@@ -27,10 +27,12 @@ impl DrawingEditor {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Drawing".into());
         // Through the user's export rules (Preferences › User export rules).
         let values = crate::export_naming::values(&self.doc.read(cx).name(), &name, &name, None);
-        let name = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Drawing, ExportSettings::default().format.label(), &values, name);
+        // The last export's format and options (live: exportDrawingOptions).
+        let remembered = ExportSettings::remembered();
+        let name = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Drawing, remembered.format.label(), &values, name);
         let file = cx.new(|cx| InputState::new(window, cx).default_value(name));
-        let custom = cx.new(|cx| InputState::new(window, cx).placeholder("1-3, 5"));
-        let st = Rc::new(RefCell::new(ExportSettings::default()));
+        let custom = cx.new(|cx| InputState::new(window, cx).placeholder("1-3, 5").default_value(remembered.custom.clone()));
+        let st = Rc::new(RefCell::new(remembered));
         let ed = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
@@ -56,11 +58,7 @@ impl DrawingEditor {
                 .child(Input::new(&file).h(px(34.)).text_size(px(14.)))
                 // Live (dom g39-export-drawing-pdf): an empty name is an error.
                 .when(file.read(cx).value().trim().is_empty(), |d| d.child(div().mt(px(4.)).text_size(px(12.)).text_color(gpui_kit::rgb(0xdc3545)).child("Valid file name is required.")))
-                .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| {
-                    s.format = DrawingFormat::ALL[i];
-                    s.version = default_version(s.format);
-                    s.text = 0;
-                }));
+                .child(select("ex-format", "Format", DrawingFormat::ALL.iter().map(|f| f.label().to_string()).collect(), DrawingFormat::ALL.iter().position(|x| *x == f).unwrap_or(0), |s, i| s.set_format(DrawingFormat::ALL[i])));
             if let Some(note) = format_note(f) {
                 body = body.child(div().pt(px(6.)).text_size(px(13.33)).child(note));
             }
@@ -127,6 +125,7 @@ impl DrawingEditor {
                     if name.is_empty() {
                         return false;
                     }
+                    noshape_ops::drawing_export::DrawingExportPrefs::of(&s).save();
                     let ed = ed2.clone();
                     window.defer(cx, move |window, cx| ed.update(cx, |t, cx| t.export_with(s, name, window, cx)));
                     true

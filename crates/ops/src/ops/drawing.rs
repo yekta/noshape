@@ -172,7 +172,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "export",
             summary: "Export a drawing (PDF, DWG, DXF, DWT, SVG, PNG, JPEG, TIFF, inspection lists)",
-            description: "The Export Drawing modal with every option. PDF holds every sheet, DWT the first two, DXF / DWG a layout per sheet of `sheets`; SVG and the raster formats (300 dpi) the active sheet. `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists.",
+            description: "The Export Drawing modal with every option. PDF holds every sheet, DWT the first two, DXF / DWG a layout per sheet of `sheets`; SVG and the raster formats (300 dpi) the active sheet. `version` from the format's list (PDF 1.4–1.7, default 1.5; DWG / DXF Release 11-12 … 2018, default 2000 / Release 14; DWT 2013 / 2018). Inspection list / Drawing definition list are the CSV lists. An option not given takes the value the app's Export Drawing last exported that format with (version, sheets, overridden dimensions, text, color; hide inspection items and exclude off-sheet content), as Onshape remembers them; the first time the defaults above.",
             fields: vec![
                 doc_field(),
                 drawing_field(),
@@ -1045,13 +1045,16 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let d = dr::drawing_of(od.doc(), tab).cloned().expect("drawing");
     let f = a.str("format")?;
     let format = DrawingFormat::ALL.into_iter().find(|x| x.label().eq_ignore_ascii_case(f) || x.ext().eq_ignore_ascii_case(f)).ok_or_else(|| OpError::param("format", "one of the listed formats"))?;
-    let mut s = ExportSettings { format, version: de::default_version(format), ..Default::default() };
+    // The options not given are Export Drawing's remembered ones.
+    let mut s = ExportSettings::remembered();
+    s.set_format(format);
     if let Some(v) = a.opt_str("version")? {
         let list = format.versions();
         s.version = list.iter().position(|x| x.eq_ignore_ascii_case(v)).ok_or_else(|| OpError::param("version", &if list.is_empty() { "this format has no version choice".to_string() } else { format!("one of {}", list.join(", ")) }))?;
     }
     match a.opt_str("sheets")? {
-        None | Some("all") => {}
+        None => {}
+        Some("all") => s.sheets = 0,
         Some("current") => s.sheets = 1,
         Some(r) => {
             s.sheets = 2;
@@ -1059,19 +1062,22 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
     }
     s.overridden = match a.opt_str("overridden_dimensions")? {
-        None | Some("show_underlines") => 0,
+        None => s.overridden,
+        Some("show_underlines") => 0,
         Some("hide_underlines") => 1,
         Some(_) => return Err(OpError::param("overridden_dimensions", "show_underlines or hide_underlines")),
     };
     s.text = match (a.opt_str("text")?, format.cad()) {
-        (None, _) | (Some("normal"), false) | (Some("export_as_text"), true) => 0,
+        (None, _) => s.text,
+        (Some("normal"), false) | (Some("export_as_text"), true) => 0,
         (Some("selectable"), false) => 1,
         (Some("explode_notes"), true) => 1,
         (Some("explode_all"), true) => 2,
         _ => return Err(OpError::param("text", if format.cad() { "export_as_text, explode_notes or explode_all" } else { "normal or selectable" })),
     };
     s.color = match a.opt_str("color")? {
-        None | Some("color") => 0,
+        None => s.color,
+        Some("color") => 0,
         Some("black_and_white") => 1,
         Some("grayscale") => 2,
         Some(_) => return Err(OpError::param("color", "color, black_and_white or grayscale")),
@@ -1081,8 +1087,8 @@ fn export(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     s.splines = a.bool_or("splines_as_polylines", false)?;
     s.z_zero = a.bool_or("z_zero", true)?;
-    s.hide_inspection = a.bool_or("hide_inspection_items", false)?;
-    s.exclude_off_sheet = a.bool_or("exclude_off_sheet", false)?;
+    s.hide_inspection = a.bool_or("hide_inspection_items", s.hide_inspection)?;
+    s.exclude_off_sheet = a.bool_or("exclude_off_sheet", s.exclude_off_sheet)?;
     let current = d.active_sheet.min(d.sheets.len().saturating_sub(1));
     let sheets = de::export_sheets_of(&s, d.sheets.len(), current);
     if !format.csv() && sheets.is_empty() {

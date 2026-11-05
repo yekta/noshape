@@ -11,6 +11,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
+- Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
+  Part Studio and Assembly export (format, shared options, each format's own block; STL its own resolution / units /
+  encoding, glTF / GLB / OBJ / 3MF / URDF one shared resolution), saved on Export only; Export Drawing its own
+  `exportDrawingOptions` (per-format blocks, applied on opening and on every Format change).
+- Ours: `noshape_ops::export::SolidExportPrefs` (export_solid.json; replaces MeshExportPrefs / export_mesh.json) and
+  `drawing_export::DrawingExportPrefs` (export_drawing.json). The dialogs' settings carry them (`memory`) so a
+  Format switch keeps each format's choices. export_parts / drawing_export take them as their defaults (`options`
+  stays download). URDF's include-hidden is given back on leaving URDF (live onFormatChanged).
+- Tests: ops lib each_format_keeps_its_own_choices, urdf_checks_include_hidden_until_left,
+  drawing_export_choices_kept_per_format; prefs.rs export_defaults (e2e); UI export_dialog_opens_with_the_last_
+  exports_choices (part-studio-ui) and export_drawing_opens_with_the_last_exports_choices (drawing-ui, its first UI
+  test: inert drawing hooks, dev-deps as assembly-ui). app-core: debug selectors on select fields, checkboxes,
+  modal OK / Cancel and menu rows (`menu:<label>`) so UI tests click them by name; test windows that open lists
+  must come from `os_menu::open_window`.
+- Request 2035 to live (a session check of the same) still open; adjust if it differs from the code.
+
 ## 11-04 20:43 UTC: natives, spur gear, hem (lead's 17:xx list)
 - Landed: bend centerline wires + @evSheetMetalBendUp (7fcc9f62), opEdgeChange keeps moved edges' attributes
   (f84f36f5, SM-FLIPPED-JOINT-ASSOCIATION), qSketchRegion(id, true) leaves out every region in a hole (20fc166e:

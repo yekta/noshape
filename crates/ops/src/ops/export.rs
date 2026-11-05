@@ -2,7 +2,7 @@
 
 use super::{doc_field, s, strings, studio_target, tab_field};
 use crate::error::OpError;
-use crate::export::{ExportSettings, PartFormat, UNITS};
+use crate::export::{ExportSettings, PartFormat, SolidExportPrefs, UNITS};
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, refs};
 use serde_json::json;
@@ -12,7 +12,7 @@ pub fn ops() -> Vec<Op> {
         group: "export",
         verb: "parts",
         summary: "Export a Part Studio's parts or an Assembly to a CAD or mesh file (STEP, Parasolid, IGES, ACIS, STL, OBJ, 3MF, glTF, GLB, JT, PVZ, Rhino)",
-        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP, Parasolid and IGES keep the assembly (the root product / ASSEMBLY / subfigures, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL `units` (default mm), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep Medium's values), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`.",
+        description: "Onshape's Export dialog. Exports the visible parts (or `parts`) to `file`; with `tab` an Assembly, its visible instances (or `parts`: instance ids or names) — STEP, Parasolid and IGES keep the assembly (the root product / ASSEMBLY / subfigures, each part once, placed by its instances), the other formats get the placed parts. Options as in the dialog: `y_up` (models oriented Y axis up), `version` (format version: STEP AP242/AP214/AP203, Parasolid 38.1..., Rhino 8...), `units` (mesh formats and STEP with custom units), `resolution` (coarse/medium/fine/custom for mesh formats; Coarse / Medium / Fine are chordal 0.24 / 0.12 / 0.06 mm at 12.5 / 6.25 / 2.5°; Custom's fields: STL `chordal_tolerance` / `angular_deviation` deg / `min_facet_width` in the STL `units` (default mm), the other mesh formats `distance_tolerance` m / `angular_tolerance` deg / `max_chord_length` m; unset fields keep the last-used ones, first Medium's), `stl_text`, `individual` (one file per part, zipped), `include_hidden`, STEP `preprocessing` / `derived_tolerances` / `mbd_text_height`, IGES `iges_compatibility`, PVZ `group_composites`, glTF `compress`, URDF `geometry_format`. An option not given takes the value the app's Export dialog last exported with (per format, as Onshape remembers them; the first time Onshape's defaults: Medium, STL in Meter and Binary, the latest versions); `options` defaults to download.",
         fields: vec![
             doc_field(),
             tab_field(),
@@ -53,16 +53,17 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let names: Vec<&str> = PartFormat::ALL.iter().map(|f| f.label()).collect();
         OpError::param("format", &format!("`{label}` is not an export format{}; formats: {}", crate::error::did_you_mean(label, names.iter().copied()), names.join(", ")))
     })?;
-    let mut s = ExportSettings::default();
+    // The options not given are the Export dialog's remembered ones.
+    let mut s = SolidExportPrefs::load().settings(false);
     let Some(row) = PartFormat::list(false).iter().position(|f| *f == format) else {
         return Err(OpError::param("format", "RHINO export is not in this build (it needs openNURBS; releases have it)"));
     };
     crate::export::set_part_format(&mut s, row);
-    s.y_up = a.bool_or("y_up", false)?;
-    s.stl_text = a.bool_or("stl_text", false)?;
-    s.individual = a.bool_or("individual", false)?;
-    s.hidden = a.bool_or("include_hidden", false)?;
-    s.derived_tolerances = a.bool_or("derived_tolerances", false)?;
+    s.y_up = a.bool_or("y_up", s.y_up)?;
+    s.stl_text = a.bool_or("stl_text", s.stl_text)?;
+    s.individual = a.bool_or("individual", s.individual)?;
+    s.hidden = a.bool_or("include_hidden", s.hidden || format == PartFormat::Urdf)?;
+    s.derived_tolerances = a.bool_or("derived_tolerances", s.derived_tolerances)?;
     if let Some(h) = a.opt_f64("mbd_text_height")? {
         if !(0.0001..=50.0).contains(&h) {
             return Err(OpError::param("mbd_text_height", "Valid annotations text height in range from 0.0001 to 50 is required."));
@@ -70,9 +71,9 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         s.mbd_text_height = true;
         s.mbd_text_mm = h;
     }
-    s.iges_compat = a.bool_or("iges_compatibility", false)?;
-    s.pvz_group = a.bool_or("group_composites", false)?;
-    s.compress = a.bool_or("compress", false)?;
+    s.iges_compat = a.bool_or("iges_compatibility", s.iges_compat)?;
+    s.pvz_group = a.bool_or("group_composites", s.pvz_group)?;
+    s.compress = a.bool_or("compress", s.compress)?;
     if let Some(p) = a.opt_str("preprocessing")? {
         s.preprocessing = crate::export::STEP_PREPROCESSING.iter().position(|x| x.eq_ignore_ascii_case(p)).ok_or_else(|| OpError::param("preprocessing", "one of the listed choices"))?;
     }

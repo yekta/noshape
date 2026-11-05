@@ -64,7 +64,23 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     assert_eq!(locked["tabs"][0]["rows"][0]["locked"], true, "{locked}");
 
     custom_properties(&mut ctx, &dir);
+    export_defaults(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The Export dialog's remembered options are export_parts' defaults (live exportSolidOptions): STL as text in
+/// mm after the dialog last exported so; an option given wins.
+fn export_defaults(ctx: &mut Ctx, dir: &std::path::Path) {
+    noshape_ops::export::SolidExportPrefs { stl_text: true, stl_units: 4, ..Default::default() }.save();
+    let stl = dir.join("remembered.stl");
+    call(ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "file": stl.to_str().unwrap() })).unwrap();
+    let text = std::fs::read_to_string(&stl).expect("a text STL");
+    let max_x = text.lines().filter_map(|l| l.trim().strip_prefix("vertex ")).filter_map(|v| v.split_whitespace().next()?.parse::<f64>().ok()).fold(0.0_f64, |m, x| m.max(x.abs()));
+    assert!((max_x - 20.0).abs() < 1e-6, "in mm: {max_x}");
+    call(ctx, "export_parts", json!({ "tab": "Part Studio 1", "format": "STL", "stl_text": false, "file": stl.to_str().unwrap() })).unwrap();
+    let bytes = std::fs::read(&stl).unwrap();
+    let n = u32::from_le_bytes(bytes[80..84].try_into().unwrap()) as usize;
+    assert_eq!(bytes.len(), 84 + 50 * n, "binary as asked");
 }
 
 /// Company settings › Custom properties (drawing.md A15): definitions kept

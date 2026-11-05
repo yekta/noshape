@@ -217,12 +217,12 @@ pub fn modal_footer() -> Div {
 
 /// A footer button that confirms the dialog (runs its `on_ok`).
 pub fn modal_ok(button: impl IntoElement) -> Div {
-    div().flex_none().child(gpui_kit::component::dialog::DialogAction::new().child(button))
+    div().flex_none().debug_selector(|| "modal-ok".into()).child(gpui_kit::component::dialog::DialogAction::new().child(button))
 }
 
 /// A footer button that closes the dialog.
 pub fn modal_cancel(button: impl IntoElement) -> Div {
-    div().flex_none().child(DialogClose::new().child(button))
+    div().flex_none().debug_selector(|| "modal-cancel".into()).child(DialogClose::new().child(button))
 }
 
 /// A bold 14 px field label ("Document name").
@@ -251,7 +251,10 @@ pub fn user_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, o
 
 fn checkbox_with(id: impl Into<ElementId>, label: AnyElement, on: bool) -> Stateful<Div> {
     let pal = p();
+    let id: ElementId = id.into();
+    let selector = id.clone();
     h_flex()
+        .debug_selector(move || selector.to_string())
         .id(id)
         .h(px(27.))
         .pl(px(4.))
@@ -553,7 +556,10 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         crate::os_menu::open_anchored(point(b.origin.x, b.origin.y + b.size.height), Anchor::TopLeft, menu, window, cx);
     });
     let open_key = open.clone();
+    let id: ElementId = id.into();
+    let selector = id.clone();
     div()
+        .debug_selector(move || selector.to_string())
         .id(id)
         .when_some(opts.focus, |d, f| {
             d.track_focus(&f)

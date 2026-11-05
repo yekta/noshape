@@ -122,6 +122,10 @@ pub struct ExportSettings {
     /// Each part's MBD (index = part; [`studio_pmi`]), written to STEP AP242
     /// as semantic PMI.
     pub pmi: Vec<Option<k::PartPmi>>,
+    /// The dialog's values of the formats not shown, given back on
+    /// switching to them.
+    pub memory: Box<SolidExportPrefs>,
+    pub hidden_before_urdf: Option<bool>,
 }
 
 /// Resolution › Custom (live 1745): STL's Chordal tolerance · Angular
@@ -160,44 +164,171 @@ impl Default for CustomResolution {
     }
 }
 
-/// The mesh options the Export dialog opens with: the last export's (live
-/// 1745: Onshape keeps them as the `exportSolidOptions` user setting).
-#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct MeshExportPrefs {
-    pub resolution: usize,
-    pub custom: CustomResolution,
+/// What the Export dialog remembers (live: the user setting
+/// `exportSolidOptions`, one for part, Part Studio and Assembly exports,
+/// saved on Export only): the format, the options every format shares, and
+/// each format's own. glTF, GLB, OBJ, 3MF and URDF share one resolution;
+/// STL keeps its own, with its units and encoding.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct SolidExportPrefs {
+    pub format: String,
+    pub y_up: bool,
+    pub individual: bool,
+    pub hidden: bool,
+    pub options: usize,
+    pub step: StepPrefs,
+    pub parasolid: VersionPrefs,
+    pub rhino: VersionPrefs,
+    pub iges_compat: bool,
+    pub pvz_group: bool,
+    pub gltf_compress: bool,
+    pub glb_compress: bool,
+    pub stl_resolution: usize,
     pub stl_text: bool,
-    pub units: usize,
+    pub stl_units: usize,
+    pub mesh_resolution: usize,
+    pub custom: CustomResolution,
+    pub urdf_geometry: usize,
+    pub urdf_stl_text: bool,
 }
 
-impl MeshExportPrefs {
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct VersionPrefs {
+    pub version: usize,
+    pub latest: bool,
+}
+
+impl Default for VersionPrefs {
+    fn default() -> Self {
+        Self { version: 0, latest: true }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct StepPrefs {
+    pub version: VersionPrefs,
+    pub preprocessing: usize,
+    pub custom_units: bool,
+    pub units: usize,
+    pub derived_tolerances: bool,
+    pub mbd_text_height: bool,
+    pub mbd_text_mm: f64,
+}
+
+impl Default for StepPrefs {
+    fn default() -> Self {
+        Self { version: VersionPrefs::default(), preprocessing: 0, custom_units: false, units: METER, derived_tolerances: false, mbd_text_height: false, mbd_text_mm: MBD_TEXT_MM }
+    }
+}
+
+/// Live's first Export: Parasolid, Medium, STL in Meter and Binary.
+impl Default for SolidExportPrefs {
+    fn default() -> Self {
+        Self {
+            format: PartFormat::Parasolid.label().into(),
+            y_up: false,
+            individual: false,
+            hidden: false,
+            options: 0,
+            step: StepPrefs::default(),
+            parasolid: VersionPrefs::default(),
+            rhino: VersionPrefs::default(),
+            iges_compat: false,
+            pvz_group: false,
+            gltf_compress: false,
+            glb_compress: false,
+            stl_resolution: MEDIUM,
+            stl_text: false,
+            stl_units: METER,
+            mesh_resolution: MEDIUM,
+            custom: CustomResolution::default(),
+            urdf_geometry: 0,
+            urdf_stl_text: false,
+        }
+    }
+}
+
+impl SolidExportPrefs {
     fn path() -> std::path::PathBuf {
-        noshape_scene::config_dir().join("export_mesh.json")
+        noshape_scene::config_dir().join("export_solid.json")
     }
 
-    pub fn load() -> Option<Self> {
-        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok())
+    /// The remembered options, else live's first-time ones.
+    pub fn load() -> Self {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
     }
 
     pub fn save(&self) {
         let p = Self::path();
-        if let Some(dir) = p.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
         if let Ok(t) = serde_json::to_vec_pretty(self) {
             let _ = std::fs::write(p, t);
         }
     }
 
-    pub fn of(s: &ExportSettings) -> Self {
-        Self { resolution: s.resolution, custom: s.custom, stl_text: s.stl_text, units: s.units }
+    fn version(&self, f: PartFormat) -> VersionPrefs {
+        match f {
+            PartFormat::Step => self.step.version,
+            PartFormat::Parasolid => self.parasolid,
+            PartFormat::Rhino => self.rhino,
+            _ => VersionPrefs::default(),
+        }
     }
 
-    pub fn apply(&self, s: &mut ExportSettings) {
-        s.resolution = self.resolution.min(CUSTOM_RESOLUTION);
+    /// Keeps `s`'s values: the shared ones and its format's own.
+    pub fn keep(&mut self, s: &ExportSettings) {
+        self.format = s.format.label().into();
+        (self.y_up, self.individual, self.hidden, self.options) = (s.y_up, s.individual, s.hidden, s.options);
+        self.custom = s.custom;
+        let v = VersionPrefs { version: s.version, latest: s.latest };
+        match s.format {
+            PartFormat::Step => self.step.version = v,
+            PartFormat::Parasolid => self.parasolid = v,
+            PartFormat::Rhino => self.rhino = v,
+            _ => {}
+        }
+        match s.format {
+            PartFormat::Step => {
+                let p = &mut self.step;
+                (p.preprocessing, p.custom_units, p.units, p.derived_tolerances, p.mbd_text_height, p.mbd_text_mm) = (s.preprocessing, s.custom_units, s.units, s.derived_tolerances, s.mbd_text_height, s.mbd_text_mm);
+            }
+            PartFormat::Iges => self.iges_compat = s.iges_compat,
+            PartFormat::Pvz => self.pvz_group = s.pvz_group,
+            PartFormat::Gltf => (self.gltf_compress, self.mesh_resolution) = (s.compress, s.resolution),
+            PartFormat::Glb => (self.glb_compress, self.mesh_resolution) = (s.compress, s.resolution),
+            PartFormat::Obj | PartFormat::ThreeMf => self.mesh_resolution = s.resolution,
+            PartFormat::Stl => (self.stl_resolution, self.stl_text, self.stl_units) = (s.resolution, s.stl_text, s.units),
+            PartFormat::Urdf => (self.mesh_resolution, self.urdf_geometry, self.urdf_stl_text) = (s.resolution, s.urdf_geometry, s.stl_text),
+            PartFormat::Parasolid | PartFormat::Rhino | PartFormat::Acis | PartFormat::Jt => {}
+        }
+    }
+
+    /// Gives `s` the remembered shared values and those of `s.format`.
+    pub fn give(&self, s: &mut ExportSettings) {
+        (s.y_up, s.individual, s.hidden, s.options) = (self.y_up, self.individual, self.hidden, self.options.min(OPTIONS.len() - 1));
         s.custom = self.custom;
-        s.stl_text = self.stl_text;
-        s.units = self.units.min(UNITS.len() - 1);
+        let v = self.version(s.format);
+        (s.version, s.latest) = (v.version, v.latest);
+        let p = &self.step;
+        (s.preprocessing, s.custom_units, s.derived_tolerances, s.mbd_text_height, s.mbd_text_mm) = (p.preprocessing.min(STEP_PREPROCESSING.len() - 1), p.custom_units, p.derived_tolerances, p.mbd_text_height, p.mbd_text_mm);
+        (s.iges_compat, s.pvz_group, s.urdf_geometry) = (self.iges_compat, self.pvz_group, self.urdf_geometry.min(URDF_GEOMETRY.len() - 1));
+        s.compress = if s.format == PartFormat::Glb { self.glb_compress } else { self.gltf_compress };
+        let stl = s.format == PartFormat::Stl;
+        s.resolution = if stl { self.stl_resolution } else { self.mesh_resolution }.min(CUSTOM_RESOLUTION);
+        s.units = if stl { self.stl_units } else { p.units }.min(UNITS.len() - 1);
+        s.stl_text = if s.format == PartFormat::Urdf { self.urdf_stl_text } else { self.stl_text };
+    }
+
+    /// The Export dialog's settings on opening: the remembered format if
+    /// the list has it (else its first) and options.
+    pub fn settings(&self, assembly: bool) -> ExportSettings {
+        let list = PartFormat::list(assembly);
+        let mut s = ExportSettings { format: list.iter().copied().find(|f| f.label() == self.format).unwrap_or(list[0]), ..Default::default() };
+        self.give(&mut s);
+        s.memory = Box::new(self.clone());
+        s
     }
 }
 
@@ -208,6 +339,9 @@ pub fn unit_abbreviation(i: usize) -> &'static str {
 
 /// Index of "Custom" in [`RESOLUTIONS`].
 pub const CUSTOM_RESOLUTION: usize = 3;
+const MEDIUM: usize = 1;
+/// Index of Meter in [`UNITS`].
+const METER: usize = 3;
 
 impl ExportSettings {
     /// The extension of the file the export saves (the save prompt's name
@@ -232,16 +366,18 @@ impl Default for ExportSettings {
             mbd_text_mm: MBD_TEXT_MM,
             iges_compat: false,
             pvz_group: false,
-            resolution: 1,
+            resolution: MEDIUM,
             compress: false,
             stl_text: false,
-            units: 3,
+            units: METER,
             individual: false,
             hidden: false,
             urdf_geometry: 0,
             options: 0,
             custom: CustomResolution::default(),
             pmi: Vec::new(),
+            memory: Box::default(),
+            hidden_before_urdf: None,
         }
     }
 }
@@ -491,18 +627,30 @@ fn step_options(s: &ExportSettings) -> k::StepOptions {
 }
 
 /// The Part Studio Format list's row `i` ([`PartFormat::list`]).
-pub fn set_part_format(s: &mut ExportSettings, i: usize) {
-    s.format = PartFormat::list(false)[i];
-    s.version = 0;
-    s.latest = true;
+/// Format: keeps the shown format's values, shows the new one's.
+fn switch_format(s: &mut ExportSettings, f: PartFormat) {
+    let mut memory = std::mem::take(&mut s.memory);
+    memory.keep(s);
+    s.format = f;
+    memory.give(s);
+    s.memory = memory;
 }
 
+pub fn set_part_format(s: &mut ExportSettings, i: usize) {
+    switch_format(s, PartFormat::list(false)[i]);
+}
+
+/// URDF checks "Include hidden instances in export"; leaving it gives back
+/// the value it had before (live onFormatChanged).
 pub fn set_asm_format(s: &mut ExportSettings, i: usize) {
-    s.format = PartFormat::list(true)[i];
-    s.version = 0;
-    s.latest = true;
-    // Onshape checks "Include hidden instances in export" for URDF.
-    s.hidden = s.format == PartFormat::Urdf;
+    switch_format(s, PartFormat::list(true)[i]);
+    if let Some(h) = s.hidden_before_urdf.take() {
+        s.hidden = h;
+    }
+    if s.format == PartFormat::Urdf {
+        s.hidden_before_urdf = Some(s.hidden);
+        s.hidden = true;
+    }
 }
 
 /// The formats whose writer is still to come (kern): Export shows Onshape's
@@ -1146,5 +1294,54 @@ mod tests {
         assert_eq!(&z[z.len() - 22..z.len() - 18], &[0x50, 0x4b, 0x05, 0x06]);
         // Local header 30 + name + data, central entry 46 + name, end record 22.
         assert_eq!(z.len(), 30 + 5 + 5 + 46 + 5 + 22);
+    }
+
+    /// Live's exportSolidOptions: each format keeps its own version, units
+    /// and resolution while the dialog switches between them, and the kept
+    /// ones come back on opening.
+    #[test]
+    fn each_format_keeps_its_own_choices() {
+        use super::*;
+        let row = |f: PartFormat| PartFormat::list(false).iter().position(|x| *x == f).unwrap();
+        let mut s = SolidExportPrefs::default().settings(false);
+        assert_eq!((s.format, s.latest, s.resolution, s.units, s.stl_text), (PartFormat::Parasolid, true, 1, 3, false), "live's first Export");
+        set_part_format(&mut s, row(PartFormat::Step));
+        (s.version, s.latest, s.custom_units, s.units) = (1, false, true, 4);
+        set_part_format(&mut s, row(PartFormat::Stl));
+        assert_eq!((s.units, s.resolution), (3, 1), "STL's own units");
+        (s.resolution, s.stl_text) = (2, true);
+        set_part_format(&mut s, row(PartFormat::Obj));
+        assert_eq!(s.resolution, 1, "OBJ shares glTF's resolution, not STL's");
+        set_part_format(&mut s, row(PartFormat::Parasolid));
+        assert!(s.latest, "Parasolid's own version");
+        set_part_format(&mut s, row(PartFormat::Step));
+        assert_eq!((s.version, s.latest, s.custom_units, s.units), (1, false, true, 4));
+        let mut kept = (*s.memory).clone();
+        kept.keep(&s);
+        let kept: SolidExportPrefs = serde_json::from_str(&serde_json::to_string(&kept).unwrap()).unwrap();
+        let mut again = kept.settings(false);
+        assert_eq!((again.format, again.version, again.latest, again.units), (PartFormat::Step, 1, false, 4), "reopened on STEP AP214 in mm");
+        set_part_format(&mut again, row(PartFormat::Stl));
+        assert_eq!((again.resolution, again.stl_text, again.units), (2, true, 3));
+        let urdf = SolidExportPrefs { format: "URDF".into(), ..Default::default() };
+        assert_eq!(urdf.settings(false).format, PartFormat::Parasolid, "a format the list lacks: its first");
+        assert_eq!(urdf.settings(true).format, PartFormat::Urdf);
+    }
+
+    /// Live onFormatChanged: URDF checks "Include hidden instances in
+    /// export"; leaving it gives back the earlier value.
+    #[test]
+    fn urdf_checks_include_hidden_until_left() {
+        use super::*;
+        let row = |f: PartFormat| PartFormat::list(true).iter().position(|x| *x == f).unwrap();
+        let mut s = SolidExportPrefs::default().settings(true);
+        set_asm_format(&mut s, row(PartFormat::Urdf));
+        assert!(s.hidden);
+        set_asm_format(&mut s, row(PartFormat::Step));
+        assert!(!s.hidden);
+        s.hidden = true;
+        set_asm_format(&mut s, row(PartFormat::Urdf));
+        set_asm_format(&mut s, row(PartFormat::Gltf));
+        assert!(s.hidden);
     }
 }

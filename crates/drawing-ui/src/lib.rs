@@ -6,6 +6,12 @@
 #[allow(unused_imports)]
 use noshape_app_core::*;
 
+// UI tests get their own settings directory, not the user's ~/.config/noshape (noshape-ui-test-support).
+#[cfg(test)]
+use noshape_ui_test_support as _;
+#[cfg(test)]
+mod drawing_ui_tests;
+
 pub mod drawing_aux;
 pub mod drawing_break;
 pub mod drawing_callout;

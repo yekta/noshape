@@ -121,11 +121,157 @@ pub struct ExportSettings {
     /// Document menu › Print…: the PDF opens in the system viewer (Onshape
     /// opens a print-friendly page with print / save controls).
     pub print: bool,
+    /// The remembered options (none before the first export), given back
+    /// on switching formats as live does.
+    pub memory: Option<Box<DrawingExportPrefs>>,
 }
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: true, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false }
+        Self { format: DrawingFormat::Pdf, version: default_version(DrawingFormat::Pdf), sheets: 0, custom: String::new(), overridden: 0, text: 0, color: 0, units: 0, splines: false, z_zero: true, hide_inspection: false, exclude_off_sheet: false, options: 0, print: false, memory: None }
+    }
+}
+
+impl ExportSettings {
+    /// Export Drawing on opening: the last export's format and options.
+    pub fn remembered() -> Self {
+        let mut s = Self::default();
+        let Some(p) = DrawingExportPrefs::load() else {
+            return s;
+        };
+        if let Some(f) = DrawingFormat::ALL.into_iter().find(|f| f.label() == p.format) {
+            s.format = f;
+        }
+        s.options = p.options.min(OPTIONS.len() - 1);
+        s.memory = Some(Box::new(p));
+        s.give_format();
+        s
+    }
+
+    /// Format: the format's first version, then its remembered options.
+    pub fn set_format(&mut self, f: DrawingFormat) {
+        self.format = f;
+        self.version = default_version(f);
+        self.text = 0;
+        self.give_format();
+    }
+
+    fn give_format(&mut self) {
+        let Some(p) = self.memory.take() else {
+            return;
+        };
+        p.give(self);
+        self.memory = Some(p);
+    }
+}
+
+/// What Export Drawing remembers (live: the user setting
+/// `exportDrawingOptions`, saved on Export only): the format, Options, the
+/// two checkboxes, and each format's choices. Units and the CAD
+/// checkboxes are not kept.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct DrawingExportPrefs {
+    pub format: String,
+    pub options: usize,
+    pub hide_inspection: bool,
+    pub exclude_off_sheet: bool,
+    pub dxf: SheetPrefs,
+    pub dwg: SheetPrefs,
+    pub dwt: SheetPrefs,
+    pub pdf: SheetPrefs,
+    pub image: SheetPrefs,
+    pub tiff: SheetPrefs,
+}
+
+/// One format's choices; `version` only once exported in that format.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct SheetPrefs {
+    pub version: Option<usize>,
+    pub sheets: usize,
+    pub custom: String,
+    pub overridden: usize,
+    pub text: usize,
+    pub color: usize,
+}
+
+impl DrawingExportPrefs {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("export_drawing.json")
+    }
+
+    pub fn load() -> Option<Self> {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok())
+    }
+
+    pub fn save(&self) {
+        if let Ok(t) = serde_json::to_vec_pretty(self) {
+            let _ = std::fs::write(Self::path(), t);
+        }
+    }
+
+    fn block(&self, f: DrawingFormat) -> Option<&SheetPrefs> {
+        match f {
+            DrawingFormat::Dxf => Some(&self.dxf),
+            DrawingFormat::Dwg => Some(&self.dwg),
+            DrawingFormat::Dwt => Some(&self.dwt),
+            DrawingFormat::Pdf => Some(&self.pdf),
+            DrawingFormat::Svg | DrawingFormat::Png | DrawingFormat::Jpeg => Some(&self.image),
+            DrawingFormat::Tiff => Some(&self.tiff),
+            DrawingFormat::InspectionList | DrawingFormat::DefinitionList => None,
+        }
+    }
+
+    /// The export's choices kept: after the first export only its format's
+    /// block changes; the first one fills every block (live saveSettings).
+    pub fn of(s: &ExportSettings) -> Self {
+        let first = s.memory.is_none();
+        let mut p = s.memory.as_deref().cloned().unwrap_or_default();
+        (p.format, p.options, p.hide_inspection, p.exclude_off_sheet) = (s.format.label().into(), s.options, s.hide_inspection, s.exclude_off_sheet);
+        let blocks: [(&mut SheetPrefs, &[DrawingFormat]); 6] = [
+            (&mut p.dxf, &[DrawingFormat::Dxf]),
+            (&mut p.dwg, &[DrawingFormat::Dwg]),
+            (&mut p.dwt, &[DrawingFormat::Dwt]),
+            (&mut p.pdf, &[DrawingFormat::Pdf]),
+            (&mut p.image, &[DrawingFormat::Svg, DrawingFormat::Png, DrawingFormat::Jpeg]),
+            (&mut p.tiff, &[DrawingFormat::Tiff]),
+        ];
+        for (b, formats) in blocks {
+            let this = formats.contains(&s.format);
+            if this || first {
+                *b = SheetPrefs { version: this.then_some(s.version), sheets: s.sheets, custom: s.custom.clone(), overridden: s.overridden, text: s.text, color: s.color };
+            }
+        }
+        p
+    }
+
+    /// `s.format`'s remembered choices (live: on opening and on every
+    /// Format change, with the two checkboxes).
+    fn give(&self, s: &mut ExportSettings) {
+        (s.hide_inspection, s.exclude_off_sheet) = (self.hide_inspection, self.exclude_off_sheet);
+        let Some(b) = self.block(s.format) else {
+            return;
+        };
+        let f = s.format;
+        if let Some(v) = b.version.filter(|&v| v < f.versions().len()) {
+            s.version = v;
+        }
+        if matches!(f, DrawingFormat::Dxf | DrawingFormat::Dwg | DrawingFormat::Tiff) {
+            s.sheets = b.sheets.min(SHEETS.len() - 1);
+            s.custom = b.custom.clone();
+        }
+        if f != DrawingFormat::Dwt {
+            s.overridden = b.overridden.min(OVERRIDDEN.len() - 1);
+        }
+        match f {
+            DrawingFormat::Pdf => {
+                s.text = b.text.min(PDF_TEXT.len() - 1);
+                s.color = b.color.min(COLOR.len() - 1);
+            }
+            DrawingFormat::Dxf | DrawingFormat::Dwg | DrawingFormat::Dwt => s.text = b.text.min(DXF_TEXT.len() - 1),
+            _ => {}
+        }
     }
 }
 
@@ -426,5 +572,29 @@ mod tests {
         assert_eq!(parse_sheet_range("1-3, 5", 6), vec![0, 1, 2, 4]);
         assert_eq!(parse_sheet_range("3-1 9", 4), vec![0, 1, 2]);
         assert!(parse_sheet_range("x", 3).is_empty());
+    }
+
+    /// Live's exportDrawingOptions: the first export fills every format's
+    /// choices (the version only its own); later ones change only their
+    /// format's; opening and every Format change give them back.
+    #[test]
+    fn drawing_export_choices_kept_per_format() {
+        let mut s = ExportSettings::default();
+        s.set_format(DrawingFormat::Dxf);
+        (s.version, s.sheets, s.custom, s.text, s.hide_inspection) = (8, 2, "1-2".into(), 2, true);
+        let p = DrawingExportPrefs::of(&s);
+        assert_eq!((p.format.as_str(), p.dxf.version, p.dwg.version, p.dwg.sheets, p.pdf.text), ("DXF", Some(8), None, 2, 2));
+        let mut open = ExportSettings { memory: Some(Box::new(p)), ..Default::default() };
+        open.set_format(DrawingFormat::Dwg);
+        assert_eq!((open.version, open.sheets, open.custom.as_str(), open.text, open.hide_inspection), (default_version(DrawingFormat::Dwg), 2, "1-2", 2, true), "DWG: its default version, the first export's other choices");
+        open.set_format(DrawingFormat::Pdf);
+        assert_eq!(open.text, 1, "clamped to PDF's two Text choices");
+        open.text = 0;
+        open.color = 2;
+        let p = DrawingExportPrefs::of(&open);
+        assert_eq!((p.format.as_str(), p.pdf.color, p.pdf.version, p.dxf.version), ("PDF", 2, Some(1), Some(8)), "only PDF's choices changed");
+        let mut back = ExportSettings { memory: Some(Box::new(p)), ..Default::default() };
+        back.set_format(DrawingFormat::Dxf);
+        assert_eq!((back.version, back.text), (8, 2));
     }
 }

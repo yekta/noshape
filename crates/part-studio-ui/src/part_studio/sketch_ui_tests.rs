@@ -2614,3 +2614,100 @@ fn list_rows_span_the_list_with_the_eye_at_the_right(cx: &mut TestAppContext) {
         assert!(row.right() - eye.right() < px(20.), "{name} eye {eye:?} at the right of {row:?}");
     }
 }
+
+/// The Export dialog of a test window: `open` it, `press` an element by id, `pick` a list's option as the user does
+/// (open the list, click the option).
+struct ExportDialog {
+    window: AnyWindowHandle,
+    exported: std::rc::Rc<std::cell::RefCell<Vec<noshape_ops::export::ExportSettings>>>,
+}
+
+impl ExportDialog {
+    fn open(&self, cx: &mut TestAppContext, assembly: bool) {
+        let exported = self.exported.clone();
+        let run: super::super::export::RunExport = std::rc::Rc::new(move |s, _, _, _| exported.borrow_mut().push(s));
+        cx.update_window(self.window, |_, w, cx| super::super::export::open_export_modal("Part Studio 1".into(), assembly, run, w, cx)).unwrap();
+        draw(cx, self.window);
+    }
+
+    fn press(&self, cx: &mut TestAppContext, id: &'static str) {
+        let mut vcx = gpui_kit::VisualTestContext::from_window(self.window, cx);
+        let b = vcx.debug_bounds(id).unwrap_or_else(|| panic!("no {id}"));
+        vcx.simulate_click(b.center(), Modifiers::default());
+        draw(cx, self.window);
+    }
+
+    fn pick(&self, cx: &mut TestAppContext, id: &'static str, label: &str) {
+        self.press(cx, id);
+        let rows = cx.update(|cx| crate::os_menu::open_labels(cx));
+        assert!(rows.iter().any(|r| r == label), "{label} in {id}'s {rows:?}");
+        self.press(cx, Box::leak(format!("menu:{label}").into_boxed_str()));
+        assert!(!cx.update(|cx| crate::os_menu::is_open(cx)), "{label} picked");
+    }
+
+    /// Export with what the dialog shows: the settings it exported with.
+    fn export(&self, cx: &mut TestAppContext) -> noshape_ops::export::ExportSettings {
+        self.press(cx, "modal-ok");
+        self.exported.borrow_mut().pop().expect("Export ran")
+    }
+}
+
+/// Live (the client's saveExportOptions / getExportSolidOptions, user setting exportSolidOptions): Export opens on the
+/// last export's format and options, each format keeping its own (STEP's version stays across a switch to Parasolid
+/// and back, Parasolid's is still the latest); Cancel keeps nothing.
+#[gpui::test]
+fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
+    use noshape_ops::export::PartFormat;
+    struct Page;
+    impl Render for Page {
+        fn render(&mut self, _: &mut Window, _: &mut gpui_kit::Context<Self>) -> impl IntoElement {
+            div().size_full()
+        }
+    }
+    cx.update(gpui_kit::init);
+    crate::part_studio_hooks::register_for_tests();
+    // The app's window layers: dialogs and the lists opened from them.
+    let options = WindowOptions { window_bounds: Some(WindowBounds::Windowed(Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) })), ..Default::default() };
+    let (window, _) = cx.update(|cx| crate::os_menu::open_window(options, cx, |_, cx| cx.new(|_| Page))).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    draw(cx, window);
+    let _ = std::fs::remove_file(noshape_scene::config_dir().join("export_solid.json"));
+    let d = ExportDialog { window, exported: Default::default() };
+    d.open(cx, false);
+    let first = d.export(cx);
+    assert_eq!((first.format, first.latest, first.resolution, first.units), (PartFormat::Parasolid, true, 1, 3), "live's first Export: Parasolid, latest version");
+
+    d.open(cx, false);
+    d.pick(cx, "ex-format", "STEP");
+    d.press(cx, "ex-latest");
+    d.pick(cx, "ex-version", "AP214");
+    d.press(cx, "ex-tol");
+    d.press(cx, "ex-yup");
+    d.pick(cx, "ex-format", "PARASOLID");
+    d.pick(cx, "ex-format", "STEP");
+    let step = d.export(cx);
+    assert_eq!((step.format, step.version, step.latest, step.derived_tolerances, step.y_up), (PartFormat::Step, 1, false, true, true), "STEP's own choices kept across the switch");
+
+    d.open(cx, false);
+    let again = d.export(cx);
+    assert_eq!((again.format, again.version, again.latest, again.derived_tolerances, again.y_up), (PartFormat::Step, 1, false, true, true), "reopened on STEP AP214 with its options");
+
+    d.open(cx, false);
+    d.pick(cx, "ex-format", "PARASOLID");
+    let parasolid = d.export(cx);
+    assert!(parasolid.latest && parasolid.y_up, "Parasolid keeps its own version, Y up is shared");
+
+    d.open(cx, false);
+    d.pick(cx, "ex-format", "STL");
+    d.press(cx, "ex-yup");
+    d.press(cx, "modal-cancel");
+    assert!(d.exported.borrow().is_empty(), "Cancel exports nothing");
+    d.open(cx, false);
+    let after_cancel = d.export(cx);
+    assert_eq!((after_cancel.format, after_cancel.y_up), (PartFormat::Parasolid, true), "Cancel saved nothing");
+
+    // The Assembly Export shares them: Parasolid, Y up.
+    d.open(cx, true);
+    let asm = d.export(cx);
+    assert_eq!((asm.format, asm.y_up), (PartFormat::Parasolid, true));
+}

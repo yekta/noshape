@@ -553,6 +553,7 @@ impl Render for OsMenu {
                     h_flex()
                         .id(id)
                         .map(|d| crate::ui_script::mark(d, || format!("menu:{menu_label}")))
+                        .debug_selector(|| format!("menu:{menu_label}"))
                         .relative()
                         .when(wraps, |d| d.min_h(px(row_h)).py(px(2.)).line_height(px(18.)))
                         .when(!wraps, |d| d.h(px(row_h)).whitespace_nowrap())

@@ -55,6 +55,24 @@ pub fn register(hooks: Hooks) {
     let _ = HOOKS.set(hooks);
 }
 
+/// Inert hooks for UI tests on GPUI's test platform (docs/TESTS.md "UI keystroke tests"): nothing above the
+/// Drawing studio exists there.
+#[cfg(test)]
+pub fn register_for_tests() {
+    register(Hooks {
+        import: |_, _| {},
+        open_document_window: |_, _, _| Err(anyhow::anyhow!("no document windows in UI tests")),
+        pick_file: |_, _, _, _, _, _, _| {},
+        release_log: |_| ReleaseLog::default(),
+        watermark_text: |_, _| None,
+        library_docs: Vec::new,
+        create_version: |_, _, _| {},
+        export_rules_link: |id| div().id(id),
+        light_model_space: || true,
+        studio_context: |_, _, _, _| None,
+    });
+}
+
 fn hooks() -> &'static Hooks {
     HOOKS.get().expect("the app registers the drawing hooks at startup (noshape_drawing_ui::drawing_hooks::register)")
 }

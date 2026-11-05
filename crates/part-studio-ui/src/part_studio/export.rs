@@ -138,14 +138,8 @@ pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &
 /// vs -jt-tab.txt).
 pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
     let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
-    // The mesh options the last export used (live 1745: sticky).
-    let st = Rc::new(RefCell::new({
-        let mut s = ExportSettings::default();
-        if let Some(p) = noshape_ops::export::MeshExportPrefs::load() {
-            p.apply(&mut s);
-        }
-        s
-    }));
+    // The last export's format and options (live: exportSolidOptions).
+    let st = Rc::new(RefCell::new(noshape_ops::export::SolidExportPrefs::load().settings(assembly)));
     // Resolution › Custom's fields (live 1745): STL's three, their lengths
     // in the STL units, then the other mesh formats' three.
     let custom: Rc<Vec<(&'static str, Entity<InputState>)>> = Rc::new(CUSTOM_FIELDS.iter().map(|f| (f.id, cx.new(|cx| InputState::new(window, cx).default_value(custom_text(&st.borrow(), f))))).collect());
@@ -199,18 +193,18 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             })
             .detach();
     }
-    // Custom is pre-filled from the preset chosen before it; STL's lengths
-    // follow its units.
-    let shown_as = Rc::new(std::cell::Cell::new((st.borrow().resolution, st.borrow().units)));
+    // Custom is pre-filled from the preset chosen before it in the same
+    // format's list; STL's lengths follow its units.
+    let shown_as = Rc::new(std::cell::Cell::new((st.borrow().format, st.borrow().resolution, st.borrow().units)));
     window.open_dialog(cx, move |dialog, window, cx| {
         {
-            let (res, units) = shown_as.get();
+            let (format, res, units) = shown_as.get();
             let mut s = st.borrow_mut();
-            let prefill = s.resolution == noshape_ops::export::CUSTOM_RESOLUTION && res != noshape_ops::export::CUSTOM_RESOLUTION;
+            let prefill = s.format == format && s.resolution == noshape_ops::export::CUSTOM_RESOLUTION && res != noshape_ops::export::CUSTOM_RESOLUTION;
             if prefill {
                 s.custom = noshape_ops::export::CustomResolution::preset(res);
             }
-            shown_as.set((s.resolution, s.units));
+            shown_as.set((s.format, s.resolution, s.units));
             if prefill || units != s.units {
                 let s = s.clone();
                 for (f, (_, input)) in CUSTOM_FIELDS.iter().zip(custom.iter()) {
@@ -391,7 +385,9 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
                 if name.is_empty() || invalid2.get() || (s.format == PartFormat::Step && s.mbd_text_height && mbd_bad2.get()) {
                     return false;
                 }
-                noshape_ops::export::MeshExportPrefs::of(&s).save();
+                let mut prefs = (*s.memory).clone();
+                prefs.keep(&s);
+                prefs.save();
                 let run = run2.clone();
                 window.defer(cx, move |window, cx| run(s, name, window, cx));
                 true
@@ -435,6 +431,7 @@ fn custom_text(s: &ExportSettings, f: &CustomField) -> String {
 pub(super) fn modal_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
     let pal = crate::theme::p();
     h_flex()
+        .debug_selector(move || id.into())
         .id(id)
         .h(px(27.))
         .gap(px(8.))
