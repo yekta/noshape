@@ -191,6 +191,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   Extrude 1: the same two regions as live's, 98.5 mm² smaller in total (sketch geometry: its R3.5 tip arc's ends are
   swapped against live's params; not explained yet, waits on the REST refetch's regions). c2-extension-spring's
   Spring sits 2 mm off in y (its regions query too). Speed: tracking's on-face answers cached (Flange 1 832 -> 649 ms).
+- 23:48: drawing batch 2 against live's recordings (live's drafts in /root/dx-scratch/uip-b2/live): 18 -> 37 of 49
+  states. Hole tables list only Hole features' holes (live: extruded cuts give the header only; behaviours "no Hole
+  features"; the showcase's plate holes are cuts, so its hole table is empty now: give them Hole features). State as
+  live's recorder reads it: dimension tools by menu name, a dimension by its value (0.394), "Detail", picked edges and a
+  closed broken-out profile as EDGE. Left: live's recorder artefacts (a hovered frame, a table's selection box over
+  the iso view, a centermark at Detail's first step); the broken-out depth pick (live snapped to the hole's right
+  quadrant without Shift+Q? REQUESTS); live reports no annotation for an empty hole table.
+- 23:48: P1 FeatureScript speed (lead 23:2x: the user's Displacement map, script part under 1 s at 1024²). Landed in
+  one commit: per-argument-type overload resolution, std operators in place on temporaries, inline 2-entry maps,
+  interned keys, args on the stack, assign fast path, native vector(x, y). Numbers (vibe5, dev profile): the feature
+  (custom_features displacement_map_profile_probe side:0) 9.98 -> 6.47 s; its loops (T2 featurescript
+  displacement_map_loops_timing) 5.9 -> 3.6 s (points loop 4.9 -> 3.0 s); steps (T2 interpreter_step_costs): loop
+  101 -> 77 ns, call 199 -> 138, vector(x, y) 297 -> 92, length vector + length vector 680 -> 513. Corpus run 133
+  (before the last four changes) vs 132: same scores, total regen 31.4 -> 30.0 s (cf-spur-gear 1692 -> 1123 ms,
+  model-plus 1004 -> 871, shaped-flange 930 -> 792, wave-spring 649 -> 547). What's left for 1 s: the points loop's
+  3 s is half memory (a point holds three ValueWithUnits maps, ~500 MB at 1024²: page faults and zeroing) and half
+  allocation and refcounting per unit operation. Next: ValueWithUnits as a compact value (no map, no allocation per
+  operation, ~1/4 the memory); measured too: jemalloc / mimalloc as the global allocator take 30-37 % off the points
+  loop (LD_PRELOAD; not ours to decide alone: lead).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
