@@ -103,6 +103,11 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Near-tolerance declines (bool, 11-05 03:40): cf-straight-spline's already go to OCCT after the first per feature
+  type (the DeclineMemo: our 0.3 s in 46 s of OCCT's); the first per feature costs round 0's sections (~0.3 s). cf-
+  sheet-metal-model-plus's glued fuse (a262e1bb, OCCT 1.0 s) spent 0.57 s ray-casting every piece before declining "a
+  piece's point on another solid's face" (points exactly on the other part's end planes, and 6-26 um off them at
+  x = 4.4875 m): now a piece no section of its edges could settle stops the other pieces' states at once, 0.25 s.
 - P1s (bool, 11-05 03:10): RUST-MIRROR-SPLIT-FACES fixed in the unify (face orders retried, TICKETS);
   PVZ-RUST-BOOL passes in T2; BOOL-RUST-LATE-DECLINE's prize-wheel case taken (a periodic face's crossing a turn
   over). bd401fd64 (core's seam move) makes 3 corpus cases unify to other volumes than OCCT's results do: TICKETS

@@ -4983,6 +4983,28 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         sym.period(p, size).filter(|&j| j > 0)
     };
+    // (A piece whose point lies on another solid's face that no section of its edges with that solid's face could
+    // settle (below): the Boolean declines, so the other pieces' rays are skipped (a sheet metal part's glued ends:
+    // 0.57 s of rays before declining, OCCT's 1 s after).)
+    const ON_ANOTHER: &str = "a piece's point on another solid's face";
+    let doomed = std::sync::atomic::AtomicBool::new(false);
+    let settles = |pi: usize| {
+        let f = pieces[pi].face;
+        pieces[pi].loops.iter().flatten().any(|&(s, _)| {
+            let lo = section_faces.partition_point(|x| x.0 < s);
+            section_faces[lo..].iter().take_while(|x| x.0 == s).any(|&(_, g)| g != f && cx.faces[g].solid != cx.faces[f].solid && free::surface_distance(&cx.faces[g], pieces[pi].inside) <= GREY * tol)
+        })
+    };
+    let state_of = |pi: usize| -> R<Vec<(usize, State)>> {
+        if doomed.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Decline(ON_ANOTHER));
+        }
+        let r = state_of(pi);
+        if matches!(&r, Err(Decline(w)) if *w == ON_ANOTHER) && !settles(pi) {
+            doomed.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        r
+    };
     let first = par_map(pieces.len(), &|pi| if later(pi).is_some() { None } else { Some(state_of(pi)) })?;
     let cell = 1e-6 * size;
     let key = |f: usize, p: DVec3| (f, (p.x / cell).round() as i64, (p.y / cell).round() as i64, (p.z / cell).round() as i64);
