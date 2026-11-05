@@ -16,7 +16,7 @@ use crate::{Body, Curve, Decline, Edge, Face, Kind, Origin, Output, Record, Rela
 
 mod corner;
 mod prism;
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 
 /// A blend of one edge.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -135,6 +135,47 @@ fn point_edge_distance(b: &Body, e: &Edge, p: DVec3) -> Option<f64> {
 
 /// A lower bound of the distance between edges `a` (a line or an arc) and `o` (any edge whose points can be
 /// had): `o` sampled, less how far its chords may stray from it.
+/// Whether edge `e` (a cap's, in the triangle's plane) comes within `margin` of triangle `t`: its pieces (a line,
+/// else 64 chords) against the triangle in that plane.
+fn edge_meets_triangle(b: &Body, e: &Edge, t: [DVec3; 3], margin: f64) -> bool {
+    let n = (t[1] - t[0]).cross(t[2] - t[0]);
+    let (Some(x), true) = ((t[1] - t[0]).try_normalize(), n.length() > 1e-30) else { return true };
+    let y = n.normalize().cross(x);
+    let flat = |p: DVec3| DVec2::new((p - t[0]).dot(x), (p - t[0]).dot(y));
+    let tri = [flat(t[0]), flat(t[1]), flat(t[2])];
+    let pts: Vec<DVec2> = match e.curve {
+        Curve::Line => vec![flat(b.vertices[e.v[0] as usize]), flat(b.vertices[e.v[1] as usize])],
+        _ => match (0..=64).map(|k| curve_point(b, e, k as f64 / 64.0).map(flat)).collect::<Option<Vec<_>>>() {
+            Some(v) => v,
+            None => return true,
+        },
+    };
+    let cross = |a: DVec2, b: DVec2| a.x * b.y - a.y * b.x;
+    let inside = |p: DVec2| {
+        let s = [cross(tri[1] - tri[0], p - tri[0]), cross(tri[2] - tri[1], p - tri[1]), cross(tri[0] - tri[2], p - tri[2])];
+        s.iter().all(|&v| v >= 0.0) || s.iter().all(|&v| v <= 0.0)
+    };
+    let seg_dist = |p: DVec2, a: DVec2, b: DVec2| {
+        let d = b - a;
+        let s = if d.length_squared() > 0.0 { ((p - a).dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+        (a + d * s - p).length()
+    };
+    let crosses = |a: DVec2, b: DVec2, c: DVec2, d: DVec2| {
+        let (d1, d2) = (cross(b - a, c - a), cross(b - a, d - a));
+        let (d3, d4) = (cross(d - c, a - c), cross(d - c, b - c));
+        (d1 > 0.0) != (d2 > 0.0) && (d3 > 0.0) != (d4 > 0.0)
+    };
+    pts.windows(2).any(|w| {
+        let (a, bb) = (w[0], w[1]);
+        inside(a)
+            || inside(bb)
+            || (0..3).any(|k| {
+                let (c, d) = (tri[k], tri[(k + 1) % 3]);
+                crosses(a, bb, c, d) || seg_dist(a, c, d) <= margin || seg_dist(bb, c, d) <= margin || seg_dist(c, a, bb) <= margin || seg_dist(d, a, bb) <= margin
+            })
+    })
+}
+
 fn edge_distance(b: &Body, a: &Edge, o: &Edge) -> Option<f64> {
     // Two lines: exactly (sampled, two edges 10 mm apart came out 9.79: R4.99 round a 10 mm block declined).
     if a.curve == Curve::Line && o.curve == Curve::Line {
@@ -1054,6 +1095,9 @@ fn check_clearance(b: &Body, ve: &[Vec<u32>], boxes: &[(DVec3, DVec3)], c: &Chai
                 }
                 match point_edge_distance(b, &b.edges[u.edge as usize], p) {
                     Some(d) if d > reach.max(end.w1.length()).max(end.w2.length()) + margin => {}
+                    // (Nearer: whether it reaches what the blend takes of the cap, the triangle between the corner and
+                    // the blend's ends on its two edges; the arc between them lies inside it.)
+                    Some(_) if !edge_meets_triangle(b, &b.edges[u.edge as usize], [p, p + end.w1, p + end.w2], margin) => {}
                     Some(_) => return no("another edge of a cap within the blend"),
                     None => return no("an edge near the blend whose distance isn't known"),
                 }

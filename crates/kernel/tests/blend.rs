@@ -1247,6 +1247,31 @@ fn a_tooth_root_round_is_noshapes() {
     assert!((vol_mm3(&ours) - vol_mm3(&occt)).abs() < 1e-6 * vol_mm3(&occt), "{} {}", vol_mm3(&ours), vol_mm3(&occt));
 }
 
+/// BLEND-RUST, the corpus's next commonest decline ("another edge of a cap within the blend", 12 of 134): an edge of the
+/// cap near the blend's end but clear of what the blend takes of the cap (the triangle between the corner and the
+/// blend's ends on the cap's edges): a blind hole in the end face 4 mm in from the rounded edge, R5 round. Noshape's
+/// own, OCCT's result.
+#[test]
+fn a_cap_edge_clear_of_the_round_is_noshapes() {
+    setup();
+    let block = bx([0.0; 3], [60.0, 40.0, 20.0]);
+    let pin = make_cylinder(&Plane::new(DVec3::new(0.0, 4.0, 16.0) * MM, DVec3::X, DVec3::Y), 0.5 * MM, 2.0 * MM, std::f64::consts::TAU).unwrap();
+    let part = boolean(BooleanOp::Cut, &[block], &[pin], &BooleanOptions::default()).unwrap().shape;
+    let es = edges_where(&part, |i| matches!(i.curve, Curve::Line { .. }) && i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && (i.start.z - 20.0 * MM).abs() < 1e-9 && (i.end.z - 20.0 * MM).abs() < 1e-9);
+    assert_eq!(es.len(), 1);
+    set_rust_blend(Some(true));
+    reset_blend_decline();
+    let ours = fillet_checked(&part, &es, &[5.0 * MM]).unwrap().shape;
+    let why = last_blend_decline();
+    set_rust_blend(Some(false));
+    let occt = fillet_checked(&part, &es, &[5.0 * MM]).unwrap().shape;
+    set_rust_blend(None);
+    assert_eq!(why, "", "noshape's own round");
+    assert!(ours.is_valid());
+    assert_eq!(ours.faces().len(), occt.faces().len());
+    assert!((vol_mm3(&ours) - vol_mm3(&occt)).abs() < 1e-9 * vol_mm3(&occt), "{} {}", vol_mm3(&ours), vol_mm3(&occt));
+}
+
 /// cf-spur-gear's root fillets (PARITY-CUSTOM-RUN-FAILURES): R0.72 on both top edges of a 1.2 mm rib, so the rounds
 /// overlap and the rib's top face goes (OCCT fails): each round made alone, the part their common, as Parasolid's.
 #[test]
