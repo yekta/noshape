@@ -36,6 +36,12 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 06:08:** no 05:00 Release run yet (the list, written 03:52 and extended 04:15, stands: no blocker). Greens checked since
+(vibe3 sweeps; the full smoke on 769f4796, 1e046255, 86546441): 9ea6b56f, 769f4796, 672a3edb, d293a184, 1e046255, a3b4fbc4,
+86546441 — no change anywhere. New P1 DRAFT-NONDETERMINISTIC (cli-draft-hang2 regenerates differently per open, v0.4.29 too):
+the ticket-document comparisons may show that document flip — compare against the ticket, not a regression. At the next release:
+the update is the first by the lead's new helper (v0.4.30's): vibe3 :64 with `noshape mcp` (pid 892613) running.
+
 **v0.4.30 (published 02:21, cut def6f23c = green a1ec7849, includes the lead's 8b5fcd9c update helper: a failed install starts
 the old app with the reason, every OS; on Windows other copies closed first)** 02:26: artifacts byte-identical, SHA256SUMS OK, 11
 assets. Updater v0.4.29 → v0.4.30 on vibe3 with an mcp copy running (still v0.4.29's helper): staged 02:23:37, Restart → 0.4.30,
