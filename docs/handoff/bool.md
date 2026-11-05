@@ -103,6 +103,19 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Gears, motor-mount-jack (bool, 11-05 08:35). Landed a28b32ad (planar B-splines read as planes; made faces stay on
+  the B-spline, as OCCT's: building them on a new plane broke a sheet metal jog's later split), ad679565 (parallel
+  check), d072728e: chords' bulges measured (3x the middle's offset, once per curve; was a quarter of the chord:
+  cf-spur-gear's 396-face cut ran 187k Newton seeds, 1.1M steps, for 1.5k crossings; now -55 %), a touch's place by
+  bisection where the tangents agree (every corpus +1-2 taken), face boxes on all threads, boundary quick boxes
+  kept. vibe3: cf-spur-gear -4.5 % against OCCT, corpus5 neutral. Run 113 (dx): cf-fix-pcb x7.1 -> x1.4.
+  learning-center-michael's Fillet 2 (468 ms, live 46) is OCCT's fillet fallbacks (blend.scaled,
+  blend.fallback.split_closed), not a Boolean. motor-mount-jack's Circular pattern 1 (f09d, a glued cut, OCCT 113 ms on
+  vibe4) declines at once, "a cylinder face without curved edges" (a slot's patch on the tube bounded by one closed
+  B-spline: its angles' net sweep is 0); covering the angles such a loop spans takes it, OCCT's result, but 144 ms (OCCT's
+  sections 25-45 ms, 16 piece pcurves projected onto the tube 45 ms; moving the tool face's own curve instead takes
+  0.2 ms but the check then costs 45 ms more and the volume is 1e-7 off): left declined. Patch:
+  /root/bool-scratch/slot-moved-pcurve.patch.
 - Prize-wheel and cf-fix-pcb (bool, 11-05 06:24). Landed 4a1f153a: the prize-wheel corpus 69 -> 44 ms (OCCT 58; b2a1
   13.7 ms against OCCT's 12.2 before this round's other work): a segment's chord doesn't grow the Newton seed boxes,
   the boundary distance search is a golden section skipped on parts clear of it, each curve's area and length once;
