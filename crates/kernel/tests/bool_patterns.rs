@@ -1179,3 +1179,26 @@ fn a_slot_of_ellipses_and_tangent_lines_keeps_its_seam_quickly() {
     assert!(ms < 1000.0, "{ms:.0} ms");
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (s.count(k::ShapeType::Face), s.count(k::ShapeType::Edge)));
 }
+
+/// SEAM-MOVER-UNIFY-VOLUME (bool's corpus4 0662365385035891, a fuse): noshape's and OCCT's results are one part (their
+/// volumes equal to 1e-15), and unified they must stay one: the unify moves each one's cylinder seam to another vertex,
+/// and the volume integral read the wall whose u ran on [5.30, 11.58] 8.6e-6 off. Both unified agree to 1e-9, and
+/// either unified twice gives the same volume, bit for bit.
+#[test]
+fn equal_results_unify_to_equal_volumes() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify");
+    let c = k::bool_corpus::load(&dir, "seam-mover-0662365385035891").expect("the case");
+    let run = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse").shape;
+        k::set_rust_boolean(None);
+        r
+    };
+    let unified_volume = |s: &k::Shape| k::unify_same_domain(s).expect("unified").shape.volume().unwrap();
+    let (ours, occt) = (run(true), run(false));
+    let (vo, vc) = (unified_volume(&ours), unified_volume(&occt));
+    assert!((vo / vc - 1.0).abs() < 1e-9, "ours unified {vo}, OCCT's {vc}");
+    assert_eq!(unified_volume(&ours).to_bits(), vo.to_bits());
+    assert_eq!(unified_volume(&occt).to_bits(), vc.to_bits());
+}

@@ -1033,6 +1033,20 @@ constexpr double kGaussW[8] = {0.1012285362903763, 0.2223810344533745, 0.3137066
 // A face OCCT's integrators get wrong: wrapping a periodic surface more
 // than once (a thread's crest). Such a solid is integrated here whole, its
 // many-span flanks too (OCCT's Gauss and adaptive disagree on those).
+// A face of a u-periodic surface whose u runs past the surface's own period.
+bool past_period(const TopoDS_Face& f)
+{
+  TopLoc_Location                 l;
+  const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, l);
+  if (s.IsNull() || !s->IsUPeriodic())
+    return false;
+  double u0, u1, v0, v1, s0, s1, t0, t1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  s->Bounds(s0, s1, t0, t1);
+  const double eps = 1e-9 * s->UPeriod();
+  return u0 < s0 - eps || u1 > s0 + s->UPeriod() + eps;
+}
+
 bool hard_to_integrate(const TopoDS_Face& f)
 {
   TopLoc_Location                 l;
@@ -1439,8 +1453,15 @@ GProp_GProps volume_props(const TopoDS_Shape& s)
     return out;
   }
   // Analytic faces only: the adaptive integrator, whose error is controlled
-  // there (a Ø6 hole through a Ø40 cylinder: plain Gauss −0.41 mm³).
-  BRepGProp::VolumeProperties(s, out, props_eps(1e-7), true);
+  // there (a Ø6 hole through a Ø40 cylinder: plain Gauss −0.41 mm³); to
+  // 1e-12 where a face's u runs past its surface's period (its 1e-7 read a
+  // cylinder wall on [5.30, 11.58] 8.6e-6 off, the same wall on [2.16, 8.44]
+  // right: one part, two volumes by where a unify left its seam,
+  // SEAM-MOVER-UNIFY-VOLUME).
+  bool past = false;
+  for (TopExp_Explorer e(s, TopAbs_FACE); e.More() && !past; e.Next())
+    past = past_period(TopoDS::Face(e.Current()));
+  BRepGProp::VolumeProperties(s, out, props_eps(past ? 1e-12 : 1e-7), true);
   return out;
 }
 
