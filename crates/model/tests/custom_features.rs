@@ -587,11 +587,12 @@ fn displacement_map_on_a_cylinder() {
     }
 }
 
-/// DISPLACEMENT-MAP at scale (lead 11-05: Replace face must scale): a noise map at 512² and 704² (live's limit is 500 000
-/// control points in all) on the cylinder's side and top, Replace face on. Each step (the feature, the part's check
-/// and volume, its preview and fine display meshes) about linear in the poles: 704²'s within 3× 512²'s (1.9× the
-/// poles); the preview mesh of 512²'s side took 650 s in BRepMesh before, 1024²'s top 48 s. At 1024² the feature fails
-/// as live's, "The B-spline definition has too many control points." (live 2057: after 47 s), the part as it was.
+/// DISPLACEMENT-MAP at scale (lead 11-05: Replace face must scale): a noise map at 512² and 704² on the cylinder's side
+/// and top, Replace face on. Each step (the feature, the part's check and volume, its preview and fine display meshes)
+/// about linear in the poles: 704²'s within 3× 512²'s (1.9× the poles); the preview mesh of 512²'s side took 650 s in
+/// BRepMesh before, 1024²'s top 48 s. Then 1024² (the user's map: live stops at 500 000 control points, a limit of its
+/// own we don't copy), Replace face off and on, side and top: each builds, its times printed (NOSHAPE_DISP_MAP=<csv>:
+/// that map at 1024², the user's leather031-1024.csv, in place of the noise).
 #[test]
 #[ignore = "T2: timing, ~1 min"]
 fn displacement_map_scales() {
@@ -647,12 +648,26 @@ fn displacement_map_scales() {
             assert!(big[k] <= 3.0 * small[k].max(0.1), "{face}: {} {:.2} s at 704², {:.2} s at 512²", names[k], big[k], small[k]);
         }
     }
-    let (r, secs) = displacement_map(&noise_csv(1024), "side", true);
-    let last = r.display.features.last().expect("the feature");
-    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("The B-spline definition has too many control points.")));
-    assert_eq!(r.context.bodies.len(), 1);
-    assert!((r.context.bodies[0].shape.volume().unwrap() - PI * 0.025f64.powi(2) * 0.06).abs() < 1e-12, "the part as it was");
-    println!("DISP 1024²: the error in {secs:.2} s (live 47 s)");
+    let csv = std::env::var("NOSHAPE_DISP_MAP").map(|p| std::fs::read_to_string(p).expect("the map")).unwrap_or_else(|_| noise_csv(1024));
+    for face in ["side", "top"] {
+        for replace in [false, true] {
+            let (r, secs) = displacement_map(&csv, face, replace);
+            assert_samples(&r, &format!("{} samples", 1024 * 1024));
+            assert_eq!(r.context.bodies.len(), if replace { 1 } else { 2 }, "1024² {face} replace {replace}");
+            let b = &r.context.bodies.last().unwrap().shape;
+            let t = std::time::Instant::now();
+            assert!(b.is_valid(), "1024² {face} replace {replace}: valid");
+            let check = t.elapsed().as_secs_f64();
+            let mesh = |preview: bool| {
+                let (lin, ang) = noshape_model::regen::display_deflection(b, 1.0, preview);
+                let t = std::time::Instant::now();
+                assert!(!noshape_kernel::tessellate(b, lin, ang, true).unwrap().indices.is_empty());
+                t.elapsed().as_secs_f64()
+            };
+            let (preview, fine) = (mesh(true), mesh(false));
+            println!("DISP 1024² {face} replace {replace}: feature {secs:.2} s, check {check:.2} s, preview mesh {preview:.2} s, fine mesh {fine:.2} s");
+        }
+    }
 }
 
 /// CANCEL-LATENCY on the Displacement map (lead 11-05: its cancel did nothing): a noise map of each side of

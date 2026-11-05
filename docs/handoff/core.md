@@ -39,9 +39,9 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   note): live asked about its second part (REQUESTS 14:56).
 
 **State 11-05 12:18 UTC.**
-- P1 DISPLACEMENT-MAP-SCALE done (TICKETS): live refuses 1024² (500,000 control points at most; its error after 47 s,
-  ours in 7.6 s); up to the limit every step scales (704² feature 4.7 s, meshes 0.3-0.4 s); cancel stops within
-  ~100 ms (most points < 10 ms). T2 custom_features::displacement_map_scales and displacement_map_cancel_latency_probe.
+- P1 DISPLACEMENT-MAP-SCALE done (TICKETS): 1024² builds (the user's decision 11-05: live's 500,000-control-point
+  limit is not ours to copy; removed): leather031-1024.csv Replace face off 7.9 s, on 9.3-9.6 s, meshes < 0.4 s;
+  704² feature 4.7 s; cancel stops within ~30 ms but one point in Replace face's step (921 ms at 1024², being cut). T2 custom_features::displacement_map_scales and displacement_map_cancel_latency_probe.
   Left: P2 DISPLACEMENT-TOP-VOLUME (20 s mass properties of the replaced top).
 - Next: learning-center-michael Fillet 2 (seam pieces 103/58 vs live 99/54; time; the tori cut is bool's).
 
