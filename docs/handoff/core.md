@@ -2447,3 +2447,11 @@ inside the boundary, banded Cholesky; it declines (and your plate / loose path r
 can't be within 1 degree of a support (G1 to a box's four walls). Only cf-setback-fillet changes in the model suite
 (3/5 -> 4/5); kernel and model tests, blend corpus unchanged. TICKETS SETBACK-FILL-PATCH has the numbers.
 
+11-05 23:25: pipeflange's corners too (FILLET-PROPAGATION-VOLUME closed, 10/10 as live): finish_blend_faces and the
+fallback finish now call `true_ball_over_rims` (before rim_seams_off_joints, ScopeRule 12): a connected group of new
+B-spline blend faces between two tori, the tori's coaxial cylinder (the boss) and a hole's face whose rim circle lies
+in the floor is rebuilt from the true rolling ball's curves and filled with `fair_g1_fill(..., share)` (two faces,
+G1 to the tori, the boss and the ball), the boss's and hole's loops spliced, then `merge_split_tori` joins torus faces
+OCCT split at the boss's circle vertex (by hand: UnifySameDomain shifted the boss's hole loops a turn). It does
+nothing on a fillet with no new torus. Only pipeflange changed in the model suite; Fillet 2 103 -> 109 ms on vibe5.
+RABC (Setback Fillet 1's third patch) parked with notes in TICKETS. Both areas back to you whenever you like.

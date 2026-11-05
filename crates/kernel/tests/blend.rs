@@ -1612,8 +1612,8 @@ fn overflowing_rounds_meeting_earlier_ones_are_lives() {
 
 /// pipeflange-steven's Fillet 2 (R8 round the flange's top, its −y countersinks' rims trimmed by it): the countersinks'
 /// cones and holes get their seams at one of the trimmed rim's vertices, so the rim's arc on the top face stays one
-/// edge, as live's (36 / 79 / 40 without OCCT's seams; ours 81 / 42 before). Its volume is OCCT's blend's
-/// (FILLET-PROPAGATION-VOLUME: live 18329.663, ours 18314.952). T1.
+/// edge, as live's; where the ball rolls over a countersink's rim, the true ball's corner, two faces filled between its
+/// contacts on the boss and the rim (FILLET-PROPAGATION-VOLUME, live 2104 B). T1.
 #[test]
 fn a_fillet_trimming_countersinks_keeps_their_rims_whole() {
     setup();
@@ -1621,7 +1621,17 @@ fn a_fillet_trimming_countersinks_keeps_their_rims_whole() {
     let s = read_brep(&path).unwrap();
     let r = fillet_checked(&s, &[s.edges()[2].clone()], &[8.0 * MM]).unwrap().shape;
     assert!(r.is_valid());
-    assert_eq!(r.count(ShapeType::Face), 36);
-    assert_eq!((r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (91, 55), "with OCCT's seams (93 / 57 before)");
-    assert!((vol_mm3(&r) - 18314.9516).abs() < 0.05, "{}", vol_mm3(&r));
+    let shown = r.shown_topology().unwrap();
+    assert_eq!((r.count(ShapeType::Face), shown.edge_count(), shown.vertex_count()), (36, 79, 40), "live's");
+    // Live 18329.663 mm³ (band ±7.8); OCCT's ball, its sections in planes through the boss's axis, 18314.952.
+    assert!((vol_mm3(&r) - 18326.27).abs() < 0.05, "{}", vol_mm3(&r));
+    let areas: Vec<(String, f64)> = r.faces().iter().map(|f| (format!("{:?}", f.face_surface().unwrap()), f.area().unwrap() / (MM * MM))).collect();
+    let of = |kind: &str| areas.iter().filter(|(k, _)| k.starts_with(kind)).map(|(_, a)| *a).collect::<Vec<f64>>();
+    // The rolling round's four tori whole (live 309.756 mm² each), the boss down to the true ball's contact (live
+    // 1764.4895 mm²), and each corner two faces (live 28.7417 + 31.3199 mm²: its seam 0.1 degree off the middle).
+    assert_eq!(of("Torus").iter().filter(|a| (*a - 309.756).abs() < 1e-3).count(), 4, "{areas:?}");
+    assert!(of("Cylinder").iter().any(|a| (a - 1764.4895).abs() < 0.02), "{areas:?}");
+    let corners = of("BSpline");
+    assert_eq!(corners.len(), 8, "{areas:?}");
+    assert!(corners.iter().all(|a| (a - 30.0).abs() < 0.01), "{areas:?}");
 }

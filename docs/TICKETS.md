@@ -1043,6 +1043,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   decimals (28.7413 / 31.3202, live 28.7417 / 31.3199): pipeflange needs those boundaries (the true rolling ball's:
   the ball's contact on the tube while it rides the countersink rim, the rim arc, the ball's arcs at the ends and the
   seam), then this fill G1 to its neighbours with the crease along the countersink kept: next.
+  skasm 11-05 23:25: pipeflange done (FILLET-PROPAGATION-VOLUME: its corners from the true ball's curves and this fill,
+  10/10 as live). RABC parked (lead): its middle 0.23 mm above live's, Setback Fillet 1's part 4117.54 mm² against
+  live's 4116.40 ±0.84; tried and not it: the plane (live's own normal), live's knots, a membrane term, area
+  weighting, the convex hull; pipeflange's corners didn't show what it is (their fill gives live's areas to 4 decimals
+  from live's boundaries, as JcC / JuC do). Prototype and numbers in /root/skasm-scratch/corner (proto.py).
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
   space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:
@@ -4153,7 +4158,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   re-evaluates the picked native (and custom) features in the FS context under the instance's id and variables, as
   Feature pattern's Reapply does natively. Rebuilt document: /root/dx-scratch/pmdocs/cf/cf-parameter-pattern.noshape.
   (core 11-03)
-- [ ] P2 FILLET-PROPAGATION-VOLUME (core; dx's parity suite 11-03, pipeflange-steven) Fillet 2 (r 8 mm, one edge,
+- [x] (skasm 11-05 23:25: the true ball's corners, filled as Parasolid's: pipeflange-steven 10/10 as live) P2
+  FILLET-PROPAGATION-VOLUME (core; dx's parity suite 11-03, pipeflange-steven) Fillet 2 (r 8 mm, one edge,
   tangent propagation, circular) after a Fillet 1 and a cut: ours 36/81/42 faces/edges/vertices, 18314.952 mm³;
   live 36/79/40, 18329.663 mm³ (Δ 14.7 mm³, so not only split edges, see CUT-CLOSED-EDGES-SPLIT). Live's new faces:
   four tori 309.756 mm², four blends 31.32 mm² and four 28.742 mm² (OTHER), the cylinder 1764.49 mm², a plane
@@ -4180,6 +4186,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   36 / 79 / 40 as live. Left: the corners (ours 6 tori + 6 OTHER, live 4 + 8) and the volume.
   skasm 11-05 18:48: the time: Fillet 2 158 -> 104 ms on an idle vibe5 (live 114), the document 212 -> 158 (live 212): the
   unify's three tries of one rejected merge integrate its four B-spline corner faces once, not three times.
+  skasm 11-05 23:25: the corners as live's (features.cpp true_ball_over_rims, ScopeRule 12): where the round's ball
+  rides a hole's rim in the floor, the corner is rebuilt from the true ball's curves (its contact on the boss, the
+  rim's arcs, the ball's arc where it dips lowest at the corner's middle) and filled G1 to the tori, the boss and the
+  ball by Parasolid's fill (fair_g1_fill, SETBACK-FILL-PATCH), two faces; the tori OCCT split at the boss's vertex
+  made one, the corner's edges B-splines as live's. 36/79/40 and every face type as live, 18326.27 mm³ (live 18329.66,
+  band ±7.8; OCCT 18314.95), the boss 1764.4797 mm² (live 1764.4895), each corner 59.998 mm² (live 60.062; live's seam
+  sits 0.1015° off the middle at all four, which splits its two faces 28.74 / 31.32 against our 30.00 / 30.00, the
+  pair's area unchanged: not derivable, not copied). Parity: pipeflange-steven 9 -> 10/10, nothing else changed
+  (54 -> 55/72 documents, 488 -> 489/753 features). Time on vibe5 (load ~5.8): Fillet 2 103 -> 109 ms (live 114), the
+  document 158 -> 164 ms (live 212). T1 blend::a_fillet_trimming_countersinks_keeps_their_rims_whole.
 - [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live

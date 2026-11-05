@@ -37,6 +37,12 @@
 #include <limits>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
 #include <ElCLib.hxx>
+#include <ElSLib.hxx>
+#include <ShapeBuild_ReShape.hxx>
+#include <GeomAPI_PointsToBSpline.hxx>
+#include <Geom_SphericalSurface.hxx>
+#include <Geom_Circle.hxx>
+#include <gp_Torus.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeSphere.hxx>
 #include <GC_MakeArcOfCircle.hxx>
@@ -4032,6 +4038,913 @@ static void rim_seams_off_joints(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   r = m;
 }
 
+} // namespace
+std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share);
+namespace {
+
+// (u, v) of p on an elementary surface; nothing on others.
+std::optional<gp_Pnt2d> elementary_uv_of(const BRepAdaptor_Surface& s, const gp_Pnt& p)
+{
+  double u = 0, v = 0;
+  switch (s.GetType())
+  {
+  case GeomAbs_Plane: ElSLib::Parameters(s.Plane(), p, u, v); break;
+  case GeomAbs_Cylinder: ElSLib::Parameters(s.Cylinder(), p, u, v); break;
+  case GeomAbs_Cone: ElSLib::Parameters(s.Cone(), p, u, v); break;
+  case GeomAbs_Sphere: ElSLib::Parameters(s.Sphere(), p, u, v); break;
+  case GeomAbs_Torus: ElSLib::Parameters(s.Torus(), p, u, v); break;
+  default: return std::nullopt;
+  }
+  return gp_Pnt2d(u, v);
+}
+
+// An edge along points p[i] at parameters t[i] from va to vb, with its curve on face f (an elementary surface) going
+// on from `from` (the face's (u, v) at va, whole turns kept). `on`: its curve, t its parameters (falling: the edge
+// runs against it, reversed).
+std::optional<TopoDS_Edge> edge_through(const std::vector<gp_Pnt>& p, const std::vector<double>& t, const TopoDS_Vertex& va,
+                                        const TopoDS_Vertex& vb, const TopoDS_Face& f, const gp_Pnt2d& from, double tol,
+                                        const occ::handle<Geom_Curve>& on = nullptr)
+{
+  const BRepAdaptor_Surface s(f, false);
+  const int                 n = (int)p.size();
+  NCollection_Array1<gp_Pnt>   q(1, n);
+  NCollection_Array1<gp_Pnt2d> w(1, n);
+  NCollection_Array1<double>   prm(1, n);
+  double                       uprev = from.X();
+  for (int i = 0; i < n; ++i)
+  {
+    q(i + 1)                         = p[(size_t)i];
+    prm(i + 1)                       = t[(size_t)i];
+    const std::optional<gp_Pnt2d> uv = elementary_uv_of(s, p[(size_t)i]);
+    if (!uv)
+      return std::nullopt;
+    double u = uv->X();
+    if (s.IsUPeriodic())
+      u += s.UPeriod() * std::round((uprev - u) / s.UPeriod());
+    w(i + 1) = gp_Pnt2d(u, uv->Y());
+    uprev    = u;
+  }
+  if (w(1).Distance(from) > 1e-6 * std::max(1.0, std::abs(from.X()) + std::abs(from.Y())))
+    return std::nullopt;
+  const bool falling = t.back() < t.front();
+  if (falling)
+    for (int i = 1; i <= n / 2; ++i)
+    {
+      std::swap(q(i), q(n + 1 - i));
+      std::swap(w(i), w(n + 1 - i));
+      std::swap(prm(i), prm(n + 1 - i));
+    }
+  occ::handle<Geom_Curve>          c3 = on;
+  occ::handle<Geom2d_BSplineCurve> c2;
+  try
+  {
+    // (The fits come back on [0, 1]: their knots moved onto the parameters.)
+    const auto onto = [&](NCollection_Array1<double>& k) {
+      const double k0 = k(k.Lower()), k1 = k(k.Upper());
+      for (int i = k.Lower(); i <= k.Upper(); ++i)
+        k(i) = prm(1) + (k(i) - k0) / (k1 - k0) * (prm(n) - prm(1));
+    };
+    if (c3.IsNull())
+    {
+      GeomAPI_PointsToBSpline f3(q, prm, 3, 8, GeomAbs_C2, tol);
+      if (!f3.IsDone())
+        return std::nullopt;
+      const occ::handle<Geom_BSplineCurve> b = f3.Curve();
+      NCollection_Array1<double>           k(1, b->NbKnots());
+      b->Knots(k);
+      onto(k);
+      b->SetKnots(k);
+      c3 = b;
+    }
+    Geom2dAPI_PointsToBSpline f2(w, prm, 3, 8, GeomAbs_C2, 1e-9);
+    if (!f2.IsDone())
+      return std::nullopt;
+    c2 = f2.Curve();
+    NCollection_Array1<double> k(1, c2->NbKnots());
+    c2->Knots(k);
+    onto(k);
+    c2->SetKnots(k);
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+  if (c3.IsNull() || c2.IsNull())
+    return std::nullopt;
+  BRep_Builder bb;
+  TopoDS_Edge  e;
+  bb.MakeEdge(e, c3, tol);
+  bb.Add(e, (falling ? vb : va).Oriented(TopAbs_FORWARD));
+  bb.Add(e, (falling ? va : vb).Oriented(TopAbs_REVERSED));
+  bb.Range(e, prm(1), prm(n));
+  bb.UpdateEdge(e, c2, f, tol);
+  bb.Range(e, f, prm(1), prm(n));
+  BRepLib::SameParameter(e, tol);
+  return falling ? TopoDS::Edge(e.Reversed()) : e;
+}
+
+// Curve c over [a, b] as a B-spline on the same parameters (live's blend corners have no circles: their sections and
+// the rim's arcs are B-splines).
+occ::handle<Geom_BSplineCurve> spline_of(const occ::handle<Geom_Curve>& c, double a, double b, double tol)
+{
+  const int                  n = 32;
+  NCollection_Array1<gp_Pnt> q(1, n + 1);
+  NCollection_Array1<double> prm(1, n + 1);
+  for (int i = 0; i <= n; ++i)
+  {
+    prm(i + 1) = a + (b - a) * i / n;
+    q(i + 1)   = c->Value(prm(i + 1));
+  }
+  try
+  {
+    GeomAPI_PointsToBSpline f(q, prm, 3, 8, GeomAbs_C2, tol);
+    if (!f.IsDone())
+      return nullptr;
+    const occ::handle<Geom_BSplineCurve> s = f.Curve();
+    NCollection_Array1<double>           k(1, s->NbKnots());
+    s->Knots(k);
+    const double k0 = k(1), k1 = k(k.Upper());
+    for (int i = 1; i <= k.Upper(); ++i)
+      k(i) = a + (k(i) - k0) / (k1 - k0) * (b - a);
+    s->SetKnots(k);
+    return s;
+  }
+  catch (const Standard_Failure&)
+  {
+    return nullptr;
+  }
+}
+
+// (u, v) on f where edge e (one of f's) reaches vertex v.
+std::optional<gp_Pnt2d> uv_at(const TopoDS_Edge& e, const TopoDS_Face& f, const TopoDS_Vertex& v)
+{
+  double                          a, b;
+  const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, f, a, b);
+  if (c.IsNull() || (!TopExp::FirstVertex(e).IsSame(v) && !TopExp::LastVertex(e).IsSame(v)))
+    return std::nullopt;
+  return c->Value(TopExp::FirstVertex(e).IsSame(v) ? a : b);
+}
+
+// Face f with each run of edges `runs[i].first` in its wires swapped for `runs[i].second` (edges each from where the
+// one before ends): each stretch of a run that the wire passes in one go (a seam may cut a run in two) by the chain's
+// edges between the same vertices; nothing when the stretches don't use the chain once.
+using Run = std::pair<ShapeIMap, std::vector<TopoDS_Edge>>;
+std::optional<TopoDS_Face> spliced(const TopoDS_Face& f, const std::vector<Run>& runs)
+{
+  const TopoDS_Face             ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+  TopoDS_Face                   nf = TopoDS::Face(ff.EmptyCopied());
+  BRep_Builder                  bb;
+  std::vector<std::vector<int>> used(runs.size());
+  for (size_t j = 0; j < runs.size(); ++j)
+    used[j].assign(runs[j].second.size(), 0);
+  const auto run_of = [&](const TopoDS_Shape& e) {
+    for (size_t j = 0; j < runs.size(); ++j)
+      if (runs[j].first.Contains(e))
+        return (int)j;
+    return -1;
+  };
+  for (TopoDS_Iterator it(ff); it.More(); it.Next())
+  {
+    const TopoDS_Wire        w = TopoDS::Wire(it.Value());
+    std::vector<TopoDS_Edge> seq;
+    for (BRepTools_WireExplorer x(w, ff); x.More(); x.Next())
+      seq.push_back(TopoDS::Edge(x.Current()));
+    int nw = 0, olds = 0;
+    for (TopExp_Explorer x(w, TopAbs_EDGE); x.More(); x.Next())
+      (++nw, olds += run_of(x.Current()) >= 0);
+    if (olds == 0)
+    {
+      bb.Add(nf, w);
+      continue;
+    }
+    size_t start = 0;
+    while (start < seq.size() && run_of(seq[start]) >= 0)
+      ++start;
+    if ((int)seq.size() != nw || start == seq.size())
+      return std::nullopt;
+    TopoDS_Wire nw2;
+    bb.MakeWire(nw2);
+    for (size_t k = start; k < start + seq.size();)
+    {
+      const TopoDS_Edge& e = seq[k % seq.size()];
+      const int          j = run_of(e);
+      if (j < 0)
+      {
+        bb.Add(nw2, e);
+        ++k;
+        continue;
+      }
+      const TopoDS_Vertex from = TopExp::FirstVertex(e, true);
+      while (k < start + seq.size() && run_of(seq[k % seq.size()]) == j)
+        ++k;
+      const TopoDS_Vertex to = TopExp::LastVertex(seq[(k - 1) % seq.size()], true);
+      // The chain's vertices in order; its edges from `from` to `to`, turned when it runs the other way.
+      const std::vector<TopoDS_Edge>& c = runs[(size_t)j].second;
+      std::vector<TopoDS_Vertex>      vs{TopExp::FirstVertex(c.front(), true)};
+      for (const TopoDS_Edge& x : c)
+        vs.push_back(TopExp::LastVertex(x, true));
+      const auto at = [&](const TopoDS_Vertex& v) {
+        for (size_t i = 0; i < vs.size(); ++i)
+          if (vs[i].IsSame(v))
+            return (int)i;
+        return -1;
+      };
+      const int ia = at(from), ib = at(to);
+      if (ia < 0 || ib < 0 || ia == ib)
+        return std::nullopt;
+      if (ia < ib)
+        for (int i = ia; i < ib; ++i)
+          (bb.Add(nw2, c[(size_t)i]), ++used[(size_t)j][(size_t)i]);
+      else
+        for (int i = ia - 1; i >= ib; --i)
+          (bb.Add(nw2, c[(size_t)i].Reversed()), ++used[(size_t)j][(size_t)i]);
+    }
+    nw2.Closed(true);
+    bb.Add(nf, nw2);
+  }
+  for (const std::vector<int>& u : used)
+    if (std::any_of(u.begin(), u.end(), [](int d) { return d != 1; }))
+      return std::nullopt;
+  nf.Orientation(f.Orientation());
+  return nf;
+}
+
+// e's orientation in f, as f's material sees it.
+TopAbs_Orientation orientation_in(const TopoDS_Face& f, const TopoDS_Shape& e)
+{
+  for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    if (x.Current().IsSame(e))
+      return x.Current().Orientation();
+  return TopAbs_EXTERNAL;
+}
+
+// Edge e's curve on face f (an elementary surface) going on from `from` (f's (u, v) where e's curve starts).
+static bool add_curve_on(const TopoDS_Edge& e, const TopoDS_Face& f, const gp_Pnt2d& from, double tol)
+{
+  const BRepAdaptor_Curve   c(e);
+  const BRepAdaptor_Surface s(f, false);
+  const int                 n = 24;
+  NCollection_Array1<gp_Pnt2d> w(1, n + 1);
+  NCollection_Array1<double>   prm(1, n + 1);
+  double                       uprev = from.X();
+  for (int i = 0; i <= n; ++i)
+  {
+    prm(i + 1)                       = c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * i / n;
+    const std::optional<gp_Pnt2d> uv = elementary_uv_of(s, c.Value(prm(i + 1)));
+    if (!uv)
+      return false;
+    double u = uv->X();
+    if (s.IsUPeriodic())
+      u += s.UPeriod() * std::round((uprev - u) / s.UPeriod());
+    w(i + 1) = gp_Pnt2d(u, uv->Y());
+    uprev    = u;
+  }
+  if (w(1).Distance(from) > 1e-6 * std::max(1.0, std::abs(from.X()) + std::abs(from.Y())))
+    return false;
+  try
+  {
+    Geom2dAPI_PointsToBSpline f2(w, prm, 3, 8, GeomAbs_C2, 1e-9);
+    if (!f2.IsDone())
+      return false;
+    const occ::handle<Geom2d_BSplineCurve> c2 = f2.Curve();
+    NCollection_Array1<double>             k(1, c2->NbKnots());
+    c2->Knots(k);
+    const double k0 = k(1), k1 = k(k.Upper());
+    for (int i = 1; i <= k.Upper(); ++i)
+      k(i) = prm(1) + (k(i) - k0) / (k1 - k0) * (prm(n + 1) - prm(1));
+    c2->SetKnots(k);
+    BRep_Builder bb;
+    bb.UpdateEdge(e, c2, f, tol);
+    bb.Range(e, f, prm(1), prm(n + 1));
+  }
+  catch (const Standard_Failure&)
+  {
+    return false;
+  }
+  return true;
+}
+
+// The rolling round's torus between two rebuilt corners in two faces (OCCT's blend split where the boss's circle had a
+// vertex), one face as live's: two faces of `tori` on one torus made one across the section between them, and the
+// floor's two arcs meeting there one arc (at the boss, a seam runs to the vertex: kept, shown as no vertex).
+static void merge_split_tori(const TopoDS_Shape& input, const ShapeIMap& tori, TopoDS_Shape& r, HHist& h)
+{
+  ShapeAncMap ef, ve;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve);
+  const auto same_torus = [](const TopoDS_Face& a, const TopoDS_Face& b) {
+    const BRepAdaptor_Surface sa(a, false), sb(b, false);
+    if (sa.GetType() != GeomAbs_Torus || sb.GetType() != GeomAbs_Torus)
+      return false;
+    const gp_Torus ta = sa.Torus(), tb = sb.Torus();
+    const double   tol = 1e-7 * ta.MajorRadius();
+    return ta.Location().Distance(tb.Location()) < tol && ta.Axis().Direction().IsEqual(tb.Axis().Direction(), 1e-9) &&
+           ta.Position().Direct() == tb.Position().Direct() && std::abs(ta.MajorRadius() - tb.MajorRadius()) < tol &&
+           std::abs(ta.MinorRadius() - tb.MinorRadius()) < tol;
+  };
+  const auto seam_at = [&](const TopoDS_Vertex& v) {
+    for (const TopoDS_Shape& e : ve.FindFromKey(v))
+    {
+      const ShapeList& fs = ef.FindFromKey(e);
+      if (fs.Extent() == 2 && fs.First().IsSame(fs.Last()))
+        return true;
+    }
+    return false;
+  };
+  const auto loop_of = [](const TopoDS_Face& f) -> std::optional<std::vector<TopoDS_Edge>> {
+    const TopoDS_Face        ff = TopoDS::Face(f.Oriented(TopAbs_FORWARD));
+    std::vector<TopoDS_Edge> seq;
+    int                      wires = 0;
+    for (TopoDS_Iterator it(ff); it.More(); it.Next(), ++wires)
+      for (BRepTools_WireExplorer x(TopoDS::Wire(it.Value()), ff); x.More(); x.Next())
+        seq.push_back(TopoDS::Edge(x.Current()));
+    if (wires != 1)
+      return std::nullopt;
+    return seq;
+  };
+  occ::handle<BRepTools_ReShape>                        rs = new BRepTools_ReShape();
+  occ::handle<BRepTools_History>                        mh = new BRepTools_History();
+  std::vector<std::pair<TopoDS_Face, std::vector<Run>>> splices;
+  ShapeIMap                                             used;
+  std::vector<TopoDS_Shape>                             rebuilt;
+  BRep_Builder                                          bb;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || !tori.Contains(fs.First()) || !tori.Contains(fs.Last()) ||
+        used.Contains(fs.First()) || used.Contains(fs.Last()) || fs.First().Orientation() != fs.Last().Orientation())
+      continue;
+    const TopoDS_Face A = TopoDS::Face(fs.First()), B = TopoDS::Face(fs.Last());
+    const TopoDS_Edge E = TopoDS::Edge(ef.FindKey(i));
+    if (!same_torus(A, B))
+      continue;
+    std::optional<std::vector<TopoDS_Edge>> la = loop_of(A), lb = loop_of(B);
+    if (!la || !lb)
+      continue;
+    // Each loop from after the section round to before it: A's from its end to its start, B's back.
+    const auto others = [&](std::vector<TopoDS_Edge> l) -> std::optional<std::vector<TopoDS_Edge>> {
+      const auto at = std::find_if(l.begin(), l.end(), [&](const TopoDS_Edge& e) { return e.IsSame(E); });
+      if (at == l.end() || std::count_if(l.begin(), l.end(), [&](const TopoDS_Edge& e) { return e.IsSame(E); }) != 1)
+        return std::nullopt;
+      std::rotate(l.begin(), at + 1, l.end());
+      l.pop_back();
+      return l;
+    };
+    std::optional<std::vector<TopoDS_Edge>> oa = others(*la), ob = others(*lb);
+    if (!oa || !ob || oa->empty() || ob->empty())
+      continue;
+    const TopoDS_Vertex v1 = TopExp::LastVertex(oa->back(), true), v2 = TopExp::LastVertex(ob->back(), true);
+    if (!v1.IsSame(TopExp::FirstVertex(ob->front(), true)) || !v2.IsSame(TopExp::FirstVertex(oa->front(), true)))
+      continue;
+    // B's curves on A's surface: shifted by what takes B's parameters at v1 to A's.
+    const TopoDS_Face        NF = TopoDS::Face(A.Oriented(TopAbs_FORWARD).EmptyCopied());
+    const std::optional<gp_Pnt2d> ua = uv_at(oa->back(), A, v1), ub = uv_at(ob->front(), B, v1);
+    const std::optional<gp_Pnt2d> ua2 = uv_at(oa->front(), A, v2), ub2 = uv_at(ob->back(), B, v2);
+    if (!ua || !ub || !ua2 || !ub2)
+      continue;
+    const gp_Vec2d shift(*ub, *ua);
+    if (ub2->Translated(shift).Distance(*ua2) > 1e-7)
+      continue;
+    const double tol = BRep_Tool::Tolerance(E);
+    bool         ok  = true;
+    for (const TopoDS_Edge& e : *ob)
+    {
+      double                          f2, l2;
+      const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, B, f2, l2);
+      if (c.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      bb.UpdateEdge(e, occ::down_cast<Geom2d_Curve>(c->Translated(shift)), NF, BRep_Tool::Tolerance(e));
+      bb.Range(e, NF, f2, l2);
+    }
+    if (!ok)
+      continue;
+    // The loop, the floor's two arcs at a vertex no seam runs to made one.
+    std::vector<TopoDS_Edge> loop = *oa;
+    loop.insert(loop.end(), ob->begin(), ob->end());
+    for (const TopoDS_Vertex& v : {v1, v2})
+    {
+      if (seam_at(v))
+        continue;
+      const size_t k = v.IsSame(v1) ? oa->size() - 1 : loop.size() - 1;
+      const TopoDS_Edge e1 = loop[k], e2 = loop[(k + 1) % loop.size()];
+      const BRepAdaptor_Curve c1(e1), c2(e2);
+      if (c1.GetType() != GeomAbs_Circle || c2.GetType() != GeomAbs_Circle)
+        continue;
+      const gp_Circ k1 = c1.Circle(), k2 = c2.Circle();
+      if (k1.Location().Distance(k2.Location()) > tol || std::abs(k1.Radius() - k2.Radius()) > tol || !k1.Axis().Direction().IsParallel(k2.Axis().Direction(), 1e-9))
+        continue;
+      const ShapeList& f1 = ef.FindFromKey(e1);
+      const ShapeList& f2 = ef.FindFromKey(e2);
+      const TopoDS_Face P = TopoDS::Face(f1.First().IsSame(A) ? f1.Last() : f1.First());
+      if (!(f2.First().IsSame(P) || f2.Last().IsSame(P)) || P.IsSame(A) || P.IsSame(B))
+        continue;
+      // One arc of the circle from e1's start through v to e2's end.
+      const TopoDS_Vertex a0 = TopExp::FirstVertex(e1, true), a1 = TopExp::LastVertex(e2, true);
+      const double        p0 = ElCLib::Parameter(k1, BRep_Tool::Pnt(a0)), pv0 = ElCLib::Parameter(k1, BRep_Tool::Pnt(v));
+      double              p1 = ElCLib::Parameter(k1, BRep_Tool::Pnt(a1)), pv = pv0;
+      p1 = p0 + std::fmod(p1 - p0 + 4 * M_PI, 2 * M_PI);
+      pv = p0 + std::fmod(pv - p0 + 4 * M_PI, 2 * M_PI);
+      if (pv > p1)
+        p1 -= 2 * M_PI;
+      std::vector<gp_Pnt> q;
+      std::vector<double> t;
+      for (int j = 0; j <= 24; ++j)
+      {
+        t.push_back(p0 + (p1 - p0) * j / 24);
+        q.push_back(ElCLib::Value(t.back(), k1));
+      }
+      const std::optional<gp_Pnt2d> fa = uv_at(e1, v.IsSame(v1) ? A : B, a0);
+      if (!fa)
+        continue;
+      const gp_Pnt2d from = v.IsSame(v1) ? *fa : fa->Translated(shift);
+      std::optional<TopoDS_Edge> m = edge_through(q, t, a0, a1, NF, from, tol, new Geom_Circle(k1));
+      if (!m)
+        continue;
+      // (On the floor too, from e1's curve there.)
+      const TopoDS_Edge mf = TopoDS::Edge(m->Oriented(TopAbs_FORWARD));
+      const TopoDS_Vertex start = TopExp::FirstVertex(mf);
+      const std::optional<gp_Pnt2d> fp = uv_at(e1, P, start.IsSame(a0) ? a0 : a1);
+      if (!fp || (!start.IsSame(a0) && !uv_at(e2, P, a1)))
+        continue;
+      if (!add_curve_on(mf, P, start.IsSame(a0) ? *fp : *uv_at(e2, P, a1), tol))
+        continue;
+      ShapeIMap old;
+      old.Add(e1);
+      old.Add(e2);
+      size_t at = 0;
+      while (at < splices.size() && !splices[at].first.IsSame(P))
+        ++at;
+      if (at == splices.size())
+        splices.push_back({P, {}});
+      splices[at].second.push_back({old, {*m}});
+      mh->AddModified(e1, *m);
+      mh->AddModified(e2, *m);
+      loop[k] = *m;
+      loop.erase(loop.begin() + (long)((k + 1) % loop.size()));
+    }
+    TopoDS_Wire w;
+    bb.MakeWire(w);
+    for (const TopoDS_Edge& e : loop)
+      bb.Add(w, e);
+    w.Closed(true);
+    TopoDS_Face nf = NF;
+    bb.Add(nf, w);
+    nf.Orientation(A.Orientation());
+    used.Add(A);
+    used.Add(B);
+    rs->Replace(A, nf);
+    rs->Remove(B);
+    rebuilt.push_back(A);
+    mh->AddModified(A, nf);
+    mh->AddModified(B, nf);
+    mh->Remove(E);
+  }
+  if (used.IsEmpty())
+    return;
+  for (const auto& [f, runs] : splices)
+  {
+    const std::optional<TopoDS_Face> nf = spliced(f, runs);
+    if (!nf)
+      return;
+    rs->Replace(f, *nf);
+    mh->AddModified(f, *nf);
+    rebuilt.push_back(f);
+  }
+  // (Only the rebuilt faces checked: the rest of the part is as it was, its edges' uses unchanged.)
+  const TopoDS_Shape out = rs->Apply(r);
+  for (const TopoDS_Shape& f : rebuilt)
+    if (!BRepCheck_Analyzer(rs->Value(f)).IsValid())
+      return;
+  if (h.IsNull())
+    h = new BRepTools_History();
+  h->Merge(mh);
+  r = out;
+}
+
+// A round between a boss and a floor running over a hole's rim in the floor (pipeflange-steven's Fillet 2 over its
+// countersinks): live's ball rolls on, touching the boss and the rim, and the corner is two faces filled G1 between
+// the true ball's curves (its contact on the boss, the rim's arcs, its arc where it dips lowest, live 2104 B); OCCT's
+// rolls the ball's sections in planes through the boss's axis, its corner lower on the boss and one face. Each such
+// corner rebuilt as live's.
+static void true_ball_over_rims(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  if (legacy_rim_seams())
+    return;
+  const KernelTimer timer("blend.ball_over_rims");
+  ShapeIMap         in_faces;
+  TopExp::MapShapes(input, TopAbs_FACE, in_faces);
+  // The corners: connected new faces that aren't elementary, between new tori.
+  ShapeIMap cands;
+  bool      tori = false;
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (in_faces.Contains(x.Current()))
+      continue;
+    const GeomAbs_SurfaceType t = BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType();
+    tori |= t == GeomAbs_Torus;
+    if (t == GeomAbs_BSplineSurface || t == GeomAbs_BezierSurface || t == GeomAbs_OtherSurface || t == GeomAbs_OffsetSurface)
+      cands.Add(x.Current());
+  }
+  if (cands.IsEmpty() || !tori)
+    return;
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef);
+  std::vector<TopoDS_Face> cand;
+  for (int i = 1; i <= cands.Extent(); ++i)
+    cand.push_back(TopoDS::Face(cands(i)));
+  std::vector<int> group(cand.size());
+  for (size_t i = 0; i < cand.size(); ++i)
+    group[i] = (int)i;
+  const auto top = [&](int i) { while (group[(size_t)i] != i) i = group[(size_t)i]; return i; };
+  const auto index_of = [&](const TopoDS_Shape& f) { return cands.FindIndex(f) - 1; };
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const ShapeList& fs = ef(i);
+    if (fs.Extent() != 2)
+      continue;
+    const int a = index_of(fs.First()), b = index_of(fs.Last());
+    if (a >= 0 && b >= 0)
+      group[(size_t)top(a)] = top(b);
+  }
+  occ::handle<ShapeBuild_ReShape>                       rs = new ShapeBuild_ReShape();
+  occ::handle<BRepTools_History>                        mh = new BRepTools_History();
+  std::vector<std::pair<TopoDS_Face, std::vector<Run>>> splices; // the boss's and the rims' faces, their runs
+  ShapeIMap                                             end_tori;
+  for (size_t g = 0; g < cand.size(); ++g)
+  {
+    if (top((int)g) != (int)g)
+      continue;
+    std::vector<TopoDS_Face> region;
+    for (size_t i = 0; i < cand.size(); ++i)
+      if (top((int)i) == (int)g)
+        region.push_back(cand[i]);
+    // Its boundary: two ends on tori, the rest on the boss's cylinder and on the rim's face.
+    std::vector<std::pair<TopoDS_Edge, TopoDS_Face>> ends, along;
+    ShapeIMap                                        seen;
+    bool                                             ok = true;
+    for (const TopoDS_Face& f : region)
+      for (TopExp_Explorer x(f, TopAbs_EDGE); x.More() && ok; x.Next())
+      {
+        const TopoDS_Edge e = TopoDS::Edge(x.Current());
+        if (BRep_Tool::Degenerated(e) || seen.Contains(e))
+          continue;
+        seen.Add(e);
+        const ShapeList& fs = ef.FindFromKey(e);
+        if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()))
+        {
+          ok = false;
+          break;
+        }
+        const TopoDS_Face other = TopoDS::Face(index_of(fs.First()) >= 0 ? fs.Last() : fs.First());
+        if (index_of(other) >= 0)
+          continue;
+        const GeomAbs_SurfaceType t = BRepAdaptor_Surface(other, false).GetType();
+        if (t == GeomAbs_Torus)
+          ends.push_back({e, other});
+        else if (t == GeomAbs_Cylinder || t == GeomAbs_Cone)
+          along.push_back({e, other});
+        else
+          ok = false;
+      }
+    if (!ok || ends.size() != 2)
+      continue;
+    const BRepAdaptor_Surface ts(ends[0].second, false);
+    const gp_Torus            tor = ts.Torus();
+    const gp_Ax3              ax  = tor.Position();
+    const gp_Pnt              O   = ax.Location();
+    const gp_Dir              Z = ax.Direction(), X = ax.XDirection(), Y = ax.YDirection();
+    const double              R = tor.MajorRadius(), rho = tor.MinorRadius(), tol = 1e-6 * rho;
+    {
+      const gp_Torus t2 = BRepAdaptor_Surface(ends[1].second, false).Torus();
+      if (t2.Location().Distance(O) > tol || !t2.Axis().Direction().IsParallel(Z, 1e-9) || std::abs(t2.MajorRadius() - R) > tol ||
+          std::abs(t2.MinorRadius() - rho) > tol)
+        continue;
+    }
+    // The boss: a cylinder round the torus's axis, its radius R -/+ rho; the rim's face the other.
+    TopoDS_Face boss, hole;
+    double      sgn = 0;
+    for (const auto& [e, f] : along)
+    {
+      const BRepAdaptor_Surface s(f, false);
+      bool                      is_boss = false;
+      if (s.GetType() == GeomAbs_Cylinder)
+      {
+        const gp_Cylinder c = s.Cylinder();
+        if (c.Axis().Direction().IsParallel(Z, 1e-9) && gp_Lin(ax.Axis()).Distance(c.Location()) < tol)
+        {
+          if (std::abs(c.Radius() - (R - rho)) < tol)
+            (is_boss = true, sgn = -1);
+          else if (std::abs(c.Radius() - (R + rho)) < tol)
+            (is_boss = true, sgn = 1);
+        }
+      }
+      TopoDS_Face& slot = is_boss ? boss : hole;
+      if (!slot.IsNull() && !slot.IsSame(f))
+        ok = false;
+      slot = f;
+    }
+    if (!ok || boss.IsNull() || hole.IsNull())
+      continue;
+    // The rim: the hole's circle in the floor (the plane rho from the torus's centre plane), round an axis along Z.
+    gp_Circ rim;
+    bool    found = false;
+    for (TopExp_Explorer x(hole, TopAbs_EDGE); x.More() && !found; x.Next())
+    {
+      const BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+      if (c.GetType() != GeomAbs_Circle)
+        continue;
+      const gp_Circ cc = c.Circle();
+      if (cc.Axis().Direction().IsParallel(Z, 1e-9) && std::abs(std::abs(gp_Vec(O, cc.Location()).Dot(gp_Vec(Z))) - rho) < tol)
+        (rim = cc, found = true);
+    }
+    if (!found)
+      continue;
+    const gp_Pnt hc = rim.Location();
+    const double a = rim.Radius();
+    const gp_Vec up = gp_Vec(Z) * (gp_Vec(O, hc).Dot(gp_Vec(Z)) < 0 ? 1.0 : -1.0); // floor to the balls' centres
+    const auto dir = [&](double th) { return gp_Vec(X) * std::cos(th) + gp_Vec(Y) * std::sin(th); };
+    const auto planar = [&](const gp_Vec& v) { return v - gp_Vec(Z) * v.Dot(gp_Vec(Z)); };
+    // The ball's centre at angle th: on the boss's offset, rho from the rim (below the torus's centre circle).
+    const auto centre = [&](double th, gp_Pnt& c) {
+      const gp_Pnt p = O.Translated(dir(th) * R);
+      const double d = planar(gp_Vec(hc, p)).Magnitude();
+      if (std::abs(d - a) > rho)
+        return false;
+      c = p.Translated(up * (std::sqrt(rho * rho - (d - a) * (d - a)) - rho));
+      return d <= a + tol;
+    };
+    const auto rim_point = [&](const gp_Pnt& c) {
+      gp_Vec v = planar(gp_Vec(hc, c));
+      return hc.Translated(v.Normalized() * a);
+    };
+    double th[2];
+    for (int k = 0; k < 2; ++k)
+    {
+      // (A section of the torus: its angle from its middle, every point rho from the centre circle there.)
+      const BRepAdaptor_Curve c(ends[(size_t)k].first);
+      const gp_Vec            v = gp_Vec(O, c.Value(0.5 * (c.FirstParameter() + c.LastParameter())));
+      th[k]                     = std::atan2(v.Dot(gp_Vec(Y)), v.Dot(gp_Vec(X)));
+      const gp_Pnt cc           = O.Translated(dir(th[k]) * R);
+      for (int i = 0; i <= 8 && ok; ++i)
+        if (std::abs(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * i / 8).Distance(cc) - rho) > 1e-4 * rho)
+          ok = false;
+      if (!ok)
+        break;
+    }
+    if (!ok)
+      continue;
+    double span = th[1] - th[0];
+    span -= 2 * M_PI * std::round(span / (2 * M_PI));
+    gp_Pnt cm;
+    if (std::abs(span) < 1e-6 || !centre(th[0] + span / 2, cm))
+      continue;
+    // The ends' vertices on the boss and on the rim.
+    TopoDS_Vertex vb[2], vr[2];
+    for (int k = 0; k < 2; ++k)
+    {
+      const TopoDS_Edge& e = ends[(size_t)k].first;
+      for (const TopoDS_Vertex& v : {TopExp::FirstVertex(e), TopExp::LastVertex(e)})
+      {
+        const gp_Pnt p = BRep_Tool::Pnt(v);
+        gp_Pnt       c;
+        centre(th[k], c);
+        if (p.Distance(c.Translated(dir(th[k]) * (sgn * rho))) < 1e-4 * rho)
+          vb[k] = v;
+        else if (p.Distance(rim_point(c)) < 1e-4 * rho)
+          vr[k] = v;
+      }
+      if (vb[k].IsNull() || vr[k].IsNull())
+        ok = false;
+    }
+    if (!ok)
+      continue;
+    // (The ends as live's, B-splines on the circles' parameters.)
+    for (const auto& [e, f] : ends)
+    {
+      double                        a, b;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, a, b);
+      if (c.IsNull() || BRepAdaptor_Curve(e).GetType() != GeomAbs_Circle)
+        continue;
+      const occ::handle<Geom_BSplineCurve> sp = spline_of(c, a, b, 1e-7 * rho);
+      if (sp.IsNull())
+        continue;
+      BRep_Builder bb;
+      bb.UpdateEdge(e, sp, BRep_Tool::Tolerance(e));
+      bb.Range(e, a, b);
+    }
+    // The seam where the ball dips lowest, between its contacts there.
+    gp_Pnt cs;
+    const double ths = th[0] + span / 2;
+    centre(ths, cs);
+    const gp_Pnt        bs = cs.Translated(dir(ths) * (sgn * rho)), rs_ = rim_point(cs);
+    const TopoDS_Vertex vbs = BRepBuilderAPI_MakeVertex(bs), vrs = BRepBuilderAPI_MakeVertex(rs_);
+    const double        etol = std::max(Precision::Confusion(), 1e-7 * rho);
+    TopoDS_Edge         seam;
+    {
+      const gp_Vec x0(cs, bs), x1(cs, rs_);
+      const gp_Vec nn = x0.Crossed(x1);
+      if (nn.Magnitude() < 1e-9 * rho * rho)
+        continue;
+      const occ::handle<Geom_BSplineCurve> gc = spline_of(new Geom_Circle(gp_Ax2(cs, gp_Dir(nn), gp_Dir(x0)), rho), 0, x0.Angle(x1), etol);
+      if (gc.IsNull())
+        continue;
+      BRep_Builder bb;
+      bb.MakeEdge(seam, gc, etol);
+      bb.Add(seam, vbs.Oriented(TopAbs_FORWARD));
+      bb.Add(seam, vrs.Oriented(TopAbs_REVERSED));
+      bb.Range(seam, 0, x0.Angle(x1));
+    }
+    // The boss's and the rim's curves, each in two from the ends to the seam.
+    const auto first_uv = [&](const std::vector<std::pair<TopoDS_Edge, TopoDS_Face>>& es, const TopoDS_Face& f,
+                              const TopoDS_Vertex& v) -> std::optional<gp_Pnt2d> {
+      for (const auto& [e, ff] : es)
+        if (ff.IsSame(f) && (TopExp::FirstVertex(e).IsSame(v) || TopExp::LastVertex(e).IsSame(v)))
+          return uv_at(e, f, v);
+      return std::nullopt;
+    };
+    std::vector<TopoDS_Edge>              on_boss;
+    std::vector<std::vector<TopoDS_Edge>> on_rim;
+    const int                             n = 24;
+    // Where another edge of the hole's face meets the rim inside the corner (its seam): kept as a vertex.
+    std::vector<TopoDS_Vertex> pins;
+    {
+      ShapeIMap old_rim;
+      for (const auto& [e, f] : along)
+        if (f.IsSame(hole))
+          old_rim.Add(e);
+      ShapeAncMap ve;
+      TopExp::MapShapesAndAncestors(hole, TopAbs_VERTEX, TopAbs_EDGE, ve);
+      for (int i = 1; i <= old_rim.Extent(); ++i)
+        for (const TopoDS_Vertex& v : {TopExp::FirstVertex(TopoDS::Edge(old_rim(i))), TopExp::LastVertex(TopoDS::Edge(old_rim(i)))})
+        {
+          if (v.IsSame(vr[0]) || v.IsSame(vr[1]) || std::any_of(pins.begin(), pins.end(), [&](const TopoDS_Vertex& x) { return x.IsSame(v); }))
+            continue;
+          const ShapeList& es = ve.FindFromKey(v);
+          if (std::any_of(es.begin(), es.end(), [&](const TopoDS_Shape& e) { return !old_rim.Contains(e); }))
+            pins.push_back(v);
+        }
+    }
+    for (int k = 0; k < 2 && ok; ++k)
+    {
+      // th from the end k to the middle.
+      std::vector<gp_Pnt> pb, pr;
+      std::vector<double> t;
+      for (int i = 0; i <= n; ++i)
+      {
+        const double s  = (double)i / n;
+        const double tt = k == 0 ? th[0] + (ths - th[0]) * s : th[1] + (ths - th[1]) * s;
+        gp_Pnt       c;
+        centre(tt, c);
+        pb.push_back(c.Translated(dir(tt) * (sgn * rho)));
+        pr.push_back(rim_point(c));
+        t.push_back(s);
+      }
+      pb.front() = BRep_Tool::Pnt(vb[k]);
+      pb.back()  = bs;
+      const std::optional<gp_Pnt2d> fb = first_uv(along, boss, vb[k]);
+      const std::optional<TopoDS_Edge> eb = fb ? edge_through(pb, t, vb[k], vbs, boss, *fb, etol) : std::nullopt;
+      // On the rim, along its circle the way that passes the corner, through the pins on the way.
+      const double p0 = ElCLib::Parameter(rim, BRep_Tool::Pnt(vr[k]));
+      double       p1 = ElCLib::Parameter(rim, rs_), pm = ElCLib::Parameter(rim, pr[(size_t)n / 2]);
+      p1 = p0 + std::fmod(p1 - p0 + 4 * M_PI, 2 * M_PI);
+      pm = p0 + std::fmod(pm - p0 + 4 * M_PI, 2 * M_PI);
+      if (pm > p1)
+        p1 -= 2 * M_PI;
+      std::vector<std::pair<double, TopoDS_Vertex>> stops{{p0, vr[k]}, {p1, vrs}};
+      for (const TopoDS_Vertex& v : pins)
+      {
+        double pp = ElCLib::Parameter(rim, BRep_Tool::Pnt(v));
+        pp        = p0 + std::fmod(pp - p0 + (p1 > p0 ? 4 * M_PI : -4 * M_PI), (p1 > p0 ? 2 * M_PI : -2 * M_PI));
+        if ((pp - p0) * (p1 - pp) > 0)
+          stops.insert(stops.end() - 1, {pp, v});
+      }
+      std::sort(stops.begin(), stops.end(), [&](const auto& x, const auto& y) { return (x.first - y.first) * (p1 - p0) < 0; });
+      // (One curve for the arc, its pieces on either side of a seam shown as one.)
+      const occ::handle<Geom_Curve> rim_curve = spline_of(new Geom_Circle(rim), std::min(p0, p1), std::max(p0, p1), etol);
+      if (rim_curve.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      std::vector<TopoDS_Edge>      pieces;
+      for (size_t i = 0; i + 1 < stops.size() && ok; ++i)
+      {
+        const auto& [a0, va] = stops[i];
+        const auto& [a1, vb] = stops[i + 1];
+        std::vector<gp_Pnt> q;
+        std::vector<double> tq;
+        for (int j = 0; j <= n; ++j)
+        {
+          tq.push_back(a0 + (a1 - a0) * j / n);
+          q.push_back(ElCLib::Value(tq.back(), rim));
+        }
+        // (Its curve on the hole's face from the old one's at va, on this side of a seam there.)
+        const gp_Pnt mid = ElCLib::Value(0.5 * (a0 + a1), rim);
+        std::optional<gp_Pnt2d> from;
+        double                  best = 1e300;
+        for (const auto& [e, f] : along)
+          if (f.IsSame(hole) && (TopExp::FirstVertex(e).IsSame(va) || TopExp::LastVertex(e).IsSame(va)))
+          {
+            const BRepAdaptor_Curve ce(e);
+            const double            d = ce.Value(0.5 * (ce.FirstParameter() + ce.LastParameter())).Distance(mid);
+            if (d < best)
+              (best = d, from = uv_at(e, hole, va));
+          }
+        const std::optional<TopoDS_Edge> er = from ? edge_through(q, tq, va, vb, hole, *from, etol, rim_curve) : std::nullopt;
+        if (!er)
+          ok = false;
+        else
+          pieces.push_back(*er);
+      }
+      if (!eb || !ok)
+        ok = false;
+      else
+      {
+        on_boss.push_back(*eb);
+        on_rim.push_back(pieces);
+      }
+    }
+    if (!ok)
+      continue;
+    // The two faces, tangent to the tori at the ends, the boss, and the ball along the seam; through the rim.
+    const TopoDS_Face ball = BRepBuilderAPI_MakeFace(occ::handle<Geom_Surface>(new Geom_SphericalSurface(gp_Ax3(cs, Z), rho)), Precision::Confusion());
+    std::vector<TopoDS_Face> made;
+    for (int k = 0; k < 2 && ok; ++k)
+    {
+      std::vector<TopoDS_Edge> es{ends[(size_t)k].first, on_boss[(size_t)k], seam};
+      std::vector<TopoDS_Face> fs{ends[(size_t)k].second, boss, ball};
+      for (const TopoDS_Edge& e : on_rim[(size_t)k])
+        (es.push_back(e), fs.push_back(TopoDS_Face()));
+      const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs, true);
+      if (!f)
+      {
+        ok = false;
+        break;
+      }
+      const TopAbs_Orientation o = orientation_in(ends[(size_t)k].second, ends[(size_t)k].first);
+      made.push_back(orientation_in(*f, ends[(size_t)k].first) == o ? TopoDS::Face(f->Reversed()) : *f);
+    }
+    if (!ok)
+      continue;
+    ShapeIMap old_boss, old_rim;
+    for (const auto& [e, f] : along)
+      (f.IsSame(boss) ? old_boss : old_rim).Add(e);
+    // (Each pair as one run: the first to the seam, the second back from it.)
+    const auto chain = [](const std::vector<TopoDS_Edge>& a, const std::vector<TopoDS_Edge>& b) {
+      std::vector<TopoDS_Edge> c = a;
+      for (auto x = b.rbegin(); x != b.rend(); ++x)
+        c.push_back(TopoDS::Edge(x->Reversed()));
+      return c;
+    };
+    for (auto [f, old, two] : {std::make_tuple(boss, old_boss, chain({on_boss[0]}, {on_boss[1]})), std::make_tuple(hole, old_rim, chain(on_rim[0], on_rim[1]))})
+    {
+      size_t at = 0;
+      while (at < splices.size() && !splices[at].first.IsSame(f))
+        ++at;
+      if (at == splices.size())
+        splices.push_back({f, {}});
+      splices[at].second.push_back({old, two});
+      for (int i = 1; i <= old.Extent(); ++i)
+        for (const TopoDS_Edge& e : two)
+          mh->AddModified(old(i), e);
+    }
+    TopoDS_Compound pair;
+    BRep_Builder    bb;
+    bb.MakeCompound(pair);
+    for (const TopoDS_Face& f : made)
+      bb.Add(pair, f);
+    rs->Replace(region.front(), pair);
+    for (size_t i = 1; i < region.size(); ++i)
+      rs->Remove(region[i]);
+    for (const TopoDS_Face& f : region)
+      for (const TopoDS_Face& m : made)
+        mh->AddModified(f, m);
+    for (const auto& [e, f] : ends)
+      end_tori.Add(f);
+  }
+  if (splices.empty())
+    return;
+  for (const auto& [f, runs] : splices)
+  {
+    const std::optional<TopoDS_Face> nf = spliced(f, runs);
+    if (!nf)
+      return;
+    rs->Replace(f, *nf);
+    mh->AddModified(f, *nf);
+  }
+  const TopoDS_Shape out = rs->Apply(r);
+  if (!BRepCheck_Analyzer(out).IsValid())
+    return;
+  if (h.IsNull())
+    h = new BRepTools_History();
+  h->Merge(mh);
+  r = out;
+  merge_split_tori(input, end_tori, r, h);
+}
+
 // A blend's new faces finished: approximated ones made analytic, then a full round's two faces on one cylinder one
 // face (B-spline blends of a full round too: the analytic step first), a corner's two sphere patches one. A studio
 // saved before (legacy_blend_finish) keeps the old order: the merges first.
@@ -4047,6 +4960,7 @@ static void finish_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist
   analytic_blend_faces(input, r, h);
   merge_full_rounds(input, r, h);
   merge_corner_spheres(input, r, h);
+  true_ball_over_rims(input, r, h);
   rim_seams_off_joints(input, r, h);
 }
 
@@ -5855,6 +6769,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     {
       analytic_blend_faces(in, past->first, past->second);
       merge_full_rounds(in, past->first, past->second);
+      true_ball_over_rims(in, past->first, past->second);
       rim_seams_off_joints(in, past->first, past->second);
     }
     tighten_new_tolerances(in, past->first, accurate(in));
@@ -7277,8 +8192,9 @@ bool inside_polygon(const std::vector<gp_Pnt2d>& poly, double x, double y)
 // the boundary (outside it barely counts), trimmed by the boundary. With live's own boundaries it gives live's areas
 // (setback 26.05 / 26.91 / 35.1 mm², live 26.07 / 26.98 / 34.46; pipeflange 28.7413 / 31.3202, live 28.7417 /
 // 31.3199), where OCCT's plate, the least bending over the whole plane, overshoots (26.93 / 27.85 / 38.00).
-// `supports[i]` null: edge i only passed through. Null where it doesn't come out a valid face.
-std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports)
+// `supports[i]` null: edge i only passed through. Null where it doesn't come out a valid face. `share`: on the edges
+// themselves (a face of a part being rebuilt), not copies.
+std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports, bool share)
 {
   if (edges.size() < 2 || supports.size() != edges.size())
     return std::nullopt;
@@ -7293,12 +8209,12 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
   std::vector<std::pair<TopoDS_Edge, int>> copies; // copy, input index
   for (size_t i = 0; i < edges.size(); ++i)
   {
-    const TopoDS_Edge e = TopoDS::Edge(cp.ModifiedShape(edges[i]));
+    const TopoDS_Edge e = share ? edges[i] : TopoDS::Edge(cp.ModifiedShape(edges[i]));
     seq->Append(e);
     copies.push_back({e, (int)i});
   }
   occ::handle<NCollection_HSequence<TopoDS_Shape>> wires;
-  ShapeAnalysis_FreeBounds::ConnectEdgesToWires(seq, Precision::Confusion(), false, wires);
+  ShapeAnalysis_FreeBounds::ConnectEdgesToWires(seq, Precision::Confusion(), share, wires);
   if (wires.IsNull() || wires->Length() != 1)
     return std::nullopt;
   const TopoDS_Wire W = TopoDS::Wire(wires->Value(1));
@@ -7633,6 +8549,10 @@ std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, c
   const TopoDS_Face out = TopoDS::Face(fix.Face());
   if (!BRepCheck_Analyzer(out).IsValid())
     return std::nullopt;
+  if (share)
+    for (TopExp_Explorer x(out, TopAbs_EDGE); x.More(); x.Next())
+      if (std::none_of(edges.begin(), edges.end(), [&](const TopoDS_Edge& e) { return e.IsSame(x.Current()); }))
+        return std::nullopt;
   return out;
   }
   catch (const Standard_Failure& x)
@@ -7715,7 +8635,7 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
       es.push_back(as_edge(edges.items[i], "fill boundary edge"));
       fs.push_back(i < orders.size() && orders[i] == 1 && !supports.items[i].IsNull() ? as_face(supports.items[i], "fill support face") : TopoDS_Face());
     }
-    if (const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs))
+    if (const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs, false))
     {
       std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
       return make_result(args, *f, nullptr);
