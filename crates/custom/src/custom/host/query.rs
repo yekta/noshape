@@ -1259,6 +1259,14 @@ pub(super) fn uniq(v: Vec<Ent>) -> Vec<Ent> {
     v.into_iter().filter(|e| seen.insert(e.clone())).collect()
 }
 
+/// A query's `bodyType`: one BodyType or an array of them.
+fn body_types(query: &Value) -> Vec<Arc<str>> {
+    match query.get("bodyType") {
+        Value::Array(a, _) => a.iter().filter_map(enum_str).collect(),
+        v => enum_str(v).into_iter().collect(),
+    }
+}
+
 fn enum_str(v: &Value) -> Option<Arc<str>> {
     v.as_str()
 }
@@ -1307,6 +1315,11 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         "NOTHING" => Vec::new(),
         "EVERYTHING" => {
             let mut all = q.all(entity_type);
+            // std's qBodyType of qEverything is this query with its body types.
+            let types = body_types(query);
+            if !types.is_empty() {
+                all.retain(|e| types.iter().any(|t| **t == *q.body_type(e)));
+            }
             live_order(q, &mut all);
             all
         }
@@ -1443,10 +1456,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "OWNER_PART" => uniq(eval(i, q, query.get("query"))?.iter().filter_map(|e| q.owner(e)).collect()),
         "BODY_TYPE" => {
-            let types: Vec<Arc<str>> = match query.get("bodyType") {
-                Value::Array(a, _) => a.iter().filter_map(enum_str).collect(),
-                v => enum_str(v).into_iter().collect(),
-            };
+            let types = body_types(query);
             sub(i, "subquery")?.into_iter().filter(|e| types.iter().any(|t| **t == *q.body_type(e))).collect()
         }
         "GEOMETRY" => {

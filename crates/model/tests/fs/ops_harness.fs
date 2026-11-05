@@ -315,6 +315,18 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                     inside += 1;
             check("a cut corner's tracking", size(found) == 3 && inside == 0, found);
         });
+        step(context, id, "solidsOfEverything", function(sub) {
+            // std folds qBodyType of qEverything into one EVERYTHING query with its body types: only the solids, no
+            // sketch (cf-fix-pcb's Fix PCB 2 took the four sketches for components).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 3600) * mm, "corner2" : vector(20, 10, 3605) * mm });
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 3610) * mm, vector(0, 0, 1)) });
+            skRectangle(sk, "r", { "firstCorner" : vector(0, 0) * mm, "secondCorner" : vector(5, 5) * mm });
+            skSolve(sk);
+            const solids = qBodyType(qEverything(EntityType.BODY), BodyType.SOLID);
+            const sketches = size(evaluateQuery(context, qSketchFilter(solids, SketchObject.YES)));
+            const block = size(evaluateQuery(context, qIntersection([solids, qCreatedBy(sub + "b", EntityType.BODY)])));
+            check("qBodyType of qEverything", solids.queryType == QueryType.EVERYTHING && sketches == 0 && block == 1, [solids, sketches, block]);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).
