@@ -539,6 +539,10 @@ pub struct NamedPosition {
     /// saved; restoring the position re-imposes them.
     #[serde(default)]
     pub mate_values: Vec<(MateId, [f64; 4])>,
+    /// The named position of each subassembly column ([`Assembly::position_subs`]) this position takes (a column
+    /// without one is "Position is required.").
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sub_positions: Vec<(InstanceId, String)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -877,6 +881,10 @@ pub struct Assembly {
     /// columns): (mate, value index 0 = Rz, 1..3 = Tx/Ty/Tz).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub position_drivers: Vec<(MateId, u8)>,
+    /// Named positions' subassembly columns (instance menu "Add to named positions…", live 2027): each position
+    /// picks one of the subassembly's own named positions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub position_subs: Vec<InstanceId>,
     #[serde(default)]
     pub exploded_views: Vec<ExplodedView>,
     /// Named views (camera menu "Named views…", Shift+V), as in a Part Studio.
@@ -1213,7 +1221,9 @@ impl Assembly {
         self.groups.retain(|g| !g.is_empty());
         for np in &mut self.named_positions {
             np.placements.retain(|(i, _)| *i != id);
+            np.sub_positions.retain(|(i, _)| *i != id);
         }
+        self.position_subs.retain(|i| *i != id);
         for ev in &mut self.exploded_views {
             for s in &mut ev.steps {
                 s.instances.retain(|i| *i != id);

@@ -1520,7 +1520,7 @@ fn named_position_restores_driving_mate_values() {
     saved.apply_placements(s.clone(), None);
     let values = saved.named_position_values(&asm);
     assert_eq!(values.len(), 2, "revolute and slider values are stored");
-    let np = NamedPosition { name: "Open".into(), placements: s.placements.clone(), mate_values: values };
+    let np = NamedPosition { name: "Open".into(), placements: s.placements.clone(), mate_values: values, sub_positions: Vec::new() };
     // Move away (both mates back to 0), then restore: the stored values come back
     // even from placements that do not match them.
     for (id, p) in &res.solved.placements {
@@ -2461,7 +2461,7 @@ fn flexible_subassembly_moves_in_parent_and_locks() {
         instances: vec![part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.015), false)],
         mates: vec![mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid))],
         // Mate values in live's sense: 30 mm up reads -30 mm.
-        named_positions: vec![NamedPosition { name: "Up".into(), placements: vec![], mate_values: vec![(MateId(10), [0.0, 0.0, 0.0, -0.03])] }],
+        named_positions: vec![NamedPosition { name: "Up".into(), placements: vec![], mate_values: vec![(MateId(10), [0.0, 0.0, 0.0, -0.03])], sub_positions: Vec::new() }],
         ..Default::default()
     };
     let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));

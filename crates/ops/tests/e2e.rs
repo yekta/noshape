@@ -3369,6 +3369,21 @@ fn assembly_instance_menu() {
     assert!(try_call(&mut ctx, "assembly_lock", json!({ "instance": b, "lock": "current" })).is_err(), "not a subassembly");
     let e = try_call(&mut ctx, "assembly_lock", json!({ "instance": sub, "lock": "Open" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("lock"));
+    // Add to named positions… (live 2027): a column of the parent's table; "Named position 1" made for it; each
+    // position picks one of the subassembly's own; applying it locks the subassembly there.
+    call(&mut ctx, "assembly_named_position", json!({ "tab": "Assembly 2", "action": "add", "name": "Open" }));
+    let ap = call(&mut ctx, "assembly_add_to_named_positions", json!({ "tab": "Assembly 1", "instance": sub }));
+    assert!(ap["toast"].as_str().unwrap().ends_with(" added to named positions"), "{ap}");
+    assert_eq!(ap["named_positions"], json!(["Named position 1"]), "{ap}");
+    assert!(try_call(&mut ctx, "assembly_add_to_named_positions", json!({ "tab": "Assembly 1", "instance": b })).is_err(), "not a subassembly");
+    let e = try_call(&mut ctx, "assembly_named_position", json!({ "tab": "Assembly 1", "action": "set_sub", "position": "Named position 1", "instance": sub, "sub_position": "Shut" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("sub_position"), "{e:?}");
+    call(&mut ctx, "assembly_named_position", json!({ "tab": "Assembly 1", "action": "set_sub", "position": "Named position 1", "instance": sub, "sub_position": "Open" }));
+    call(&mut ctx, "assembly_lock", json!({ "tab": "Assembly 1", "instance": sub, "lock": "current" }));
+    let applied = call(&mut ctx, "assembly_named_position", json!({ "tab": "Assembly 1", "action": "apply", "position": "Named position 1" }));
+    assert!(applied["named_positions"].as_array().is_some_and(|v| v.len() == 1), "{applied}");
+    let st = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(st["instances"].as_array().unwrap().iter().find(|i| i["id"] == sub).unwrap()["lock"], "Open", "{st}");
     let dv = call(&mut ctx, "assembly_dissolve_subassembly", json!({ "instances": [sub] }));
     assert_eq!(count(&dv), 3, "{dv}");
     assert!(last(&mut ctx).ends_with("Dissolve subassembly"));

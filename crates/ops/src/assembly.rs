@@ -582,7 +582,7 @@ pub fn next_named_position_name(a: &Assembly) -> String {
 /// A named position holding the current state (placements and the driving
 /// mates' values).
 pub fn capture_named_position(a: &Assembly, result: &AssemblyResult, name: String) -> NamedPosition {
-    NamedPosition { name, placements: result.solved.placements.clone(), mate_values: result.named_position_values(a) }
+    NamedPosition { name, placements: result.solved.placements.clone(), mate_values: result.named_position_values(a), sub_positions: Vec::new() }
 }
 
 /// Apply a position: its driving values are imposed (the other mates stay
@@ -597,6 +597,47 @@ pub fn apply_named_position(a: &Assembly, result: &AssemblyResult, np: &NamedPos
         start.insert(*id, *p);
     }
     result.prepared.solve(&noshape_model::assembly::eval::SolveOptions { start: Some(start), hold_values: hold, ..Default::default() })
+}
+
+/// Instance menu "Add to named positions…" (live 2027, no dialog): subassembly `id` becomes a column of the Named
+/// positions table, each position to pick one of its own named positions; with no position yet, "Named position 1"
+/// is made from the current state. Returns the toast ("<instance> added to named positions") and the new
+/// position's row, if one was made.
+pub fn add_to_named_positions(a: &mut Assembly, id: InstanceId, result: &AssemblyResult) -> Result<(String, Option<usize>), String> {
+    let inst = a.instance(id).ok_or("no such instance")?;
+    if !matches!(inst.source, noshape_model::assembly::InstanceSource::Assembly { .. }) {
+        return Err("Only subassemblies can be added to named positions".into());
+    }
+    let toast = format!("{} added to named positions", inst.name);
+    if !a.position_subs.contains(&id) {
+        a.position_subs.push(id);
+    }
+    let made = a.named_positions.is_empty().then(|| {
+        let name = next_named_position_name(a);
+        let np = capture_named_position(a, result, name);
+        a.named_positions.push(np);
+        0
+    });
+    Ok((toast, made))
+}
+
+/// Position `i`'s choice for subassembly column `id`: one of the subassembly's named positions.
+pub fn set_sub_position(a: &mut Assembly, i: usize, id: InstanceId, name: String) {
+    let Some(np) = a.named_positions.get_mut(i) else { return };
+    match np.sub_positions.iter_mut().find(|(x, _)| *x == id) {
+        Some(e) => e.1 = name,
+        None => np.sub_positions.push((id, name)),
+    }
+}
+
+/// Applying a named position locks each subassembly column to the position it picks.
+pub fn lock_subs_to(a: &mut Assembly, i: usize) {
+    let Some(np) = a.named_positions.get(i).cloned() else { return };
+    for (id, name) in np.sub_positions {
+        if a.position_subs.contains(&id) {
+            set_lock(a, id, SubassemblyLock::Named(name));
+        }
+    }
 }
 
 /// Duplicate named position's name: "<name> (1)", "<name> (2)"...

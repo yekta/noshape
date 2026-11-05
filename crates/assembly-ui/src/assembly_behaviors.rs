@@ -1352,24 +1352,34 @@ impl AssemblyView {
             _ => self.linked_assembly(top).map(|(_, a)| a.named_positions.iter().map(|n| n.name.clone()).collect()),
         };
         if let (false, Some(names)) = (multi, sub_positions) {
-            // Lock/follow position to ▸ Lock current position | <named positions> (Onshape).
+            // Live 2027: Add to named positions… (no dialog: a column of the Named positions table).
+            if matches!(inst.source, InstanceSource::Assembly { .. }) {
+                m.push(item("Add to named positions…", move |t, _, cx| t.add_to_named_positions(top, cx)));
+            }
+            // Live 2027: [Unlock, when locked] · Lock/follow position to… ▸ Lock current position | ─ | "<sub>
+            // <named position>" each, the one it follows ticked.
             let cur = inst.lock.clone();
+            if !cur.is_flexible() {
+                m.push(item("Unlock", move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Flexible, cx)));
+            }
             let mut children = vec![MenuEntry::Item {
                 label: if cur == SubassemblyLock::Current { "✓ Lock current position".into() } else { "Lock current position".into() },
                 icon: None,
                 disabled: false,
                 act: Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| t.set_sub_lock(top, SubassemblyLock::Current, cx)),
             }];
+            if !names.is_empty() {
+                children.push(MenuEntry::Sep);
+            }
+            // (The subassembly's name: its instance's without " <n>".)
+            let sub = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(b, _)| b).to_string();
             for n in names {
                 let on = cur == SubassemblyLock::Named(n.clone());
                 let n2 = n.clone();
-                children.push(item(if on { format!("✓ {n}") } else { n }, move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Named(n2.clone()), cx)));
+                let label = format!("{sub} {n}");
+                children.push(item(if on { format!("✓ {label}") } else { label }, move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Named(n2.clone()), cx)));
             }
-            if !cur.is_flexible() {
-                children.push(MenuEntry::Sep);
-                children.push(item("Unlock", move |t, _, cx| t.set_sub_lock(top, SubassemblyLock::Flexible, cx)));
-            }
-            m.push(MenuEntry::Sub { label: "Lock/follow position to".into(), children });
+            m.push(MenuEntry::Sub { label: "Lock/follow position to…".into(), children });
         }
         if matches!(inst.source, InstanceSource::Standard { .. }) {
             m.push(icon_item("Edit standard content instance…", "standard-content", move |t, _, cx| t.edit_standard_instance(top, cx)));

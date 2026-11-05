@@ -13,7 +13,7 @@ use noshape_model::document::TabId;
 use noshape_units::{Dim, EmptyScope, UnitPrefs};
 use serde_json::{Value, json};
 
-const POSITION_ACTIONS: [&str; 9] = ["add", "update", "apply", "duplicate", "delete", "rename", "move_up", "move_down", "set_value"];
+const POSITION_ACTIONS: [&str; 10] = ["add", "update", "apply", "duplicate", "delete", "rename", "move_up", "move_down", "set_value", "set_sub"];
 const DOFS: [&str; 4] = ["rz", "tx", "ty", "tz"];
 
 pub fn ops() -> Vec<Op> {
@@ -32,10 +32,22 @@ pub fn ops() -> Vec<Op> {
                 opt("mate", s(), "set_value: the driving mate (id or name)."),
                 opt("dof", json!({ "type": "string", "enum": DOFS }), "set_value: the mate's value: rz = rotation about Z, tx / ty / tz = translation."),
                 opt("value", json!({ "type": ["string", "number"] }), "set_value: the value (angle or length expression)."),
+                opt("instance", s(), "set_sub: a subassembly column (see assembly_add_to_named_positions): instance id or name."),
+                opt("sub_position", s(), "set_sub: one of that subassembly's own named positions."),
             ],
             mutates: true,
             destructive: false,
             run: named_position,
+        },
+        Op {
+            group: "assembly",
+            verb: "add_to_named_positions",
+            summary: "Add a subassembly to named positions (instance menu)",
+            description: "The subassembly instance menu's \"Add to named positions…\": the subassembly becomes a column of the Named positions table, where each position picks one of the subassembly's own named positions (assembly_named_position set_sub; applying the position locks the subassembly to it). With no named position yet, \"Named position 1\" is made from the current state. Returns the toast.",
+            fields: vec![doc_field(), asm_field(), req("instance", s(), "The subassembly instance: id or name.")],
+            mutates: true,
+            destructive: false,
+            run: add_to_named_positions,
         },
         Op {
             group: "assembly",
@@ -255,7 +267,20 @@ fn named_position(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         "apply" => {
             let i = pos()?;
             let solved = sa::apply_named_position(&asm, &result, &asm.named_positions[i]);
-            commit_solved(od, tab, &format!("Apply named position : {}", name_of(i)), result, solved, |_| {})?;
+            commit_solved(od, tab, &format!("Apply named position : {}", name_of(i)), result, solved, |a| sa::lock_subs_to(a, i))?;
+        }
+        "set_sub" => {
+            let i = pos()?;
+            let inst = find_instance(&asm, a.opt_str("instance")?.ok_or_else(|| OpError::param("instance", "required"))?, "instance")?;
+            if !asm.position_subs.contains(&inst) {
+                return Err(OpError::param("instance", "not a column of the named positions (assembly_add_to_named_positions first)"));
+            }
+            let name = a.opt_str("sub_position")?.ok_or_else(|| OpError::param("sub_position", "required"))?.to_string();
+            let theirs = sub_position_names(od, &asm, inst);
+            if !theirs.contains(&name) {
+                return Err(OpError::param("sub_position", &format!("not a named position of the subassembly ({})", if theirs.is_empty() { "it has none".to_string() } else { theirs.join(", ") })));
+            }
+            commit(od, tab, "Named position value", &result, |a| sa::set_sub_position(a, i, inst, name))?;
         }
         "duplicate" => {
             let i = pos()?;
@@ -301,6 +326,29 @@ fn named_position(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let now = assembly(od, tab)?;
     Ok(json!({ "named_positions": now.named_positions.iter().map(|p| json!({ "name": p.name, "mate_values": p.mate_values.iter().map(|(m, v)| json!({ "mate": format!("mate:{}", m.0), "rz_deg": v[0].to_degrees(), "t": [v[1] * len_scale(&units), v[2] * len_scale(&units), v[3] * len_scale(&units)] })).collect::<Vec<_>>() })).collect::<Vec<_>>() }).into())
+}
+
+/// The named positions of subassembly instance `id`'s own assembly (this document's tabs).
+fn sub_position_names(od: &OpenDoc, asm: &Assembly, id: noshape_model::assembly::InstanceId) -> Vec<String> {
+    let Some(noshape_model::assembly::InstanceSource::Assembly { assembly, .. }) = asm.instance(id).map(|i| &i.source) else { return Vec::new() };
+    match od.doc().tab(*assembly).map(|t| &t.content) {
+        Some(noshape_model::document::TabContent::Assembly(sub)) => sub.named_positions.iter().map(|n| n.name.clone()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn add_to_named_positions(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let inst = find_instance(&asm, a.str("instance")?, "instance")?;
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let mut probe = asm.clone();
+    let (toast, _) = sa::add_to_named_positions(&mut probe, inst, &result).map_err(|e| OpError::param("instance", &e))?;
+    commit(od, tab, &toast, &result, |a| {
+        let _ = sa::add_to_named_positions(a, inst, &result);
+    })?;
+    let now = assembly(od, tab)?;
+    Ok(json!({ "toast": toast, "columns": now.position_subs.iter().filter_map(|i| now.instance(*i).map(|x| x.name.clone())).collect::<Vec<_>>(), "named_positions": now.named_positions.iter().map(|p| p.name.clone()).collect::<Vec<_>>() }).into())
 }
 
 fn drivers(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
