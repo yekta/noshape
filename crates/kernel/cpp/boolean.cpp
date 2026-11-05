@@ -1990,8 +1990,8 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   std::vector<TopoDS_Edge> chain;
   if (from_v == uses.size() || !loop_from(from_v, chain))
     return {};
-  // An edge along the axis from V on the new seam's line: leaving V the wire goes on up the seam's side at
-  // alpha + 2 pi, coming back to V it comes down the side at alpha.
+  // An edge along the axis from V on the new seam's line: on the side the wire leaves V by (from the ring up the seam
+  // at alpha + 2 pi, so on at alpha + 2 pi; from a ring above, down at alpha) or comes back to V by (the other).
   for (const TopoDS_Edge* e : {&chain.front(), &chain.back()})
   {
     if (!along(*e, alpha))
@@ -2000,7 +2000,7 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
     occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(*e, F, f2, l2);
     if (pc.IsNull())
       return {};
-    const double want = e == &chain.front() ? alpha + 2 * M_PI : alpha;
+    const double want = (e == &chain.front()) == up ? alpha + 2 * M_PI : alpha;
     pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(want - pc->Value(0.5 * (f2 + l2)).X(), 0)));
     B.UpdateEdge(*e, pc, F, BRep_Tool::Tolerance(*e));
     B.Range(*e, F, f2, l2);

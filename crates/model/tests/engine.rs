@@ -1518,7 +1518,9 @@ fn boolean_results_and_names_as_live() {
     let ps = parts(&r);
     assert_eq!(ps.len(), 2, "{ps:?}");
     assert_eq!((ps[0].0.clone(), ps[0].1.as_str()), (p1.clone(), "Part 1"));
-    assert!((ps[0].2 - 9178.097245).abs() < 1e-4, "{ps:?}");
+    // (Within 1e-6 of it: the pin's seam moved to its corner on the block's edge leaves the volume integral, to 1e-7
+    // by its own measure, 2.8e-7 off; the shape's exact, mass properties' 1e-12 integral reads 9178.0972451.)
+    assert!((ps[0].2 / 9178.097245 - 1.0).abs() < 1e-6, "{ps:?}");
     assert_eq!(color(&r, &p1), c1);
     assert_eq!((ps[1].0.clone(), ps[1].1.as_str()), (p3.clone(), "Part 2"), "the old Part 3 renumbers");
     t.ps.features.retain(|f| f.id != u);
@@ -1551,7 +1553,7 @@ fn union_pick_order_and_intersect_keep_tools() {
     let r = t.ok();
     let ps = parts(&r);
     assert_eq!(ps.len(), 2, "{ps:?}");
-    assert!(ps.iter().any(|p| p.0 == p2 && (p.2 - 9178.097245).abs() < 1e-4), "the pin's id holds the union: {ps:?}");
+    assert!(ps.iter().any(|p| p.0 == p2 && (p.2 / 9178.097245 - 1.0).abs() < 1e-6), "the pin's id holds the union: {ps:?}");
     assert_eq!(color(&r, &p2), c2);
     t.ps.features.retain(|f| f.id != u);
 
