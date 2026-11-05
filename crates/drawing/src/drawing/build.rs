@@ -2746,7 +2746,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             g.cad_since(origin_mark, CadLayer::OriginIndicators);
             let tag_mark = g.texts.len();
             let tags = &ts.hole_tags;
-            for hrow in tables::hole_rows(geo, o, exclude, *x_dir) {
+            for hrow in tables::hole_rows(geo, source.map(|s| &*s.context), o, exclude, *x_dir) {
                 let c = pl.to_sheet(hrow.center);
                 let r = pl.len_to_sheet(hrow.diameter / 2.0);
                 g.texts.push(Text2 { pos: [c[0] + r * 0.75 + 0.8, c[1] + r * 0.75 + 0.8], height: tags.height.unwrap_or(drawing.props.ann_text_height), text: hrow.tag, angle: 0.0, anchor: Anchor::BottomLeft, pick });

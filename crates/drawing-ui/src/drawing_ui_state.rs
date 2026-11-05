@@ -1,7 +1,7 @@
 //! The ui-parity state of a drawing tab and where its targets show (tests/ui-parity/README.md "### Drawings").
 
 use super::*;
-use noshape_scene::drawing_tools::{Sel, Tool};
+use noshape_scene::drawing_tools::{DimTool, Pick, PickedPoint, Sel, Tool};
 use serde_json::{Value, json};
 
 impl DrawingEditor {
@@ -58,7 +58,7 @@ impl DrawingEditor {
     }
 
     /// A view's name as its properties show it: its orientation (a projected view's: what it looks along), a
-    /// section's "Section" (live 2063), a detail's "Detail A".
+    /// section's "Section" (live 2063), a detail's "Detail".
     pub fn ui_view_name(&self, id: ViewId) -> String {
         let drawing = self.display();
         let Some(sheet) = drawing.sheets.get(self.sheet) else { return String::new() };
@@ -69,7 +69,7 @@ impl DrawingEditor {
             ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, id).map(oriented).unwrap_or_else(|| "Isometric".into()),
             // Live's export names it "Section", its "SECTION A - A" a note (2063).
             ViewKind::Section { .. } => "Section".to_string(),
-            ViewKind::Detail { label, .. } => format!("Detail {label}"),
+            ViewKind::Detail { .. } => "Detail".to_string(),
             _ => v.label.clone().unwrap_or_else(|| self.ui_view_kind(id).to_string()),
         }
     }
@@ -114,7 +114,8 @@ impl DrawingEditor {
                     "Gdt" => "gdt",
                     _ => "other",
                 };
-                (a.id, k, text(a.id))
+                let t = text(a.id);
+                (a.id, k, if k == "dimension" { dimension_value(&t) } else { t })
             })
             .collect()
     }
@@ -135,7 +136,7 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let scale = self.placement(v.id).map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
-                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
+                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale })
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
@@ -169,6 +170,19 @@ impl DrawingEditor {
             && self.projection_parent_lit
         {
             selection.push(("EDGE".into(), self.ui_view_name(*p)));
+        }
+        // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
+        // drw-broken-out-section).
+        match &self.tool {
+            Tool::Dimension { picks, .. } => {
+                for p in picks {
+                    if let Pick::Line { a: PickedPoint { view, .. }, .. } | Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } = p {
+                        selection.push(("EDGE".into(), self.ui_view_name(*view)));
+                    }
+                }
+            }
+            Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
+            _ => {}
         }
         selection.sort();
         selection.dedup();
@@ -236,7 +250,13 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
         Tool::Detail { .. } => "Detail view",
         Tool::Crop { .. } => "Crop view",
         Tool::Break { .. } => "Break view",
-        Tool::Dimension { .. } => "Dimension",
+        Tool::Dimension { kind, .. } => match kind {
+            DimTool::Linear => "Dimension",
+            DimTool::Angle => "Line to line angular dimension",
+            DimTool::MaxMin => "Maximum or minimum dimension",
+            DimTool::Foreshorten => "Foreshorten dimension",
+            k => k.name(),
+        },
         Tool::Ordinate { .. } => "Ordinate dimension",
         Tool::Note => "Note",
         Tool::Centermark => "Centermark",
@@ -254,4 +274,11 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
         // The rest by the tool's own name (the table tools, Crop, Break… as their tooltips).
         t => t.name(),
     })
+}
+
+/// A dimension as live's recorder reads it: its value without the Ø / R prefix, with its leading zero ("Ø.394" →
+/// "0.394").
+fn dimension_value(shown: &str) -> String {
+    let v = shown.trim_start_matches(['Ø', '⌀', 'R', 'S']);
+    if v.starts_with('.') { format!("0{v}") } else { v.to_string() }
 }
