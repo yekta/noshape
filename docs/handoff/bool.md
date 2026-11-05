@@ -103,7 +103,7 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
-- PARITY-SPEED by Boolean time (bool, 11-05 00:52; the whole suite with NOSHAPE_X_DECL + NOSHAPE_KERNEL_PROFILE on
+- PARITY-SPEED by Boolean time (bool, 11-05 00:35; the whole suite with NOSHAPE_X_DECL + NOSHAPE_KERNEL_PROFILE on
   vibe4, two regenerations each): cf-straight-spline 46 s (OCCT's, after our declines: the cutters' sub-micron
   conflicts), cf-drive-train-generator 19.8 s (ours: all 14 cuts taken, 2.2x OCCT's; recorded exactly vibe4
   ~/agents/bool-corpora/drive-train), cf-spur-gear 10 s (ours), cf-sheet-metal-model-plus 7 s (OCCT's: a glued fuse,
@@ -114,6 +114,9 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   A/B against main: drive-train -15 %, cf-spur-gear -6 %, corpus5 small -6 %, motor-mount-jack unchanged; corpora
   and Shell's recordings the same (a7bdd15ba4f8613a's unified volume 3.4e-7 off OCCT's came with main, not this).
   Next there: intervals_on's numeric crossings and distances on the gears' faces (OCCT-accurate mapped curves).
+  Tried 11-05 01:20, not kept: a crossing's other seeds (some 15 Newton seeds per crossing on drive-train, 204k
+  seeds for 13k crossings) skipped within a cell and a half of one found at a clear angle: corpora the same, but
+  only -2 to -3 % on the gears (branch bool-seeds).
 - motor-mount-jack's Fillet 2 (bool, 11-05 00:12): stepped seams on branch bool-jog (8e4efc6b9, in bool-c), not
   landed. A full cylinder's seam in two steps (rulings at two angles joined by arcs at one height: core's seam
   movers) maps above and below the step from its own ruling (Surf::Cyl jog, Surf::at_height, GFace::surf_for; the
