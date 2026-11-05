@@ -15,7 +15,7 @@
 //! or parallel to it: then surfaces meet in lines along the axis or circles around it.
 
 use crate::arrange::{deeper, regions, Region};
-use crate::curve2::{distance as distance2, distance_with, inside as inside2, Map, SpanBoxes, C2};
+use crate::curve2::{distance as distance2, distance_with, inside as inside2, inside_with, Map, SpanBoxes, C2};
 use crate::freeform::FreeSurface;
 use crate::nurbs::NurbsCurve;
 use crate::pattern::Rigid;
@@ -246,7 +246,7 @@ struct GFace {
     /// Its curves' spans' boxes, made when first asked for ([`Ctx::bound_distance`]).
     bound_spans: std::sync::OnceLock<Vec<SpanBoxes>>,
     /// Each of those curves' sample points, made when first asked for (curves crossing it: `intervals_on`).
-    bound_pts: std::sync::OnceLock<Vec<std::sync::OnceLock<Vec<DVec2>>>>,
+    bound_pts: std::sync::OnceLock<Vec<crate::curve2::Samples>>,
     /// A part of a cylinder or cone going round between rulings at th0 (a thread's helical face): the rulings on
     /// the far side, at th0 + 2π, and the angle within which a point is at th0 (the Boolean's tolerance's).
     right: Vec<usize>,
@@ -1244,8 +1244,8 @@ impl Ctx<'_> {
                 }
             }
         }
-        let samples = std::sync::OnceLock::new();
-        let pts = self.faces[f].bound_pts.get_or_init(|| bound.iter().map(|_| std::sync::OnceLock::new()).collect());
+        let samples = crate::curve2::Samples::new();
+        let pts = self.faces[f].bound_pts.get_or_init(|| bound.iter().map(|_| crate::curve2::Samples::new()).collect());
         for (b, theirs) in bound.iter().zip(pts) {
             for (u, _) in c2.intersections_with(b, tol, &samples, theirs) {
                 let t = t0 + (t1 - t0) * u;
@@ -1400,11 +1400,11 @@ impl Ctx<'_> {
                 // (Within the grey band all along: on the boundary, as within the tolerance (OCCT's section within
                 // its own tolerance of the edge: a common block).)
                 match far {
-                    Some((d, q)) if d > clear * ctol => inside2(q, &bound),
+                    Some((d, q)) if d > clear * ctol => inside_with(q, &bound, spans),
                     _ => closed,
                 }
             } else {
-                inside2(mid, &bound)
+                inside_with(mid, &bound, spans)
             };
             if !inside {
                 continue;
@@ -3587,8 +3587,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     if sheets && !sheet_common && !sheet_cut && !((op == Op::Fuse && sheet_arg.iter().all(|&x| x)) || (op != Op::Fuse && sheet_arg[0] && !sheet_arg[1..].iter().any(|&x| x))) {
         return Err(Decline("sheets with solids"));
     }
-    // Each face: its parameter range (a partial cylinder's starts in the gap), boundary, box.
-    for f in 0..cx.faces.len() {
+    // Each face: its parameter range (a partial cylinder's starts in the gap), boundary, box (the boxes on all
+    // threads: a gear's B-spline flanks' took 20 ms on one).
+    let face_box = |f: usize| -> (DVec3, DVec3) {
         let mut lo = DVec3::INFINITY;
         let mut hi = DVec3::NEG_INFINITY;
         for &(e, _) in &cx.faces[f].edges {
@@ -3626,6 +3627,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             lo = lo.min(blo);
             hi = hi.max(bhi);
         }
+        (lo, hi)
+    };
+    let boxes = par_map(cx.faces.len(), &face_box)?;
+    for (f, (lo, hi)) in boxes.into_iter().enumerate() {
         cx.faces[f].lo = lo;
         cx.faces[f].hi = hi;
         if let Surf::Cyl { o, x, y, full: false, .. } = cx.faces[f].s {

@@ -409,6 +409,11 @@ impl C2 {
 
     /// Where the ray `m + s d` (s > 0) meets it.
     pub fn ray_hits(&self, m: DVec2, d: DVec2, out: &mut Vec<f64>) {
+        self.ray_hits_by(m, d, out, None)
+    }
+
+    /// [`Self::ray_hits`], its box kept in `boxes`.
+    pub(crate) fn ray_hits_by(&self, m: DVec2, d: DVec2, out: &mut Vec<f64>, boxes: Option<&SpanBoxes>) {
         match *self {
             C2::Seg { a, b } => {
                 let e = b - a;
@@ -452,7 +457,7 @@ impl C2 {
                     }
                 };
                 // (All of it on one side: it doesn't meet the line.)
-                if self.quick_box().and_then(side).is_some() {
+                if self.quick_box_by(boxes).and_then(side).is_some() {
                     return;
                 }
                 // (A NURBS part's sample on a span clearly on one side: that side.)
@@ -567,7 +572,7 @@ impl C2 {
                     apart(b)
                 })
             }
-            None => self.quick_box().is_some_and(apart),
+            None => self.quick_box_by(boxes).is_some_and(apart),
         }
     }
 
@@ -626,7 +631,15 @@ impl C2 {
 
     /// Its spans' boxes, each made when first needed: for many distances from it ([`Self::distance_by`]).
     pub(crate) fn span_boxes2(&self) -> SpanBoxes {
-        SpanBoxes { boxes: self.spans2().map_or_else(Vec::new, |(c, ..)| (0..c.spans().len()).map(|_| OnceLock::new()).collect()), runs: OnceLock::new() }
+        SpanBoxes { boxes: self.spans2().map_or_else(Vec::new, |(c, ..)| (0..c.spans().len()).map(|_| OnceLock::new()).collect()), runs: OnceLock::new(), quick: OnceLock::new() }
+    }
+
+    /// [`Self::quick_box`], kept in `boxes` (a curve on a cylinder's: an angle a pole each time).
+    pub(crate) fn quick_box_by(&self, boxes: Option<&SpanBoxes>) -> Option<(DVec2, DVec2)> {
+        match boxes {
+            Some(b) => *b.quick.get_or_init(|| self.quick_box()),
+            None => self.quick_box(),
+        }
     }
 
     /// [`Self::distance`], its spans' boxes from `boxes`.
@@ -684,11 +697,16 @@ pub(crate) fn ray_misses_box(b: (DVec2, DVec2), m: DVec2, d: DVec2) -> bool {
     across.iter().all(|&x| x > margin) || across.iter().all(|&x| x < -margin) || along.iter().all(|&x| x < -margin)
 }
 
+/// A curve's sample points and its chords' bulges ([`C2::chords`]), made once for its crossings with several curves.
+pub(crate) type Samples = OnceLock<(Vec<DVec2>, Vec<f64>)>;
+
 /// A NURBS part's spans' boxes on the parameter plane, by span, and its samples' runs on each span (span, first,
 /// past the last) ([`C2::span_boxes2`]).
 pub(crate) struct SpanBoxes {
     boxes: Vec<OnceLock<(DVec2, DVec2)>>,
     runs: OnceLock<Vec<(usize, usize, usize)>>,
+    /// Its [`C2::quick_box`].
+    quick: OnceLock<Option<(DVec2, DVec2)>>,
 }
 
 /// A box a 3D NURBS curve's part from `t0` to `t1` seen in a plane's or cylinder's parameter plane lies in: its
@@ -722,8 +740,20 @@ impl C2 {
         (0..=n).map(|k| self.at(k as f64 / n as f64)).collect()
     }
 
+    /// Its sample points and how far its curve may bulge from each chord between them: three times the chord's
+    /// middle's distance from the curve's, at least a fiftieth of its length (a quarter of it seeded 30 Newton
+    /// runs a crossing on a gear's end face, most finding nothing); a segment is its own chord.
+    fn chords(&self) -> (Vec<DVec2>, Vec<f64>) {
+        let (p, n) = (self.sample_points(), self.samples());
+        if matches!(self, C2::Seg { .. }) {
+            return (p, vec![0.0; n]);
+        }
+        let bulge = (0..n).map(|i| (3.0 * (self.at((i as f64 + 0.5) / n as f64) - (p[i] + p[i + 1]) * 0.5).length()).max(0.02 * (p[i + 1] - p[i]).length())).collect();
+        (p, bulge)
+    }
+
     /// (`mine`, `theirs`: the two's sample points, made once for crossings with several curves.)
-    fn numeric_intersections(&self, o: &C2, tol: f64, mine: &OnceLock<Vec<DVec2>>, theirs: &OnceLock<Vec<DVec2>>) -> Vec<(f64, f64)> {
+    fn numeric_intersections(&self, o: &C2, tol: f64, mine: &Samples, theirs: &Samples) -> Vec<(f64, f64)> {
         // (Boxes apart: none.)
         if let (Some(a), Some(b)) = (self.quick_box(), o.quick_box()) {
             let g = 4.0 * tol;
@@ -751,26 +781,23 @@ impl C2 {
             return Vec::new();
         }
         let (na, nb) = (self.samples(), o.samples());
-        let pa = mine.get_or_init(|| self.sample_points());
-        let pb = theirs.get_or_init(|| o.sample_points());
+        let (pa, ba) = mine.get_or_init(|| self.chords());
+        let (pb, bb) = theirs.get_or_init(|| o.chords());
         let scale = pa.iter().chain(pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
         let mut out: Vec<(f64, f64)> = Vec::new();
         // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
-        // (A segment is its own chord: no bulge (its length grew every pair's box: a B-spline's 512 chords each
-        // seeded against one long side, 2 crossings).)
         const RUN: usize = 16;
-        let (bulge_a, bulge_b) = (if matches!(self, C2::Seg { .. }) { 0.0 } else { 0.25 }, if matches!(o, C2::Seg { .. }) { 0.0 } else { 0.25 });
-        let runs = |p: &[DVec2], n: usize, pad: f64, bulge: f64| -> Vec<(DVec2, DVec2)> {
+        let runs = |p: &[DVec2], n: usize, pad: f64, bulge: &[f64]| -> Vec<(DVec2, DVec2)> {
             (0..n.div_ceil(RUN))
                 .map(|r| {
                     let q = &p[r * RUN..=((r + 1) * RUN).min(n)];
                     let (lo, hi) = q.iter().fold((DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY)), |(l, h), &x| (l.min(x), h.max(x)));
-                    let long = q.windows(2).fold(0.0_f64, |m, w| m.max((w[1] - w[0]).length()));
-                    (lo - DVec2::splat(bulge * long + pad), hi + DVec2::splat(bulge * long + pad))
+                    let most = bulge[r * RUN..((r + 1) * RUN).min(n)].iter().fold(0.0_f64, |m, &x| m.max(x));
+                    (lo - DVec2::splat(most + pad), hi + DVec2::splat(most + pad))
                 })
                 .collect()
         };
-        let (ra, rb) = (runs(pa, na, 4.0 * tol, bulge_a), runs(pb, nb, 0.0, bulge_b));
+        let (ra, rb) = (runs(pa, na, 4.0 * tol, ba), runs(pb, nb, 0.0, bb));
         let chords = |ia: std::ops::Range<usize>, ib: std::ops::Range<usize>, out: &mut Vec<(f64, f64)>| {
             for i in ia {
                 let (a0, a1) = (pa[i], pa[i + 1]);
@@ -778,7 +805,7 @@ impl C2 {
                 for j in ib.clone() {
                     let (b0, b1) = (pb[j], pb[j + 1]);
                     // (Chords bulge from their curve: seeds from any pair whose boxes, grown, meet.)
-                    let grow = bulge_a * (a1 - a0).length() + bulge_b * (b1 - b0).length();
+                    let grow = ba[i] + bb[j];
                     let (blo, bhi) = (b0.min(b1) - DVec2::splat(grow), b0.max(b1) + DVec2::splat(grow));
                     if ahi.x < blo.x || bhi.x < alo.x || ahi.y < blo.y || bhi.y < alo.y {
                         continue;
@@ -829,34 +856,65 @@ impl C2 {
         }
         out.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.total_cmp(&y.1)));
         // (Where they touch, Newton's roots scatter along the stretch they're within `tol`: one crossing there, where
-        // they're most nearly tangent, however many seeds landed.)
+        // they're tangent (found between the scattered ones, their place by Newton only good to ~1e-9 there: an
+        // ellipse touching a line at its end of an axis came out "nearly at an axis"), else the most nearly tangent
+        // one, however many seeds landed.)
         let sine = |&(s, t): &(f64, f64)| {
             let (da, db) = (self.deriv1(s), o.deriv1(t));
             (da.perp_dot(db) / (da.length() * db.length()).max(1e-300)).abs()
         };
-        let mut kept: Vec<(f64, f64)> = Vec::with_capacity(out.len());
+        let mut groups: Vec<Vec<(f64, f64)>> = Vec::new();
         for x in out {
-            match kept.last_mut() {
-                Some(last) if o.distance(self.at(0.5 * (last.0 + x.0))) <= tol && (self.at(last.0) - self.at(x.0)).length() <= 1e3 * tol => {
-                    if sine(&x) < sine(last) {
-                        *last = x;
-                    }
-                }
-                _ => kept.push(x),
+            match groups.last_mut().and_then(|g| g.last().copied().map(|l| (g, l))) {
+                Some((g, last)) if o.distance(self.at(0.5 * (last.0 + x.0))) <= tol && (self.at(last.0) - self.at(x.0)).length() <= 1e3 * tol => g.push(x),
+                _ => groups.push(vec![x]),
             }
         }
-        kept
+        let turn = |s: f64| self.deriv1(s).perp_dot(o.deriv1(o.param_of(self.at(s)).0));
+        groups
+            .into_iter()
+            .map(|g| {
+                let best = g.iter().copied().min_by(|a, b| sine(a).total_cmp(&sine(b))).expect("a root");
+                if g.len() < 2 {
+                    return best;
+                }
+                // (Widened either way until the tangents turn past each other within the touch's reach.)
+                let (s0, s1) = (g[0].0, g[g.len() - 1].0);
+                let mut w = (s1 - s0).max(1e-9);
+                let (mut lo, mut hi) = (s0, s1);
+                while turn(lo) * turn(hi) >= 0.0 {
+                    let (a, b) = ((s0 - w).max(0.0), (s1 + w).min(1.0));
+                    if (self.at(a) - self.at(s0)).length() > 1e3 * tol || (self.at(b) - self.at(s1)).length() > 1e3 * tol || (a == lo && b == hi) {
+                        return best;
+                    }
+                    (lo, hi) = (a, b);
+                    w *= 2.0;
+                }
+                let h_lo = turn(lo);
+                for _ in 0..64 {
+                    let m = 0.5 * (lo + hi);
+                    if (turn(m) < 0.0) == (h_lo < 0.0) {
+                        lo = m;
+                    } else {
+                        hi = m;
+                    }
+                }
+                let s = 0.5 * (lo + hi);
+                let (t, d) = o.param_of(self.at(s));
+                if d <= tol { (s, t) } else { best }
+            })
+            .collect()
     }
 
     /// Parameters (on `self`, on `o`) where the two cross, ends included; none where they run together
     /// (within `tol`: collinear segments, arcs of one circle), which their ends lying on each other show.
     pub fn intersections(&self, o: &C2, tol: f64) -> Vec<(f64, f64)> {
-        self.intersections_with(o, tol, &OnceLock::new(), &OnceLock::new())
+        self.intersections_with(o, tol, &Samples::new(), &Samples::new())
     }
 
     /// [`Self::intersections`], `mine` and `theirs` the two's sample points, made once for crossings with several
     /// curves.
-    pub fn intersections_with(&self, o: &C2, tol: f64, mine: &OnceLock<Vec<DVec2>>, theirs: &OnceLock<Vec<DVec2>>) -> Vec<(f64, f64)> {
+    pub(crate) fn intersections_with(&self, o: &C2, tol: f64, mine: &Samples, theirs: &Samples) -> Vec<(f64, f64)> {
         if matches!(self, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) || matches!(o, C2::Trig { .. } | C2::Hyp { .. } | C2::Nurbs { .. } | C2::Mapped { .. } | C2::Conic { .. }) {
             return self.numeric_intersections(o, tol, mine, theirs);
         }
@@ -933,6 +991,11 @@ impl C2 {
 /// Whether `p` is inside the loops of `edges` (even-odd), by a ray in a direction no input favours; another
 /// one when it passes through an end of a curve.
 pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
+    inside_with(p, edges, &[])
+}
+
+/// [`inside`], the curves' boxes kept in `spans` (one per curve, by [`C2::span_boxes2`]).
+pub(crate) fn inside_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> bool {
     const ANGLES: [f64; 4] = [0.371_1, 1.913_7, 4.170_9, 2.653_1];
     let scale = edges.iter().map(|e| e.start().abs().max_element()).fold(p.abs().max_element(), f64::max).max(1e-3);
     let mut odd = false;
@@ -940,9 +1003,9 @@ pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
         let d = DVec2::new(a.cos(), a.sin());
         let mut hits = Vec::new();
         let mut clean = true;
-        for e in edges {
+        for (i, e) in edges.iter().enumerate() {
             let n = hits.len();
-            e.ray_hits(p, d, &mut hits);
+            e.ray_hits_by(p, d, &mut hits, spans.get(i));
             for &s in &hits[n..] {
                 let q = p + d * s;
                 if (q - e.start()).length() <= 1e-9 * scale || (q - e.end()).length() <= 1e-9 * scale {
@@ -994,7 +1057,7 @@ pub(crate) fn distance(p: DVec2, edges: &[C2]) -> f64 {
 /// [`distance`], the curves' spans' boxes from `spans` (one per curve, by [`C2::span_boxes2`]; none: made each time).
 pub(crate) fn distance_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> f64 {
     // Nearest box first; none whose box is farther than the nearest found yet.
-    let mut order: Vec<(f64, usize)> = edges.iter().enumerate().map(|(i, e)| (e.quick_box().map_or(0.0, |(lo, hi)| (lo - p).max(p - hi).max(DVec2::ZERO).length()), i)).collect();
+    let mut order: Vec<(f64, usize)> = edges.iter().enumerate().map(|(i, e)| (e.quick_box_by(spans.get(i)).map_or(0.0, |(lo, hi)| (lo - p).max(p - hi).max(DVec2::ZERO).length()), i)).collect();
     order.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut best = f64::INFINITY;
     for (away, i) in order {
@@ -1009,7 +1072,7 @@ pub(crate) fn distance_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> f64 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::f64::consts::{FRAC_PI_2, PI};
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
     #[test]
     fn a_disk_with_a_square_hole() {
@@ -1138,5 +1201,12 @@ mod tests {
         let touch: Vec<f64> = top.intersections(&wave, 1e-7).iter().map(|&(s, _)| top.at(s).x).collect();
         assert_eq!(touch.len(), 1, "{touch:?}");
         assert!((touch[0] - FRAC_PI_2).abs() < 1e-3, "{touch:?}");
+        // An ellipse touching a line at the end of its axis: there exactly (Newton's roots there scatter ~1e-9 round
+        // it, an end "nearly at an axis").
+        let ell = C2::Trig { c: DVec2::ZERO, u: DVec2::new(2.0, 0.0), v: DVec2::new(0.0, 1.0), w: DVec2::ZERO, t0: 0.0, sweep: TAU };
+        let side = C2::Seg { a: DVec2::new(-2.0, -1.5), b: DVec2::new(-2.0, 1.5) };
+        let at: Vec<(f64, f64)> = ell.intersections(&side, 1e-7);
+        assert_eq!(at.len(), 1, "{at:?}");
+        assert!((at[0].0 - 0.5).abs() < 1e-12 && (at[0].1 - 0.5).abs() < 1e-12, "{at:?}");
     }
 }
