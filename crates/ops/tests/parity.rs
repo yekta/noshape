@@ -157,6 +157,10 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             res.features_ms = list.value["regen_ms"].as_f64();
             for f in list.value["features"].as_array().into_iter().flatten() {
                 let (Some(id), Some(name), Some(ours)) = (f["id"].as_str(), f["name"].as_str(), f["regen_ms"].as_f64()) else { continue };
+                // One model run (NOSHAPE_PARITY_ONLY): each feature's time against live's.
+                if std::env::var_os("NOSHAPE_PARITY_ONLY").is_some() {
+                    println!("  {name}: {ours:.0} ms, live {}", live_times.get(id).map_or("-".to_string(), |l| format!("{l:.0} ms")));
+                }
                 if let Some(l) = live_times.get(id).filter(|l| ours >= 10.0 * l.max(1.0) && ours - **l >= 50.0) {
                     res.slow_features.push((name.to_string(), ours, *l));
                 }
