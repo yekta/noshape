@@ -2477,7 +2477,8 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
     most_wires = std::max(most_wires, n);
   }
   const bool full_check = r.face_origin.size() / 3 <= 2000 && most_wires <= 256;
-  if (full_check && !BRepCheck_Analyzer(out).IsValid())
+  // (A big one's on all threads: a 300-face gear fuse's took 0.2 s on one, half the Boolean's time.)
+  if (full_check && !BRepCheck_Analyzer(out, true, t_built.f.size() > 32).IsValid())
     return decline("an invalid result");
   stop();
   if (noshape_should_break() != 0)
