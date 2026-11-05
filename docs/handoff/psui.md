@@ -564,6 +564,16 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N000. (11-05 01:50) **Per-pass GPU time on the runners**: `NOSHAPE_PERF_PASSES=1` (with NOSHAPE_PERF): the
+    vendored wgpu-hal (metal::pass_timing) reads every labelled command buffer's GPUStartTime/GPUEndTime; wgpu-core
+    records each render / compute pass in a command buffer of its own labelled with the pass (color, ao, sil-cull,
+    hover-mask, …), so the renderer logs r.pass.<label> with no change to how it encodes. (A first try split the
+    encoder and filtered on `noshape:` labels: wgpu labels pass buffers with the pass's label, so nothing matched,
+    run 41942955242.) **UI side measured here (11-05 01:00, cf-straight-spline):** a dialog open's UI CPU p50
+    23.5-24.9 ms after f57610ca; its frame is the dialog's own layout, the toolbar (re-rendered on purpose: the open
+    feature's tool shows active, mod.rs ~3107) and the edited row; slices re-laid out ~6.6 % of the UI thread. Next
+    there would be caching each toolbar button as its own view. Hover over the model and over list rows re-render
+    no list (60 viewport hovers, 10 row hovers: only the overlay slice, 0.4 ms).
 N00. (11-05 00:40) **Viewport Metal layer: measured, not landed (no gain).** Branch `psui-layer-keep` (and
     perf/psui-layer2) has it: NOSHAPE_VIEWPORT_LAYER=1 presents viewport frames to a CAMetalLayer in an NSView under
     GPUI's view (gpui::UnderlayHole hole sprites, gpui-pre-macos underlay_layer / place_underlays, app-core
