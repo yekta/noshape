@@ -403,13 +403,21 @@ fn copies_among_patterned_tools() {
 
 /// qa MIRROR-HANG-402 (live request 1629): a Part mirror (across Top), Add with Merge with all, over 11 overlapping
 /// copies of a 38-face free-form fuzz part: live one solid of 243267.537 mm³ in ~2 s. OCCT's one fuse of all 12 ran
-/// ~220 s and failed (BOPAlgo_AlertBuilderFailed); fused two at a time in a balanced tree it is live's solid.
+/// ~220 s and failed (BOPAlgo_AlertBuilderFailed); fused two at a time in a balanced tree it is live's solid. The
+/// STEP's parts in its order: its 38-face body shifted along x (exact copies) and its 3-face body.
 #[test]
-#[ignore = "T2: qa's STEP outside the repo (onshape-research/live/samples/qa-hang402-11parts.step), ~30 s"]
+#[ignore = "T2: ~30 s"]
 fn overlapping_free_form_parts_merge_like_onshape() {
-    let path = std::path::Path::new("/root/onshape-research/live/samples/qa-hang402-11parts.step");
     let _ = k::set_working_scale(1000.0);
-    let parts: Vec<k::Shape> = k::read_step(path, k::LengthUnit::Meter).unwrap().into_iter().map(|p| p.shape).collect();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/mirror/hang402-parts.brep");
+    let bodies = k::read_brep(&path).unwrap().solids();
+    let parts: Vec<k::Shape> = [Some(18.0), Some(16.0), Some(14.0), Some(12.0), Some(10.0), None, Some(32.0), Some(24.0), Some(16.0), Some(8.0), Some(0.0)]
+        .into_iter()
+        .map(|dx| match dx {
+            Some(dx) => bodies[0].translated(DVec3::new(dx * 1e-3, 0.0, 0.0)).unwrap(),
+            None => bodies[1].clone(),
+        })
+        .collect();
     assert_eq!(parts.len(), 11);
     let pick = parts.iter().position(|p| (p.bounding_box(false).unwrap().min.x + 0.052).abs() < 5e-4).unwrap();
     let mirrored = parts[pick].transformed(&k::Transform::Mirror(k::Plane::from_normal(DVec3::ZERO, DVec3::Z))).unwrap();
