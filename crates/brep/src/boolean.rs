@@ -386,6 +386,11 @@ impl GFace {
 
     /// The curve `g` from `p0` (in 3D) in this face's parameter plane, `copy` 1 for the right side of a seam.
     fn curve2(&self, p0: DVec3, p1: DVec3, g: &Geo, copy: usize) -> R<C2> {
+        self.curve2_within(p0, p1, g, copy, 0.0)
+    }
+
+    /// [`Self::curve2`], its far end on the face's seam within `reach` too (its vertex's tolerance).
+    fn curve2_within(&self, p0: DVec3, p1: DVec3, g: &Geo, copy: usize, reach: f64) -> R<C2> {
         match (&self.s, g) {
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. }) => Err(Decline("a curve on a free-form face")),
             (Surf::Plane { .. }, Geo::Line) => Ok(C2::Seg { a: self.to2(p0), b: self.to2(p1) }),
@@ -441,8 +446,9 @@ impl GFace {
                 let near = (1e-9 * r.max(1.0)).max(self.wrap_eps * r);
                 let (at0, at1) = ((q0.x - r * th0).abs() <= near, (q0.x - r * (th0 + TAU)).abs() <= near);
                 // (A curve's far end at the seam, rounding a little past it (2.7e-9 rad on an 8 mm cylinder): on it,
-                // within 0.1 um along it; farther, across it.)
-                let slack = (1e-9 * r).max(1e-7);
+                // within 0.1 um along it or its vertex's tolerance (a Shell slab's ellipse 22 um past it to a vertex of
+                // a group of 0.17 mm); farther, across it.)
+                let slack = (1e-9 * r).max(1e-7).max(reach);
                 let onto = |x1: f64| -> Option<f64> {
                     let (lo, hi) = (r * th0, r * (th0 + TAU));
                     if x1 < lo - slack || x1 > hi + slack { None } else { Some(x1.clamp(lo, hi)) }
@@ -1108,7 +1114,7 @@ impl Ctx<'_> {
             }
             return free::mapped(g, &self.ncurves[id as usize].c, t0, t1);
         }
-        g.curve2(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy)
+        g.curve2_within(self.p(s.v[0]), self.p(s.v[1]), &s.g, copy, self.pool.t[s.v[1] as usize])
     }
 
     /// Segment `s` on free-form face `f` projected onto it, its parameters scaled by `su`, `sv` (None where it leaves
@@ -3603,6 +3609,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     let k = Circ { c: center, n: normal, x: xdir, y: normal.cross(xdir), r: radius };
                     let (p0, p1) = (body.vertices[e.v[0] as usize], body.vertices[e.v[1] as usize]);
                     if (k.angle(p1) - k.angle(p0)).rem_euclid(TAU) * radius <= 2.0 * cx.pool.t[v[0] as usize] {
+                        cx.edges.push(GEdge { arg: a, index: i as u32, v, g: Geo::Line, t: 0.0, micro: true });
+                        continue;
+                    }
+                }
+                // (A B-spline likewise (a Shell slab's 0.1 mm edge, both ends in a group of 0.17 mm): by its length.)
+                if let (Curve::Nurbs { index, t0, t1 }, true) = (e.curve, cx.pool.is_group(v[0])) {
+                    let c = &body.nurbs_curves[index as usize];
+                    let len: f64 = (0..16).map(|k| (c.at(t0 + (t1 - t0) * (k + 1) as f64 / 16.0) - c.at(t0 + (t1 - t0) * k as f64 / 16.0)).length()).sum();
+                    if len <= 2.0 * cx.pool.t[v[0] as usize] {
                         cx.edges.push(GEdge { arg: a, index: i as u32, v, g: Geo::Line, t: 0.0, micro: true });
                         continue;
                     }
