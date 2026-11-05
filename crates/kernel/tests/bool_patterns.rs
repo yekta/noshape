@@ -612,6 +612,15 @@ fn a_gear_fused_as_occt() {
     as_recorded("cef7972794e2ae06");
 }
 
+/// cf-fix-pcb's glued fuse of embossed letters onto the board: one letter's trim by the board (recorded: an e-like
+/// glyph standing on the board's top face): OCCT's result. A ray from the board's piece under the letter's counter
+/// crossed the counter's wall, a 3 mm extruded face over u 0 .. 1, where Newton's steps stall at rounding (3e-14 in u)
+/// without counting as converged: the crossing unseen, the piece taken as inside the letter ("a non-manifold result").
+#[test]
+fn a_letter_on_a_board_cut_as_occt() {
+    as_recorded("63881743af8b072f");
+}
+
 /// motor-mount-jack's Extrude 3 (recorded: a boss fused onto the tube with four elliptic slots through it): OCCT's
 /// result. Each slot is a hole in the tube's cylinders: the region bounded by its loop alone is outside the face, no
 /// point deep inside it sought (86 ms against OCCT's 31 before, with the slot walls' ray patches).

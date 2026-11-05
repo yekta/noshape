@@ -218,8 +218,9 @@ pub(super) fn ray_hits(ns: &FreeSurface, patches: &Patches, uv: [f64; 4], p: DVe
                     break;
                 }
             }
-            // (A piece's start: where the steps stall at rounding, there if it is on the ray.)
-            if pa.piece && !ok {
+            // (Where the steps stall at rounding, there if it is on the ray: a 3 mm letter's wall over u 0 .. 1 moves u
+            // by its rounding, 3e-14 a step; the ray crossed it unseen, the letter's counter taken as inside it.)
+            if !ok {
                 ok = (ns.at(uv.x, uv.y) - p - r * t).length() <= 1e-12;
             }
             if !ok || uv.x < u0 - 1e-12 || uv.x > u1 + 1e-12 || uv.y < v0 - 1e-12 || uv.y > v1 + 1e-12 {
