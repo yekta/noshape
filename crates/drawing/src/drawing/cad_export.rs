@@ -81,19 +81,23 @@ fn adjusted_line_type(g: &SheetGeometry, li: usize) -> Option<(&'static str, f64
     })
 }
 
-/// The dash pattern (mm) live's PDF draws line `li` with where it was measured: the line's DXF line type, its
-/// elements × `$LTSCALE` 0.5 read as inches (behaviours "Adjust linestyle"): an Adjust linestyle pen's, CENTER on
-/// a centre mark's arms and the CENTER layers. `None`: the line's own pen.
+/// The dash pattern (mm) live's PDF draws line `li` with: the line's DXF line type, its elements × `$LTSCALE` 0.5
+/// read as inches (behaviours "Adjust linestyle", live 1857's centre marks, 2066's hidden lines: HIDDEN's 1.27 mm
+/// dashes): an Adjust linestyle pen's, CENTER on a centre mark's arms, else its layer's. `None`: solid.
 pub(crate) fn pdf_dashes(g: &SheetGeometry, li: usize) -> Option<Vec<f64>> {
     if adjusted_line_type(g, li).is_some() {
         return Some(g.line_pen(li).1);
     }
-    let center = match g.cad_line_layer(li) {
-        CadLayer::Centermarks => g.lines[li].style == super::sheet::LineStyle::Centerline,
-        l => l.line_type() == "CENTER",
+    let name = match g.cad_line_layer(li) {
+        CadLayer::Centermarks if g.lines[li].style == super::sheet::LineStyle::Centerline => "CENTER",
+        CadLayer::Centermarks => return None,
+        l => l.line_type(),
     };
-    let (_, _, pattern) = LINE_TYPES.iter().find(|t| t.0 == "CENTER")?;
-    center.then(|| pattern.iter().map(|v| v.abs() * 0.5 * 25.4).collect())
+    let (_, _, pattern) = LINE_TYPES.iter().find(|t| t.0 == name)?;
+    // A dash scale (Drawing properties › Views › hidden dashes) multiplies the pattern, as Adjust linestyle's.
+    let (own, base) = (g.line_pen(li).1.iter().sum::<f64>(), g.lines[li].style.dashes().iter().sum::<f64>());
+    let scale = if own > 0.0 && base > 0.0 { own / base } else { 1.0 };
+    Some(pattern.iter().map(|v| v.abs() * 0.5 * 25.4 * scale).collect())
 }
 
 /// The layer table's order (live drw2-k-dxf2018, asbu-aux: 0, Defpoints,

@@ -1321,6 +1321,9 @@ mod tests {
         let d = centered_dashes(40.0, &[6.35, 3.175]).unwrap();
         assert!((d[0] - 4.125).abs() < 1e-9 && d.len() == 10, "{d:?}");
         assert!(centered_dashes(8.0, &center).is_none());
+        // Live 2066: a 10 mm hidden edge, HIDDEN 0.1 / 0.05 in x 0.5: 0.8725, then four 1.27 mm dashes.
+        let d = centered_dashes(10.0, &[1.27, 0.635]).unwrap();
+        assert!((d[0] - 0.8725).abs() < 1e-9 && (d[2] - 1.27).abs() < 1e-9 && d.len() == 12, "{d:?}");
         assert!((plot_width(0.40) * 72.0 / 25.4 - 1.08).abs() < 1e-9 && (plot_width(0.15) * 72.0 / 25.4 - 0.48).abs() < 1e-9);
     }
 

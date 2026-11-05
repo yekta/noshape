@@ -478,6 +478,10 @@ fn views_tab_pens_colours_and_labels() {
     let b = render_sheet(&drawing, 0, &sources, &cache, false).unwrap();
     assert!(style_pens(&b, sheet::LineStyle::Visible).iter().all(|(w, _, c)| (*w - 0.7).abs() < 1e-9 && *c == Some([200, 0, 0])));
     assert!(style_pens(&b, sheet::LineStyle::Hidden).iter().all(|(w, d, _)| (*w - 0.25).abs() < 1e-9 && d == &[6.0, 3.0]));
+    // The PDF dashes a hidden line by the DXF's HIDDEN (0.1 / 0.05 in x $LTSCALE 0.5, live 2066), scaled likewise.
+    let hl = (0..b.geometry.lines.len()).find(|&i| b.geometry.lines[i].style == sheet::LineStyle::Hidden).unwrap();
+    let d = crate::drawing::cad_export::pdf_dashes(&b.geometry, hl).unwrap();
+    assert!((d[0] - 2.54).abs() < 1e-9 && (d[1] - 1.27).abs() < 1e-9, "{d:?}");
     let g = &b.geometry;
     let label = g.texts.iter().position(|t| t.text == "FRONT").expect("view label");
     assert!((g.texts[label].height - 4.0).abs() < 1e-9 && g.text_color(label) == Some([0, 0, 200]));

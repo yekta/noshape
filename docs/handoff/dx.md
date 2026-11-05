@@ -149,6 +149,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   side, evEdgeConvexity's direction into face b (the projections kept as fallbacks), thicken_names' caps by their
   foot on the sheet (no foot, no cap: the sides aren't projected); tracking's split-piece test cached by (old face,
   piece); Up to Part's touches checks boxes first. Left: TICKETS SM-BOOLEAN-SPEED.
+- 16:04: live 2066 (samples/dx-pdf-hidden): ISO A4 Portrait's PDF frame sits 10.0 mm left of its DXF's, the line
+  extents (20-210 mm) centred: as ours (text left out: live's DXF $EXTMAX 210.384 counts a text, ours 210). Hidden
+  lines in the PDF as live's: the DXF's HIDDEN (1.27 / 0.635 mm) laid out AutoCAD's way (a 10 mm edge: 0.8725 ends),
+  every line by its DXF line type now, the Views tab's dash scale multiplying it.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
