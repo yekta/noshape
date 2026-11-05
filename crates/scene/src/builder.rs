@@ -639,6 +639,10 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // 238, … (occurrence id + mesh group hash; live ui (10-26),
                 // icons2 caps 3).
                 let mesh = mesh.hatch_id(230 + 4 * part_index as u32);
+                // A solid's faces (not an imported mesh's, whose winding nobody checked): back faces culled where
+                // nothing cuts or shows through it (the renderer decides).
+                let plain = !opts.preview_bodies.contains(&b.id) && !opts.ghost_bodies.contains(&b.id);
+                let mesh = if b.kind == BodyKind::Solid && plain && cached.mesh_lines.is_none() && replaced.is_none() { mesh.closed() } else { mesh };
                 // Parts excluded from the section view are not cut.
                 scene.instances.push(if opts.section_skip.contains(&b.id) { mesh.ignore_clip() } else { mesh });
             }
