@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**v0.4.30 (published 02:21, cut def6f23c = green a1ec7849, includes the lead's 8b5fcd9c update helper: a failed install starts
+the old app with the reason, every OS; on Windows other copies closed first)** 02:26: artifacts byte-identical, SHA256SUMS OK, 11
+assets. Updater v0.4.29 → v0.4.30 on vibe3 with an mcp copy running (still v0.4.29's helper): staged 02:23:37, Restart → 0.4.30,
+g34 reopened; the mcp copy kept running. **For the next release (v0.4.30's helper):** a fresh `noshape mcp` from the 0.4.30 install
+is running beside the app (pid 892613); check the update ends on the new version and what the new helper does / logs with it.
+Smoke, ticket documents and GUI rows of v0.4.30 running on vibe3 (cli/relsmoke-v0430.out, tixvol-v30.out, relgui-v0430.out).
+
 **11-05 00:44:** vibe3 fuzz so far 0 deaths: CLI 120 seeds fallback-off / 140 on (greens f3010615, 87ea26b5; v0.4.26), GUI 141
 seeds (fz5101–5241, green f3010615). Now: CLI ~/qa/bin/v3nf3.sh (a1ec7849, 4241–4300), v3g3.sh (4301–4340), v3cf2.sh (v0.4.29,
 4341–4400); GUI fuzz on a1ec7849 (~/qa/noshape-green-new → it; repoint it per green). The watch also stops on GUIFUZZ (dead GUI
