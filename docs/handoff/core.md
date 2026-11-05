@@ -109,6 +109,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   the fillet circle touches both flanks and the root) has 226/612/388 faces/edges/vertices, live 186/512/328:
   the two root fillets of each gap lie on one surface, live gives one face per half-gap where ours keeps two
   (8 B-spline faces per gap, live 6). Repro: `NOSHAPE_PARITY_ONLY=cf-spur-gear` parity_models.
+- From dx (11-05 03:38): kernel features.cpp join_target_seam_splits has a `tangent_lines` option (new FFI
+  op_join_target_seam_splits, k::join_target_seam_splits): pieces of a sheet's free boundary on one face of the
+  target that meet tangentially are joined, a straight one too, seam or not. The FeatureScript host's up-to-part trim
+  uses it (Sheet Metal Up to Part: OCCT's three-edge intersection with a cylinder is Parasolid's one); your native
+  up-to extrude calls it with the option off, as before.
 - From dx (11-05 02:29): the corpus documents with custom features that are slowest against live, by where the time
   goes (parity_models, vibe5, NOSHAPE_FS_PROFILE): cf-sheet-metal-model-plus 2.33 s (live 0.92): its std Flange's
   sheet metal rebuild is 0.4 / 1.5 s a call, of which the glued fuse of the walls' and bends' solids (k::fuse_all, 9-11

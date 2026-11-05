@@ -4099,6 +4099,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   at the joins) where Parasolid's is one curve (live: KSVB). Next: in the trim (ops.rs Bounds::trim), join a face's
   consecutive boundary edges made against one tool face and tangent at their shared ends into one B-spline edge
   (kernel: GeomConvert_CompCurveToBSplineCurve); the rebuild's three end faces are then live's one.
+  dx 11-05 03:38 (4016e777): done (kernel join_target_seam_splits joins pieces on one target face meeting
+  tangentially): 50/112/64 faces/edges/vertices against live's 50/112/76, volume and area live's. Live's
+  V - E + F = 14 where one closed part has 2: asked live what its 76 vertices are (REQUESTS 03:38).
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
