@@ -45,7 +45,7 @@ Tests: `T:ux` = `crates/sketch/tests/onshape_ux.rs`, `T:inf` = `crates/sketch/sr
 | 2.7 | Pressing a tool's shortcut (or button) again exits it | B§2.1 | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.202 (a tool's shortcut while active turns it off), skasm 11-04 |
 | 2.8 | Constraint buttons not applicable to the current selection are disabled | B§3.1 | ✅ (T:sm) | 8cd3c4da 10-28 (GUI 1600 px: collapsed list at full strength with a line selected = live request 1549: live never dims constraints, and collapses this group below 1650 px too) |
 | 2.9 | Tooltips name the tool and its shortcut | UI | ✅ | 0.4.10+ / 203c4d6f 10-27; = live: behaviours l.98 (tooltips "Name (shortcut)"), skasm 11-04 |
-| 2.10 | Search tools (Alt+C) in a sketch lists sketch tools only, at most 10 rows | live audit 1969 and 2025 (behaviours "skasm (2026-11-04 21:34, P3)") | 🔧 (sketch tools only ✅; live's order is fuzzy by name and includes Extrude / Revolve; with one list per query (li, c, ci, ar, po, tr, re, pt) no rule reproduces it yet; "project" gives "Did you mean: [Use]") | skasm 11-05 |
+| 2.10 | Search tools (Alt+C) in a sketch lists sketch tools only, at most 10 rows | live audit 1969, 2025 and 2064 (behaviours "skasm (request 2064)") | ✅ live's rule from its client (tool_search::rank: the name's score, +0.2 for built-in shortcuts, first 10; Extrude, Revolve and Construction listed first among ties): all 36 recorded lists reproduced; the Part Studio and Assembly searches by the same rule | skasm 11-05 |
 | 2.11 | S opens the sketch shortcut toolbar at the cursor | H:sketch_basics | ✅ (sketch tools in the S toolbar) | 0.4.10+ / 2d9a275c 10-27; = live: behaviours l.198 (S: the shortcut toolbar at the cursor), skasm 11-04 |
 
 ## 3. Keyboard shortcuts (sketch scope)

@@ -324,9 +324,7 @@ fn search_tools(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let tools: Vec<Value> = match d.tab(tab).map(|t| &t.content) {
         Some(TabContent::Assembly(_)) => assembly_rank(&ASSEMBLY_TOOLS.iter().map(|t| t.1).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": ASSEMBLY_TOOLS[i].1, "icon": ASSEMBLY_TOOLS[i].0, "keys": ASSEMBLY_TOOLS[i].2 })).collect(),
         Some(TabContent::PartStudio(_)) if a.bool_or("sketch", false)? => {
-            use crate::tool_search::{searchable_sketch_tools, sketch_search_name, sketch_tool_shortcut};
-            let tools: Vec<_> = searchable_sketch_tools().collect();
-            studio_rank(&tools.iter().map(|t| sketch_search_name(*t)).collect::<Vec<_>>(), text).into_iter().map(|i| json!({ "name": sketch_search_name(tools[i]), "keys": sketch_tool_shortcut(tools[i]) })).collect()
+            crate::tool_search::sketch_rank(text).into_iter().map(|t| json!({ "name": t.name(), "keys": t.shortcut() })).collect()
         }
         Some(TabContent::PartStudio(_)) => {
             // Only tools: hidden feature types are not in live's tool search either.

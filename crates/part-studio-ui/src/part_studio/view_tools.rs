@@ -18,6 +18,8 @@ pub(super) enum PaletteItem {
     Feature(&'static str),
     /// A sketch tool (only while a sketch is open).
     SketchTool(crate::sketch_mode::Tool),
+    /// The sketch's Construction toggle.
+    Construction,
 }
 
 impl PartStudioView {
@@ -73,20 +75,22 @@ impl PartStudioView {
         }
     }
 
-    /// Onshape's tool search (live, menus/tool-search-*.png): nothing until
-    /// something is typed; then the tools whose **names** contain the typed
-    /// letters in order ("fil" finds Fillet, Fill, Finish flex PCB model,
-    /// Finish sheet metal model, 3D fit spline, Modify fillet), ranked by
-    /// where the first letter matches, then how tightly the letters sit,
-    /// then catalog order. In a sketch only the sketch tools are searched,
-    /// by their plain names (live qa5-ts-sketch-*: "chamfer" lists just the
-    /// sketch "Chamfer", no Part Studio feature).
+    /// Onshape's tool search (live 2064, `noshape_ops::tool_search::rank`): the tools used last until something is
+    /// typed, then the first 10 by live's score of their names ("fil" finds Fillet, Fill, Finish flex PCB model, …).
+    /// In a sketch, the sketch tools by their plain names, with Extrude, Revolve and Construction (live qa5-ts-sketch-*:
+    /// "chamfer" lists just the sketch "Chamfer").
     fn palette_items(&self, cx: &App) -> Vec<PaletteItem> {
         use noshape_ops::tool_search::studio_rank;
         if self.sketch.is_some() {
-            let tools: Vec<crate::sketch_mode::Tool> = noshape_ops::tool_search::searchable_sketch_tools().collect();
-            let names: Vec<&str> = tools.iter().map(|t| sketch_search_name(*t)).collect();
-            return studio_rank(&names, &self.palette_query).into_iter().map(|i| PaletteItem::SketchTool(tools[i])).collect();
+            use noshape_ops::tool_search::SketchSearch;
+            return noshape_ops::tool_search::sketch_rank(&self.palette_query)
+                .into_iter()
+                .map(|t| match t {
+                    SketchSearch::Feature(id) => PaletteItem::Feature(id),
+                    SketchSearch::Construction => PaletteItem::Construction,
+                    SketchSearch::Tool(t) => PaletteItem::SketchTool(t),
+                })
+                .collect();
         }
         // Live 10-27: an empty search lists the tools used last, newest first.
         if self.palette_query.trim().is_empty() {
@@ -105,6 +109,7 @@ impl PartStudioView {
         match item {
             PaletteItem::Feature(id) => self.start_feature(id, window, cx),
             PaletteItem::SketchTool(t) => self.activate_tool(t, window, cx),
+            PaletteItem::Construction => self.toggle_construction(window, cx),
         }
         cx.notify();
     }
@@ -130,6 +135,7 @@ impl PartStudioView {
                     let name = sketch_search_name(*t);
                     (t.icon().into(), name.to_string(), sketch_tool_shortcut(*t), crate::tool_text::sketch_description(name).unwrap_or_default().to_string())
                 }
+                PaletteItem::Construction => ("construction".into(), "Construction".to_string(), Some("Q"), crate::tool_text::sketch_description("Construction").unwrap_or_default().to_string()),
             }
         };
         let chip = |t: &str| div().px(px(3.)).h(px(18.)).flex().items_center().border_1().border_color(gpui_kit::rgb(0xaaaaaa)).rounded(px(2.)).bg(gpui_kit::rgb(0xf5f5f5)).text_size(px(11.)).text_color(pal.text).child(t.to_string());
