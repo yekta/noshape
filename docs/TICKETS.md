@@ -569,7 +569,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fillet errors at once); v0.4.31's shipped CLI hangs here. Same rustc (1.98.1); the differences left are CI's: OCCT
   compiled by GCC 13.3 (ours in /opt/occt by GCC 15.2; the patched sources are the same), and lld (ours mold). Building
   OCCT as CI does (scripts/build-occt.sh, g++-13) on vibe4 (~/agents/core-occt-ci) to link v0.4.31 against it.
-  core 11-05 14:40: found: v0.4.31 built with OCCT compiled as CI does (g++-13, lld) hangs as the release; with our
+  core 11-05 14:36: found: v0.4.31 built with OCCT compiled as CI does (g++-13, lld) hangs as the release; with our
   /opt/occt (GCC 15) it doesn't. The hang is the display mesh, not the fillet: a fuzz part's degenerate faces (boxes
   kilometres wide) go to BRepMesh, whose Delaunay frontier walk (BRepMesh_Delaun::meshLeftPolygonOf, each step scanning
   the polygon) went round for ever in GCC 13's build (~1 s in GCC 15's). OCCT patch 0022: the walk polls noshape's
@@ -2174,6 +2174,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   differs from the test that fuses them: there the first eight steps go through op_boolean (noshape's Boolean with the
   inputs' cached bodies), here through quick_boolean's direct call; their union is the same volume, so look at its
   topology (tolerances, a vertex or edge OCCT then trips on) before step 9.
+  core 11-05 14:57 (lead: Shell 4's speed back with core; skasm's numbers in core.md): Shell 4 alone (T1's body, release,
+  5 runs) 466-483 ms on idle vibe5, 671-690 ms on vibe4 (live 627); the feature is ~35 ms more. Quadrics 446 ms of it:
+  edges 97, faces 65, self-interference 265-283 (OCCT's CheckerSI: two lines against the ramp's offset face, a
+  Geom_OffsetSurface of a rational 2x8 B-spline, in IntCurveSurface's polyhedral line/surface intersection, and the
+  offset faces' face/face pairs), offset 17. **Speed regression in the same document (P0): Shell 3** failed in 0.9 s
+  on v0.4.31 and takes 10 s on vibe5 (31 s here, the 30 s budget) on main: since dx's cb1b7dfcb (the whole / opened
+  checks by the face classifier) its first part's shell passes them, so the second part (dump shell-16: 25 faces, top
+  removed, 0.1 mm) is tried: regions "a concave edge", offset "no solid", quadrics "a kept face tangent to a removed
+  one", then the slabs: OCCT's union of 47 slabs 8.5 s (noshape's Boolean declines "a plane nearly along a cylinder":
+  **bool**), their common invalid. Live asked whether it shells that part (REQUESTS 14:56, live/core/shell16); then
+  either quadrics takes it or it fails fast. Dumps: vibe5 ~/agents/core-scratch/sh3dump (shell::dumped_shell_probe).
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left

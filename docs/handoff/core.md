@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 14:57 UTC.**
+- P0 RELEASE-BUILD-FILLET-HANG landed (da234fac, OCCT patch 0022; lib sync asked): the hang was BRepMesh's Delaunay walk
+  in CI's GCC 13 OCCT on a fuzz part's degenerate face, not the fillet. CI-like build: ~/agents/core-occt-ci on vibe4.
+- learning-center-michael's Fillet 2 went to skasm (lead 14:20); my seam diagnosis is on its ticket.
+- Shell 4 speed (lead's next): 0.47 s vibe5 / 0.68 s vibe4 (live 0.63); the cost is OCCT on the ramp's offset surface
+  (self-interference 270 ms). Found on the way: Shell 3 of the same document 0.9 -> 10 s (P0 regression, SHELL-SLOW
+  note): live asked about its second part (REQUESTS 14:56).
+
 **State 11-05 12:18 UTC.**
 - P1 DISPLACEMENT-MAP-SCALE done (TICKETS): live refuses 1024² (500,000 control points at most; its error after 47 s,
   ours in 7.6 s); up to the limit every step scales (704² feature 4.7 s, meshes 0.3-0.4 s); cancel stops within
