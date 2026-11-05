@@ -564,24 +564,19 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N00. (11-04 22:30) **Viewport Metal layer (orbit floor), in CI.** Branch `perf/psui-layer` = main + 459e3fdf
-    (local commit, not landed; `psui-layer-keep` branch points at it): NOSHAPE_VIEWPORT_LAYER=1 presents viewport
-    frames to a CAMetalLayer in an NSView under GPUI's view (gpui::UnderlayHole: GPUI draws a transparent hole;
-    gpui-pre-macos `underlay_layer` / `place_underlays`; gpui-pre-apple hole pipeline; app-core gpu.rs
-    LayerPresenter blits on the render thread; Viewport::attach_underlay). macOS code is type-checked from Linux:
-    `cargo check --target aarch64-apple-darwin -p gpui-pre-apple -p gpui-pre-macos` (CARGO_TARGET_DIR=
-    /root/target-psui-mac; touch `.../build/gpui-pre-apple-*/out/stitched_shaders.metal` first) and app-core's macOS
-    module through /root/psui-scratch/maccheck (a stub crate). Runs (jobs=bench, modes=texture, env
-    NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames): 41923148042 baseline, 41923165723 + NOSHAPE_VIEWPORT_LAYER=1;
-    compare the first orbit's presented fps / done_ms and look at texture-still.png / texture-orbit-*.png of the
-    layer run (the viewport must show through).
-    **Results 23:20:** the layer draws correctly on macOS 14 and 15 (texture-still / orbit shots: the model, planes and
-    view cube under GPUI's panels; "window draw per frame 0.00 ms", UI CPU/frame 0.22 vs 0.32 ms). But the first
-    orbit (2×, frames-driven) presented 56 fps against 77.6 on the same build without it: the layer was display-synced
-    (interval p50 16.67 = the runner's 60 Hz), and our own frame's GPU time didn't drop (r.done_ms p50 14.5-15.3 vs
-    12.3-13.8 ms). So GPUI's full-window redraw is not the floor's main cost. Next runs (perf/psui-layer2, layer not
-    display-synced): 41932160816 layer; 41933357955 / 41933370375 the empty frame (NOSHAPE_PERF_SKIP=lines+meshes)
-    without / with the layer — the floor with and without GPUI's present. Land the layer only if it wins there.
+N00. (11-05 00:40) **Viewport Metal layer: measured, not landed (no gain).** Branch `psui-layer-keep` (and
+    perf/psui-layer2) has it: NOSHAPE_VIEWPORT_LAYER=1 presents viewport frames to a CAMetalLayer in an NSView under
+    GPUI's view (gpui::UnderlayHole hole sprites, gpui-pre-macos underlay_layer / place_underlays, app-core
+    LayerPresenter blit). It works (CI screenshots on macOS 14 / 15 show the model through the hole; GPUI draws 0 ms per
+    orbit frame) but doesn't pay: same build, first orbit at 2× frames-driven, GPUI path vs layer: NIST macOS 14
+    77.6 vs 72.6 fps, macOS 15 67.0 vs 76.4 (noise); the empty frame (NOSHAPE_PERF_SKIP=lines+meshes) macOS 14 140.4 vs
+    89.8 fps, macOS 15 118.2 vs 123.2 (runs 41923148042 / 41932160816 / 41933357955 / 41933370375). So GPUI's present
+    isn't the floor; the empty frame is ~6-7 ms of our own fixed passes at 2388×1588 and NIST adds ~4-5 ms. Next for
+    the 8.3 ms target: per-pass GPU timestamps (clears, MSAA resolve, AO, overlay, the present copy) on the runners,
+    then cut the biggest. Cross-checking macOS code from Linux: `cargo check --target aarch64-apple-darwin -p
+    gpui-pre-apple -p gpui-pre-macos` (CARGO_TARGET_DIR=/root/target-psui-mac; touch
+    `.../build/gpui-pre-apple-*/out/stitched_shaders.metal` first); app-core's macOS module through the stub crate
+    /root/psui-scratch/maccheck.
 N0. (11-04 21:00, lead's speed list) (a) Dialog open: the preview's `apply_display` (~30 ms each, scene build ~16)
     is UI-thread work; build the scene off the UI thread with the regen (`scene_builder::build` needs `&mut GpuCache` +
     the uploader: move the cache into the worker or split upload from build), or skip `build_preview_base` when the
