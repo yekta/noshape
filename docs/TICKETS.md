@@ -818,7 +818,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   of the initial entities' (ours follow names whose ordinals shift; the new order interns ids in another order).
   Next: find that collision (getInitialEntitiesAndAttributes' ids vs the vertex's), then rerun the corpus with
   the order on.
-- [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
+- [x] (core 11-05 18:10: unscored, lead's rule: live 2097's eight parts show the 0.0106-0.0165 mm cone-circle edges on the 1.25 / 1.5 / 1.625 in shafts and none on 1.375 in or smaller, not monotonic in size, so no geometric rule; tests/parity-models/unscored.json gives the reason) P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
   50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
   meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so
   Parasolid's subtract leaves a sliver edge at each corner; ours ends the flat's line at the corner, at z = 101.607 on
