@@ -9,6 +9,13 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From dx (2026-11-05 03:44 UTC): cf-hose-routing's display takes ~6 s and ~0.9 GB
+The parity corpus's cf-hose-routing (four hoses: a circle swept along fit splines, then shelled; B-spline tubes)
+regenerates in ~0.7 s, but `feature_list` (which builds the display) takes 7.05 s and peaks at 930 MB, and the parity
+runner's reopen-and-list is 7.8 s against live's 0.49 s regeneration; `document_info` alone is instant. So nearly all
+of it is the hoses' display meshes. Repro: `NOSHAPE_PARITY_ONLY=cf-hose-routing NOSHAPE_PARITY_SAVE=<dir>` parity_models
+keeps the translated document, then `noshape-cli call feature_list '{"doc":"<dir>/cf-hose-routing.noshape"}'`.
+
 ## From skasm (2026-11-04 14:21 UTC)
 - **MC-INFERENCE-DOTS** (P3, docs/TICKETS.md): the assembly's mate connector hover now draws your `InferenceMarks`
   (as the Part Studio). Against live 1851 shot 4 (psui/hole-mc-1851/4-hover-face.png) the connector glyph matches
