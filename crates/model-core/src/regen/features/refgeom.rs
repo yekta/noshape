@@ -78,6 +78,15 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
         _ => None,
     });
     let sec_edge = secondary.iter().find_map(|r| ev.resolve_edges(std::slice::from_ref(r)).first().and_then(|&(bi, ei)| ev.edge_shape(bi, ei).ok()));
+    // A round face's axis (a rounded corner picked as the CENTER of a Hole's connector on the face beside it, live
+    // clamp-hms: the hole on the corner fillet's axis).
+    let sec_axis = secondary.iter().find_map(|r| {
+        let &(bi, fi) = ev.resolve_faces(std::slice::from_ref(r)).first()?;
+        match ev.face_shape(bi, fi).ok()?.face_surface().ok()? {
+            k::Surface::Cylinder { origin, axis, .. } | k::Surface::Cone { origin, axis, .. } => Some((origin, axis.normalize())),
+            _ => None,
+        }
+    });
     match face.face_surface()? {
         k::Surface::Cylinder { origin, axis, x_dir, .. } | k::Surface::Cone { origin, axis, x_dir, .. }
             if matches!(inference, "TOP_AXIS_POINT" | "MID_AXIS_POINT" | "BOTTOM_AXIS_POINT" | "CENTROID" | "CENTER" | "") =>
@@ -95,6 +104,16 @@ fn face_csys(ev: &EvalCtx, face: &Shape, inference: &str, secondary: &[Reference
             let plane = if let k::Surface::Plane(p) = surf { Some(p) } else { None };
             let point = match inference {
                 "POINT" if sec_point.is_some() => sec_point.unwrap_or_default(),
+                // (A face as the secondary resolves to its edges too: its axis first.)
+                "CENTER" if sec_axis.is_some() => {
+                    let (o, a) = sec_axis.unwrap_or_default();
+                    // Where the axis meets the face's plane, else its point nearest the face's centroid.
+                    let c = face.centroid()?;
+                    match plane.as_ref().map(|p| (p.origin, p.unit_normal())).filter(|(_, n)| a.dot(*n).abs() > 1e-9) {
+                        Some((po, n)) => o + a * ((po - o).dot(n) / a.dot(n)),
+                        None => o + a * (c - o).dot(a),
+                    }
+                }
                 "MID_POINT" | "CENTER" | "LOOP_CENTER" if sec_edge.is_some() => {
                     let e = sec_edge.clone().unwrap_or_default();
                     let c = edge_csys(&e, if inference == "MID_POINT" { "MID_POINT" } else { "CENTER" })?;

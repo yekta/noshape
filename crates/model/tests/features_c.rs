@@ -3276,3 +3276,42 @@ fn face_blend_side_flips_as_std() {
     let changed = noshape_model::custom::std_feature::manipulator_change_in((*r.context).clone(), "faceBlend", fb.id, &fb.name, &s.units, &fb.params, k1, &moved).expect("std's change function ran");
     assert_eq!(changed.get("flipSide1"), Some(&ParamValue::Bool(true)), "{changed:?}");
 }
+
+/// Live (clamp-hms's Hole): a mate connector on a planar face with CENTER and a round face as its secondary entity (a
+/// rounded corner beside the face) sits where the round face's axis meets the face's plane, Z the face's normal; the
+/// round face's own edges (it resolves to them too) don't decide it.
+#[test]
+fn mate_connector_at_the_center_of_a_rounded_corner() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, 0.0), (40.0, 0.0), (40.0, 30.0), (0.0, 30.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let corner = edge_near(&r, 0, DVec3::new(mm(40.0), mm(30.0), mm(5.0)));
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(vec![corner]));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    // The top face (the plane at z = 10) and the rounded corner (the 5 mm cylinder).
+    let b = &r.context.bodies[0];
+    let pick = |want: &dyn Fn(&noshape_kernel::Surface) -> bool| {
+        let faces = b.shape.faces();
+        let i = faces.iter().position(|f| f.face_surface().is_ok_and(|x| want(&x))).expect("the face");
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let top = pick(&|x| matches!(x, noshape_kernel::Surface::Plane(p) if near(p.origin.z, mm(10.0), 1e-9) && p.unit_normal().z.abs() > 0.999));
+    let round = pick(&|x| matches!(x, noshape_kernel::Surface::Cylinder { radius, .. } if near(*radius, mm(5.0), 1e-9)));
+    s.add("mateConnector", move |p| {
+        p.set("originQuery", q(top));
+        p.set("entityInferenceType", en("CENTER"));
+        p.set("secondaryOriginQuery", q(round));
+    });
+    let c = s.ok().context.connectors[0].clone();
+    assert!(c.origin.distance(DVec3::new(mm(35.0), mm(25.0), mm(10.0))) < 1e-9 && c.z.distance(DVec3::Z) < 1e-9, "{:?} z {:?}", c.origin, c.z);
+}
