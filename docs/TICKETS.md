@@ -857,7 +857,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
-- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:52, speed) cf-sheet-metal-model-plus regenerates in 2.5 s, live 0.92 (one.sh,
+- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed) cf-sheet-metal-model-plus regenerates in 2.5 s, live 0.92 (one.sh,
   vibe5). By feature (NOSHAPE_FS_PROFILE): Sheet Metal Up to Part 281 ms (live 160), Flange 1 307 (224), Up to Face w/
   Offset 35 (123), Extrude 4 898 (339). Extrude 4 is std's sheet metal boolean: 571 ms in the per-face loop
   (boolean.fs createOutlineBooleanToolsForFaceNoChecks: thicken, trimTool's intersect, createOutline), of which
