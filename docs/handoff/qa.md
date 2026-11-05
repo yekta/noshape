@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 09:42: disk (lead: the machine hit 100 %).** /root/qa-scratch cut from 47 GB to 6.3 GB: rel/k now holds only v0.4.30,
+v0.4.29 and keep/x/y noshape-8cc1b766 / -a1ec7849 (the last two greens; the CRASH-2045 binary 0531f66e went, the ticket is verified);
+the local updater home (retired; it runs on vibe3) and the vibe3 transfer bundle deleted; cli/ fuzz outputs deleted except
+summaries, baselines and files TICKETS.md / this handoff cite (the hang4539 and crash3151 repro logs moved into their ticket folders).
+**Rule from now on:** big fuzz / sweep output only on vibe3 (~/qa, 330 GB free); here keep at most the two newest release downloads
+in rel/k (delete the older one after each release smoke) and the two newest green copies in keep/x/y.
+
 **11-05 06:08:** no 05:00 Release run yet (the list, written 03:52 and extended 04:15, stands: no blocker). Greens checked since
 (vibe3 sweeps; the full smoke on 769f4796, 1e046255, 86546441): 9ea6b56f, 769f4796, 672a3edb, d293a184, 1e046255, a3b4fbc4,
 86546441 — no change anywhere. New P1 DRAFT-NONDETERMINISTIC (cli-draft-hang2 regenerates differently per open, v0.4.29 too):
