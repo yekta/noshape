@@ -1817,7 +1817,7 @@ pub(super) fn inner_point(f: &Shape) -> Option<DVec3> {
     let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
     for (a, b) in [(0.5, 0.5), (0.3, 0.3), (0.7, 0.7), (0.3, 0.7), (0.7, 0.3), (0.5, 0.2), (0.2, 0.5), (0.5, 0.8), (0.8, 0.5)] {
         let p = f.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok()?;
-        if f.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-9) {
+        if f.contains_point(p, 1e-9).unwrap_or(false) {
             return Some(p);
         }
     }
@@ -1835,7 +1835,7 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
     // On the face, facing the same way, and not on its boundary (a bend's
     // end face touches the side face it replaces at one edge).
     let on = |f: &Shape, (p, n): (DVec3, DVec3)| {
-        f.project_point(p).is_ok_and(|pr| pr.distance < 1e-7)
+        f.contains_point(p, 1e-7).unwrap_or(false)
             && f.normal_at_point(p).is_ok_and(|m| m.dot(n) > 1.0 - 1e-6)
             && k::make_vertex(p).is_ok_and(|v| f.edges().iter().all(|e| k::distance(&v, e).is_ok_and(|d| d.distance > 1e-6)))
     };
@@ -1893,7 +1893,7 @@ fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<D
                 (Some(a), Ok(b)) => a.cross(b).length() < 1e-6,
                 _ => true,
             };
-            pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-7) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
+            pieces.iter().enumerate().find(|(i, x)| in_box(*i, p) && x.face.contains_point(p, 1e-7).unwrap_or(false) && along(x)).map_or(Def::Face(0), |(_, x)| x.from)
         })
         .collect();
     let ef = part.edge_faces().unwrap_or_default();

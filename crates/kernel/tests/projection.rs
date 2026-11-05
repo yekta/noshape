@@ -139,3 +139,33 @@ fn projection_onto_a_bspline_of_many_poles() {
     let q = face.project_point(s).unwrap();
     assert!(q.distance < 1e-9 && q.point.distance(s) < 1e-9, "{q:?}");
 }
+
+/// `contains_point` answers as the projection does: points on a face (a plane with holes, a ruled B-spline loft) in,
+/// points over a hole, past the edge or off the surface out.
+#[test]
+fn contains_point_agrees_with_the_projection() {
+    let tol = 1e-7;
+    let agree = |f: &k::Shape, p: DVec3| {
+        let near = f.project_point(p).unwrap().distance < tol;
+        assert_eq!(f.contains_point(p, tol).unwrap(), near, "{p:?}");
+        near
+    };
+    let mut s = k::make_box_corners(DVec3::ZERO, DVec3::new(0.02, 0.02, 0.002)).unwrap();
+    let hole = k::make_cylinder(&k::Plane::from_normal(DVec3::new(0.01, 0.01, -0.001), DVec3::Z), 0.003, 0.004, 2.0 * PI).unwrap();
+    s = k::cut(&s, &hole).unwrap().shape;
+    let top = s.faces().into_iter().find(|f| f.is_planar() && (f.centroid().unwrap().z - 0.002).abs() < 1e-9).unwrap();
+    assert!(agree(&top, DVec3::new(0.002, 0.002, 0.002)));
+    assert!(!agree(&top, DVec3::new(0.01, 0.01, 0.002)));
+    assert!(!agree(&top, DVec3::new(0.025, 0.01, 0.002)));
+    assert!(!agree(&top, DVec3::new(0.002, 0.002, 0.0021)));
+    let sheet = ruled_sheet();
+    for f in sheet.faces() {
+        let b = f.uv_bounds().unwrap();
+        for (fu, fv) in [(0.5, 0.4), (0.1, 0.9), (0.75, 0.1)] {
+            let (u, v) = (b[0] + fu * (b[1] - b[0]), b[2] + fv * (b[3] - b[2]));
+            let on = f.point_at_uv(u, v).unwrap();
+            assert!(agree(&f, on));
+            assert!(!agree(&f, on + f.normal_at_uv(u, v).unwrap().normalize() * 1e-4));
+        }
+    }
+}

@@ -704,6 +704,50 @@ static bool big_bspline_nearest(const TopoDS_Face& f, const gp_Pnt& P, ProjPoint
   return true;
 }
 
+// On an elementary surface: within `tol` of the surface, the foot inside the face or on its boundary (no distance to
+// the boundary for a point off it: the projection's edge search took ~0.5 ms a call, a sheet metal Flange's thousands
+// of "on this face?" probes 0.7 s). Free-form faces by the projection below.
+bool face_contains_point(const OcShape& fs, P3 p, double tol)
+{
+  const TopoDS_Face&        f    = as_face(fs.shape, "shape");
+  const GeomAbs_SurfaceType kind = BRepAdaptor_Surface(f, false).GetType();
+  if (kind == GeomAbs_Plane || kind == GeomAbs_Cylinder || kind == GeomAbs_Cone || kind == GeomAbs_Sphere || kind == GeomAbs_Torus)
+  {
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
+    if (surf.IsNull())
+      return false;
+    GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf);
+    if (!pr.IsDone() || pr.NbPoints() == 0 || pr.LowerDistance() > tol)
+      return false;
+    double u, v;
+    pr.LowerDistanceParameters(u, v);
+    BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), std::max(tol, BRep_Tool::Tolerance(f)));
+    return fc.State() == TopAbs_IN || fc.State() == TopAbs_ON;
+  }
+  // Free-form: the surface's feet within the face's parameter box (a point on the face has one at 0), each classified.
+  {
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
+    if (surf.IsNull())
+      return face_project_point(fs, p).distance <= tol;
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf, u0, u1, v0, v1);
+    if (!pr.IsDone())
+      return face_project_point(fs, p).distance <= tol;
+    for (int k = 1; k <= pr.NbPoints(); ++k)
+    {
+      if (pr.Distance(k) > tol)
+        continue;
+      double u, v;
+      pr.Parameters(k, u, v);
+      BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), std::max(tol, BRep_Tool::Tolerance(f)));
+      if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
+        return true;
+    }
+    return false;
+  }
+}
+
 ProjPoint face_project_point(const OcShape& fs, P3 p)
 {
   const TopoDS_Face& f = as_face(fs.shape, "shape");
@@ -740,6 +784,35 @@ ProjPoint face_project_point(const OcShape& fs, P3 p)
     ProjPoint r{};
     if (big_bspline_nearest(f, to_pnt(p), r))
       return r;
+  }
+  // A point on a free-form face (a normal asked there: std sheet metal's rolled walls, 0.4 ms a call by the search
+  // below): a foot on the surface at no distance, inside the face, is the nearest point (none can be nearer). A point
+  // off it goes on below (another extremum could be nearer, PROJ-RULED).
+  if (kind != GeomAbs_Plane && kind != GeomAbs_Cylinder && kind != GeomAbs_Cone && kind != GeomAbs_Sphere && kind != GeomAbs_Torus)
+  {
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(f);
+    double                          u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    if (!surf.IsNull())
+    {
+      GeomAPI_ProjectPointOnSurf pr(to_pnt(p), surf, u0, u1, v0, v1);
+      const double               tol = BRep_Tool::Tolerance(f);
+      if (pr.IsDone() && pr.NbPoints() > 0 && pr.LowerDistance() <= tol)
+      {
+        double u, v;
+        pr.LowerDistanceParameters(u, v);
+        BRepClass_FaceClassifier fc(f, gp_Pnt2d(u, v), tol);
+        if (fc.State() == TopAbs_IN || fc.State() == TopAbs_ON)
+        {
+          ProjPoint r{};
+          r.point    = from_pnt(pr.NearestPoint());
+          r.distance = pr.LowerDistance();
+          r.u        = u;
+          r.v        = v;
+          return r;
+        }
+      }
+    }
   }
   TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(to_pnt(p));
   // Off a face of many edges (a plate's 1,700 holes): the nearest point of its edges, visited by their boxes' distance

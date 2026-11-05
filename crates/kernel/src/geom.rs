@@ -295,6 +295,11 @@ impl Shape {
         Ok(v3(ck(ffi::face_point_at_uv(self.raw(), u, v))?))
     }
 
+    /// Whether `p` lies on the (bounded) face within `tol` (cheaper than [`Shape::project_point`] for a point off it).
+    pub fn contains_point(&self, p: DVec3, tol: f64) -> Result<bool> {
+        ck(ffi::face_contains_point(self.raw(), p3(p), tol))
+    }
+
     /// Closest point on the (bounded) face to `p`, with its (u, v) parameters.
     pub fn project_point(&self, p: DVec3) -> Result<FaceProjection> {
         let r = ck(ffi::face_project_point(self.raw(), p3(p)))?;

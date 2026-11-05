@@ -217,7 +217,7 @@ fn ev_edge_tangent_lines(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn face_on_left(face: &k::Shape, info: &k::EdgeInfo, p: DVec3, n: DVec3, d: DVec3) -> bool {
     let eps = (info.length * 1e-4).clamp(1e-9, 1e-5);
     let left = p + n.cross(d).normalize_or_zero() * eps;
-    face.project_point(left).is_ok_and(|pr| pr.point.distance(left) < eps * 1e-3)
+    face.contains_point(left, eps * 1e-3).unwrap_or(false)
 }
 
 /// The tangent planes at parameters in [0, 1]² of the face's uv bounds: x along u, one kernel call for all.

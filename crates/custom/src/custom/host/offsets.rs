@@ -31,7 +31,7 @@ fn samples(f: &Shape) -> Vec<(DVec3, DVec3)> {
         let (u, v) = (u0 + (u1 - u0) * a, v0 + (v1 - v0) * b);
         let (Ok(p), Ok(n)) = (f.point_at_uv(u, v), f.normal_at_uv(u, v)) else { continue };
         // Trimmed faces: keep points inside the face.
-        if f.project_point(p).is_ok_and(|pr| pr.point.distance(p) < 1e-9) {
+        if f.contains_point(p, 1e-9).unwrap_or(false) {
             out.push((p, n.normalize_or_zero()));
         }
         if out.len() >= 3 {

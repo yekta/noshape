@@ -570,9 +570,15 @@ impl<'a> QueryCx<'a> {
                 [0.0, 0.5, 1.0].iter().filter_map(|t| shape.point_at(i.first_param + (i.last_param - i.first_param) * t).ok()).collect()
             }
             _ => {
+                // A point of the face: its parameters' middle when on it, else a few others, else the nearest to
+                // the middle (the projection's search along the edges: ~0.4 ms a face, std sheet metal's thousands).
                 let [u0, u1, v0, v1] = shape.uv_bounds().ok()?;
-                let p = shape.point_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).ok()?;
-                vec![shape.project_point(p).ok()?.point]
+                let at = |a: f64, b: f64| shape.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
+                let inside = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.75), (0.25, 0.75), (0.75, 0.25)].into_iter().filter_map(|(a, b)| at(a, b)).find(|p| shape.contains_point(*p, 1e-9).unwrap_or(false));
+                match inside {
+                    Some(p) => vec![p],
+                    None => vec![shape.project_point(at(0.5, 0.5)?).ok()?.point],
+                }
             }
         };
         let face = (etype == EType::Face).then(|| shape.clone());
