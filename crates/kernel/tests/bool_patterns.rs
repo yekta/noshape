@@ -503,7 +503,7 @@ fn a_25_by_25_knurl() {
 }
 
 /// cf-straight-spline's cuts by a pattern of 8 spline cutters (recorded): noshape's Boolean declines the first late
-/// (a piece of a cutter cone across its seam angle, once its result is built), so in its feature type's scope the next
+/// (its result built and found invalid by OCCT's checker), so in its feature type's scope the next
 /// cut goes straight to OCCT's (a "two edges" cut, declined as late outside the scope); OCCT's results both.
 #[test]
 fn a_late_decline_sends_the_like_straight_to_occt() {
@@ -518,7 +518,7 @@ fn a_late_decline_sends_the_like_straight_to_occt() {
     };
     let memo = std::sync::Arc::new(k::DeclineMemo::default());
     memo.scope("spline", || {
-        assert_eq!(run(&a).1, "a piece across its surface's seam angle");
+        assert_eq!(run(&a).1, "an invalid result");
         assert_eq!(run(&b).1, "not tried (an earlier path took it)");
     });
     // (Another feature type, or none: tried.)
@@ -602,6 +602,14 @@ fn a_sphere_knob_fused_onto_a_wheel_as_occt() {
 #[test]
 fn boards_with_b_spline_faces_fused_as_occt() {
     as_recorded("042819da42a6ddf5");
+}
+
+/// cf-spur-gear's Boolean 1 (recorded: a 186-face gear fused with one tool): OCCT's result. A flank face's angles run
+/// over its cylinder's seam angle (3.4 .. 9.1) in the input already; its piece kept them and was declined as across
+/// the seam ("a piece across its surface's seam angle" after the whole Boolean, then OCCT's 0.45 s).
+#[test]
+fn a_gear_fused_as_occt() {
+    as_recorded("cef7972794e2ae06");
 }
 
 /// motor-mount-jack's Extrude 3 (recorded: a boss fused onto the tube with four elliptic slots through it): OCCT's

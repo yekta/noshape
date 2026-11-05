@@ -1882,8 +1882,14 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     const occ::handle<Geom_CylindricalSurface> scyl = occ::down_cast<Geom_CylindricalSurface>(sf);
     const double radius = !scyl.IsNull() ? scyl->Radius() : occ::down_cast<Geom_ConicalSurface>(sf)->RefRadius();
     const double round_off = radius > 1e-9 ? std::max(1e-7, tol / radius) : 1e-7;
+    // (Within its input face's own angles across it: as that face was (a gear's flank face over u 3.4 .. 9.1).)
     if (z - a < 2 * M_PI - 1e-6 && std::floor((a + round_off) / (2 * M_PI)) != std::floor((z - round_off) / (2 * M_PI)))
-      return "a piece across its surface's seam angle";
+    {
+      double sa = 0, sz = 0, sv1 = 0, sv2 = 0;
+      BRepTools::UVBounds(TopoDS::Face(input(srcs, r.face_origin[3 * i + 1], TopAbs_FACE, r.face_origin[3 * i + 2])), sa, sz, sv1, sv2);
+      if (a < sa - round_off || z > sz + round_off)
+        return "a piece across its surface's seam angle";
+    }
     if (z - a > 2 * M_PI + 1e-6)
       return "a face's curves over more than a turn";
   }
