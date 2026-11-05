@@ -345,6 +345,10 @@ pub struct PartStudioView {
     /// Bumped by every scene build started: a background build's scene only lands if none started since (its
     /// display's other steps still run).
     scene_gen: u64,
+    /// Bumped whenever `built` is replaced (keys what is derived from it: `no_pick`).
+    built_seq: u64,
+    /// For `built_seq` and the active field's pick kinds: the overlay pick ids it can't take (they leave the pick pass).
+    no_pick: Option<(u64, Vec<PickKind>, Arc<[u32]>)>,
     pub selection: Vec<Reference>,
     hover: Option<Reference>,
     opts: SceneOptions,
@@ -512,6 +516,8 @@ impl PartStudioView {
             cache: Default::default(),
             display_seq: 0,
             scene_gen: 0,
+            built_seq: 0,
+            no_pick: None,
             selection: Vec::new(),
             hover: None,
             opts: SceneOptions { show_planes: true, show_sketches: true, show_origin: true, ..Default::default() },
@@ -979,12 +985,19 @@ impl PartStudioView {
         (geometry_changed, SceneJob { shown, opts, base })
     }
 
+    /// Show a newly built scene (and the preview blend's base); the replaced ones are freed off the UI thread (~4 % of
+    /// a dialog's open and close there, cf-straight-spline).
+    fn set_built(&mut self, built: BuiltScene, base: Option<BuiltScene>, cx: &mut Context<Self>) {
+        self.built_seq += 1;
+        let old = (self.built.replace(built), std::mem::replace(&mut self.built_base, base));
+        cx.background_spawn(async move { drop(old) }).detach();
+    }
+
     /// What [`Self::apply_display`] does once the scene is built (`None`: a newer build replaced it meanwhile).
     fn apply_display_end(&mut self, geometry_changed: bool, scene: Option<(BuiltScene, Option<BuiltScene>)>, cx: &mut Context<Self>) {
         let _t = noshape_render::perf::scope("ps.apply_display_end");
         if let Some((built, base)) = scene {
-            self.built = Some(built);
-            self.built_base = base;
+            self.set_built(built, base, cx);
         }
         let prio = self.built.as_ref().map(|b| b.picks.priority_fn());
         self.ui.pick_filter = None;
@@ -1162,8 +1175,7 @@ impl PartStudioView {
         let base = self.preview_base_job(&opts, cx);
         self.scene_gen += 1;
         let (built, base) = SceneJob { shown, opts, base }.build(&self.cache, self.gpu.uploader());
-        self.built = Some(built);
-        self.built_base = base;
+        self.set_built(built, base, cx);
         self.refresh_scene(true, cx);
         cx.notify();
     }
@@ -1339,8 +1351,17 @@ impl PartStudioView {
         // part edge for Fillet's edges) leave the pick pass, so what lies
         // under them is picked. Faces keep hiding what's behind them.
         if let Some(kinds) = self.pick_kinds(cx) {
-            let overlay = |k: PickKind| matches!(k, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion | PickKind::Edge | PickKind::Vertex);
-            for id in built.picks.ids_where(|t| overlay(t.kind) && !kinds.contains(&t.kind)) {
+            // Per scene and field: a scan of every pick target (~3 % of a dialog's open on cf-straight-spline).
+            let ids = match &self.no_pick {
+                Some((seq, k, ids)) if *seq == self.built_seq && *k == kinds => ids.clone(),
+                _ => {
+                    let overlay = |k: PickKind| matches!(k, PickKind::SketchCurve | PickKind::SketchPoint | PickKind::SketchRegion | PickKind::Edge | PickKind::Vertex);
+                    let ids: Arc<[u32]> = built.picks.ids_where(|t| overlay(t.kind) && !kinds.contains(&t.kind)).collect();
+                    self.no_pick = Some((self.built_seq, kinds, ids.clone()));
+                    ids
+                }
+            };
+            for &id in ids.iter() {
                 scene.add_flag(id, noshape_render::scene::state::NO_PICK);
             }
         }
@@ -2605,9 +2626,20 @@ impl PartStudioView {
         self.context = b.context;
         // Closing a dialog: the committed model's scene is built off the UI thread.
         self.apply_display_async(b.display, window, cx);
-        if !current.is_some_and(|(studio, upto, config)| upto == b.upto && config == b.config && studio == *b.studio) {
-            self.schedule_regen(window, cx);
-        }
+        // Whether the document changed since that result: a deep compare of the studios (~8 % of a dialog's open and
+        // close on the UI thread, cf-straight-spline) done in the background; a regeneration follows if it did and
+        // nothing newer started meanwhile.
+        let (seq, shown) = (self.regen_seq, b.studio.clone());
+        let same = cx.background_spawn(async move { current.is_some_and(|(studio, upto, config)| upto == b.upto && config == b.config && studio == *shown) });
+        self.ui.restore_check = Some(cx.spawn_in(window, async move |this, cx| {
+            let same = same.await;
+            let _ = this.update_in(cx, |this: &mut Self, window, cx| {
+                this.ui.restore_check = None;
+                if !same && this.regen_seq == seq {
+                    this.schedule_regen(window, cx);
+                }
+            });
+        }));
         true
     }
 
