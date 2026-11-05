@@ -3422,7 +3422,11 @@ impl SketchEditor {
         };
         if data.sketch.constraint(cid).is_some_and(|c| c.driving) {
             data.sketch.set_dimension_value(cid, q.value / f.scale).map_err(|e| e.to_string())?;
-            data.sketch.solve();
+            // (A free line's typed length moves its start, never scales: live 2022.)
+            match data.sketch.free_line_edit_options(cid) {
+                Some(opts) => data.sketch.solve_with(&opts),
+                None => data.sketch.solve(),
+            };
         } else {
             self.message = Some("The dimension over-defines the sketch; it was added as a driven dimension".into());
         }
@@ -4470,9 +4474,9 @@ impl SketchEditor {
             // `display_scale`), with its unit.
             data.dimension_exprs.insert(cid.0, ExprValue::new(text));
         }
-        // Live 1785: the free geometry scales onto the new value.
-        data.sketch.scale_for_edit(cid);
-        let opts = data.sketch.dimension_edit_options(cid);
+        // Live 1785 / 2022: a sketch's first dimension scales it onto the new value; else a free line's start moves.
+        let scaled = data.sketch.scale_for_edit(cid);
+        let opts = (!scaled).then(|| data.sketch.free_line_edit_options(cid)).flatten().unwrap_or_else(|| data.sketch.dimension_edit_options(cid));
         let report = data.sketch.solve_with(&opts);
         // The next fillet defaults to the radius just typed (live, 568).
         if let Some(ConstraintKind::Radius { curve, value }) = data.sketch.constraint(cid).map(|c| c.kind.clone())

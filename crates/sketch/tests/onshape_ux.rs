@@ -902,3 +902,53 @@ fn a_fit_spline_takes_onshapes_end_derivatives() {
     let line = sk.add_line(v(0.0, 0.0), v(0.01, 0.0));
     assert!(sk.set_fit_spline_end_derivatives(line, d0, d1).is_err());
 }
+
+/// Live 2022: a free line's length set anew moves its start (the first click) and keeps its end, in all four
+/// directions, by its dimension once the sketch has another one (its lines B2, C2, D2; and A in the typed box).
+#[test]
+fn a_free_lines_new_length_moves_its_start() {
+    let cases = [
+        ((20.13, 20.27), (39.968, 24.36), (25.276, 21.335)),
+        ((39.968, 30.195), (20.13, 34.279), (34.822, 31.255)),
+        ((-39.968, -19.692), (-20.13, -15.608), (-34.822, -18.633)),
+        ((-20.13, -29.612), (-39.968, -25.819), (-25.235, -28.636)),
+    ];
+    for (a, b, want) in cases {
+        let mut sk = Sketch::new();
+        let q0 = sk.add_point(v(100.0, 100.0));
+        let q1 = sk.add_point(v(120.0, 100.0));
+        let other = sk.add_line_between(q0, q1).unwrap();
+        sk.add_constraint(ConstraintKind::Length { curve: other, value: 20.0 }).unwrap();
+        let (p0, p1) = (sk.add_point(v(a.0, a.1)), sk.add_point(v(b.0, b.1)));
+        let l = sk.add_line_between(p0, p1).unwrap();
+        let d = sk.add_constraint(ConstraintKind::Length { curve: l, value: (v(b.0, b.1) - v(a.0, a.1)).length() }).unwrap();
+        assert!(sk.solve().is_solved());
+        sk.set_dimension_value(d, 15.0).unwrap();
+        assert!(!sk.scale_for_edit(d), "the sketch has a dimension: no scaling");
+        assert!(sk.solve_with(&sk.free_line_edit_options(d).expect("a free line")).is_solved());
+        assert!((sk.point(p1).unwrap() - v(b.0, b.1)).length() < 1e-9, "the end stays");
+        // (Live's clicks to 0.001-0.006 mm: line A reads 20.27 in its typed-box table, 20.276 in its Dimension run.)
+        assert!((sk.point(p0).unwrap() - v(want.0, want.1)).length() < 5e-3, "start {:?}, live {want:?}", sk.point(p0).unwrap());
+    }
+}
+
+/// Live 2022 (8): two free lines of 18.543 and 20.254 mm, the first dimensioned to 15: the sketch's first dimension
+/// scales the whole sketch, the other line too (16.384 mm), about the centre of the box of all its geometry.
+#[test]
+fn a_sketchs_first_dimension_scales_all_of_it() {
+    let mut sk = Sketch::new();
+    let pts = [v(20.13, 20.268), v(38.4, 23.4), v(21.0, 34.271), v(39.968, 30.0)];
+    let ids: Vec<EntityId> = pts.iter().map(|p| sk.add_point(*p)).collect();
+    let first = sk.add_line_between(ids[0], ids[1]).unwrap();
+    sk.add_line_between(ids[2], ids[3]).unwrap();
+    let len = (pts[1] - pts[0]).length();
+    let d = sk.add_constraint(ConstraintKind::Length { curve: first, value: len }).unwrap();
+    assert!(sk.solve().is_solved());
+    sk.set_dimension_value(d, 15.0).unwrap();
+    assert!(sk.scale_for_edit(d));
+    assert!(sk.solve_with(&sk.dimension_edit_options(d)).is_solved());
+    let (k, c) = (15.0 / len, v((20.13 + 39.968) / 2.0, (20.268 + 34.271) / 2.0));
+    for (id, p) in ids.iter().zip(pts) {
+        assert!((sk.point(*id).unwrap() - (c + (p - c) * k)).length() < 1e-6, "{:?}", sk.point(*id).unwrap());
+    }
+}

@@ -1221,14 +1221,29 @@ impl Sketch {
         opts
     }
 
-    /// A length or distance typed in the editor scales the free geometry it
-    /// belongs to uniformly onto the new value, about its centre, or about
-    /// the one point of it fixed to the Origin (live 1785: a corner
-    /// rectangle's width 40 -> 50 scales it ×1.25, height too; 1775: a lone
-    /// line grows about its midpoint). Not a radius (live SK5: a fillet's
-    /// new radius moves the edges beside it, the rectangle keeps its size).
-    /// Only when nothing else there is dimensioned or fixed; returns whether
-    /// it scaled (the solve after then finds everything held).
+    /// A free line's length set anew (its typed box, or its dimension edited when the sketch isn't scaled): its start,
+    /// the first click, moves along it and its end stays (live 2022, all four directions). Free: nothing else holds
+    /// the line or its end points.
+    pub fn free_line_edit_options(&self, cid: ConstraintId) -> Option<SolveOptions> {
+        let c = self.constraint(cid)?;
+        let ConstraintKind::Length { curve, .. } = c.kind else { return None };
+        let (start, end) = self.endpoints(curve).filter(|_| self.kind(curve) == Some(EntityKind::Line))?;
+        let mine = [curve, start, end];
+        if self.constraints().any(|k| k.id != cid && k.kind.entities().iter().any(|e| mine.contains(e))) {
+            return None;
+        }
+        if self.entities().any(|x| x.id != curve && x.point_refs().iter().any(|p| *p == start || *p == end)) {
+            return None;
+        }
+        Some(SolveOptions { light: vec![curve, start], still: vec![end], ..Default::default() })
+    }
+
+    /// A sketch's first dimension, a length or distance, scales the whole sketch uniformly onto its value, about the
+    /// centre of its geometry's box, or about the one Origin point it's fixed to (live 2022: two free lines, the first
+    /// dimensioned 18.543 -> 15 mm, both ×0.8089 about their box's centre; 1785: a corner rectangle's width 40 -> 50
+    /// scales it ×1.25, height too; 1775: a lone line grows about its midpoint). Not a radius (live SK5: a fillet's
+    /// new radius moves the edges beside it, the rectangle keeps its size). Only when the sketch has no other
+    /// dimension and nothing fixed; returns whether it scaled (the solve after then finds everything held).
     pub fn scale_for_edit(&mut self, cid: ConstraintId) -> bool {
         let Some(c) = self.constraint(cid).filter(|c| c.driving).cloned() else { return false };
         let (ConstraintKind::Length { value, .. } | ConstraintKind::Distance { value, .. }) = c.kind else { return false };
@@ -1237,25 +1252,18 @@ impl Sketch {
         if !k.is_finite() || k <= 0.0 || (k - 1.0).abs() < 1e-12 {
             return false;
         }
-        // The geometry joined to the dimension's (constraints, shared
-        // points, curves' own points).
-        let mut set: HashSet<EntityId> = HashSet::new();
-        let mut todo: Vec<EntityId> = c.kind.entities().into_iter().collect();
-        while let Some(e) = todo.pop() {
-            if !set.insert(e) {
-                continue;
-            }
-            if let Some(x) = self.entity(e) {
-                todo.extend(x.point_refs());
-            }
-            todo.extend(self.entities().filter(|x| x.point_refs().contains(&e)).map(|x| x.id));
-            for k in self.constraints().filter(|k| k.driving && k.kind.entities().contains(&e)) {
-                todo.extend(k.kind.entities());
-            }
-        }
-        let others_fix = self.constraints().filter(|k| k.driving && k.id != cid && k.kind.entities().iter().any(|e| set.contains(e))).any(|k| k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. }));
-        if others_fix {
+        // The sketch's first dimension: no other, nothing fixed (live 2022: once one is there, the next only moves its
+        // own geometry).
+        if self.constraints().any(|k| k.driving && k.id != cid && (k.kind.is_dimension() || matches!(k.kind, ConstraintKind::Fix { .. }))) {
             return false;
+        }
+        // The whole sketch, and the outside points its constraints hold it to.
+        let mut set: HashSet<EntityId> = self.entities().filter(|x| !x.external).map(|x| x.id).collect();
+        for k in self.constraints().filter(|k| k.driving) {
+            let es = k.kind.entities();
+            if es.iter().any(|e| set.contains(e)) {
+                set.extend(es.iter().copied().filter(|e| self.entity(*e).is_some_and(|x| x.external)));
+            }
         }
         let external: Vec<EntityId> = set.iter().copied().filter(|e| self.entity(*e).is_some_and(|x| x.external)).collect();
         if external.iter().any(|e| self.kind(*e) != Some(EntityKind::Point)) || external.len() > 1 {
