@@ -103,6 +103,20 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Prize-wheel and cf-fix-pcb (bool, 11-05 06:24). Landed 4a1f153a: the prize-wheel corpus 69 -> 44 ms (OCCT 58; b2a1
+  13.7 ms against OCCT's 12.2 before this round's other work): a segment's chord doesn't grow the Newton seed boxes,
+  the boundary distance search is a golden section skipped on parts clear of it, each curve's area and length once;
+  Newton roots scattered along a tangent touch are one crossing (two cases taken that differed with fewer seeds now
+  match OCCT; cf-straight-spline's first cut now declines at the build, "a piece across its surface's seam angle",
+  added to the late declines; its corpus's declines 19.9 -> 18.3 s). Queued 06:00: planar B-spline faces read as
+  planes (cf-fix-pcb's 51-tool board fuse 101003c5: 0.22 s, OCCT's tree 4.3 s, its single fuse 2.0 s; equivalent to
+  the single fuse; the tree's history says Modified for every shape because it scales the inputs), and a big
+  result's validity check in parallel (spur gear -7 %). cf-fix-pcb's 474a (glued fuse, OCCT 0.4 s) declines "a
+  non-manifold result" (a cut's reason now reaches the caller); dx found our part studio has 4 solids live doesn't
+  before Fix PCB 2, so both pcb cases may change once that is fixed. cf-spur-gear's 279-face fuse (ae54, vibe5
+  loaded): our Boolean ~300 ms (setup 20, edges-on-faces 25, OCCT sections 35, placing sections 45, states 30, the
+  C++ build and check ~100); live 34 ms for Boolean 1. Next there: the build's check, intervals_on, the 10k
+  edge-on-surface pairs (hull boxes don't prune them).
 - Near-tolerance declines (bool, 11-05 03:40): cf-straight-spline's already go to OCCT after the first per feature
   type (the DeclineMemo: our 0.3 s in 46 s of OCCT's); the first per feature costs round 0's sections (~0.3 s). cf-
   sheet-metal-model-plus's glued fuse (a262e1bb, OCCT 1.0 s) spent 0.57 s ray-casting every piece before declining "a
