@@ -78,7 +78,7 @@ impl AssemblyView {
         });
         let placements = self.result.solved.placements.clone();
         let mate_values = self.result.named_position_values(asm);
-        self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(NamedPosition { name, placements, mate_values, sub_positions: Vec::new() }));
+        self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(NamedPosition { name, placements, mate_values }));
         self.panel = Some(SidePanel::Positions);
         self.ui.np_editing = Some(n);
         // Live 1671: the new position is the current one (blue, no Apply).
@@ -166,69 +166,10 @@ impl AssemblyView {
             self.result.prepared.solve(&SolveOptions { start: Some(start), hold_values: hold, ..Default::default() })
         };
         self.apply_solved(solved, cx);
-        self.edit(&format!("Apply named position : {}", np.name), cx, |a| noshape_ops::assembly::lock_subs_to(a, i));
+        self.edit(&format!("Apply named position : {}", np.name), cx, |_| {});
         self.ui.np_applied = Some(i);
         self.np_toast(format!("{} is applied.", np.name), 4400, cx);
         cx.notify();
-    }
-
-    /// Instance menu "Add to named positions…" (live 2027): the subassembly becomes a column of the table, the panel
-    /// opens with the green toast; with no position yet, "Named position 1" is made and edited (the yellow banner).
-    pub(super) fn add_to_named_positions(&mut self, id: InstanceId, cx: &mut Context<Self>) {
-        let Some(mut asm) = self.assembly(cx).cloned() else { return };
-        let (toast, made) = match noshape_ops::assembly::add_to_named_positions(&mut asm, id, &self.result) {
-            Ok(x) => x,
-            Err(e) => {
-                self.message = Some((true, e));
-                cx.notify();
-                return;
-            }
-        };
-        let (subs, positions) = (asm.position_subs, asm.named_positions);
-        let name = toast.trim_end_matches(" added to named positions").to_string();
-        self.edit(&format!("Add to named positions : {name}"), cx, move |a| {
-            a.position_subs = subs;
-            a.named_positions = positions;
-        });
-        self.panel = Some(SidePanel::Positions);
-        if let Some(i) = made {
-            self.ui.np_editing = Some(i);
-            self.ui.np_applied = Some(i);
-        }
-        self.np_toast(toast, 4400, cx);
-        cx.notify();
-    }
-
-    /// The named positions of subassembly instance `id`'s own assembly (a column's Position list).
-    pub(super) fn sub_named_positions(&self, id: InstanceId, cx: &App) -> Vec<String> {
-        let Some(InstanceSource::Assembly { assembly, .. }) = self.assembly(cx).and_then(|a| a.instance(id)).map(|i| i.source.clone()) else { return Vec::new() };
-        match self.doc.read(cx).session.doc.tab(assembly).map(|t| &t.content) {
-            Some(TabContent::Assembly(a)) => a.named_positions.iter().map(|n| n.name.clone()).collect(),
-            _ => self.linked_assembly(id).map(|(_, a)| a.named_positions.iter().map(|n| n.name.clone()).collect()).unwrap_or_default(),
-        }
-    }
-
-    /// A Position cell: the subassembly's named positions to pick from.
-    fn open_sub_position_menu(&mut self, row: usize, sub: InstanceId, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
-        let entries: Vec<MenuEntry> = self
-            .sub_named_positions(sub, cx)
-            .into_iter()
-            .map(|n| {
-                let n2 = n.clone();
-                MenuEntry::Item {
-                    label: n,
-                    icon: None,
-                    disabled: false,
-                    act: std::rc::Rc::new(move |t: &mut AssemblyView, _: &mut Window, cx: &mut Context<AssemblyView>| {
-                        let n = n2.clone();
-                        t.edit("Named position value", cx, move |a| noshape_ops::assembly::set_sub_position(a, row, sub, n));
-                    }),
-                }
-            })
-            .collect();
-        let view = cx.entity();
-        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_menu(m, entries, view, window, cx));
-        crate::os_menu::open(at, menu, window, cx);
     }
 
     /// A named position's green toast; it goes by itself (live 1671: Apply
@@ -402,8 +343,7 @@ impl AssemblyView {
         let head_bg = rgb(0xeaeaea);
         let cell = |w: f32| div().w(px(w)).h(px(34.)).flex_none().flex().items_center().px(px(6.)).border_r_1().border_b_1().border_color(border).text_size(px(14.));
         let drivers = asm.position_drivers.clone();
-        let subs = asm.position_subs.clone();
-        let two_level = !drivers.is_empty() || !subs.is_empty();
+        let two_level = !drivers.is_empty();
         // Column widths: live's grips (`ui::col_grip`, 140 px until dragged).
         const T: &str = "named-positions";
         let name_w = crate::ui::col_w(T, "name", 140.);
@@ -436,13 +376,6 @@ impl AssemblyView {
             head = head.child(v_flex().child(cell(dof_w[i..i + span].iter().sum()).justify_center().bg(driver_bg).child(mname)).child(sub));
             i += span;
         }
-        // Live 2027: a subassembly column, its instance's name over "Position".
-        let sub_key = |s: &InstanceId| format!("sub-{}", s.0);
-        let sub_w: Vec<f32> = subs.iter().map(|s| crate::ui::col_w(T, &sub_key(s), 140.)).collect();
-        for (k, s) in subs.iter().enumerate() {
-            let iname = asm.instance(*s).map(|x| x.name.clone()).unwrap_or_default();
-            head = head.child(v_flex().child(cell(sub_w[k]).justify_center().bg(driver_bg).child(div().truncate().child(iname))).child(cell(sub_w[k]).relative().justify_center().bg(driver_bg).child("Position").child(crate::ui::col_grip(T, &sub_key(s), 140.))));
-        }
         let editing_cell = |row: usize, col: usize| self.ui.np_cell.as_ref().filter(|c| c.row == row && c.col == col).map(|c| c.input.clone());
         let mut rows = v_flex().border_l_1().border_color(border);
         for (r, np) in asm.named_positions.iter().enumerate() {
@@ -474,19 +407,6 @@ impl AssemblyView {
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.edit_np_cell(r, c + 1, text.clone(), window, cx)))
                         .into_any_element(),
                 });
-            }
-            // A subassembly's Position: one of its named positions; none yet is pink with a red outline.
-            for (k, s) in subs.iter().enumerate() {
-                let s = *s;
-                let picked = np.sub_positions.iter().find(|(x, _)| *x == s).map(|(_, n)| n.clone());
-                let required = picked.is_none();
-                row = row.child(
-                    cell(sub_w[k])
-                        .id(SharedString::from(format!("np-sub-{r}-{k}")))
-                        .when(required, |d| d.bg(pal.error_fill).border_1().border_color(pal.error).tooltip(crate::ui::tooltip("Position is required.")))
-                        .child(div().truncate().child(picked.unwrap_or_default()))
-                        .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.open_sub_position_menu(r, s, ev.position(), window, cx))),
-                );
             }
             let entries = self.np_row_menu(r, name);
             rows = rows.child(div().id(SharedString::from(format!("np-row-{r}"))).child(row).os_context_menu(move |menu, window, cx| fill_menu(menu, entries.clone(), view.clone(), window, cx)));

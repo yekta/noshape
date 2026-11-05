@@ -383,8 +383,6 @@ pub struct PartStudioView {
     /// list renders.
     row_ctx: RowCtx,
     /// Feature rows drawn as cached views, by their state's key (`feature_row_cached`).
-    /// Toolbar buttons keyed by what they show (`tool_button_cached`).
-    tool_cache: std::collections::HashMap<&'static str, ((bool, bool), CachedView)>,
     row_cache: std::collections::HashMap<FeatureId, (u64, Entity<crate::cached_slice::Slice<PartStudioView>>)>,
     /// Part rows the same way (`part_row_cached`).
     part_row_cache: std::collections::HashMap<BodyId, (u64, Entity<crate::cached_slice::Slice<PartStudioView>>)>,
@@ -538,7 +536,6 @@ impl PartStudioView {
             filter_rows: (None, Vec::new()),
             list_cache: Default::default(),
             row_ctx: RowCtx::default(),
-            tool_cache: Default::default(),
             row_cache: Default::default(),
             part_row_cache: Default::default(),
             fitted_once: false,
@@ -3100,39 +3097,6 @@ impl PartStudioView {
     }
 
     fn tool_button(&mut self, ty: &'static FeatureType, group: &'static [&'static str], key: &'static str, cx: &mut Context<Self>) -> AnyElement {
-        let main = self.tool_button_cached(ty, group, cx);
-        if group.len() <= 1 {
-            return main;
-        }
-        self.tool_button_group(ty, group, key, main, cx)
-    }
-
-    /// A fixed-size tool button as a cached view keyed by what it shows (its dialog open, highlighted by tool
-    /// search): a dialog's open redrew the whole toolbar for one button's fill (~6-10 ms of the open's frame on
-    /// cf-straight-spline). Sketch's (text, its width varies) and the ui-parity driver's are drawn inline.
-    fn tool_button_cached(&mut self, ty: &'static FeatureType, group: &'static [&'static str], cx: &mut Context<Self>) -> AnyElement {
-        let id = ty.id;
-        if id == "sketch" || crate::ui_script::active() || crate::cached_slice::perf_skip("toolcache") {
-            return self.tool_button_main(ty, group, cx);
-        }
-        let active = self.edit.as_ref().is_some_and(|e| e.dialog.read(cx).feature.type_id == id);
-        let found = self.palette_found_tool(cx).is_some_and(|f| f == id || group.contains(&f));
-        let key = (active, found);
-        let button = match self.tool_cache.get(id) {
-            Some((k, e)) if *k == key => e.clone(),
-            _ => {
-                let me = cx.entity();
-                let e = crate::cached_slice::Slice::unobserved(&me, move |this: &mut Self, _, cx| this.tool_button_main(ty, group, cx), cx);
-                // The shortcut in its tooltip follows a customization (the document's settings notify).
-                crate::cached_slice::Slice::observing(&e, &self.doc, cx);
-                self.tool_cache.insert(id, (key, e.clone()));
-                e
-            }
-        };
-        button.cached(StyleRefinement::default().w(px(crate::ui::TOOL_CELL)).h(px(crate::ui::TOOL_CELL)).flex_none()).into_any_element()
-    }
-
-    fn tool_button_main(&mut self, ty: &'static FeatureType, group: &'static [&'static str], cx: &mut Context<Self>) -> AnyElement {
         // Onshape: "Extrude (shift+e)", "Mate connector (ctrl+m)".
         let tooltip: SharedString = match ty.shortcut {
             Some(s) => format!("{} ({})", ty.name, s.replace('-', "+").to_lowercase()).into(),
@@ -3156,12 +3120,10 @@ impl PartStudioView {
         // The active tool clicked again keeps its dialog (`start_feature`).
         let main = main.on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(id, window, cx)));
         let main = crate::ui::with_rich_tooltip(SharedString::from(format!("tt-{id}")), tooltip, crate::tool_text::description(id).unwrap_or(ty.description), main);
-        crate::ui_script::wrap(main, || format!("tool:{}", ty.name))
-    }
-
-    /// A split tool: `main` and the caret with its menu of the group's tools.
-    fn tool_button_group(&mut self, ty: &'static FeatureType, group: &'static [&'static str], key: &'static str, main: AnyElement, cx: &mut Context<Self>) -> AnyElement {
-        let id = ty.id;
+        let main = crate::ui_script::wrap(main, || format!("tool:{}", ty.name));
+        if group.len() <= 1 {
+            return main;
+        }
         let view = cx.entity();
         crate::ui::tool_group(
             SharedString::from(format!("tg-{id}")),
@@ -5892,9 +5854,6 @@ impl SceneJob {
         (built, base)
     }
 }
-
-/// A part of the Part Studio drawn as a cached view of its own.
-type CachedView = Entity<crate::cached_slice::Slice<PartStudioView>>;
 
 /// The Sketch dialog's bubble while it has no plane (live sketch/00-sketch-dialog-empty.png).
 const NO_SKETCH_PLANE_BUBBLE: &str = "Select a sketch plane";

@@ -107,6 +107,7 @@
 #include <deque>
 #include <mutex>
 #include <memory>
+#include <optional>
 #include <algorithm>
 #include <limits>
 #include <ElCLib.hxx>
@@ -1409,8 +1410,6 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
-  std::optional<std::pair<int, double>> last_reject;
-  int                                   repeats = 0;
   for (int k = 0; k < 16; ++k)
   {
     fail_if_cancelled();
@@ -1448,22 +1447,8 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape());
-    if (!keeps_volume(change, u.Shape()))
-    {
-      // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
-      // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
-      // its third.)
-      int nf = 0;
-      for (TopExp_Explorer x(u.Shape(), TopAbs_FACE); x.More(); x.Next())
-        ++nf;
-      const bool same = change && last_reject && last_reject->first == nf && std::abs(last_reject->second - *change) <= 1e-12 * bv;
-      repeats         = same ? repeats + 1 : 1;
-      if (repeats >= 3)
-        break;
-      last_reject = change ? std::optional<std::pair<int, double>>({nf, *change}) : std::nullopt;
+    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
       continue;
-    }
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.history");
     if (hist.IsNull())
@@ -3698,11 +3683,142 @@ TopoDS_Shape keep_solid_order(const TopoDS_Shape& in, const TopoDS_Shape& out, c
   return c;
 }
 
+namespace {
+// Two faces still meeting across an edge (not a seam) on one cylinder: USD's result depends on the faces' order.
+bool cylinder_faces_apart(const TopoDS_Shape& s)
+{
+  ShapeIMap faces;
+  TopExp::MapShapes(s, TopAbs_FACE, faces);
+  std::vector<std::optional<gp_Cylinder>> cyl(faces.Extent() + 1);
+  bool                                    any = false;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    BRepAdaptor_Surface a(TopoDS::Face(faces(i)), false);
+    if (a.GetType() == GeomAbs_Cylinder)
+    {
+      cyl[i] = a.Cylinder();
+      any    = true;
+    }
+  }
+  if (!any)
+    return false;
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const auto& fs = ef(i);
+    if (fs.Extent() != 2)
+      continue;
+    const std::optional<gp_Cylinder>&ca = cyl[faces.FindIndex(fs.First())], &cb = cyl[faces.FindIndex(fs.Last())];
+    if (!ca || !cb)
+      continue;
+    const gp_Lin la(ca->Axis()), lb(cb->Axis());
+    const double tol = 1e-9 * std::max(1.0, ca->Radius());
+    if (std::abs(ca->Radius() - cb->Radius()) <= tol && la.Direction().IsParallel(lb.Direction(), 1e-9) && la.Distance(lb.Location()) <= tol)
+      return true;
+  }
+  return false;
+}
+
+// The shape with each shell's faces in another order (`k` 1: reversed; 2, 3: the reversed and the plain order
+// turned by half), the same faces; null where it isn't solids.
+TopoDS_Shape faces_reordered(const TopoDS_Shape& s0, int k)
+{
+  BRep_Builder bb;
+  auto         solid = [&](const TopoDS_Solid& so) {
+    TopoDS_Solid out;
+    bb.MakeSolid(out);
+    for (TopoDS_Iterator it(so, false, false); it.More(); it.Next())
+    {
+      if (it.Value().ShapeType() != TopAbs_SHELL)
+        return TopoDS_Solid();
+      std::vector<TopoDS_Shape> fs;
+      for (TopoDS_Iterator f(it.Value(), false, false); f.More(); f.Next())
+        fs.push_back(f.Value());
+      if (k == 1 || k == 2)
+        std::reverse(fs.begin(), fs.end());
+      if (k >= 2)
+        std::rotate(fs.begin(), fs.begin() + fs.size() / 2, fs.end());
+      TopoDS_Shell sh;
+      bb.MakeShell(sh);
+      for (const TopoDS_Shape& f : fs)
+        bb.Add(sh, f);
+      sh.Closed(it.Value().Closed());
+      sh.Orientation(it.Value().Orientation());
+      bb.Add(out, sh);
+    }
+    out.Orientation(so.Orientation());
+    return out;
+  };
+  if (s0.ShapeType() == TopAbs_SOLID)
+    return solid(TopoDS::Solid(s0));
+  if (s0.ShapeType() != TopAbs_COMPOUND)
+    return TopoDS_Shape();
+  TopoDS_Compound c;
+  bb.MakeCompound(c);
+  for (TopoDS_Iterator it(s0, false, false); it.More(); it.Next())
+  {
+    if (it.Value().ShapeType() != TopAbs_SOLID)
+      return TopoDS_Shape();
+    const TopoDS_Solid so = solid(TopoDS::Solid(it.Value()));
+    if (so.IsNull())
+      return TopoDS_Shape();
+    bb.Add(c, so);
+  }
+  return c;
+}
+
+int face_count(const TopoDS_Shape& s)
+{
+  ShapeIMap m;
+  TopExp::MapShapes(s, TopAbs_FACE, m);
+  return m.Extent();
+}
+} // namespace
+
 TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc, bool* clean)
 {
   if (legacy_topology())
     return unify_faces_in(s0, hist, sc, clean);
-  const TopoDS_Shape r = unify_seams_in(s0, hist, sc, clean);
+  // (Faces on one cylinder USD left apart: again with the faces in other orders (a part mirrored over a hole on the
+  // mirror plane: its wall left in 4 pieces in 20 of the 24 orders of the half's faces, RUST-MIRROR-SPLIT-FACES), the
+  // fewest faces kept where valid and of the same volume; each try with the history as it came.)
+  auto copy = [](const HHist& h) {
+    HHist c;
+    if (!h.IsNull())
+    {
+      c = new BRepTools_History();
+      c->Merge(h);
+    }
+    return c;
+  };
+  const bool   may    = cylinder_faces_apart(s0);
+  const HHist  before = may ? copy(hist) : HHist();
+  TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
+  if (may && !r.IsSame(s0) && cylinder_faces_apart(r))
+  {
+    const KernelTimer timer("unify.reordered");
+    GProp_GProps      v0;
+    BRepGProp::VolumeProperties(r, v0);
+    for (int k = 1; k <= 3 && cylinder_faces_apart(r); ++k)
+    {
+      const TopoDS_Shape sk = faces_reordered(s0, k);
+      if (sk.IsNull())
+        break;
+      HHist              hk = copy(before);
+      bool               ck = false;
+      const TopoDS_Shape rk = unify_seams_in(sk, hk, sc, clean != nullptr ? &ck : nullptr);
+      GProp_GProps       vk;
+      BRepGProp::VolumeProperties(rk, vk);
+      if (face_count(rk) < face_count(r) && std::abs(vk.Mass() - v0.Mass()) <= 1e-9 * std::abs(v0.Mass()) && BRepCheck_Analyzer(rk).IsValid())
+      {
+        r    = rk;
+        hist = hk;
+        if (clean != nullptr)
+          *clean = ck;
+      }
+    }
+  }
   return r.IsSame(s0) ? r : keep_solid_order(s0, r, hist);
 }
 

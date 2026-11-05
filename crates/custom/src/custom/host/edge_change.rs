@@ -83,6 +83,8 @@ fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let Ent::Edge(b, ei) = e else { continue };
             let sides = q.adjacent(&e, EType::Face, false);
             let Some(edge) = q.st.ctx.bodies[b].shape.edges().get(ei).cloned() else { continue };
+            let Ok((p0, p1)) = edge.endpoints() else { continue };
+            let mid = (p0 + p1) * 0.5;
             let own = assoc(&e);
             // The part faces sharing the edge's association (solid bodies only).
             let part_faces: Vec<Ent> = q
@@ -100,11 +102,10 @@ fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let defs: Vec<&Ent> = sides.iter().filter(|f| assoc(f).iter().any(|v| near.contains(v))).collect();
                 let [side] = defs.as_slice() else { continue };
                 let Some(face) = q.st.ctx.bodies[pb].shape.faces().get(pi).cloned() else { continue };
-                // std's signed distance: from the edge to the part face's closest point, along the face's normal there
-                // (a curved part face's too: a rip on a rolled wall).
-                let Ok(d) = k::distance(&face, &edge) else { continue };
-                let Ok(n) = face.normal_at_point(d.point_a) else { continue };
-                let offset = n.normalize().dot(d.point_a - d.point_b);
+                let Ok(Some(pl)) = face.face_plane() else { continue };
+                let Ok(n) = normal(&face) else { continue };
+                // std's signed distance: from the edge to the part face, along the face's normal.
+                let offset = n.dot(pl.origin - mid);
                 out.push(EdgeOption { edges: vec![q.to_ref(&e)], offset, replace: None, face: Some(vec![q.to_ref(side)]) });
             }
         }

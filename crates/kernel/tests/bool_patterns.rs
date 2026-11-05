@@ -580,6 +580,14 @@ fn a_gear_blanks_seam_under_a_tooth_gaps_face() {
     as_recorded("9bcf777667a133d5");
 }
 
+/// prize-wheel-tim's Revolve 1 (recorded: a Ø9.8 sphere knob fused onto the wheel's top): OCCT's result. A ray's
+/// crossing with the sphere came out at u 3e-5 below 0, outside its face until taken a whole turn over; the sliver of
+/// the wheel's side under the sphere's section was kept ("a non-manifold result" after ~90 ms, then OCCT's 15 ms).
+#[test]
+fn a_sphere_knob_fused_onto_a_wheel_as_occt() {
+    as_recorded("b2a1c0a5aff95e9f");
+}
+
 /// motor-mount-jack's Extrude 3 (recorded: a boss fused onto the tube with four elliptic slots through it): OCCT's
 /// result. Each slot is a hole in the tube's cylinders: the region bounded by its loop alone is outside the face, no
 /// point deep inside it sought (86 ms against OCCT's 31 before, with the slot walls' ray patches).

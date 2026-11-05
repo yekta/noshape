@@ -871,25 +871,10 @@ fn op_transform(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let refs = evaluate_refs(i, &cx, def.get("bodies"))?;
     let Some(m) = transform_of(def.get("transform")) else { return Err(i.error("opTransform: transform should be a Transform")) };
-    // The moved bodies' attributes go with them (Parasolid's): their entities' snapshots, which the remap after the
-    // operation looks for, move first (a folded sheet metal piece kept its corner breaks' vertices, live 1188 Fold SM).
-    let bodies: HashSet<BodyId> = with_ents(i, &cx, def.get("bodies"), |_, q, ents| {
-        Ok(ents.iter().filter_map(|e| match q.owner(e)? {
-            Ent::Body(b) => Some(q.st.ctx.bodies[b].id.clone()),
-            _ => None,
-        }).collect())
-    })?;
-    let before = move_attribute_snapshots(&cx, &bodies, &m);
-    let moved = match run_op(i, &cx, &id, "TRANSFORM_FAILED", |ev| {
+    let moved = run_op(i, &cx, &id, "TRANSFORM_FAILED", |ev| {
         transform_refs(ev, &refs, &m)?;
         Ok(ev.resolve_bodies(&refs).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect::<Vec<_>>())
-    }) {
-        Ok(moved) => moved,
-        Err(e) => {
-            cx.state.lock().attr_snapshots.extend(before);
-            return Err(e);
-        }
-    };
+    })?;
     // The edges and vertices a split made on a moved body go with it (they're found where they lie).
     let mut st = cx.state.lock();
     let follow = |owners: &[BodyId], points: &mut Vec<DVec3>| {
@@ -905,21 +890,6 @@ fn op_transform(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         follow(owners, points);
     }
     Ok(Value::Undefined)
-}
-
-/// The attribute snapshots of `bodies`' entities moved by `m`; their old ones returned (to put back if the
-/// operation fails).
-fn move_attribute_snapshots(cx: &FsContext, bodies: &HashSet<BodyId>, m: &DMat4) -> Vec<(Reference, (BodyId, super::query::Snapshot))> {
-    let mut st = cx.state.lock();
-    let mut before = Vec::new();
-    for (r, (body, snap)) in st.attr_snapshots.iter_mut().filter(|(_, (b, _))| bodies.contains(b)) {
-        before.push((r.clone(), (body.clone(), snap.clone())));
-        for p in snap.points.iter_mut() {
-            *p = m.transform_point3(*p);
-        }
-        snap.face = snap.face.as_ref().and_then(|f| k::transform(f, &k::Transform::Matrix(*m), true).ok()).map(|t| t.shape);
-    }
-    before
 }
 
 /// Move bodies, sketches, planes, points and mate connectors in place.

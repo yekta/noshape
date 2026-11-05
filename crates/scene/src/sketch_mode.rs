@@ -368,9 +368,6 @@ pub enum BoxPlace {
 pub struct OnTheFly {
     pub fields: Vec<OtfField>,
     pub active: usize,
-    /// A box of these has been made a dimension: Enter on the next, untouched one does nothing (live 2025: an
-    /// ellipse's minor typed and entered, then Enter on the major makes no dimension).
-    pub committed: bool,
 }
 
 /// Dimension graphics in sketch-plane coordinates.
@@ -3305,7 +3302,7 @@ impl SketchEditor {
 
     fn set_otf(&mut self, data: &SketchData, fields: Vec<OtfField>) {
         let fields: Vec<OtfField> = fields.into_iter().filter(|f| data.sketch.measure_new(&f.kind).is_some()).collect();
-        self.otf = (!fields.is_empty()).then_some(OnTheFly { fields, active: 0, committed: false });
+        self.otf = (!fields.is_empty()).then_some(OnTheFly { fields, active: 0 });
         self.otf_typing = false;
     }
 
@@ -3390,9 +3387,6 @@ impl SketchEditor {
     /// Returns false when no box is showing.
     pub fn accept_otf(&mut self, data: &mut SketchData) -> Result<bool, String> {
         let Some(o) = self.otf.clone() else { return Ok(false) };
-        if o.committed {
-            return Ok(true);
-        }
         let Some(f) = o.fields.get(o.active).cloned() else { return Ok(false) };
         let Some(v) = data.sketch.measure_new(&f.kind) else { return Ok(false) };
         let value = v * f.scale;
@@ -3437,7 +3431,6 @@ impl SketchEditor {
         let mut o = o;
         o.fields.remove(o.active);
         o.active = o.active.min(o.fields.len().saturating_sub(1));
-        o.committed = true;
         self.otf = (!o.fields.is_empty()).then_some(o);
         self.otf_typing = false;
         // The geometry moved: refresh the snap of the tool in progress.
@@ -7346,34 +7339,6 @@ mod tests {
         assert!(ed.chain_end.is_some(), "the chain keeps going");
         assert!(ed.otf.is_none());
         assert!(!ed.accept_otf(&mut d).unwrap(), "nothing left to accept");
-    }
-
-    /// Live 2025 (b): an ellipse's boxes after its 3rd click, the major active; Enter dimensions the active box at
-    /// its value and moves to the other; once a box is a dimension, Enter on the other, untouched one does nothing.
-    #[test]
-    fn ellipse_boxes_major_first_and_one_enter_after_a_typed_box() {
-        let ellipse_dims = |d: &SketchData| d.sketch.constraints().filter_map(|c| match c.kind { ConstraintKind::EllipseRadius { major, .. } => Some(major), _ => None }).collect::<Vec<_>>();
-        // b1: Tab to the minor, type 12, Enter, Enter.
-        let (mut ed, mut d) = editor(Tool::Ellipse);
-        for p in [v(0.0, 0.0), v(0.03, 0.0), v(0.0, 0.012)] {
-            click(&mut ed, &mut d, p);
-        }
-        let o = ed.otf.as_ref().expect("the boxes");
-        assert!(matches!(o.fields[o.active].kind, ConstraintKind::EllipseRadius { major: true, .. }), "the major box first");
-        ed.otf_step(1);
-        ed.commit_otf(&mut d, "12", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
-        assert_eq!(ellipse_dims(&d), vec![false]);
-        assert!(ed.accept_otf(&mut d).unwrap(), "Enter taken");
-        assert_eq!(ellipse_dims(&d), vec![false], "no major dimension");
-        // b2: Enter on the untouched major, then the minor is active.
-        let (mut ed, mut d) = editor(Tool::Ellipse);
-        for p in [v(0.0, 0.0), v(0.03, 0.0), v(0.0, 0.012)] {
-            click(&mut ed, &mut d, p);
-        }
-        assert!(ed.accept_otf(&mut d).unwrap());
-        assert_eq!(ellipse_dims(&d), vec![true]);
-        let o = ed.otf.as_ref().expect("the minor box");
-        assert!(matches!(o.fields[o.active].kind, ConstraintKind::EllipseRadius { major: false, .. }));
     }
 
     #[test]

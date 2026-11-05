@@ -305,7 +305,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Turn off section view", Op("render_image")),
     ("assembly:Unfix all", Op("assembly_set_state")),
     ("assembly:Unlock", Op("assembly_lock")),
-    ("assembly:Add to named positions…", Op("assembly_add_to_named_positions")),
     ("assembly:Unpack folder", Op("assembly_unpack_folder")),
     ("assembly:Unsuppress", Op("assembly_set_state")),
     ("assembly:Update named position", Op("assembly_named_position")),

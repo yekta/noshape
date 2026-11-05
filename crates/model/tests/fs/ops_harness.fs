@@ -276,20 +276,6 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const moved = size(evaluateQuery(context, qCreatedBy(sub + "split", EntityType.EDGE)));
             check("a split edge moves with its piece", moved == 2, moved);
         });
-        step(context, id, "attributeMovesWithItsBody", function(sub) {
-            // A transformed sheet's vertex keeps its attribute where it went, no other vertex gets it (Parasolid's;
-            // std's Fold rotates a sheet metal piece, its corner breaks with it).
-            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 3200) * mm, "corner2" : vector(20, 10, 3205) * mm });
-            opExtractSurface(context, sub + "s", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(10, 5, 3205) * mm) });
-            const sheet = qCreatedBy(sub + "s", EntityType.BODY);
-            setAttribute(context, { "entities" : qContainsPoint(qOwnedByBody(sheet, EntityType.VERTEX), vector(20, 10, 3205) * mm), "name" : "dxCorner", "attribute" : "the corner" });
-            opTransform(context, sub + "t", { "bodies" : sheet, "transform" : rotationAround(line(vector(0, 0, 3205) * mm, vector(1, 0, 0)), 90 * degree) });
-            var holders = [];
-            for (var v in evaluateQuery(context, qOwnedByBody(sheet, EntityType.VERTEX)))
-                if (getAttribute(context, { "entity" : v, "name" : "dxCorner" }) != undefined)
-                    holders = append(holders, evVertexPoint(context, { "vertex" : v }));
-            check("an attribute moves with its body", size(holders) == 1 && norm(holders[0] - vector(20, 0, 3215) * mm) < 1e-9 * meter, holders);
-        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).
