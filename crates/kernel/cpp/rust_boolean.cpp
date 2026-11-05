@@ -31,6 +31,10 @@
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
+#include <gp_Ax2d.hxx>
+#include <IntRes2d_IntersectionPoint.hxx>
+#include <Geom2d_Circle.hxx>
+#include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_Ellipse.hxx>
 #include <Geom_Conic.hxx>
@@ -2063,6 +2067,155 @@ static rust::Vec<uint32_t> occt_moved(rust::Slice<const uint32_t> ids, uint32_t 
   return out;
 }
 
+namespace
+{
+// A face on an extrusion of a B-spline: the profile (its parameters the face's u), the direction, the face's bounds.
+struct Extruded
+{
+  occ::handle<Geom_BSplineCurve> c;
+  gp_Dir                         d;
+  double                         u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+};
+
+std::optional<Extruded> extruded(const TopoDS_Face& f)
+{
+  const occ::handle<Geom_SurfaceOfLinearExtrusion> e = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(BRep_Tool::Surface(f));
+  if (e.IsNull())
+    return std::nullopt;
+  const occ::handle<Geom_BSplineCurve> c = occ::down_cast<Geom_BSplineCurve>(basis_of(e->BasisCurve()));
+  if (c.IsNull() || c->IsPeriodic())
+    return std::nullopt;
+  Extruded x{c, e->Direction()};
+  BRepTools::UVBounds(f, x.u0, x.u1, x.v0, x.v1);
+  x.u0 = std::max(x.u0, c->FirstParameter());
+  x.u1 = std::min(x.u1, c->LastParameter());
+  if (!(x.u0 < x.u1) || !(x.v0 < x.v1))
+    return std::nullopt;
+  return x;
+}
+
+// `c` seen along `d` (its poles' coordinates on the frame across it): the same B-spline in that plane.
+occ::handle<Geom2d_BSplineCurve> flat(const occ::handle<Geom_BSplineCurve>& c, const gp_Ax2& frame)
+{
+  NCollection_Array1<gp_Pnt2d> poles(1, c->NbPoles());
+  for (int i = 1; i <= c->NbPoles(); ++i)
+  {
+    const gp_Vec w(frame.Location(), c->Pole(i));
+    poles(i) = gp_Pnt2d(w.Dot(gp_Vec(frame.XDirection())), w.Dot(gp_Vec(frame.YDirection())));
+  }
+  if (c->IsRational())
+    return new Geom2d_BSplineCurve(poles, *c->Weights(), c->Knots(), c->Multiplicities(), c->Degree());
+  return new Geom2d_BSplineCurve(poles, c->Knots(), c->Multiplicities(), c->Degree());
+}
+
+// Where two curves in a plane cross (the parameters on each), none where they overlap; false where they do.
+bool crossings2d(const occ::handle<Geom2d_Curve>& a, const occ::handle<Geom2d_Curve>& b, std::vector<std::pair<double, double>>& out)
+{
+  Geom2dAPI_InterCurveCurve x(a, b, 1e-9);
+  if (x.NbSegments() > 0)
+    return false;
+  for (int i = 1; i <= x.NbPoints(); ++i)
+  {
+    const IntRes2d_IntersectionPoint& p = x.Intersector().Point(i);
+    out.emplace_back(p.ParamOnFirst(), p.ParamOnSecond());
+  }
+  return true;
+}
+
+// A ruling of extrusion `e` at profile parameter `u` over its face's heights, its curve on the extrusion.
+IntTools_Curve ruling(const Extruded& e, double u, const occ::handle<Geom2d_Curve>& on_other, bool extrusion_first)
+{
+  const occ::handle<Geom_Curve>   line = new Geom_TrimmedCurve(new Geom_Line(e.c->Value(u), e.d), e.v0, e.v1);
+  const occ::handle<Geom2d_Curve> on_e = new Geom2d_Line(gp_Pnt2d(u, 0), gp_Dir2d(0, 1));
+  IntTools_Curve                  ic(line, extrusion_first ? on_e : on_other, extrusion_first ? on_other : on_e, Precision::Confusion());
+  return ic;
+}
+} // namespace
+
+// noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
+// `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
+// direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
+// cross, seen along it). Exact, where OCCT's approximates; false where it isn't one of those (OCCT's then).
+bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  static const bool off = std::getenv("NOSHAPE_OWN_SECTIONS") != nullptr && std::string(std::getenv("NOSHAPE_OWN_SECTIONS")) == "0";
+  if (off)
+    return false;
+  const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
+  if (!xa && !xb)
+    return false;
+  const bool                      e_first = xa.has_value();
+  const Extruded&                 e       = e_first ? *xa : *xb;
+  const TopoDS_Face&              other   = e_first ? fb : fa;
+  const occ::handle<Geom_Surface> so      = BRep_Tool::Surface(other);
+  const gp_Ax2                    frame(gp::Origin(), e.d);
+  const double                    along   = 1e-12;
+  // A plane across it: the profile, if it lies across the direction too, moved to the plane's height.
+  if (const occ::handle<Geom_Plane> pl = occ::down_cast<Geom_Plane>(so))
+  {
+    const gp_Pln P = pl->Pln();
+    const gp_Dir n = P.Axis().Direction();
+    if (std::abs(std::abs(n.Dot(e.d)) - 1) > along)
+      return false;
+    const double h = gp_Vec(e.c->Pole(1).XYZ()).Dot(gp_Vec(e.d));
+    for (int i = 2; i <= e.c->NbPoles(); ++i)
+      if (std::abs(gp_Vec(e.c->Pole(i).XYZ()).Dot(gp_Vec(e.d)) - h) > 1e-10)
+        return false;
+    double v = gp_Vec(P.Location().XYZ()).Dot(gp_Vec(e.d)) - h;
+    if (v < e.v0 - Precision::Confusion() || v > e.v1 + Precision::Confusion())
+      return true;
+    v = std::clamp(v, e.v0, e.v1);
+    occ::handle<Geom_BSplineCurve> moved = occ::down_cast<Geom_BSplineCurve>(e.c->Copy());
+    moved->Translate(gp_Vec(e.d) * v);
+    const occ::handle<Geom_Curve>   curve = new Geom_TrimmedCurve(moved, e.u0, e.u1);
+    const occ::handle<Geom2d_Curve> on_e  = new Geom2d_Line(gp_Pnt2d(0, v), gp_Dir2d(1, 0));
+    const occ::handle<Geom2d_Curve> on_p  = flat(moved, P.Position().Ax2());
+    out.emplace_back(curve, e_first ? on_e : on_p, e_first ? on_p : on_e, Precision::Confusion());
+    return true;
+  }
+  // A cylinder along it: rulings where the profile crosses its circle.
+  if (const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(so))
+  {
+    const gp_Cylinder C = cs->Cylinder();
+    const double      up = C.Axis().Direction().Dot(e.d);
+    if (std::abs(std::abs(up) - 1) > along)
+      return false;
+    const gp_Vec   w(frame.Location(), C.Location());
+    const gp_Pnt2d centre(w.Dot(gp_Vec(frame.XDirection())), w.Dot(gp_Vec(frame.YDirection())));
+    std::vector<std::pair<double, double>> at;
+    if (!crossings2d(new Geom2d_Circle(gp_Ax2d(centre, gp_Dir2d(1, 0)), C.Radius()), flat(e.c, frame), at))
+      return false;
+    for (const auto& [_, u] : at)
+    {
+      if (u < e.u0 - 1e-9 || u > e.u1 + 1e-9)
+        continue;
+      double a = 0, h0 = 0;
+      ElSLib::Parameters(C, e.c->Value(u), a, h0);
+      out.push_back(ruling(e, u, new Geom2d_Line(gp_Pnt2d(a, h0), gp_Dir2d(0, up > 0 ? 1 : -1)), e_first));
+    }
+    return true;
+  }
+  // Another extrusion along it: rulings where the profiles cross.
+  if (xa && xb)
+  {
+    const double same = xa->d.Dot(xb->d);
+    if (std::abs(std::abs(same) - 1) > along)
+      return false;
+    std::vector<std::pair<double, double>> at;
+    if (!crossings2d(flat(xa->c, frame), flat(xb->c, frame), at))
+      return false;
+    for (const auto& [ua, ub] : at)
+    {
+      if (ua < xa->u0 - 1e-9 || ua > xa->u1 + 1e-9 || ub < xb->u0 - 1e-9 || ub > xb->u1 + 1e-9)
+        continue;
+      const double w0 = gp_Vec(xb->c->Value(ub), xa->c->Value(ua)).Dot(gp_Vec(xb->d));
+      out.push_back(ruling(*xa, ua, new Geom2d_Line(gp_Pnt2d(ub, w0), gp_Dir2d(0, same > 0 ? 1 : -1)), true));
+    }
+    return true;
+  }
+  return false;
+}
+
 static void occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -2091,6 +2244,12 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
   OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
     try
     {
+      if (own_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))
+      {
+        jobs[k].done = true;
+        return;
+      }
+      jobs[k].lines.clear();
       IntTools_FaceFace ff;
       ff.SetParameters(true, true, true, 1e-7);
       ff.Perform(jobs[k].fa, jobs[k].fb);
@@ -2192,8 +2351,11 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
   // (Kept for the Boolean's later rounds (boolean_with: again with vertices merged), whose input faces are these.)
   else if (made != t_free->ahead.end())
     lines = made->second;
+  else if (own_sections(fa, fb, lines))
+    t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   else
   {
+    lines.clear();
     IntTools_FaceFace ff;
     ff.SetParameters(true, true, true, 1e-7);
     // (Called from Rust: an OCCT exception, a cancelled run's break hook's, must not get out.)
