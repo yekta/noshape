@@ -1663,7 +1663,21 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             None => k::make_face_from_wire(&k::make_polyline(&outline_points(pulled), true).map_err(|e| fe(e.to_string()))?, true).map_err(|e| fe(e.to_string()))?,
         };
         // Its holes, through the thickness (and out of the flat), all in one cut (a Fill pattern makes thousands).
-        let holes = wall_holes(&topo.faces[fi], &topo)?;
+        let mut holes = wall_holes(&topo.faces[fi], &topo)?;
+        // A bend on a hole's side (a louver's flange on its slot): the wall pulled back from it by the setback, as from
+        // an outer side (live c2-sm-corner-break: else the bend overlaps the wall and the flap comes off as its own part).
+        for (hole, edges) in &mut holes {
+            if !edges.iter().any(|e| setbacks.get(e).is_some_and(|s| *s > TOL)) {
+                continue;
+            }
+            let Ok(hl) = wall_loop(hole, &topo) else { continue };
+            let (_, hn) = face_normal(hole)?;
+            let pull: Vec<f64> = hl.side.iter().map(|e| -setbacks.get(e).copied().unwrap_or(0.0)).collect();
+            let pts = outline_points(&pulled_sides(&hl, hn, &pull));
+            if let Ok(f) = k::make_polyline(&pts, true).and_then(|w| k::make_face_from_wire(&w, true)) {
+                *hole = f;
+            }
+        }
         if !holes.is_empty() {
             let mut tools = Vec::with_capacity(holes.len());
             for (hole, edges) in &holes {
