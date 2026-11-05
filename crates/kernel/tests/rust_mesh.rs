@@ -525,3 +525,16 @@ fn a_displaced_top_and_its_wall_mesh_here() {
     }
     assert_watertight(&rust);
 }
+
+/// RELEASE-BUILD-FILLET-HANG: a fuzz part's degenerate faces (boxes kilometres wide) go to BRepMesh, whose frontier walk
+/// in a GCC 13 build of OCCT (CI's, the releases') went round for ever: the document never opened. OCCT patch 0022
+/// gives a face's walk 2 s, then that face fails; the rest of the part is meshed.
+#[test]
+fn a_degenerate_face_doesnt_hold_the_display_mesh() {
+    let s = read_brep(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/mesh/fuzz4539-degenerate.brep")).unwrap();
+    let t = std::time::Instant::now();
+    let m = tessellate(&s, s.bounding_box(false).unwrap().diagonal(), 2.0 * TAU / 144.0, true).unwrap();
+    assert!(!m.indices.is_empty());
+    // (~1 s here; up to 2 s a stopped face.)
+    assert!(t.elapsed().as_secs_f64() < 30.0, "{:?}", t.elapsed());
+}

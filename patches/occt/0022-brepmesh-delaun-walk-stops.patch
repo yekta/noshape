@@ -1,0 +1,56 @@
+diff -ru a/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_Delaun.cxx b/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_Delaun.cxx
+--- a/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_Delaun.cxx	2026-11-05 14:12:21.191169429 +0000
++++ b/src/ModelingAlgorithms/TKMesh/BRepMesh/BRepMesh_Delaun.cxx	2026-11-05 14:12:21.192496239 +0000
+@@ -35,6 +35,27 @@
+ 
+ #include <algorithm>
+ #include <stack>
++#include <chrono>
++#include <Standard_Failure.hxx>
++
++// noshape: whether the caller's budget, cancel or deadline says stop (defined in noshape's kernel, boolean.cpp): the
++// frontier walk below takes no progress indicator.
++extern "C" int noshape_should_break();
++#if defined(__GNUC__)
++// The default for a program that doesn't define the hook: never stop.
++extern "C" __attribute__((weak)) int noshape_should_break()
++{
++  return 0;
++}
++#endif
++
++namespace
++{
++// noshape: when this thread's triangulation began (BRepMesh_Delaun::perform): the frontier walk gives up past a
++// face's time (a release build's display mesh of a fuzz part's degenerate face never finished).
++thread_local std::chrono::steady_clock::time_point THE_FACE_START;
++const std::chrono::seconds                         THE_FACE_TIME(2);
++} // namespace
+ 
+ const double AngDeviation1Deg  = M_PI / 180.;
+ const double AngDeviation90Deg = 90 * AngDeviation1Deg;
+@@ -333,6 +354,7 @@
+   std::make_heap(theVertexIndices.begin(), theVertexIndices.end(), aCmp);
+   std::sort_heap(theVertexIndices.begin(), theVertexIndices.end(), aCmp);
+ 
++  THE_FACE_START = std::chrono::steady_clock::now();
+   compute(theVertexIndices);
+ }
+ 
+@@ -1114,8 +1136,16 @@
+ 
+   bool isSkipLeprous = true;
+   int  aFirstNode    = aStartNode;
++  // noshape: the walk can go round all but without end (each step scans the polygon); stopped by the caller's cancel
++  // or deadline, or past the face's time (the face then fails, as an exception in it does).
++  unsigned int aSteps = 0;
+   while (aPivotNode != aFirstNode)
+   {
++    if ((++aSteps & 255) == 0
++        && (noshape_should_break() != 0 || std::chrono::steady_clock::now() - THE_FACE_START > THE_FACE_TIME))
++    {
++      throw Standard_Failure("noshape: stopped");
++    }
+     Bnd_B2d  aNextLinkBndBox;
+     gp_Vec2d aNextLinkDir;
+     int      aNextPivotNode = 0;

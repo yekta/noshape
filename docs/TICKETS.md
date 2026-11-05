@@ -569,6 +569,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   fillet errors at once); v0.4.31's shipped CLI hangs here. Same rustc (1.98.1); the differences left are CI's: OCCT
   compiled by GCC 13.3 (ours in /opt/occt by GCC 15.2; the patched sources are the same), and lld (ours mold). Building
   OCCT as CI does (scripts/build-occt.sh, g++-13) on vibe4 (~/agents/core-occt-ci) to link v0.4.31 against it.
+  core 11-05 14:40: found: v0.4.31 built with OCCT compiled as CI does (g++-13, lld) hangs as the release; with our
+  /opt/occt (GCC 15) it doesn't. The hang is the display mesh, not the fillet: a fuzz part's degenerate faces (boxes
+  kilometres wide) go to BRepMesh, whose Delaunay frontier walk (BRepMesh_Delaun::meshLeftPolygonOf, each step scanning
+  the polygon) went round for ever in GCC 13's build (~1 s in GCC 15's). OCCT patch 0022: the walk polls noshape's
+  break hook (cancel, deadlines: the display mesh's 60 s one from e3ba6871) and gives a face 2 s, then that face fails
+  (the rest is meshed). With it the CI-like v0.4.31 opens the document in 14 s (BRepMesh 2.25 s on the body), Fillet 6
+  Ok. T1 kernel rust_mesh::a_degenerate_face_doesnt_hold_the_display_mesh (the body as test data). **lead: libTKMesh.a
+  (patch 0022, GCC 15) is in /root/occt/lib; please sync to /opt/occt; CI rebuilds OCCT from patches/occt.** Left: the
+  CI-like build's open is 14 s against our 7.8 s (other GCC 13 differences, not a hang); the release smoke should open
+  this document.
 - [ ] P2 DISPLACEMENT-TOP-VOLUME (core 11-05 12:18) a displacement map's replaced flat top (a 512² or 704² B-spline
   trimmed by the cylinder's circle) takes 20 s for its volume (mass properties; the side face's 0.6-1 s): common.cpp
   face_moments' boundary integral cuts the circle's curve on the face at every knot it crosses and runs an inner
@@ -3940,6 +3950,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   only move to a vertex of that loop (e.g. (187.59, 60.51, 0.15), u 25°) with the hole's cylinder seam and the top rim
   torus's seam at the same angle (they share the rim circles' vertices): a chain move (torus, cylinder, torus) that
   seam_to_vertex doesn't do yet; then join_loop_pieces joins the pieces. Probe: /root/core-scratch/michael-seams-probe.patch.
+  (lead 11-05 14:20: skasm takes Fillet 2's rest from here.)
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
