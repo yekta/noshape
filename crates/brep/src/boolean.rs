@@ -440,6 +440,13 @@ impl GFace {
                 // At the start of its angles (rounding may give the end).
                 let near = (1e-9 * r.max(1.0)).max(self.wrap_eps * r);
                 let (at0, at1) = ((q0.x - r * th0).abs() <= near, (q0.x - r * (th0 + TAU)).abs() <= near);
+                // (A curve's far end at the seam, rounding a little past it (2.7e-9 rad on an 8 mm cylinder): on it,
+                // within 0.1 um along it; farther, across it.)
+                let slack = (1e-9 * r).max(1e-7);
+                let onto = |x1: f64| -> Option<f64> {
+                    let (lo, hi) = (r * th0, r * (th0 + TAU));
+                    if x1 < lo - slack || x1 > hi + slack { None } else { Some(x1.clamp(lo, hi)) }
+                };
                 if at1 {
                     q0.x = r * th0;
                 }
@@ -459,10 +466,7 @@ impl GFace {
                         if ds < 0.0 && (at0 || at1) {
                             q0.x = r * (th0 + TAU);
                         }
-                        let x1 = q0.x + ds;
-                        if x1 < r * th0 - 1e-9 * r || x1 > r * (th0 + TAU) + 1e-9 * r {
-                            return Err(Decline("an arc across a cylinder's seam"));
-                        }
+                        let Some(x1) = onto(q0.x + ds) else { return Err(Decline("an arc across a cylinder's seam")) };
                         Ok(C2::Seg { a: q0, b: DVec2::new(x1, q0.y) })
                     }
                     Geo::Ell { e, t0, sweep, .. } if e.hyp => {
@@ -478,8 +482,7 @@ impl GFace {
                         if dth < 0.0 && (at0 || at1) {
                             q0.x = r * (th0 + TAU);
                         }
-                        let x1 = q0.x + r * dth;
-                        if x1 < r * th0 - 1e-9 * r || x1 > r * (th0 + TAU) + 1e-9 * r {
+                        if onto(q0.x + r * dth).is_none() {
                             return Err(Decline("a hyperbola across a cone's seam"));
                         }
                         let (hc, amp) = ((e.c - *o).dot(*a), e.a * e.x.dot(*a));
@@ -497,8 +500,7 @@ impl GFace {
                         if ds < 0.0 && (at0 || at1) {
                             q0.x = r * (th0 + TAU);
                         }
-                        let x1 = q0.x + ds;
-                        if x1 < r * th0 - 1e-9 * r || x1 > r * (th0 + TAU) + 1e-9 * r {
+                        if onto(q0.x + ds).is_none() {
                             return Err(Decline("an ellipse across a cylinder's seam"));
                         }
                         let (hc, amp) = ((e.c - *o).dot(*a), e.a * e.x.dot(*a));
@@ -2640,10 +2642,11 @@ impl Ctx<'_> {
         }
         let be = (y2 / 3.0).sqrt();
         let e = Ell { c, n: sn, x: xe, y: ye, a: ae, b: be, hyp: true, par: false };
-        // Its range: past the face's box from the centre.
+        // Its range: past the face's box from the centre (a point is at least a cosh t and b |sinh t| from it; by the
+        // smaller semi-axis alone a thin one went on for a kilometre, and its far part was taken inside both faces).
         let (lo, hi) = (self.faces[fc].lo, self.faces[fc].hi);
         let far = (lo - c).abs().max((hi - c).abs()).length() + GREY * tol;
-        let t = (far / ae.min(be)).max(1.0).acosh() * 1.01 + 1e-3;
+        let t = (far / ae).max(1.0).acosh().min((far / be).asinh()) * 1.01 + 1e-3;
         self.section(fp, fc, Path::Ellipse(e), -t, t)
     }
 
@@ -4720,11 +4723,17 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
     let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split_reach(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false))?.into_iter();
     let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
+    // (A piece from a vertex back to it, all of it within that vertex's tolerance (80 um of a section at a Shell
+    // slab's vertex of 0.32 mm): none, as OCCT's micro edge.)
+    let micro = |piece: &Seg| {
+        let w = piece.v[0];
+        w == piece.v[1] && [0.0, 0.25, 0.5, 0.75, 1.0].iter().all(|&t| (cx.seg_at(piece, t) - cx.p(w)).length() <= tol.max(cx.pool.t[w as usize]))
+    };
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
     for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
         crate::check_cancel()?;
         let chain = chain?;
-        for piece in cx.pieces_of(&s, &chain) {
+        for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
             face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
         }
     }
@@ -4734,7 +4743,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let (s, fs, ft) = cx.sections[k];
         crate::check_cancel()?;
         let chain = chain?;
-        for piece in cx.pieces_of(&s, &chain) {
+        for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
             let (si, _) = get_sedge(&cx, &mut sedges, piece);
             section_faces.push((si, fs));
             section_faces.push((si, ft));
@@ -4744,10 +4753,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     section_faces.dedup();
     crate::check_cancel()?;
     // (A piece whose curve runs far shorter than its vertices are apart (a section's 11 nm between two of its split
-    // points a micrometre apart across it): the faces' wires would cross themselves there.)
+    // points a micrometre apart across it): the faces' wires would cross themselves there. Not where its ends are
+    // within their vertices' own tolerances (a section ending 0.23 mm from a Shell slab's vertex of 0.32 mm: OCCT's).)
     for se in &sedges {
         let d = (cx.p(se.seg.v[1]) - cx.p(se.seg.v[0])).length();
-        if se.seg.v[0] != se.seg.v[1] && d > 4.0 * tol && (cx.seg_at(&se.seg, 1.0) - cx.seg_at(&se.seg, 0.0)).length() < 0.5 * d {
+        let held = |k: usize| (cx.seg_at(&se.seg, k as f64) - cx.p(se.seg.v[k])).length() <= tol.max(cx.pool.t[se.seg.v[k] as usize]);
+        if se.seg.v[0] != se.seg.v[1] && d > 4.0 * tol && (cx.seg_at(&se.seg, 1.0) - cx.seg_at(&se.seg, 0.0)).length() < 0.5 * d && !(held(0) && held(1)) {
             return Err(Decline("a piece shorter than its vertices' distance"));
         }
     }
@@ -4805,6 +4816,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let mut pts: Vec<DVec2> = Vec::new();
         let mut lsegs: Vec<([u32; 2], C2)> = Vec::with_capacity(segs.len());
         let mut lsrc: Vec<usize> = Vec::with_capacity(segs.len());
+        // (How many of its curves join each two vertices.)
+        let mut joining: HashMap<(u32, u32), usize> = HashMap::default();
+        for &si in &segs {
+            let v = sedges[si].seg.v;
+            *joining.entry((v[0].min(v[1]), v[0].max(v[1]))).or_default() += 1;
+        }
         for &si in &segs {
             let s = sedges[si].seg;
             for copy in 0..if seams.contains(&si) { 2 } else { 1 } {
@@ -4841,7 +4858,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 // (A piece a few tolerances long: straight between its vertices' places here, which its curve on
                 // the face can miss by more than its length (a knurl section's piece 0.4 um long whose curve on the
                 // flank is 1e-13 long).)
-                let c = if ends[0] != ends[1] && cx.seg_within(&s, 100.0 * tol) { C2::Seg { a: pts[ends[0] as usize], b: pts[ends[1] as usize] } } else { c };
+                // (Not where another of its curves joins the same two vertices (a Shell slab's sections 30 to 100 um
+                // apart between two vertices 0.39 mm apart): straight, they would be one.)
+                let alone = joining.get(&(s.v[0].min(s.v[1]), s.v[0].max(s.v[1]))).is_none_or(|&k| k < 2);
+                let c = if ends[0] != ends[1] && alone && cx.seg_within(&s, 100.0 * tol) { C2::Seg { a: pts[ends[0] as usize], b: pts[ends[1] as usize] } } else { c };
                 lsegs.push((ends, c));
                 lsrc.push(si);
             }
