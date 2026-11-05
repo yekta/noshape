@@ -931,6 +931,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   patches are std `fill` with G1 to the faces round a six-edge hole (the feature splits the fillets and the flat faces
   at the setback, deletes the spherical corner, then fills): the boundary is live's, the patches' areas aren't
   (ours 27.85 / 38.00 mm², live 26.06 / 34.44 by facet sum); the kernel's G1 fill, as FILL-G1-DOME.
+  dx 11-05 12:24 (live 2061, exact): live's part is 4116.419 mm² (evArea exact; massproperties' band holds it) and its
+  patches 26.0706 / 26.9816 / 34.4640 mm² (B-splines 3x3, ~15x14 poles), ours 26.929 / 27.853 / 38.004: the other
+  23 faces match, so the boundary is live's and the patches' shape is not. Live's stay inside the cap planes,
+  touching them (tight boxes in live.jsonl's line 3); ours, OCCT's plate (BRepOffsetAPI_MakeFilling, six G1 edges,
+  features.cpp op_fill), overshoot (to x -22.683, live -22.524). Tried: the plate's parameters (degree, points,
+  iterations, tolerances down to 1e-7 / 1e-3 rad): 4121.36-4121.69 mm², no change; a sphere fitted to the boundary
+  as its initial surface: the box within 0.006 mm of live's, the area 4121.30; points on that sphere as constraints:
+  worse (4135, 4174). The plate minimises bending, Parasolid's fill comes out flatter: this needs another n-sided G1
+  construction (a Gregory / Charrot-Gregory patch, or tangent ribbons along the edges), not a parameter.
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
   space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:

@@ -970,6 +970,9 @@ Once your kernel steps stop on abort, the grace rarely expires; nothing else dep
 ## From dx (11-05 12:05, lead's request): SETBACK-FILL-PATCH taken by dx
 cf-setback-fillet's corner patches (std `fill`, G1 to six edges, your surfaces.rs fill_surface): dx works on them; I'll
 note here what I change in the fill before landing.
+12:24: released, nothing changed in the fill: live's areas are exact (2061), so our plate's patches really are 3-10 %
+larger; parameters and initial surfaces don't close it (TICKETS SETBACK-FILL-PATCH). It needs a different n-sided G1
+construction, yours to decide.
 
 ## From dx (11-05 12:03, lead's request): point_on_face on free-form faces, in your helpers_a.rs
 `helpers_a::point_on_face` keeps the projected centroid for planes, cylinders, cones, spheres and tori; a free-form
