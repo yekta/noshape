@@ -142,6 +142,8 @@ pub struct CtxState {
     /// Each body's edges' sketch order keys ([`query::live_order`]), with the number of sketches they were found among.
     pub sketch_order_cache: ByBody<query::SketchKeys>,
     pub created_cache: Mutex<CreatedCache>,
+    /// Each face's inner point ([`query::QueryCx::face_point`]), by the face (held, so its identity stays its own).
+    pub face_points: Mutex<HashMap<noshape_kernel::Shape, Option<glam::DVec3>>>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -283,6 +285,7 @@ impl FsContext {
                 adopted: HashMap::new(),
                 face_creators: Mutex::new(HashMap::new()),
                 created_cache: Mutex::new(HashMap::new()),
+                face_points: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
                 sketch_order_cache: Mutex::new(HashMap::new()),
                 name_index: Mutex::new(HashMap::new()),

@@ -569,20 +569,31 @@ impl<'a> QueryCx<'a> {
                 let i = shape.edge_info().ok()?;
                 [0.0, 0.5, 1.0].iter().filter_map(|t| shape.point_at(i.first_param + (i.last_param - i.first_param) * t).ok()).collect()
             }
-            _ => {
-                // A point of the face: its parameters' middle when on it, else a few others, else the nearest to
-                // the middle (the projection's search along the edges: ~0.4 ms a face, std sheet metal's thousands).
-                let [u0, u1, v0, v1] = shape.uv_bounds().ok()?;
-                let at = |a: f64, b: f64| shape.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
-                let inside = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.75), (0.25, 0.75), (0.75, 0.25)].into_iter().filter_map(|(a, b)| at(a, b)).find(|p| shape.contains_point(*p, 1e-9).unwrap_or(false));
-                match inside {
-                    Some(p) => vec![p],
-                    None => vec![shape.project_point(at(0.5, 0.5)?).ok()?.point],
-                }
-            }
+            _ => vec![self.face_point(&shape)?],
         };
         let face = (etype == EType::Face).then(|| shape.clone());
         Some(Snapshot { etype, points, body_type: self.body_type(e), sketch: self.is_sketch(e), face })
+    }
+
+    /// A point of face `f`: its parameters' middle when on it, else a few others, else the nearest to the middle
+    /// (the projection's search along the edges: ~0.4 ms a face, std sheet metal's thousands), once a face
+    /// (tracking looks for a split face's pieces among every face, each time: model-plus's Extrude 4).
+    pub fn face_point(&self, f: &k::Shape) -> Option<DVec3> {
+        if let Some(p) = self.st.face_points.lock().get(f) {
+            return *p;
+        }
+        let point = || {
+            let [u0, u1, v0, v1] = f.uv_bounds().ok()?;
+            let at = |a: f64, b: f64| f.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
+            let inside = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.75), (0.25, 0.75), (0.75, 0.25)].into_iter().filter_map(|(a, b)| at(a, b)).find(|p| f.contains_point(*p, 1e-9).unwrap_or(false));
+            match inside {
+                Some(p) => Some(p),
+                None => Some(f.project_point(at(0.5, 0.5)?).ok()?.point),
+            }
+        };
+        let p = point();
+        self.st.face_points.lock().insert(f.clone(), p);
+        p
     }
 
     /// What a transient id stands for now. Operations rename entities, and
@@ -666,6 +677,12 @@ impl<'a> QueryCx<'a> {
                 }
             }
         }
+        // The old face's box: a face whose box misses it can't be a piece of it (its inner point is costly).
+        let old_box = snap.face.as_ref().and_then(|f| f.bounding_box(false).ok());
+        let near_old = |e: &Ent| {
+            let (Some(o), Some(b)) = (old_box, self.shape(e).and_then(|s| s.bounding_box(false).ok())) else { return true };
+            !((o.min - DVec3::splat(TOL)).cmpgt(b.max).any() || b.min.cmpgt(o.max + DVec3::splat(TOL)).any())
+        };
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
             .into_iter()
@@ -685,7 +702,8 @@ impl<'a> QueryCx<'a> {
                 // A piece of a split face (std Jog clips its face away from the
                 // old face's middle): an inner point on the old face.
                 if let Some(old) = &snap.face
-                    && let Some(m) = self.snapshot(e).and_then(|s| s.points.first().copied())
+                    && near_old(e)
+                    && let Some(m) = self.shape(e).and_then(|s| self.face_point(&s))
                     && all_on(old, &[m], TOL)
                 {
                     return true;
@@ -1132,6 +1150,11 @@ pub(crate) fn all_on(s: &k::Shape, points: &[DVec3], tol: f64) -> bool {
         && points.iter().any(|p| (b.min - DVec3::splat(tol)).cmpgt(*p).any() || p.cmpgt(b.max + DVec3::splat(tol)).any())
     {
         return false;
+    }
+    // A face: the foot on its surface classified (BRepExtrema's distance also measures every edge: ~0.2 ms a call,
+    // and tracking asks it of every face nearby).
+    if s.shape_type() == k::ShapeType::Face {
+        return points.iter().all(|p| s.contains_point(*p, tol).unwrap_or(false));
     }
     points.iter().all(|p| k::make_vertex(*p).ok().and_then(|v| k::distance(&v, s).ok()).is_some_and(|d| d.distance < tol))
 }
