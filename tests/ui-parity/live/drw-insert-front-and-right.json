@@ -1,6 +1,6 @@
 {
  "scenario": "drw-insert-front-and-right",
- "recorded": "2026-11-05T15:41:25.930Z",
+ "recorded": "2026-11-05T17:33:45.400Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "0c583492a33e165b4b1979a8",
+  "element": "f6b726e93b9dbeec992868ba",
   "start": "block-drawing-empty",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -122,7 +122,7 @@
      "selection": []
     }
    },
-   "t": 116325
+   "t": 108266
   },
   {
    "step": 2,
@@ -203,7 +203,7 @@
      "selection": []
     }
    },
-   "t": 128582
+   "t": 120508
   },
   {
    "step": 3,
@@ -279,7 +279,7 @@
      "selection": []
     }
    },
-   "t": 141117
+   "t": 132630
   },
   {
    "step": 4,
@@ -355,7 +355,7 @@
      "selection": []
     }
    },
-   "t": 153629
+   "t": 146872
   },
   {
    "step": 5,
@@ -421,7 +421,7 @@
      ]
     }
    },
-   "t": 173460
+   "t": 161186
   },
   {
    "step": 6,
@@ -485,15 +485,10 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Right"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 198591
+   "t": 176575
   },
   {
    "step": 7,
@@ -548,15 +543,10 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Right"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 249901
+   "t": 192476
   }
  ]
 }

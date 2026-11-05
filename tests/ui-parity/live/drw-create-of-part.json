@@ -1,6 +1,6 @@
 {
  "scenario": "drw-create-of-part",
- "recorded": "2026-11-05T15:48:02.570Z",
+ "recorded": "2026-11-05T16:38:01.843Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "65d195f54998ef72f0bd4225",
+  "element": "9f21b9f5aa72feef5ad4f873",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -142,7 +142,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 23995
+   "t": 44338
   },
   {
    "step": 2,
@@ -213,7 +213,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 26635
+   "t": 47620
   },
   {
    "step": 3,
@@ -278,7 +278,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 31312
+   "t": 52887
   },
   {
    "step": 4,
@@ -296,15 +296,32 @@
    "state": {
     "focus": {
      "kind": "other",
-     "tag": "button"
+     "tag": "iframe"
     },
     "dialog": {
-     "kind": "modal",
-     "title": "Create Drawing: New drawing name",
-     "fields": [],
-     "buttons": [
-      "OK",
-      "Cancel"
+     "kind": "drawing-panel",
+     "title": "Insert view",
+     "text": [
+      "Insert view",
+      "Insert",
+      "start block Copy 1 Part 1",
+      "View orientation",
+      "Top",
+      "Left",
+      "Right",
+      "Front",
+      "Back",
+      "Bottom",
+      "Isometric",
+      "View scale",
+      "View simplification",
+      "None",
+      "Absolute",
+      "Ratio to studio",
+      "Ratio to part",
+      "Auto",
+      "Show sketch appearances",
+      "Show annotations from model"
      ]
     },
     "dialogs": [],
@@ -314,32 +331,10 @@
      "items": []
     },
     "features": {
-     "rows": [
-      {
-       "name": "Sketch 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
-      },
-      {
-       "name": "Extrude 1",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": ""
-      }
-     ],
-     "rollbackAfter": "Extrude 1"
+     "rows": [],
+     "rollbackAfter": null
     },
-    "parts": [
-     "Part 1"
-    ],
-    "partsHeading": "Parts (1)",
+    "parts": [],
     "undo": {
      "undo": false,
      "redo": false
@@ -347,9 +342,19 @@
     "message": null,
     "tooltip": null,
     "sketch": null,
-    "drawing": null
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Insert view",
+     "views": [],
+     "annotations": [],
+     "selection": []
+    }
    },
-   "t": 33829
+   "t": 86481
   },
   {
    "step": 5,
@@ -419,7 +424,7 @@
      "selection": []
     }
    },
-   "t": 54817
+   "t": 113090
   }
  ]
 }

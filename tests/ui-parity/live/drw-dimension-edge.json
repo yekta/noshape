@@ -1,6 +1,6 @@
 {
  "scenario": "drw-dimension-edge",
- "recorded": "2026-11-05T15:21:30.269Z",
+ "recorded": "2026-11-05T17:30:53.332Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "63f88bc5b024f5c4f420b70b",
+  "element": "325661d0ddb31feac00569b0",
   "start": "block-drawing",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -149,7 +149,7 @@
      "selection": []
     }
    },
-   "t": 181177
+   "t": 179002
   },
   {
    "step": 2,
@@ -229,15 +229,10 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Front"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 198641
+   "t": 194534
   },
   {
    "step": 3,
@@ -325,7 +320,7 @@
      "selection": []
     }
    },
-   "t": 216802
+   "t": 210293
   },
   {
    "step": 4,
@@ -397,15 +392,10 @@
        "text": "1.575"
       }
      ],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Front"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 234009
+   "t": 225783
   }
  ]
 }

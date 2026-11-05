@@ -1,6 +1,6 @@
 {
  "scenario": "drw-section-view",
- "recorded": "2026-11-05T15:34:04.519Z",
+ "recorded": "2026-11-05T17:26:35.122Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "43858cf67a83b93741862751",
+  "element": "0eff5cf693d5ac4aad746d92",
   "start": "block-drawing",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -160,7 +160,7 @@
      "selection": []
     }
    },
-   "t": 178525
+   "t": 178425
   },
   {
    "step": 2,
@@ -247,7 +247,7 @@
      "selection": []
     }
    },
-   "t": 193278
+   "t": 193637
   },
   {
    "step": 3,
@@ -338,15 +338,10 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 207997
+   "t": 208071
   },
   {
    "step": 4,
@@ -433,19 +428,10 @@
        "text": "SECTION A - A"
       }
      ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      },
-      {
-       "kind": "VIEW",
-       "owner": "Section"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 225633
+   "t": 227224
   },
   {
    "step": 5,
@@ -523,19 +509,10 @@
        "text": "SECTION A - A"
       }
      ],
-     "selection": [
-      {
-       "kind": "EDGE",
-       "owner": "Top"
-      },
-      {
-       "kind": "VIEW",
-       "owner": "Section"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 243484
+   "t": 245158
   }
  ]
 }
