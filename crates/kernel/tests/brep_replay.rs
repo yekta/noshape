@@ -12,7 +12,7 @@
 
 use noshape_kernel::bool_corpus::{cases, load, Summary};
 use noshape_kernel::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 use std::time::Instant;
 
@@ -316,6 +316,69 @@ fn brep_corpus_replay() {
     let (n, _, bad, report) = replay(Path::new(&dir));
     eprintln!("{report}");
     assert!(bad.is_empty(), "{} of {n} cases differ:\n{}", bad.len(), bad.join("\n"));
+}
+
+/// How far noshape's own Boolean goes, over the corpora in NOSHAPE_BOOL_CORPORA (directories, `:`-separated; a case
+/// in several counted once, in the first): the share of cases it takes, and the share of OCCT's time (run here, each
+/// case once) those cases are. A case OCCT fails isn't counted. One row per corpus, then all of them.
+/// `tools/bool-share.sh` runs it over the recorded corpora.
+#[test]
+#[ignore = "T2: the Boolean corpora (outside the repo, NOSHAPE_BOOL_CORPORA)"]
+fn brep_corpus_share() {
+    let _ = set_working_scale(1000.0);
+    let dirs = std::env::var("NOSHAPE_BOOL_CORPORA").unwrap_or_default();
+    let mut seen: HashSet<String> = HashSet::new();
+    // (cases, taken, OCCT ms of all, OCCT ms of those taken)
+    let mut all = (0usize, 0usize, 0.0f64, 0.0f64);
+    for dir in dirs.split(':').filter(|d| !d.is_empty()).map(Path::new) {
+        let mut row = (0usize, 0usize, 0.0f64, 0.0f64);
+        for name in cases(dir) {
+            if !seen.insert(name.clone()) {
+                continue;
+            }
+            let Some(c) = load(dir, &name) else { continue };
+            // (Recorded failing: not a Boolean the model got.)
+            if c.path == "failed" {
+                continue;
+            }
+            set_rust_boolean_only(true);
+            let ours = boolean(c.op, &c.objects, &c.tools, &c.opts);
+            let taken = ours.is_ok() && last_boolean_path() == "rust";
+            set_rust_boolean_only(false);
+            // (OCCT the way the app ran it: op_boolean's, or OCCT's one Boolean of them all.)
+            let direct = c.path.starts_with("direct");
+            if direct {
+                unsafe { std::env::set_var("NOSHAPE_BOOL_NO_TREE", "1") };
+            }
+            set_rust_boolean(Some(false));
+            let t = Instant::now();
+            let occt = boolean(c.op, &c.objects, &c.tools, &c.opts);
+            let ms = t.elapsed().as_secs_f64() * 1e3;
+            set_rust_boolean(None);
+            if direct {
+                unsafe { std::env::remove_var("NOSHAPE_BOOL_NO_TREE") };
+            }
+            if occt.is_err() {
+                continue;
+            }
+            row.0 += 1;
+            row.2 += ms;
+            if taken {
+                row.1 += 1;
+                row.3 += ms;
+            }
+        }
+        if row.0 > 0 {
+            eprint!("{}", share_row(&dir.file_name().unwrap_or_default().to_string_lossy(), row));
+        }
+        all = (all.0 + row.0, all.1 + row.1, all.2 + row.2, all.3 + row.3);
+    }
+    eprint!("{}", share_row("all", all));
+}
+
+fn share_row(what: &str, (n, taken, occt, occt_taken): (usize, usize, f64, f64)) -> String {
+    let pc = |a: f64, b: f64| if b > 0.0 { 100.0 * a / b } else { 0.0 };
+    format!("share {what}: {taken} of {n} Booleans taken ({:.1} %); {:.0} of {:.0} ms of OCCT's time ({:.1} %)\n", pc(taken as f64, n as f64), occt_taken, occt, pc(occt_taken, occt))
 }
 
 /// Small planar cases from the corpus (tests/data/brep): noshape's own Boolean takes every one, as OCCT.

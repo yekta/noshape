@@ -60,3 +60,14 @@ fillet / chamfer "error" titles (10, incl. new-fillet-then-dblclick-other, undo-
 (POINT vs EDGE), sketch-delete-line / -vertical-constraint / -extend-to-line (selection), revolve-dialog-axis, face-rclick-menu,
 mass-properties-part (Mass override enabled), section-view-front (focus), extrude-end-type-up-to-face (live's start).
 dx 11-05 16:35: the 8 drawing scenarios (drw-*) against live's recordings (2063, /root/parity/ui/live): **2/8 scenarios, 37/45 states** (first run 0/8, 2/45). Left: the Insert view's scale on a No views sheet (2:1 live, ours 1:1: REQUESTS 16:12), what the selection pixels mean (hover or selection: REQUESTS 16:27, 4 states), drw-create-of-part's step 4 recorded while live still created the drawing (re-record asked).
+
+## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
+
+Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
+by the OCCT time those calls cost (OCCT run on vibe4, each once). Parity: the 56 parity documents' 594 Booleans
+(recorded 11-05 17:25 from `parity_models` on main, vibe4 ~/agents/bool-corpora/parity56). All: those and bool-corpus,
+corpus5, the shell recordings (shfall, sh-new2, shv, shell6) and the knurl sweep (7 cases, 360 s of OCCT's 790 s).
+
+| date | main | parity: count | parity: OCCT time | all: count | all: OCCT time | all but knurls: OCCT time |
+|---|---|---|---|---|---|---|
+| 2026-11-05 | 38f9abc52 (17:29) | 318/594 (53.5 %) | 43.3/73.0 s (59.4 %) | 1855/2498 (74.3 %) | 495/790 s (62.7 %) | 135/430 s (31.3 %; shfall's 191 Shell fuses, 266 s, 4 % taken) |

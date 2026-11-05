@@ -3,6 +3,27 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## How far it goes; tori; learning-center-michael's Fillet 2 (11-05 18:15 UTC)
+- `tools/bool-share.sh` (T2 `brep_replay::brep_corpus_share` over vibe4's corpora): the share of recorded Booleans ours
+  takes, by count and by OCCT's time (OCCT run there on every case). Rows in docs/parity/SCORE.md. 11-05 on main
+  38f9abc52: parity documents (parity56, 594 Booleans recorded from `parity_models`) 53.5 % by count, 59.4 % of OCCT's
+  time; all corpora 74.3 % / 62.7 % (the knurl sweep, 7 cases, is 360 of the 790 s; without it 31.3 %). The biggest
+  untaken block: shfall's Shell fuses, 191 cases, 266 s of OCCT, 4 % taken.
+- Landed b9543e2b: tori and spheres meet planes, cylinders, cones, spheres and tori on their axis in exact circles
+  (rust_boolean.cpp `coaxial_sections`; a sphere's axis is its own, its circles' curves on it lines; tangent meetings
+  OCCT's; each circle cut to the arcs within both faces' angles, as OCCT's); closed-form parameters on spheres and tori.
+- Queued after it (bool-turns): a sphere's or torus's face whose edges' curves OCCT put a turn apart (a quarter ball's
+  seam at 2π, its pole the long way round) read in one turn, its points' angles the turn inside the face.
+- learning-center-michael 41701bb23cc08305 (vibe4 ~/agents/bool-corpora/lcm, the 12-tool cut, OCCT ~700 ms) now
+  declines "a non-manifold result": OCCT's section of plane face 31 and torus face 55 runs into corner vertex 130
+  tangent to straight edge 12; the crossing with edge 12 is found 23 um before the corner (vertex 134), the piece
+  134-130 lies along the edge on face 31 and is dropped, so face 55's loop doesn't close. Next: merge such a grazing
+  crossing into the end vertex, or keep the piece along the edge as a common block. Debug patch:
+  /root/bool-scratch/lcm-wip-1105.patch (bool-c).
+- motor-mount-jack (Fillet 2 39 ms / live 3, Extrude 3 28 ms / live 6): converting the B-spline-edged part isn't the
+  cost (0.2-0.7 ms). Extrude 3's 28 ms is spread over sections 4.4, pieces 4, states 4.6, build and check 7.4; Fillet 2
+  is mostly OCCT's build after ours declines "an arc across a cylinder's seam".
+
 ## From dx (11-04 23:04 UTC): the sheet metal rebuild's fuse of walls and bends
 - cf-sheet-metal-model-plus (now running; its Flange 1 takes 1.7–2.4 s, live's whole document 0.9 s): the FeatureScript
   host's sheet metal rebuild (host/sheetmetal.rs build_part) ends in `k::fuse_all(&solids, glue: ShiftChecked)` of
