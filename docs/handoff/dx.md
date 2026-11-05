@@ -11,6 +11,19 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-05 03:06 UTC: lead's list (Fold SM, bend centrelines, opDerip, spur gear, speed)
+- Landed: opTransform keeps the moved bodies' attributes (86cbc2c4: Fold SM 1 29/69/42 -> 34/84/52); @opDerip on
+  curved part faces, std's signed distance (6767e2f4; every std caller goes through deripEdges: Tab, cuts in the
+  flat, rip breaks, move face); core.md: the slowest custom-feature documents are kernel-bound (spur gear: Booleans,
+  root fillet; model-plus: the rebuild's glued fuse and B-spline projections; hose routing: opShell).
+- Bend centrelines: done on the std route (default); the native legacy route makes none, nothing reaches
+  @evSheetMetalBendUp there. cf-spur-gear matches live to the end (14/14).
+- In progress (branch wip/dx-edge-order, one commit, to land after the main control run93): FS-QUERY-EDGE-ORDER.
+  qAdjacent / qOwnedByBody / qEverything give a sheet's edges from a sketch region in that sketch's order (live's
+  ascending transient ids); a cut-away corner's tracking finds nothing after a topology change. Run 92 with it:
+  41/55 documents, 389/471 features, custom 46/109 (run 90: 38, 376, 40); cf-sheet-metal-overcut-dogbone 10/10.
+- Next: land it; 04:00 daily walk; then the corpus's remaining custom-feature differences.
+
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
   Part Studio and Assembly export (format, shared options, each format's own block; STL its own resolution / units /
