@@ -36,6 +36,11 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 10:51:** vibe3 ~/qa/rel pruned (25 → 4.4 GB: keep the greens in use, the last two release CLIs; prune again every few greens:
+v3sweep.sh copies an ~800 MB binary per green). Fuzz loops now on green 2572d7d9 (~/qa/bin/v3nf5.sh 4561–4620, v3g5.sh 4621–4660) and
+v0.4.30 (v3cf4.sh 4661–4720). Release-loop deaths so far, both filed: v0.4.30 seed 4539 (hang, RELEASE-BUILD-FILLET-HANG) and seed 4558
+(not reproduced). Greens since 7bb99058 swept (8cc1b766: SAVED-MIRROR-REF-CHANGE; dedfb1ae, 302ca1a2, 4bd203ef, 2572d7d9: no change).
+
 **11-05 09:42: disk (lead: the machine hit 100 %).** /root/qa-scratch cut from 47 GB to 6.3 GB: rel/k now holds only v0.4.30,
 v0.4.29 and keep/x/y noshape-8cc1b766 / -a1ec7849 (the last two greens; the CRASH-2045 binary 0531f66e went, the ticket is verified);
 the local updater home (retired; it runs on vibe3) and the vibe3 transfer bundle deleted; cli/ fuzz outputs deleted except
