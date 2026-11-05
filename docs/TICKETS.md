@@ -607,6 +607,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bool 11-04 20:31: the document's recorded Booleans 217 -> 122 ms on vibe3 (OCCT 122): Extrude 3's fuse 86 -> 37 ms
   (vibe4; OCCT 31), Fillet 2's cut declines after 10 ms instead of 35 (an arc across the bore's seam, then OCCT's).
   The document there 881 -> 712 ms (Extrude 3 219 -> 112, Fillet 2 197 -> 125; Circular pattern 1 unchanged).
+  core 11-05 02:11 (for **bool**): Circular pattern 1 is still 109 ms (live 5): its cut of the three slot copies (glued,
+  the caps on the tube's cylinders) declines in noshape's Boolean "a cylinder face without curved edges" (brep
+  boolean.rs) in 0.9 ms, then OCCT's takes 64-80 ms (23 ms of it projecting the copies' edges onto the cylinders).
+  Recorded case f09d7998ed9eb11b in vibe5 ~/agents/shared-cases. The seam movers there are 6 ms now.
 - [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
