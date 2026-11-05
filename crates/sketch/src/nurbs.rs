@@ -3,7 +3,7 @@
 
 #![allow(clippy::needless_range_loop)]
 
-use glam::DVec2;
+use glam::{DVec2, DVec3};
 use serde::{Deserialize, Serialize};
 
 /// A (possibly rational) B-spline curve in the plane.
@@ -773,6 +773,29 @@ pub(crate) fn fit_params(pts: &[DVec2]) -> (Vec<f64>, f64) {
     }
     ub[n - 1] = 1.0;
     (ub, total)
+}
+
+/// The cubic through 3D `pts` as Onshape's opFitSpline (live 2052): knots at the centripetal parameters on [0, 1],
+/// natural ends, or the end derivatives `ends` (with respect to that parameter). The full knot vector and the
+/// control points; `None` for fewer than two points or a singular system.
+pub fn fit_3d(pts: &[DVec3], ends: Option<(DVec3, DVec3)>) -> Option<(Vec<f64>, Vec<DVec3>)> {
+    let n = pts.len();
+    if n < 2 {
+        return None;
+    }
+    let total: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length().sqrt()).sum();
+    let mut ub = vec![0.0; n];
+    for k in 1..n {
+        ub[k] = if total <= 1e-300 { k as f64 / (n - 1) as f64 } else { ub[k - 1] + (pts[k] - pts[k - 1]).length().sqrt() / total };
+    }
+    ub[n - 1] = 1.0;
+    let xy: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.x, p.y)).collect();
+    let z: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.z, 0.0)).collect();
+    let a = FitSystem::new(&ub, &xy, ends.map(|(d0, d1)| (DVec2::new(d0.x, d0.y), DVec2::new(d1.x, d1.y))));
+    let b = FitSystem::new(&ub, &z, ends.map(|(d0, d1)| (DVec2::new(d0.z, 0.0), DVec2::new(d1.z, 0.0))));
+    let lu = a.factor()?;
+    let (c, d) = (a.solve_with(&lu), b.solve_with(&lu));
+    Some((c.knots, c.ctrl.iter().zip(&d.ctrl).map(|(p, q)| DVec3::new(p.x, p.y, q.x)).collect()))
 }
 
 /// The linear system of a fit spline: a cubic through `pts` at the

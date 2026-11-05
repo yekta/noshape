@@ -1420,28 +1420,39 @@ fn add_wire(ev: &mut EvalCtx, shape: Shape) -> FResult<()> {
 fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
     let pts: Vec<DVec3> = def.get("points").as_array().map(|v| v.iter().filter_map(vec3_of).collect()).unwrap_or_default();
-    let mut tangents = Vec::new();
     // Onshape's derivatives are with respect to the spline's parameter on [0, 1] (geomOperations.fs:
-    // arcLengthParameterization false); OCCT's interpolation runs over the chord length.
-    let chord: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum();
-    if let (Some(s), Some(e)) = (vec3_of(def.get("startDerivative")), vec3_of(def.get("endDerivative")))
-        && chord > 0.0
-    {
-        tangents = vec![s / chord, e / chord];
-    }
+    // arcLengthParameterization false).
+    let ends = vec3_of(def.get("startDerivative")).zip(vec3_of(def.get("endDerivative")));
     run_op(i, &cx, &id, "SKETCH_SPLINE_FAILED", |ev| {
         if pts.len() < 2 {
             return err("A spline needs at least two points");
         }
         // Through two points, nothing else: a line (std Jog reads its fitted
         // bend reference with evLine).
-        if pts.len() == 2 && tangents.is_empty() {
+        if pts.len() == 2 && ends.is_none() {
             return add_wire(ev, k::make_line(pts[0], pts[1])?);
         }
         let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
-        let p = if closed { &pts[..pts.len() - 1] } else { &pts[..] };
-        let s = k::make_interpolated_spline(p, &tangents, closed)?;
-        add_wire(ev, s)
+        if closed {
+            // (OCCT's periodic interpolation runs over the chord length.)
+            let chord: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
+            let tangents: Vec<DVec3> = ends.map(|(s, e)| vec![s / chord, e / chord]).unwrap_or_default();
+            return add_wire(ev, k::make_interpolated_spline(&pts[..pts.len() - 1], &tangents, true)?);
+        }
+        // Live 2052: knots at the centripetal parameters on [0, 1], natural ends without derivatives.
+        let (knots, poles) = noshape_sketch::nurbs::fit_3d(&pts, ends).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
+        let mut unique: Vec<f64> = Vec::new();
+        let mut mults: Vec<u32> = Vec::new();
+        for k in knots {
+            match mults.last_mut() {
+                Some(m) if unique.last().is_some_and(|&u| (k - u).abs() < 1e-15) => *m += 1,
+                _ => {
+                    unique.push(k);
+                    mults.push(1);
+                }
+            }
+        }
+        add_wire(ev, k::make_bspline(&poles, None, &unique, &mults, 3, false)?)
     })?;
     Ok(Value::Undefined)
 }

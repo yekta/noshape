@@ -368,6 +368,25 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const length = size(common) == 1 ? evLength(context, { "entities" : common[0] }) : undefined;
             check("a sheet extended up to a plane", abs(area - (25 * 10 + 25 * 10) * mm ^ 2) < 1e-9 * mm ^ 2 && length != undefined && abs(length - 25 * mm) < 1e-9 * mm, [area, size(common), length]);
         });
+        step(context, id, "fitSplineAsLive", function(sub) {
+            // opFitSpline through (0, 0), (1, 0), (2, 1) cm (live 2052): knots at the centripetal parameters on [0, 1],
+            // natural ends; with end derivatives (1, 0) and (0, 1) cm, the same knots.
+            const at = vector(0, 0, 4200) * mm;
+            const pts = [at, at + vector(10, 0, 0) * mm, at + vector(20, 10, 0) * mm];
+            opFitSpline(context, sub + "a", { "points" : pts });
+            opFitSpline(context, sub + "b", { "points" : pts, "startDerivative" : vector(10, 0, 0) * mm, "endDerivative" : vector(0, 10, 0) * mm });
+            const expect = function(name, poles)
+                {
+                    const c = evCurveDefinition(context, { "edge" : qCreatedBy(sub + name, EntityType.EDGE) });
+                    var off = 0 * mm;
+                    for (var i = 0; i < size(poles); i += 1)
+                        off = max(off, norm(c.controlPoints[i] - at - poles[i] * mm));
+                    return size(c.controlPoints) == 5 && abs(c.knots[4] - 0.4567863831370551) < 1e-12 && c.knots[8] == 1 && off < 1e-4 * mm;
+                };
+            const a = expect("a", [vector(0, 0, 0), vector(3.45446, -0.64018, 0), vector(11.01699, -2.04168, 0), vector(16.83797, 5.76131, 0), vector(20, 10, 0)]);
+            const b = expect("b", [vector(0, 0, 0), vector(1.52262, 0, 0), vector(10.83620, -3.44317, 0), vector(20, 8.18929, 0), vector(20, 10, 0)]);
+            check("opFitSpline as live", a && b, [a, b, evCurveDefinition(context, { "edge" : qCreatedBy(sub + "a", EntityType.EDGE) })]);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).
