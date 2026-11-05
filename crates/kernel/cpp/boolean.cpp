@@ -6998,6 +6998,12 @@ OpOut op_unify_whole(const OcShape& s)
   return make_result({s.shape}, res, hist.get());
 }
 
+// The kernel's unify of a whole shape (op_unify's), for the kernel's own operations.
+TopoDS_Shape unify_shape(const TopoDS_Shape& s, HHist& hist)
+{
+  return unify(s, hist);
+}
+
 // Only the pieces of loops joined (join_loop_pieces: where a seam or a blend left a vertex between two pieces of one
 // curve), nothing unified; none in a studio saved before (legacy topology).
 OpOut op_join_edges(const OcShape& s)

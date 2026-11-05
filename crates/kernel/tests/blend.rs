@@ -1424,3 +1424,28 @@ fn a_chamfered_double_d_holes_bottom_arcs_are_whole() {
     let want = 32.0f64.sqrt() * (std::f64::consts::PI - 2.0 * (7.0f64.sqrt() / 32.0f64.sqrt()).asin());
     assert!(lens.iter().all(|l| (l - want).abs() < 1e-6), "{lens:?} {want}");
 }
+
+/// Live learning-center-michael's Fillet 2: R14.48528 on the outline of a two-pronged plate (114 mm thick), its holes'
+/// rims and, by tangency, the mitres Fillet 1's rounds of that radius left at the prong ends. The rims' rounds overflow
+/// the prongs' walls (OCCT fails it all): live's part, 3569327.895499 mm³, 44 faces (its spheres where the three rounds
+/// meet, the rims' tori trimmed by the side rounds, the notch's rounds mitred at its concave corners), each round's
+/// removal taken from the part.
+#[test]
+fn overflowing_rounds_meeting_earlier_ones_are_lives() {
+    setup();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/michael-fillet2-input.brep");
+    let s = read_brep(&path).unwrap();
+    let all = s.edges();
+    let edges: Vec<Shape> = [0usize, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 42, 43, 44, 45, 46, 47].iter().map(|&i| all[i].clone()).collect();
+    let t0 = std::time::Instant::now();
+    let r = fillet_checked(&s, &edges, &[0.01448528]).unwrap().shape;
+    let took = t0.elapsed();
+    assert!(r.is_valid());
+    assert!((vol_mm3(&r) - 3569327.895499).abs() < 0.05, "{}", vol_mm3(&r));
+    // (Live's 99 edges / 54 vertices; ours 103 / 58: the R12.5 rims' tori meet the prong ends' rounds in two pieces
+    // each, split at OCCT's seam, which Parasolid's tori don't have.)
+    assert_eq!(r.count(ShapeType::Face), 44);
+    let kinds = |k: &str| r.faces().iter().filter(|f| format!("{:?}", f.face_surface()).contains(k)).count();
+    assert_eq!((kinds("Plane"), kinds("Cylinder"), kinds("Sphere"), kinds("Torus")), (11, 19, 6, 8));
+    eprintln!("{took:?}");
+}

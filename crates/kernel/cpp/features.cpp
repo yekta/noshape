@@ -36,6 +36,10 @@
 #include <algorithm>
 #include <limits>
 #include <GeomAPI_ProjectPointOnSurf.hxx>
+#include <ElCLib.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
+#include <GC_MakeArcOfCircle.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
 #include <GeomConvert_SurfToAnaSurf.hxx>
@@ -4643,6 +4647,375 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
   return false;
 }
 
+// A fillet of one radius as Parasolid makes it where its rounds overflow their faces or meet earlier rounds of the
+// same radius (live learning-center-michael's Fillet 2, matched to 0.0087 mm³ and its 44 faces): the part less each
+// round's own removal, the spandrel between the edge, its two tangent points and the ball (a line's along it, an arc's
+// or a hole rim's round its axis, overflowing past the walls); where an edge is the mitre of two earlier rounds of the
+// radius whose axes cross, the ball's octant (its sphere); at a concave corner between two rounds, what both take
+// extended past it. Lines between planes, arcs between a plane and the cylinder they bound; tangent edges take nothing.
+// Only fillets with such a mitre (OCCT can't roll a ball that stands still).
+// Null when it doesn't apply or doesn't come out valid.
+std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
+                                                              const std::vector<double>& rs)
+{
+  const double r = rs.front();
+  for (double x : rs)
+    if (std::abs(x - r) > 1e-9 * r)
+      return std::nullopt;
+  try
+  {
+    ShapeAncMap e2f, v2e;
+    TopExp::MapShapesAndUniqueAncestors(input, TopAbs_EDGE, TopAbs_FACE, e2f);
+    TopExp::MapShapesAndUniqueAncestors(input, TopAbs_VERTEX, TopAbs_EDGE, v2e);
+    // Face f's outward normal at P (on it or near it).
+    auto normal_at = [](const TopoDS_Face& f, const gp_Pnt& P, gp_Vec& n) {
+      const occ::handle<Geom_Surface> sf = BRep_Tool::Surface(f);
+      GeomAPI_ProjectPointOnSurf      pr(P, sf);
+      if (pr.NbPoints() == 0)
+        return false;
+      double u, v;
+      pr.LowerDistanceParameters(u, v);
+      gp_Pnt q;
+      gp_Vec du, dv;
+      sf->D1(u, v, q, du, dv);
+      n = du.Crossed(dv);
+      if (n.Magnitude() < 1e-12)
+        return false;
+      n.Normalize();
+      if (f.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      return true;
+    };
+    // Edge e's two faces and their normals at P; its tangent at P as face 1 runs it.
+    auto across = [&](const TopoDS_Edge& e, const gp_Pnt& P, double par, TopoDS_Face& f1, TopoDS_Face& f2, gp_Vec& n1, gp_Vec& n2, gp_Vec& t) {
+      const ShapeList* fl = e2f.Seek(e);
+      if (fl == nullptr || fl->Extent() != 2)
+        return false;
+      f1 = TopoDS::Face(fl->First());
+      f2 = TopoDS::Face(fl->Last());
+      if (!normal_at(f1, P, n1) || !normal_at(f2, P, n2))
+        return false;
+      BRepAdaptor_Curve c(e);
+      gp_Pnt            q;
+      c.D1(par, q, t);
+      if (t.Magnitude() < 1e-12)
+        return false;
+      t.Normalize();
+      for (TopExp_Explorer x(f1, TopAbs_EDGE); x.More(); x.Next())
+        if (x.Current().IsSame(e))
+        {
+          if (x.Current().Orientation() == TopAbs_REVERSED)
+            t.Reverse();
+          break;
+        }
+      return true;
+    };
+    // The spandrel at E between faces of outward normals n1, n2 (convex): E, the tangent points, the ball's arc.
+    auto spandrel = [r](const gp_Pnt& E, const gp_Vec& n1, const gp_Vec& n2, gp_Pnt& C) -> TopoDS_Face {
+      const double half = std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2)))) / 2;
+      const gp_Vec bis  = (n1 + n2).Normalized();
+      C                 = E.Translated(-bis * (r / std::cos(half)));
+      const gp_Pnt t1 = C.Translated(n1 * r), t2 = C.Translated(n2 * r);
+      const gp_Pnt mid = C.Translated(gp_Vec(C, E).Normalized() * r);
+      GC_MakeArcOfCircle arc(t1, mid, t2);
+      if (!arc.IsDone())
+        return TopoDS_Face();
+      BRepBuilderAPI_MakeWire w(BRepBuilderAPI_MakeEdge(E, t1).Edge(), BRepBuilderAPI_MakeEdge(arc.Value()).Edge(), BRepBuilderAPI_MakeEdge(t2, E).Edge());
+      if (!w.IsDone())
+        return TopoDS_Face();
+      BRepBuilderAPI_MakeFace f(w.Wire(), true);
+      return f.IsDone() ? f.Face() : TopoDS_Face();
+    };
+    enum Kind { Skip, Line, Arc, Ball };
+    struct Tool
+    {
+      Kind         kind = Skip;
+      TopoDS_Face  w1, w2;   // the edge's faces
+      gp_Pnt       a, b;     // a line's ends as face 1 runs it
+      gp_Vec       n1, n2;   // at a
+      gp_Ax1       axis;     // a line's ball axis (from a); an arc's circle axis; a ball's centre
+      double       sweep = 0;
+      gp_Pnt       C;        // the ball's centre (a line's at a, an arc's at its start, a mitre's)
+      TopoDS_Shape shape;
+    };
+    std::vector<Tool> ts(es.size());
+    ShapeList         tools;
+    for (size_t i = 0; i < es.size(); ++i)
+    {
+      const TopoDS_Edge& e = es[i];
+      Tool&              T = ts[i];
+      BRepAdaptor_Curve  c(e);
+      const double       p0 = c.FirstParameter(), p1 = c.LastParameter(), pm = 0.5 * (p0 + p1);
+      gp_Vec             nm1, nm2, tm;
+      if (!across(e, c.Value(pm), pm, T.w1, T.w2, nm1, nm2, tm))
+        return std::nullopt;
+      // Smooth: nothing to take.
+      if (nm1.Dot(nm2) > 1 - 1e-9)
+        continue;
+      // Convex only.
+      if (nm1.Crossed(nm2).Dot(tm) <= 1e-9)
+        return std::nullopt;
+      BRepAdaptor_Surface s1(T.w1, false), s2(T.w2, false);
+      if (c.GetType() == GeomAbs_Line && s1.GetType() == GeomAbs_Plane && s2.GetType() == GeomAbs_Plane)
+      {
+        TopoDS_Vertex va, vb;
+        TopExp::Vertices(e, va, vb, true);
+        if (va.IsNull() || vb.IsNull())
+          return std::nullopt;
+        T.kind = Line;
+        T.a    = BRep_Tool::Pnt(va);
+        T.b    = BRep_Tool::Pnt(vb);
+        double pa = BRep_Tool::Parameter(va, e);
+        if (gp_Vec(T.a, T.b).Dot(tm) < 0)
+        {
+          std::swap(T.a, T.b);
+          pa = BRep_Tool::Parameter(vb, e);
+        }
+        gp_Vec t;
+        if (!across(e, T.a, pa, T.w1, T.w2, T.n1, T.n2, t))
+          return std::nullopt;
+        continue;
+      }
+      if (c.GetType() == GeomAbs_Circle)
+      {
+        // A plane square to the circle's axis and the cylinder it bounds.
+        const gp_Circ circ = c.Circle();
+        const BRepAdaptor_Surface* pl = s1.GetType() == GeomAbs_Plane ? &s1 : s2.GetType() == GeomAbs_Plane ? &s2 : nullptr;
+        const BRepAdaptor_Surface* cy = s1.GetType() == GeomAbs_Cylinder ? &s1 : s2.GetType() == GeomAbs_Cylinder ? &s2 : nullptr;
+        if (pl == nullptr || cy == nullptr || !pl->Plane().Axis().IsParallel(circ.Axis(), 1e-9) || !cy->Cylinder().Axis().IsParallel(circ.Axis(), 1e-9)
+            || gp_Lin(cy->Cylinder().Axis()).Distance(circ.Location()) > 1e-9 * circ.Radius() || std::abs(cy->Cylinder().Radius() - circ.Radius()) > 1e-9 * circ.Radius())
+          return std::nullopt;
+        T.kind  = Arc;
+        T.a     = c.Value(p0);
+        T.axis  = circ.Axis();
+        T.sweep = p1 - p0;
+        gp_Vec t;
+        if (!across(e, T.a, p0, T.w1, T.w2, T.n1, T.n2, t))
+          return std::nullopt;
+        continue;
+      }
+      // The mitre of two earlier rounds of this radius whose axes cross square: the ball there.
+      if (s1.GetType() == GeomAbs_Cylinder && s2.GetType() == GeomAbs_Cylinder)
+      {
+        const gp_Cylinder c1 = s1.Cylinder(), c2 = s2.Cylinder();
+        const gp_Dir      a1 = c1.Axis().Direction(), a2 = c2.Axis().Direction();
+        if (std::abs(c1.Radius() - r) > Precision::Confusion() || std::abs(c2.Radius() - r) > Precision::Confusion() || std::abs(a1.Dot(a2)) > 1e-9)
+          return std::nullopt;
+        // Where the axes come closest.
+        const gp_Vec w0(c2.Location(), c1.Location());
+        const double b  = gp_Vec(a1).Dot(gp_Vec(a2)), d = gp_Vec(a1).Dot(w0), ee = gp_Vec(a2).Dot(w0);
+        const double den = 1 - b * b;
+        const double s = (b * ee - d) / den, u = (ee - b * d) / den;
+        const gp_Pnt q1 = c1.Location().Translated(gp_Vec(a1) * s), q2 = c2.Location().Translated(gp_Vec(a2) * u);
+        if (q1.Distance(q2) > 1e-7 * (1 + r))
+          return std::nullopt;
+        T.kind = Ball;
+        T.C    = q1;
+        const gp_Vec m(T.C, c.Value(pm));
+        const gp_Dir a3 = gp_Dir(gp_Vec(a1).Crossed(gp_Vec(a2)));
+        double       sg[3];
+        const gp_Dir ax[3] = {a1, a2, a3};
+        for (int k = 0; k < 3; ++k)
+        {
+          const double dk = m.Dot(gp_Vec(ax[k]));
+          if (std::abs(dk) < 1e-6 * r)
+            return std::nullopt;
+          sg[k] = dk > 0 ? 1 : -1;
+        }
+        const gp_Dir X = sg[0] > 0 ? a1 : a1.Reversed(), Y = sg[1] > 0 ? a2 : a2.Reversed(), Z = sg[2] > 0 ? a3 : a3.Reversed();
+        const double L = r * (1 + 1e-3);
+        const gp_Ax2 fr = gp_Vec(X).Crossed(gp_Vec(Y)).Dot(gp_Vec(Z)) > 0 ? gp_Ax2(T.C, Z, X) : gp_Ax2(T.C, Z, Y);
+        const TopoDS_Shape box = BRepPrimAPI_MakeBox(fr, L, L, L).Shape();
+        BRepAlgoAPI_Cut    cut(box, BRepPrimAPI_MakeSphere(T.C, r).Shape());
+        if (!cut.IsDone() || cut.HasErrors())
+          return std::nullopt;
+        T.shape = cut.Shape();
+        continue;
+      }
+      return std::nullopt;
+    }
+    // Only with a ball OCCT can't roll (elsewhere a round past an edge it doesn't take fails in live: "End boundary
+    // intersects unfilleted edge.", and OCCT's blends and the other fallbacks are live's).
+    if (std::none_of(ts.begin(), ts.end(), [](const Tool& T) { return T.kind == Ball; }))
+      return std::nullopt;
+    // A line's or arc's tool, extended at its start / end by `e0` / `e1` (lengths; an arc's by the angle at its
+    // ball's path).
+    auto build = [&](Tool& T, double e0, double e1) -> TopoDS_Shape {
+      gp_Pnt C;
+      if (T.kind == Line)
+      {
+        const gp_Vec u = gp_Vec(T.a, T.b).Normalized();
+        const gp_Pnt s = T.a.Translated(-u * e0);
+        const TopoDS_Face f = spandrel(s, T.n1, T.n2, C);
+        if (f.IsNull())
+          return TopoDS_Shape();
+        T.C    = C.Translated(u * e0);
+        T.axis = gp_Ax1(T.C, gp_Dir(u));
+        BRepPrimAPI_MakePrism mk(f, u * (T.a.Distance(T.b) + e0 + e1));
+        return mk.IsDone() ? mk.Shape() : TopoDS_Shape();
+      }
+      const TopoDS_Face f = spandrel(T.a, T.n1, T.n2, C);
+      if (f.IsNull())
+        return TopoDS_Shape();
+      T.C = C;
+      const double rc = gp_Lin(T.axis).Distance(C);
+      const double a0 = rc > 0 ? e0 / rc : 0, a1 = rc > 0 ? e1 / rc : 0;
+      const double sweep = std::min(T.sweep + a0 + a1, 2 * M_PI);
+      const double start = -std::min(a0, 2 * M_PI - T.sweep);
+      gp_Trsf rot;
+      rot.SetRotation(T.axis, start);
+      const TopoDS_Shape f0 = BRepBuilderAPI_Transform(f, rot, true).Shape();
+      BRepPrimAPI_MakeRevol mk(f0, T.axis, sweep);
+      return mk.IsDone() ? mk.Shape() : TopoDS_Shape();
+    };
+    for (Tool& T : ts)
+      if (T.kind == Line || T.kind == Arc)
+      {
+        T.shape = build(T, 0, 0);
+        if (T.shape.IsNull())
+          return std::nullopt;
+      }
+    for (Tool& T : ts)
+      if (!T.shape.IsNull())
+        tools.Append(T.shape);
+    // Concave corners: two lines meeting where their walls meet in a concave edge.
+    for (int i = 1; i <= v2e.Extent(); ++i)
+    {
+      std::vector<size_t> at;
+      for (ShapeList::Iterator it(v2e(i)); it.More(); it.Next())
+        for (size_t k = 0; k < es.size(); ++k)
+          if (it.Value().IsSame(es[k]) && ts[k].kind != Skip)
+            at.push_back(k);
+      if (at.size() < 2)
+        continue;
+      if (at.size() > 2)
+        return std::nullopt;
+      Tool &A = ts[at[0]], &B = ts[at[1]];
+      if (A.kind == Ball || B.kind == Ball)
+        continue;
+      const gp_Pnt V = BRep_Tool::Pnt(TopoDS::Vertex(v2e.FindKey(i)));
+      // Tangent there: one round on.
+      const TopoDS_Vertex Vx = TopoDS::Vertex(v2e.FindKey(i));
+      auto dir_at = [&](const Tool&, size_t k) {
+        BRepAdaptor_Curve cc(es[k]);
+        gp_Pnt            q;
+        gp_Vec            d;
+        cc.D1(BRep_Tool::Parameter(Vx, es[k]), q, d);
+        return d;
+      };
+      if (dir_at(A, at[0]).Crossed(dir_at(B, at[1])).Magnitude() <= 1e-9 * dir_at(A, at[0]).Magnitude() * dir_at(B, at[1]).Magnitude())
+        continue;
+      if (A.kind != Line || B.kind != Line)
+        return std::nullopt;
+      // The face they share, and the edge at V between their other faces.
+      const TopoDS_Face P  = A.w1.IsSame(B.w1) || A.w1.IsSame(B.w2) ? A.w1 : A.w2.IsSame(B.w1) || A.w2.IsSame(B.w2) ? A.w2 : TopoDS_Face();
+      if (P.IsNull())
+        return std::nullopt;
+      const TopoDS_Face WA = A.w1.IsSame(P) ? A.w2 : A.w1, WB = B.w1.IsSame(P) ? B.w2 : B.w1;
+      TopoDS_Edge       third;
+      for (ShapeList::Iterator it(v2e(i)); it.More() && third.IsNull(); it.Next())
+      {
+        const ShapeList* fl = e2f.Seek(it.Value());
+        if (fl != nullptr && fl->Extent() == 2 && ((fl->First().IsSame(WA) && fl->Last().IsSame(WB)) || (fl->First().IsSame(WB) && fl->Last().IsSame(WA))))
+          third = TopoDS::Edge(it.Value());
+      }
+      if (third.IsNull())
+        return std::nullopt;
+      TopoDS_Face g1, g2;
+      gp_Vec      m1, m2, t3;
+      if (!across(third, V, BRep_Tool::Parameter(Vx, third), g1, g2, m1, m2, t3))
+        return std::nullopt;
+      if (m1.Crossed(m2).Dot(t3) > 0)
+        continue; // convex: the two rounds meet in a mitre already
+      // Both extended past V; what both take there.
+      Tool         a2 = A, b2 = B;
+      const bool   a_end = A.b.Distance(V) < A.a.Distance(V), b_end = B.b.Distance(V) < B.a.Distance(V);
+      const double ext   = 2 * r;
+      const TopoDS_Shape xa = build(a2, a_end ? 0 : ext, a_end ? ext : 0), xb = build(b2, b_end ? 0 : ext, b_end ? ext : 0);
+      if (xa.IsNull() || xb.IsNull())
+        return std::nullopt;
+      BRepAlgoAPI_Common both(xa, xb);
+      if (!both.IsDone() || both.HasErrors())
+        return std::nullopt;
+      tools.Append(both.Shape());
+    }
+    if (tools.IsEmpty())
+      return std::nullopt;
+    // The lines' (planes and cylinders: noshape's Boolean takes them) first, then the rings and balls.
+    ShapeList first, second;
+    for (ShapeList::Iterator it(tools); it.More(); it.Next())
+    {
+      bool curved = false;
+      for (TopExp_Explorer x(it.Value(), TopAbs_FACE); x.More() && !curved; x.Next())
+      {
+        const GeomAbs_SurfaceType k = BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType();
+        curved = k != GeomAbs_Plane && k != GeomAbs_Cylinder;
+      }
+      (curved ? second : first).Append(it.Value());
+    }
+    TopoDS_Shape cut = input;
+    HHist        h;
+    for (const ShapeList* part : {&first, &second})
+    {
+      if (part->IsEmpty())
+        continue;
+      ShapeList args;
+      args.Append(cut);
+      TopoDS_Shape step;
+      HHist        hs;
+      if (!quick_boolean(1, args, *part, bop_parallel(), step, hs) || !valid_shape(step))
+        return std::nullopt;
+      h   = h.IsNull() ? hs : compose(input, h, hs);
+      cut = step;
+    }
+    HHist              uh;
+    const TopoDS_Shape out = unify_shape(cut, uh);
+    if (!uh.IsNull())
+      h = compose(input, h, uh);
+    int solids = 0;
+    for (TopExp_Explorer x(out, TopAbs_SOLID); x.More(); x.Next())
+      ++solids;
+    if (solids != 1 || !valid_shape(out))
+      return std::nullopt;
+    // The faces the tools made, generated by their edges: a line's cylinder on its ball's axis, an arc's torus about
+    // its axis, a mitre's sphere about its ball.
+    ShapeIMap old;
+    for (TopExp_Explorer f(input, TopAbs_FACE); f.More(); f.Next())
+    {
+      const ShapeList& m = h->Modified(f.Current());
+      for (ShapeList::Iterator it(m); it.More(); it.Next())
+        old.Add(it.Value());
+      if (m.IsEmpty() && !h->IsRemoved(f.Current()))
+        old.Add(f.Current());
+    }
+    for (TopExp_Explorer f(out, TopAbs_FACE); f.More(); f.Next())
+    {
+      if (old.Contains(f.Current()))
+        continue;
+      BRepAdaptor_Surface a(TopoDS::Face(f.Current()), false);
+      for (size_t k = 0; k < es.size(); ++k)
+      {
+        const Tool& T  = ts[k];
+        bool        is = false;
+        if (T.kind == Line && a.GetType() == GeomAbs_Cylinder)
+          is = std::abs(a.Cylinder().Radius() - r) < Precision::Confusion() && a.Cylinder().Axis().IsParallel(T.axis, 1e-9) && gp_Lin(T.axis).Distance(a.Cylinder().Location()) < 1e-7 * (1 + r);
+        else if (T.kind == Arc && a.GetType() == GeomAbs_Torus)
+          is = std::abs(a.Torus().MinorRadius() - r) < Precision::Confusion() && a.Torus().Axis().IsParallel(T.axis, 1e-9) && gp_Lin(T.axis).Distance(a.Torus().Location()) < 1e-7 * (1 + r)
+               && std::abs(a.Torus().MajorRadius() - gp_Lin(T.axis).Distance(T.C)) < 1e-7 * (1 + r) && std::abs(gp_Vec(a.Torus().Location(), T.C).Dot(gp_Vec(T.axis.Direction()))) < 1e-7 * (1 + r);
+        else if (T.kind == Ball && a.GetType() == GeomAbs_Sphere)
+          is = std::abs(a.Sphere().Radius() - r) < Precision::Confusion() && a.Sphere().Location().Distance(T.C) < 1e-7 * (1 + r);
+        if (is)
+          h->AddGenerated(es[k], f.Current());
+      }
+    }
+    return std::make_pair(out, h);
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+}
+
 // BRepFilletAPI_MakeFillet on `es` (radii `rs`) of the input scaled by `sc`.
 static BlendBuild fillet_build(const Scaled& sc, const std::vector<TopoDS_Edge>& es,
                                const std::vector<double>& rs)
@@ -5370,6 +5743,21 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   const TopoDS_Shape  in = copy.Shape();
   for (TopoDS_Edge& e : es)
     e = TopoDS::Edge(copy.ModifiedShape(e));
+  // Rounds that run into earlier rounds of their radius at a stationary ball (OCCT fails them, slowly): the part less
+  // each round's removal first.
+  if (checked && !legacy_blend_finish())
+  {
+    std::optional<std::pair<TopoDS_Shape, HHist>> by;
+    {
+      const KernelTimer timer("blend.by_tools");
+      by = fillet_by_tools(in, es, rs);
+    }
+    if (by)
+    {
+      tighten_new_tolerances(in, by->first, accurate(in));
+      return make_result({in}, by->first, by->second.get());
+    }
+  }
   if (checked)
   {
     const SlabBlend blend = [&](const TopoDS_Shape& slab, const std::vector<int>& idx,

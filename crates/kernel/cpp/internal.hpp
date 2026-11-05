@@ -216,6 +216,8 @@ std::shared_ptr<const UnifyScope> rust_unify_scope(const OcShape& target);
 // NOSHAPE_RECORD_BOOLEANS. False when OCCT's fails.
 bool quick_boolean(uint8_t op, const ShapeList& args, const ShapeList& tools, bool parallel, TopoDS_Shape& out,
                    occ::handle<BRepTools_History>& hist);
+// The kernel's unify of a whole shape (op_unify's; boolean.cpp).
+TopoDS_Shape unify_shape(const TopoDS_Shape& s, occ::handle<BRepTools_History>& hist);
 
 class HistoryBuilder
 {
