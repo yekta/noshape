@@ -145,11 +145,20 @@ pub struct SketchText {
     /// variables and `~` concatenation, evaluated on regeneration.
     #[serde(default)]
     pub expression: bool,
+    /// The box's height is the font's `ascent`, as Onshape's (SKETCH-TEXT-BOX-HEIGHT); a text saved before has its
+    /// ascender line there and keeps its size.
+    #[serde(default)]
+    pub ascent_box: bool,
 }
 
 impl SketchText {
-    fn layout(&self) -> noshape_sketch::text::TextLayout {
-        noshape_sketch::text::layout_text(&self.text, &self.font, self.bold, self.italic)
+    /// The laid-out text in box units (the box's height 1).
+    pub fn layout(&self) -> noshape_sketch::text::TextLayout {
+        if self.ascent_box {
+            noshape_sketch::text::layout_sketch_text(&self.text, &self.font, self.bold, self.italic)
+        } else {
+            noshape_sketch::text::layout_text(&self.text, &self.font, self.bold, self.italic)
+        }
     }
 
     fn corner_ids(&self) -> Vec<EntityId> {
@@ -188,13 +197,13 @@ impl PartialEq for SketchData {
 
 impl SketchData {
     /// Adds a text box with its lower-left corner (first baseline start) at
-    /// `origin` and the given height (baseline to ascender). Returns the
+    /// `origin` and the given height (the font's `ascent`, 0.72 of its size). Returns the
     /// text id.
     pub fn add_text(&mut self, text: &str, font: &str, bold: bool, italic: bool, origin: glam::DVec2, height: f64) -> Result<u32, String> {
         if text.trim().is_empty() {
             return Err("Sketch text cannot be empty".into());
         }
-        let layout = noshape_sketch::text::layout_text(text, font, bold, italic);
+        let layout = noshape_sketch::text::layout_sketch_text(text, font, bold, italic);
         let tb = self.sketch.add_text_box(origin, height, layout.width).map_err(|e| e.to_string())?;
         let id = self.texts.iter().map(|t| t.id + 1).max().unwrap_or(1);
         self.texts.push(SketchText {
@@ -211,6 +220,7 @@ impl SketchData {
             mirror_horizontal: false,
             mirror_vertical: false,
             expression: false,
+            ascent_box: true,
         });
         Ok(id)
     }

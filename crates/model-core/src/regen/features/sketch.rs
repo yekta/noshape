@@ -183,7 +183,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             match eval_text_expression(ev, &t.text) {
                 Ok(v) if !v.trim().is_empty() => {
                     t.text = v;
-                    let width = noshape_sketch::text::layout_text(&t.text, &t.font, t.bold, t.italic).width;
+                    let width = t.layout().width;
                     if let Some(rc) = t.ratio_constraint {
                         let _ = sk.set_length_ratio(ConstraintId(rc), width.max(1e-6));
                     }

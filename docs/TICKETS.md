@@ -681,7 +681,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (native Reapply: pattern.rs instance_references; std's FeatureList re-run: the faces made under the instance's id,
   also through the pattern's merge). Also: the parity runner takes a sheet's box from live's UI fetch as an outer
   bound (cf-curve-pattern-normal's Extrude 2 matches; its next is a custom feature not loading, dx).
-- [ ] P2 SKETCH-TEXT-BOX-HEIGHT (for skasm; core 11-05 02:50) a sketch text box's height is the font's ascender line here
+- [x] (skasm 11-05 13:12: a new text box's height is the font's ascent, 0.72 of its size, for every font (text.rs ASCENT_PER_EM, layout_sketch_text); texts saved before keep their ascender-line box (SketchText.ascent_box, serde default false); the parity translator passes live's ascent as the height; T1 sketch text_and_tools::a_text_box_is_the_fonts_ascent_as_onshapes (E 9.067 mm in a 9.1444 mm box, the run 105.95 mm); cf-fix-pcb 12/12) P2 SKETCH-TEXT-BOX-HEIGHT (for skasm; core 11-05 02:50) a sketch text box's height is the font's ascender line here
   (Open Sans 2189 / 2048 = 1.069 em: sketch text.rs layout_face, box y = 1) but Onshape's is `ascent`, 0.72 of the font
   size (live 1922 and 2044: cf-fix-pcb's 9.1444 mm box holds a 12.70 mm font, its E 9.067 mm tall). So the same box
   (drawn, or its height dimensioned) makes letters 0.72 / 1.069 = 67 % of live's: a 10 mm box, live's capitals ~9.9 mm,

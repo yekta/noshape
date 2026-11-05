@@ -435,6 +435,12 @@ pub struct TextLayout {
 }
 
 impl TextLayout {
+    /// The layout `k` times as large (about the first baseline's start).
+    pub fn scaled(self, k: f64) -> Self {
+        let contours = self.contours.iter().map(|c| map_contour(c, &|p| p * k)).collect();
+        TextLayout { contours, width: self.width * k, lines: self.lines }
+    }
+
     /// Polylines approximating the contours (previews).
     pub fn polylines(&self, steps: usize) -> Vec<Vec<DVec2>> {
         let steps = steps.max(1);
@@ -544,6 +550,20 @@ fn sketch_text_face(font: &str, bold: bool, italic: bool) -> (&'static [u8], Opt
 pub fn layout_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
     let (data, wght) = sketch_text_face(font, bold, italic);
     layout_face(text, data, wght, false, false)
+}
+
+/// A sketch text box's height per font size: Onshape's `ascent`, 0.72 of the font size whatever the font (live 1922:
+/// cf-fix-pcb's 9.1444 mm box holds a 12.70 mm Open Sans, its E 9.067 mm tall).
+pub const ASCENT_PER_EM: f64 = 0.72;
+
+/// [`layout_text`] for a sketch text box: in units where the box's height is 1, its `ascent` ([`ASCENT_PER_EM`]),
+/// not the font's ascender line.
+pub fn layout_sketch_text(text: &str, font: &str, bold: bool, italic: bool) -> TextLayout {
+    let layout = layout_text(text, font, bold, italic);
+    match ascender_per_em(font, bold, italic) {
+        Some(a) => layout.scaled(a / ASCENT_PER_EM),
+        None => layout,
+    }
 }
 
 /// The ascender line (a text box's height) per font size of the face [`layout_text`] uses (Open Sans 2189 / 2048).

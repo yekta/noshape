@@ -181,3 +181,18 @@ fn sketch_fonts_name_their_families() {
     assert_eq!(font_family_name(sketch_font_files("PTSans")[0]).as_deref(), Some("PT Sans"));
     assert_eq!(sketch_font_files("Allerta").len(), 1);
 }
+
+/// SKETCH-TEXT-BOX-HEIGHT: a sketch text box's height is Onshape's `ascent`, 0.72 of the font size (live 1922:
+/// cf-fix-pcb's "Embossed Letters" in a 9.1444 mm box: a 12.70 mm Open Sans, its E 9.067 mm tall, the box 105.95 mm
+/// long, the advances plus ~40 font units).
+#[test]
+fn a_text_box_is_the_fonts_ascent_as_onshapes() {
+    let h = 9.1444;
+    let e = noshape_sketch::text::layout_sketch_text("E", noshape_sketch::text::SKETCH_DEFAULT_FONT, false, false);
+    let top = e.polylines(8).iter().flatten().map(|p| p.y).fold(f64::MIN, f64::max) * h;
+    assert!((top - 9.067).abs() < 0.01, "E {top} mm tall");
+    let run = noshape_sketch::text::layout_sketch_text("Embossed Letters", noshape_sketch::text::SKETCH_DEFAULT_FONT, false, false);
+    let em = h / noshape_sketch::text::ASCENT_PER_EM;
+    let width = run.width * h + 40.0 / 2048.0 * em;
+    assert!((width - 105.95).abs() < 0.05, "the run {width} mm");
+}

@@ -2506,21 +2506,21 @@ impl<'a> Translator<'a> {
             }
             name.push(c);
         }
-        // Ours takes the box's height, the font's ascender line; Onshape's
-        // `ascent` is 0.72 of the font size (cf-fix-pcb's and cf-straight-
-        // spline's Open Sans: their glyphs live's to 1e-4). Its baseline
-        // vector is the advances plus ~40 font units (39-40 of 2048 in all
-        // three), so only without an ascent is the height what lays the text
-        // out that wide.
+        // The box's height is Onshape's `ascent` (0.72 of the font size).
+        // Its baseline vector is the advances plus ~40 font units (39-40 of
+        // 2048 in cf-fix-pcb's and cf-straight-spline's Open Sans), so only
+        // without an ascent is the height what lays the text out that wide.
         let text = param("text").as_str().unwrap_or("").to_string();
         let font = if name.is_empty() { noshape_sketch::text::SKETCH_DEFAULT_FONT.to_string() } else { name.clone() };
         let (bold, italic) = (style.contains("Bold"), style.contains("Italic"));
-        let advance = noshape_sketch::text::layout_text(&text, &font, bold, italic).width;
+        let advance = noshape_sketch::text::layout_sketch_text(&text, &font, bold, italic).width;
         let live_width = dx.hypot(dy);
-        let height = match noshape_sketch::text::ascender_per_em(&font, bold, italic) {
-            Some(a) if ascent > 1e-12 => ascent / 0.72 * a,
-            _ if advance > 1e-9 && live_width > 1e-9 => live_width / advance,
-            _ => ascent / 0.72 * 1.069,
+        let height = if ascent > 1e-12 {
+            ascent
+        } else if advance > 1e-9 && live_width > 1e-9 {
+            live_width / advance
+        } else {
+            0.0
         };
         let mut args = json!({ "sketch": id, "text": text, "corner": [mm(start[0]), mm(start[1])], "height": mm(height),
             "bold": style.contains("Bold"), "italic": style.contains("Italic"), "flip_horizontal": param("mirrorHorizontal") == true, "flip_vertical": param("mirrorVertical") == true });
