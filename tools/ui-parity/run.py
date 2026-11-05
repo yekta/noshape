@@ -147,6 +147,10 @@ def normalize_live(state):
         hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
         lst["rows"] = [r for r in rows if r not in CLOUD_ONLY]
         lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
+        # A row fewer, the menu sits elsewhere when it has to move to fit (live's flipped up under the still pointer,
+        # ours fitted below it: face-rclick-menu): which row the pointer is over isn't compared then.
+        if len(lst["rows"]) != len(rows):
+            lst["moved"] = True
     return state
 
 
@@ -194,6 +198,14 @@ def placed_alike(a, b):
                 y["transform"] = ta
 
 
+def cloud_menu(a, b):
+    """A menu that lost live's cloud-only rows ([`normalize_live`]): the row under a pointer that didn't move isn't
+    compared (the shorter menu may fit where live's had to move under the pointer)."""
+    la, lb = (a or {}).get("list"), (b or {}).get("list")
+    if isinstance(la, dict) and la.pop("moved", False) and isinstance(lb, dict):
+        lb["highlighted"] = la.get("highlighted")
+
+
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
     pairs = [("start", live.get("start"), ours.get("start"))]
@@ -211,6 +223,7 @@ def compare(live, ours):
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
         drawn_sizes(a, b)
         placed_alike(a, b)
+        cloud_menu(a, b)
         d = first_difference(a, b)
         if d is None:
             matched += 1

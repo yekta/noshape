@@ -183,7 +183,9 @@ line's or circle's length in the sketch value box, or its dimension before a val
 10 %: each side's pointer is at whole pixels, so the same `sketch_point` steps draw lengths a pixel or two apart (a
 10 mm circle is 9.53 mm in live). An assembly instance's transform (the `assembly` key) is equal within 0.5 mm and
 0.002 per rotation entry, for the same reason after a drag; the instances are compared by name (live's REST order
-isn't the list's). Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>".
+isn't the list's). Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
+menus lose the rows of cloud features noshape leaves out ("Add comment"); a menu that lost one is a row shorter, so it
+may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
 ## noshape side
 

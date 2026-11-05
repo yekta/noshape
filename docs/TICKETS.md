@@ -552,6 +552,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P3 SKETCH-LINE-ON-PLANE-TRACE (skasm; psui's interaction run 11-05 20:22) ui-parity `revolve-dialog-axis` step 8:
+  in a Front sketch a Line from the origin straight up to (0, 20) gets two COINCIDENT and no VERTICAL in live (its
+  end apparently coincident with the Right plane seen edge-on, which makes Vertical redundant); ours makes one
+  COINCIDENT and a VERTICAL. What the second coincident joins is asked (live REQUESTS 20:22 (2)); the only differing
+  state of the run's 288 Part Studio scenarios that is ours to fix.
 - [ ] P2 UPDATE-HELPER-LINUX-PARITY (lead; the same-app rule) the update helper behaves differently on Linux than the Windows one
   after 8b5fcd9c: (1) **no update-helper.log on Linux** — update-helper.sh logs only when NOSHAPE_UPDATE_LOG is set (the test
   harness's), so a real update leaves nothing beside the download (Windows: always logs there); (2) **other noshape copies are not
