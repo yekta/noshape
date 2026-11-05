@@ -366,6 +366,18 @@ fn compile_with(path: Arc<str>, src: &str, resolver: &dyn Resolver, loading: &mu
 /// recompiled module replaces its own).
 static OPERATORS: LazyLock<parking_lot::RwLock<Operators>> = LazyLock::new(Default::default);
 
+/// Changes whenever operator or exported overloads do: what an interpreter's resolved calls were found among.
+static OVERLOADS_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// The overload registries' generation (read without a lock: interpreters check it per call).
+pub fn overloads_generation() -> u64 {
+    OVERLOADS_GENERATION.load(std::sync::atomic::Ordering::Acquire)
+}
+
+fn bump_overloads_generation() {
+    OVERLOADS_GENERATION.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+}
+
 #[derive(Default)]
 struct Operators {
     by_module: HashMap<Arc<str>, Versions>,
@@ -400,6 +412,7 @@ fn register_operators(module: &Arc<str>, version: u32, decls: Vec<Arc<FnDecl>>) 
         }
     }
     ops.sets = sets.into_iter().map(|(k, fns)| (k, Arc::new(OverloadSet { name: k.into(), fns }))).collect();
+    bump_overloads_generation();
 }
 
 /// Exported functions are overloads of every same-named function, whichever
@@ -432,6 +445,7 @@ fn register_exports(module: &Arc<str>, version: u32, decls: Vec<Arc<FnDecl>>) {
     }
     ex.by_name = by_name.into_iter().map(|(k, v)| (k, Arc::new(v))).collect();
     ex.generation += 1;
+    bump_overloads_generation();
 }
 
 /// Exported functions named `name` of every loaded module, and the
@@ -957,7 +971,7 @@ impl Cx<'_> {
                 loop {
                     match &*root.kind {
                         ExprKind::Member(b, k, _) => {
-                            path.push(Acc::Member(Value::str(k.clone())));
+                            path.push(Acc::Member(Value::key(k)));
                             root = b;
                         }
                         ExprKind::Index(b, i, _) => {
@@ -1143,7 +1157,7 @@ impl Cx<'_> {
 
     fn map_key(&mut self, k: &MapKey) -> Ex {
         match k {
-            MapKey::Str(s) => lit(Pos::default(), Value::str(s.clone())),
+            MapKey::Str(s) => lit(Pos::default(), Value::key(s)),
             MapKey::Expr(e) => self.expr(e),
         }
     }
@@ -1152,7 +1166,7 @@ impl Cx<'_> {
         let pos = e.pos;
         let k = match &*e.kind {
             ExprKind::Number(n) => ExK::Lit(Value::num(*n)),
-            ExprKind::Str(s) => ExK::Lit(Value::str(s.clone())),
+            ExprKind::Str(s) => ExK::Lit(Value::key(s)),
             ExprKind::Bool(b) => ExK::Lit(Value::bool(*b)),
             ExprKind::Undefined => ExK::Lit(Value::Undefined),
             ExprKind::Ident(q) => {
@@ -1229,7 +1243,7 @@ impl Cx<'_> {
                 ExK::Call(callee, a)
             }
             ExprKind::Index(b, i, safe) => ExK::Index(Box::new(self.expr(b)), Box::new(self.expr(i)), *safe),
-            ExprKind::Member(b, k, safe) => ExK::Member(Box::new(self.expr(b)), Value::str(k.clone()), *safe),
+            ExprKind::Member(b, k, safe) => ExK::Member(Box::new(self.expr(b)), Value::key(k), *safe),
             ExprKind::BoxGet(b, safe) => ExK::BoxGet(Box::new(self.expr(b)), *safe),
             ExprKind::Lambda(def) => {
                 let (f, outer) = self.function(def, FnKind::Lambda, None, None);

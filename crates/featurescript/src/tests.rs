@@ -491,7 +491,7 @@ fn std_unit_and_vector_operators_answer_as_their_bodies() {
         "vector(1, 2, 3) * meter", "meter * vector(1, 2, 3)", "vector(1, 2) * meter + vector(3, 4) * meter",
         "vector(1, 2) * meter - vector(3, 4) * inch", "-(vector(1, 2) * meter)", "vector(1, 2) * meter / 2",
         "vector(1, 2) / 2", "2 * vector(1, 2)", "vector(1, 2) + vector(1, 2, 3)", "vector(1, 2) * meter + vector(1, 2)",
-        "vector(1, 2) * vector(3, 4)", "vector(1, 2) * meter * meter", "vector(1, 2) * meter / meter", "meter ^ 2",
+        "vector(1, 2) * vector(3, 4)", "vector(1, 2) * meter * meter", "vector(1, meter)", "vector('a', 2, [3])", "vector([1, 2])", "vector(1, 2) * meter / meter", "meter ^ 2",
         "squaredNorm(vector(3, 4) * meter)", "norm(vector(3, 4) * meter) == 5 * meter", "(vector(1, 2) as Vector) * (meter / second)",
         "isLength(meter)", "isLength(inch)", "isLength(1)", "isLength(meter * meter)", "isLength(degree)",
         "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } } as ValueWithUnits)", "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } })",
@@ -511,6 +511,24 @@ fn std_unit_and_vector_operators_answer_as_their_bodies() {
         crate::std_ops::OFF.with(|o| o.set(false));
         assert_eq!(message(native), message(body), "{c}");
     }
+    // Operands held by locals stay as they were (answers reuse only temporaries' maps and arrays); a vector whose
+    // second element has no answer gets std's error from untouched operands.
+    let bodies = [
+        "const a = vector(1, 2) * meter; const b = a + vector(3, 4) * meter; const c = vector(5, 6) * meter - a; return [a, b, c, -a, a * 2, 2 * a, a / 2, a, b];",
+        "var a = meter; const b = a + 2 * meter; const c = 3 * meter + a; a = -a; return [a, b, c, a * 4, a / 2];",
+        "const n = vector(1, 0, 0); const o = 2 * meter; return [o * n, n * o, n, o, vector(1, 2, 3) * meter + o * n];",
+        "return ([meter, 2] as Vector) + ([meter, inch] as Vector);",
+        "const a = [meter, inch] as Vector; const b = ([2 * meter, 1] as Vector) + a; return [a, b];",
+    ];
+    for b in bodies {
+        let src = format!("function f() {{ {b} }}");
+        let native = run_str(&src);
+        crate::std_ops::OFF.with(|o| o.set(true));
+        let body = run_str(&src);
+        crate::std_ops::OFF.with(|o| o.set(false));
+        assert_eq!(native.starts_with("ERROR"), b.contains("as Vector)"), "{b}: {native}");
+        assert_eq!(message(native), message(body), "{b}");
+    }
 }
 
 
@@ -521,7 +539,7 @@ fn natively_answered_std_texts_are_3095s_from_since() {
     let ops = |src: &str, file: &str| -> Vec<String> {
         let heads: &[&str] = match file {
             "units.fs" => &["export operator", "export predicate isLength(val)", "export function reciprocal(", "export function unitProduct(", "export const LENGTH_UNITS"],
-            "vector.fs" => &["export operator", "export predicate isLengthVector(", "export predicate is3dLengthVector("],
+            "vector.fs" => &["export operator", "export predicate isLengthVector(", "export predicate is3dLengthVector(", "export function vector(x, y)", "export function vector(x, y, z)"],
             _ => &["export predicate canBeControlPointMatrix("],
         };
         let mut out = Vec::new();
@@ -543,5 +561,149 @@ fn natively_answered_std_texts_are_3095s_from_since() {
             let differ: Vec<&String> = now.iter().filter(|x| !theirs.contains(x) && !x.starts_with("export operator^")).collect();
             assert!(differ.is_empty(), "std {v} {file}: {:?}", differ.iter().map(|d| d.lines().next().unwrap_or("")).collect::<Vec<_>>());
         }
+    }
+}
+
+/// The interpreter's speed on a heavy community feature's own FeatureScript: the Displacement map's loops over an
+/// image at NOSHAPE_FS_BENCH_N² (default 1024², a million samples; tests/fs/displacement_map.fs) on planes made as
+/// the host makes evFaceTangentPlanes' (lead 11-05: the script's own part under 1 s at 1024²). Each step's time.
+#[test]
+#[ignore = "T2: timing, ~10 s"]
+fn displacement_map_loops_timing() {
+    use crate::value::{Map, Tag, UNIT_KEY, VALUE_KEY, tag_of_key};
+    use std::sync::Arc;
+    let n: usize = std::env::var("NOSHAPE_FS_BENCH_N").ok().and_then(|s| s.parse().ok()).unwrap_or(1024);
+    let src = r#"FeatureScript 3044;
+import(path : "onshape/std/common.fs", version : "3044.0");
+function remap(value is number, fromLow is number, fromHigh is number, toLow is number, toHigh is number) returns number
+{
+    return toLow + (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow);
+}
+function check(table is array)
+{
+    for (var row in table)
+    {
+        if (size(row) != size(table[0]))
+            throw regenError("Every row of the CSV file needs the same number of values.", ["imageTable"]);
+        for (var item in row)
+        {
+            if (!(item is number))
+                throw regenError("The CSV file must hold only pixel values (0 to 255).", ["imageTable"]);
+        }
+    }
+    return table;
+}
+function parameters(rowCount is number, columnCount is number)
+{
+    var parameters = [];
+    for (var i = 0; i < rowCount; i += 1)
+    {
+        for (var j = 0; j < columnCount; j += 1)
+        {
+            parameters = append(parameters, vector(i / (rowCount - 1), j / (columnCount - 1)));
+        }
+    }
+    return parameters;
+}
+function preconditionLoop(parameters is array)
+{
+    for (var uv in parameters)
+    {
+        uv is Vector || uv is MeshFaceParameter;
+        @size(uv) == 2;
+    }
+    return true;
+}
+function points(table is array, planes is array)
+{
+    const definition = { "blackValue" : 0 * meter, "whiteValue" : 1 * millimeter };
+    const columnCount = size(table[0]);
+    var pointsTable = [];
+    for (var i, row in table)
+    {
+        var pointRow = [];
+        for (var j, item in row)
+        {
+            const plane = planes[i * columnCount + j];
+            const offset = remap(item, 0, 255, definition.blackValue / meter, definition.whiteValue / meter) * meter;
+            pointRow = append(pointRow, plane.origin + offset * plane.normal);
+        }
+        pointsTable = append(pointsTable, pointRow);
+    }
+    return pointsTable;
+}
+"#;
+    let m = compile_module(&unique_path(), src, &NoImports).unwrap_or_else(|e| panic!("{}", e.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")));
+    let tag = |k: &str| tag_of_key(k).unwrap_or(Tag::NONE);
+    let (vwu, spec, vector, plane) = (tag("onshape/std/units.fs#ValueWithUnits"), tag("onshape/std/units.fs#UnitSpec"), tag("onshape/std/vector.fs#Vector"), tag("onshape/std/surfaceGeometry.fs#Plane"));
+    let meter = Value::Map(Arc::new(Map::from([(Value::key("meter"), Value::num(1.0))])), spec);
+    let length = |x: f64| Value::Map(Arc::new(Map::from([(UNIT_KEY.clone(), meter.clone()), (VALUE_KEY.clone(), Value::num(x))])), vwu);
+    let keys = ["origin", "normal", "x"].map(Value::key);
+    let planes: Vec<Value> = (0..n * n)
+        .map(|k| {
+            let (u, v) = ((k / n) as f64 / n as f64, (k % n) as f64 / n as f64);
+            let (s, c) = (u * std::f64::consts::TAU).sin_cos();
+            let origin = Value::Array(Arc::new(vec![length(0.025 * c), length(0.025 * s), length(0.06 * v)]), vector);
+            let normal = Value::Array(Arc::new(vec![Value::num(c), Value::num(s), Value::num(0.0)]), vector);
+            let x = Value::Array(Arc::new(vec![Value::num(-s), Value::num(c), Value::num(0.0)]), vector);
+            Value::Map(Arc::new(Map::from([(keys[0].clone(), origin), (keys[1].clone(), normal), (keys[2].clone(), x)])), plane)
+        })
+        .collect();
+    let table = Value::array((0..n).map(|i| Value::array((0..n).map(|j| Value::num(((i * 7 + j * 13) % 256) as f64)).collect())).collect());
+    let mut interp = Interp::new();
+    let mut step = |name: &str, args: Vec<Value>| -> Value {
+        let f = m.functions(name).expect(name);
+        let t = std::time::Instant::now();
+        let r = interp.call_set(&f, args).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
+        println!("{name}: {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+        r
+    };
+    let t = std::time::Instant::now();
+    step("check", vec![table.clone()]);
+    let params = step("parameters", vec![Value::num(n as f64), Value::num(n as f64)]);
+    // (The values passed stay held here: the frames don't hand them to the freeing thread mid-measure.)
+    step("preconditionLoop", vec![params.clone()]);
+    let planes = Value::array(planes);
+    let pts = step("points", vec![table.clone(), planes.clone()]);
+    println!("loops at {n}²: {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
+    assert_eq!(pts.as_array().map(|r| r.len()), Some(n));
+}
+
+/// What one step of a loop costs (ns per iteration over a million): the loop itself, arithmetic, a call, an append,
+/// unit and vector arithmetic, a member read (NOSHAPE_FS_BENCH_N iterations, default 1M).
+#[test]
+#[ignore = "T2: timing, ~5 s"]
+fn interpreter_step_costs() {
+    let n: usize = std::env::var("NOSHAPE_FS_BENCH_N").ok().and_then(|s| s.parse().ok()).unwrap_or(1_000_000);
+    let steps = [
+        ("loop", ""),
+        ("number arithmetic", "x = i * 2 + 1;"),
+        ("call", "x = id(i);"),
+        ("call of five", "x = five(i, 0, 255, 0, 1);"),
+        ("append", "a = append(a, i);"),
+        ("length * number", "x = m * 2;"),
+        ("length / length", "x = m / m;"),
+        ("vector(x, y)", "x = vector(i, 1);"),
+        ("vector * length", "x = n * m;"),
+        ("length vector + length vector", "x = p + q;"),
+        ("member", "x = pl.origin;"),
+        ("index", "x = arr[2];"),
+    ];
+    let mut src = String::from("FeatureScript 3044;\nimport(path : \"onshape/std/common.fs\", version : \"3044.0\");\nfunction id(v) { return v; }\nfunction five(a is number, b is number, c is number, d is number, e is number) returns number { return a; }\n");
+    for (k, (_, body)) in steps.iter().enumerate() {
+        src += &format!("function s{k}(n is number) {{ var x; var a = []; const m = 2 * meter; const p = vector(1, 2, 3) * meter; const q = vector(3, 2, 1) * meter; const pl = plane(p, vector(0, 0, 1)); const arr = [1, 2, 3]; for (var i = 0; i < n; i += 1) {{ {body} }} return x; }}\n");
+    }
+    let m = compile_module(&unique_path(), &src, &NoImports).unwrap_or_else(|e| panic!("{}", e.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")));
+    let mut interp = Interp::new();
+    let mut base = 0.0;
+    for (k, (name, _)) in steps.iter().enumerate() {
+        let f = m.functions(&format!("s{k}")).expect("step");
+        let t = std::time::Instant::now();
+        interp.call_set(&f, vec![Value::num(n as f64)]).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
+        let ns = t.elapsed().as_secs_f64() * 1e9 / n as f64;
+        if k == 0 {
+            base = ns;
+        }
+        println!("{name}: {ns:.0} ns ({:.0} over the loop)", ns - base);
     }
 }

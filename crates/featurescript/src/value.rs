@@ -94,8 +94,21 @@ pub fn same_declaration(a: Tag, b: Tag) -> bool {
 /// The tag of a type declaration (`onshape/std/units.fs#ValueWithUnits`) once a module declared it (not an enum's:
 /// those get one per member list).
 /// A ValueWithUnits' keys, made once (looked up and inserted per arithmetic operation).
-pub static VALUE_KEY: LazyLock<Value> = LazyLock::new(|| Value::str("value"));
-pub static UNIT_KEY: LazyLock<Value> = LazyLock::new(|| Value::str("unit"));
+pub static VALUE_KEY: LazyLock<Value> = LazyLock::new(|| Value::key("value"));
+pub static UNIT_KEY: LazyLock<Value> = LazyLock::new(|| Value::key("unit"));
+
+/// One shared allocation per string programs name (their literals and member keys, std's and the host's keys): map
+/// lookups find such keys by address before comparing text ([`Map`]).
+pub fn interned(s: &str) -> Arc<str> {
+    static TABLE: LazyLock<Mutex<std::collections::HashSet<Arc<str>>>> = LazyLock::new(Default::default);
+    let mut t = TABLE.lock();
+    if let Some(a) = t.get(s) {
+        return a.clone();
+    }
+    let a: Arc<str> = s.into();
+    t.insert(a.clone());
+    a
+}
 
 pub fn tag_of_key(key: &str) -> Option<Tag> {
     REGISTRY.read().by_key.get(key).and_then(|t| t.first().copied())
@@ -103,6 +116,30 @@ pub fn tag_of_key(key: &str) -> Option<Tag> {
 
 pub fn type_info(tag: Tag) -> Arc<TypeInfo> {
     REGISTRY.read().types[tag.0 as usize - 1].clone()
+}
+
+/// Whether `tag` is an enum's (kept per thread: `as` asks it per value, the registry's lock each time cost a call).
+pub fn is_enum_tag(tag: Tag) -> bool {
+    thread_local! {
+        /// By tag: 0 not known yet, 1 an enum, 2 another type.
+        static KNOWN: std::cell::RefCell<Vec<u8>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    if tag.is_none() {
+        return false;
+    }
+    let i = tag.0 as usize;
+    if let Some(k) = KNOWN.with(|k| k.borrow().get(i).copied()).filter(|k| *k != 0) {
+        return k == 1;
+    }
+    let is_enum = type_info(tag).is_enum;
+    KNOWN.with(|k| {
+        let mut k = k.borrow_mut();
+        if k.len() <= i {
+            k.resize(i + 1, 0);
+        }
+        k[i] = if is_enum { 1 } else { 2 };
+    });
+    is_enum
 }
 
 pub fn tag_name(tag: Tag) -> Arc<str> {
@@ -360,6 +397,14 @@ impl Value {
     pub fn str(s: impl Into<Arc<str>>) -> Value {
         Value::Str(s.into(), Tag::NONE)
     }
+    /// A string a program or the host names as a key ([`interned`]).
+    pub fn key(s: &str) -> Value {
+        Value::Str(interned(s), Tag::NONE)
+    }
+    /// The same string by address (an [`interned`] key): equal without comparing text.
+    pub fn same_str(&self, other: &Value) -> bool {
+        matches!((self, other), (Value::Str(a, ta), Value::Str(b, tb)) if ta == tb && Arc::ptr_eq(a, b))
+    }
     pub fn array(v: Vec<Value>) -> Value {
         Value::Array(Arc::new(v), Tag::NONE)
     }
@@ -464,7 +509,7 @@ impl Value {
         match self {
             Value::Map(m, _) => {
                 note_key_read(m, key);
-                m.get(&Value::Str(key.into(), Tag::NONE)).unwrap_or(&UNDEF)
+                m.get_str(key).unwrap_or(&UNDEF)
             }
             _ => &UNDEF,
         }
@@ -515,7 +560,7 @@ impl Ord for Value {
             (Value::Bool(a, _), Value::Bool(b, _)) => a.cmp(b),
             (Value::Number(a, _), Value::Number(b, _)) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
             (Value::Enum(_, a), Value::Enum(_, b)) => a.cmp(b),
-            (Value::Str(a, _), Value::Str(b, _)) => a.cmp(b),
+            (Value::Str(a, _), Value::Str(b, _)) => if Arc::ptr_eq(a, b) { Ordering::Equal } else { a.cmp(b) },
             (Value::Enum(t, o), Value::Str(b, _)) => (*enum_name(*t, *o)).cmp(&**b),
             (Value::Str(a, _), Value::Enum(t, o)) => (**a).cmp(&*enum_name(*t, *o)),
             (Value::Array(a, _), Value::Array(b, _)) => {

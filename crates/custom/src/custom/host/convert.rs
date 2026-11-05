@@ -8,11 +8,30 @@ use glam::{DMat3, DMat4, DVec2, DVec3};
 use noshape_featurescript::interp::{Interp, R};
 use noshape_featurescript::value::{Map, Tag, UNIT_KEY, VALUE_KEY, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+
+/// `std_tag(module, name)`, kept once std has it (a plane's or a point's values ask per coordinate).
+fn kept_tag(cell: &'static OnceLock<Tag>, module: &str, name: &str) -> Tag {
+    if let Some(t) = cell.get() {
+        return *t;
+    }
+    let t = std_tag(module, name);
+    if !t.is_none() {
+        let _ = cell.set(t);
+    }
+    t
+}
 
 fn unit_spec(entries: &[(&str, f64)]) -> Value {
-    // One unit to a power (a length, an angle): made once, shared.
+    // One unit to a power (a length, an angle): made once, shared; a meter without a lookup.
     static ONE: std::sync::LazyLock<parking_lot::RwLock<HashMap<String, HashMap<u64, Value>>>> = std::sync::LazyLock::new(Default::default);
+    static METER: OnceLock<Value> = OnceLock::new();
+    if let [(n, p)] = entries
+        && (*n, *p) == ("meter", 1.0)
+        && let Some(v) = METER.get()
+    {
+        return v.clone();
+    }
     if let [(name, power)] = entries
         && let Some(v) = ONE.read().get(*name).and_then(|m| m.get(&power.to_bits()))
     {
@@ -23,6 +42,9 @@ fn unit_spec(entries: &[(&str, f64)]) -> Value {
         && !v.tag().is_none()
     {
         ONE.write().entry(name.to_string()).or_default().insert(power.to_bits(), v.clone());
+        if (*name, *power) == ("meter", 1.0) {
+            let _ = METER.set(v.clone());
+        }
     }
     v
 }
@@ -30,16 +52,18 @@ fn unit_spec(entries: &[(&str, f64)]) -> Value {
 fn unit_map(entries: &[(&str, f64)]) -> Value {
     let mut m = Map::new();
     for (k, v) in entries {
-        m.insert(Value::str(*k), Value::num(*v));
+        m.insert(Value::key(k), Value::num(*v));
     }
-    Value::Map(Arc::new(m), std_tag("units.fs", "UnitSpec"))
+    static TAG: OnceLock<Tag> = OnceLock::new();
+    Value::Map(Arc::new(m), kept_tag(&TAG, "units.fs", "UnitSpec"))
 }
 
 fn with_units(x: f64, unit: &[(&str, f64)]) -> Value {
     let mut m = Map::new();
     m.insert(UNIT_KEY.clone(), unit_spec(unit));
     m.insert(VALUE_KEY.clone(), Value::num(x));
-    Value::Map(Arc::new(m), std_tag("units.fs", "ValueWithUnits"))
+    static TAG: OnceLock<Tag> = OnceLock::new();
+    Value::Map(Arc::new(m), kept_tag(&TAG, "units.fs", "ValueWithUnits"))
 }
 
 pub fn length_value(x: f64) -> Value {
@@ -114,7 +138,8 @@ pub fn vec2_of(v: &Value) -> Option<DVec2> {
 }
 
 fn vector_tag() -> Tag {
-    std_tag("vector.fs", "Vector")
+    static TAG: OnceLock<Tag> = OnceLock::new();
+    kept_tag(&TAG, "vector.fs", "Vector")
 }
 
 /// Kernel results carry -0.0 where Onshape's have 0 (it prints a face normal
@@ -148,8 +173,14 @@ pub fn point2_value(p: DVec2) -> Value {
 }
 
 pub fn plane_value(f: &PlaneFrame) -> Value {
-    let m = Value::map_from([("origin", point_value(f.origin)), ("normal", dir_value(f.normal)), ("x", dir_value(f.x))]);
-    m.with_tag(std_tag("surfaceGeometry.fs", "Plane"))
+    // (Its keys made once: a Displacement map asks for a million planes.)
+    static KEYS: std::sync::LazyLock<[Value; 3]> = std::sync::LazyLock::new(|| ["origin", "normal", "x"].map(Value::key));
+    static TAG: OnceLock<Tag> = OnceLock::new();
+    let mut m = Map::new();
+    m.insert(KEYS[0].clone(), point_value(f.origin));
+    m.insert(KEYS[1].clone(), dir_value(f.normal));
+    m.insert(KEYS[2].clone(), dir_value(f.x));
+    Value::Map(Arc::new(m), kept_tag(&TAG, "surfaceGeometry.fs", "Plane"))
 }
 
 pub fn plane_of(v: &Value) -> Option<PlaneFrame> {

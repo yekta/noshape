@@ -180,6 +180,11 @@ pub struct Interp {
     /// Overload sets merged with the loaded modules' exported overloads,
     /// by set address: (registry generation, candidates).
     merged: HashMap<usize, (u64, Candidates)>,
+    /// Calls resolved by overload set and argument types ([`Interp::resolve_cached`]), and the operators' overload
+    /// sets: both found again when the registries change ([`crate::compile::overloads_generation`]).
+    resolved: HashMap<ResolveKey, Resolved, ahash::RandomState>,
+    operator_sets: [Option<Option<Arc<OverloadSet>>>; OPERATORS.len()],
+    overloads_generation: u64,
     /// The `@native` being called (its errors read "@evPlane: ...").
     pub native_name: Name,
     /// The predicate statement that evaluated to false: (position, text).
@@ -201,6 +206,38 @@ pub struct LineProfile {
 
 /// The overloads a call chooses from.
 type Candidates = Arc<Vec<Arc<FnDecl>>>;
+
+/// The operators with overloads, as [`Interp::operator_set`] indexes them.
+const OPERATORS: [&str; 7] = ["operator+", "operator-", "operator*", "operator/", "operator%", "operator^", "operator<"];
+
+/// A call's overload set (its address), whether it is an operator's try ([`Interp::try_overload`]), and its
+/// arguments' types ([`signature`]).
+type ResolveKey = (usize, bool, [u32; 6], u8);
+
+/// A resolved call: the overload (none: an operator's overloads don't apply) and the std operator it is. The set is
+/// kept so its address isn't reused while it keys this.
+struct Resolved {
+    _set: Arc<OverloadSet>,
+    decl: Option<Arc<FnDecl>>,
+    op: Option<crate::std_ops::Op>,
+}
+
+/// What overload resolution reads of the arguments ([`TypeRef::matches`]): each one's standard type, tag and whether
+/// it is an enum member; `None` past six arguments or tags.
+fn signature(args: &[Value]) -> Option<([u32; 6], u8)> {
+    if args.len() > 6 {
+        return None;
+    }
+    let mut sig = [0u32; 6];
+    for (s, a) in sig.iter_mut().zip(args) {
+        let t = a.tag().0;
+        if t >= 1 << 27 {
+            return None;
+        }
+        *s = u32::from(matches!(a, Value::Enum(..))) << 31 | (a.std_type() as u32) << 27 | t;
+    }
+    Some((sig, args.len() as u8))
+}
 
 impl Default for Interp {
     fn default() -> Self {
@@ -230,6 +267,9 @@ impl Interp {
             output: String::new(),
             host: None,
             merged: HashMap::new(),
+            resolved: HashMap::default(),
+            operator_sets: Default::default(),
+            overloads_generation: crate::compile::overloads_generation(),
             native_name: "".into(),
             failed_check: None,
             profile: None,
@@ -467,15 +507,54 @@ impl Interp {
     }
 
     /// Call the best overload of `set` for `args`.
-    pub fn call_set(&mut self, set: &Arc<OverloadSet>, args: Vec<Value>) -> R<Value> {
-        let decl = self.resolve(set, &args)?;
-        if let Some(v) = crate::std_ops::native(&decl, &args) {
+    pub fn call_set(&mut self, set: &Arc<OverloadSet>, mut args: Vec<Value>) -> R<Value> {
+        let (decl, op) = self.resolve_cached(set, &args)?;
+        if let Some(op) = op
+            && let Some(v) = crate::std_ops::apply(op, &decl, &mut args)
+        {
             return Ok(v);
         }
-        let Some(c) = decl.compiled.get().cloned() else {
+        let Some(c) = decl.compiled.get() else {
             return Err(self.error(format!("Function {} is not compiled", set.name)));
         };
-        self.invoke(&c, args, &[], false)
+        self.invoke(c, args, &[], false)
+    }
+
+    /// Call the best overload of `set` for the arguments on the stack from `base`.
+    fn call_set_at(&mut self, set: &Arc<OverloadSet>, base: usize) -> R<Value> {
+        let (decl, op) = match self.resolve_cached_at(set, base) {
+            Ok(found) => found,
+            Err(e) => {
+                self.discard_from(base);
+                return Err(e);
+            }
+        };
+        if let Some(op) = op
+            && let Some(v) = crate::std_ops::apply(op, &decl, &mut self.stack[base..])
+        {
+            self.stack.truncate(base);
+            return Ok(v);
+        }
+        let Some(c) = decl.compiled.get() else {
+            self.discard_from(base);
+            return Err(self.error(format!("Function {} is not compiled", set.name)));
+        };
+        self.invoke_at(c, base)
+    }
+
+    /// [`Interp::resolve_cached`] for the arguments on the stack from `base` (left there).
+    fn resolve_cached_at(&mut self, set: &Arc<OverloadSet>, base: usize) -> R<(Arc<FnDecl>, Option<crate::std_ops::Op>)> {
+        self.check_generation();
+        let key = signature(&self.stack[base..]).map(|(sig, n)| (Arc::as_ptr(set) as usize, false, sig, n));
+        if let Some(r) = key.and_then(|k| self.resolved.get(&k))
+            && let Some(d) = &r.decl
+        {
+            return Ok((d.clone(), r.op));
+        }
+        let args = self.stack.split_off(base);
+        let r = self.resolve_cached(set, &args);
+        self.stack.extend(args);
+        r
     }
 
     /// `x = append(x, v)`, `x = concatenateArrays(x, y)` (std's) and `x = @resize(x, n, v)` on an array grow x in place:
@@ -511,7 +590,7 @@ impl Interp {
         let idx = self.base + slot as usize;
         a[0] = self.stack[idx].clone();
         let decl = match callee {
-            Callee::Overloads(set) => Some(self.resolve(set, &a)?),
+            Callee::Overloads(set) => Some(self.resolve_cached(set, &a)?.0),
             _ => None,
         };
         let array = matches!(a[0], Value::Array(..));
@@ -546,10 +625,10 @@ impl Interp {
         }
         let r = match (decl, callee) {
             (Some(d), _) => {
-                let Some(c) = d.compiled.get().cloned() else {
+                let Some(c) = d.compiled.get() else {
                     return Err(self.error(format!("Function {} is not compiled", d.name)));
                 };
-                self.invoke(&c, a, &[], false)?
+                self.invoke(c, a, &[], false)?
             }
             (None, Callee::Native(n, name)) => {
                 let saved = std::mem::replace(&mut self.native_name, name.clone());
@@ -603,6 +682,40 @@ impl Interp {
         let all = Arc::new(all);
         self.merged.insert(key, (generation, all.clone()));
         all
+    }
+
+    /// The overload registries changed: what was resolved among them is found again.
+    fn check_generation(&mut self) {
+        let g = crate::compile::overloads_generation();
+        if g != self.overloads_generation {
+            self.overloads_generation = g;
+            self.resolved.clear();
+            self.operator_sets = Default::default();
+        }
+    }
+
+    /// [`Interp::resolve`], remembered for the arguments' types (all it reads of them), with the std operator the
+    /// overload is.
+    fn resolve_cached(&mut self, set: &Arc<OverloadSet>, args: &[Value]) -> R<(Arc<FnDecl>, Option<crate::std_ops::Op>)> {
+        self.check_generation();
+        let key = signature(args).map(|(sig, n)| (Arc::as_ptr(set) as usize, false, sig, n));
+        if let Some(r) = key.and_then(|k| self.resolved.get(&k))
+            && let Some(d) = &r.decl
+        {
+            return Ok((d.clone(), r.op));
+        }
+        let decl = self.resolve(set, args)?;
+        let op = crate::std_ops::classify(&decl);
+        if let Some(k) = key {
+            self.resolved.insert(k, Resolved { _set: set.clone(), decl: Some(decl.clone()), op });
+        }
+        Ok((decl, op))
+    }
+
+    /// Every loaded overload of operator `OPERATORS[i]`.
+    fn operator_set(&mut self, i: usize) -> Option<Arc<OverloadSet>> {
+        self.check_generation();
+        self.operator_sets[i].get_or_insert_with(|| crate::compile::operator_overloads(OPERATORS[i])).clone()
     }
 
     pub fn resolve(&mut self, set: &OverloadSet, args: &[Value]) -> R<Arc<FnDecl>> {
@@ -659,11 +772,38 @@ impl Interp {
                 }
             }
         }
-        let call_pos = self.pos;
         let base = self.stack.len();
-        self.stack.resize(base + f.frame_size as usize, Value::Undefined);
-        for (i, a) in args.into_iter().enumerate() {
-            self.stack[base + i] = a;
+        self.stack.extend(args);
+        self.enter(f, base, captures)
+    }
+
+    /// Run `f` on the arguments on the stack from `base` (a call's, evaluated there: no vector of them).
+    fn invoke_at(&mut self, f: &CompiledFn, base: usize) -> R<Value> {
+        if self.frames.len() >= MAX_DEPTH {
+            self.discard_from(base);
+            return Err(self.error("Maximum call stack depth exceeded."));
+        }
+        if let Err(e) = self.tick() {
+            self.discard_from(base);
+            return Err(e);
+        }
+        self.enter(f, base, &[])
+    }
+
+    /// The stack's values from `base` dropped (a call that didn't happen); once stopped, kept for the caller to free.
+    fn discard_from(&mut self, base: usize) {
+        match &mut self.stopped {
+            Some(dead) => dead.push(self.stack.split_off(base)),
+            None => self.stack.truncate(base),
+        }
+    }
+
+    /// `f`'s frame from `base`, its arguments there.
+    fn enter(&mut self, f: &CompiledFn, base: usize, captures: &[Value]) -> R<Value> {
+        let call_pos = self.pos;
+        let size = base + f.frame_size as usize;
+        if self.stack.len() < size {
+            self.stack.resize(size, Value::Undefined);
         }
         for (slot, v) in f.capture_slots.iter().zip(captures) {
             self.stack[base + *slot as usize] = v.clone();
@@ -790,6 +930,20 @@ impl Interp {
                     && let Some(r) = self.assign_grown(*slot, callee, args, value.pos)
                 {
                     return r;
+                }
+                // A local itself (`x = v`, `x += v`): its slot directly.
+                if path.is_empty() {
+                    let rhs = self.eval(value)?;
+                    self.pos = s.pos;
+                    let idx = self.base + *slot as usize;
+                    self.stack[idx] = match op {
+                        None => rhs,
+                        Some((o, ov)) => {
+                            let old = std::mem::take(&mut self.stack[idx]);
+                            self.binop(*o, old, rhs, ov.as_ref())?
+                        }
+                    };
+                    return Ok(Flow::Normal);
                 }
                 let mut keys = Vec::with_capacity(path.len());
                 for a in path {
@@ -1062,12 +1216,14 @@ impl Interp {
                     return Ok(Value::num(-n));
                 }
                 let _ = ov;
-                if !v.tag().is_none()
-                    && let Some(set) = crate::compile::operator_overloads("operator-")
-                    && let Some(r) = self.try_overload(&set, vec![v.clone()])?
+                let mut one = [v];
+                if !one[0].tag().is_none()
+                    && let Some(set) = self.operator_set(1)
+                    && let Some(r) = self.try_overload(&set, &mut one)?
                 {
                     return Ok(r);
                 }
+                let [v] = one;
                 match v {
                     Value::Number(n, _) => Ok(Value::num(-n)),
                     _ => Err(self.error("Operand for '-' was not a number.")),
@@ -1123,6 +1279,21 @@ impl Interp {
                 // position of their own (undefined functions) at the call.
                 if !matches!(callee, Callee::Missing(..)) {
                     self.pos = e.pos;
+                }
+                // A function's arguments onto the stack, where its frame starts.
+                if let Callee::Overloads(set) = callee {
+                    let base = self.stack.len();
+                    for x in args {
+                        match self.eval(x) {
+                            Ok(v) => self.stack.push(v),
+                            Err(err) => {
+                                self.discard_from(base);
+                                return Err(err);
+                            }
+                        }
+                    }
+                    self.pos = e.pos;
+                    return self.call_set_at(set, base);
                 }
                 let f = match callee {
                     Callee::Value(fx) => Some(self.eval(fx)?),
@@ -1240,21 +1411,21 @@ impl Interp {
                 Ok(v.with_tag(Tag::NONE))
             }
             TypeRef::Tag(tag) => {
-                let info = type_info(tag);
-                if info.is_enum {
-                    // Live: 'Type error: value "FOO" cannot be enum Shade'.
-                    let Some(s) = v.as_str() else {
-                        return Err(self.error(format!("Type error: value {} cannot be enum {}", crate::value::to_display_quoted(&v), info.name)));
-                    };
-                    return match info.ordinal(&s) {
-                        Some(o) => Ok(Value::Enum(tag, o)),
-                        None => Err(self.error(format!("Type error: value {} cannot be enum {}", crate::value::to_display_quoted(&v), info.name))),
+                if !crate::value::is_enum_tag(tag) {
+                    // std tags boxes (`new box(...) as Instantiator`).
+                    return match v.std_type() {
+                        StdType::Function => Err(self.error(format!("Cannot convert a value of type {} to {}", v.type_description(), type_info(tag).name))),
+                        _ => Ok(v.with_tag(tag)),
                     };
                 }
-                match v.std_type() {
-                    // std tags boxes (`new box(...) as Instantiator`).
-                    StdType::Function => Err(self.error(format!("Cannot convert a value of type {} to {}", v.type_description(), info.name))),
-                    _ => Ok(v.with_tag(tag)),
+                // Live: 'Type error: value "FOO" cannot be enum Shade'.
+                let info = type_info(tag);
+                let Some(s) = v.as_str() else {
+                    return Err(self.error(format!("Type error: value {} cannot be enum {}", crate::value::to_display_quoted(&v), info.name)));
+                };
+                match info.ordinal(&s) {
+                    Some(o) => Ok(Value::Enum(tag, o)),
+                    None => Err(self.error(format!("Type error: value {} cannot be enum {}", crate::value::to_display_quoted(&v), info.name))),
                 }
             }
         }
@@ -1262,18 +1433,38 @@ impl Interp {
 
     /// Call the best overload of an operator if one matches; `None` when no
     /// overload accepts the operands (the built-in operator applies).
-    fn try_overload(&mut self, set: &Arc<OverloadSet>, args: Vec<Value>) -> R<Option<Value>> {
-        if !set.fns.iter().any(|f| f.arity() == args.len() && Self::satisfies(&f.param_types, &args)) {
-            return Ok(None);
-        }
-        let decl = self.resolve(set, &args)?;
-        if let Some(v) = crate::std_ops::native(&decl, &args) {
+    /// `args` are taken only when an overload applies.
+    fn try_overload(&mut self, set: &Arc<OverloadSet>, args: &mut [Value]) -> R<Option<Value>> {
+        self.check_generation();
+        let key = signature(args).map(|(sig, n)| (Arc::as_ptr(set) as usize, true, sig, n));
+        let found = match key.and_then(|k| self.resolved.get(&k)) {
+            Some(r) => r.decl.clone().map(|d| (d, r.op)),
+            None => {
+                let found = match set.fns.iter().any(|f| f.arity() == args.len() && Self::satisfies(&f.param_types, args)) {
+                    true => {
+                        let d = self.resolve(set, args)?;
+                        let op = crate::std_ops::classify(&d);
+                        Some((d, op))
+                    }
+                    false => None,
+                };
+                if let Some(k) = key {
+                    self.resolved.insert(k, Resolved { _set: set.clone(), decl: found.as_ref().map(|f| f.0.clone()), op: found.as_ref().and_then(|f| f.1) });
+                }
+                found
+            }
+        };
+        let Some((decl, op)) = found else { return Ok(None) };
+        if let Some(op) = op
+            && let Some(v) = crate::std_ops::apply(op, &decl, args)
+        {
             return Ok(Some(v));
         }
-        let Some(c) = decl.compiled.get().cloned() else {
+        let Some(c) = decl.compiled.get() else {
             return Err(self.error(format!("Function {} is not compiled", set.name)));
         };
-        self.invoke(&c, args, &[], false).map(Some)
+        let args = args.iter_mut().map(std::mem::take).collect();
+        self.invoke(c, args, &[], false).map(Some)
     }
 
     /// A binary operator, with operator overloads for tagged operands.
@@ -1281,45 +1472,39 @@ impl Interp {
         if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&a, &b) {
             return self.num_op(op, *x, *y);
         }
-        let name = match op {
-            BinOp::Add => Some("operator+"),
-            BinOp::Sub => Some("operator-"),
-            BinOp::Mul => Some("operator*"),
-            BinOp::Div => Some("operator/"),
-            BinOp::Mod => Some("operator%"),
-            BinOp::Pow => Some("operator^"),
-            BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => Some("operator<"),
+        // (OPERATORS' index.)
+        let operator = match op {
+            BinOp::Add => Some(0),
+            BinOp::Sub => Some(1),
+            BinOp::Mul => Some(2),
+            BinOp::Div => Some(3),
+            BinOp::Mod => Some(4),
+            BinOp::Pow => Some(5),
+            BinOp::Lt | BinOp::Gt | BinOp::Le | BinOp::Ge => Some(6),
             _ => None,
         };
-        let global = if !a.tag().is_none() || !b.tag().is_none() { name.and_then(crate::compile::operator_overloads) } else { None };
+        let global = if !a.tag().is_none() || !b.tag().is_none() { operator.and_then(|i| self.operator_set(i)) } else { None };
+        // (The operands tried in place: taken only by an overload that applies.)
+        let mut pair = [a, b];
         if let Some(set) = global.as_ref() {
-            match op {
-                BinOp::Lt => {
-                    if let Some(r) = self.try_overload(set, vec![a.clone(), b.clone()])? {
-                        return Ok(r);
-                    }
-                }
-                BinOp::Gt => {
-                    if let Some(r) = self.try_overload(set, vec![b.clone(), a.clone()])? {
-                        return Ok(r);
-                    }
-                }
-                BinOp::Le | BinOp::Ge => {
-                    let args = if op == BinOp::Le { vec![b.clone(), a.clone()] } else { vec![a.clone(), b.clone()] };
-                    if let Some(r) = self.try_overload(set, args)? {
-                        return match r {
-                            Value::Bool(x, _) => Ok(Value::bool(!x)),
-                            other => Err(self.error(format!("operator< must return a boolean, returned {}", other.type_description()))),
-                        };
-                    }
-                }
-                _ => {
-                    if let Some(r) = self.try_overload(set, vec![a.clone(), b.clone()])? {
-                        return Ok(r);
-                    }
-                }
+            // operator< answers > and <= with the operands swapped, >= and <= negated.
+            let swapped = matches!(op, BinOp::Gt | BinOp::Le);
+            if swapped {
+                pair.swap(0, 1);
+            }
+            let r = self.try_overload(set, &mut pair)?;
+            if swapped {
+                pair.swap(0, 1);
+            }
+            if let Some(r) = r {
+                return match (op, r) {
+                    (BinOp::Le | BinOp::Ge, Value::Bool(x, _)) => Ok(Value::bool(!x)),
+                    (BinOp::Le | BinOp::Ge, other) => Err(self.error(format!("operator< must return a boolean, returned {}", other.type_description()))),
+                    (_, r) => Ok(r),
+                };
             }
         }
+        let [a, b] = pair;
         match op {
             BinOp::Eq => return Ok(Value::bool(a == b)),
             BinOp::Ne => return Ok(Value::bool(a != b)),
