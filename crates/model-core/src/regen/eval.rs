@@ -1510,9 +1510,14 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         // The entity each `out` segment ends with (a merged line's last).
         let mut last: Vec<u32> = Vec::new();
         let legacy = noshape_kernel::legacy_topology();
-        // Where two lines meet, no other curve of the sketch touches.
+        // Where two lines meet, no other curve of the sketch touches, but the lines between regions united into this one
+        // and lines over them (live qa5 SF2: two squares drawn side by side extrude to 6 faces).
+        let joined: Vec<noshape_sketch::Curve2> = region.joined.iter().filter_map(|&j| s.sketch.curve(j)).collect();
+        let inside = |e: noshape_sketch::EntityId| {
+            region.joined.contains(&e) || matches!(s.sketch.curve(e), Some(noshape_sketch::Curve2::Line { a, b }) if joined.iter().any(|j| j.distance(a) < 1e-9 && j.distance(b) < 1e-9))
+        };
         let alone = |p: DVec2, a: u32, b: u32| {
-            s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
+            s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b && !inside(e.id)).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
         };
         let joins = |a0: DVec2, b0: DVec2, a: DVec2, b: DVec2, e0: u32, e: u32| {
             let (d0, d) = ((b0 - a0).normalize_or_zero(), (b - a).normalize_or_zero());

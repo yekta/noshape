@@ -2581,7 +2581,6 @@ fn hole_and_rib_match_onshape() {
 /// qa5 SF2: two adjacent sketch regions extruded together are one part
 /// without a seam (live: 8000 mm³, 6 faces).
 #[test]
-#[ignore = "T2: oracle vs live (exact values, known-difference lists)"]
 fn adjacent_regions_extrude_without_a_seam() {
     let mut t = T::new();
     let (_, regions) = t.sketch(&[&[(0.0, 0.0), (20.0, 0.0), (20.0, 20.0), (0.0, 20.0)], &[(20.0, 0.0), (40.0, 0.0), (40.0, 20.0), (20.0, 20.0)]], &[]);

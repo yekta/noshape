@@ -316,6 +316,9 @@ pub struct Region {
     pub id: RegionId,
     pub outer: ProfileLoop,
     pub holes: Vec<ProfileLoop>,
+    /// Lines between touching regions that `union_touching` removed from inside this one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub joined: Vec<EntityId>,
 }
 
 impl Region {
@@ -807,7 +810,7 @@ impl Arrangement {
             }
             boundary.sort();
             boundary.dedup();
-            regions.push((Region { id: RegionId { boundary, ordinal: 0 }, outer, holes: hl }, DVec2::ZERO));
+            regions.push((Region { id: RegionId { boundary, ordinal: 0 }, outer, holes: hl, joined: Vec::new() }, DVec2::ZERO));
         }
         // Ordinals for identical boundary sets, by their outer boxes' centres
         // (worked out only for those).
@@ -1081,11 +1084,15 @@ pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
             continue;
         }
         let mut segs: Vec<(ProfileSegment, SegmentSource)> = Vec::new();
+        let mut joined: Vec<EntityId> = Vec::new();
         for &ri in &members {
+            joined.extend(regions[ri].joined.iter().copied());
             for (li, lp) in all[ri].iter().enumerate() {
                 for (si, (seg, src)) in lp.segments.iter().zip(&lp.sources).enumerate() {
                     if !dropped.contains(&(ri, li, si)) {
                         segs.push((seg.clone(), *src));
+                    } else if !joined.contains(&src.entity) {
+                        joined.push(src.entity);
                     }
                 }
             }
@@ -1097,7 +1104,7 @@ pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
         for &ri in &members {
             out[ri] = None;
         }
-        out[g] = Some(Region { id: regions[g].id.clone(), outer, holes });
+        out[g] = Some(Region { id: regions[g].id.clone(), outer, holes, joined });
     }
     out
 }
