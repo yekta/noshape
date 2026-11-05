@@ -775,8 +775,7 @@ fn a_solid_with_a_void_doesnt_shell() {
 }
 
 /// A removed fillet as the opening (live 1752): Parasolid ends the walls next to it in flat rims normal to them,
-/// 2175.269908 mm³ and 16 faces, as the slabs; the direct construction (its walls run on to the fillet's surface,
-/// 2330.6 mm³) declines it.
+/// 2175.269908 mm³ and 16 faces; the direct construction makes them (5 ms; the slabs took it before).
 #[test]
 fn a_removed_fillet_opening_is_lives() {
     let b = bx([0.0; 3], [40.0, 20.0, 10.0]);
@@ -785,12 +784,13 @@ fn a_removed_fillet_opening_is_lives() {
     let s = fillet(&b, &e, 5.0).unwrap().shape;
     let rm: Vec<Shape> = s.faces().into_iter().filter(|f| !matches!(f.face_surface(), Ok(Surface::Plane { .. }))).collect();
     assert_eq!(rm.len(), 1);
-    assert!(shell_solid(&s, &rm, 1.0, ShellSide::Inside, ShellMethod::Quadrics).is_err());
-    let r = shell_solid(&s, &rm, 1.0, ShellSide::Inside, ShellMethod::Auto).unwrap();
-    assert!(r.shape.is_valid());
-    let v = vol(&r.shape);
-    assert!((v - 2175.269908169872).abs() < 1e-4, "{v}");
-    assert_eq!(r.shape.count(ShapeType::Face), 16);
+    for method in [ShellMethod::Quadrics, ShellMethod::Auto] {
+        let r = shell_solid(&s, &rm, 1.0, ShellSide::Inside, method).unwrap();
+        assert!(r.shape.is_valid());
+        let v = vol(&r.shape);
+        assert!((v - 2175.269908169872).abs() < 1e-4, "{method:?}: {v}");
+        assert_eq!(r.shape.count(ShapeType::Face), 16, "{method:?}");
+    }
 }
 
 /// Spheres, tori and free-form faces taken directly: the tub's, the rounded pocket's and the free-form corner's Shell

@@ -3604,6 +3604,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   // Edges: their faces (a seam: the same twice), whether tangent there.
   std::vector<std::array<int, 2>> efi(ne + 1);
   std::vector<char>               seam(ne + 1), tangent(ne + 1), degen(ne + 1);
+  // A kept face's line tangent to a removed face: its wall ends there in a flat rim normal to it (below).
+  std::vector<char> rimt(ne + 1);
   for (int i = 1; i <= ne; ++i)
   {
     const TopoDS_Edge& e = TopoDS::Edge(edges(i));
@@ -3637,10 +3639,15 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     BRepAdaptor_Curve c(e);
     const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
     const gp_Dir      na = normal_at(TopoDS::Face(faces(a)), m), nb = normal_at(TopoDS::Face(faces(b)), m);
-    // A kept face tangent to a removed one (a removed fillet): Parasolid ends the kept walls in flat rims normal to
-    // them, as the slabs (live 1752: 2175.27 mm³, 16 faces); ours ran them on to the fillet (2330.6). Declined.
+    // A kept face tangent to a removed one (a removed fillet): Parasolid cuts the kept wall off along the line of
+    // tangency with a flat rim normal to it, the removed face left only in the other walls' skins (live 1752:
+    // 2175.27 mm³, 16 faces; 2045). Its corners as a tangent edge's, each end split (below).
     if (na.Dot(nb) > 1 - 1e-9 && (!kept[(size_t)a] || !kept[(size_t)b]))
-      return no("a kept face tangent to a removed one");
+    {
+      if (outward || c.GetType() != GeomAbs_Line)
+        return no("a kept face tangent to a removed one");
+      rimt[(size_t)i] = 1;
+    }
     if (na.Dot(nb) > 1 - 1e-9)
     {
       tangent[(size_t)i] = 1;
@@ -3820,6 +3827,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     gp_XYZ        pb;
     TopoDS_Vertex vb;
     TopoDS_Edge   bridge;
+    // A flat rim's end: the first corner on the rim's plane, the second on the line of tangency itself (where the
+    // wall's offset crosses it), the bridge on the wall's offset (hinge and e1 / e2 unused, -1).
+    bool rim = false;
   };
   std::vector<SplitCorner> splits;
   std::vector<int>         vsplit(nv + 1, -1);
@@ -3978,6 +3988,42 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             third = f;
         if (const char* why = tangent_corner(tp, a, third, x))
           return no(why);
+        if (rimt[(size_t)tp])
+        {
+          // A flat rim's end: the first corner (x) where the line's offset meets the third face's, on the rim's plane;
+          // the second where the line itself does, the removed face's offset edge across starting there.
+          const int k = kept[(size_t)a] ? a : b, r = k == a ? b : a;
+          if (third < 0 || !kept[(size_t)third] || find(i) != i)
+            return no("a flat rim's end not on a kept face");
+          SplitCorner sp{};
+          sp.v     = i;
+          sp.hinge = sp.e1 = sp.e2 = -1;
+          sp.wall  = third;
+          sp.rim   = true;
+          sp.w1 = sp.w2 = -1;
+          for (int e : es)
+          {
+            const int p = efi[(size_t)e][0], q = efi[(size_t)e][1];
+            if ((p == k && q == third) || (q == k && p == third))
+              sp.w1 = e;
+            if ((p == r && q == third) || (q == r && p == third))
+              sp.w2 = e;
+          }
+          BRepAdaptor_Curve c(TopoDS::Edge(edges(tp)));
+          gp_Pnt            p0;
+          gp_Vec            d0;
+          c.D1(c.FirstParameter(), p0, d0);
+          gp_XYZ y;
+          if (sp.w1 < 0 || sp.w2 < 0 || !quad::solve_line(sf[(size_t)third], V.XYZ(), d0.Normalized().XYZ(), y, size))
+            return no("a flat rim's end not found");
+          // (Within the line: the wall's offset crosses it.)
+          const double along = (y - V.XYZ()).Dot(d0.Normalized().XYZ()), len = c.Value(c.FirstParameter()).Distance(c.Value(c.LastParameter()));
+          if (std::abs(along) <= 10 * tol || std::abs(along) >= len - 10 * tol)
+            return no("a flat rim's end off its line");
+          sp.pb             = y;
+          vsplit[(size_t)i] = (int)splits.size();
+          splits.push_back(sp);
+        }
       }
       else
       {
@@ -4433,7 +4479,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   // The split corners' edges: on the hinge's and the wall's offsets, from the first corner to the second.
   for (SplitCorner& sp : splits)
   {
-    const gp_Pnt            A = gp_Pnt(pts[(size_t)sp.v]), B = gp_Pnt(sp.pb);
+    const gp_Pnt A = gp_Pnt(pts[(size_t)sp.v]), B = gp_Pnt(sp.pb);
+    if (sp.rim)
+    {
+      // A flat rim's end: across the wall's offset along the rim's plane, straight (a planar wall's).
+      if (A.Distance(B) <= 10 * tol || std::abs(quad::eval(sf[(size_t)sp.wall], 0.5 * (A.XYZ() + B.XYZ()))) > 1e3 * tol)
+        return no("a flat rim's end edge not straight");
+      BRepBuilderAPI_MakeEdge mk(new Geom_Line(A, gp_Dir(gp_Vec(A, B))), vx[(size_t)sp.v], sp.vb, 0.0, A.Distance(B));
+      if (!mk.IsDone())
+        return no("a flat rim's end edge failed");
+      sp.bridge = mk.Edge();
+      continue;
+    }
     GeomAPI_IntSS           is(sf[(size_t)sp.hinge].off, sf[(size_t)sp.wall].off, 1e-9 * size);
     occ::handle<Geom_Curve> c;
     double                  u0 = 0, u1 = 0;
@@ -4465,6 +4522,40 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (!mk.IsDone())
       return no("a split corner's edge failed");
     sp.bridge = mk.Edge();
+  }
+  // A flat rim's line of tangency in three: the removed face's skin at each end, the rim between its ends' second
+  // corners (the line's own curve, as the line's way).
+  std::map<int, std::array<TopoDS_Edge, 3>>          pieces;
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Edge>> h_rim_edges; // (the line, a piece)
+  for (int i = 1; i <= ne; ++i)
+  {
+    if (!rimt[(size_t)i])
+      continue;
+    const TopoDS_Edge e = TopoDS::Edge(edges(i).Oriented(TopAbs_FORWARD));
+    TopoDS_Vertex     a, b;
+    TopExp::Vertices(e, a, b);
+    const int ka = vsplit[(size_t)verts.FindIndex(a)], kb = vsplit[(size_t)verts.FindIndex(b)];
+    if (ka < 0 || kb < 0 || !splits[(size_t)ka].rim || !splits[(size_t)kb].rim || BRep_Tool::IsClosed(e, TopoDS::Face(ef.FindFromKey(e).First())))
+      return no("a flat rim's line without both ends");
+    double                        f0, f1;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f0, f1);
+    GeomAPI_ProjectPointOnCurve   pa(gp_Pnt(splits[(size_t)ka].pb), c3), pb(gp_Pnt(splits[(size_t)kb].pb), c3);
+    if (c3.IsNull() || pa.NbPoints() == 0 || pb.NbPoints() == 0)
+      return no("a flat rim's line without both ends");
+    const double ua = pa.LowerDistanceParameter(), ub = pb.LowerDistanceParameter();
+    if (!(f0 < ua && ua < ub && ub < f1))
+      return no("a flat rim's ends cross");
+    auto piece = [&](const TopoDS_Vertex& v0, const TopoDS_Vertex& v1, double u0, double u1) {
+      TopoDS_Edge pe;
+      bld.MakeEdge(pe, c3, BRep_Tool::Tolerance(e));
+      bld.Add(pe, v0.Oriented(TopAbs_FORWARD));
+      bld.Add(pe, v1.Oriented(TopAbs_REVERSED));
+      bld.Range(pe, u0, u1);
+      return pe;
+    };
+    pieces[i] = {piece(a, splits[(size_t)ka].vb, f0, ua), piece(splits[(size_t)ka].vb, splits[(size_t)kb].vb, ua, ub), piece(splits[(size_t)kb].vb, b, ub, f1)};
+    for (const TopoDS_Edge& pe : pieces[i])
+      h_rim_edges.emplace_back(edges(i), pe);
   }
   lap("edges");
   bool ok_wires = true;
@@ -4518,6 +4609,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     {
       for (const auto [first, other] : {std::pair{sp.e1, sp.e2}, std::pair{sp.w1, sp.w2}})
       {
+        if (first < 0 || other < 0)
+          continue;
         TopoDS_Edge in_first;
         bool        has_other = false;
         for (TopoDS_Iterator it(w, false); it.More(); it.Next())
@@ -4537,6 +4630,61 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   };
   SourceMap    sources;
   HHist        h = new BRepTools_History();
+  for (const auto& [line, pe] : h_rim_edges)
+    h->AddModified(line, pe);
+  // A piece's curve on face `face` (built on `ff`'s surface): the line's on `ff`.
+  auto piece_curve = [&](int line, const TopoDS_Edge& pe, const TopoDS_Face& ff, const TopoDS_Face& face) {
+    double                          c0, c1, u0, u1;
+    const occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(edges(line).Oriented(TopAbs_FORWARD)), ff, c0, c1);
+    if (c2.IsNull())
+      return false;
+    BRep_Tool::Range(pe, u0, u1);
+    bld.UpdateEdge(pe, c2, face, BRep_Tool::Tolerance(pe));
+    bld.Range(pe, face, u0, u1);
+    return true;
+  };
+  // A kept face whose line of tangency a flat rim cuts: the same face with the line's pieces in its place (null when
+  // it has none; `ok` false when a piece's curve on it failed).
+  auto with_pieces = [&](const TopoDS_Face& ff, bool& ok) {
+    TopoDS_Face nf;
+    bool        any = false;
+    for (TopExp_Explorer x(ff, TopAbs_EDGE); x.More() && !any; x.Next())
+      any = pieces.count(edges.FindIndex(x.Current())) > 0;
+    if (!any)
+      return nf;
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> surf = BRep_Tool::Surface(ff, loc);
+    bld.MakeFace(nf, surf, loc, BRep_Tool::Tolerance(ff));
+    for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
+    {
+      TopoDS_Wire nw;
+      bld.MakeWire(nw);
+      for (TopoDS_Iterator x(w.Value(), false); x.More(); x.Next())
+      {
+        const int  k  = edges.FindIndex(x.Value());
+        const auto pc = pieces.find(k);
+        if (pc == pieces.end())
+        {
+          bld.Add(nw, x.Value());
+          continue;
+        }
+        const bool fwd = x.Value().Orientation() == TopAbs_FORWARD;
+        for (int j = 0; j < 3; ++j)
+        {
+          const TopoDS_Edge& pe = pc->second[(size_t)(fwd ? j : 2 - j)];
+          if (!piece_curve(k, pe, ff, nf))
+          {
+            ok = false;
+            return TopoDS_Face();
+          }
+          bld.Add(nw, pe.Oriented(fwd ? TopAbs_FORWARD : TopAbs_REVERSED));
+        }
+      }
+      nw.Closed(true);
+      bld.Add(nf, nw.Oriented(w.Value().Orientation()));
+    }
+    return nf;
+  };
   TopoDS_Shell shell;
   bld.MakeShell(shell);
   for (TopoDS_Iterator it(old_shell, false); it.More(); it.Next())
@@ -4548,7 +4696,18 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f)); // (no offset: the neighbours' offsets meet where it was)
     else if (kept[(size_t)i])
     {
-      bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f));
+      bool              pieces_ok = true;
+      const TopoDS_Face nk        = with_pieces(ff, pieces_ok);
+      if (!pieces_ok)
+        return no("a line's piece without its curve");
+      if (!nk.IsNull())
+      {
+        const TopoDS_Face o = TopoDS::Face(nk.Oriented(f.Orientation()));
+        bld.Add(shell, o);
+        h->AddModified(f, o);
+      }
+      else
+        bld.Add(shell, outward ? TopoDS_Shape(f.Reversed()) : TopoDS_Shape(f));
       TopoDS_Face of;
       bld.MakeFace(of, sf[(size_t)i].off, 1e3 * tol);
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
@@ -4755,6 +4914,122 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
       for (TopoDS_Iterator w(ff, false); w.More(); w.Next())
       {
+        std::vector<TopoDS_Edge> seq;
+        for (BRepTools_WireExplorer x(TopoDS::Wire(w.Value()), ff); x.More(); x.Next())
+          seq.push_back(x.Current());
+        if (std::any_of(seq.begin(), seq.end(), [&](const TopoDS_Edge& x) { return rimt[(size_t)edges.FindIndex(x)] != 0; }))
+        {
+          // Lines of tangency on it: the walls there end in flat rims, and what is left of it is a skin at each run of
+          // its other edges between them (live 1752, 2045: a corner round's skins in the floor and the top).
+          if (w.Value().Orientation() != TopAbs_FORWARD || seq.size() != (size_t)w.Value().NbChildren())
+            return no("a flat rim's face not one forward wire");
+          const size_t n = seq.size();
+          size_t       s0 = 0;
+          while (s0 < n && !rimt[(size_t)edges.FindIndex(seq[s0])])
+            ++s0;
+          // From a line of tangency: the runs after each.
+          for (size_t q = 0; q < n; ++q)
+          {
+            const size_t at = (s0 + q) % n, nx = (at + 1) % n;
+            const int    lk = edges.FindIndex(seq[at]);
+            if (!rimt[(size_t)lk])
+              continue;
+            if (rimt[(size_t)edges.FindIndex(seq[nx])])
+              return no("two lines of tangency meet");
+            std::vector<TopoDS_Edge> run;
+            size_t                   end = nx;
+            while (!rimt[(size_t)edges.FindIndex(seq[end])])
+            {
+              run.push_back(seq[end]);
+              end = (end + 1) % n;
+            }
+            const int    nk = edges.FindIndex(seq[end]);
+            const auto&  pp = pieces.at(lk);
+            const auto&  pn = pieces.at(nk);
+            const TopoDS_Vertex vs = TopExp::FirstVertex(run.front(), true), ve = TopExp::LastVertex(run.back(), true);
+            // A line's piece at vertex v: the first (the line's start) or the last, and whether it leaves v.
+            auto end_piece = [&](const std::array<TopoDS_Edge, 3>& p3, const TopoDS_Vertex& v, bool leaving) {
+              const TopoDS_Edge& pe = TopExp::FirstVertex(p3[0]).IsSame(v) ? p3[0] : p3[2];
+              const bool         starts = TopExp::FirstVertex(pe).IsSame(v);
+              return TopoDS::Edge(pe.Oriented(starts == leaving ? TopAbs_FORWARD : TopAbs_REVERSED));
+            };
+            TopoDS_Face skin;
+            bld.MakeFace(skin, surf, loc, BRep_Tool::Tolerance(ff));
+            TopoDS_Wire sw;
+            bld.MakeWire(sw);
+            for (const TopoDS_Edge& x : run)
+              bld.Add(sw, x);
+            const TopoDS_Edge out_piece = end_piece(pn, ve, true), in_piece = end_piece(pp, vs, false);
+            bld.Add(sw, out_piece);
+            for (auto r = run.rbegin(); r != run.rend(); ++r)
+            {
+              const int k = edges.FindIndex(*r);
+              if (ex[(size_t)k].IsNull())
+                return no("a skin's edge without its offset");
+              bld.Add(sw, ex[(size_t)k].Oriented(flip[(size_t)k] ? r->Orientation() : TopAbs::Reverse(r->Orientation())));
+              if (sf[(size_t)i].kind != GeomAbs_Plane && !quad::add_pcurve(ex[(size_t)k], skin, TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD)), ff, false, 1e3 * tol))
+                return no("an offset edge's curve on a skin failed");
+            }
+            bld.Add(sw, in_piece);
+            sw.Closed(true);
+            bld.Add(skin, sw);
+            if (!piece_curve(nk, out_piece, ff, skin) || !piece_curve(lk, in_piece, ff, skin))
+              return no("a skin's piece without its curve");
+            const TopoDS_Face sk = TopoDS::Face(skin.Oriented(f.Orientation()));
+            bld.Add(shell, sk);
+            h->AddModified(f, sk);
+          }
+          // The flat rims: on the plane through each line square to its wall, between the line's middle piece, its
+          // ends' bridges and the line's offset; facing away from the wall (towards the removed face).
+          for (const TopoDS_Edge& x : seq)
+          {
+            const int k = edges.FindIndex(x);
+            if (!rimt[(size_t)k])
+              continue;
+            const TopoDS_Edge e = TopoDS::Edge(edges(k).Oriented(TopAbs_FORWARD));
+            TopoDS_Vertex     a, b;
+            TopExp::Vertices(e, a, b);
+            const SplitCorner& sa = splits[(size_t)vsplit[(size_t)verts.FindIndex(a)]];
+            const SplitCorner& sb = splits[(size_t)vsplit[(size_t)verts.FindIndex(b)]];
+            const int          wf = kept[(size_t)efi[(size_t)k][0]] ? efi[(size_t)k][0] : efi[(size_t)k][1];
+            BRepAdaptor_Curve  c(e);
+            const gp_Pnt       m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+            gp_Vec             d = c.DN(0.5 * (c.FirstParameter() + c.LastParameter()), 1);
+            const gp_Vec       nw(normal_at(TopoDS::Face(faces(wf)), m));
+            gp_Vec             out = nw.Crossed(d);
+            if (out.Magnitude() < 1e-12)
+              return no("a flat rim's plane undefined");
+            out.Normalize();
+            // (Towards the removed face: a point of it inside, off the line.)
+            {
+              BRepAdaptor_Surface rs(ff);
+              const gp_Pnt        q = rs.Value(0.5 * (rs.FirstUParameter() + rs.LastUParameter()), 0.5 * (rs.FirstVParameter() + rs.LastVParameter()));
+              if (gp_Vec(m, q).Dot(out) < 0)
+                out.Reverse();
+            }
+            const gp_Pnt na = BRep_Tool::Pnt(sa.vb), nb = BRep_Tool::Pnt(sb.vb), ca = gp_Pnt(pts[(size_t)sa.v]), cb = gp_Pnt(pts[(size_t)sb.v]);
+            const gp_XYZ loop[4] = {na.XYZ(), nb.XYZ(), cb.XYZ(), ca.XYZ()};
+            gp_XYZ       newell(0, 0, 0);
+            for (int j = 0; j < 4; ++j)
+              newell += loop[j].Crossed(loop[(j + 1) % 4]);
+            TopoDS_Wire fw;
+            bld.MakeWire(fw);
+            bld.Add(fw, pieces.at(k)[1]);                                // na -> nb
+            bld.Add(fw, TopoDS::Edge(sb.bridge.Reversed()));            // nb -> cb
+            bld.Add(fw, TopoDS::Edge(ex[(size_t)k].Reversed()));        // cb -> ca
+            bld.Add(fw, sa.bridge);                                      // ca -> na
+            fw.Closed(true);
+            if (newell.Dot(out.XYZ()) < 0)
+              fw.Reverse();
+            TopoDS_Face flat;
+            bld.MakeFace(flat, new Geom_Plane(gp_Pln(m, gp_Dir(out))), 1e3 * tol);
+            bld.Add(flat, fw);
+            const TopoDS_Face fl = TopoDS::Face(flat.Oriented(old_shell.Orientation() == TopAbs_REVERSED ? TopAbs_REVERSED : TopAbs_FORWARD));
+            bld.Add(shell, fl);
+            h->AddModified(f, fl);
+          }
+          continue;
+        }
         TopoDS_Face rim;
         bld.MakeFace(rim, surf, loc, BRep_Tool::Tolerance(ff));
         // (Outward the offset is the rim's outside, the part's edges its inside.)

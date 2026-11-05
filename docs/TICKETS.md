@@ -1975,6 +1975,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   vertex, 155 ms each in OCCT's edge/face intersector), the wall's volume check by OCCT's integral (120 -> 26 ms), and
   the offset path gives up on an empty offset before its other volumes (87 -> 17 ms). Shell corpus (211): same outcomes,
   volumes and faces; same times.
+  core 11-05 03:19: flat rims in the quadric path: a kept face's line of tangency to a removed one ends its wall in a
+  flat rim normal to it (live 1752 / 2045): the line's corners as a tangent edge's, each end split (the second corner
+  where the line itself meets the next wall's offset, a straight edge between them), the line in three pieces (the
+  removed face's skin at each end, the rim between), the removed face's rim one skin per run of its other edges. Live
+  1752's opening now 5 ms by quadrics (it went to the slabs), 2175.269908 mm³, 16 faces, as live (T1 kernel shell::
+  a_removed_fillet_opening_is_lives asserts both paths). Shell corpus (211) unchanged. qa's seed 508 (live 2045: OK,
+  22936.413 mm³, 26 faces, 1.4 s) still fails (2.8 s): past the rims, its 0.5 mm top chamfers' offsets vanish at 3 mm
+  (quadrics: "an offset edge vanishes"; live keeps their inner offsets only near the opening, 6.38 mm² each), and the
+  slabs' common of its 12 slabs with the part comes out empty in OCCT (valid union, every fuzzy value). Next there:
+  offsets that vanish.
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
