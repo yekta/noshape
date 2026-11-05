@@ -2725,3 +2725,24 @@ fn export_dialog_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     let asm = d.export(cx);
     assert_eq!((asm.format, asm.y_up), (PartFormat::Parasolid, true));
 }
+
+/// Opening a feature's dialog redraws only its toolbar button (now active); the other tools keep their cached views
+/// (the whole toolbar was drawn again: ~6-10 ms of the open's frame on a big studio).
+#[gpui::test]
+fn opening_a_dialog_redraws_only_its_toolbar_button(cx: &mut TestAppContext) {
+    let (window, view, top, _) = block_part(cx, "tool-cache");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let buttons = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).tool_cache.iter().map(|(id, (k, e))| (*id, (*k, e.entity_id()))).collect::<std::collections::HashMap<_, _>>());
+    let before = buttons(cx);
+    assert!(before.contains_key("extrude") && before.contains_key("revolve"), "{:?}", before.keys());
+    assert_eq!(before["extrude"].0, (false, false));
+    view.update(cx, |v, _| v.selection = vec![top.clone()]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("extrude", w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    draw(cx, window);
+    let after = buttons(cx);
+    assert_eq!(after["extrude"].0, (true, false), "the open tool shows active");
+    assert_ne!(after["extrude"].1, before["extrude"].1, "and is drawn again");
+    assert_eq!(after["revolve"], before["revolve"], "another tool keeps its cached view");
+}
