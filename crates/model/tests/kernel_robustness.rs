@@ -2578,6 +2578,18 @@ fn hole_and_rib_match_onshape() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
 
+/// Live Bo3 (10-23 18:00): a through cut by a cylinder tangent to the block's front face leaves the face's halves
+/// meeting along a line; Onshape refuses it and the block stays (our unify merged the cylinder's halves across it).
+#[test]
+fn a_cut_tangent_to_a_face_fails_as_non_manifold() {
+    let mut t = T::new();
+    t.block(60.0, 40.0, 20.0);
+    let h = t.holes(&[((30.0, 5.0), 5.0)]);
+    let (st, msg, v) = status(&mut t, h);
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Boolean operation would result in non-manifold body.")));
+    assert!((v - 48000.0).abs() < 1e-6, "{v}");
+}
+
 /// qa5 SF2: two adjacent sketch regions extruded together are one part
 /// without a seam (live: 8000 mm³, 6 faces).
 #[test]
