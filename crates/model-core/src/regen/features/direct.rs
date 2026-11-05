@@ -585,6 +585,14 @@ pub fn replace_face(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, faces) in &groups {
         for &f in faces {
             let face = ev.ctx.bodies[*bi].shape.sub_shape(ShapeType::Face, f)?;
+            // (A template built over the face's own parameters: its normal where the face's points map, no projection
+            // onto it.)
+            if let Some(along) = k::mapped_template_sense(&face, &template) {
+                if along != (sense > 0.0) {
+                    return err(REPLACE_FAILED);
+                }
+                continue;
+            }
             // (A point on the face: a whole cylinder's centroid is on its axis.)
             let c = point_on_face(&face).ok_or_else(|| fe(REPLACE_FAILED))?;
             if let (Ok(n), Some(t)) = (face.normal_at_point(c), template_normal(c))

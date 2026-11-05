@@ -194,6 +194,17 @@ pub fn drop_open_wires(shape: &Shape) -> Result<Shape> {
     Shape::from_res(ffi::drop_open_wires(shape.raw()))
 }
 
+/// Whether `template` (one B-spline face built over `face`'s own parameters, as [`replace_face_mapped`] takes) faces
+/// the way `face` does: Some(true) along, Some(false) against, None where it isn't such a template. No projection onto
+/// the template (a 1024² displacement map's: 0.24 s a point).
+pub fn mapped_template_sense(face: &Shape, template: &Shape) -> Option<bool> {
+    match ffi::mapped_template_sense(face.raw(), template.raw()) {
+        Ok(1) => Some(true),
+        Ok(-1) => Some(false),
+        _ => None,
+    }
+}
+
 /// `solid` with `face` replaced by `template`, a B-spline surface built over the face's own parameters (its points
 /// at the face's normalized (u, v) the face's moved along its normals: a displacement map's): the face's edges carried
 /// into the template's parameters, its neighbours taking the new edges, no intersection computed. An error where the

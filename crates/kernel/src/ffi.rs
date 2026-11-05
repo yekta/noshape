@@ -541,6 +541,7 @@ pub(crate) mod ffi {
         fn face_patches(face: &OcShape, spans: u32) -> Result<UniquePtr<OcShape>>;
         fn merge_faces_on(shape: &OcShape, on: &OcShape) -> Result<UniquePtr<OcShape>>;
         fn replace_face_mapped(solid: &OcShape, face: &OcShape, tmpl: &OcShape) -> Result<UniquePtr<OcShape>>;
+        fn mapped_template_sense(face: &OcShape, tmpl: &OcShape) -> Result<i32>;
         fn stitch_face_copies(solid: &OcShape, faces: &OcShapeList, m: &[f64], codes: &mut Vec<i64>) -> Result<UniquePtr<OcShape>>;
         fn make_plane_face(
             plane: &PlaneF,

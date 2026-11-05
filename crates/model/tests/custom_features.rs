@@ -593,6 +593,21 @@ fn displacement_map_on_a_cylinder() {
 /// BRepMesh before, 1024²'s top 48 s. Then 1024² (the user's map: live stops at 500 000 control points, a limit of its
 /// own we don't copy), Replace face off and on, side and top: each builds, its times printed (NOSHAPE_DISP_MAP=<csv>:
 /// that map at 1024², the user's leather031-1024.csv, in place of the noise).
+/// One Displacement map timed (NOSHAPE_DISP_MAP=<csv>, NOSHAPE_DISP_CASE=<side|top>:<0|1> Replace face; with
+/// NOSHAPE_FS_PROFILE / NOSHAPE_KERNEL_PROFILE for its steps).
+#[test]
+#[ignore = "T2 probe: NOSHAPE_DISP_MAP"]
+fn displacement_map_profile_probe() {
+    let Ok(path) = std::env::var("NOSHAPE_DISP_MAP") else { return };
+    let csv = std::fs::read_to_string(path).expect("the map");
+    let case = std::env::var("NOSHAPE_DISP_CASE").unwrap_or("side:1".into());
+    let (face, replace) = case.split_once(':').unwrap_or(("side", "1"));
+    let (r, secs) = displacement_map(&csv, face, replace == "1");
+    assert_samples(&r, &format!("{} samples", csv.lines().count() * csv.lines().next().map_or(0, |l| l.split(',').count())));
+    noshape_kernel::kernel_profile_mark(&format!("{face} replace {replace}"));
+    println!("DISP {face} replace {replace}: {secs:.2} s");
+}
+
 #[test]
 #[ignore = "T2: timing, ~1 min"]
 fn displacement_map_scales() {

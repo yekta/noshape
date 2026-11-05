@@ -248,6 +248,14 @@ impl Interp {
         self.cancel = cancel;
     }
 
+    /// A native's error after the cancel (a kernel operation it stopped): the run is stopping, even where the script
+    /// catches the error.
+    fn native_stopped(&mut self, r: &R<Value>) {
+        if r.is_err() && self.stopped.is_none() && self.cancel.as_ref().is_some_and(|c| c()) {
+            self.stopped = Some(Vec::new());
+        }
+    }
+
     fn cancelled(&mut self) -> R<()> {
         if self.cancel.as_ref().is_some_and(|c| c()) {
             self.cancel = None;
@@ -271,6 +279,27 @@ impl Interp {
     /// displacement map's million-point arrays took 0.3-0.8 s to free after the cancel).
     pub fn take_stopped_frames(&mut self) -> Vec<Vec<Value>> {
         self.stopped.take().unwrap_or_default()
+    }
+
+    /// A returning frame's values dropped, a big array or map only it held freed on a thread of its own (a displacement
+    /// map's million-point table: 0.5 s at the feature's end, or after a cancel the run waited for).
+    fn drop_frame(&mut self, base: usize) {
+        const BIG: usize = 4096;
+        static DROPPER: LazyLock<Option<std::sync::mpsc::Sender<Value>>> = LazyLock::new(|| {
+            let (tx, rx) = std::sync::mpsc::channel::<Value>();
+            std::thread::Builder::new().name("fs-free".into()).spawn(move || rx.into_iter().for_each(drop)).ok().map(|_| tx)
+        });
+        for v in self.stack.drain(base..) {
+            let big = match &v {
+                Value::Array(a, _) => a.len() >= BIG && Arc::strong_count(a) == 1,
+                Value::Map(m, _) => m.len() >= BIG && Arc::strong_count(m) == 1,
+                _ => false,
+            };
+            if big && let Some(tx) = DROPPER.as_ref() {
+                // (Sent, or dropped here should the thread be gone.)
+                let _ = tx.send(v);
+            }
+        }
     }
 
     pub fn module(&self) -> &Arc<str> {
@@ -429,6 +458,7 @@ impl Interp {
                     let saved = std::mem::replace(&mut self.native_name, name.clone());
                     let r = f(self, all);
                     self.native_name = saved;
+                    self.native_stopped(&r);
                     r
                 }
             },
@@ -525,6 +555,7 @@ impl Interp {
                 let saved = std::mem::replace(&mut self.native_name, name.clone());
                 let r = n(self, a);
                 self.native_name = saved;
+                self.native_stopped(&r);
                 r?
             }
             (None, _) => return Err(self.error("Not a call that grows an array")),
@@ -643,13 +674,14 @@ impl Interp {
         self.frames.push(TraceFrame { function: f.name.clone(), module: saved_module.clone(), pos: call_pos });
         let r = self.run_body(f);
         self.frames.pop();
-        // (Also a native's error after the cancel: a kernel operation stopped by it.)
+        // (Once stopped, every frame's values to the caller, returned or not: a script that caught a kernel
+        // operation's cancel ran on and freed the displacement map's points table here, 0.5-0.9 s.)
         if r.is_err() && self.stopped.is_none() && self.cancel.as_ref().is_some_and(|c| c()) {
             self.stopped = Some(Vec::new());
         }
         match &mut self.stopped {
-            Some(dead) if r.is_err() => dead.push(self.stack.split_off(base)),
-            _ => self.stack.truncate(base),
+            Some(dead) => dead.push(self.stack.split_off(base)),
+            None => self.drop_frame(base),
         }
         self.base = saved_base;
         self.module = saved_module;
@@ -1110,6 +1142,7 @@ impl Interp {
                         let saved = std::mem::replace(&mut self.native_name, name.clone());
                         let r = n(self, a);
                         self.native_name = saved;
+                        self.native_stopped(&r);
                         r
                     }
                     Callee::MissingNative(name) => Err(self.error(format!("@{name} is not supported"))),

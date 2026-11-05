@@ -57,6 +57,7 @@
 #include <GProp_GProps.hxx>
 #include <Geom2d_Line.hxx>
 #include <GeomAPI_Interpolate.hxx>
+#include <GeomAdaptor_Surface.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_ConicalSurface.hxx>
@@ -430,6 +431,151 @@ std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire)
 // `on`'s face on its surface carried `len` past its edges (a template that must reach past the faces it replaces):
 // a B-spline extended in its non-periodic directions (GeomLib, curvature-continuous), another surface by its
 // parameters (a plane's by length, a periodic direction whole).
+namespace
+{
+// A template built over a face's own parameters (a displacement map's): the map from the face's (u, v), normalized,
+// maybe swapped or flipped, onto the template's parameters. Along a clamped direction the sample at fractional index x
+// sits where the knots' index function sum_j N_j(t) j is x (a B-spline repeats data linear in the index exactly: a
+// plane's points); along a periodic one, linearly.
+struct TemplateAxis
+{
+  double                           lo, hi, last;
+  occ::handle<Geom2d_BSplineCurve> index;  // null: periodic
+  double at(double s) const
+  {
+    if (index.IsNull())
+      return lo + s * (hi - lo);
+    const double x = std::clamp(s, 0.0, 1.0) * last;
+    double       a = lo, b = hi;
+    for (int k = 0; k < 64; ++k)
+    {
+      const double mid = 0.5 * (a + b);
+      (index->Value(mid).X() < x ? a : b) = mid;
+    }
+    return 0.5 * (a + b);
+  }
+};
+
+struct TemplateFlip
+{
+  bool swap, flip_u, flip_v;
+};
+
+struct TemplateMap
+{
+  TopoDS_Face                      F;  // forward
+  occ::handle<Geom_BSplineSurface> S;
+  gp_Trsf                          tt;
+  double                           fu0 = 0, fu1 = 0, fv0 = 0, fv1 = 0, su0 = 0, su1 = 0, sv0 = 0, sv1 = 0, size = 1;
+  TemplateAxis                     ua, va;
+  TemplateFlip                     m{};
+  gp_XY norm(const gp_Pnt2d& p) const { return gp_XY((p.X() - fu0) / (fu1 - fu0), (p.Y() - fv0) / (fv1 - fv0)); }
+  gp_Pnt2d apply(const TemplateFlip& f, const gp_XY& q0) const
+  {
+    gp_XY q = f.swap ? gp_XY(q0.Y(), q0.X()) : q0;
+    if (f.flip_u)
+      q.SetX(1 - q.X());
+    if (f.flip_v)
+      q.SetY(1 - q.Y());
+    return gp_Pnt2d(ua.at(q.X()), va.at(q.Y()));
+  }
+};
+
+// The map from face `face_in` onto template `T` (each sampled point of the face moved along its normal, the move's
+// sideways part small); a message when there is none.
+const char* template_map(const TopoDS_Face& face_in, const TopoDS_Face& T, TemplateMap& tm)
+{
+  tm.F = TopoDS::Face(face_in.Oriented(TopAbs_FORWARD));
+  TopLoc_Location tl;
+  tm.S = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(T, tl));
+  if (tm.S.IsNull())
+    return "the template is not a B-spline surface";
+  const occ::handle<Geom_BSplineSurface>& S = tm.S;
+  tm.tt = tl.Transformation();
+  BRepTools::UVBounds(tm.F, tm.fu0, tm.fu1, tm.fv0, tm.fv1);
+  S->Bounds(tm.su0, tm.su1, tm.sv0, tm.sv1);
+  if (!(tm.fu1 > tm.fu0 && tm.fv1 > tm.fv0))
+    return "the face has no extent";
+  auto axis = [&](bool along_u) -> TemplateAxis {
+    const int    n        = along_u ? S->NbUPoles() : S->NbVPoles();
+    const bool   periodic = along_u ? S->IsUPeriodic() : S->IsVPeriodic();
+    TemplateAxis x{along_u ? tm.su0 : tm.sv0, along_u ? tm.su1 : tm.sv1, double(n - 1), {}};
+    if (periodic)
+      return x;
+    NCollection_Array1<gp_Pnt2d> poles(1, n);
+    for (int i = 1; i <= n; ++i)
+      poles(i) = gp_Pnt2d(i - 1, 0);
+    x.index = new Geom2d_BSplineCurve(poles, along_u ? S->UKnots() : S->VKnots(), along_u ? S->UMultiplicities() : S->VMultiplicities(), along_u ? S->UDegree() : S->VDegree());
+    return x;
+  };
+  tm.ua = axis(true);
+  tm.va = axis(false);
+  {
+    Bnd_Box b;
+    BRepBndLib::Add(tm.F, b);
+    tm.size = b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
+  }
+  BRepAdaptor_Surface fs(tm.F, false);
+  for (int k = 0; k < 8; ++k)
+  {
+    const TemplateFlip m{(k & 4) != 0, (k & 1) != 0, (k & 2) != 0};
+    bool               ok = true;
+    for (int i = 0; i <= 6 && ok; ++i)
+      for (int j = 0; j <= 6 && ok; ++j)
+      {
+        const double u = tm.fu0 + (tm.fu1 - tm.fu0) * (0.1 + 0.8 * i / 6.0), v = tm.fv0 + (tm.fv1 - tm.fv0) * (0.1 + 0.8 * j / 6.0);
+        gp_Pnt       p;
+        gp_Vec       du, dv;
+        fs.D1(u, v, p, du, dv);
+        const gp_Vec n = du.Crossed(dv);
+        if (n.Magnitude() < 1e-12)
+          continue;
+        const gp_Pnt2d st = tm.apply(m, tm.norm(gp_Pnt2d(u, v)));
+        const gp_Vec   d(p, S->Value(st.X(), st.Y()).Transformed(tm.tt));
+        const gp_Vec   nn = n.Normalized();
+        const double   side = (d - nn * d.Dot(nn)).Magnitude();
+        ok = side <= 0.05 * tm.size;
+      }
+    if (ok)
+    {
+      tm.m = m;
+      return nullptr;
+    }
+  }
+  return "the template is not the face moved along its normals";
+}
+} // namespace
+
+// Whether template `tmpl` (a single B-spline face built over `face`'s parameters, as replace_face_mapped takes) faces
+// the way `face` does, both as they lie in their shapes: the majority of the map's sample points, the face's normal
+// against the template's at the point it maps to (no projection onto the dense template). 1 along, -1 against, 0 no
+// such map.
+int mapped_template_sense(const OcShape& face_in, const OcShape& tmpl_in)
+{
+  const TopoDS_Face& face = as_face(face_in.shape, "face");
+  const TopoDS_Face& T    = as_face(tmpl_in.shape, "template");
+  TemplateMap        tm;
+  if (template_map(face, T, tm) != nullptr)
+    return 0;
+  BRepAdaptor_Surface fs(tm.F, false);
+  const double        fsign = face.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
+  const double        tsign = T.Orientation() == TopAbs_REVERSED ? -1.0 : 1.0;
+  int                 votes = 0;
+  for (int i = 0; i <= 6; ++i)
+    for (int j = 0; j <= 6; ++j)
+    {
+      const double u = tm.fu0 + (tm.fu1 - tm.fu0) * (0.1 + 0.8 * i / 6.0), v = tm.fv0 + (tm.fv1 - tm.fv0) * (0.1 + 0.8 * j / 6.0);
+      gp_Pnt       p, q;
+      gp_Vec       du, dv, su, sv;
+      fs.D1(u, v, p, du, dv);
+      const gp_Pnt2d st = tm.apply(tm.m, tm.norm(gp_Pnt2d(u, v)));
+      tm.S->D1(st.X(), st.Y(), q, su, sv);
+      const double d = fsign * tsign * du.Crossed(dv).Dot(su.Crossed(sv).Transformed(tm.tt));
+      votes += d > 0 ? 1 : d < 0 ? -1 : 0;
+    }
+  return votes > 0 ? 1 : votes < 0 ? -1 : 0;
+}
+
 // `face` of `solid` replaced by a template built over its own parameters: a B-spline surface whose points at the
 // face's normalized (u, v) are the face's points moved along its normals (a displacement map's, std
 // evFaceTangentPlanes then bSplineSurface over the samples). The face's edge curves on it are carried into the
@@ -439,100 +585,24 @@ std::unique_ptr<OcShape> make_face_on(const OcShape& on, const OcShape& wire)
 // vertex. No intersection with the dense surface: the user's 512 x 512 map. Fails where any of that doesn't hold.
 std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcShape& face_in, const OcShape& tmpl_in)
 {
-  const TopoDS_Shape&                    solid = solid_in.shape;
-  const TopoDS_Face                      F     = TopoDS::Face(as_face(face_in.shape, "face").Oriented(TopAbs_FORWARD));
-  const TopoDS_Face&                     T     = as_face(tmpl_in.shape, "template");
-  TopLoc_Location                        tl;
-  const occ::handle<Geom_BSplineSurface> S = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(T, tl));
-  if (S.IsNull())
-    fail_op("the template is not a B-spline surface");
-  const gp_Trsf tt = tl.Transformation();
-  double        fu0, fu1, fv0, fv1, su0, su1, sv0, sv1;
-  BRepTools::UVBounds(F, fu0, fu1, fv0, fv1);
-  S->Bounds(su0, su1, sv0, sv1);
-  if (!(fu1 > fu0 && fv1 > fv0))
-    fail_op("the face has no extent");
+  const KernelTimer   timer("replace_mapped");
+  const TopoDS_Shape& solid = solid_in.shape;
+  const TopoDS_Face&  T     = as_face(tmpl_in.shape, "template");
+  TemplateMap         tm;
+  if (const char* why = template_map(as_face(face_in.shape, "face"), T, tm))
+    fail_op(why);
+  const TopoDS_Face&                      F = tm.F;
+  const occ::handle<Geom_BSplineSurface>& S = tm.S;
+  const gp_Trsf&                          tt = tm.tt;
+  TopLoc_Location                         tl;
+  BRep_Tool::Surface(T, tl);
+  double &fu0 = tm.fu0, &fu1 = tm.fu1, &fv0 = tm.fv0, &fv1 = tm.fv1;
+  const double su0 = tm.su0, su1 = tm.su1, sv0 = tm.sv0, sv1 = tm.sv1, size = tm.size;
   BRepAdaptor_Surface fs(F, false);
-  // The map from the face's (u, v): normalized, maybe swapped or flipped, onto the template's parameters. Along a
-  // clamped direction the sample at fractional index x sits where the knots' index function sum_j N_j(t) j is x (a
-  // B-spline repeats data linear in the index exactly: a plane's points); along a periodic one, linearly.
-  struct Axis
-  {
-    double                          lo, hi, last;
-    occ::handle<Geom2d_BSplineCurve> index;  // null: periodic
-    double at(double s) const
-    {
-      if (index.IsNull())
-        return lo + s * (hi - lo);
-      const double x = std::clamp(s, 0.0, 1.0) * last;
-      double       a = lo, b = hi;
-      for (int k = 0; k < 64; ++k)
-      {
-        const double mid = 0.5 * (a + b);
-        (index->Value(mid).X() < x ? a : b) = mid;
-      }
-      return 0.5 * (a + b);
-    }
-  };
-  auto axis = [&](bool along_u) -> Axis {
-    const int  n        = along_u ? S->NbUPoles() : S->NbVPoles();
-    const bool periodic = along_u ? S->IsUPeriodic() : S->IsVPeriodic();
-    Axis       x{along_u ? su0 : sv0, along_u ? su1 : sv1, double(n - 1), {}};
-    if (periodic)
-      return x;
-    NCollection_Array1<gp_Pnt2d> poles(1, n);
-    for (int i = 1; i <= n; ++i)
-      poles(i) = gp_Pnt2d(i - 1, 0);
-    x.index = new Geom2d_BSplineCurve(poles, along_u ? S->UKnots() : S->VKnots(), along_u ? S->UMultiplicities() : S->VMultiplicities(), along_u ? S->UDegree() : S->VDegree());
-    return x;
-  };
-  const Axis ua = axis(true), va = axis(false);
-  struct Map
-  {
-    bool swap, flip_u, flip_v;
-  };
-  auto norm = [&](const gp_Pnt2d& p) { return gp_XY((p.X() - fu0) / (fu1 - fu0), (p.Y() - fv0) / (fv1 - fv0)); };
-  auto apply = [&](const Map& m, const gp_XY& q0) {
-    gp_XY q = m.swap ? gp_XY(q0.Y(), q0.X()) : q0;
-    if (m.flip_u)
-      q.SetX(1 - q.X());
-    if (m.flip_v)
-      q.SetY(1 - q.Y());
-    return gp_Pnt2d(ua.at(q.X()), va.at(q.Y()));
-  };
-  const double size = [&] {
-    Bnd_Box b;
-    BRepBndLib::Add(F, b);
-    return b.IsVoid() ? 1.0 : std::sqrt(b.SquareExtent());
-  }();
-  // The template moves each sampled point along the face's normal: the move's sideways part small against it and
-  // against the face.
-  int best = -1;
-  for (int k = 0; k < 8 && best < 0; ++k)
-  {
-    const Map m{(k & 4) != 0, (k & 1) != 0, (k & 2) != 0};
-    bool      ok = true;
-    for (int i = 0; i <= 6 && ok; ++i)
-      for (int j = 0; j <= 6 && ok; ++j)
-      {
-        const double u = fu0 + (fu1 - fu0) * (0.1 + 0.8 * i / 6.0), v = fv0 + (fv1 - fv0) * (0.1 + 0.8 * j / 6.0);
-        gp_Pnt       p;
-        gp_Vec       du, dv;
-        fs.D1(u, v, p, du, dv);
-        const gp_Vec n = du.Crossed(dv);
-        if (n.Magnitude() < 1e-12)
-          continue;
-        const gp_Pnt2d st = apply(m, norm(gp_Pnt2d(u, v)));
-        const gp_Vec   d(p, S->Value(st.X(), st.Y()).Transformed(tt));
-        const gp_Vec   nn = n.Normalized();
-        const double   side = (d - nn * d.Dot(nn)).Magnitude();
-        ok = side <= 0.05 * size;
-      }
-    if (ok)
-      best = k;
-  }
-  if (best < 0)
-    fail_op("the template is not the face moved along its normals");
+  using Map = TemplateFlip;
+  auto norm  = [&](const gp_Pnt2d& p) { return tm.norm(p); };
+  auto apply = [&](const Map& m, const gp_XY& q) { return tm.apply(m, q); };
+  const int best = (tm.m.swap ? 4 : 0) | (tm.m.flip_u ? 1 : 0) | (tm.m.flip_v ? 2 : 0);
   const Map    m{(best & 4) != 0, (best & 1) != 0, (best & 2) != 0};
   const bool   odd = m.swap != (m.flip_u != m.flip_v);
   // The face's box as the samples were taken over it: the template's corners back on the face (OCCT's bounds of
@@ -574,6 +644,27 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
     const occ::handle<Geom2d_Curve> c = BRep_Tool::CurveOnSurface(e, on, f, l);
     if (c.IsNull())
       return {};
+    // A line of constant u or v on the face (a rim, a seam): the map keeps each axis apart, so its image is the
+    // template's iso line between its ends' images; no sampling.
+    {
+      occ::handle<Geom2d_Curve> basis = c;
+      while (const occ::handle<Geom2d_TrimmedCurve> tc = occ::down_cast<Geom2d_TrimmedCurve>(basis))
+        basis = tc->BasisCurve();
+      const occ::handle<Geom2d_Line> ln = occ::down_cast<Geom2d_Line>(basis);
+      if (!ln.IsNull() && (std::abs(ln->Direction().X()) < 1e-12 || std::abs(ln->Direction().Y()) < 1e-12))
+      {
+        const gp_Pnt2d p0 = apply(m, norm(c->Value(f))), p1 = apply(m, norm(c->Value(l)));
+        const gp_Vec2d d(p0, p1);
+        if (d.Magnitude() > 0)
+        {
+          occ::handle<Geom2d_BSplineCurve> b = Geom2dConvert::CurveToBSplineCurve(new Geom2d_TrimmedCurve(new Geom2d_Line(p0, gp_Dir2d(d)), 0, d.Magnitude()));
+          f        = b->FirstParameter();
+          l        = b->LastParameter();
+          last_iso = true;
+          return b;
+        }
+      }
+    }
     // (Four points a span of the template: the map bends within its first spans at each clamped side.)
     const int                                   n   = std::clamp(4 * (S->NbUKnots() + S->NbVKnots()) + 1, 129, 40001);
     occ::handle<NCollection_HArray1<gp_Pnt2d>> pts = new NCollection_HArray1<gp_Pnt2d>(1, n);
@@ -635,6 +726,7 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
   };
   TopoDS_Face G;
   B.MakeFace(G, S, tl, tol);
+  std::optional<KernelTimer> step(std::in_place, "replace_mapped.carry");
   for (TopoDS_Iterator wi(F); wi.More(); wi.Next())
   {
     TopoDS_Wire w;
@@ -677,7 +769,8 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
         // own parameters. An iso line's comes from BRepLib below.
         if (!iso_edge)
         {
-          const int n = std::clamp(16 * (S->NbUKnots() + S->NbVKnots()), 257, 100001);
+          // (Four points a span of the template, as the curve on it: between them the curve strays nanometres.)
+          const int n = std::clamp(4 * (S->NbUKnots() + S->NbVKnots()) + 1, 257, 100001);
           occ::handle<NCollection_HArray1<gp_Pnt>> ps = new NCollection_HArray1<gp_Pnt>(1, n);
           occ::handle<NCollection_HArray1<double>> ts = new NCollection_HArray1<double>(1, n);
           for (int k = 0; k < n; ++k)
@@ -689,6 +782,7 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
             ps->SetValue(k + 1, S->Value(w.X(), w.Y()));
             ts->SetValue(k + 1, t);
           }
+          const KernelTimer t3("replace_mapped.carry.3d");
           GeomAPI_Interpolate in3(ps, ts, false, 1e-12);
           in3.Perform();
           if (!in3.IsDone())
@@ -705,8 +799,10 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
     w.Closed(BRep_Tool::IsClosed(TopoDS::Wire(wi.Value())));
     B.Add(G, w);
   }
+  step.emplace("replace_mapped.curves3d");
   if (!BRepLib::BuildCurves3d(G, tol))
     fail_op("the new face's edges have no 3D curves");
+  step.emplace("replace_mapped.neighbours");
   // Standing for the face as its surface faces: the template's normal against the face's at a point.
   bool same;
   {
@@ -758,12 +854,28 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
       occ::handle<Geom2d_Curve> pc;
       double                    dev = 0;
       {
-        // (Eight points a span of the 3D curve: it carries the image's detail.)
+        // (Two points a span of the 3D curve: it carries the image's detail, sampled as finely as the template.)
         const occ::handle<Geom_BSplineCurve> bc = occ::down_cast<Geom_BSplineCurve>(local);
-        const int n = std::clamp(bc.IsNull() ? 257 : 8 * bc->NbKnots() * std::max(1, bc->Degree() / 2) + 1, 257, 80001);
+        const int n = std::clamp(bc.IsNull() ? 257 : 2 * bc->NbKnots() * std::max(1, bc->Degree() / 2) + 1, 257, 80001);
         occ::handle<NCollection_HArray1<gp_Pnt2d>> uv = new NCollection_HArray1<gp_Pnt2d>(1, n);
         occ::handle<NCollection_HArray1<double>>   ts = new NCollection_HArray1<double>(1, n);
         ShapeAnalysis_Surface                       sas(ns);
+        const GeomAdaptor_Surface                   ga(ns);
+        const GeomAbs_SurfaceType                   kind = ga.GetType();
+        // (On a plane, cylinder, cone or sphere a point's parameters in closed form.)
+        auto elementary = [&](const gp_Pnt& q, gp_Pnt2d& w) {
+          double pu = 0, pv = 0;
+          switch (kind)
+          {
+            case GeomAbs_Plane: ElSLib::Parameters(ga.Plane(), q, pu, pv); break;
+            case GeomAbs_Cylinder: ElSLib::Parameters(ga.Cylinder(), q, pu, pv); break;
+            case GeomAbs_Cone: ElSLib::Parameters(ga.Cone(), q, pu, pv); break;
+            case GeomAbs_Sphere: ElSLib::Parameters(ga.Sphere(), q, pu, pv); break;
+            default: return false;
+          }
+          w.SetCoord(pu, pv);
+          return true;
+        };
         gp_Pnt2d                                    last;
         for (int k = 0; k < n; ++k)
         {
@@ -771,7 +883,9 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
             fail_if_cancelled();
           const double t = f + (l - f) * k / (n - 1);
           const gp_Pnt q = local->Value(t);
-          gp_Pnt2d     w = k == 0 ? sas.ValueOfUV(q, 1e-9) : sas.NextValueOfUV(last, q, 1e-9);
+          gp_Pnt2d     w;
+          if (!elementary(q, w))
+            w = k == 0 ? sas.ValueOfUV(q, 1e-9) : sas.NextValueOfUV(last, q, 1e-9);
           // (Unwrapped: each within half a period of the last.)
           if (k > 0 && ns->IsUPeriodic())
             w.SetX(w.X() + std::round((last.X() - w.X()) / ns->UPeriod()) * ns->UPeriod());
@@ -781,6 +895,7 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
           uv->SetValue(k + 1, last);
           ts->SetValue(k + 1, t);
         }
+        const KernelTimer ti("replace_mapped.neighbours.interpolate");
         Geom2dAPI_Interpolate in(uv, ts, false, 1e-12);
         in.Perform();
         if (!in.IsDone())
@@ -803,6 +918,7 @@ std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid_in, const OcSh
     }
   }
   // Edges elsewhere at a moved vertex: a straight one along the move drawn to the new vertex.
+  step.emplace("replace_mapped.rest");
   ShapeAncMap ve;
   TopExp::MapShapesAndAncestors(solid, TopAbs_VERTEX, TopAbs_EDGE, ve);
   occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
