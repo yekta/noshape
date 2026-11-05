@@ -89,8 +89,10 @@ pub(crate) fn regions(pts: &[DVec2], segs: &[([u32; 2], C2)]) -> Result<Vec<Regi
         cycles.push(cyc);
     }
     let curves_of = |c: &[usize]| -> Vec<C2> { c.iter().map(|&h| curve(h)).collect() };
-    // (Each curve's area term and length once, a half-edge's the way it runs: a B-spline's are sums over its spans.)
-    let terms: Vec<(f64, f64)> = crate::boolean::par_map(segs.len(), &|k| (segs[k].1.area_term(), segs[k].1.length()))?;
+    // (Each curve's area term once, a half-edge's the way it runs, and its length by 16 chords: only to try the
+    // longest first below (exact lengths were a gear's end face's pieces' most time).)
+    let chord_length = |c: &C2| (0..16).map(|k| (c.at((k + 1) as f64 / 16.0) - c.at(k as f64 / 16.0)).length()).sum::<f64>();
+    let terms: Vec<(f64, f64)> = crate::boolean::par_map(segs.len(), &|k| (segs[k].1.area_term(), chord_length(&segs[k].1)))?;
     let area_of = |h: usize| if h.is_multiple_of(2) { terms[h / 2].0 } else { -terms[h / 2].0 };
     let areas: Vec<f64> = cycles.iter().map(|c| c.iter().map(|&h| area_of(h)).sum()).collect();
     // Connected components (a hole is never inside a cycle of its own component).
