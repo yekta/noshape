@@ -21,6 +21,8 @@ struct ModelResult {
     compared: usize,
     matching: usize,
     first: Option<String>,
+    /// Every feature that differs and how ("feature k \"name\": ..."), for comparing two runs feature by feature.
+    differing: Vec<String>,
     untranslated: Vec<String>,
     /// Full regeneration: ours (reopened) and live's, ms.
     regen_ms: Option<(f64, Option<f64>)>,
@@ -50,7 +52,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -117,6 +119,9 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
         let failed_run = step.custom && step.ours.is_some() && ours == "ERROR" && live_status != "ERROR" && !unmapped;
         if failed_run {
             res.custom.push(format!("{}: failed to run: {}", step.name, step.message.as_deref().unwrap_or("no message")));
+        }
+        if !diff.is_empty() {
+            res.differing.push(format!("feature {k} \"{}\": {}", step.name, diff.join("; ")));
         }
         if diff.is_empty() {
             res.matching += 1;
@@ -395,7 +400,7 @@ fn parity_models() {
         println!("  cause: {n} × {c}");
     }
     println!("{}", score_row(docs, whole.len(), matching, total, (custom_matching, custom_total), &causes));
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "differing": r.differing, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": whole.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report,
         "speed": { "timed": timed, "slower_than_live": slower.iter().map(|(x, n, o, l)| json!({ "document": n, "ours_ms": o.round(), "live_ms": l.round(), "ratio": (x * 10.0).round() / 10.0 })).collect::<Vec<_>>(),
             "slow_features": results.iter().flat_map(|r| r.slow_features.iter().map(move |(f, o, l)| json!({ "document": r.name, "feature": f, "ours_ms": o.round(), "live_ms": l.round() }))).collect::<Vec<_>>() } })).unwrap());

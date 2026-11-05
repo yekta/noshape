@@ -129,6 +129,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   already carry one (assignSMAttributesToNewOrSplitEntities); Parasolid keeps an edge's attributes as an operation
   moves it, ours lose them here. Repro: T2 model custom_features::bend_centerline_wire_of_a_flange_down_as_live.
 
+- [x] (skasm 11-05 00:50, lead) P2 BLEND-FINISH-ORDER a blend's finish made analytic faces after the full-round merge, so
+  two B-spline blends of one full round stayed two faces, and analytic_blend_faces' rebuilt faces kept their edges'
+  old same-parameter flag, failing BRepCheck (cf-spur-gear's THIRD root blends stayed B-splines; live's are
+  cylinders). Now (kernel features.cpp finish_blend_faces): analytic first, then the merges; SameParameter forced;
+  the fallback's finish too; all behind ScopeRule 11 (`legacy_blend_finish`; studios saved before regenerate as
+  they did). Parity (a copy) 39/55, 386/471 before and after, no feature's difference changed; blend corpus 0 of
+  310 cases change; T1 custom_features::a_full_root_fillet_between_involutes_is_one_face (FULL and an old studio).
 - [x] (skasm 11-04 23:46: the exact full round makes OCCT fail and a fallback builds it, which skipped the blend clean-up; kernel features.cpp: a fallback's result now gets analytic_blend_faces then merge_full_rounds, as scaled_blend's; cf-spur-gear 14/14 to the end, 186/512/328 as live; T1 custom_features::a_full_root_fillet_between_involutes_is_one_face) P1 FULL-ROUND-FILLET-ONE-FACE (skasm, from core (lead 11-04 22:29); dx 11-04 19:53) two fillets of one opFillet whose surfaces coincide (a
   full round: cf-spur-gear's FULL root fillet, the fillet circle tangent to both involute flanks and the root
   circle) stay two faces here; live gives one. The double-helical 20-tooth gear: 226/612/388 faces/edges/vertices,

@@ -82,6 +82,22 @@ impl Drop for LegacyTopology {
     }
 }
 
+/// The kernel's blends finished as before for a studio saved before ([`crate::partstudio::PartStudio::legacy_blend_finish`])
+/// while it regenerates on this thread; the setting before comes back when dropped.
+pub struct LegacyBlendFinish(bool);
+
+impl LegacyBlendFinish {
+    pub fn set(on: bool) -> Self {
+        Self(noshape_kernel::set_legacy_blend_finish(on))
+    }
+}
+
+impl Drop for LegacyBlendFinish {
+    fn drop(&mut self) {
+        noshape_kernel::set_legacy_blend_finish(self.0);
+    }
+}
+
 thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested

@@ -3360,22 +3360,25 @@ export const shift = defineFeature(function(context is Context, id is Id, defini
 /// FULL-ROUND-FILLET-ONE-FACE (cf-spur-gear's FULL root fillet): one gap of a 20-tooth module-2 gear (28°), its
 /// flanks fit splines through involute points, its root the dedendum circle; a circle solved tangent to the root and
 /// both flanks gives the radius of an opFillet on the two root edges: the root goes and both blends are one round
-/// face (live: the gear 186 faces; ours had two blend faces per gap, 226). T1.
+/// face (live: the gear 186 faces; ours had two blend faces per gap, 226); a studio saved before ScopeRule 11 keeps
+/// its two blends. T1.
 #[test]
 fn a_full_root_fillet_between_involutes_is_one_face() {
-    let src = studio(
-        r#"
+    // One gap of a gear: (teeth, module mm, pressure angle deg, pitch diameter mm), as cf-spur-gear's.
+    let gap = |teeth: u32, module: f64, pressure: f64, pitch: f64| {
+        let src = studio(
+            &r#"
 annotation { "Feature Type Name" : "Gear gap" }
 export const gearGap = defineFeature(function(context is Context, id is Id, definition is map)
     precondition {}
     {
-        const pitch = 40 * millimeter;
-        const pressure = 28 * degree;
+        const pitch = PITCH * millimeter;
+        const pressure = PRESSURE * degree;
         const base = pitch * cos(pressure);
-        const inner = pitch / 2 - 2.5 * millimeter;
-        const outer = pitch / 2 + 2 * millimeter;
+        const inner = pitch / 2 - 1.25 * MODULE * millimeter;
+        const outer = pitch / 2 + MODULE * millimeter;
         const alpha = sqrt(pitch ^ 2 - base ^ 2) / base * radian - pressure;
-        const beta = 360 / (4 * 20) * degree - alpha;
+        const beta = 360 / (4 * TEETH) * degree - alpha;
         var flank1 = [];
         var flank2 = [];
         for (var t = 0; t <= 2; t += 1 / 50)
@@ -3396,7 +3399,7 @@ export const gearGap = defineFeature(function(context is Context, id is Id, defi
         const sk = newSketchOnPlane(context, id + "sk", { "sketchPlane" : plane(vector(0, 0, 0) * meter, vector(0, 0, 1)) });
         skFitSpline(sk, "spline1", { "points" : flank1 });
         skFitSpline(sk, "spline2", { "points" : flank2 });
-        const mid = vector(pitch / 2 - 1.25 * millimeter, 0 * meter);
+        const mid = vector(pitch / 2 - 0.625 * MODULE * millimeter, 0 * meter);
         skCircle(sk, "addendum", { "center" : vector(0, 0) * meter, "radius" : outer });
         skCircle(sk, "dedendum", { "center" : vector(0, 0) * meter, "radius" : inner });
         skCircle(sk, "fillet", { "center" : mid, "radius" : 0.1 * millimeter, "construction" : true });
@@ -3411,18 +3414,34 @@ export const gearGap = defineFeature(function(context is Context, id is Id, defi
                 "direction" : vector(0, 0, 1), "endBound" : BoundingType.BLIND, "endDepth" : 8 * millimeter });
         const r = evCurveDefinition(context, { "edge" : sketchEntityQuery(id + "sk", EntityType.EDGE, "fillet") }).radius;
         opFillet(context, id + "fillet", { "entities" : qClosestTo(qNonCapEntity(id + "gap", EntityType.EDGE), vector(0, 0, 0) * meter), "radius" : r });
-        if (size(evaluateQuery(context, qGeometry(qOwnedByBody(qCreatedBy(id + "gap", EntityType.BODY), EntityType.FACE), GeometryType.CYLINDER))) != 2)
-            throw "two cylinders: the tip and one root round";
     });
-"#,
-    );
-    let fx = Fixture::new(&src);
-    let mut ps = PartStudio::new();
-    ps.features.push(ps.new_feature(&fx.ty("gearGap"), &fx.units).unwrap());
-    let r = fx.regen(&mut Regenerator::new(), &ps);
-    assert_ok(&r);
-    let faces: Vec<usize> = r.context.bodies.iter().map(|b| b.shape.faces().len()).collect();
-    assert_eq!(faces, vec![6], "top, bottom, two flanks, tip and one root round");
+"#
+            .replace("TEETH", &teeth.to_string())
+            .replace("MODULE", &format!("{module:?}"))
+            .replace("PRESSURE", &format!("{pressure:?}"))
+            .replace("PITCH", &format!("{pitch:?}")),
+        );
+        let fx = Fixture::new(&src);
+        let mut ps = PartStudio::new();
+        ps.features.push(ps.new_feature(&fx.ty("gearGap"), &fx.units).unwrap());
+        (fx, ps)
+    };
+    let faces = |fx: &Fixture, ps: &PartStudio| {
+        let r = fx.regen(&mut Regenerator::new(), ps);
+        assert_ok(&r);
+        r.context.bodies.iter().map(|b| (b.shape.faces().len(), b.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).count())).collect::<Vec<_>>()
+    };
+    let old = |ps: &PartStudio| {
+        let mut o = ps.clone();
+        o.scope_rule = noshape_model::partstudio::ScopeRule(10);
+        o.upgrade_saved_params();
+        assert!(o.legacy_blend_finish);
+        o
+    };
+    let (fx, full) = gap(20, 2.0, 28.0, 40.0);
+    assert_eq!(faces(&fx, &full), vec![(6, 2)], "top, bottom, two flanks, the tip and one root round (cylinders)");
+    // A studio saved before ScopeRule 11 keeps its two root blends.
+    assert_eq!(faces(&fx, &old(&full)).first().map(|f| f.0), Some(7), "the root's two blends, as it regenerated before");
 }
 
 /// PARITY-CUSTOM-RUN-FAILURES (cf-setback-fillet): the edges an opSplitFace made stay `qCreatedBy` it after

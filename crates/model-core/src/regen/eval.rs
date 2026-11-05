@@ -845,8 +845,8 @@ impl<'a> EvalCtx<'a> {
                 regions.push((s, region, Source::Region { sketch: *sketch, key: key.clone() }));
             }
             use rayon::prelude::*;
-            let legacy = noshape_kernel::legacy_topology();
-            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| noshape_kernel::with_legacy_topology(legacy, || region_profile(&s, &region, key))).collect();
+            let legacy = noshape_kernel::kernel_legacy();
+            let made: Vec<FResult<Profile>> = regions.into_par_iter().map(|(s, region, key)| noshape_kernel::with_kernel_legacy(legacy, || region_profile(&s, &region, key))).collect();
             return made.into_iter().collect();
         }
         let mut out = Vec::new();

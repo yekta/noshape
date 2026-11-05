@@ -3940,7 +3940,9 @@ static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
         first = false;
       }
     }
-    BRepLib::SameParameter(nf, fit);
+    // (Forced: the edges were same-parameter on their old faces and their new pcurves aren't yet; unforced, the
+    // face failed BRepCheck and stayed a B-spline: cf-spur-gear's THIRD root fillets, cylinders in live.)
+    BRepLib::SameParameter(nf, fit, !legacy_blend_finish());
     rs->Replace(f, flip ? nf.Reversed() : nf);
     any = true;
   }
@@ -3958,6 +3960,23 @@ static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
     h = new BRepTools_History();
   h->Merge(rs->History());
   r = out;
+}
+
+// A blend's new faces finished: approximated ones made analytic, then a full round's two faces on one cylinder one
+// face (B-spline blends of a full round too: the analytic step first), a corner's two sphere patches one. A studio
+// saved before (legacy_blend_finish) keeps the old order: the merges first.
+static void finish_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  if (legacy_blend_finish())
+  {
+    merge_full_rounds(input, r, h);
+    merge_corner_spheres(input, r, h);
+    analytic_blend_faces(input, r, h);
+    return;
+  }
+  analytic_blend_faces(input, r, h);
+  merge_full_rounds(input, r, h);
+  merge_corner_spheres(input, r, h);
 }
 
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
@@ -3987,9 +4006,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
     if (valid)
     {
       const KernelTimer timer("blend.finish");
-      merge_full_rounds(input, r, h);
-      merge_corner_spheres(input, r, h);
-      analytic_blend_faces(input, r, h);
+      finish_blend_faces(input, r, h);
       join_split_lines(input, r, h);
       tighten_new_tolerances(input, r, accurate(input));
       return as_is.finish(r, h);
@@ -4000,9 +4017,7 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
   auto [r, h] = checked_blend(sc.shape, make(sc), checked, size * sc.factor, what);
   if (checked)
   {
-    merge_full_rounds(sc.shape, r, h);
-    merge_corner_spheres(sc.shape, r, h);
-    analytic_blend_faces(sc.shape, r, h);
+    finish_blend_faces(sc.shape, r, h);
     join_split_lines(sc.shape, r, h);
   }
   return sc.finish(r, h);
@@ -5376,8 +5391,11 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       throw;
     // A fallback's blends finish as the others do: approximated faces made analytic, then a full round's two faces
     // (one radius on one axis) one face (cf-spur-gear's FULL root fillet, OCCT failing on the exact full round).
-    analytic_blend_faces(in, past->first, past->second);
-    merge_full_rounds(in, past->first, past->second);
+    if (!legacy_blend_finish())
+    {
+      analytic_blend_faces(in, past->first, past->second);
+      merge_full_rounds(in, past->first, past->second);
+    }
     tighten_new_tolerances(in, past->first, accurate(in));
     return make_result({in}, past->first, past->second.get());
   }

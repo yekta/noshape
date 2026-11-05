@@ -414,6 +414,41 @@ pub fn with_legacy_topology<T>(on: bool, f: impl FnOnce() -> T) -> T {
     out
 }
 
+thread_local! {
+    static LEGACY_BLEND_FINISH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Blends finished as before 11-05 on this thread (a Part Studio saved before ScopeRule 11 regenerates as it did): a
+/// full round's two approximated faces left apart, approximated faces whose rebuilt edges need re-parametrising left
+/// approximated, a fallback's blend not finished. Returns the thread's setting before.
+pub fn set_legacy_blend_finish(on: bool) -> bool {
+    LEGACY_BLEND_FINISH.with(|c| c.replace(on))
+}
+
+/// Whether [`set_legacy_blend_finish`] is on for this thread.
+pub fn legacy_blend_finish() -> bool {
+    LEGACY_BLEND_FINISH.with(|c| c.get())
+}
+
+/// This thread's legacy settings ([`set_legacy_topology`], [`set_legacy_blend_finish`]), to hand to another.
+#[derive(Clone, Copy, Debug)]
+pub struct KernelLegacy {
+    topology: bool,
+    blend_finish: bool,
+}
+
+pub fn kernel_legacy() -> KernelLegacy {
+    KernelLegacy { topology: legacy_topology(), blend_finish: legacy_blend_finish() }
+}
+
+/// `f` with the legacy settings `l` (work handed to another thread), the thread's own back after.
+pub fn with_kernel_legacy<T>(l: KernelLegacy, f: impl FnOnce() -> T) -> T {
+    let before = set_legacy_blend_finish(l.blend_finish);
+    let out = with_legacy_topology(l.topology, f);
+    set_legacy_blend_finish(before);
+    out
+}
+
 /// Scale applied to lengths around OCCT's blend algorithms (the checked fillet and chamfer),
 /// process-wide. Their approximation tolerances are absolute and tuned for
 /// millimetre-sized parts: the same part modelled in metres fails (a top-loop

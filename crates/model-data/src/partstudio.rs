@@ -148,13 +148,14 @@ impl Feature {
 /// ([`PartStudio::legacy_topology`]); 8, a planar face's frame as Onshape's evPlane gives it
 /// ([`PartStudio::legacy_face_frames`]); 9, a sketch on a construction plane in std newSketch's frame
 /// ([`PartStudio::legacy_plane_sketch_frames`]); 10, a sketch region's edges along their sketch curves
-/// ([`PartStudio::legacy_edge_directions`]); 0, older studios.
+/// ([`PartStudio::legacy_edge_directions`]); 11, blends finished as live ([`PartStudio::legacy_blend_finish`]);
+/// 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(10)
+        ScopeRule(11)
     }
 }
 
@@ -361,6 +362,11 @@ pub struct PartStudio {
     /// keep the loop's direction, so patterns along them stay where they were.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_edge_directions: bool,
+    /// Saved with features before blends were finished as live's (ScopeRule < 11: approximated blend faces made
+    /// analytic before a full round's two faces merge, their rebuilt edges re-parametrised, a fallback's blend
+    /// finished too): its fillets keep the faces they had, so later features find them where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_blend_finish: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -578,6 +584,10 @@ impl PartStudio {
         // And with the region loops' edge directions.
         if self.scope_rule.0 < 10 && !self.features.is_empty() {
             self.legacy_edge_directions = true;
+        }
+        // And with blends finished as before.
+        if self.scope_rule.0 < 11 && !self.features.is_empty() {
+            self.legacy_blend_finish = true;
         }
         self.scope_rule = ScopeRule::default();
     }

@@ -250,6 +250,8 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
     let derived = ev.derived.clone();
     let cancel = ev.cancel.clone();
     let declines = noshape_kernel::DeclineScope::current();
+    // (The studio's blends finished as before rule 11 or not: a per-thread setting.)
+    let legacy_finish = noshape_kernel::legacy_blend_finish();
 
     // Run on a thread with a large stack (FeatureScript recursion), in the regeneration's cancel scope (the kernel's
     // cancel flag is per thread: without it a cancelled custom feature's Booleans ran to their end) and with the
@@ -258,6 +260,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
             .spawn_scoped(s, || {
+                noshape_kernel::set_legacy_blend_finish(legacy_finish);
                 let go = || {
                     noshape_featurescript::value::set_shown_counters(counters);
                     host::set_derived(derived);
@@ -442,6 +445,7 @@ pub(crate) fn run_manipulator_change(
 fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Value>, name: &str, units: &noshape_units::UnitPrefs, decls: &[ParamDecl], new_def: &Value, news: &ParamValues, cx: &Arc<FsContext>) -> Option<ParamValues> {
     let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
     let units = *units;
+    let legacy_finish = noshape_kernel::legacy_blend_finish();
     // The kernel's cancel flag for the call, raised at the limit (a timer woken when the call ends).
     let stop = std::sync::atomic::AtomicBool::new(false);
     let (done, timer) = std::sync::mpsc::channel::<()>();
@@ -456,6 +460,7 @@ fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Valu
         std::thread::Builder::new()
             .stack_size(STACK_SIZE)
             .spawn_scoped(s, move || {
+                noshape_kernel::set_legacy_blend_finish(legacy_finish);
                 let _done = done;
                 let mut i = Interp::new();
                 i.set_deadline(Some(Instant::now() + DIALOG_LIMIT));

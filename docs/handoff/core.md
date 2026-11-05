@@ -901,6 +901,20 @@ the way, not changed: (1) in scaled_blend, merge_full_rounds runs before analyti
 the gear's THIRD root fillets (edges InvalidCurveOnSurface / InvalidSameParameterFlag: the edges keep their old
 same-parameter flag, so BRepLib::SameParameter(nf, fit) skips them; `forced = true` makes them valid and those root
 fillets cylinders, as FILLET-PRISMATIC-CYLINDER wants). Both left to you.
+11-05 00:50, the lead gave both to skasm; done in your area, behind **ScopeRule 11** (`PartStudio::legacy_blend_finish`,
+kernel `set_legacy_blend_finish` / `legacy_blend_finish()`, carried with legacy_topology by `kernel_legacy()` /
+`with_kernel_legacy` at the parallel sites): features.cpp `finish_blend_faces` runs analytic_blend_faces before
+merge_full_rounds and merge_corner_spheres (a full round's B-spline blends merge too); analytic_blend_faces forces
+SameParameter on its rebuilt faces (the gear's THIRD root fillets are cylinders now); yesterday's fallback finish is
+under the rule too. Studios saved before rule 11 regenerate exactly as before. Evidence: dx's parity suite (a copy)
+39/55 documents, 386/471 features before and after, no feature's difference changed; the blend corpus (your
+/root/core-scratch/blend-corpus, 310 cases) replayed with the old and the new finish: 0 cases change face types,
+counts or volume; the gear's THIRD root blends now pass analytic_blend_faces' check (they are cylinders), counts
+and volumes the same. T1 custom_features::a_full_root_fillet_between_involutes_is_one_face: FULL one face, a studio
+saved before rule 11 its two. Custom features run on a thread of their own (custom/run.rs): both spawn sites now take the
+studio's legacy_blend_finish. **Seen, not changed:** they never got legacy_topology either, so a studio saved before
+rule 7 runs its custom features with the topology clean-ups on; passing it now would change how such studios
+regenerate today, so that's your call.
 
 ## From skasm (11-04 21:45, lead's request): TAB-RIPPED-CORNER taken by skasm
 The lead moved P1 TAB-RIPPED-CORNER (a Tab into a ripped flange corner fills nothing; T2 model sheetmetal_std::
