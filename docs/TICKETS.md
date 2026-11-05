@@ -857,6 +857,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
+- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:52, speed) cf-sheet-metal-model-plus regenerates in 2.5 s, live 0.92 (one.sh,
+  vibe5). By feature (NOSHAPE_FS_PROFILE): Sheet Metal Up to Part 281 ms (live 160), Flange 1 307 (224), Up to Face w/
+  Offset 35 (123), Extrude 4 898 (339). Extrude 4 is std's sheet metal boolean: 571 ms in the per-face loop
+  (boolean.fs createOutlineBooleanToolsForFaceNoChecks: thicken, trimTool's intersect, createOutline), of which
+  opCreateOutline 294 ms: the Common of the rolled face with each trimmed tool 42 / 66 ms in the kernel, the rest the
+  arguments' tracking queries (offsetFaces: startTracking of qCapEntity) and run_op; createOutline's cap check
+  (tracking queries again) ~157 ms; 250 ms after the loop (the definition's tracking and the part's rebuild). Next:
+  time evaluate_refs on tracking queries (a per-op cache of a tracked snapshot's resolution), and the Common on an
+  extruded surface (try the boolean on the face's surface as a cylinder or B-spline, or the section by the tool's
+  faces).
 - [ ] P2 SM-CURVED-OUTLINE-SHADOW (dx 11-05 09:27) cf-sheet-metal-model-plus's Extrude 4 (a 5 mm blind cut whose end
   slants across the sloped wall and the rolled wall): std's sheet metal boolean outlines each tool on each definition
   face (opCreateOutline with the trimmed tool's cap faces as offsetFaces); Parasolid's outline is the tool's shadow
