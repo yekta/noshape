@@ -70,17 +70,44 @@ impl LineSegment {
     /// faces the viewer (a segment between two faces turned away lies behind its own solid).
     pub const FACE_NORMALS: u32 = 128;
 
-    /// A solid's edge segment with the normal cones of the facets on its two sides, packed into its colour (unused
-    /// for part edges, drawn in the instance's colour) and its style's upper bits: the renderer leaves it out where
-    /// both sides face away from the viewer (it is behind its own solid). Cones too wide to say anything are left out.
-    pub fn with_face_normals(mut self, a: NormalCone, b: NormalCone) -> Self {
-        let (Some(ca), Some(cb)) = (a.code(), b.code()) else { return self };
-        let (ax, ay) = oct_code(a.axis);
-        let (bx, by) = oct_code(b.axis);
-        self.color = (ax | (ay << 10) | (ca << 20) | (cb << 26)).to_le_bytes();
-        self.style |= Self::FACE_NORMALS | (bx << 8) | (by << 18);
+    /// A solid's edge segment with what [`EdgeCull`] knows of its two sides, packed into its colour (unused for
+    /// part edges, drawn in the instance's colour) and its style's upper bits: the renderer leaves it out where both
+    /// sides face away from the viewer and the solid around it is several pixels thick (it is behind its own solid).
+    /// Cones too wide or a clearance too small to say anything leave the segment as it is.
+    pub fn with_face_normals(mut self, cull: EdgeCull) -> Self {
+        let (Some(ca), Some(cb), Some(cc)) = (cull.a.code(), cull.b.code(), clearance_code(cull.clearance)) else { return self };
+        let (ax, ay) = oct_code(cull.a.axis);
+        let (bx, by) = oct_code(cull.b.axis);
+        self.color = (ax | (ay << 10) | (ca << 20) | (cb << 25) | ((cull.convex as u32) << 30)).to_le_bytes();
+        self.style |= Self::FACE_NORMALS | (bx << 8) | (by << 18) | (cc << 28);
         self
     }
+}
+
+/// What lets the renderer leave an edge segment out: its two sides' facet normal cones, and the solid's clearance
+/// around it (model units): no face but its two within that distance, and where a side curves away along the edge
+/// (`convex`, a boss's rim), that side's radius at most.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EdgeCull {
+    pub a: NormalCone,
+    pub b: NormalCone,
+    pub clearance: f32,
+    pub convex: bool,
+}
+
+/// What is known of one edge segment's two sides: their facet normals (outward), the clearance and curving as in
+/// [`EdgeCull`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EdgeSides {
+    pub normals: [Vec3; 2],
+    pub clearance: f32,
+    pub convex: bool,
+}
+
+/// The clearance in 4 bits, rounded down: 2^(code - 17) model units (meters: 15 µm to 0.25 m); `None` under it.
+fn clearance_code(c: f32) -> Option<u32> {
+    let code = (c.max(1e-30).log2() + 17.0).floor();
+    (code >= 1.0).then(|| (code as u32).min(15))
 }
 
 /// Facet normals around an axis: every normal is within the angle whose sine is `sin_spread` of `axis` (unit), so a
@@ -107,10 +134,10 @@ impl NormalCone {
         Some(Self { axis, sin_spread })
     }
 
-    /// The spread in 6 bits, rounded up and widened by the 10-bit normal's error; `None` if it says nothing.
+    /// The spread in 5 bits, rounded up and widened by the 10-bit normal's error; `None` if it says nothing.
     fn code(self) -> Option<u32> {
         let s = self.sin_spread + 0.006;
-        (s < 1.0).then(|| ((s * 63.0).ceil() as u32).min(63))
+        (s < 1.0).then(|| ((s * 31.0).ceil() as u32).min(31))
     }
 }
 
@@ -856,12 +883,12 @@ pub fn edge_line_lods(edges: &[Vec<[f32; 3]>], diagonal: f32) -> Vec<LineData> {
     edge_line_lods_with_normals(edges, &[], diagonal)
 }
 
-/// The facet normals on either side of each segment of each edge (`None` where not known).
-pub type EdgeFacetNormals = Vec<Vec<Option<[Vec3; 2]>>>;
+/// Each segment's two sides ([`EdgeSides`]), by edge and segment (`None` where not known).
+pub type EdgeFacetNormals = Vec<Vec<Option<EdgeSides>>>;
 
-/// [`edge_line_lods`] with each edge segment's facet normals (`normals[edge][segment]`, may be empty): a simplified
-/// segment carries the cones of the normals it stands for ([`LineSegment::with_face_normals`]).
-pub fn edge_line_lods_with_normals(edges: &[Vec<[f32; 3]>], normals: &[Vec<Option<[Vec3; 2]>>], diagonal: f32) -> Vec<LineData> {
+/// [`edge_line_lods`] with each edge segment's sides (`normals[edge][segment]`, may be empty): a simplified segment
+/// carries what is known of the segments it stands for ([`LineSegment::with_face_normals`]).
+pub fn edge_line_lods_with_normals(edges: &[Vec<[f32; 3]>], normals: &[Vec<Option<EdgeSides>>], diagonal: f32) -> Vec<LineData> {
     LINE_LOD_TOLERANCES[1..]
         .iter()
         .map(|t| {
@@ -872,7 +899,7 @@ pub fn edge_line_lods_with_normals(edges: &[Vec<[f32; 3]>], normals: &[Vec<Optio
                 for w in kept.windows(2) {
                     let seg = LineSegment { a: pl[w[0]], b: pl[w[1]], color: [0, 0, 0, 255], pick_id: ei as u32 + 1, width: 1.25, style: LineSegment::CORE };
                     l.segments.push(match ns.and_then(|ns| edge_cull_cones(ns, w[0], w[1])) {
-                        Some((a, b)) => seg.with_face_normals(a, b),
+                        Some(cull) => seg.with_face_normals(cull),
                         None => seg,
                     });
                 }
@@ -886,21 +913,23 @@ pub fn edge_line_lods_with_normals(edges: &[Vec<[f32; 3]>], normals: &[Vec<Optio
 /// (point indices), and its cones also take in the segments on either side (where a neighbour's facet turns toward
 /// the viewer, the outline passes through the shared point and the line's end would show). `None` for a run touching
 /// the edge's ends (a vertex: other edges, perhaps an outline, meet there) or with unknown normals.
-pub fn edge_cull_cones(normals: &[Option<[Vec3; 2]>], from: usize, to: usize) -> Option<(NormalCone, NormalCone)> {
+pub fn edge_cull_cones(normals: &[Option<EdgeSides>], from: usize, to: usize) -> Option<EdgeCull> {
     if from == 0 || to >= normals.len() || from >= to {
         return None;
     }
     edge_span_cones(&normals[from - 1..to + 1])
 }
 
-/// The two sides' normal cones over a run of segments (`None` if any segment's normals are unknown).
-pub fn edge_span_cones(span: &[Option<[Vec3; 2]>]) -> Option<(NormalCone, NormalCone)> {
+/// The two sides' normal cones over a run of segments, its smallest clearance, convex if any is (`None` if any
+/// segment's sides are unknown).
+pub fn edge_span_cones(span: &[Option<EdgeSides>]) -> Option<EdgeCull> {
     if span.is_empty() || span.iter().any(Option::is_none) {
         return None;
     }
-    let a = NormalCone::of(span.iter().flatten().map(|n| n[0]))?;
-    let b = NormalCone::of(span.iter().flatten().map(|n| n[1]))?;
-    Some((a, b))
+    let a = NormalCone::of(span.iter().flatten().map(|n| n.normals[0]))?;
+    let b = NormalCone::of(span.iter().flatten().map(|n| n.normals[1]))?;
+    let clearance = span.iter().flatten().map(|n| n.clearance).fold(f32::INFINITY, f32::min);
+    Some(EdgeCull { a, b, clearance, convex: span.iter().flatten().any(|n| n.convex) })
 }
 
 impl Default for Style {

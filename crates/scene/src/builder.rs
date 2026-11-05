@@ -16,6 +16,8 @@ use noshape_render::{Drawable, ImageData, ImageHandle, Instance, LineData, LineS
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub use crate::edge_sides::edge_facet_normals;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PickKind {
     Face,
@@ -1164,7 +1166,7 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
             // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased).
             let seg = LineSegment { a: w[0], b: w[1], color: [0, 0, 0, 255], pick_id: ei as u32 + 1, width: 1.0, style: LineSegment::CORE };
             lines.segments.push(match noshape_render::scene::edge_cull_cones(&normals[ei], si, si + 1) {
-                Some((a, b)) => seg.with_face_normals(a, b),
+                Some(cull) => seg.with_face_normals(cull),
                 None => seg,
             });
         }
@@ -1203,53 +1205,6 @@ fn edge_lods_with_normals(m: &noshape_model::display::MeshBuffers, normals: &nos
         return Vec::new();
     }
     noshape_render::scene::edge_line_lods_with_normals(&m.edges, normals, (hi - lo).length()).iter().map(|l| up.upload_lines(l)).collect()
-}
-
-/// The normals of the facets on either side of each edge segment (`[edge][segment]`): the two triangles of two
-/// different faces whose side is the segment (same end points, bit for bit), each normal turned outward like its
-/// vertex normals; `None` where there aren't exactly two (an open sheet's border, a mesh that doesn't share the
-/// edge's points). The renderer leaves out the segments both of whose facets face away (behind their own solid).
-pub fn edge_facet_normals(m: &noshape_model::display::MeshBuffers) -> noshape_render::scene::EdgeFacetNormals {
-    type Key = ([u32; 3], [u32; 3]);
-    let key = |a: [f32; 3], b: [f32; 3]| -> Key {
-        let (ka, kb) = (a.map(f32::to_bits), b.map(f32::to_bits));
-        if ka <= kb { (ka, kb) } else { (kb, ka) }
-    };
-    let wanted: std::collections::HashSet<Key> = m.edges.iter().flat_map(|pl| pl.windows(2).map(|w| key(w[0], w[1]))).collect();
-    let mut sides: HashMap<Key, Vec<(glam::Vec3, usize)>> = HashMap::new();
-    let p = |i: u32| m.positions.get(i as usize).copied();
-    for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
-        let Some(tris) = m.indices.get(start as usize..(start + count) as usize) else { continue };
-        for t in tris.as_chunks::<3>().0 {
-            let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2])) else { continue };
-            let (va, vb, vc) = (glam::Vec3::from(a), glam::Vec3::from(b), glam::Vec3::from(c));
-            let mut n = (vb - va).cross(vc - va).normalize_or_zero();
-            if n == glam::Vec3::ZERO {
-                continue;
-            }
-            let shading: glam::Vec3 = t.iter().filter_map(|&i| m.normals.get(i as usize)).map(|v| glam::Vec3::from(*v)).sum();
-            if n.dot(shading) < 0.0 {
-                n = -n;
-            }
-            for (x, y) in [(a, b), (b, c), (c, a)] {
-                let k = key(x, y);
-                if wanted.contains(&k) {
-                    sides.entry(k).or_default().push((n, fi));
-                }
-            }
-        }
-    }
-    m.edges
-        .iter()
-        .map(|pl| {
-            pl.windows(2)
-                .map(|w| match sides.get(&key(w[0], w[1])).map(Vec::as_slice) {
-                    Some(&[(n0, f0), (n1, f1)]) if f0 != f1 => Some(if f0 < f1 { [n0, n1] } else { [n1, n0] }),
-                    _ => None,
-                })
-                .collect()
-        })
-        .collect()
 }
 
 /// Onshape's edge-based silhouettes: every tessellation edge inside a face

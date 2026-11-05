@@ -764,10 +764,20 @@ fn edge_normal(x: u32, y: u32) -> vec3<f32> {
     return normalize((inst.normal_m * vec4(oct_decode(e), 0.0)).xyz);
 }
 
+// How many device pixels `t` world units across at `w` cover on screen (0 behind the eye).
+fn px_across(w: vec3<f32>, t: f32) -> f32 {
+    let p = g.view_proj * vec4(w, 1.0);
+    let q = g.view_proj * vec4(w + g.camera_up.xyz * t, 1.0);
+    if (p.w <= 1e-6 || q.w <= 1e-6) { return 0.0; }
+    return length((q.xy / q.w - p.xy / p.w) * g.viewport.xy * 0.5);
+}
+
 // A solid's edge segment whose facets on both sides face away from the viewer, everywhere along it, lies behind
 // that solid's own front faces: it is never seen (instance params.x bit 4: an opaque solid's edges, no section
-// cutting it; the segment carries its facets' normal cones). Not while it is highlighted, and with a margin so the
-// segments by the outline, where its front and back faces meet, are still drawn.
+// cutting it; the segment carries its facets' normal cones and the solid's clearance around it). Only where the
+// solid is thick enough on screen that nothing of the line would show: its two faces cover the line's width on both
+// sides (the clearance times how far each turns away; a convex side's radius curves back sooner), and the faces
+// in front far enough from it that the depth offsets don't let it through. Not while highlighted.
 fn behind_own_solid(l: LineIn) -> bool {
     if ((inst.params.x & 16u) == 0u || (l.style & 128u) == 0u) { return false; }
     if (g.flags.x != 0u && (inst.params.y & 1u) == 0u) { return false; }
@@ -776,15 +786,23 @@ fn behind_own_solid(l: LineIn) -> bool {
     let packed = c.x | (c.y << 8u) | (c.z << 16u) | (c.w << 24u);
     let na = edge_normal(packed & 1023u, (packed >> 10u) & 1023u);
     let nb = edge_normal((l.style >> 8u) & 1023u, (l.style >> 18u) & 1023u);
-    let margin = 0.02;
-    let sa = -(f32((packed >> 20u) & 63u) / 63.0 + margin);
-    let sb = -(f32((packed >> 26u) & 63u) / 63.0 + margin);
     let wa = (inst.model * vec4(l.a, 1.0)).xyz;
     let wb = (inst.model * vec4(l.b, 1.0)).xyz;
     let persp = g.camera_pos.w > 0.5;
     let va = select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - wa), persp);
     let vb = select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - wb), persp);
-    return dot(na, va) < sa && dot(na, vb) < sa && dot(nb, va) < sb && dot(nb, vb) < sb;
+    // How far past perpendicular each side's cone is turned away (> 0: all its facets face away).
+    let sa = f32((packed >> 20u) & 31u) / 31.0;
+    let sb = f32((packed >> 25u) & 31u) / 31.0;
+    let d = min(min(-dot(na, va), -dot(na, vb)) * (1.0 - sa * sa) - sa, min(-dot(nb, va), -dot(nb, vb)) * (1.0 - sb * sb) - sb);
+    if (d <= 0.0) { return false; }
+    let t = exp2(f32(l.style >> 28u) - 17.0) * length(inst.model[0].xyz);
+    let px = min(px_across(wa, t), px_across(wb, t));
+    let width = l.width * inst.extra.x * g.viewport.z * 0.5 + 1.5;
+    if (((packed >> 30u) & 1u) != 0u) {
+        return px * d * d * 0.5 >= width && min(px, 2.0 * px * d) >= 8.0;
+    }
+    return px * d >= width && px >= 8.0;
 }
 
 // NOSHAPE_PERF_LINES=minimal (benchmarks only): the segment projected and widened, nothing else (no state, lift,

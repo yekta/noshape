@@ -60,37 +60,72 @@ fn models() -> Vec<(&'static str, StudioDisplay)> {
 /// View directions (forward), off-axis so edges turn away at many angles.
 const VIEWS: [[f64; 3]; 4] = [[-1.0, 1.0, -1.0], [1.0, 0.4, -0.6], [0.3, -1.0, 0.8], [-0.2, 0.1, -1.0]];
 
-/// The frame with hidden edges kept or left out, and how many edge segments face away on both sides.
-fn render(r: &mut Renderer, display: &StudioDisplay, keep: bool, view: DVec3, projection: Projection, dpr: f32, far: f64) -> Vec<u8> {
-    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
-    let up = r.uploader();
-    let mut cache = GpuCache::default();
-    let opts = SceneOptions { keep_hidden_edges: keep, display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() };
-    let built = builder::build(display, &opts, &mut cache, &up);
-    let (lo, hi) = built.scene.bounds().map(|(l, h)| (l.as_dvec3(), h.as_dvec3())).unwrap();
-    let (w, h) = ((640.0 * dpr) as u32, (480.0 * dpr) as u32);
+/// The camera of a view: `far` times farther than fitting the part.
+fn camera(display: &StudioDisplay, view: DVec3, projection: Projection, dpr: f32, far: f64) -> Camera {
+    let (w, h) = ((640.0 * dpr) as f64, (480.0 * dpr) as f64);
+    let (lo, hi) = display.bodies[0].mesh.positions.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), p| {
+        let p = DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64);
+        (lo.min(p), hi.max(p))
+    });
     let mut cam = Camera::default();
     let fwd = view.normalize();
     let side = fwd.cross(DVec3::Z).normalize_or(DVec3::X);
     cam.rotation = Camera::look_rotation(fwd, side.cross(fwd));
     cam.projection = projection;
-    cam.fit_box(lo, hi, w as f64 / h as f64);
+    cam.fit_box(lo, hi, w / h);
     // Zoomed out, the part is small on screen and its edges are drawn at a coarser line level.
     cam.distance *= far;
-    let scene = builder::with_highlights(&built, display, &[], None, &[], Vec::new(), false, &up);
-    r.render(RenderParams { scene: &scene, camera: &cam, width: w, height: h, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap().bgra
+    cam
 }
 
-/// The finest edge segments left out for `view` (orthographic), as the shader decides (their cones past
-/// perpendicular by the spread and the margin).
-fn turned_away(display: &StudioDisplay, view: DVec3) -> usize {
-    let v = -view.normalize().as_vec3();
-    let normals = builder::edge_facet_normals(&display.bodies[0].mesh);
-    let away = |c: noshape_render::scene::NormalCone| c.axis.dot(v) < -(c.sin_spread + 0.006 + 1.0 / 63.0 + 0.02);
-    normals
-        .iter()
-        .map(|ns| (0..ns.len()).filter(|&si| noshape_render::scene::edge_cull_cones(ns, si, si + 1).is_some_and(|(a, b)| away(a) && away(b))).count())
-        .sum()
+/// The frame with hidden edges kept or left out.
+fn render(r: &mut Renderer, display: &StudioDisplay, keep: bool, cam: &Camera, dpr: f32) -> Vec<u8> {
+    let style = noshape_scene::png::viewport_style(&noshape_scene::GraphicsPrefs::default());
+    let up = r.uploader();
+    let mut cache = GpuCache::default();
+    let opts = SceneOptions { keep_hidden_edges: keep, display_mode: DisplayMode::ShadedWithEdges, show_planes: false, show_origin: false, show_sketches: false, ..Default::default() };
+    let built = builder::build(display, &opts, &mut cache, &up);
+    let (w, h) = ((640.0 * dpr) as u32, (480.0 * dpr) as u32);
+    let scene = builder::with_highlights(&built, display, &[], None, &[], Vec::new(), false, &up);
+    r.render(RenderParams { scene: &scene, camera: cam, width: w, height: h, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap().bgra
+}
+
+/// How many of the finest edge segments the visible lines' pass leaves out (shaders.wgsl `behind_own_solid`, at a
+/// 1 px line), as the renderer decides.
+fn left_out(display: &StudioDisplay, cam: &Camera, dpr: f32) -> usize {
+    let viewport = glam::DVec2::new(640.0 * dpr as f64, 480.0 * dpr as f64);
+    let mesh = &display.bodies[0].mesh;
+    let normals = builder::edge_facet_normals(mesh);
+    let px_across = |w: DVec3, t: f64| -> f64 {
+        match (cam.project(w, viewport, 1.0), cam.project(w + cam.up() * t, viewport, 1.0)) {
+            (Some(a), Some(b)) => a.distance(b),
+            _ => 0.0,
+        }
+    };
+    let mut n = 0;
+    for (pl, ns) in mesh.edges.iter().zip(&normals) {
+        for si in 0..ns.len() {
+            let Some(c) = noshape_render::scene::edge_cull_cones(ns, si, si + 1) else { continue };
+            if c.clearance < 2f32.powi(-16) {
+                continue;
+            }
+            let ends = [pl[si], pl[si + 1]].map(|p| DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+            let toward = |w: DVec3| if cam.projection == Projection::Perspective { (cam.eye() - w).normalize() } else { -cam.forward() };
+            let side = |cone: noshape_render::scene::NormalCone| {
+                let s = ((cone.sin_spread as f64 + 0.006) * 31.0).ceil() / 31.0;
+                ends.iter().map(|&w| -cone.axis.as_dvec3().dot(toward(w))).fold(f64::INFINITY, f64::min) * (1.0 - s * s) - s
+            };
+            let d = side(c.a).min(side(c.b));
+            let t = 2f64.powf((c.clearance as f64).log2().floor().min(-2.0));
+            let px = ends.iter().map(|&w| px_across(w, t)).fold(f64::INFINITY, f64::min);
+            let width = 0.5 * dpr as f64 + 1.5;
+            let thick = if c.convex { px * d * d * 0.5 >= width && px.min(2.0 * px * d) >= 8.0 } else { px * d >= width && px >= 8.0 };
+            if d > 0.0 && thick {
+                n += 1;
+            }
+        }
+    }
+    n
 }
 
 fn compare(views: &[[f64; 3]], dprs: &[f32]) {
@@ -101,7 +136,7 @@ fn compare(views: &[[f64; 3]], dprs: &[f32]) {
             return;
         }
     };
-    let mut away = 0;
+    let mut left = 0;
     for (name, display) in models() {
         let normals = builder::edge_facet_normals(&display.bodies[0].mesh);
         let known = normals.iter().flatten().filter(|n| n.is_some()).count();
@@ -109,11 +144,14 @@ fn compare(views: &[[f64; 3]], dprs: &[f32]) {
         assert!(known * 10 >= total * 9, "{name}: facet normals for {known} of {total} edge segments");
         for v in views {
             let view = DVec3::from_array(*v);
-            away += turned_away(&display, view);
             for projection in [Projection::Orthographic, Projection::Perspective] {
                 for (dpr, far) in dprs.iter().map(|&d| (d, 1.0)).chain([(1.0, 8.0), (1.0, 30.0)]) {
-                    let kept = render(&mut r, &display, true, view, projection, dpr, far);
-                    let culled = render(&mut r, &display, false, view, projection, dpr, far);
+                    let cam = camera(&display, view, projection, dpr, far);
+                    let n = left_out(&display, &cam, dpr);
+                    eprintln!("{name} {v:?} {projection:?} {dpr}x far {far}: {n} segments left out");
+                    left += n;
+                    let kept = render(&mut r, &display, true, &cam, dpr);
+                    let culled = render(&mut r, &display, false, &cam, dpr);
                     let differ = kept.chunks(4).zip(culled.chunks(4)).filter(|(a, b)| a != b).count();
                     if differ > 0 {
                         let w = (640.0 * dpr) as usize;
@@ -125,8 +163,7 @@ fn compare(views: &[[f64; 3]], dprs: &[f32]) {
             }
         }
     }
-    eprintln!("segments left out over the views: {away}");
-    assert!(away > 0, "some segments are left out (else the comparison proves nothing)");
+    assert!(left > 0, "some segments are left out (else the comparison proves nothing)");
 }
 
 #[test]
