@@ -103,6 +103,16 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- cf-fix-pcb, motor-mount-jack (bool, 11-05 11-05 13:37). Landed ba96d940 (crossings seeded only from chords within their
+  bulges of each other: the spur gear cut's Newton runs -70 %) and c04768bb: a ray's crossing with a small free-form
+  face where Newton's steps stall at rounding (a 3 mm letter's wall over u 0 .. 1: u moves 3e-14 a step, never
+  "converged") is kept when on the ray within 1e-12 (pieces only had that): cf-fix-pcb's glued letter fuse 474a is
+  ours (0.1 s, OCCT 0.38 s), bool-corpus +3. motor-mount-jack's f09d (Circular pattern 1, the slot cut): a closed
+  loop's angles covered takes it as OCCT's (/root/bool-scratch/slot-loop-angles.patch), but ~290 ms against OCCT's
+  ~250 locally (OCCT's sections of the slots' extruded ellipses with the tube 50 ms, the slots' B-spline outlines
+  projected onto the tube 80 ms in the build): left declined (at once). Lifting an extrusion onto a quadric by the
+  roots along its lines (/root/bool-scratch/quadric-lift.patch) makes those sections ours but its 1e-8 cubics have
+  hundreds of points and the rest of the Boolean pays for them: the mmj corpus 379 -> 478 ms (vibe3); not landed.
 - Our own sections (bool, 11-05 11-05 11:34). The hookup: rust_boolean.cpp own_sections(fa, fb, lines) makes a pair's
   sections as OCCT's IntTools_Curve (curve, curves on both faces, tolerance), called before IntTools_FaceFace in
   occt_ahead and occt_sections; everything after (the build's pcurves, section_tol) is unchanged.
