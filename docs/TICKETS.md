@@ -661,6 +661,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (fixed wall from x 32.58, moved wall from 30) and its strip runs on 20.75 mm into the cutout; the cut back (a lofted
   cutter) shares no volume with the bend there, so the strip stays (+625 mm³). Live's dogbone is on the y = 40 edge:
   the bend's end is square. Once the order is live's, check the slanted-end cutter on its own (T2 to add).
+  dx 11-05 02:39: live's order for that sheet is Sketch 1's eight lines as drawn (bottom, top, left, right, y = 40,
+  y = 20, x = 30, x = 0 above the cutout: JGB … JGd). Branch wip/dx-edge-order sorts a sheet's edges that lie along
+  a sketch curve by (sketch, entity) wherever results leave the host (evaluateQuery, qNthElement): Corner Overcut 1
+  and 2 then still match, but Corner Overcut 3 fails: after Extrude 1's sheet metal Boolean the new definition
+  vertex at (37.5, 10) has no association (its neighbours (39.48, 0) and (50, 10) do), so std's
+  assignSMAttributesToNewOrSplitEntities took it for an original entity: its transient id must collide with one
+  of the initial entities' (ours follow names whose ordinals shift; the new order interns ids in another order).
+  Next: find that collision (getInitialEntitiesAndAttributes' ids vs the vertex's), then rerun the corpus with
+  the order on.
 - [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
   50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
   meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so
