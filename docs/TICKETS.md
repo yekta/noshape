@@ -564,6 +564,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   release (it already does) and will add this document to the release smoke. live: opens it. (qa 2026-11-05 09:16)
   qa 09:32: one more release-loop death, not reproduced: v0.4.30 seed 4558 died at step 73 (a Shell, 7.4 s, no message); replays
   v0.4.30 2 / 2 and green dedfb1ae 1 / 1 ran to the end. Logged here in case it is the same release-build difference.
+  core 11-05 12:53: not the release profile: our release builds (vibe5) of v0.4.31's source (-p noshape-cli alone, and
+  -p noshape -p noshape-cli -p noshape-launcher as release.yml) and of main open it in ~8 s (Fillet 6 Ok; step 99's
+  fillet errors at once); v0.4.31's shipped CLI hangs here. Same rustc (1.98.1); the differences left are CI's: OCCT
+  compiled by GCC 13.3 (ours in /opt/occt by GCC 15.2; the patched sources are the same), and lld (ours mold). Building
+  OCCT as CI does (scripts/build-occt.sh, g++-13) on vibe4 (~/agents/core-occt-ci) to link v0.4.31 against it.
 - [ ] P2 DISPLACEMENT-TOP-VOLUME (core 11-05 12:18) a displacement map's replaced flat top (a 512² or 704² B-spline
   trimmed by the cylinder's circle) takes 20 s for its volume (mass properties; the side face's 0.6-1 s): common.cpp
   face_moments' boundary integral cuts the circle's curve on the face at every knot it crosses and runs an inner
@@ -3929,6 +3934,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (was 458 failing; live 96 for the document): the lines' cut by noshape's Boolean 11 ms, the rings' and balls' cut by
   OCCT 571 ms (tori; noshape's declines "an edge on another argument's free-form face"): bool, recorded case vibe5
   ~/agents/shared-cases/michael-fillet2/f71e381ddc082e34 (14 tools).
+  core 11-05 12:54: the 4 extra edges / vertices are where each R12.5 rim torus's seam (OCCT's u = 0, +x from the hole
+  axis, towards the prong end) meets its outer loop: it ends mid-way on the curve the torus shares with the prong end's
+  round (bottom left rim: e31 / e32 between F7 and F27, joined at (188.75, 50, 0.37)); live's is one edge. The seam can
+  only move to a vertex of that loop (e.g. (187.59, 60.51, 0.15), u 25°) with the hole's cylinder seam and the top rim
+  torus's seam at the same angle (they share the rim circles' vertices): a chain move (torus, cylinder, torus) that
+  seam_to_vertex doesn't do yet; then join_loop_pieces joins the pieces. Probe: /root/core-scratch/michael-seams-probe.patch.
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,
