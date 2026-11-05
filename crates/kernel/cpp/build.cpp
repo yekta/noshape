@@ -1,5 +1,8 @@
 #include <BRepTools_ReShape.hxx>
 #include <BRepCheck_Analyzer.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
+#include <BRepClass_FaceClassifier.hxx>
+#include <ElSLib.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <NCollection_DataMap.hxx>
 #include <ShapeFix_Face.hxx>
@@ -1435,6 +1438,382 @@ std::unique_ptr<OcShapeList> edges_to_wires(const OcShape& s, double tol)
     for (int i = 1; i <= wires->Length(); ++i)
       out->items.push_back(wires->Value(i));
   return out;
+}
+
+} // namespace noshape
+
+namespace noshape {
+
+// A face pattern of a pocket (`faces`, the seed's walls) whose copies land on the faces holding the seed's rims, each
+// of which the instance transforms (`m`, 12 values each: rows of 3 x 4) map onto itself (a tube's coaxial cylinders
+// under a rotation about their axis, a plate's plane under a shift in it): each such face with every copy's rim loops
+// as more holes (their curves on it the seed's, shifted), the walls copied (Parasolid's face pattern copies the faces;
+// no Boolean). A cylinder band whose seam a loop would cross gets its seam moved to the widest angle clear of them
+// first. `codes`, per face of the result: its index in `solid`, or -(1 + instance * walls + wall). An error where it
+// doesn't apply (a copy leaving its face, near another loop or any other face): then the general cut.
+std::unique_ptr<OcShape> stitch_face_copies(const OcShape& solid_in, const OcShapeList& faces_in, rust::Slice<const double> m,
+                                            rust::Vec<int64_t>& codes)
+{
+  const bool dbg = std::getenv("NOSHAPE_STITCH_DEBUG") != nullptr;
+  if (faces_in.items.empty() || m.empty() || m.size() % 12 != 0)
+    fail_op("stitch: nothing to pattern");
+  const int            n = (int)(m.size() / 12);
+  std::vector<gp_Trsf> ts((size_t)n);
+  for (int i = 0; i < n; ++i)
+  {
+    const double* r = m.data() + 12 * i;
+    ts[(size_t)i].SetValues(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11]);
+    if (ts[(size_t)i].IsNegative() || std::abs(ts[(size_t)i].ScaleFactor() - 1) > 1e-12)
+      fail_op("stitch: not a rigid motion");
+  }
+  ShapeIMap sel;
+  for (const TopoDS_Shape& f : faces_in.items)
+    sel.Add(f);
+  TopoDS_Shape S = solid_in.shape;
+  occ::handle<BRepTools_History> moved; // the seams moved
+  BRep_Builder B;
+  for (int attempt = 0;; ++attempt)
+  {
+    TopoDS_Shell shell;
+    int          nshells = 0, nsolids = 0;
+    for (TopExp_Explorer x(S, TopAbs_SHELL); x.More(); x.Next(), ++nshells)
+      shell = TopoDS::Shell(x.Current());
+    for (TopExp_Explorer x(S, TopAbs_SOLID); x.More(); x.Next())
+      ++nsolids;
+    if (nsolids != 1 || nshells != 1)
+      fail_op("stitch: not one solid of one shell");
+    ShapeAncMap ef;
+    TopExp::MapShapesAndUniqueAncestors(S, TopAbs_EDGE, TopAbs_FACE, ef);
+    // The faces holding the seed's rims, each with its rim edges.
+    std::vector<TopoDS_Face> hosts;
+    std::vector<ShapeIMap>   rims;
+    for (int i = 1; i <= sel.Extent(); ++i)
+      for (TopExp_Explorer x(sel(i), TopAbs_EDGE); x.More(); x.Next())
+      {
+        const ShapeList* fs = ef.Seek(x.Current());
+        if (fs == nullptr)
+          fail_op("stitch: a wall off the part");
+        for (ShapeList::Iterator it(*fs); it.More(); it.Next())
+        {
+          if (sel.Contains(it.Value()))
+            continue;
+          size_t h = 0;
+          while (h < hosts.size() && !hosts[h].IsSame(it.Value()))
+            ++h;
+          if (h == hosts.size())
+          {
+            hosts.push_back(TopoDS::Face(it.Value()));
+            rims.emplace_back();
+          }
+          rims[h].Add(x.Current());
+        }
+      }
+    if (hosts.empty())
+      fail_op("stitch: no rims");
+    // Each host's rims: whole holes of it (the seed's there), none on a seam.
+    std::vector<std::vector<TopoDS_Wire>> seed_wires(hosts.size());
+    for (size_t h = 0; h < hosts.size(); ++h)
+    {
+      const TopoDS_Face hf      = TopoDS::Face(hosts[h].Oriented(TopAbs_FORWARD));
+      const TopoDS_Wire outer   = BRepTools::OuterWire(hf);
+      int               covered = 0;
+      for (TopoDS_Iterator w(hf); w.More(); w.Next())
+      {
+        int in = 0, k = 0;
+        for (TopoDS_Iterator e(w.Value()); e.More(); e.Next(), ++k)
+          in += rims[h].Contains(e.Value()) ? 1 : 0;
+        if (in == 0)
+          continue;
+        if (in != k || w.Value().IsSame(outer))
+          fail_op("stitch: a rim isn't a hole of its face");
+        seed_wires[h].push_back(TopoDS::Wire(w.Value()));
+        covered += k;
+      }
+      for (int i = 1; i <= rims[h].Extent(); ++i)
+        if (BRep_Tool::IsClosed(TopoDS::Edge(rims[h](i)), hf))
+          fail_op("stitch: a rim on a seam");
+      if (covered != rims[h].Extent())
+        fail_op("stitch: rims left over");
+    }
+    // Each host mapped onto itself by each transform, its parameters shifted by (du, dv): checked over its (u, v) box.
+    std::vector<std::vector<gp_Vec2d>> shift(hosts.size(), std::vector<gp_Vec2d>((size_t)n));
+    for (size_t h = 0; h < hosts.size(); ++h)
+    {
+      BRepAdaptor_Surface       s(hosts[h]);
+      const GeomAbs_SurfaceType k = s.GetType();
+      auto params = [&](const gp_Pnt& p, double& u, double& v) {
+        switch (k)
+        {
+          case GeomAbs_Plane: ElSLib::Parameters(s.Plane(), p, u, v); return true;
+          case GeomAbs_Cylinder: ElSLib::Parameters(s.Cylinder(), p, u, v); return true;
+          case GeomAbs_Cone: ElSLib::Parameters(s.Cone(), p, u, v); return true;
+          case GeomAbs_Sphere: ElSLib::Parameters(s.Sphere(), p, u, v); return true;
+          case GeomAbs_Torus: ElSLib::Parameters(s.Torus(), p, u, v); return true;
+          default: return false;
+        }
+      };
+      double u0, u1, v0, v1;
+      BRepTools::UVBounds(hosts[h], u0, u1, v0, v1);
+      const double tol = 10 * BRep_Tool::Tolerance(hosts[h]);
+      for (int i = 0; i < n; ++i)
+      {
+        const double um = 0.5 * (u0 + u1), vm = 0.5 * (v0 + v1);
+        double       u, v;
+        if (!params(s.Value(um, vm).Transformed(ts[(size_t)i]), u, v))
+          fail_op("stitch: a host that isn't elementary");
+        gp_Vec2d d(u - um, v - vm);
+        if (s.IsUPeriodic())
+          d.SetX(std::remainder(d.X(), s.UPeriod()));
+        for (int a = 0; a <= 2; ++a)
+          for (int b = 0; b <= 2; ++b)
+          {
+            const double uu = u0 + (u1 - u0) * a / 2, vv = v0 + (v1 - v0) * b / 2;
+            if (s.Value(uu + d.X(), vv + d.Y()).Distance(s.Value(uu, vv).Transformed(ts[(size_t)i])) > tol)
+              fail_op("stitch: a host the transform doesn't keep");
+          }
+        shift[h][(size_t)i] = d;
+      }
+    }
+    // Each loop's curves' u on a periodic host (a copy's shifted, by whole turns so its first edge's middle is in the
+    // face's range): one crossing the seam has the seam moved into the widest gap of every loop's and edge's, the band
+    // then made again.
+    auto loop_us = [&](size_t h, const TopoDS_Wire& w, double du, double period, double u0, double& turns) {
+      std::vector<double> us;
+      const TopoDS_Face   hf    = TopoDS::Face(hosts[h].Oriented(TopAbs_FORWARD));
+      bool                first = true;
+      for (TopoDS_Iterator e(w); e.More(); e.Next())
+      {
+        double                          f, l;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Value().Oriented(TopAbs_FORWARD)), hf, f, l);
+        if (pc.IsNull())
+          fail_op("stitch: a rim without its curve on the face");
+        if (first && period > 0)
+          turns = std::floor((pc->Value(0.5 * (f + l)).X() + du - u0) / period) * period;
+        first = false;
+        for (int k = 0; k <= 16; ++k)
+          us.push_back(pc->Value(f + (l - f) * k / 16).X() + du - turns);
+      }
+      return us;
+    };
+    bool restart = false;
+    for (size_t h = 0; h < hosts.size() && !restart; ++h)
+    {
+      BRepAdaptor_Surface s(hosts[h]);
+      if (s.GetType() != GeomAbs_Cylinder || !s.IsUPeriodic())
+        continue;
+      const double period = s.UPeriod();
+      double       u0, u1, v0, v1;
+      BRepTools::UVBounds(hosts[h], u0, u1, v0, v1);
+      if (u1 - u0 < period - 1e-9)
+        continue;
+      std::vector<double> all;
+      bool                crosses = false;
+      for (int i = 0; i < n; ++i)
+        for (const TopoDS_Wire& w : seed_wires[h])
+        {
+          double turns = 0;
+          for (const double u : loop_us(h, w, shift[h][(size_t)i].X(), period, u0, turns))
+          {
+            crosses = crosses || u < u0 - 1e-9 || u > u0 + period + 1e-9;
+            all.push_back(u);
+          }
+        }
+      if (!crosses)
+        continue;
+      if (attempt >= 4)
+        fail_op("stitch: the seams keep crossing the copies");
+      // The seed's loops, and the host's other edges but its end circles and seams.
+      for (const TopoDS_Wire& w : seed_wires[h])
+      {
+        double turns = 0;
+        for (const double u : loop_us(h, w, 0, period, u0, turns))
+          all.push_back(u);
+      }
+      const TopoDS_Face hf = TopoDS::Face(hosts[h].Oriented(TopAbs_FORWARD));
+      for (TopExp_Explorer x(hf, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        TopoDS_Vertex      a0, a1;
+        TopExp::Vertices(e, a0, a1);
+        if (BRep_Tool::IsClosed(e, hf) || (!a0.IsNull() && a0.IsSame(a1)))
+          continue;
+        double                          f, l;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, hf, f, l);
+        if (pc.IsNull())
+          fail_op("stitch: an edge without its curve on the face");
+        for (int k = 0; k <= 16; ++k)
+          all.push_back(pc->Value(f + (l - f) * k / 16).X());
+      }
+      for (double& u : all)
+        u = u0 + std::fmod(std::fmod(u - u0, period) + period, period);
+      std::sort(all.begin(), all.end());
+      double gap = all.front() + period - all.back(), alpha = all.back() + gap / 2;
+      for (size_t k = 0; k + 1 < all.size(); ++k)
+        if (all[k + 1] - all[k] > gap)
+        {
+          gap   = all[k + 1] - all[k];
+          alpha = all[k] + gap / 2;
+        }
+      if (gap < 1e-3)
+        fail_op("stitch: no room for the seam");
+      const TopoDS_Shape out = band_seam_at(S, hosts[h], alpha, moved);
+      if (out.IsNull())
+        fail_op("stitch: the seam couldn't move");
+      if (dbg)
+        std::fprintf(stderr, "stitch: host %zu seam moved to %.4f\n", h, alpha);
+      S       = out;
+      restart = true;
+    }
+    if (restart)
+      continue;
+    // The walls copied, each instance's own.
+    TopoDS_Compound walls;
+    B.MakeCompound(walls);
+    for (int i = 1; i <= sel.Extent(); ++i)
+      B.Add(walls, sel(i));
+    std::vector<std::unique_ptr<BRepBuilderAPI_Transform>> copies;
+    for (int i = 0; i < n; ++i)
+    {
+      copies.push_back(std::make_unique<BRepBuilderAPI_Transform>(walls, ts[(size_t)i], true));
+      if (!copies.back()->IsDone())
+        fail_op("stitch: a copy failed");
+      fail_if_cancelled();
+    }
+    // No copy's walls near any other face (but its hosts) or another copy's walls (the seed's among them).
+    {
+      auto box_of = [](const TopoDS_Shape& x) {
+        Bnd_Box b;
+        BRepBndLib::Add(x, b, false);
+        b.Enlarge(1e-7);
+        return b;
+      };
+      std::vector<Bnd_Box> each{box_of(walls)};
+      for (int i = 0; i < n; ++i)
+        each.push_back(box_of(copies[(size_t)i]->Shape()));
+      for (size_t i = 0; i < each.size(); ++i)
+        for (size_t j = i + 1; j < each.size(); ++j)
+          if (!each[i].IsOut(each[j]))
+            fail_op("stitch: copies near each other");
+      for (TopExp_Explorer x(S, TopAbs_FACE); x.More(); x.Next())
+      {
+        if (sel.Contains(x.Current()) || std::any_of(hosts.begin(), hosts.end(), [&](const TopoDS_Face& h) { return h.IsSame(x.Current()); }))
+          continue;
+        const Bnd_Box fb = box_of(x.Current());
+        for (size_t i = 1; i < each.size(); ++i)
+          if (!each[i].IsOut(fb))
+            fail_op("stitch: a copy near another face");
+      }
+    }
+    // The hosts with the copies' rims as more holes.
+    std::vector<TopoDS_Face> new_hosts;
+    for (size_t h = 0; h < hosts.size(); ++h)
+    {
+      const TopoDS_Face               hf = TopoDS::Face(hosts[h].Oriented(TopAbs_FORWARD));
+      TopLoc_Location                 hl;
+      const occ::handle<Geom_Surface> hs = BRep_Tool::Surface(hf, hl);
+      double                          u0, u1, v0, v1;
+      BRepTools::UVBounds(hf, u0, u1, v0, v1);
+      BRepAdaptor_Surface             ha(hf);
+      const double                    period = ha.IsUPeriodic() ? ha.UPeriod() : 0;
+      TopoDS_Face                     nf;
+      B.MakeFace(nf, hs, hl, BRep_Tool::Tolerance(hf));
+      for (TopoDS_Iterator w(hf); w.More(); w.Next())
+        B.Add(nf, w.Value());
+      BRepClass_FaceClassifier inside;
+      for (int i = 0; i < n; ++i)
+        for (const TopoDS_Wire& sw : seed_wires[h])
+        {
+          double turns = 0;
+          (void)loop_us(h, sw, shift[h][(size_t)i].X(), period, u0, turns);
+          TopoDS_Wire nw;
+          B.MakeWire(nw);
+          for (TopoDS_Iterator e(sw); e.More(); e.Next())
+          {
+            const TopoDS_Edge               se = TopoDS::Edge(e.Value());
+            double                          f, l;
+            const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Oriented(TopAbs_FORWARD)), hf, f, l);
+            const gp_Vec2d                  d(shift[h][(size_t)i].X() - turns, shift[h][(size_t)i].Y());
+            const occ::handle<Geom2d_Curve> npc = occ::down_cast<Geom2d_Curve>(pc->Translated(d));
+            const TopoDS_Edge ce = TopoDS::Edge(copies[(size_t)i]->ModifiedShape(se).Oriented(TopAbs_FORWARD));
+            B.UpdateEdge(ce, npc, nf, BRep_Tool::Tolerance(ce));
+            B.Range(ce, nf, f, l);
+            B.Add(nw, ce.Oriented(se.Orientation()));
+            // Inside the face as it was, off its own edges.
+            inside.Perform(hf, npc->Value(0.5 * (f + l)), BRep_Tool::Tolerance(hf));
+            if (inside.State() != TopAbs_IN)
+              fail_op("stitch: a copy off its face");
+          }
+          nw.Closed(true);
+          B.Add(nf, nw.Oriented(sw.Orientation()));
+        }
+      fail_if_cancelled();
+      if (BRepCheck_Analyzer an(nf); !an.IsValid())
+      {
+        if (dbg)
+          for (const TopAbs_ShapeEnum kk : {TopAbs_VERTEX, TopAbs_EDGE, TopAbs_WIRE, TopAbs_FACE})
+            for (TopExp_Explorer x(nf, kk); x.More(); x.Next())
+              if (const occ::handle<BRepCheck_Result> r = an.Result(x.Current()); !r.IsNull())
+                for (const BRepCheck_Status st : r->Status())
+                  if (st != BRepCheck_NoError)
+                    std::fprintf(stderr, "stitch: host %zu kind %d status %d\n", h, (int)kk, (int)st);
+        fail_op("stitch: a host with the copies isn't valid");
+      }
+      new_hosts.push_back(TopoDS::Face(nf.Oriented(hosts[h].Orientation())));
+    }
+    // Each face of S by its index in `solid` (through the seams moved).
+    ShapeIMap orig;
+    TopExp::MapShapes(solid_in.shape, TopAbs_FACE, orig);
+    NCollection_DataMap<TopoDS_Shape, int64_t, TopTools_ShapeMapHasher> orig_of;
+    for (int i = 1; i <= orig.Extent(); ++i)
+    {
+      orig_of.Bind(orig(i), i - 1);
+      if (!moved.IsNull())
+        for (ShapeList::Iterator it(moved->Modified(orig(i))); it.More(); it.Next())
+          orig_of.Bind(it.Value(), i - 1);
+    }
+    // The shell: the part's faces (the hosts replaced), then each copy's walls.
+    NCollection_DataMap<TopoDS_Shape, int64_t, TopTools_ShapeMapHasher> code_of;
+    TopoDS_Shell                                                          ns;
+    B.MakeShell(ns);
+    for (TopoDS_Iterator x(shell); x.More(); x.Next())
+    {
+      size_t h = 0;
+      while (h < hosts.size() && !hosts[h].IsSame(x.Value()))
+        ++h;
+      const TopoDS_Shape f = h < hosts.size() ? TopoDS_Shape(new_hosts[h].Oriented(x.Value().Orientation())) : x.Value();
+      const int64_t*     o = orig_of.Seek(x.Value());
+      if (o == nullptr)
+        fail_op("stitch: a face without its source");
+      B.Add(ns, f);
+      code_of.Bind(f, *o);
+    }
+    const int64_t nw = sel.Extent();
+    for (int i = 0; i < n; ++i)
+      for (TopoDS_Iterator x(shell); x.More(); x.Next())
+      {
+        const int j = sel.FindIndex(x.Value());
+        if (j == 0)
+          continue;
+        const TopoDS_Shape c = copies[(size_t)i]->ModifiedShape(x.Value()).Oriented(x.Value().Orientation());
+        B.Add(ns, c);
+        code_of.Bind(c, -(1 + i * nw + (j - 1)));
+      }
+    ns.Closed(true);
+    TopoDS_Solid so;
+    B.MakeSolid(so);
+    B.Add(so, ns.Oriented(shell.Orientation()));
+    ShapeIMap out_faces;
+    TopExp::MapShapes(so, TopAbs_FACE, out_faces);
+    codes.clear();
+    for (int i = 1; i <= out_faces.Extent(); ++i)
+    {
+      const int64_t* c = code_of.Seek(out_faces(i));
+      if (c == nullptr)
+        fail_op("stitch: a face without its source");
+      codes.push_back(*c);
+    }
+    return wrap(so);
+  }
 }
 
 } // namespace noshape

@@ -694,6 +694,14 @@ pub fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instan
     let Some(bi) = index_of_body(ev, body_id) else { return Ok(()) };
     let body = ev.ctx.bodies[bi].clone();
     let t0 = std::time::Instant::now();
+    // The copies stitched in where they land inside faces the pattern keeps (Parasolid's face pattern copies the faces:
+    // motor-mount-jack's slots through a tube 5 ms in live; tools and a cut took 158 ms).
+    if stitch_copies(ev, bi, &body, faces, instances) {
+        if crate::regen::display::perf_enabled() {
+            log::info!(target: "perf", "pattern_faces × {}: stitched {:.1} ms", instances.len(), t0.elapsed().as_secs_f64() * 1e3);
+        }
+        return Ok(());
+    }
     let tool = faces_tool(ev, &body, faces)?;
     let t_tool = t0.elapsed();
     let mut tools: Vec<NamedShape> = Vec::new();
@@ -712,6 +720,37 @@ pub fn pattern_faces(ev: &mut EvalCtx, body_id: &BodyId, faces: &[usize], instan
         log::info!(target: "perf", "pattern_faces × {}: tool {:.1} ms, copies + names {:.1} ms, apply {:.1} ms", instances.len(), t_tool.as_secs_f64() * 1e3, (t_copies - t_tool).as_secs_f64() * 1e3, (t0.elapsed() - t_copies).as_secs_f64() * 1e3);
     }
     r
+}
+
+/// A face pattern without a Boolean ([`k::stitch_face_copies`]): the part's faces keep their names, each copy of a
+/// face its tool copy's (`Role::Copy`, as the cut's or fuse's). False where it doesn't apply.
+fn stitch_copies(ev: &mut EvalCtx, bi: usize, body: &Body, faces: &[usize], instances: &[Instance]) -> bool {
+    let walls: Vec<Shape> = faces.iter().filter_map(|&f| body.shape.sub_shape(ShapeType::Face, f).ok()).collect();
+    if walls.len() != faces.len() || instances.is_empty() {
+        return false;
+    }
+    let ts: Vec<k::Transform> = instances.iter().map(|i| i.t).collect();
+    let (shape, codes) = match k::stitch_face_copies(&body.shape, &walls, &ts) {
+        Ok(r) => r,
+        Err(e) => {
+            log::debug!("face pattern: the cut ({e})");
+            return false;
+        }
+    };
+    let names: Option<Vec<Name>> = codes
+        .iter()
+        .map(|&c| {
+            if c >= 0 {
+                return body.faces.get(c as usize).cloned();
+            }
+            let c = (-c - 1) as usize;
+            let (i, j) = (c / faces.len(), c % faces.len());
+            Some(Arc::new(TopoName::face(ev.feature, Role::Copy { instance: instances.get(i)?.code, of: body.faces.get(faces[j])?.clone() })))
+        })
+        .collect();
+    let Some(names) = names else { return false };
+    ev.replace_body(bi, shape, names);
+    true
 }
 
 /// Fuse (boss) or cut (pocket) instance tools into the parts they touch.

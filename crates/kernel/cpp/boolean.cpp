@@ -2599,6 +2599,176 @@ TopoDS_Shape seam_to_vertex(const TopoDS_Shape& s, const TopoDS_Face& a, const g
   return out;
 }
 
+// Cylinder band `a` (between the end circles `ends`, its seams `seams`, its other edges `rest`) with its seam moved to
+// angle `alpha`, the end circles' vertices with it (`la` its surface's location). Null where it doesn't come out valid
+// with the same area.
+TopoDS_Shape band_seam_to(const TopoDS_Shape& s, const TopoDS_Face& a, TopLoc_Location la, const gp_Cylinder& ca, const std::vector<TopoDS_Edge>& seams,
+                          const std::vector<TopoDS_Edge>& ends, const std::vector<TopoDS_Edge>& rest, double alpha, HHist& hist)
+{
+  bool ok = true;
+  const double  r = ca.Radius();
+  const gp_Ax3& A = ca.Position();
+  auto          v_of = [&](const TopoDS_Edge& e) {
+    BRepAdaptor_Curve c(e);
+    double            u, v;
+    ElSLib::Parameters(ca, c.Value(c.FirstParameter()), u, v);
+    return v;
+  };
+  const bool   first_low = v_of(ends[0]) < v_of(ends[1]);
+  const double lo = v_of(ends[first_low ? 0 : 1]), hi = v_of(ends[first_low ? 1 : 0]);
+  BRep_Builder B;
+  double       tol = BRep_Tool::Tolerance(a);
+  for (const TopoDS_Edge& e : ends)
+    tol = std::max(tol, BRep_Tool::Tolerance(e));
+  // The end circles again, their vertex at alpha, their parameter the cylinder's u.
+  const gp_Dir n = gp_Dir(gp_Vec(A.XDirection()).Crossed(gp_Vec(A.YDirection())));
+  auto         ring = [&](double v, TopoDS_Vertex& vx) {
+    B.MakeVertex(vx, ElSLib::Value(alpha, v, ca), tol);
+    occ::handle<Geom_Circle> circ = new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(A.Direction()) * v), n, A.XDirection()), r);
+    TopoDS_Edge              e;
+    B.MakeEdge(e, circ, tol);
+    B.Add(e, vx.Oriented(TopAbs_FORWARD));
+    B.Add(e, vx.Oriented(TopAbs_REVERSED));
+    B.Range(e, alpha, alpha + 2 * M_PI);
+    return e;
+  };
+  TopoDS_Vertex     vlo, vhi;
+  const TopoDS_Edge low = ring(lo, vlo), top = ring(hi, vhi);
+  occ::handle<Geom_Line> line = new Geom_Line(ElSLib::Value(alpha, lo, ca), A.Direction());
+  TopoDS_Edge            seam;
+  B.MakeEdge(seam, line, tol);
+  B.Add(seam, vlo.Oriented(TopAbs_FORWARD));
+  B.Add(seam, vhi.Oriented(TopAbs_REVERSED));
+  B.Range(seam, 0, hi - lo);
+  // (On a copy of the surface: the edges keep their curves on the old face, whatever comes of this.)
+  TopoDS_Face F;
+  B.MakeFace(F, occ::down_cast<Geom_Surface>(BRep_Tool::Surface(a, la)->Copy()), la, BRep_Tool::Tolerance(a));
+  B.UpdateEdge(low, new Geom2d_Line(gp_Pnt2d(0, lo), gp_Dir2d(1, 0)), F, tol);
+  B.Range(low, F, alpha, alpha + 2 * M_PI);
+  B.UpdateEdge(top, new Geom2d_Line(gp_Pnt2d(0, hi), gp_Dir2d(1, 0)), F, tol);
+  B.Range(top, F, alpha, alpha + 2 * M_PI);
+  B.UpdateEdge(seam, new Geom2d_Line(gp_Pnt2d(alpha + 2 * M_PI, lo), gp_Dir2d(0, 1)), new Geom2d_Line(gp_Pnt2d(alpha, lo), gp_Dir2d(0, 1)), F, tol);
+  B.Range(seam, F, 0, hi - lo);
+  TopoDS_Wire W;
+  B.MakeWire(W);
+  B.Add(W, low);
+  B.Add(W, seam.Oriented(TopAbs_FORWARD));
+  B.Add(W, top.Reversed());
+  B.Add(W, seam.Oriented(TopAbs_REVERSED));
+  B.Add(F, W);
+  // The other edges, as the face uses them, a whole number of turns into (alpha, alpha + 2 pi), in loops.
+  std::vector<TopoDS_Edge> uses;
+  for (TopoDS_Iterator w(a); w.More(); w.Next())
+    for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
+      for (const TopoDS_Edge& e : rest)
+        if (x.Value().IsSame(e))
+          uses.push_back(TopoDS::Edge(x.Value()));
+  for (const TopoDS_Edge& e : rest)
+  {
+    double                    f2, l2;
+    occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
+    const double              um = pc->Value(0.5 * (f2 + l2)).X();
+    const double              k  = std::floor((alpha + 2 * M_PI - um) / (2 * M_PI));
+    if (k != 0)
+      pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(2 * M_PI * k, 0)));
+    B.UpdateEdge(e, pc, F, BRep_Tool::Tolerance(e));
+    B.Range(e, F, f2, l2);
+  }
+  std::vector<bool> used(uses.size(), false);
+  for (size_t k = 0; k < uses.size() && ok; ++k)
+  {
+    if (used[k])
+      continue;
+    TopoDS_Wire hole;
+    B.MakeWire(hole);
+    size_t              at    = k;
+    const TopoDS_Vertex start = TopExp::FirstVertex(uses[k], true);
+    while (ok)
+    {
+      used[at] = true;
+      B.Add(hole, uses[at]);
+      const TopoDS_Vertex end = TopExp::LastVertex(uses[at], true);
+      if (end.IsSame(start))
+        break;
+      size_t next = uses.size();
+      for (size_t j = 0; j < uses.size() && next == uses.size(); ++j)
+        if (!used[j] && TopExp::FirstVertex(uses[j], true).IsSame(end))
+          next = j;
+      if (next == uses.size())
+        ok = false;
+      at = next;
+    }
+    hole.Closed(true);
+    B.Add(F, hole);
+  }
+  if (!ok || !BRepCheck_Analyzer(F).IsValid())
+    return {};
+  occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+  rs->Replace(a, F);
+  for (size_t k = 0; k < 2; ++k)
+  {
+    const TopoDS_Edge&  old   = ends[k];
+    const TopoDS_Edge&  made  = (k == 0) == first_low ? low : top;
+    BRepAdaptor_Curve   old_c(old);
+    const bool          same  = old_c.Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
+    rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
+  }
+  const TopoDS_Shape out = rs->Apply(s);
+  if (out.IsNull() || !same_area(a, F) || !valid_around(out, {low, top}))
+    return {};
+  if (hist.IsNull())
+    hist = new BRepTools_History();
+  HHist h = rs->History();
+  if (h.IsNull())
+    h = new BRepTools_History();
+  if (h->Modified(a).IsEmpty())
+    h->AddModified(a, F);
+  for (const TopoDS_Edge& e : seams)
+    h->Remove(e);
+  hist->Merge(h);
+  return out;
+}
+
+} // namespace
+
+// Face `a` of `s`, a cylinder band between two end circles, with its seam at angle `alpha` (band_seam_to). Null where
+// it isn't such a band or the move doesn't come out valid.
+TopoDS_Shape band_seam_at(const TopoDS_Shape& s, const TopoDS_Face& face, double alpha, HHist& hist)
+{
+  const TopoDS_Face                    a = TopoDS::Face(face.Oriented(TopAbs_FORWARD));
+  TopLoc_Location                      la;
+  occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(a, la));
+  if (cs.IsNull())
+    return {};
+  const gp_Cylinder        ca = cs->Cylinder().Transformed(la.Transformation());
+  std::vector<TopoDS_Edge> seams, ends, rest;
+  ShapeIMap                seen;
+  for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    if (seen.Contains(e))
+      continue;
+    seen.Add(e);
+    if (BRep_Tool::IsClosed(e, a))
+    {
+      seams.push_back(e);
+      continue;
+    }
+    TopoDS_Vertex v0, v1;
+    TopExp::Vertices(e, v0, v1);
+    BRepAdaptor_Curve c(e);
+    if (!v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle && c.Circle().Axis().Direction().IsParallel(ca.Axis().Direction(), 1e-9))
+      ends.push_back(e);
+    else
+      rest.push_back(e);
+  }
+  if (seams.empty() || ends.size() != 2)
+    return {};
+  return band_seam_to(s, a, la, ca, seams, ends, rest, alpha, hist);
+}
+
+namespace {
+
 // A cylinder band between two end circles whose seam runs into its other edges (a hole through a tube across the
 // tube's seam: the hole's loops split where the seam meets them, dx's CUT-CLOSED-EDGES-SPLIT; Parasolid's faces have no
 // seams, live's loops are whole): the seam moved to the widest angle no other edge reaches, the end circles' vertices
@@ -2687,126 +2857,9 @@ TopoDS_Shape move_seams_off_holes(const TopoDS_Shape& s, HHist& hist)
       }
     if (gap < 1e-3)
       continue;
-    const double  r = ca.Radius();
-    const gp_Ax3& A = ca.Position();
-    auto          v_of = [&](const TopoDS_Edge& e) {
-      BRepAdaptor_Curve c(e);
-      double            u, v;
-      ElSLib::Parameters(ca, c.Value(c.FirstParameter()), u, v);
-      return v;
-    };
-    const bool   first_low = v_of(ends[0]) < v_of(ends[1]);
-    const double lo = v_of(ends[first_low ? 0 : 1]), hi = v_of(ends[first_low ? 1 : 0]);
-    BRep_Builder B;
-    double       tol = BRep_Tool::Tolerance(a);
-    for (const TopoDS_Edge& e : ends)
-      tol = std::max(tol, BRep_Tool::Tolerance(e));
-    // The end circles again, their vertex at alpha, their parameter the cylinder's u.
-    const gp_Dir n = gp_Dir(gp_Vec(A.XDirection()).Crossed(gp_Vec(A.YDirection())));
-    auto         ring = [&](double v, TopoDS_Vertex& vx) {
-      B.MakeVertex(vx, ElSLib::Value(alpha, v, ca), tol);
-      occ::handle<Geom_Circle> circ = new Geom_Circle(gp_Ax2(A.Location().Translated(gp_Vec(A.Direction()) * v), n, A.XDirection()), r);
-      TopoDS_Edge              e;
-      B.MakeEdge(e, circ, tol);
-      B.Add(e, vx.Oriented(TopAbs_FORWARD));
-      B.Add(e, vx.Oriented(TopAbs_REVERSED));
-      B.Range(e, alpha, alpha + 2 * M_PI);
-      return e;
-    };
-    TopoDS_Vertex     vlo, vhi;
-    const TopoDS_Edge low = ring(lo, vlo), top = ring(hi, vhi);
-    occ::handle<Geom_Line> line = new Geom_Line(ElSLib::Value(alpha, lo, ca), A.Direction());
-    TopoDS_Edge            seam;
-    B.MakeEdge(seam, line, tol);
-    B.Add(seam, vlo.Oriented(TopAbs_FORWARD));
-    B.Add(seam, vhi.Oriented(TopAbs_REVERSED));
-    B.Range(seam, 0, hi - lo);
-    // (On a copy of the surface: the edges keep their curves on the old face, whatever comes of this.)
-    TopoDS_Face F;
-    B.MakeFace(F, occ::down_cast<Geom_Surface>(BRep_Tool::Surface(a, la)->Copy()), la, BRep_Tool::Tolerance(a));
-    B.UpdateEdge(low, new Geom2d_Line(gp_Pnt2d(0, lo), gp_Dir2d(1, 0)), F, tol);
-    B.Range(low, F, alpha, alpha + 2 * M_PI);
-    B.UpdateEdge(top, new Geom2d_Line(gp_Pnt2d(0, hi), gp_Dir2d(1, 0)), F, tol);
-    B.Range(top, F, alpha, alpha + 2 * M_PI);
-    B.UpdateEdge(seam, new Geom2d_Line(gp_Pnt2d(alpha + 2 * M_PI, lo), gp_Dir2d(0, 1)), new Geom2d_Line(gp_Pnt2d(alpha, lo), gp_Dir2d(0, 1)), F, tol);
-    B.Range(seam, F, 0, hi - lo);
-    TopoDS_Wire W;
-    B.MakeWire(W);
-    B.Add(W, low);
-    B.Add(W, seam.Oriented(TopAbs_FORWARD));
-    B.Add(W, top.Reversed());
-    B.Add(W, seam.Oriented(TopAbs_REVERSED));
-    B.Add(F, W);
-    // The other edges, as the face uses them, a whole number of turns into (alpha, alpha + 2 pi), in loops.
-    std::vector<TopoDS_Edge> uses;
-    for (TopoDS_Iterator w(a); w.More(); w.Next())
-      for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
-        for (const TopoDS_Edge& e : rest)
-          if (x.Value().IsSame(e))
-            uses.push_back(TopoDS::Edge(x.Value()));
-    for (const TopoDS_Edge& e : rest)
-    {
-      double                    f2, l2;
-      occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, a, f2, l2);
-      const double              um = pc->Value(0.5 * (f2 + l2)).X();
-      const double              k  = std::floor((alpha + 2 * M_PI - um) / (2 * M_PI));
-      if (k != 0)
-        pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(2 * M_PI * k, 0)));
-      B.UpdateEdge(e, pc, F, BRep_Tool::Tolerance(e));
-      B.Range(e, F, f2, l2);
-    }
-    std::vector<bool> used(uses.size(), false);
-    for (size_t k = 0; k < uses.size() && ok; ++k)
-    {
-      if (used[k])
-        continue;
-      TopoDS_Wire hole;
-      B.MakeWire(hole);
-      size_t              at    = k;
-      const TopoDS_Vertex start = TopExp::FirstVertex(uses[k], true);
-      while (ok)
-      {
-        used[at] = true;
-        B.Add(hole, uses[at]);
-        const TopoDS_Vertex end = TopExp::LastVertex(uses[at], true);
-        if (end.IsSame(start))
-          break;
-        size_t next = uses.size();
-        for (size_t j = 0; j < uses.size() && next == uses.size(); ++j)
-          if (!used[j] && TopExp::FirstVertex(uses[j], true).IsSame(end))
-            next = j;
-        if (next == uses.size())
-          ok = false;
-        at = next;
-      }
-      hole.Closed(true);
-      B.Add(F, hole);
-    }
-    if (!ok || !BRepCheck_Analyzer(F).IsValid())
+    const TopoDS_Shape out = band_seam_to(s, a, la, ca, seams, ends, rest, alpha, hist);
+    if (out.IsNull())
       continue;
-    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
-    rs->Replace(a, F);
-    for (size_t k = 0; k < 2; ++k)
-    {
-      const TopoDS_Edge&  old   = ends[k];
-      const TopoDS_Edge&  made  = (k == 0) == first_low ? low : top;
-      BRepAdaptor_Curve   old_c(old);
-      const bool          same  = old_c.Circle().Axis().Direction().Dot(gp_Vec(n)) > 0;
-      rs->Replace(old.Oriented(TopAbs_FORWARD), same ? made : TopoDS::Edge(made.Reversed()));
-    }
-    const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull() || !same_area(a, F) || !valid_around(out, {low, top}))
-      continue;
-    if (hist.IsNull())
-      hist = new BRepTools_History();
-    HHist h = rs->History();
-    if (h.IsNull())
-      h = new BRepTools_History();
-    if (h->Modified(a).IsEmpty())
-      h->AddModified(a, F);
-    for (const TopoDS_Edge& e : seams)
-      h->Remove(e);
-    hist->Merge(h);
     return move_seams_off_holes(out, hist);
   }
   return s;

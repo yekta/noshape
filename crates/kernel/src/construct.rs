@@ -442,3 +442,16 @@ pub fn make_face_2d_tracked(plane: &Plane, outer: &[Segment2d], holes: &[Vec<Seg
     let segment_edges = match_edges(&all_edges, &face)?;
     Ok(TrackedProfile { shape: face, segment_edges })
 }
+
+/// A face pattern of a pocket (`faces`, the seed's walls) built as Parasolid's is: each face holding the seed's rims,
+/// which every transform maps onto itself (a tube's coaxial cylinders under a rotation about their axis), takes the
+/// copies' rims as more holes, and the walls are copied; no Boolean. Also, per face of the result, its index in `solid`
+/// (`>= 0`) or `-(1 + instance * faces.len() + wall)`. An error where it doesn't apply (a copy leaving its face, near
+/// another loop or any other face): then the general cut.
+pub fn stitch_face_copies(solid: &Shape, faces: &[Shape], transforms: &[crate::Transform]) -> Result<(Shape, Vec<i64>)> {
+    let l = vec_to_list(faces);
+    let m: Vec<f64> = transforms.iter().flat_map(|t| t.rows()).collect();
+    let mut codes = Vec::new();
+    let s = Shape::from_res(ffi::stitch_face_copies(solid.raw(), &l, &m, &mut codes))?;
+    Ok((s, codes))
+}

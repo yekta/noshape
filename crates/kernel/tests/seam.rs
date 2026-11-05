@@ -42,3 +42,27 @@ fn a_seam_moves_to_the_loop_round_the_axis_past_a_window() {
     assert!((u.volume().unwrap() - s.volume().unwrap()).abs() < 1e-9 * s.volume().unwrap());
     assert_eq!(counts(&u), (18, 41, 25));
 }
+
+/// A face pattern of a hole through a tube's wall, stitched (Parasolid's face pattern copies the faces: motor-mount-jack's
+/// slots, 5 ms in live): the copies' rims holes of the tube's two cylinders, their seams moved clear of every hole first,
+/// the walls copied. The same part as cutting all four holes.
+#[test]
+fn a_face_pattern_round_a_tube_is_stitched_as_the_cut() {
+    let frame = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let tube = boolean(BooleanOp::Cut, &[make_cylinder(&frame, 15.0, 40.0, 2.0 * PI).unwrap()], &[make_cylinder(&frame, 12.0, 40.0, 2.0 * PI).unwrap()], &BooleanOptions::default()).unwrap().shape;
+    let hole = |a: f64| make_cylinder(&Plane::new(DVec3::new(0.0, 0.0, 20.0), DVec3::new(-a.sin(), a.cos(), 0.0), DVec3::Z), 3.0, 20.0, 2.0 * PI).unwrap();
+    let seed = boolean(BooleanOp::Cut, std::slice::from_ref(&tube), &[hole(0.0)], &BooleanOptions::default()).unwrap().shape;
+    let walls: Vec<Shape> = seed.faces().into_iter().filter(|f| matches!(f.face_surface(), Ok(Surface::Cylinder { radius, .. }) if (radius - 3.0).abs() < 1e-9)).collect();
+    assert_eq!(walls.len(), 1);
+    let turns: Vec<Transform> = (1..4).map(|i| Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::Z, angle: i as f64 * PI / 2.0 }).collect();
+    let (stitched, codes) = stitch_face_copies(&seed, &walls, &turns).unwrap();
+    assert!(stitched.is_valid());
+    assert_eq!(codes.len(), stitched.count(ShapeType::Face));
+    assert_eq!(codes.iter().filter(|&&c| c < 0).count(), 3, "a wall a copy");
+    let all: Vec<Shape> = (0..4).map(|i| hole(i as f64 * PI / 2.0)).collect();
+    let cut = boolean(BooleanOp::Cut, &[tube], &all, &BooleanOptions::default()).unwrap().shape;
+    let v = |s: &Shape| s.volume().unwrap();
+    assert!((v(&stitched) - v(&cut)).abs() < 1e-9 * v(&cut), "{} vs {}", v(&stitched), v(&cut));
+    // (Live's: each rim one closed edge; the plain cut leaves rims split at the seams, 8 / 14 / 4.)
+    assert_eq!(counts(&stitched), (8, 12, 0));
+}

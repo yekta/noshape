@@ -389,6 +389,7 @@ std::vector<XtPart> read_rhino_parts(const std::string& path);
 
 // Volume properties that survive OCCT's integrator weaknesses (see common.cpp).
 GProp_GProps volume_props(const TopoDS_Shape& s);
+TopoDS_Shape band_seam_at(const TopoDS_Shape& s, const TopoDS_Face& face, double alpha, occ::handle<BRepTools_History>& hist);
 // boolean.cpp: a progress indicator stopping an OCCT build at the thread's
 // cancel flag, the memory budget or a budget's deadline off Linux; pass
 // `->Start()` as the build's range.

@@ -786,6 +786,8 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& shape, const OcShape
 std::unique_ptr<OcShape> face_patches(const OcShape& face, uint32_t spans);
 std::unique_ptr<OcShape> merge_faces_on(const OcShape& shape, const OcShape& on);
 std::unique_ptr<OcShape> replace_face_mapped(const OcShape& solid, const OcShape& face, const OcShape& tmpl);
+std::unique_ptr<OcShape> stitch_face_copies(const OcShape& solid, const OcShapeList& faces, rust::Slice<const double> m,
+                                            rust::Vec<int64_t>& codes);
 std::unique_ptr<OcShape> make_plane_face(const PlaneF& plane, double umin, double umax,
                                          double vmin, double vmax);
 std::unique_ptr<OcShape> make_polyline(rust::Slice<const double> pts, bool closed);

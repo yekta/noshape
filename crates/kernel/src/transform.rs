@@ -70,7 +70,7 @@ impl Transform {
         }
     }
 
-    fn rows(&self) -> [f64; 12] {
+    pub(crate) fn rows(&self) -> [f64; 12] {
         let m = self.matrix();
         let mut r = [0.0; 12];
         for row in 0..3 {

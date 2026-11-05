@@ -728,6 +728,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the caps on the tube's cylinders) declines in noshape's Boolean "a cylinder face without curved edges" (brep
   boolean.rs) in 0.9 ms, then OCCT's takes 64-80 ms (23 ms of it projecting the copies' edges onto the cylinders).
   Recorded case f09d7998ed9eb11b in vibe5 ~/agents/shared-cases. The seam movers there are 6 ms now.
+  core 11-05 16:21 (lead: match Onshape's face pattern, no cut): a face pattern whose copies land inside faces each
+  instance maps onto itself (the tube's coaxial cylinders under the rotation) is stitched, as Parasolid's face pattern
+  copies faces: each such face takes the copies' rim loops as more holes (their curves on it the seed's, shifted), a
+  cylinder band whose seam a loop would cross has its seam moved clear first, the walls are copied (kernel
+  stitch_face_copies; the cut / fuse where a copy leaves its face or comes near any other face or copy). Circular
+  pattern 1 158 -> 8 ms (live 5), the document 10/10 as live; parity corpus 52/56, 429/483 (no face-pattern document
+  differs). T1 kernel seam::a_face_pattern_round_a_tube_is_stitched_as_the_cut, model kernel_robustness::
+  a_face_pattern_of_a_hole_through_a_tubes_wall (now stitched).
 - [ ] P2 FULL-ROUND-BOSS-TWO-FACES (core 11-04 09:05) a full round of a boss's whole cylinder (a Ø16 × 3 mm puck's rim)
   has the right volume, but its half torus is two faces: OCCT's torus has its v seam on the outer equator, which the
   outer half crosses (the bore's inner half is one face, as live's). Live: one face (not checked live; Parasolid's
