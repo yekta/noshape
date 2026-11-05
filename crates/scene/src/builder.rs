@@ -402,6 +402,9 @@ impl TangentEdges {
 /// What is highlighted / filtered.
 #[derive(Clone, Default)]
 pub struct SceneOptions {
+    /// Draw an opaque solid's edge segments that lie behind the solid itself too (they are left out by default:
+    /// never seen; tests compare the two).
+    pub keep_hidden_edges: bool,
     pub show_planes: bool,
     pub show_sketches: bool,
     pub show_origin: bool,
@@ -668,6 +671,17 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             let edges = Instance::new(Drawable::Lines(cached.edges.clone())).with_color(edge_color).pick_base(edge_base).line_scale(opts.graphics.line_width).layer(1);
             let edges = if opts.section_skip.contains(&b.id) { edges.ignore_clip() } else { edges };
+            // An opaque solid's own faces hide its edge segments both of whose facets face away: left out of the
+            // visible lines' pass (never seen; the hidden-line and pick passes keep them).
+            let own_faces_hide = !opts.keep_hidden_edges
+                && b.kind == BodyKind::Solid
+                && color[3] >= 0.999
+                && matches!(opts.display_mode, DisplayMode::ShadedWithEdges | DisplayMode::HiddenLine)
+                && replaced.is_none()
+                && !opts.ghost_bodies.contains(&b.id)
+                && !opts.preview_bodies.contains(&b.id)
+                && !opts.pick_through_bodies.contains(&b.id);
+            let edges = if own_faces_hide { edges.cull_hidden() } else { edges };
             // Shaded mode hides edges visually but keeps them pickable.
             let tangent = (opts.tangent_edges != TangentEdges::Visible && b.kind != BodyKind::Wire && opts.display_mode != DisplayMode::Shaded).then(|| {
                 match cache.tangent.get(&key) {
@@ -1142,11 +1156,18 @@ fn decode_image(data_base64: &str) -> Option<ImageData> {
 fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> CachedBody {
     let pick_ids = face_pick_ids(m);
 
+    let normals = edge_facet_normals(m);
     let mut lines = LineData::default();
     lines.segments.reserve(m.edges.iter().map(|e| e.len().saturating_sub(1)).sum());
     for (ei, pl) in m.edges.iter().enumerate() {
-        // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased).
-        lines.push_polyline(pl, [0, 0, 0, 255], ei as u32 + 1, 1.0, LineSegment::CORE);
+        for (si, w) in pl.windows(2).enumerate() {
+            // Onshape DEFAULT_LINE_WIDTH 1 (live EDGE-HIGHLIGHT-LOOK: a plain edge is 1 CSS px, antialiased).
+            let seg = LineSegment { a: w[0], b: w[1], color: [0, 0, 0, 255], pick_id: ei as u32 + 1, width: 1.0, style: LineSegment::CORE };
+            lines.segments.push(match noshape_render::scene::edge_cull_cones(&normals[ei], si, si + 1) {
+                Some((a, b)) => seg.with_face_normals(a, b),
+                None => seg,
+            });
+        }
     }
     let points = PointData {
         points: m.vertices.iter().enumerate().map(|(i, p)| PointSprite { position: *p, color: [255; 4], pick_id: i as u32 + 1, size: 6.0, style: 0, _pad: 0 }).collect(),
@@ -1161,7 +1182,7 @@ fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Cached
     });
     let sil = silhouette_edges(m);
     let silhouettes = (!sil.segments.is_empty()).then(|| up.upload_silhouettes(&sil));
-    let edge_lods = edge_lods(m, up);
+    let edge_lods = edge_lods_with_normals(m, &normals, up);
     CachedBody { mesh: up.upload_mesh_parts(&m.positions, &m.normals, &pick_ids, &m.indices), edges: up.upload_lines(&lines), vertices: up.upload_points(&points), mesh_lines, silhouettes, edge_lods }
 }
 
@@ -1173,6 +1194,62 @@ pub fn edge_lods(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> Vec<
         return Vec::new();
     }
     noshape_render::scene::edge_line_lods(&m.edges, (hi - lo).length()).iter().map(|l| up.upload_lines(l)).collect()
+}
+
+/// [`edge_lods`] with each segment's facet normals ([`edge_facet_normals`]).
+fn edge_lods_with_normals(m: &noshape_model::display::MeshBuffers, normals: &noshape_render::scene::EdgeFacetNormals, up: &Uploader) -> Vec<LinesHandle> {
+    let Some((lo, hi)) = noshape_render::scene::bounds_of(m.positions.iter().copied()) else { return Vec::new() };
+    if m.edges.is_empty() {
+        return Vec::new();
+    }
+    noshape_render::scene::edge_line_lods_with_normals(&m.edges, normals, (hi - lo).length()).iter().map(|l| up.upload_lines(l)).collect()
+}
+
+/// The normals of the facets on either side of each edge segment (`[edge][segment]`): the two triangles of two
+/// different faces whose side is the segment (same end points, bit for bit), each normal turned outward like its
+/// vertex normals; `None` where there aren't exactly two (an open sheet's border, a mesh that doesn't share the
+/// edge's points). The renderer leaves out the segments both of whose facets face away (behind their own solid).
+pub fn edge_facet_normals(m: &noshape_model::display::MeshBuffers) -> noshape_render::scene::EdgeFacetNormals {
+    type Key = ([u32; 3], [u32; 3]);
+    let key = |a: [f32; 3], b: [f32; 3]| -> Key {
+        let (ka, kb) = (a.map(f32::to_bits), b.map(f32::to_bits));
+        if ka <= kb { (ka, kb) } else { (kb, ka) }
+    };
+    let wanted: std::collections::HashSet<Key> = m.edges.iter().flat_map(|pl| pl.windows(2).map(|w| key(w[0], w[1]))).collect();
+    let mut sides: HashMap<Key, Vec<(glam::Vec3, usize)>> = HashMap::new();
+    let p = |i: u32| m.positions.get(i as usize).copied();
+    for (fi, &(start, count)) in m.face_ranges.iter().enumerate() {
+        let Some(tris) = m.indices.get(start as usize..(start + count) as usize) else { continue };
+        for t in tris.as_chunks::<3>().0 {
+            let (Some(a), Some(b), Some(c)) = (p(t[0]), p(t[1]), p(t[2])) else { continue };
+            let (va, vb, vc) = (glam::Vec3::from(a), glam::Vec3::from(b), glam::Vec3::from(c));
+            let mut n = (vb - va).cross(vc - va).normalize_or_zero();
+            if n == glam::Vec3::ZERO {
+                continue;
+            }
+            let shading: glam::Vec3 = t.iter().filter_map(|&i| m.normals.get(i as usize)).map(|v| glam::Vec3::from(*v)).sum();
+            if n.dot(shading) < 0.0 {
+                n = -n;
+            }
+            for (x, y) in [(a, b), (b, c), (c, a)] {
+                let k = key(x, y);
+                if wanted.contains(&k) {
+                    sides.entry(k).or_default().push((n, fi));
+                }
+            }
+        }
+    }
+    m.edges
+        .iter()
+        .map(|pl| {
+            pl.windows(2)
+                .map(|w| match sides.get(&key(w[0], w[1])).map(Vec::as_slice) {
+                    Some(&[(n0, f0), (n1, f1)]) if f0 != f1 => Some(if f0 < f1 { [n0, n1] } else { [n1, n0] }),
+                    _ => None,
+                })
+                .collect()
+        })
+        .collect()
 }
 
 /// Onshape's edge-based silhouettes: every tessellation edge inside a face

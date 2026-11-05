@@ -1143,10 +1143,11 @@ fn same_buffers(a: &Instance, b: &Instance, pick: bool) -> bool {
 /// Draw slots the line quad index buffer covers ([`Pipelines::quad_index`]).
 const QUAD_INDEX_SLOTS: u32 = 1 << 16;
 
-/// The edge lines' vertex shader: `vs_line`, or under `NOSHAPE_PERF_LINES=minimal` the bare projection
-/// `vs_line_min` (benchmarks: how much of the lines' Retina cost is the vertex work).
+/// The visible lines' vertex shader: `vs_line_visible` (a solid's edge segments behind the solid itself left out),
+/// or under `NOSHAPE_PERF_LINES=minimal` the bare projection `vs_line_min` (benchmarks: how much of the lines' Retina
+/// cost is the vertex work).
 fn line_vs() -> &'static str {
-    if std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "minimal") { "vs_line_min" } else { "vs_line" }
+    if std::env::var("NOSHAPE_PERF_LINES").is_ok_and(|v| v == "minimal") { "vs_line_min" } else { "vs_line_visible" }
 }
 
 /// The edge lines' fragment shader: `fs_line`, or under `NOSHAPE_PERF_LINES=plain` the same without its discards
@@ -1356,6 +1357,8 @@ struct PerfOverrides {
     no_solid: bool,
     skip_silhouettes: bool,
     skip_ao: bool,
+    /// `edgecull`: a solid's edge segments behind the solid itself are drawn too (`Instance::cull_hidden` off).
+    skip_edge_cull: bool,
 }
 
 /// `NOSHAPE_PERF_SKIP=instancing`: no instanced calls, and the scene builder
@@ -1379,6 +1382,7 @@ fn perf_overrides() -> &'static PerfOverrides {
             no_solid: skip.split([',', '+']).any(|t| t == "solid"),
             skip_silhouettes: skip.split([',', '+']).any(|t| t == "silhouettes"),
             skip_ao: skip.split([',', '+']).any(|t| t == "ao"),
+            skip_edge_cull: skip.split([',', '+']).any(|t| t == "edgecull"),
         }
     })
 }
@@ -2797,7 +2801,7 @@ impl Renderer {
                 model: model.to_cols_array_2d(),
                 normal_m: normal_m.to_cols_array_2d(),
                 color: inst.color,
-                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
+                params: [(inst.color_mode == ColorMode::PerPrimitive) as u32 | (((inst.reflection.is_none() && inst.ambient != 0.0) as u32) << 1) | ((inst.selected_only as u32) << 2) | ((inst.decal_selected as u32) << 3) | (((inst.cull_hidden && !perf_overrides().skip_edge_cull) as u32) << 4) | (inst.hatch_id << 8), inst.ignore_clip as u32 | ((inst.unlit as u32) << 1) | ((inst.preview as u32) << 4) | zebra_bits(inst.zebra) | ((inst.compare as u32 & 3) << 5) | (((inst.ghost > 0.0) as u32) << 7), inst.pickable as u32, inst.pick_base],
                 extra: match &inst.reflection {
                     Some(r) => [inst.line_scale, r.rotation, if r.blur { 3.0 } else { 0.0 }, lock_eye.is_some_and(|_| r.lock.is_some()) as u32 as f32],
                     None => [inst.line_scale, inst.ghost, inst.ambient, 0.0],

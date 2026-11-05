@@ -66,6 +66,61 @@ impl LineSegment {
     /// state OUTLINE) it keeps a dark core under the highlight (live
     /// selection/06b, 07b).
     pub const CORE: u32 = 64;
+    /// The normals of the facets on either side are packed in (`with_face_normals`): drawn only where one of them
+    /// faces the viewer (a segment between two faces turned away lies behind its own solid).
+    pub const FACE_NORMALS: u32 = 128;
+
+    /// A solid's edge segment with the normal cones of the facets on its two sides, packed into its colour (unused
+    /// for part edges, drawn in the instance's colour) and its style's upper bits: the renderer leaves it out where
+    /// both sides face away from the viewer (it is behind its own solid). Cones too wide to say anything are left out.
+    pub fn with_face_normals(mut self, a: NormalCone, b: NormalCone) -> Self {
+        let (Some(ca), Some(cb)) = (a.code(), b.code()) else { return self };
+        let (ax, ay) = oct_code(a.axis);
+        let (bx, by) = oct_code(b.axis);
+        self.color = (ax | (ay << 10) | (ca << 20) | (cb << 26)).to_le_bytes();
+        self.style |= Self::FACE_NORMALS | (bx << 8) | (by << 18);
+        self
+    }
+}
+
+/// Facet normals around an axis: every normal is within the angle whose sine is `sin_spread` of `axis` (unit), so a
+/// view direction at least that far past perpendicular to `axis` has all of them turned away.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NormalCone {
+    pub axis: Vec3,
+    pub sin_spread: f32,
+}
+
+impl NormalCone {
+    pub fn of(normals: impl IntoIterator<Item = Vec3>) -> Option<Self> {
+        let ns: Vec<Vec3> = normals.into_iter().collect();
+        let axis = ns.iter().copied().sum::<Vec3>().normalize_or_zero();
+        if axis == Vec3::ZERO {
+            return None;
+        }
+        // The widest angle from the axis, as the sine of an angle past 90° counts as more than 1 (never left out).
+        let mut sin_spread = 0.0f32;
+        for n in &ns {
+            let c = n.normalize_or_zero().dot(axis);
+            sin_spread = sin_spread.max(if c <= 0.0 { 2.0 } else { (1.0 - c * c).max(0.0).sqrt() });
+        }
+        Some(Self { axis, sin_spread })
+    }
+
+    /// The spread in 6 bits, rounded up and widened by the 10-bit normal's error; `None` if it says nothing.
+    fn code(self) -> Option<u32> {
+        let s = self.sin_spread + 0.006;
+        (s < 1.0).then(|| ((s * 63.0).ceil() as u32).min(63))
+    }
+}
+
+/// `n` (unit) as octahedral coordinates in 10 bits each (shaders.wgsl `edge_normal` decodes them).
+fn oct_code(n: Vec3) -> (u32, u32) {
+    let n = n / (n.x.abs() + n.y.abs() + n.z.abs()).max(1e-20);
+    let sign = |v: f32| if v >= 0.0 { 1.0 } else { -1.0 };
+    let (x, y) = if n.z >= 0.0 { (n.x, n.y) } else { ((1.0 - n.y.abs()) * sign(n.x), (1.0 - n.x.abs()) * sign(n.y)) };
+    let q = |v: f32| ((v.clamp(-1.0, 1.0) * 0.5 + 0.5) * 1023.0).round() as u32;
+    (q(x), q(y))
 }
 
 impl LineData {
@@ -340,6 +395,9 @@ pub struct Instance {
     /// (a unit cube placed by `transform`) in the body's color
     /// (`getDisplayIncrement`), drawn only in the body's place.
     pub lod_box: bool,
+    /// Lines: an opaque solid's edges, whose segments with facet normals ([`LineSegment::FACE_NORMALS`]) are left
+    /// out where they are behind the solid itself (both facets turned away).
+    pub cull_hidden: bool,
 }
 
 /// Versions and history › Compare, as Onshape draws it (webgl bundle): the
@@ -401,6 +459,7 @@ impl Instance {
             no_bounds: false,
             unlit: false,
             back_silhouette: false,
+            cull_hidden: false,
             preview: false,
             ghost: 0.0,
             ambient: 0.0,
@@ -546,6 +605,12 @@ impl Instance {
     }
     /// Draw this mesh as Onshape's image-based (backface) silhouettes in
     /// the instance color, not as faces; never picked.
+    /// See [`Instance::cull_hidden`].
+    pub fn cull_hidden(mut self) -> Self {
+        self.cull_hidden = true;
+        self
+    }
+
     pub fn back_silhouette(mut self) -> Self {
         self.back_silhouette = true;
         self.pickable = false;
@@ -753,8 +818,13 @@ fn line_lod_max_error_px() -> f32 {
 /// Douglas–Peucker: the points of `pts` that keep every dropped point
 /// within `tol` of the simplified polyline; the ends always stay.
 pub fn simplify_polyline(pts: &[[f32; 3]], tol: f32) -> Vec<[f32; 3]> {
+    simplify_polyline_kept(pts, tol).into_iter().map(|i| pts[i]).collect()
+}
+
+/// [`simplify_polyline`]'s kept points, by index (ascending).
+pub fn simplify_polyline_kept(pts: &[[f32; 3]], tol: f32) -> Vec<usize> {
     if pts.len() < 3 || tol <= 0.0 {
-        return pts.to_vec();
+        return (0..pts.len()).collect();
     }
     let dist = |p: Vec3, a: Vec3, b: Vec3| {
         let ab = b - a;
@@ -776,23 +846,61 @@ pub fn simplify_polyline(pts: &[[f32; 3]], tol: f32) -> Vec<[f32; 3]> {
             stack.push((i, b));
         }
     }
-    pts.iter().zip(&keep).filter(|(_, k)| **k).map(|(p, _)| *p).collect()
+    (0..pts.len()).filter(|&i| keep[i]).collect()
 }
 
 /// A body's edge polylines (`edges`, pick ids 1-based by edge) as line
 /// data at each of [`LINE_LOD_TOLERANCES`] after the first, for a body
 /// `diagonal` across.
 pub fn edge_line_lods(edges: &[Vec<[f32; 3]>], diagonal: f32) -> Vec<LineData> {
+    edge_line_lods_with_normals(edges, &[], diagonal)
+}
+
+/// The facet normals on either side of each segment of each edge (`None` where not known).
+pub type EdgeFacetNormals = Vec<Vec<Option<[Vec3; 2]>>>;
+
+/// [`edge_line_lods`] with each edge segment's facet normals (`normals[edge][segment]`, may be empty): a simplified
+/// segment carries the cones of the normals it stands for ([`LineSegment::with_face_normals`]).
+pub fn edge_line_lods_with_normals(edges: &[Vec<[f32; 3]>], normals: &[Vec<Option<[Vec3; 2]>>], diagonal: f32) -> Vec<LineData> {
     LINE_LOD_TOLERANCES[1..]
         .iter()
         .map(|t| {
             let mut l = LineData::default();
             for (ei, pl) in edges.iter().enumerate() {
-                l.push_polyline(&simplify_polyline(pl, t * diagonal), [0, 0, 0, 255], ei as u32 + 1, 1.25, LineSegment::CORE);
+                let kept = simplify_polyline_kept(pl, t * diagonal);
+                let ns = normals.get(ei);
+                for w in kept.windows(2) {
+                    let seg = LineSegment { a: pl[w[0]], b: pl[w[1]], color: [0, 0, 0, 255], pick_id: ei as u32 + 1, width: 1.25, style: LineSegment::CORE };
+                    l.segments.push(match ns.and_then(|ns| edge_cull_cones(ns, w[0], w[1])) {
+                        Some((a, b)) => seg.with_face_normals(a, b),
+                        None => seg,
+                    });
+                }
             }
             l
         })
         .collect()
+}
+
+/// The normal cones a drawn segment of an edge may be left out by: it stands for the original segments `from..to`
+/// (point indices), and its cones also take in the segments on either side (where a neighbour's facet turns toward
+/// the viewer, the outline passes through the shared point and the line's end would show). `None` for a run touching
+/// the edge's ends (a vertex: other edges, perhaps an outline, meet there) or with unknown normals.
+pub fn edge_cull_cones(normals: &[Option<[Vec3; 2]>], from: usize, to: usize) -> Option<(NormalCone, NormalCone)> {
+    if from == 0 || to >= normals.len() || from >= to {
+        return None;
+    }
+    edge_span_cones(&normals[from - 1..to + 1])
+}
+
+/// The two sides' normal cones over a run of segments (`None` if any segment's normals are unknown).
+pub fn edge_span_cones(span: &[Option<[Vec3; 2]>]) -> Option<(NormalCone, NormalCone)> {
+    if span.is_empty() || span.iter().any(Option::is_none) {
+        return None;
+    }
+    let a = NormalCone::of(span.iter().flatten().map(|n| n[0]))?;
+    let b = NormalCone::of(span.iter().flatten().map(|n| n[1]))?;
+    Some((a, b))
 }
 
 impl Default for Style {

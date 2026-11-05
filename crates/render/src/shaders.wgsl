@@ -744,6 +744,49 @@ fn vs_line(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
     return line_vertex(index, l, 0xffffffffu);
 }
 
+// The visible lines' pass (`vs_line` elsewhere: the hidden-line and pick passes see every segment): a solid's edge
+// segments behind the solid itself are left out (`behind_own_solid`).
+@vertex
+fn vs_line_visible(@builtin(vertex_index) index: u32, l: LineIn) -> LineOut {
+    let slot = index / 6u;
+    load_inst(slot);
+    var o = line_vertex(index, l, 0xffffffffu);
+    if (behind_own_solid(l)) {
+        // All six corners at one point outside the view: nothing is rasterized.
+        o.pos = vec4(-2.0, -2.0, 0.5, 1.0);
+    }
+    return o;
+}
+
+// An edge's facet normal (`LineSegment::with_face_normals`: 10-bit octahedral codes) in world space.
+fn edge_normal(x: u32, y: u32) -> vec3<f32> {
+    let e = vec2(f32(x), f32(y)) / 1023.0 * 2.0 - 1.0;
+    return normalize((inst.normal_m * vec4(oct_decode(e), 0.0)).xyz);
+}
+
+// A solid's edge segment whose facets on both sides face away from the viewer, everywhere along it, lies behind
+// that solid's own front faces: it is never seen (instance params.x bit 4: an opaque solid's edges, no section
+// cutting it; the segment carries its facets' normal cones). Not while it is highlighted, and with a margin so the
+// segments by the outline, where its front and back faces meet, are still drawn.
+fn behind_own_solid(l: LineIn) -> bool {
+    if ((inst.params.x & 16u) == 0u || (l.style & 128u) == 0u) { return false; }
+    if (g.flags.x != 0u && (inst.params.y & 1u) == 0u) { return false; }
+    if (state_of(global_pick(l.pick)) != 0u) { return false; }
+    let c = vec4<u32>(round(l.color * 255.0));
+    let packed = c.x | (c.y << 8u) | (c.z << 16u) | (c.w << 24u);
+    let na = edge_normal(packed & 1023u, (packed >> 10u) & 1023u);
+    let nb = edge_normal((l.style >> 8u) & 1023u, (l.style >> 18u) & 1023u);
+    let margin = 0.02;
+    let sa = -(f32((packed >> 20u) & 63u) / 63.0 + margin);
+    let sb = -(f32((packed >> 26u) & 63u) / 63.0 + margin);
+    let wa = (inst.model * vec4(l.a, 1.0)).xyz;
+    let wb = (inst.model * vec4(l.b, 1.0)).xyz;
+    let persp = g.camera_pos.w > 0.5;
+    let va = select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - wa), persp);
+    let vb = select(-g.camera_fwd.xyz, normalize(g.camera_pos.xyz - wb), persp);
+    return dot(na, va) < sa && dot(na, vb) < sa && dot(nb, va) < sb && dot(nb, vb) < sb;
+}
+
 // NOSHAPE_PERF_LINES=minimal (benchmarks only): the segment projected and widened, nothing else (no state, lift,
 // depth offset or colour): what's left of the lines' cost is the raster's, the rest was `line_vertex`'s.
 @vertex
