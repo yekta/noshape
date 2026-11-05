@@ -36,6 +36,8 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-05 14:48:** core's fix for P0 RELEASE-BUILD-FILLET-HANG is da234fac (OCCT patch 0022: BRepMesh's Delaunay frontier walk stops at the break hook and after 2 s on a face). Only a release build ever hung, so verify on the next release: the presmoke row "RELEASE-BUILD-FILLET-HANG open" must give seconds, not HANG; then mark the ticket.
+
 **v0.4.31 (published 11:11, cut d84287a1 = b3889906: greens through 7bb99058, not 8cc1b766) smoked 11:33: good, no new
 blocker.** Artifacts byte-identical, SHA256SUMS OK, 11 assets; CLI smoke = v0.4.30 (round trip, all fixed tickets, the user's
 cases incl. the Gyro); the 44 ticket documents = 7bb99058; GUI rows pixel-identical to v0.4.30; title bar: all five menus open
