@@ -3,6 +3,29 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Shell's fuses (shfall), learning-center-michael, motor-mount (11-05 19:35 UTC)
+- shfall (vibe4 ~/agents/bool-corpora/shfall, 194 cases, 46 taken): its untaken OCCT time (258 s recorded) is
+  Shell's tolerant geometry: input vertices of 0.3 mm to 1.08 m tolerance, groups of 0.17 mm, fuzzy 20 um faces.
+  Each case peels several layers. Landed today, no new case taken yet (corpora and shfall otherwise unchanged): a thin
+  hyperbola's range (it reached 1.5 km and both faces took its far part as inside), a curve's end on a cylinder's seam
+  within 0.1 um or its vertex's tolerance, sections ending at a tolerant vertex within its tolerance, curves joining the
+  same two vertices kept apart in a face (not drawn straight), micro pieces at one vertex dropped, B-spline micro edges
+  in a vertex group, an edge's curve on a free-form face within the edge's and face's tolerances.
+  Left by recorded OCCT time: "a piece's point near its face's boundary" 64 s / 11 (the four 90-tool slab fuses
+  0acfd0a2, 80a5941f, 9aec1f4b, 4fca980b: 10-40 um slivers between sections at 0.3 mm vertices, and slab edges
+  overlapping within 20 um not merged), "an edge nearly on another argument's face" 29 s / 5, "two edges leave a vertex
+  in one direction" 27 s / 5, "a section without ends" 20 s / 5 (47587a8d, OCCT's 70 s common, now there), "a point
+  near two vertices" 18 s / 14 (8 of them a vertex of 1.08 m tolerance: broken input, not worth following).
+  To list them: `NOSHAPE_BREP_WHY=declin` with why4.sh, or tools/bool-share.sh's per-corpus reasons.
+- learning-center-michael 41701bb2: OCCT's plane/torus section crosses straight edge 12 at 134, then runs 8.5 um off
+  it for 23 um to corner 130; OCCT takes that bit as edge 12's piece (a common block). Tried: keeping the excursion
+  inside face 31 and merging short section pieces with an edge's piece between the same vertices: the corner closes
+  but the result is invalid at the mirrored corner (z 0.005, BRepCheck 27 on two cylinders and the torus). WIP:
+  /root/bool-scratch/lcm-graze-wip-1105.patch.
+- motor-mount-jack 1fde8f6b ("an arc across a cylinder's seam", Fillet 2): the full cylinder's own top circle has its
+  only vertex at 45 deg while the face's seam edge meets the circle at 0 deg (core's face-pattern copy). Taking it needs
+  a closed edge split at the seam throughout the face's arrangement.
+
 ## How far it goes; tori; learning-center-michael's Fillet 2 (11-05 18:15 UTC)
 - `tools/bool-share.sh` (T2 `brep_replay::brep_corpus_share` over vibe4's corpora): the share of recorded Booleans ours
   takes, by count and by OCCT's time (OCCT run there on every case). Rows in docs/parity/SCORE.md. 11-05 on main
