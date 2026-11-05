@@ -581,6 +581,14 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N0000000. (11-05 13:40) **Landed today, speed:** 5423c54a a closed solid's back faces culled in the color pass
+    (live's solid faces are one-sided: webgl bundle `isTwoSided: false`, CULL_FACE BACK by default): NIST 2× orbit GPU
+    mean -1 ms (macOS 14, 8.40 -> 7.45 avg) / -0.5 ms (macOS 15), perf 42015953579; byte-identical with edges and in
+    hidden line, in plain Shaded only the back faces our depth offsets let through go (scene back_face_cull test).
+    3ed86c09 the Regenerator a cancel starts afresh is seeded (Regenerator::snapshot, shared Arcs): cf-straight-spline
+    edit after a cancel 17.4 s -> 8-17 ms. 7d4332c8 a cancelled dialog drops all its work (P1 Displacement map).
+    655a65fa cf-hose-routing's hoses meshed here (reopen 7.2-9.2 s -> 1.3 s). Next: perf 42036796248 (main, default
+    settings) confirms NIST ≤ 8.3 ms mean on both runners -> TARGET_GATE '--gate-target' in perf.yml.
 N000000. (11-05 09:08) **Live mid-orbit (lead 11-05: motion-only cuts are parity only if live does them).** Live's
     webgl bundle (bundle-raw/webgl.*.js, the `detail` logger): while the camera moves (frameTimer interaction, 500 ms
     after the last move) live draws its interactive DetailSettings; they start equal to FULL and drop a step only when
