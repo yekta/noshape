@@ -4301,6 +4301,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   147 ms (live's sphere corners: BLEND-RUST); cf-straight-spline (bool, BOOL-RUST-GEARS-SLOW). cf-straight-spline's
   Feature 5 (live 31/85/56, ours 31/78/49): the faces are live's one for one; live's bottom face is 1.3 mm² short of
   the disk ours is and its 7 more edges / vertices fit a bottom circle in 8 arcs: not looked into.
+  dx 11-05 05:50: not the bottom circle (one edge in live too, JHh; the 1.3 mm² is the UI fetch's facet sum). Live
+  has 8 more edges: tiny lines (11 µm, e.g. at (−122.934, 541.603, 101.595) mm) where each flank plane (z 101.6 ..
+  152.4) meets the root's cone / torus faces, the Boolean of the extruded gap profile with its revolved end (the
+  same profile about an axis 1 in away) meeting near-tangentially at z 101.6; ours meet at a vertex. And ours has 1
+  more: a 10.94 mm root edge at x −152.09 split in two halves (5.47 mm) at a periodic face's seam. 85 − 8 + 1 = 78.
+  For core (the Boolean's near-tangent intersection, the seam split).
   dx 11-04 05:31 (lead: the FeatureScript side): no custom feature is slow in the FeatureScript host. Per feature
   (NOSHAPE_KERNEL_PROFILE, main d455892b5, vibe5), the kernel takes all but ~0.05-0.1 s: Fix PCB 2 4.1 s (one opBoolean
   3.4 s: OCCT's tree 2.8 s after noshape's Boolean declines at 0.5 s; live 0.28 s), Spur Gear 1 3.1 s (Booleans 2.6 s,
