@@ -862,7 +862,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1.0440 mm); ours gives the whole sketch entities (the circles 106.18 / 91.70 mm, the splines 2.4979 untrimmed).
   The FeatureScript host's sketch edges are one per entity; live's sketch body splits them where they cross. No
   corpus number depends on it yet (the gear's region area and its extrude match live).
-- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed) cf-sheet-metal-model-plus regenerates in 2.5 s, live 0.92 (one.sh,
+- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 10:37: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
+  on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
+  with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
+  per sheet metal rebuild (updateSheetMetalGeometry, 133-225 ms a feature): fuse_all of the walls and bends ~50 ms,
+  the curved wall's fillet 20-33 ms, keep_names / part_sources 20-60 ms; in Extrude 4 also opBoolean 86 ms, opThicken
+  43, evCollisionDetection 28, tracking queries ~80; evEdgeConvexity 6.5 ms a call in Up to Part / Flange 1) cf-sheet-metal-model-plus regenerates in 2.5 s, live 0.92 (one.sh,
   vibe5). By feature (NOSHAPE_FS_PROFILE): Sheet Metal Up to Part 281 ms (live 160), Flange 1 307 (224), Up to Face w/
   Offset 35 (123), Extrude 4 898 (339). Extrude 4 is std's sheet metal boolean: 571 ms in the per-face loop
   (boolean.fs createOutlineBooleanToolsForFaceNoChecks: thicken, trimTool's intersect, createOutline), of which

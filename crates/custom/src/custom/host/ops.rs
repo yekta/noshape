@@ -1989,8 +1989,14 @@ fn op_create_outline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 }
                 None => face.clone(),
             };
-            let inside = k::boolean(k::BooleanOp::Common, &[sheet], &[tool], &k::BooleanOptions::default()).map_err(|e| FeatureError::new(format!("Failed to outline the tool: {e}")))?.shape;
             let own: Vec<Shape> = caps.iter().filter(|(cb, _)| *cb == t).filter_map(|&(cb, cf)| ev.face_shape(cb, cf).ok()).collect();
+            // On a curved face, the tool's cap lying on it is its section there (the Common with the rolled face took
+            // 40-70 ms: model-plus's Extrude 4).
+            let on_face = || own.iter().find(|c| plane.is_none() && cap_on_face(c, &face)).and_then(|c| oriented_like(c, &face));
+            let inside = match on_face() {
+                Some(cap) => Shape::compound(&[cap]),
+                None => k::boolean(k::BooleanOp::Common, &[sheet], &[tool], &k::BooleanOptions::default()).map_err(|e| FeatureError::new(format!("Failed to outline the tool: {e}")))?.shape,
+            };
             let inside = if inside.faces().is_empty() { inside } else { outline_shadow(&face, &inside, &own).unwrap_or(inside) };
             if !inside.faces().is_empty() {
                 let names = fresh_names(ev, &inside);
@@ -2003,6 +2009,20 @@ fn op_create_outline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         add_bodies(ev, made, BodyKind::Surface)
     })?;
     Ok(Value::Undefined)
+}
+
+/// Whether face `cap` lies on `face`: its inner point on it, its vertices within 1e-5 (a thickened face's corners
+/// come out 6e-7 off its edges).
+fn cap_on_face(cap: &Shape, face: &Shape) -> bool {
+    let on = |p: DVec3| face.project_point(p).is_ok_and(|pr| pr.distance < 1e-5);
+    super::sheetmetal::inner_point(cap).is_some_and(|p| face.contains_point(p, 1e-7).unwrap_or(false)) && cap.vertices().iter().all(|v| v.vertex_point().is_ok_and(on))
+}
+
+/// `cap` facing the way `face` does there.
+fn oriented_like(cap: &Shape, face: &Shape) -> Option<Shape> {
+    let p = super::sheetmetal::inner_point(cap)?;
+    let (a, b) = (cap.normal_at_point(p).ok()?, face.normal_at_point(p).ok()?);
+    if a.dot(b) >= 0.0 { Some(cap.clone()) } else { cap.reversed().ok() }
 }
 
 /// A tool's outline on planar `face`: its section there with its cap faces (the thickened face's offsets it keeps)
