@@ -2746,3 +2746,232 @@ fn opening_a_dialog_redraws_only_its_toolbar_button(cx: &mut TestAppContext) {
     assert_ne!(after["extrude"].1, before["extrude"].1, "and is drawn again");
     assert_eq!(after["revolve"], before["revolve"], "another tool keeps its cached view");
 }
+
+/// User P1 (11-05): the public Displacement map (a custom feature with editing logic; its preview a sheet beside the
+/// part, "Surfaces (1)") on a cylinder, its preview listed, a value changed and Esc before the new preview and the
+/// editing logic are in: the model before the dialog at once (no sheet listed, no spinner), and so it stays once the
+/// cancelled work's results arrive.
+#[gpui::test]
+fn cancel_a_displacement_map_after_its_preview_is_listed(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "cancel-displacement");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    let cylinder = r#"FeatureScript 3044;
+import(path : "onshape/std/common.fs", version : "3044.0");
+annotation { "Feature Type Name" : "Test cylinder" }
+export const testCylinder = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+        fCylinder(context, id + "c", { "bottomCenter" : vector(0, 0, 0) * meter, "topCenter" : vector(0, 0, 60) * millimeter, "radius" : 25 * millimeter });
+    });
+"#;
+    let csv: String = (0..24).map(|i| (0..24).map(|j| format!("{}", ((((i + 2 * j) as f64) * 0.7).sin() * 127.5 + 127.5).round() as i32)).collect::<Vec<_>>().join(",") + "\n").collect();
+    let (disp, table) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let units = v.doc.read(cx).session.doc.settings.units;
+            let mut ids = None;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_document("Add tabs", cx, |d| {
+                    let disp = d.add_tab("Displacement map", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(include_str!("../../../model/tests/fs/displacement_map.fs"))));
+                    let cyl = d.add_tab("Cylinder", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(cylinder)));
+                    let table = d.add_tab("leather.csv", noshape_model::TabContent::File(noshape_model::file_tab::FileTab::new("leather.csv", csv.as_bytes(), 0)));
+                    ids = Some((disp, cyl, table));
+                });
+                let (_, cyl, _) = ids.expect("the tabs");
+                // The Feature Studios compiled: their feature types known.
+                let _ = doc.custom_features();
+                doc.edit_studio(tab, "Add cylinder", cx, |ps| {
+                    let f = ps.new_feature(&noshape_model::custom::type_id(cyl, "testCylinder"), &units).expect("the cylinder feature");
+                    ps.features.push(f);
+                });
+            });
+            let (disp, _, table) = ids.expect("the tabs");
+            (disp, table)
+        })
+    });
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none() && view.read(cx).display.bodies.len() == 1);
+    let before = cx.update(|cx| view.read(cx).display.clone());
+    assert_eq!(before.bodies.len(), 1, "the cylinder");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let ctx = v.context.clone().expect("the cylinder's context");
+            let b = &ctx.bodies[0];
+            let side = (0..b.faces.len())
+                .find(|&i| matches!(b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).and_then(|f| f.face_surface()), Ok(noshape_kernel::Surface::Cylinder { .. })))
+                .expect("the side face");
+            let face = (*b.faces[side]).clone();
+            v.start_feature(&noshape_model::custom::type_id(disp, "displacementMap"), w, cx);
+            let d = v.edit.as_ref().expect("the dialog").dialog.clone();
+            d.update(cx, |d, _| {
+                let p = &mut d.feature.params;
+                p.set("imageTable", noshape_model::ParamValue::Text(table.to_string()));
+                p.set("face", noshape_model::ParamValue::Query(vec![Reference::Face(face)]));
+                p.set("degree", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("5")));
+                p.set("blackValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("0 mm")));
+                p.set("whiteValue", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("1 mm")));
+            });
+            v.schedule_regen(w, cx);
+        })
+    })
+    .unwrap();
+    let listed = |v: &PartStudioView| v.display.bodies.iter().map(|b| super::super::part_section(b)).collect::<Vec<_>>();
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.len() == 2);
+    assert_eq!(cx.update(|cx| listed(view.read(cx))), ["parts", "surfaces"], "the preview's sheet listed");
+    // A value changed (std's editing logic and a new preview start), then Esc before either is in.
+    cx.update(|cx| {
+        let d = view.read(cx).edit.as_ref().expect("the dialog").dialog.clone();
+        d.update(cx, |d, cx| d.set_value("degree", noshape_model::ParamValue::Expr(noshape_units::ExprValue::new("4")), cx));
+    });
+    let after_esc = cx
+        .update_window(window, |_, w, cx| {
+            assert!(view.read(cx).pending.is_some() && view.read(cx).ui.std_edit_task.is_some(), "the editing logic and the new preview running");
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(Keystroke::parse("escape").unwrap(), cx);
+            let v = view.read(cx);
+            (v.edit.is_some(), v.pending.is_some(), listed(v), std::sync::Arc::ptr_eq(&v.display, &before))
+        })
+        .unwrap();
+    assert_eq!(after_esc, (false, false, vec!["parts"], true), "(dialog open, spinner, listed, other model) right after Esc");
+    for _ in 0..100 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let settled = cx.update(|cx| {
+        let v = view.read(cx);
+        (v.pending.is_some(), listed(v), std::sync::Arc::ptr_eq(&v.display, &before))
+    });
+    assert_eq!(settled, (false, vec!["parts"], true), "(spinner, listed, other model) once the late results are in");
+}
+
+/// A Part Studio with one committed part (a 150 × 100 px rectangle on Top, extruded), settled.
+fn one_part(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
+    let (window, view) = sketch_with(cx, name, Tool::CornerRect);
+    click(cx, window, &view, (500., 300.));
+    click(cx, window, &view, (650., 400.));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.finish_sketch(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none() && !view.read(cx).display.sketches.is_empty());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.first().expect("the sketch").clone();
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    wait_until(cx, window, |cx| view.read(cx).display.bodies.len() == 1);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.accept_open_dialog(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none() && view.read(cx).edit.is_none() && view.read(cx).display.bodies.len() == 1);
+    assert_eq!(cx.update(|cx| view.read(cx).display.bodies.len()), 1, "Part 1");
+    (window, view)
+}
+
+/// The Regenerator held on another thread (a cancelled preview in a kernel step that doesn't stop) until the
+/// returned sender is dropped.
+fn hold_regenerator(cx: &mut TestAppContext, view: &Entity<PartStudioView>) -> std::sync::mpsc::Sender<()> {
+    let regen = cx.update(|cx| view.read(cx).regen.clone());
+    let (held_tx, held_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    std::thread::spawn(move || {
+        let _held = regen.lock();
+        let _ = held_tx.send(());
+        let _ = release_rx.recv();
+    });
+    held_rx.recv().unwrap();
+    release_tx
+}
+
+/// Frames for `ms` of real time (background work runs meanwhile).
+fn frames_for(cx: &mut TestAppContext, window: AnyWindowHandle, ms: u64) {
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_millis(ms) {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        draw(cx, window);
+    }
+}
+
+/// User P1 (11-05): a new part's dialog whose preview is slow (its regeneration not in when Esc comes, then held in a
+/// kernel step that doesn't stop), cancelled: the parts list shows the model before the dialog and the spinner is off
+/// at once and while the cancelled work still runs, and both stay so once it ends.
+#[gpui::test]
+fn cancel_a_slow_preview_shows_the_model_before_it_at_once_and_after(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "cancel-slow-preview");
+    let before = cx.update(|cx| view.read(cx).display.clone());
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let sk = v.display.sketches.first().expect("the sketch").clone();
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+            let d = v.edit.as_ref().expect("the dialog").dialog.clone();
+            d.update(cx, |d, _| d.feature.params.set("operationType", noshape_model::ParamValue::Enum("NEW".into())));
+            v.schedule_regen(w, cx);
+        })
+    })
+    .unwrap();
+    let release = hold_regenerator(cx, &view);
+    let state = |v: &PartStudioView| (v.edit.is_some(), v.pending.is_some(), v.display.bodies.len(), std::sync::Arc::ptr_eq(&v.display, &before));
+    let after_esc = cx
+        .update_window(window, |_, w, cx| {
+            assert!(view.read(cx).pending.is_some(), "the preview regenerating");
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(Keystroke::parse("escape").unwrap(), cx);
+            state(view.read(cx))
+        })
+        .unwrap();
+    assert_eq!(after_esc, (false, false, 1, true), "(dialog open, spinner, parts, other model) right after Esc");
+    frames_for(cx, window, 1500);
+    assert_eq!(cx.update(|cx| state(view.read(cx))), (false, false, 1, true), "while the cancelled work still runs");
+    drop(release);
+    frames_for(cx, window, 1000);
+    assert_eq!(cx.update(|cx| state(view.read(cx))), (false, false, 1, true), "once it has ended");
+}
+
+/// User P1 (11-05), the user's sequence: the part deleted (its regeneration not shown yet), a new dialog opened at
+/// once, its preview slow (held in a kernel step), cancelled. The model before the dialog shows at once, then the
+/// document as it is (no part) while the cancelled step still runs: no spinner waiting for it, and its late result
+/// changes nothing.
+#[gpui::test]
+fn cancel_a_slow_preview_opened_before_the_last_edit_was_shown(cx: &mut TestAppContext) {
+    let (window, view) = one_part(cx, "cancel-slow-after-edit");
+    let release = hold_regenerator(cx, &view);
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let extrude = v.studio(cx).and_then(|s| s.features.iter().find(|f| f.type_id == "extrude").map(|f| f.id)).expect("Extrude 1");
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Delete Extrude 1", cx, |ps| ps.features.retain(|f| f.id != extrude));
+            });
+        })
+    })
+    .unwrap();
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            assert_eq!(v.display.bodies.len(), 1, "the deletion not shown yet");
+            let sk = v.display.sketches.first().expect("the sketch").clone();
+            v.selection = vec![Reference::SketchRegion { sketch: sk.feature, key: sk.regions.first().expect("a region").key.clone() }];
+            v.start_feature("extrude", w, cx);
+        })
+    })
+    .unwrap();
+    let after_esc = cx
+        .update_window(window, |_, w, cx| {
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(Keystroke::parse("escape").unwrap(), cx);
+            let v = view.read(cx);
+            (v.edit.is_some(), v.pending.is_some(), v.display.bodies.len())
+        })
+        .unwrap();
+    assert_eq!(after_esc, (false, false, 1), "(dialog open, spinner, parts) right after Esc: the model before the dialog");
+    wait_until(cx, window, |cx| view.read(cx).pending.is_none() && view.read(cx).display.bodies.is_empty());
+    let state = |v: &PartStudioView| (v.pending.is_some(), v.display.bodies.len());
+    assert_eq!(cx.update(|cx| state(view.read(cx))), (false, 0), "the document as it is while the cancelled step still runs");
+    drop(release);
+    frames_for(cx, window, 1000);
+    assert_eq!(cx.update(|cx| state(view.read(cx))), (false, 0), "once its late result is in");
+}

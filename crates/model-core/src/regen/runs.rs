@@ -90,6 +90,12 @@ impl Runs {
     pub fn running(&self) -> usize {
         self.0.iter().filter(|r| r.cancel.held_elsewhere()).count()
     }
+
+    /// Whether a run before the newest one is still computing features the newest uses (one it extends): the
+    /// newest should wait for the Regenerator then. Otherwise whatever holds it is work no one wants any more.
+    pub fn newest_waits_for_another(&self) -> bool {
+        self.0.split_last().is_some_and(|(_, older)| older.iter().any(|r| r.cancel.held_elsewhere()))
+    }
 }
 
 #[cfg(test)]

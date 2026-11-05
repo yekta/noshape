@@ -108,6 +108,28 @@ const TOOLBAR: &[&[&[&str]]] = &[
 
 /// Customize toolbar's tool sets: the toolbar groups, then ⊞ "Add custom
 /// features" (live 341: it has a sled and is listed as a tool).
+/// How long a regeneration waits for a Regenerator held by work no one wants any more (an aborted run still in a
+/// kernel step) before it starts on a fresh one.
+const LOCK_GRACE: Duration = Duration::from_millis(300);
+
+/// The Regenerator a regeneration runs on: `regen` once it is free. One aborted while waiting doesn't run (`None`).
+/// Unless `waits` (an earlier run whose features it uses still computes), past [`LOCK_GRACE`] it doesn't wait for
+/// work no one wants any more that still holds `regen` (an aborted run in a kernel step): it gets a fresh one.
+pub(super) fn regenerator_for(regen: &Arc<Mutex<Regenerator>>, waits: bool, cancel: Option<&noshape_model::regen::RegenCancel>) -> Option<Arc<Mutex<Regenerator>>> {
+    let start = std::time::Instant::now();
+    loop {
+        if regen.try_lock_for(Duration::from_millis(20)).is_some() {
+            return Some(regen.clone());
+        }
+        if cancel.is_some_and(|c| c.aborted()) {
+            return None;
+        }
+        if !waits && start.elapsed() >= LOCK_GRACE {
+            return Some(Arc::new(Mutex::new(Regenerator::new())));
+        }
+    }
+}
+
 const TOOLSETS: usize = TOOLBAR.len() + 1;
 const ADD_CUSTOM_SET: usize = TOOLBAR.len();
 static ADD_CUSTOM: [&str; 1] = ["addCustomFeatures"];
@@ -701,6 +723,8 @@ impl PartStudioView {
         let studio = Arc::new(studio);
         let cancel = noshape_model::regen::RegenCancel::default();
         self.regen_runs.start(noshape_model::regen::runs::Run { cancel: cancel.clone(), studio: studio.clone(), upto, config: config.clone(), doc_vars: doc_vars.clone(), editing_sketch });
+        // Whether a run this one needs (it extends its features) still holds the Regenerator: wait for it then.
+        let waits = self.regen_runs.newest_waits_for_another();
         self.begin_pending(seq, window, cx);
         let cancel2 = cancel.clone();
         // View in high quality (Shift+R, kept for the session once used):
@@ -727,16 +751,32 @@ impl PartStudioView {
                     let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
                     // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
                     let started = asked.elapsed();
-                    let mut regen = regen.lock();
+                    // Work no one wants any more (a cancelled preview in a kernel step that doesn't stop at once) may
+                    // hold the Regenerator: past a short grace this run doesn't wait for it, it starts on a fresh one
+                    // (user P1 11-05: the spinner went on after Esc until the cancelled preview's step ended).
+                    let Some(target) = regenerator_for(&regen, waits, opts.cancel.as_ref()) else {
+                        return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config, units, upto, editing_sketch, doc_vars, regen);
+                    };
+                    let mut held = target.lock();
                     if noshape_render::perf::enabled() {
-                        log::info!(target: "perf", "regen #{seq}: polled {:.1} ms, started {:.1} ms after asked, lock {:.1} ms", polled.as_secs_f64() * 1e3, started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3);
+                        log::info!(target: "perf", "regen #{seq}: polled {:.1} ms, started {:.1} ms after asked, lock {:.1} ms{}", polled.as_secs_f64() * 1e3, started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3, if Arc::ptr_eq(&target, &regen) { "" } else { " (a fresh Regenerator)" });
                     }
-                    let r = regen.regenerate(&studio, &config, &units, &opts);
-                    drop(regen);
-                    (r, studio, config, units, upto, editing_sketch, doc_vars)
+                    let r = held.regenerate(&studio, &config, &units, &opts);
+                    drop(held);
+                    (r, studio, config, units, upto, editing_sketch, doc_vars, target)
                 })
                 .await;
-            let (result, studio, config, units, upto, editing_sketch, doc_vars) = result;
+            let (result, studio, config, units, upto, editing_sketch, doc_vars, target) = result;
+            // A fresh Regenerator: this view's from now on, and the refine pass's.
+            let fresh = (!Arc::ptr_eq(&target, &regen2)).then_some(target);
+            if let Some(f) = &fresh {
+                let _ = this.update(cx, |this: &mut Self, _| {
+                    if Arc::ptr_eq(&this.regen, &regen2) {
+                        this.regen = f.clone();
+                    }
+                });
+            }
+            let regen2 = fresh.unwrap_or(regen2);
             // A newer request took over.
             if result.cancelled {
                 if noshape_render::perf::enabled() {
@@ -785,7 +825,10 @@ impl PartStudioView {
                 let fine = cx
                     .background_spawn(async move {
                         let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, ..Default::default() };
-                        let r = regen2.lock().regenerate(&studio, &config, &units, &opts);
+                        let Some(target) = regenerator_for(&regen2, true, opts.cancel.as_ref()) else {
+                            return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config);
+                        };
+                        let r = target.lock().regenerate(&studio, &config, &units, &opts);
                         (r, studio, config)
                     })
                     .await;
@@ -2596,6 +2639,16 @@ impl PartStudioView {
         self.ui.query_hover = None;
         self.ui.sub_dialog = None;
         if self.edit.take().is_some() {
+            // The dialog's own background work goes with it: nothing it delivers late is applied, and std's editing
+            // logic doesn't start a held preview (user P1 11-05: the spinner kept on after Esc).
+            self.ui.std_edit_task = None;
+            self.ui.std_logic_first = None;
+            self.ui.std_edit_old = None;
+            self.ui.preview_task = None;
+            self.ui.preview_cancel.abort();
+            self.ui.preview_tool_task = None;
+            self.ui.preview_tool_cancel.abort();
+            self.ui.preview_tool = None;
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
             if !self.restore_last_done(window, cx) {

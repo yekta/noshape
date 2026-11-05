@@ -411,6 +411,8 @@ pub struct UiState {
     /// (onDecalFeatureChange sizes the decal when they first are).
     pub decal_sized: Option<(noshape_model::reference::FeatureId, String)>,
     pub preview_task: Option<Task<()>>,
+    /// Stops [`Self::preview_task`]'s regeneration (a closed dialog: no one wants it).
+    pub preview_cancel: noshape_model::regen::RegenCancel,
     /// A scene being built off the UI thread (`apply_display_async`).
     pub scene_task: Option<Task<()>>,
     /// A cancel's check whether the document changed since the result it went back to (`restore_last_done`).
@@ -430,6 +432,8 @@ pub struct UiState {
     /// The open Hole dialog's parameters last time (its linked depths).
     pub hole_prev: Option<(noshape_model::FeatureId, noshape_model::params::ParamValues)>,
     pub preview_tool_task: Option<Task<()>>,
+    /// Stops [`Self::preview_tool_task`]'s regeneration.
+    pub preview_tool_cancel: noshape_model::regen::RegenCancel,
     /// Measure graphics uploaded for a selection.
     pub measure_lines: Option<(Vec<Reference>, Option<String>, Option<noshape_render::Instance>)>,
     /// The Measure panel's distance row under the pointer (its label): live
@@ -725,6 +729,7 @@ impl UiState {
             std_manip_live: None,
             std_manip_task: None,
             preview_task: None,
+            preview_cancel: Default::default(),
             scene_task: None,
             restore_check: None,
             preview_tool: None,
@@ -733,6 +738,7 @@ impl UiState {
             feature_drop: Default::default(),
             hole_prev: None,
             preview_tool_task: None,
+            preview_tool_cancel: Default::default(),
             measure_lines: None,
             measure_hover: None,
             sm_context: None,
@@ -2288,15 +2294,19 @@ impl PartStudioView {
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
         let regen = self.regen.clone();
+        self.ui.preview_cancel.abort();
+        self.ui.preview_cancel = Default::default();
+        let cancel = self.ui.preview_cancel.clone();
         self.ui.preview_task = Some(cx.spawn_in(window, async move |this, cx| {
             let display = cx
                 .background_spawn(async move {
-                    let opts = noshape_model::regen::RegenOptions { upto: Some(index), document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
+                    let regen = super::regenerator_for(&regen, true, Some(&cancel))?;
+                    let opts = noshape_model::regen::RegenOptions { upto: Some(index), document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
-                    (r.display, r.context)
+                    (!r.cancelled).then_some((r.display, r.context))
                 })
                 .await;
-            let (display, context) = display;
+            let Some((display, context)) = display else { return };
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.preview_task = None;
                 this.ui.before_context = Some(context);
@@ -2349,13 +2359,19 @@ impl PartStudioView {
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
         let regen = self.regen.clone();
+        self.ui.preview_tool_cancel.abort();
+        self.ui.preview_tool_cancel = Default::default();
+        let cancel = self.ui.preview_tool_cancel.clone();
         self.ui.preview_tool_task = Some(cx.spawn_in(window, async move |this, cx| {
             let display = cx
                 .background_spawn(async move {
-                    let opts = noshape_model::regen::RegenOptions { upto, document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), ..Default::default() };
-                    regen.lock().regenerate(&studio, &config, &units, &opts).display
+                    let regen = super::regenerator_for(&regen, true, Some(&cancel))?;
+                    let opts = noshape_model::regen::RegenOptions { upto, document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
+                    let r = regen.lock().regenerate(&studio, &config, &units, &opts);
+                    (!r.cancelled).then_some(r.display)
                 })
                 .await;
+            let Some(display) = display else { return };
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.preview_tool = Some((Arc::new(display), fid));
                 this.ui.preview_tool_adds = adds;
