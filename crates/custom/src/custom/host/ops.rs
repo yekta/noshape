@@ -2106,6 +2106,9 @@ fn op_split_edges(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 /// opExtendSheetBody: Move boundary's evaluator (blind extension).
 fn op_extend_sheet_body(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let (cx, id, def) = args(i, &a)?;
+    if def_enum(&def, "extendMethod").is_some_and(|m| &*m == "EXTEND_TO_SURFACE") {
+        return super::edge_change::extend_to_surface(i, &cx, &id, &def);
+    }
     let entities = evaluate_refs(i, &cx, def.get("entities"))?;
     let blind = def_enum(&def, "endCondition").is_none_or(|e| &*e == "EXTEND_BLIND");
     let dist = def_length_opt(&def, "extendDistance").unwrap_or(0.0);

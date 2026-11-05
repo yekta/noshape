@@ -670,6 +670,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (Cut) 3553.1886 / 3553.1521, 49b0458c55418df3 (Fuse) 125.67092 / 125.67096; and 9 more "unified differently" by
   ~3e-7. So a seam move changes geometry (or the merge after it picks another surface). Cases in vibe5
   ~/agents/bool-corpora/corpus4 (and 5, 6); `bin/why.sh corpus4 0662365385035891` from a worktree prints it.
+- [ ] P2 AFFINE-PLANAR-SHEETS (dx 11-05 06:00): an affine map of a body bounded by planes and lines keeps them
+  (kernel op_gtransform, cf-fix-pcb's blocks: live's planes), for solids only. On a sheet (std Jog's
+  stretchClipped, features_c::jog_preserve_material_off_and_errors) the stretched planar wall then fails Jog's
+  checkSplitResults: the split of the planar face (opSplitFace with trackPartialDependency tracking of the tool
+  planes) loses the fixed / moving edges it gave the B-spline face. Onshape keeps a stretched sheet planar; fix the
+  tracking, then drop the solids-only condition (AffinePlanar::applies).
 - [x] (dx 11-05 03:12, 7bf45a86: qAdjacent / qOwnedByBody / qEverything give a sheet's edges from a sketch region in that sketch's order, live's ascending transient ids; unions keep theirs; a cut-away corner's tracking finds nothing after a topology change. cf-sheet-metal-overcut-dogbone matches live to the end, Fold SM 1 too; the corpus 40/55 -> 41/55 documents (388 -> 389 features, custom 45 -> 46) against main, nothing worse. T1 custom_features::edge_order_at_a_corner_as_live, ops_harness trackingOfACutCorner) P1 FS-QUERY-EDGE-ORDER (for dx; core 11-04 09:31; core 11:12: still open: since HOLE-RIM-PIECES the parity runner counts Corner Overcut 1 and 2 as matching (the document 5/10), but only because the circle cut on the other edge has the same counts and volume: ours is still centred (30, 37), live's on the y = 40 edge; Extrude 1's difference, the next, follows from it) cf-sheet-metal-overcut-dogbone's Corner Overcut 1 (11 faces /
   10679.314 mm³, live 12 / 10678.612; 8 features after it): createSMOvercut takes `edges[0]` / `edges[1]` of
   `evaluateQuery(qIntersection([qAdjacent(wall, EDGE), qAdjacent(point, VERTEX, EDGE)]))` and compares the point with

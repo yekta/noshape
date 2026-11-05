@@ -393,6 +393,12 @@ pub fn join_edges(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_join_edges(shape.raw()))?))
 }
 
+/// Edges between the same faces that meet alone at a vertex on one curve (a line's pieces too) joined into one, no
+/// faces merged (ShapeUpgrade_UnifySameDomain on edges only).
+pub fn unify_edges(shape: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_unify_edges(shape.raw()))?))
+}
+
 /// A sheet's free edges split where an up-to `target`'s seam crossed them joined into one edge again, through a
 /// straight piece too where the pieces meet tangentially (Parasolid's intersection with a periodic face is one curve).
 pub fn join_target_seam_splits(sheet: &Shape, target: &Shape) -> Result<OpResult> {

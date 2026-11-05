@@ -40,6 +40,8 @@ struct EdgeOption {
     offset: f64,
     replace: Option<Vec<crate::reference::Reference>>,
     face: Option<Vec<crate::reference::Reference>>,
+    /// Onto this plane (origin, normal): an extend's limit given as a Plane.
+    plane: Option<(DVec3, DVec3)>,
 }
 
 fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -60,9 +62,40 @@ fn op_edge_change(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             Value::Undefined => None,
             f => Some(evaluate_refs(i, &cx, f)?),
         };
-        options.push(EdgeOption { edges, offset: length_of(o.get("offset")).unwrap_or(0.0), replace, face });
+        options.push(EdgeOption { edges, offset: length_of(o.get("offset")).unwrap_or(0.0), replace, face, plane: None });
     }
-    change_edges_op(i, &cx, &id, options)
+    change_edges_op(i, &cx, &id, options, false)
+}
+
+/// `@opExtendSheetBody` up to a surface (std sheet metal: Make joint's walls to their bisector, a Flange's alignment,
+/// Move face): each edge moves in its face onto its limit, a plane or a planar face, as an edge change; walls whose
+/// edges meet there are sewn together.
+pub(super) fn extend_to_surface(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<str>], def: &Value) -> R<Value> {
+    if length_of(def.get("offset")).is_some_and(|o| o.abs() > TOL) {
+        return Err(i.error("opExtendSheetBody: an offset past the limit is not supported yet"));
+    }
+    let items: Vec<Value> = match def.get("edgeLimitOptions").as_array() {
+        Some(a) => a.iter().cloned().collect(),
+        None => vec![def.clone()],
+    };
+    let mut options = Vec::new();
+    for o in items {
+        let edges = evaluate_refs(i, cx, match o.get("edge") {
+            Value::Undefined => o.get("entities"),
+            e => e,
+        })?;
+        let limit = o.get("limitEntity");
+        let (plane, replace) = match plane_of(limit) {
+            Some(p) => (Some((p.origin, p.normal)), None),
+            None => (None, Some(evaluate_refs(i, cx, limit)?)),
+        };
+        let face = match o.get("faceToExtend") {
+            Value::Undefined => None,
+            f => Some(evaluate_refs(i, cx, f)?),
+        };
+        options.push(EdgeOption { edges, offset: 0.0, replace, face, plane });
+    }
+    change_edges_op(i, cx, id, options, true)
 }
 
 /// `@opDerip` (std sheetMetalDeripCall): each sheet metal definition RIP edge comes apart, each of its faces' side
@@ -105,7 +138,7 @@ fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let Ok(d) = k::distance(&face, &edge) else { continue };
                 let Ok(n) = face.normal_at_point(d.point_a) else { continue };
                 let offset = n.normalize().dot(d.point_a - d.point_b);
-                out.push(EdgeOption { edges: vec![q.to_ref(&e)], offset, replace: None, face: Some(vec![q.to_ref(side)]) });
+                out.push(EdgeOption { edges: vec![q.to_ref(&e)], offset, replace: None, face: Some(vec![q.to_ref(side)]), plane: None });
             }
         }
         Ok(out)
@@ -116,10 +149,12 @@ fn op_derip(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     if options.is_empty() {
         return Ok(Value::Undefined);
     }
-    change_edges_op(i, &cx, &id, options)
+    change_edges_op(i, &cx, &id, options, false)
 }
 
-fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<str>], options: Vec<EdgeOption>) -> R<Value> {
+/// `join`: a moved edge's neighbour that now runs on along another edge between the same faces becomes one edge with
+/// it (an extended wall's bend edge, live cf-sheet-metal-shaped-flange's Make joint).
+fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<str>], options: Vec<EdgeOption>, join: bool) -> R<Value> {
     // The attributes on the edges it moves (Parasolid's stay on a moved edge; the operation's attribute remap, by
     // where they were, would drop them).
     let kept: Vec<(Value, crate::reference::Reference, super::query::Snapshot)> = {
@@ -134,13 +169,14 @@ fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<s
     let moves = run_op(i, cx, id, "REGEN_ERROR", |ev| {
         let mut moves: Vec<(Vec<DVec3>, Vec<DVec3>)> = Vec::new();
         let mut by_body: BTreeMap<usize, BTreeMap<(usize, Option<usize>), Move>> = BTreeMap::new();
-        for EdgeOption { edges, offset, replace, face } in &options {
+        for EdgeOption { edges, offset, replace, face, plane } in &options {
             if super::trace_ops() {
-                eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset} replace {replace:?}", edges, ev.resolve_edges(edges));
+                eprintln!("[fs op] edgeChange {:?} -> {:?} offset {offset} replace {replace:?} plane {plane:?}", edges, ev.resolve_edges(edges));
             }
-            let mv = match replace {
-                None => Move::Offset(*offset),
-                Some(refs) => match ev.resolve_faces(refs).first() {
+            let mv = match (plane, replace) {
+                (Some((o, n)), _) => Move::Onto(*o, n.normalize()),
+                (None, None) => Move::Offset(*offset),
+                (None, Some(refs)) => match ev.resolve_faces(refs).first() {
                     Some(&(fb, fi)) => {
                         let pl = ev.face_shape(fb, fi)?.face_plane().map_err(fe)?.ok_or_else(|| fe("Only planar faces can replace an edge yet"))?;
                         Move::Onto(pl.origin, pl.normal.normalize())
@@ -168,7 +204,7 @@ fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<s
         }
         for (b, offsets) in by_body {
             let body = ev.ctx.bodies[b].clone();
-            let (shape, order, edge_from) = change_edges(&body.shape, &offsets)?;
+            let (shape, order, edge_from) = change_edges(&body.shape, &offsets, join)?;
             // Where each moved edge went (tracking finds it there).
             let (old, new) = (body.shape.edges(), shape.edges());
             for (i, from) in edge_from.iter().enumerate() {
@@ -423,7 +459,7 @@ fn offset_face(f: &Shape, o: f64) -> FResult<(Shape, Vec<usize>, Vec<Option<usiz
 /// The sheet with the edges moved, for each of its faces the index of the
 /// face it was, and for each of its edges the edge it was (on that edge's
 /// line, moved with it).
-fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
+fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>, join: bool) -> FResult<(Shape, Vec<usize>, Vec<Option<usize>>)> {
     let edges = shape.edges();
     let faces = shape.faces();
     // The edges that move on face `fi`'s side (a move for one face leaves the other side of its edge as it is).
@@ -562,6 +598,7 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>)
         return Ok((face, vec![0], from));
     }
     let sewn = k::sew(&built, TOL, false).map_err(fe)?.shape;
+    let sewn = if join { k::unify_edges(&sewn).map_err(fe)?.shape } else { sewn };
     // Sewing may reorder the faces: match them by their boxes.
     let key = |f: &Shape| f.bounding_box(false).map(|b| (b.center(), b.diagonal())).ok();
     let keys: Vec<_> = built.iter().map(key).collect();

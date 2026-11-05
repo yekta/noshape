@@ -885,6 +885,7 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
 void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
 OpOut op_join_edges(const OcShape& s);
+OpOut op_unify_edges(const OcShape& s);
 OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target);
 rust::String brep_body_of(const OcShape& s, BrepBody& out);
 struct BrepSections;

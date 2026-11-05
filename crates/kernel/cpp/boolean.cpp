@@ -6808,6 +6808,20 @@ OpOut op_join_edges(const OcShape& s)
   return make_result({s.shape}, res, hist.get());
 }
 
+OpOut op_unify_edges(const OcShape& s)
+{
+  require_non_null(s.shape, "shape");
+  ShapeUpgrade_UnifySameDomain u(s.shape, true, false, false);
+  u.Build();
+  fail_if_cancelled();
+  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+    return make_result({s.shape}, s.shape, nullptr);
+  HHist hist = new BRepTools_History();
+  if (!u.History().IsNull())
+    hist->Merge(u.History());
+  return make_result({s.shape}, u.Shape(), hist.get());
+}
+
 OpOut op_unify(const OcShape& s)
 {
   require_non_null(s.shape, "shape");

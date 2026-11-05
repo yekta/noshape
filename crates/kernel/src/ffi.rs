@@ -722,6 +722,7 @@ pub(crate) mod ffi {
         fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;
         fn op_join_edges(s: &OcShape) -> Result<OpOut>;
+        fn op_unify_edges(s: &OcShape) -> Result<OpOut>;
         fn op_join_target_seam_splits(sheet: &OcShape, target: &OcShape) -> Result<OpOut>;
         /// The flat body noshape's own Boolean would get for `s` (tests): "" or why it can't.
         fn brep_body_of(s: &OcShape, out: &mut BrepBody) -> String;

@@ -351,6 +351,23 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             check("a block scaled non-uniformly", planes == 6 && lines == 12 && abs(length - 140 * mm) < 1e-9 * mm && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
                     && norm(bounds.maxCorner - vector(20, 10, 3805) * mm) < 1e-9 * mm && norm(bounds.minCorner - vector(0, 0, 3800) * mm) < 1e-9 * mm, [planes, lines, length, volume, bounds]);
         });
+        step(context, id, "extendSheetToSurface", function(sub) {
+            // opExtendSheetBody up to a plane (std Make joint's walls to their bisector): each edge moves in its face
+            // onto the plane, and the faces' common edge runs on as one edge (live cf-sheet-metal-shaped-flange).
+            fCuboid(context, sub + "b", { "corner1" : vector(0, 0, 4000) * mm, "corner2" : vector(20, 10, 4010) * mm });
+            const faces = qCreatedBy(sub + "b", EntityType.FACE);
+            const bottom = qContainsPoint(faces, vector(10, 5, 4000) * mm);
+            const front = qContainsPoint(faces, vector(10, 0, 4005) * mm);
+            opExtractSurface(context, sub + "x", { "faces" : qUnion([bottom, front]) });
+            const sheet = qCreatedBy(sub + "x", EntityType.BODY);
+            const sheetFaces = qOwnedByBody(sheet, EntityType.FACE);
+            const ends = qUnion([qContainsPoint(qOwnedByBody(sheet, EntityType.EDGE), vector(20, 5, 4000) * mm), qContainsPoint(qOwnedByBody(sheet, EntityType.EDGE), vector(20, 0, 4005) * mm)]);
+            opExtendSheetBody(context, sub + "e", { "extendMethod" : ExtendSheetBoundingType.EXTEND_TO_SURFACE, "entities" : ends, "limitEntity" : plane(vector(25, 0, 0) * mm, vector(1, 0, 0)), "offset" : 0 * mm });
+            const area = evArea(context, { "entities" : sheetFaces });
+            const common = evaluateQuery(context, qIntersection([qAdjacent(qContainsPoint(sheetFaces, vector(10, 5, 4000) * mm), AdjacencyType.EDGE, EntityType.EDGE), qAdjacent(qContainsPoint(sheetFaces, vector(10, 0, 4005) * mm), AdjacencyType.EDGE, EntityType.EDGE)]));
+            const length = size(common) == 1 ? evLength(context, { "entities" : common[0] }) : undefined;
+            check("a sheet extended up to a plane", abs(area - (25 * 10 + 25 * 10) * mm ^ 2) < 1e-9 * mm ^ 2 && length != undefined && abs(length - 25 * mm) < 1e-9 * mm, [area, size(common), length]);
+        });
         step(context, id, "trackMovedEdge", function(sub) {
             // An edge opEdgeChange moved is still found by its tracking query, where it went (std's Fold tracks its
             // split edges through its edge changes).
