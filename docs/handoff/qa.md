@@ -44,7 +44,7 @@ cases incl. the Gyro); the 44 ticket documents = 7bb99058; GUI rows pixel-identi
 0.4.31, g34 reopened; the mcp copy left running on the old binary and no update-helper.log (filed P2 UPDATE-HELPER-LINUX-PARITY).
 qa-scratch/rel/k keeps v0.4.30 / v0.4.31 only.
 
-**11-05 10:51:** vibe3 ~/qa/rel pruned (25 → 4.4 GB: keep the greens in use, the last two release CLIs; prune again every few greens:
+**11-05 10:51:** vibe3 ~/qa/rel pruned (25 → 4.4 GB: keep the greens in use, the last two release CLIs; prune with `noshape-????????` (8 chars) — `noshape-[0-9a-f]*` also matches noshape-cli-* (c is hex); prune again every few greens:
 v3sweep.sh copies an ~800 MB binary per green). Fuzz loops now on green 2572d7d9 (~/qa/bin/v3nf5.sh 4561–4620, v3g5.sh 4621–4660) and
 v0.4.30 (v3cf4.sh 4661–4720). Release-loop deaths so far, both filed: v0.4.30 seed 4539 (hang, RELEASE-BUILD-FILLET-HANG) and seed 4558
 (not reproduced). Greens since 7bb99058 swept (8cc1b766: SAVED-MIRROR-REF-CHANGE; dedfb1ae, 302ca1a2, 4bd203ef, 2572d7d9: no change).
