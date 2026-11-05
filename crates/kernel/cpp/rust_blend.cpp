@@ -1225,6 +1225,9 @@ bool rust_blend(const OcShape& s, const std::vector<TopoDS_Edge>& es, const std:
     }
     else if (rel == 1 && to != nullptr)
       hist->AddGenerated(*in, *to);
+    // (A face the blend consumed: a full round's.)
+    else if (rel == 2 && kind == 1)
+      hist->Remove(*in);
   }
   {
     const ShapeIMap& sm = s.map(TopAbs_SOLID);

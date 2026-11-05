@@ -452,7 +452,10 @@ pub fn blend(body: &Body, edges: &[BlendEdge], tol: f64) -> Result<Output, Decli
     };
     let boxes: Vec<(DVec3, DVec3)> = body.edges.iter().map(|e| edge_box(body, e)).collect();
     for c in &chains {
-        check_clearance(body, &ve, &boxes, c, &chains, &corners, margin)?;
+        // (Blends that meet, a full round's: each straight edge its own round, if they are.)
+        if let Err(why) = check_clearance(body, &ve, &boxes, c, &chains, &corners, margin) {
+            return prism::blend(body, edges, &uses, &ve, margin).map_err(|_| why);
+        }
     }
     build(body, &ve, &chains, &corners, margin)
 }

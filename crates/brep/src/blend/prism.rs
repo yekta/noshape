@@ -249,6 +249,16 @@ struct Corner {
     p: u32,
 }
 
+/// Two rounds that use up the face between them (a full round): plan `a`'s side `ka` and plan `b`'s side `kb` are
+/// that face.
+struct Full {
+    a: usize,
+    ka: usize,
+    b: usize,
+    kb: usize,
+    face: u32,
+}
+
 /// One round: its edge, radius, two faces, convex (+1) or concave (−1), its two ends (the edge's order).
 struct Plan {
     edge: u32,
@@ -479,26 +489,47 @@ pub(super) fn blend(body: &Body, edges: &[BlendEdge], uses: &EdgeUses, ve: &[Vec
     if (0..body.edges.len()).any(|i| absorbed[i] && !taken_m[i]) {
         return no("a curved edge not a prism round's corner");
     }
-    // Two rounds on one face leave some of it between them: their tangent points there short of each other at each
-    // cap (a tip narrower than its two rounds is a full round, OCCT's).
+    // Two rounds on one face leave some of it between them, or use it up exactly (a full round: their tangent points
+    // there one at each cap, the face the rectangle between their edges and the caps' edges; it goes and the two
+    // rounds are one face, live's); a tip narrower than its two rounds is OCCT's.
+    let mut fulls: Vec<Full> = Vec::new();
     for (i, a) in plans.iter().enumerate() {
-        for bp in &plans[i + 1..] {
+        for (jb, bp) in plans.iter().enumerate().skip(i + 1) {
             for (ka, &f) in a.fs.iter().enumerate() {
                 let Some(kb) = bp.fs.iter().position(|&g| g == f) else { continue };
+                let mut met = 0;
+                let mut caps = 0;
                 for ea in &a.ends {
                     let Some(eb) = bp.ends.iter().find(|e| e.cap == ea.cap && e.cap != u32::MAX) else { continue };
+                    caps += 1;
                     let (pa, pb) = (body.vertices[ea.v as usize], body.vertices[eb.v as usize]);
-                    if (ea.t[ka] - pa).length() + (eb.t[kb] - pb).length() >= (pa - pb).length() - 10.0 * margin {
+                    if (ea.t[ka] - eb.t[kb]).length() <= 10.0 * margin && ea.g[ka] == eb.g[kb] {
+                        met += 1;
+                    } else if (ea.t[ka] - pa).length() + (eb.t[kb] - pb).length() >= (pa - pb).length() - 10.0 * margin {
                         return no("two prism rounds meet across a face");
                     }
                 }
+                if met == 0 {
+                    continue;
+                }
+                // (Exactly the face's rectangle: its one loop the two edges and the two cap edges.)
+                let face = &body.faces[f as usize];
+                let rect = met == 2
+                    && caps == 2
+                    && face.loops.len() == 1
+                    && face.loops[0].len() == 4
+                    && face.loops[0].iter().all(|u| u.edge == a.edge || u.edge == bp.edge || a.ends.iter().any(|e| e.g[ka] == u.edge));
+                if !rect {
+                    return no("two prism rounds meet across a face");
+                }
+                fulls.push(Full { a: i, ka, b: jb, kb, face: f });
             }
         }
     }
-    build(body, plans)
+    build(body, plans, &fulls)
 }
 
-fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
+fn build(body: &Body, plans: Vec<Plan>, fulls: &[Full]) -> Result<Output, Decline> {
     let mut b = body.clone();
     let (nv, ne, nf) = (body.vertices.len(), body.edges.len(), body.faces.len());
     let mut vertex_origin: Vec<Origin> = (0..nv as u32).map(|i| Origin::Same { arg: 0, index: i }).collect();
@@ -515,7 +546,16 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         vo.push(Origin::New);
         b.vertices.len() as u32 - 1
     };
-    for Plan { edge, r, fs, sigma, ends } in plans {
+    // A full round's face (by plan and side), its shared tangent vertex at each cap and its one line.
+    let full_face = |pi: usize, k: usize| fulls.iter().find(|x| (x.a == pi && x.ka == k) || (x.b == pi && x.kb == k)).map(|x| x.face);
+    let mut shared_v: std::collections::BTreeMap<(u32, u32), u32> = Default::default();
+    let mut shared_line: std::collections::HashMap<u32, (u32, u32)> = Default::default();
+    let mut dead_f = vec![false; nf];
+    for x in fulls {
+        dead_f[x.face as usize] = true;
+        history.push(Record { kind: Kind::Face, arg: 0, index: x.face, relation: Relation::Deleted, out_kind: Kind::Face, out: u32::MAX });
+    }
+    for (pi, Plan { edge, r, fs, sigma, ends }) in plans.into_iter().enumerate() {
         let e = body.edges[edge as usize];
         let d = (body.vertices[e.v[1] as usize] - body.vertices[e.v[0] as usize]).normalize();
         // Per end: the tangent points' vertices, the end edges cut back to them, the cap's arc between.
@@ -525,6 +565,25 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         for (j, end) in ends.iter().enumerate() {
             dead_v[end.v as usize] = true;
             for (k, t) in tv[j].iter_mut().enumerate() {
+                // (A full round's face: one tangent vertex there for both rounds; the cap's edge along it goes.)
+                if let Some(f) = full_face(pi, k) {
+                    *t = match shared_v.get(&(f, end.cap)) {
+                        Some(&v) => v,
+                        None => {
+                            let v = add_v(&mut b, end.t[k], &mut vertex_origin);
+                            shared_v.insert((f, end.cap), v);
+                            v
+                        }
+                    };
+                    let g = end.g[k];
+                    if !std::mem::replace(&mut dead_e[g as usize], true) {
+                        history.push(Record { kind: Kind::Edge, arg: 0, index: g, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
+                    }
+                    for lp in &mut b.faces[end.cap as usize].loops {
+                        lp.retain(|u| u.edge != g);
+                    }
+                    continue;
+                }
                 *t = add_v(&mut b, end.t[k], &mut vertex_origin);
                 let g = end.g[k] as usize;
                 let slot = if b.edges[g].v[0] == end.v { 0 } else { 1 };
@@ -598,7 +657,24 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         // The lines where the round touches its faces, the old edge's way (its ends in its order; its faces use
         // them as they used it).
         let mut lines = [0u32; 2];
+        let mut flipped = [false; 2];
         for k in 0..2 {
+            // (A full round's face: one line for both rounds, the second running it the other way if need be.)
+            if let Some(f) = full_face(pi, k) {
+                match shared_line.get(&f) {
+                    Some(&(id, from)) => {
+                        lines[k] = id;
+                        flipped[k] = tv[0][k] != from;
+                    }
+                    None => {
+                        b.edges.push(Edge { v: [tv[0][k], tv[1][k]], curve: Curve::Line });
+                        edge_origin.push(Origin::New);
+                        lines[k] = b.edges.len() as u32 - 1;
+                        shared_line.insert(f, (lines[k], tv[0][k]));
+                    }
+                }
+                continue;
+            }
             b.edges.push(Edge { v: [tv[0][k], tv[1][k]], curve: Curve::Line });
             edge_origin.push(Origin::New);
             lines[k] = b.edges.len() as u32 - 1;
@@ -616,8 +692,10 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         // The round: each of its four edges the other way from the face beside it.
         let use_in = |b: &Body, f: u32, o: u32| b.faces[f as usize].loops.iter().flatten().find(|x| x.edge == o).map(|x| x.reversed);
         let mut lp = Vec::new();
-        for (f, o) in [(fs[0], lines[0]), (fs[1], lines[1])] {
-            let Some(rev) = use_in(&b, f, o) else { return no("a prism round's edge not in its face") };
+        for (k, (f, o)) in [(fs[0], lines[0]), (fs[1], lines[1])].into_iter().enumerate() {
+            // (A full round's face is gone: the way it ran the old edge, the shared line's way against this round's.)
+            let rev = if full_face(pi, k).is_some() { body.faces[f as usize].loops.iter().flatten().find(|x| x.edge == edge).map(|x| x.reversed != flipped[k]) } else { use_in(&b, f, o) };
+            let Some(rev) = rev else { return no("a prism round's edge not in its face") };
             lp.push(Use { edge: o, reversed: !rev });
         }
         // (Its first line run from the first end to the second: on along the second end's arc from its first tangent
@@ -649,17 +727,45 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
         let axis = if d.cross(xdir).dot(ends[0].t[1] - c) >= 0.0 { d } else { -d };
         new_faces.push((edge, Face { surface: Surface::Cylinder { origin: c, axis, xdir, radius: r }, reversed: sigma < 0.0, loops: vec![lp] }));
     }
+    // A full round is one face, as live's: the two rounds' faces (one cylinder) joined across their line. (Each cap's
+    // two arcs stay, as after OCCT's merge_full_rounds; the shown topology joins them.)
+    let mut merged_into: Vec<Option<usize>> = vec![None; new_faces.len()];
+    dead_e.resize(b.edges.len(), false);
+    for x in fulls {
+        let Some(&(line, _)) = shared_line.get(&x.face) else { return no("a full round without its line") };
+        let lp: Vec<Use> = new_faces[x.a].1.loops[0].iter().chain(&new_faces[x.b].1.loops[0]).filter(|u| u.edge != line).copied().collect();
+        dead_e[line as usize] = true;
+        // (Its seam at one end of the half round: the arc into a meeting point run from its start.)
+        let Some((_, &m)) = shared_v.range((x.face, 0)..=(x.face, u32::MAX)).next() else { return no("a full round without its arcs") };
+        let Some(u) = lp.iter().find(|u| b.edges[u.edge as usize].v[if u.reversed { 0 } else { 1 }] == m) else { return no("a full round's arcs not through their meeting point") };
+        let Curve::Circle { center, normal, .. } = b.edges[u.edge as usize].curve else { return no("a full round's arc not a circle") };
+        let start = b.edges[u.edge as usize].v[if u.reversed { 1 } else { 0 }];
+        let axis = if u.reversed { -normal } else { normal };
+        let xdir = (b.vertices[start as usize] - center).normalize();
+        let Surface::Cylinder { radius, .. } = new_faces[x.a].1.surface else { return no("a full round not a cylinder") };
+        new_faces[x.a].1.surface = Surface::Cylinder { origin: center, axis, xdir, radius };
+        new_faces[x.a].1.loops = vec![lp];
+        merged_into[x.b] = Some(x.a);
+    }
     touched.sort_unstable();
     touched.dedup();
+    touched.retain(|&f| !dead_f[f as usize]);
     for f in touched {
         face_origin[f as usize] = Origin::Piece { arg: 0, index: f };
         history.push(Record { kind: Kind::Face, arg: 0, index: f, relation: Relation::Modified, out_kind: Kind::Face, out: f });
     }
-    for (e, face) in new_faces {
-        b.faces.push(face);
+    let mut round_face = vec![0u32; new_faces.len()];
+    for (i, (_, face)) in new_faces.iter().enumerate() {
+        if merged_into[i].is_some() {
+            continue;
+        }
+        b.faces.push(face.clone());
         face_origin.push(Origin::New);
-        let fi = b.faces.len() as u32 - 1;
-        b.solids[0].shells[0].push(fi);
+        round_face[i] = b.faces.len() as u32 - 1;
+        b.solids[0].shells[0].push(round_face[i]);
+    }
+    for (i, &(e, _)) in new_faces.iter().enumerate() {
+        let fi = round_face[merged_into[i].unwrap_or(i)];
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Generated, out_kind: Kind::Face, out: fi });
         history.push(Record { kind: Kind::Edge, arg: 0, index: e, relation: Relation::Deleted, out_kind: Kind::Edge, out: u32::MAX });
     }
@@ -673,6 +779,32 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
     for (v, &dv) in dead_v.iter().enumerate() {
         if dv {
             history.push(Record { kind: Kind::Vertex, arg: 0, index: v as u32, relation: Relation::Deleted, out_kind: Kind::Vertex, out: u32::MAX });
+        }
+    }
+    // Drop a full round's faces (renumbering the rest, the shell's list and the history's).
+    if dead_f.iter().any(|&d| d) {
+        let mut fmap = vec![u32::MAX; b.faces.len()];
+        let (mut fs_out, mut fo) = (Vec::new(), Vec::new());
+        for (i, f) in b.faces.iter().enumerate() {
+            if i < nf && dead_f[i] {
+                continue;
+            }
+            fmap[i] = fs_out.len() as u32;
+            fs_out.push(f.clone());
+            fo.push(face_origin[i]);
+        }
+        b.faces = fs_out;
+        face_origin = fo;
+        for sh in &mut b.solids[0].shells {
+            sh.retain(|&f| fmap[f as usize] != u32::MAX);
+            for f in sh.iter_mut() {
+                *f = fmap[*f as usize];
+            }
+        }
+        for h in &mut history {
+            if h.relation != Relation::Deleted && h.out_kind == Kind::Face {
+                h.out = fmap[h.out as usize];
+            }
         }
     }
     // Drop the dead vertices and edges (renumbering the rest).
@@ -689,7 +821,7 @@ fn build(body: &Body, plans: Vec<Plan>) -> Result<Output, Decline> {
     let mut emap = vec![u32::MAX; b.edges.len()];
     let (mut es, mut eo) = (Vec::new(), Vec::new());
     for (i, e) in b.edges.iter().enumerate() {
-        if i < ne && dead_e[i] {
+        if dead_e.get(i) == Some(&true) {
             continue;
         }
         emap[i] = es.len() as u32;
