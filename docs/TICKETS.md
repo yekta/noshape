@@ -655,6 +655,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (saved references). Next: a creation-order key for query results in the host (an entity born of an operation
   inherits the order of the older entity it lies on: extract edge <- cap edge <- region edge <- sketch entity id),
   used to sort evaluateQuery's results per body.
+  dx 11-05 02:50: it is also what's left of Fold SM 1 (after opTransform keeps the moved piece's attributes: 29/69/42
+  -> 34/84/52, live 32/82/52; its corner breaks were dropped with the vertices' snapshots). The dogbone on the
+  x = 30 edge leaves an arc beside the bend's start on the fixed wall, so the bend's end is taken as slanted
+  (fixed wall from x 32.58, moved wall from 30) and its strip runs on 20.75 mm into the cutout; the cut back (a lofted
+  cutter) shares no volume with the bend there, so the strip stays (+625 mm³). Live's dogbone is on the y = 40 edge:
+  the bend's end is square. Once the order is live's, check the slanted-end cutter on its own (T2 to add).
 - [ ] P2 STRAIGHT-SPLINE-CORNER-EDGES (core 11-04 09:31) cf-straight-spline's Feature 5 (live 31/85/56, ours 31/78/49;
   50 features after it): the faces are live's; live has eight 0.0106 mm edges at z = 101.595 where each slot's flat
   meets its run-out (the revolved profile's cone is tangent to the extruded flat along the profile line, so
