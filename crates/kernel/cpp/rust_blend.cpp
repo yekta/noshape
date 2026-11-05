@@ -467,9 +467,19 @@ bool uv_of(const GeomAdaptor_Surface& a, const TopLoc_Location& loc, const gp_Pn
 // Face `i`'s new edges' curves on its (elementary, not planar) surface: each an iso-line at unit speed in the
 // edge's own parameter (checked at samples), unwrapped, and shifted by whole periods so that every loop closes
 // against its neighbours' (input edges keep their own curves). A seam gets one curve per use.
-const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<TopoDS_Edge>& eo, const std::vector<bool>& made,
+const char* iso_pcurves(const BrepBody& o, size_t i, bool flip, std::vector<TopoDS_Edge>& eo, const std::vector<bool>& made_in,
                         const TopoDS_Face& fwd, const occ::handle<Geom_Surface>& S, const TopLoc_Location& loc, double tol)
 {
+  // (An input edge with no curve on this face yet, now on it (a far edge a round reaches exactly): new here.)
+  std::vector<bool> made = made_in;
+  for (uint32_t l = o.face_loops[i]; l < o.face_loops[i + 1]; ++l)
+    for (uint32_t k = o.loop_uses[l]; k < o.loop_uses[l + 1]; ++k)
+    {
+      const uint32_t e = o.uses[k] / 2;
+      double         f, l2;
+      if (!made[e] && BRep_Tool::CurveOnSurface(eo[e], fwd, f, l2).IsNull())
+        made[e] = true;
+    }
   const GeomAdaptor_Surface a(S);
   const double up = a.IsUPeriodic() ? a.UPeriod() : 0, vp = a.IsVPeriodic() ? a.VPeriod() : 0;
   struct UseCurve

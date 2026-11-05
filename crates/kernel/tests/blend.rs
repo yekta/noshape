@@ -1341,13 +1341,16 @@ fn chamfers_and_rounds_over_a_narrow_face_are_lives() {
         r
     };
     set_rust_blend(Some(true));
-    for (es, d, want, faces) in [(&two, 10.0, 7000.0, 7), (&two, 10.5, 6900.0, 7), (&two, 15.0, 6000.0, 7), (&two, 20.0, 5000.0, 7), (&three, 10.0, 6500.0, 8), (&three, 12.0, 5880.0, 8)] {
+    let top = edges_where(&part, |i| i.start.z > 9.99 * MM && i.end.z > 9.99 * MM && (i.start.x - i.end.x).abs() > 1.0 * MM);
+    assert_eq!(top.len(), 2);
+    for (es, d, want, faces) in [(&two, 10.0, 7000.0, 7), (&two, 10.5, 6900.0, 7), (&two, 15.0, 6000.0, 7), (&two, 20.0, 5000.0, 7), (&three, 10.0, 6500.0, 8), (&three, 12.0, 5880.0, 8), (&three, 20.0, 3000.0, 6), (&top, 10.0, 4000.0, 5)] {
         reset_blend_decline();
         let r = ours(&format!("{} chamfers {d}", es.len()), chamfer_checked(&part, es, ChamferSpec::Equal(d * MM), &[]));
         assert_eq!(r.faces().len(), faces, "{} chamfers {d}", es.len());
         assert!((vol_mm3(&r) - want).abs() < 1e-6, "{} chamfers {d}: {} vs live's {want}", es.len(), vol_mm3(&r));
     }
-    for (r, want, faces) in [(10.0, 7356.194490, 7), (12.0, 7075.151640, 8)] {
+    // (Three rounds R20: the x = 0 end used up too, at its far corner; and the two top edges d10, their 10 mm sides.)
+    for (r, want, faces) in [(10.0, 7356.194490, 7), (12.0, 7075.151640, 8), (20.0, 5598.332051, 5)] {
         reset_blend_decline();
         let s = ours(&format!("3 rounds R{r}"), fillet_checked(&part, &three, &[r * MM; 3]));
         assert_eq!(s.faces().len(), faces, "3 rounds R{r}");
@@ -1366,7 +1369,8 @@ fn a_lone_round_wider_than_its_face_rolls_over() {
     let es = edges_where(&part, |i| (i.start.x - 40.0 * MM).abs() < 1e-9 && i.start.y.abs() < 1e-9 && (i.start.z - i.end.z).abs() > 1e-9);
     assert_eq!(es.len(), 1);
     set_rust_blend(Some(true));
-    for (chamfer, d, want, faces) in [(false, 20.5, 7098.145945, 6), (false, 39.9, 4926.226525, 6), (false, 40.5, 4849.584982, 5), (true, 20.5, 5900.0, 6), (true, 39.9, 2020.0, 6), (true, 40.5, 1901.25, 5)] {
+    // (d 20: exactly as wide as the 20 mm end, the chamfer leaving it at its far corner.)
+    for (chamfer, d, want, faces) in [(false, 20.5, 7098.145945, 6), (false, 39.9, 4926.226525, 6), (false, 40.5, 4849.584982, 5), (true, 20.0, 6000.0, 6), (true, 20.5, 5900.0, 6), (true, 39.9, 2020.0, 6), (true, 40.5, 1901.25, 5)] {
         reset_blend_decline();
         let r = if chamfer { chamfer_checked(&part, &es, ChamferSpec::Equal(d * MM), &[]) } else { fillet_checked(&part, &es, &[d * MM]) };
         let why = last_blend_decline();
