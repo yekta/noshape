@@ -519,6 +519,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
+- [ ] P1 DRAFT-NONDETERMINISTIC (core / bool) **the same saved document regenerates to different parts from one open to the
+  next**: /root/qa-scratch/tickets/cli-draft-hang2.noshape (a fuzz document, 3 parts; `python3 tickets/draft-nondet/opens.py
+  <cli> 8`). On v0.4.29, v0.4.30 and green a1ec7849 (vibe3, idle-ish): Part 1 is 29954.56 mm³ (16 faces) or **37305.64**, Part 2
+  133.88 or 17.01 — v0.4.29 4 / 10 vs 6 / 10; per open Draft 4, 6 and 7 succeed or fail ("Selected faces could not be drafted.")
+  independently (e.g. D4 Error D6 Ok D7 Error / D4 Ok D6 Error D7 Error / D4 Error D6 Ok D7 Ok). With NOSHAPE_BOOL_RUST=0 Draft 4
+  is always Ok and Draft 6 always Error (6 / 6) but Draft 7 still flips (1 in 6 Error). Stepping the features with
+  feature_rollback (bin/rbbisect.py) gives the 29954.56 result 4 / 4 — the full regeneration on open is what varies (parallel
+  regeneration or a time budget deciding a Draft? no timeout text in the message). live: a document regenerates the same way
+  every time. (qa 2026-11-05 03:08, builds v0.4.29 / v0.4.30 / a1ec7849)
 - [x] (core 11-04 22:30) P1 DISPLACEMENT-MAP-WALL-MESH (lead 11-04 21:20) the top case's display mesh: our mesher declined
   the wall ("the triangulation failed") and the bumpy top, BRepMesh took 2.7 s (and turns some of the top's triangles
   against the surface: 921 of 5172 on a 256 x 256 top). brep::mesh, for psui: (1) cdt.rs checked(): a triangle turned
