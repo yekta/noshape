@@ -42,8 +42,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   volumes). Up to Part's part now has live's volume; left 55 vs 50 faces: the kernel's fillet against a B-spline wall
   is a B-spline (live: exact cylinders) and thickens into slivers on one bend (TICKETS 23:33).
 - Parity run 88 (my tree over main of ~23:20): 38/55, 376/471, custom 40/109, 1 document failing to run.
-- Next: exact cylinders for those fillets (a T1 with a spline rolled wall first); FS-QUERY-EDGE-ORDER
-  (cross-feature creation order); 04:00 daily walk on the newest green.
+- 23:44–11-05 00:03: exact cylinders for bends beside a spline rolled wall (T1 a_bend_beside_a_spline_…), a curved wall's
+  inward side taken at the joint (be3c7c3f, 09122613): Up to Part's part has live's volume and area; left one live
+  face we make in 3 (TICKETS PARITY-CUSTOM-RUN-FAILURES).
+- Next: that split face; FS-QUERY-EDGE-ORDER (cross-feature creation order); Make joint waits on core's
+  opExtendSheetBody; 04:00 daily walk on the newest green.
 - 21:29: DISPLACEMENT-MAP end to end with core's Replace face (297f49cdd): /root/dx-scratch/disp/e2e/run.py.
 - Next: FS-QUERY-EDGE-ORDER (creation-order key, ticket 20:14), the other failing custom features (cf-setback-
   fillet fill surface, Sheet Metal Up to Part, Fix PCB), DISPLACEMENT-MAP end to end when core's Replace face on

@@ -3989,7 +3989,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   into sliver end faces (0.716, 0.143 mm²). Next: the definition faces' angle at that edge against live's attribute. dx 23:59: found: bend_geometry chose a curved
   wall's inward side from the wall's middle, which lies behind the joint when the wall rolls far round, so the
   concave side and the definition radius (1, live's 3) flipped; now the side a small step stays on the face. Up to
-  Part's part: live's volume and area, 52/118/68 against 50/112/76 faces/edges/vertices.
+  Part's part: live's volume and area, 52/118/68 against 50/112/76 faces/edges/vertices. 11-05 00:03: the 2 faces are one live face
+  (KVeB, 88.046 mm², the rolled wall's side at the part's step) ours makes in 3 (13.29 + 18.632 + 56.124 mm²);
+  unifying the trimmed sheet's edges doesn't merge them (the split is in the rolled wall's thickening or the fuse).
   dx 11-04 21:39: cf-sheet-metal-shaped-flange's Shaped Flange 1 (flange a separate part, 78,922 vs 92,510 mm³):
   the definition sheet joins (the flange shares its partial edge with the base), but `addEdge` (its transient
   query ∪ startTracking) resolves to two edges after flangeEdgeChange + flange_boolean: the moved joint edge (z 2.5,
