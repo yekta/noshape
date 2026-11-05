@@ -149,6 +149,8 @@ pub struct CtxState {
     /// Whether a face's inner point lies on an old (tracked) face, by (old face, face): tracking asks again for each
     /// query of a split face.
     pub pieces_on_old: Mutex<HashMap<(noshape_kernel::Shape, noshape_kernel::Shape), bool>>,
+    /// Whether a point lies on a face (by the face and the point, nm): tracking asks the same again for each query.
+    pub on_face: Mutex<HashMap<(noshape_kernel::Shape, [i64; 3]), bool>>,
     /// Each sketch's region edges ([`query::QueryCx::region_pieces`]), by (sketch, its regions' address and count).
     pub region_pieces: Mutex<HashMap<(crate::reference::FeatureId, usize, usize), Arc<query::RegionPieces>>>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
@@ -295,6 +297,7 @@ impl FsContext {
                 face_points: Mutex::new(HashMap::new()),
                 shape_boxes: Mutex::new(HashMap::new()),
                 pieces_on_old: Mutex::new(HashMap::new()),
+                on_face: Mutex::new(HashMap::new()),
                 region_pieces: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
                 sketch_order_cache: Mutex::new(HashMap::new()),

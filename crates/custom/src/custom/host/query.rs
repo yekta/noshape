@@ -693,6 +693,22 @@ impl<'a> QueryCx<'a> {
     /// A point of face `f`: its parameters' middle when on it, else a few others, else the nearest to the middle
     /// (the projection's search along the edges: ~0.4 ms a face, std sheet metal's thousands), once a face
     /// (tracking looks for a split face's pieces among every face, each time: model-plus's Extrude 4).
+    /// [`all_on`], a face's answers cached (tracking asks the same points of the same faces for every query).
+    pub(super) fn all_on(&self, s: &k::Shape, points: &[DVec3], tol: f64) -> bool {
+        if s.shape_type() != k::ShapeType::Face || tol != 1e-7 {
+            return all_on(s, points, tol);
+        }
+        points.iter().all(|p| {
+            let key = (s.clone(), [(p.x * 1e9).round() as i64, (p.y * 1e9).round() as i64, (p.z * 1e9).round() as i64]);
+            if let Some(on) = self.st.on_face.lock().get(&key) {
+                return *on;
+            }
+            let on = all_on(s, std::slice::from_ref(p), tol);
+            self.st.on_face.lock().insert(key, on);
+            on
+        })
+    }
+
     fn piece_on_old(&self, old: &k::Shape, piece: &k::Shape, m: DVec3, tol: f64) -> bool {
         let key = (old.clone(), piece.clone());
         if let Some(on) = self.st.pieces_on_old.lock().get(&key) {
@@ -795,7 +811,7 @@ impl<'a> QueryCx<'a> {
             if snap.sketch && snap.etype == EType::Vertex && let Some(p) = snap.points.first() {
                 let swept = |e: &Ent| {
                     self.shape(e).is_some_and(|s| {
-                        matches!(s.edge_info().map(|i| i.curve), Ok(k::Curve::Line { .. })) && all_on(&s, &[*p], 1e-7)
+                        matches!(s.edge_info().map(|i| i.curve), Ok(k::Curve::Line { .. })) && self.all_on(&s, &[*p], 1e-7)
                     })
                 };
                 out.extend(self.all_with(Some(EType::Edge), true).into_iter().filter(|e| !self.is_sketch(e) && swept(e)));
@@ -850,7 +866,7 @@ impl<'a> QueryCx<'a> {
                 let in_box = |b: Option<k::BoundingBox>, w: &[DVec3]| b.is_none_or(|b| w.iter().all(|p| (b.min - DVec3::splat(TOL)).cmple(*p).all() && p.cmple(b.max + DVec3::splat(TOL)).all()));
                 if self.shape(e).is_some_and(|s| {
                     let b = self.shape_box(&s);
-                    wheres.iter().any(|w| in_box(b, w) && all_on(&s, w, TOL))
+                    wheres.iter().any(|w| in_box(b, w) && self.all_on(&s, w, TOL))
                 }) {
                     return true;
                 }
@@ -1332,7 +1348,7 @@ fn snap_matches(q: &QueryCx, snap: &Snapshot, e: &Ent) -> bool {
     if snap.face.as_ref().is_some_and(|f| *f == s) {
         return true;
     }
-    all_on(&s, &snap.points, 1e-7)
+    q.all_on(&s, &snap.points, 1e-7)
 }
 
 /// Whether every point lies within `tol` of `s`: its bounding box first (it holds the shape: a point farther from it
@@ -2077,7 +2093,7 @@ fn historical(q: &QueryCx, query: &Value) -> Vec<Ent> {
                 let on = |e: &Ent| {
                     let Ent::Edge(b, _) = e else { return false };
                     let body = &q.st.ctx.bodies[*b].id;
-                    q.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| originals.iter().any(|(ob, o)| ob == body && all_on(o, &[m], 1e-7)))
+                    q.snapshot(e).and_then(|s| s.points.get(1).copied()).is_some_and(|m| originals.iter().any(|(ob, o)| ob == body && q.all_on(o, &[m], 1e-7)))
                 };
                 return q.all_with(Some(EType::Edge), true).into_iter().filter(on).collect();
             }
