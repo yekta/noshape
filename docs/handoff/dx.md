@@ -54,9 +54,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   affine path now for solids only, TICKETS AFFINE-PLANAR-SHEETS): opExtendSheetBody up to a surface (std Make joint,
   a Flange's alignment, Move face) as an edge change onto the limit, sewn, the common edge one edge again (kernel
   unify_edges). Run 103: 44/55 documents, 399/471 features; cf-sheet-metal-shaped-flange 5 -> 9/10.
-- Next there: Shaped Flange 2 adds a wall region coplanar with Flange 1's −x wall; live's solid has one end face
-  (y 74, z 5..44), ours two (split at z 25, the old wall's top): whether live's definition sheet keeps that edge is a
-  question for live. Then cf-sheet-metal-hem's Derived 1 (REQUESTS 04:00), cf-straight-spline, cf-setback-fillet.
+- 06:20: landed 41b0fbb4 (extend up to a surface), ea833ece (opFitSpline: centripetal knots on [0, 1], natural
+  ends, live 2052); queued: the UI fetch's boxes as outer ones (cf-hose-routing 16/16 with live's centroid bands),
+  opEdgeChange joining run-on edges (live 2053: Shaped Flange 2 66/152/88, live 65/149/86; left: a 0.89 mm² step at
+  the new flange's +y bend relief, y ≈ 50.8). Run 106: 45/56 documents, 415/483 features, custom 54/109.
+- Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
+  cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
+  patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
+  (Derived, REQUESTS 04:00 open), cf-sheet-metal-model-plus Flange 1 (5 parts, live 2: the rebuild with Up to Part's
+  rolled walls), clamp-guillem / train-joe (PARITY-MISSING-EXTERNAL-REFS), learning-center-michael Fillet 2 (core).
 
 ## 11-05 01:00 UTC: Export dialogs remember the user's choices (P1 from the user via lead, 00:3x)
 - Live's client code (behaviours "dx (2026-11-05 00:52, P1 export memory)"): one `exportSolidOptions` for part,
