@@ -4038,6 +4038,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   envelope: iso lines non-planar, r 8.03–8.13, its rim normals uneven, not a Coons patch either, 0.5 mm off), a fill
   between those curves. The true rolling ball integrates to 18318.37 (live 18329.66, band ±7.8): ours would move
   3.4 mm³ towards live and stay outside. Not changing it: live's fill isn't a construction we can derive.
+  skasm 11-05 16:42 (lead: taken from core): the countersink rims whole (cone and hole seams at a rim vertex, ScopeRule 12):
+  36 / 79 / 40 as live. Left: the corners (ours 6 tori + 6 OTHER, live 4 + 8) and the volume.
 - [x] (core 11-03 15:05: OCCT patch 0020 (29d17a5a, lib synced) and the volume integral's u-isoline skip (acfb0433): the Wave Spring builds as live, 916.595 mm³ / 4402.375 mm² (live 916.533 / 4402.296, in its bands), its feature in 5.8 s instead of 16.6 (157 s reopened); T1 kernel surfacing::a_long_wavy_strip_thickens_along_it; the rest of the time is FS-WAVE-SPRING-SPEED) P1 FS-WAVE-SPRING (core; dx's FeatureScript corpus 11-03, cf-wave-spring) the community Wave Spring (FeatureScript
   336: two opFitSpline of 600 points each, opLoft between them into a wavy strip, opThicken 0.5 mm; Ø25 / Ø20,
   height 25 mm, 10 turns, 5 waves) builds an inside-out solid in ours: volume −555.401 mm³, box ±19 mm (live

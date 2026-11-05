@@ -4011,6 +4011,20 @@ static void analytic_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHi
   r = out;
 }
 
+// A hole's seams where they split a rim the blend trimmed (pipeflange-steven's countersinks: the cone's seam ended
+// mid-way on the top face's arc), moved to one of the rim's vertices with the hole's cylinder's.
+static void rim_seams_off_joints(const TopoDS_Shape& input, TopoDS_Shape& r, HHist& h)
+{
+  if (legacy_rim_seams())
+    return;
+  HHist              mh;
+  const TopoDS_Shape m = rim_chain_seams_joined(r, mh);
+  if (m.IsSame(r))
+    return;
+  h = h.IsNull() ? mh : compose(input, h, mh);
+  r = m;
+}
+
 // A blend's new faces finished: approximated ones made analytic, then a full round's two faces on one cylinder one
 // face (B-spline blends of a full round too: the analytic step first), a corner's two sphere patches one. A studio
 // saved before (legacy_blend_finish) keeps the old order: the merges first.
@@ -4026,6 +4040,7 @@ static void finish_blend_faces(const TopoDS_Shape& input, TopoDS_Shape& r, HHist
   analytic_blend_faces(input, r, h);
   merge_full_rounds(input, r, h);
   merge_corner_spheres(input, r, h);
+  rim_seams_off_joints(input, r, h);
 }
 
 OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const char* what,
@@ -4973,7 +4988,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     TopoDS_Shape       out;
     {
       const KernelTimer timer("blend.by_tools.seams");
-      out = rim_chain_seams_joined(unified, uh);
+      out = legacy_rim_seams() ? unified : rim_chain_seams_joined(unified, uh);
     }
     if (!uh.IsNull())
       h = compose(input, h, uh);
@@ -5833,6 +5848,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     {
       analytic_blend_faces(in, past->first, past->second);
       merge_full_rounds(in, past->first, past->second);
+      rim_seams_off_joints(in, past->first, past->second);
     }
     tighten_new_tolerances(in, past->first, accurate(in));
     return make_result({in}, past->first, past->second.get());

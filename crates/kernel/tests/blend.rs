@@ -1451,3 +1451,19 @@ fn overflowing_rounds_meeting_earlier_ones_are_lives() {
     assert_eq!((kinds("Plane"), kinds("Cylinder"), kinds("Sphere"), kinds("Torus")), (11, 19, 6, 8));
     eprintln!("{took:?}");
 }
+
+/// pipeflange-steven's Fillet 2 (R8 round the flange's top, its −y countersinks' rims trimmed by it): the countersinks'
+/// cones and holes get their seams at one of the trimmed rim's vertices, so the rim's arc on the top face stays one
+/// edge, as live's (36 / 79 / 40 without OCCT's seams; ours 81 / 42 before). Its volume is OCCT's blend's
+/// (FILLET-PROPAGATION-VOLUME: live 18329.663, ours 18314.952). T1.
+#[test]
+fn a_fillet_trimming_countersinks_keeps_their_rims_whole() {
+    setup();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend/pipeflange-fillet2-input.brep");
+    let s = read_brep(&path).unwrap();
+    let r = fillet_checked(&s, &[s.edges()[2].clone()], &[8.0 * MM]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.count(ShapeType::Face), 36);
+    assert_eq!((r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (91, 55), "with OCCT's seams (93 / 57 before)");
+    assert!((vol_mm3(&r) - 18314.9516).abs() < 0.05, "{}", vol_mm3(&r));
+}

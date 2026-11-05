@@ -2391,4 +2391,11 @@ asserts 108 / 62 with seams (was 112 / 66); kernel tests, blend corpus unchanged
 The lead moved pipeflange's Fillet 2 to skasm (FILLET-PROPAGATION-VOLUME and the countersink rims' extra edges),
 starting from your 11-04 notes (the cone + hole cylinder seams to move together; OCCT's radial-section blend 14.7 mm³
 under live). skasm lists here anything it changes in your area before landing; tell skasm if you pick it up meanwhile.
+16:42, landing, behind **ScopeRule 12** (`PartStudio::legacy_rim_seams`, kernel `set_legacy_rim_seams` / `legacy_rim_seams()`, in
+KernelLegacy): boolean.cpp `rim_chain_seams` now takes a hole's cylinder between rims of a torus, a cone or a plane
+(the planes keep their faces, the rim edge swapped); features.cpp runs it at the end of finish_blend_faces and of the
+fallback's finish (`rim_seams_off_joints`), and fillet_by_tools' call is under the rule too (it had landed under 11).
+pipeflange's countersink rims whole: 36 / 79 / 40 as live (T1 blend::a_fillet_trimming_countersinks_keeps_their_rims_
+whole, its input tests/data/blend/pipeflange-fillet2-input.brep); learning-center-michael still 7/7; kernel, model
+tests, blend corpus unchanged. Left on pipeflange: the corners' faces and the volume (OCCT's blend, your 11-04 notes).
 

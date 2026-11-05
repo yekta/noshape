@@ -98,6 +98,22 @@ impl Drop for LegacyBlendFinish {
     }
 }
 
+/// The kernel's fillets leave a hole's seams on the rims they trim, as before, for a studio saved before
+/// ([`crate::partstudio::PartStudio::legacy_rim_seams`]) while it regenerates on this thread.
+pub struct LegacyRimSeams(bool);
+
+impl LegacyRimSeams {
+    pub fn set(on: bool) -> Self {
+        Self(noshape_kernel::set_legacy_rim_seams(on))
+    }
+}
+
+impl Drop for LegacyRimSeams {
+    fn drop(&mut self) {
+        noshape_kernel::set_legacy_rim_seams(self.0);
+    }
+}
+
 thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested

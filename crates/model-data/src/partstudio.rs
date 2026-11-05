@@ -149,13 +149,13 @@ impl Feature {
 /// ([`PartStudio::legacy_face_frames`]); 9, a sketch on a construction plane in std newSketch's frame
 /// ([`PartStudio::legacy_plane_sketch_frames`]); 10, a sketch region's edges along their sketch curves
 /// ([`PartStudio::legacy_edge_directions`]); 11, blends finished as live ([`PartStudio::legacy_blend_finish`]);
-/// 0, older studios.
+/// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(11)
+        ScopeRule(12)
     }
 }
 
@@ -367,6 +367,11 @@ pub struct PartStudio {
     /// finished too): its fillets keep the faces they had, so later features find them where they were.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_blend_finish: bool,
+    /// Saved with features before a fillet moved a hole's seams off the rims it trims (ScopeRule < 12: a countersink's
+    /// or a rounded rim's seam ended mid-way on the trimmed rim and split it, pipeflange-steven's, learning-center-
+    /// michael's): its fillets keep those split edges, so later features find them where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_rim_seams: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -588,6 +593,10 @@ impl PartStudio {
         // And with blends finished as before.
         if self.scope_rule.0 < 11 && !self.features.is_empty() {
             self.legacy_blend_finish = true;
+        }
+        // And with the rims' seams where the blend left them.
+        if self.scope_rule.0 < 12 && !self.features.is_empty() {
+            self.legacy_rim_seams = true;
         }
         self.scope_rule = ScopeRule::default();
     }

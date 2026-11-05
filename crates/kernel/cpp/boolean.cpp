@@ -1969,7 +1969,7 @@ static bool valid_around(const TopoDS_Shape& out, const std::vector<TopoDS_Shape
   return true;
 }
 
-// `S` (a cylinder or torus, located) with its frame turned about its axis so that its u = 0 lies towards `p`.
+// `S` (a cylinder, cone or torus, located) with its frame turned about its axis so that its u = 0 lies towards `p`.
 occ::handle<Geom_ElementarySurface> turned_to(const occ::handle<Geom_Surface>& S, const gp_Pnt& p)
 {
   const occ::handle<Geom_ElementarySurface> el = occ::down_cast<Geom_ElementarySurface>(S->Copy());
@@ -1987,7 +1987,7 @@ occ::handle<Geom_ElementarySurface> turned_to(const occ::handle<Geom_Surface>& S
   return el;
 }
 
-// (u, v) of `p` on a cylinder or torus.
+// (u, v) of `p` on a cylinder, cone or torus.
 gp_Pnt2d elementary_uv(const occ::handle<Geom_ElementarySurface>& S, const gp_Pnt& p)
 {
   double u = 0, v = 0;
@@ -1995,14 +1995,18 @@ gp_Pnt2d elementary_uv(const occ::handle<Geom_ElementarySurface>& S, const gp_Pn
     ElSLib::Parameters(c->Cylinder(), p, u, v);
   else if (auto t = occ::down_cast<Geom_ToroidalSurface>(S); !t.IsNull())
     ElSLib::Parameters(t->Torus(), p, u, v);
+  else if (auto k = occ::down_cast<Geom_ConicalSurface>(S); !k.IsNull())
+    ElSLib::Parameters(k->Cone(), p, u, v);
   return gp_Pnt2d(u, v);
 }
 
-// A hole's cylinder between two coaxial tori, its rims rounded at both ends (learning-center-michael's Fillet 2:
-// OCCT's seams at u = 0 end mid-way on each torus's outer curve and split it; Parasolid's tori have none, live's 99 /
-// 54 edges / vertices, ours 103 / 58): the three seams moved together to an angle where both tori's outer loops have a
-// vertex, the rims' vertices with them; join_loop_pieces then joins the pieces. The shape as it was where none
-// applies or where the faces don't come out valid with their areas.
+// A hole's cylinder between two rims, each the edge of a coaxial torus or cone (a rounded rim, a countersink) or of a
+// plane, where a torus's or cone's seam ends mid-way on its outer loop and splits it (learning-center-michael's
+// Fillet 2: both rims' tori, live's 99 / 54 edges / vertices, ours 103 / 58; pipeflange-steven's Fillet 2: a
+// countersink's rim on the top face in two arcs, live's 79 / 40, ours 81 / 42; Parasolid's faces have no seams): the
+// seams moved together to an angle where the tori's and cones' outer loops all have a vertex, the rims' vertices with
+// them; join_loop_pieces then joins the pieces. The shape as it was where none applies or where the faces don't come
+// out valid with their areas.
 TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
 {
   ShapeAncMap ef;
@@ -2037,12 +2041,12 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
     }
     if (!only || cseams.size() != 1 || rims.size() != 2)
       continue;
-    // Each rim's other face: a torus about the same axis with a seam.
+    // Each rim's other face: a torus or cone about the same axis with a seam, or a plane.
     struct Side
     {
       TopoDS_Edge                         rim;
       TopoDS_Face                         face;
-      occ::handle<Geom_ToroidalSurface>   ts;
+      occ::handle<Geom_ElementarySurface> ts; // null: a plane
       std::vector<TopoDS_Edge>            seams, rest;
       std::vector<std::pair<double, TopoDS_Vertex>> at; // the outer loop's vertices off the seams, by angle
     };
@@ -2053,8 +2057,16 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
       if (fs == nullptr || fs->Extent() != 2)
         break;
       const TopoDS_Face tf = TopoDS::Face((fs->First().IsSame(cf) ? fs->Last() : fs->First()).Oriented(TopAbs_FORWARD));
-      const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(BRep_Tool::Surface(tf));
-      if (ts.IsNull() || !ts->Torus().Axis().IsParallel(ca.Axis(), 1e-9) || gp_Lin(ca.Axis()).Distance(ts->Torus().Location()) > 1e-9 * (1 + ca.Radius()))
+      const occ::handle<Geom_Surface> gs = BRep_Tool::Surface(tf);
+      if (!occ::down_cast<Geom_Plane>(gs).IsNull())
+      {
+        sides.push_back(Side{rim, tf, {}, {}, {}, {}});
+        continue;
+      }
+      occ::handle<Geom_ElementarySurface> ts = occ::down_cast<Geom_ToroidalSurface>(gs);
+      if (ts.IsNull())
+        ts = occ::down_cast<Geom_ConicalSurface>(gs);
+      if (ts.IsNull() || !ts->Position().Axis().IsParallel(ca.Axis(), 1e-9) || gp_Lin(ca.Axis()).Distance(ts->Position().Location()) > 1e-9 * (1 + ca.Radius()))
         break;
       Side sd{rim, tf, ts, {}, {}, {}};
       for (TopExp_Explorer x(tf, TopAbs_EDGE); x.More(); x.Next())
@@ -2107,22 +2119,33 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
       }
       return false;
     };
-    if (!splits(sides[0]) && !splits(sides[1]))
+    if (!(sides[0].ts.IsNull() ? false : splits(sides[0])) && !(sides[1].ts.IsNull() ? false : splits(sides[1])))
       continue;
-    // The angle both outer loops have a vertex at, nearest the seam.
-    const double old = elementary_uv(cs, BRep_Tool::Pnt(TopExp::FirstVertex(cseams[0]))).X();
+    // The angle the seamed sides' outer loops all have a vertex at, nearest the seam.
+    const double old   = elementary_uv(cs, BRep_Tool::Pnt(TopExp::FirstVertex(cseams[0]))).X();
+    const int    first = sides[0].ts.IsNull() ? 1 : 0;
     double       theta = 0, best = std::numeric_limits<double>::infinity();
     TopoDS_Vertex V[2];
-    for (const auto& [a0, v0] : sides[0].at)
-      for (const auto& [a1, v1] : sides[1].at)
-        if (std::abs(std::remainder(a0 - a1, 2 * M_PI)) < 1e-9 && std::abs(std::remainder(a0 - old, 2 * M_PI)) < best)
-        {
-          best  = std::abs(std::remainder(a0 - old, 2 * M_PI));
-          theta = a0;
-          V[0]  = v0;
-          V[1]  = v1;
-        }
-    if (V[0].IsNull() || best < 1e-9)
+    for (const auto& [a0, v0] : sides[(size_t)first].at)
+    {
+      TopoDS_Vertex v1;
+      if (!sides[(size_t)(1 - first)].ts.IsNull())
+      {
+        for (const auto& [a1, x1] : sides[(size_t)(1 - first)].at)
+          if (std::abs(std::remainder(a0 - a1, 2 * M_PI)) < 1e-9)
+            v1 = x1;
+        if (v1.IsNull())
+          continue;
+      }
+      if (std::abs(std::remainder(a0 - old, 2 * M_PI)) < best)
+      {
+        best          = std::abs(std::remainder(a0 - old, 2 * M_PI));
+        theta         = a0;
+        V[first]      = v0;
+        V[1 - first]  = v1;
+      }
+    }
+    if (V[first].IsNull() || best < 1e-9)
       continue;
     const gp_Pnt toward = cs->Value(theta, 0);
     const occ::handle<Geom_ElementarySurface> cn = turned_to(cs, toward);
@@ -2175,6 +2198,8 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
     for (int i = 0; i < 2 && ok; ++i)
     {
       const Side& sd = sides[(size_t)i];
+      if (sd.ts.IsNull())
+        continue;
       const occ::handle<Geom_ElementarySurface> tn = turned_to(sd.ts, BRep_Tool::Pnt(V[i]));
       if (tn.IsNull())
       {
@@ -2308,10 +2333,21 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
       continue;
     occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
     rs->Replace(cf, Fc);
+    std::vector<TopoDS_Shape> around{R[0], R[1], cseam};
     for (int i = 0; i < 2; ++i)
-      rs->Replace(sides[(size_t)i].face, Ft[i]);
+      if (sides[(size_t)i].ts.IsNull())
+      {
+        // A plane keeps its face, the rim swapped for the new one (the same way round).
+        const bool same = BRepAdaptor_Curve(sides[(size_t)i].rim).Circle().Axis().Direction().Dot(BRepAdaptor_Curve(R[i]).Circle().Axis().Direction()) > 0;
+        rs->Replace(sides[(size_t)i].rim.Oriented(TopAbs_FORWARD), same ? R[i] : TopoDS::Edge(R[i].Reversed()));
+      }
+      else
+      {
+        rs->Replace(sides[(size_t)i].face, Ft[i]);
+        around.push_back(tseam[i]);
+      }
     const TopoDS_Shape out = rs->Apply(s);
-    if (out.IsNull() || !valid_around(out, {R[0], R[1], cseam, tseam[0], tseam[1]}))
+    if (out.IsNull() || !valid_around(out, around))
       continue;
     if (hist.IsNull())
       hist = new BRepTools_History();
@@ -2319,8 +2355,10 @@ TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
     h->AddModified(cf, Fc);
     for (int i = 0; i < 2; ++i)
     {
-      h->AddModified(sides[(size_t)i].face, Ft[i]);
       h->AddModified(sides[(size_t)i].rim, R[i]);
+      if (sides[(size_t)i].ts.IsNull())
+        continue;
+      h->AddModified(sides[(size_t)i].face, Ft[i]);
       h->Remove(sides[(size_t)i].seams[0]);
     }
     h->Remove(cseams[0]);
