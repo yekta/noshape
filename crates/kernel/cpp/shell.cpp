@@ -1413,6 +1413,51 @@ bool collapsing_blend(const TopoDS_Face& f, double d)
   return rmax > 0 && -d >= rmax * (1 - 1e-6);
 }
 
+// A kept planar face lower than the wall: square to a kept planar neighbour across one of its edges and all of it
+// nearer that neighbour's plane than `t` (Shell 4's 0.1 mm skirt under its front rounds). OCCT's offset can't drop it
+// (155 ms for an empty offset there); the quadric path makes it vanish.
+bool low_strip(const TopoDS_Shape& solid, const ShapeIMap& removed, double t)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, ef);
+  auto plane_of = [](const TopoDS_Face& f, gp_Pln& p) {
+    BRepAdaptor_Surface s(f, false);
+    if (s.GetType() != GeomAbs_Plane)
+      return false;
+    p = s.Plane();
+    return true;
+  };
+  for (TopExp_Explorer fx(solid, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face& c = TopoDS::Face(fx.Current());
+    gp_Pln             pc;
+    if (removed.Contains(c) || !plane_of(c, pc))
+      continue;
+    for (TopExp_Explorer ex(c, TopAbs_EDGE); ex.More(); ex.Next())
+    {
+      const ShapeList* fs = ef.Seek(ex.Current());
+      if (fs == nullptr || fs->Extent() != 2)
+        continue;
+      const TopoDS_Face b = TopoDS::Face(fs->First().IsSame(c) ? fs->Last() : fs->First());
+      gp_Pln            pb;
+      if (b.IsSame(c) || removed.Contains(b) || !plane_of(b, pb) || std::abs(pc.Axis().Direction().Dot(pb.Axis().Direction())) > 1e-6)
+        continue;
+      bool low = true;
+      for (TopExp_Explorer ce(c, TopAbs_EDGE); ce.More() && low; ce.Next())
+      {
+        if (BRep_Tool::Degenerated(TopoDS::Edge(ce.Current())))
+          continue;
+        BRepAdaptor_Curve cc(TopoDS::Edge(ce.Current()));
+        for (int k = 0; k <= 8 && low; ++k)
+          low = pb.Distance(cc.Value(cc.FirstParameter() + (cc.LastParameter() - cc.FirstParameter()) * k / 8)) < t * (1 - 1e-9);
+      }
+      if (low)
+        return true;
+    }
+  }
+  return false;
+}
+
 // The solid sector of a convex blend face: everything between the face and
 // its centre over the face's (u, v) box (a cylinder or cone wedge from the
 // axis; for a torus its tube's disc sector revolved about the axis). Exact
@@ -6086,7 +6131,10 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
     for (TopExp_Explorer e(solid.shape, TopAbs_FACE); e.More() && !collapses; e.Next())
       collapses = !rmset.Contains(e.Current()) && collapsing_blend(TopoDS::Face(e.Current()), sign * thickness);
   }
-  const bool offset_ok = gap > 1e-5 && !collapses;
+  ShapeIMap removed_set;
+  for (const TopoDS_Shape& f : removed)
+    removed_set.Add(f);
+  const bool offset_ok = gap > 1e-5 && !collapses && !low_strip(solid.shape, removed_set, thickness);
   // Free-form faces meeting at sharp edges (a twisted hexagon vase's sides): OCCT's offset spends seconds intersecting
   // their offsets (2.6-3 s of 3.7 on the vase, 2 mm), the direct construction builds the same wall in 1.4-2.4 s and
   // nearer live's (live 1769: 47868.377 / OCCT 47868.366 / live 47868.386 mm³): it goes first there.
