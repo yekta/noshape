@@ -58,6 +58,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ends, live 2052); queued: the UI fetch's boxes as outer ones (cf-hose-routing 16/16 with live's centroid bands),
   opEdgeChange joining run-on edges (live 2053: Shaped Flange 2 66/152/88, live 65/149/86; left: a 0.89 mm² step at
   the new flange's +y bend relief, y ≈ 50.8). Run 106: 45/56 documents, 415/483 features, custom 54/109.
+- 06:40 queued: the translator builds a Derived feature's source Part Studio (derived/<element>/, live 2049) in a
+  tab of ours with the document's own Feature Studios; part patterns' Add with an empty merge scope unions the
+  instances with the seed (model-core, core's area; std subfeatureToolsTargets). cf-sheet-metal-hem 4 -> 5/6: its
+  Transform 1's direction is a vertex of a derived part (SFBIB, an INTERSECT in the source's names) live's UI fetch
+  gives no geometry for; next there: resolve such a query in the source's translation. Run 107: 45/56, 416/483.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
