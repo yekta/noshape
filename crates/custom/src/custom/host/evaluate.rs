@@ -129,7 +129,7 @@ fn ev_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn ev_owner_sketch_plane(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
     let frame = |q: &QueryCx, e: &Ent| match e {
-        Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => Some(q.st.ctx.sketches[*s].frame),
+        Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) => Some(q.st.ctx.sketches[*s].frame),
         _ => None,
     };
     // `checkAllEntities`: a plane only when every entity's sketch plane is
@@ -552,8 +552,9 @@ fn ev_mate_connector(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 
 fn ev_curve_definition(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let cx = context_arg(i, &a)?;
-    // Live: `{ curveType : OTHER }` alone (no type tag) instead of a B-spline.
-    let other = field(&a, "returnBSplinesAsOther").as_bool() == Some(true);
+    // Live: `{ curveType : OTHER }` alone (no type tag) instead of a B-spline; so too by default from a library
+    // older than the option (std 1691; live 2059: the Spur Gear at 1301 gets OTHER for its involute spline).
+    let other = field(&a, "returnBSplinesAsOther").as_bool().unwrap_or_else(|| i.module_version().is_some_and(|v| v < 1691));
     let v = on_first(i, &cx, &a, "edge", "INVALID_INPUT", |q, e| {
         let s = q.shape(e)?;
         let info = s.edge_info().ok()?;
@@ -716,7 +717,7 @@ fn ev_edge_convexity(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 }
 
 fn edge_plane(q: &QueryCx, e: &Ent) -> Option<crate::display::PlaneFrame> {
-    if let Ent::SketchEdge(s, _) = e {
+    if let Ent::SketchEdge(s, _) | Ent::SketchRegionEdge(s, _) = e {
         return Some(q.st.ctx.sketches[*s].frame);
     }
     let s = q.shape(e)?;

@@ -1690,6 +1690,8 @@ impl PartStudioView {
                     _ => format!("Edge of {}", fname(*sketch)),
                 },
                 Reference::SketchRegion { sketch, .. } => format!("Face of {}", fname(*sketch)),
+                Reference::SketchRegionEdge { sketch, end: None, .. } => format!("Edge of {}", fname(*sketch)),
+                Reference::SketchRegionEdge { sketch, .. } => format!("Vertex of {}", fname(*sketch)),
                 Reference::Sketch(s) => fname(*s),
                 Reference::FeaturePlane(f) => fname(*f),
                 // One made inside a feature (no feature of the list): "Mate connector" (live 1851's chip).

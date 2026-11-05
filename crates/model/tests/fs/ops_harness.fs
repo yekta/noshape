@@ -723,7 +723,8 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             const a = evArea(context, { "entities" : qCreatedBy(sub + "o", EntityType.FACE) });
             // Left of the first edge (+x direction, seen from +z) is +y: inside the L corner.
             const inside = size(evaluateQuery(context, qContainsPoint(qCreatedBy(sub + "o", EntityType.FACE), vector(10, 0.5, 3000) * mm)));
-            const rect = qCreatedBy(sub + "sk", EntityType.EDGE);
+            // The entities' edges (qCreatedBy also gives the regions' own edges, live 2059).
+            const rect = qSubtraction(qCreatedBy(sub + "sk", EntityType.EDGE), qAdjacent(qCreatedBy(sub + "sk", EntityType.FACE), AdjacencyType.EDGE, EntityType.EDGE));
             opOffsetWire(context, sub + "c", { "edges" : qSubtraction(rect, open), "normal" : vector(0, 0, 1), "offset1" : 1 * mm, "offset2" : 1 * mm, "makeRegions" : true });
             const ca = evArea(context, { "entities" : qCreatedBy(sub + "c", EntityType.FACE) });
             opOffsetWire(context, sub + "w", { "edges" : open, "normal" : vector(0, 0, -1), "offset1" : 1 * mm, "offset2" : 0 * mm });
@@ -866,6 +867,34 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
                 abortFeature(context, sub + "tmp");
             }
             check("abortFeature frees its ids", isQueryEmpty(context, qCreatedBy(sub + "tmp", EntityType.BODY)), "");
+        });
+        step(context, id, "sketchRegionEdges", function(sub) {
+            // Live 2059: a sketch's entities keep whole edges bounding nothing; its regions get edges of their own,
+            // split where the curves cross and shared between the regions on either side.
+            const sk = newSketchOnPlane(context, sub + "sk", { "sketchPlane" : plane(vector(0, 0, 1000) * mm, vector(0, 0, 1)) });
+            skCircle(sk, "c", { "center" : vector(0, 0) * mm, "radius" : 10 * mm });
+            skLineSegment(sk, "l", { "start" : vector(-20, 0) * mm, "end" : vector(20, 0) * mm });
+            skSolve(sk);
+            const len = function(q) { return evLength(context, { "entities" : q }) / mm; };
+            const line = sketchEntityQuery(sub + "sk", EntityType.EDGE, "l");
+            check("a sketch entity's edge is whole and bounds no region", size(evaluateQuery(context, line)) == 1 && abs(len(line) - 40) < 1e-9 && isQueryEmpty(context, qAdjacent(line, AdjacencyType.EDGE, EntityType.FACE)), len(line));
+            const edges = evaluateQuery(context, qCreatedBy(sub + "sk", EntityType.EDGE));
+            check("a sketch's edges: its entities' and its regions'", size(edges) == 5, size(edges));
+            const half = qContainsPoint(qCreatedBy(sub + "sk", EntityType.FACE), vector(0, 5, 1000) * mm);
+            const own = evaluateQuery(context, qAdjacent(half, AdjacencyType.EDGE, EntityType.EDGE));
+            var lengths = mapArray(own, function(e) { return roundToPrecision(len(e), 6); });
+            lengths = sort(lengths, function(a, b) { return a - b; });
+            check("a region's edges: its boundary's pieces", lengths == [20, roundToPrecision(10 * PI, 6)], lengths);
+            const diameter = qIntersection([qAdjacent(half, AdjacencyType.EDGE, EntityType.EDGE), qContainsPoint(qCreatedBy(sub + "sk", EntityType.EDGE), vector(0, 0, 1000) * mm)]);
+            check("a region edge between two regions", size(evaluateQuery(context, qAdjacent(diameter, AdjacencyType.EDGE, EntityType.FACE))) == 2 && isQueryEmpty(context, qIntersection([diameter, line])), size(evaluateQuery(context, qAdjacent(diameter, AdjacencyType.EDGE, EntityType.FACE))));
+            check("a region's vertices: its edges' ends", size(evaluateQuery(context, qAdjacent(half, AdjacencyType.VERTEX, EntityType.VERTEX))) == 2, size(evaluateQuery(context, qAdjacent(half, AdjacencyType.VERTEX, EntityType.VERTEX))));
+            // A lone circle: one region edge, the whole circle (its seam joined).
+            const sk2 = newSketchOnPlane(context, sub + "sk2", { "sketchPlane" : plane(vector(0, 0, 1010) * mm, vector(0, 0, 1)) });
+            skCircle(sk2, "c", { "center" : vector(0, 0) * mm, "radius" : 5 * mm });
+            skSolve(sk2);
+            const disc = qCreatedBy(sub + "sk2", EntityType.FACE);
+            const rim = qAdjacent(disc, AdjacencyType.EDGE, EntityType.EDGE);
+            check("a lone circle's region edge is the whole circle", size(evaluateQuery(context, rim)) == 1 && abs(len(rim) - 10 * PI) < 1e-9 && size(evaluateQuery(context, qCreatedBy(sub + "sk2", EntityType.EDGE))) == 2, len(rim));
         });
         println("done");
     });

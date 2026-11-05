@@ -97,6 +97,13 @@ pub fn to_id(r: &Reference) -> String {
         Reference::Body(b) => body_id(b),
         Reference::SketchEntity { sketch, entity } => format!("entity:{sketch}:{entity}"),
         Reference::SketchRegion { sketch, key } => format!("region:{sketch}:{}", key.iter().map(u32::to_string).collect::<Vec<_>>().join(",")),
+        Reference::SketchRegionEdge { sketch, region, edge, end } => {
+            let key = region.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+            match end {
+                Some(e) => format!("regionedge:{sketch}:{key}:{edge}:{e}"),
+                None => format!("regionedge:{sketch}:{key}:{edge}"),
+            }
+        }
         Reference::Sketch(f) => format!("sketch:{f}"),
         Reference::FeaturePlane(f) => format!("fplane:{f}"),
         Reference::MateConnector { feature, index } => format!("mc:{feature}.{index}"),
@@ -142,6 +149,17 @@ pub fn parse_str(s: &str) -> Option<Reference> {
             let (f, k) = rest.split_once(':')?;
             let key = k.split(',').map(|x| x.trim().parse().ok()).collect::<Option<Vec<u32>>>()?;
             Reference::SketchRegion { sketch: parse_feature_id(f)?, key }
+        }
+        "regionedge" => {
+            let mut parts = rest.split(':');
+            let sketch = parse_feature_id(parts.next()?)?;
+            let region = parts.next()?.split(',').map(|x| x.trim().parse().ok()).collect::<Option<Vec<u32>>>()?;
+            let edge = parts.next()?.parse().ok()?;
+            let end = match parts.next() {
+                Some(e) => Some(e.parse().ok()?),
+                None => None,
+            };
+            Reference::SketchRegionEdge { sketch, region, edge, end }
         }
         "sketch" => Reference::Sketch(parse_feature_id(rest)?),
         "fplane" => Reference::FeaturePlane(parse_feature_id(rest)?),

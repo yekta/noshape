@@ -196,6 +196,10 @@ pub enum Reference {
     /// A closed region of a sketch. `key` encodes the sketch solver's
     /// region id: `[ordinal, (entity << 1) | forward, ...]`.
     SketchRegion { sketch: FeatureId, key: Vec<u32> },
+    /// A sketch region's own boundary edge (live 2059: regions get edges of their own, split where the curves cross,
+    /// apart from the entities' whole edges): the `edge`th of region `region`'s face (the first region holding it);
+    /// with `end`, that edge's start (0) or end (1) vertex.
+    SketchRegionEdge { sketch: FeatureId, region: Vec<u32>, edge: u32, end: Option<u8> },
     /// A whole sketch.
     Sketch(FeatureId),
     /// Plane created by a Plane feature.
@@ -224,7 +228,7 @@ impl Reference {
             Reference::Origin | Reference::Plane(_) => None,
             Reference::Face(n) | Reference::Edge(n) | Reference::Vertex(n) => n.creator(),
             Reference::Body(b) => Some(b.feature),
-            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
+            Reference::SketchEntity { sketch, .. } | Reference::SketchRegion { sketch, .. } | Reference::SketchRegionEdge { sketch, .. } | Reference::Sketch(sketch) => Some(*sketch),
             Reference::FeaturePlane(f) | Reference::Feature(f) => Some(*f),
             Reference::MateConnector { feature, .. } | Reference::ConstructionPlane { feature, .. } => Some(*feature),
             Reference::Implicit { on, .. } => on.depends_on(),
@@ -247,6 +251,8 @@ impl Reference {
             Reference::Body(_) => "Part",
             Reference::SketchEntity { .. } => "Sketch entity",
             Reference::SketchRegion { .. } => "Sketch region",
+            Reference::SketchRegionEdge { end: None, .. } => "Sketch edge",
+            Reference::SketchRegionEdge { .. } => "Sketch vertex",
             Reference::Sketch(_) => "Sketch",
             Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. } => "Plane",
             Reference::MateConnector { .. } => "Mate connector",

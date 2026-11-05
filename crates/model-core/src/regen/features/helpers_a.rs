@@ -97,6 +97,12 @@ pub fn resolve_curves(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<SourcedEd
                     out.push(SourcedEdge { shape: e, source: Source::Sketch { sketch: *sketch, entity: *entity, segment: 0 } });
                 }
             }
+            Reference::SketchRegionEdge { sketch, region, edge, end: None } => {
+                let Some(s) = ev.ctx.sketch(*sketch) else { return Err(fe("A selected sketch no longer exists")) };
+                if let Some((shape, source)) = crate::regen::eval::sketch_region_edge(s, region, *edge, None) {
+                    out.push(SourcedEdge { shape, source });
+                }
+            }
             Reference::Sketch(sketch) => {
                 let Some(s) = ev.ctx.sketch(*sketch) else { return Err(fe("A selected sketch no longer exists")) };
                 let ids: Vec<u32> = s.sketch.entities().filter(|e| e.kind().is_curve() && !e.construction).map(|e| e.id.0).collect();

@@ -577,6 +577,7 @@ impl<'a> EvalCtx<'a> {
                 let p = s.sketch.point(noshape_sketch::EntityId(*entity))?;
                 Some(s.frame.to_world(p))
             }
+            Reference::SketchRegionEdge { sketch, region, edge, end: Some(end) } => sketch_region_edge(self.ctx.sketch(*sketch)?, region, *edge, Some(*end))?.0.vertex_point().ok(),
             Reference::MateConnector { .. } | Reference::Implicit { .. } => self.raw_connector(r).map(|c| c.origin),
             Reference::QueryVariable(_) => self.raw_vertex_point(&self.qv_first(r)?),
             _ => None,
@@ -1675,6 +1676,118 @@ pub fn decode_region_key(key: &[u32]) -> Option<noshape_sketch::regions::RegionI
         ordinal: *ord,
         boundary: rest.iter().map(|v| noshape_sketch::regions::SegmentSource { entity: noshape_sketch::EntityId(v >> 1), forward: v & 1 == 1 }).collect(),
     })
+}
+
+/// A sketch's region edges (live 2059: the regions' own edges, apart from the entities' whole ones, shared by the
+/// regions on either side): every region loop's segments the entity's way round, one per piece, a piece split only
+/// where nothing else meets it (a lone circle's seam) joined back; each region's edges in loop order, outer first.
+pub struct RegionEdges {
+    pub pieces: Vec<(noshape_sketch::regions::ProfileSegment, u32)>,
+    pub of_region: Vec<(Vec<u32>, Vec<u32>)>,
+}
+
+/// A region's key and its loops' segments (each with its entity), outer first.
+type RegionLoops = (Vec<u32>, Vec<Vec<(noshape_sketch::regions::ProfileSegment, u32)>>);
+
+pub fn region_edges(s: &SketchResult) -> RegionEdges {
+    use noshape_sketch::regions::ProfileSegment as P;
+    const TOL: f64 = 1e-9;
+    let near = |a: DVec2, b: DVec2| (a - b).length() < TOL;
+    let sig = |g: &P| [g.start(), g.point_at(0.5), g.end()];
+    let same = |a: &[DVec2; 3], b: &[DVec2; 3]| a.iter().zip(b).all(|(p, q)| near(*p, *q));
+    let loops: Vec<RegionLoops> = s
+        .regions
+        .iter()
+        .map(|r| {
+            let lps = std::iter::once(&r.outer).chain(r.holes.iter()).map(|lp| lp.segments.iter().zip(&lp.sources).map(|(g, src)| (if src.forward { g.clone() } else { g.reversed() }, src.entity.0)).collect()).collect();
+            (encode_region_key(&r.id), lps)
+        })
+        .collect();
+    // How many distinct pieces end at a point.
+    let mut distinct: Vec<[DVec2; 3]> = Vec::new();
+    for (g, _) in loops.iter().flat_map(|(_, l)| l.iter().flatten()) {
+        let k = sig(g);
+        if !distinct.iter().any(|d| same(d, &k)) {
+            distinct.push(k);
+        }
+    }
+    let degree = |p: DVec2| distinct.iter().filter(|d| near(d[0], p) || near(d[2], p)).count();
+    // Two pieces of one entity meeting where nothing else does, as one.
+    let join = |a: &(P, u32), b: &(P, u32)| -> Option<(P, u32)> {
+        if a.1 != b.1 {
+            return None;
+        }
+        let (first, second) = if near(a.0.end(), b.0.start()) && degree(a.0.end()) == 2 {
+            (a, b)
+        } else if near(b.0.end(), a.0.start()) && degree(b.0.end()) == 2 {
+            (b, a)
+        } else {
+            return None;
+        };
+        let g = match (&first.0, &second.0) {
+            (P::Arc { center, radius, start_angle, end_angle, ccw }, P::Arc { center: c2, radius: r2, start_angle: s2, end_angle: e2, .. }) if near(*center, *c2) && (radius - r2).abs() < TOL => {
+                P::Arc { center: *center, radius: *radius, start_angle: *start_angle, end_angle: end_angle + (e2 - s2), ccw: *ccw }
+            }
+            (P::EllipseArc { center, major_axis, major_radius, minor_radius, start_param, end_param, ccw }, P::EllipseArc { start_param: s2, end_param: e2, .. }) => {
+                P::EllipseArc { center: *center, major_axis: *major_axis, major_radius: *major_radius, minor_radius: *minor_radius, start_param: *start_param, end_param: end_param + (e2 - s2), ccw: *ccw }
+            }
+            (P::Line { a, .. }, P::Line { b, .. }) => P::Line { a: *a, b: *b },
+            _ => return None,
+        };
+        // A whole circle or ellipse from its own start, so both regions' joins come out the same.
+        let g = match g {
+            P::Arc { center, radius, start_angle, end_angle, ccw } if (end_angle - start_angle).abs() >= std::f64::consts::TAU - 1e-9 => {
+                P::Arc { center, radius, start_angle: 0.0, end_angle: if ccw { std::f64::consts::TAU } else { -std::f64::consts::TAU }, ccw }
+            }
+            g => g,
+        };
+        Some((g, a.1))
+    };
+    let mut out = RegionEdges { pieces: Vec::new(), of_region: Vec::new() };
+    let mut sigs: Vec<[DVec2; 3]> = Vec::new();
+    for (key, lps) in loops {
+        let mut list = Vec::new();
+        for mut lp in lps {
+            loop {
+                let n = lp.len();
+                let Some(k) = (0..n).find(|&k| n > 1 && join(&lp[k], &lp[(k + 1) % n]).is_some()) else { break };
+                let g = join(&lp[k], &lp[(k + 1) % n]).unwrap_or_else(|| lp[k].clone());
+                lp[k] = g;
+                lp.remove((k + 1) % n);
+            }
+            for g in lp {
+                let k = sig(&g.0);
+                let j = match sigs.iter().position(|d| same(d, &k)) {
+                    Some(j) => j,
+                    None => {
+                        sigs.push(k);
+                        out.pieces.push(g);
+                        out.pieces.len() - 1
+                    }
+                };
+                list.push(j as u32);
+            }
+        }
+        out.of_region.push((key, list));
+    }
+    out
+}
+
+/// A sketch region's own boundary edge ([`Reference::SketchRegionEdge`]): region `region`'s `edge`th edge
+/// ([`region_edges`]), or with `end` its start (0) or end (1) vertex, and the entity it lies on.
+pub fn sketch_region_edge(s: &SketchResult, region: &[u32], edge: u32, end: Option<u8>) -> Option<(Shape, Source)> {
+    let edges = region_edges(s);
+    let (_, list) = edges.of_region.iter().find(|(k, _)| k == region)?;
+    let (g, entity) = edges.pieces.get(*list.get(edge as usize)? as usize)?;
+    let e = k::make_edge_2d(&kernel_plane(&s.frame), &to_segment(g)).ok()?;
+    let source = Source::Sketch { sketch: s.feature, entity: *entity, segment: 0 };
+    match end {
+        None => Some((e, source)),
+        Some(i) => {
+            let (a, b) = e.endpoints().ok()?;
+            Some((k::make_vertex(if i == 0 { a } else { b }).ok()?, source))
+        }
+    }
 }
 
 /// Names for a swept profile result: caps by role, sides from profile edges.

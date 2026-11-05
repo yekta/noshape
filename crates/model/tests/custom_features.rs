@@ -3762,8 +3762,9 @@ fn edge_order_at_a_corner_as_live() {
     let r = fx.regen(&mut reg, &ps);
     assert_ok(&r);
     let out = custom::run::output_of(probe).expect("probe output").output;
-    // The sketch region's face (normal +z at z = 0): its edges at the corner, y = 40 then x = 30, as live's JGR, JGZ.
-    let region = out.lines().find(|l| l.contains(" n 0,0,1 | PT")).unwrap_or_else(|| panic!("{out}"));
+    // The sketch region's face (normal +z at z = 0): its edges at the corner, y = 40 then x = 30, as live's JGR, JGZ;
+    // at the region's own vertex there (the sketch entity's vertex is on the entities' edges only, live 2059).
+    let region = out.lines().find(|l| l.contains(" n 0,0,1 | PT") && !l.ends_with(" | C ")).unwrap_or_else(|| panic!("{out}"));
     let corner = region.split(" | C ").nth(1).unwrap_or_default();
     let at = |p: &str| corner.find(p).unwrap_or_else(|| panic!("{p} in {corner}"));
     assert!(corner.matches('{').count() == 2 && at("N[0,40,0 d 1,0,0 ; 30,40,0") < at("N[30,40,0 d 0,-1,0 ; 30,20,0"), "{region}");

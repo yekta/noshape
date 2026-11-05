@@ -52,6 +52,71 @@ pub enum Ent {
     SketchRegion(usize, Vec<u32>),
     SketchEdge(usize, u32),
     SketchVertex(usize, u32),
+    /// A sketch's region edge and vertex ([`RegionPieces`]' `edges[i]` / `verts[i]`): the regions' own split edges,
+    /// apart from the entities' whole ones (live 2059).
+    SketchRegionEdge(usize, u32),
+    SketchRegionVertex(usize, u32),
+}
+
+/// A sketch's region edges: each region face's edges (as the regions extrude), one per piece the regions share, and
+/// their end vertices (live 2059: `qCreatedBy(sketch, EDGE)` gives the entities' whole edges and these, which bound
+/// the regions; a region's spline edge is the spline trimmed where it crosses the circle).
+#[derive(Default)]
+pub struct RegionPieces {
+    pub edges: Vec<RegionPiece>,
+    pub verts: Vec<(DVec3, u32, u8)>,
+    /// Each region's face edges, as pieces.
+    pub of_region: HashMap<Vec<u32>, Vec<u32>>,
+}
+
+pub struct RegionPiece {
+    pub shape: Shape,
+    /// The first region holding it and its index among that region's face edges (its reference).
+    pub region: Vec<u32>,
+    pub at: u32,
+    pub regions: Vec<Vec<u32>>,
+    pub ends: Vec<u32>,
+}
+
+impl RegionPieces {
+    fn of(sk: &crate::regen::context::SketchResult) -> RegionPieces {
+        let edges = crate::regen::eval::region_edges(sk);
+        let plane = crate::regen::eval::kernel_plane(&sk.frame);
+        let mut out = RegionPieces::default();
+        for (g, _) in &edges.pieces {
+            let Ok(shape) = k::make_edge_2d(&plane, &crate::regen::eval::to_segment(g)) else { return RegionPieces::default() };
+            out.edges.push(RegionPiece { shape, region: Vec::new(), at: 0, regions: Vec::new(), ends: Vec::new() });
+        }
+        for (key, list) in &edges.of_region {
+            for (at, &j) in list.iter().enumerate() {
+                let p = &mut out.edges[j as usize];
+                if p.regions.is_empty() {
+                    p.region = key.clone();
+                    p.at = at as u32;
+                }
+                if !p.regions.contains(key) {
+                    p.regions.push(key.clone());
+                }
+            }
+            out.of_region.insert(key.clone(), list.clone());
+        }
+        for j in 0..out.edges.len() {
+            let Ok((a, b)) = out.edges[j].shape.endpoints() else { continue };
+            for (end, p) in [(0u8, a), (1u8, b)] {
+                let v = match out.verts.iter().position(|(q, ..)| q.distance(p) < 1e-9) {
+                    Some(v) => v,
+                    None => {
+                        out.verts.push((p, j as u32, end));
+                        out.verts.len() - 1
+                    }
+                };
+                if !out.edges[j].ends.contains(&(v as u32)) {
+                    out.edges[j].ends.push(v as u32);
+                }
+            }
+        }
+        out
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -86,8 +151,8 @@ pub fn entity_type_of(e: &Ent) -> EType {
     match e {
         Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) => EType::Body,
         Ent::Face(..) | Ent::Datum(_) | Ent::Plane(_) | Ent::SketchRegion(..) => EType::Face,
-        Ent::Edge(..) | Ent::SketchEdge(..) => EType::Edge,
-        Ent::Vertex(..) | Ent::Origin | Ent::Point(_) | Ent::SketchVertex(..) => EType::Vertex,
+        Ent::Edge(..) | Ent::SketchEdge(..) | Ent::SketchRegionEdge(..) => EType::Edge,
+        Ent::Vertex(..) | Ent::Origin | Ent::Point(_) | Ent::SketchVertex(..) | Ent::SketchRegionVertex(..) => EType::Vertex,
     }
 }
 
@@ -234,6 +299,7 @@ impl<'a> QueryCx<'a> {
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
                 out.extend(sk.sketch.entities().filter(|e| e.kind().is_curve()).map(|e| Ent::SketchEdge(s, e.id.0)));
+                out.extend((0..self.region_pieces(s).edges.len() as u32).map(|i| Ent::SketchRegionEdge(s, i)));
             }
         }
         if want(EType::Vertex) {
@@ -244,6 +310,7 @@ impl<'a> QueryCx<'a> {
             }
             for (s, sk) in ctx.sketches.iter().enumerate() {
                 out.extend(sk.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| Ent::SketchVertex(s, e.id.0)));
+                out.extend((0..self.region_pieces(s).verts.len() as u32).map(|i| Ent::SketchRegionVertex(s, i)));
             }
         }
         out
@@ -279,9 +346,11 @@ impl<'a> QueryCx<'a> {
                 }
                 if want(EType::Edge) {
                     out.extend(sk.sketch.entities().filter(|e| e.kind().is_curve()).map(|e| Ent::SketchEdge(*s, e.id.0)));
+                    out.extend((0..self.region_pieces(*s).edges.len() as u32).map(|i| Ent::SketchRegionEdge(*s, i)));
                 }
                 if want(EType::Vertex) {
                     out.extend(sk.sketch.entities().filter(|e| e.kind() == noshape_sketch::EntityKind::Point).map(|e| Ent::SketchVertex(*s, e.id.0)));
+                    out.extend((0..self.region_pieces(*s).verts.len() as u32).map(|i| Ent::SketchRegionVertex(*s, i)));
                 }
             }
             other => {
@@ -300,7 +369,7 @@ impl<'a> QueryCx<'a> {
             Ent::Body(_) | Ent::SketchBody(_) | Ent::Connector(_) | Ent::PlaneBody(_) | Ent::Point(_) | Ent::Datum(_) | Ent::Origin => Some(e.clone()),
             Ent::Plane(i) => Some(Ent::PlaneBody(*i)),
             Ent::Face(b, _) | Ent::Edge(b, _) | Ent::Vertex(b, _) => Some(Ent::Body(*b)),
-            Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => Some(Ent::SketchBody(*s)),
+            Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) => Some(Ent::SketchBody(*s)),
         }
     }
 
@@ -321,6 +390,17 @@ impl<'a> QueryCx<'a> {
             Ent::SketchBody(s) => Reference::Sketch(ctx.sketches[*s].feature),
             Ent::SketchRegion(s, key) => Reference::SketchRegion { sketch: ctx.sketches[*s].feature, key: key.clone() },
             Ent::SketchEdge(s, id) | Ent::SketchVertex(s, id) => Reference::SketchEntity { sketch: ctx.sketches[*s].feature, entity: *id },
+            Ent::SketchRegionEdge(s, i) => {
+                let pieces = self.region_pieces(*s);
+                let p = &pieces.edges[*i as usize];
+                Reference::SketchRegionEdge { sketch: ctx.sketches[*s].feature, region: p.region.clone(), edge: p.at, end: None }
+            }
+            Ent::SketchRegionVertex(s, i) => {
+                let pieces = self.region_pieces(*s);
+                let (_, j, end) = pieces.verts[*i as usize];
+                let p = &pieces.edges[j as usize];
+                Reference::SketchRegionEdge { sketch: ctx.sketches[*s].feature, region: p.region.clone(), edge: p.at, end: Some(end) }
+            }
         }
     }
 
@@ -374,6 +454,19 @@ impl<'a> QueryCx<'a> {
                     None => Vec::new(),
                 }
             }
+            Reference::SketchRegionEdge { sketch, region, edge, end } => {
+                let Some(s) = ctx.sketches.iter().position(|s| s.feature == *sketch) else { return Vec::new() };
+                let pieces = self.region_pieces(s);
+                let Some(&j) = pieces.of_region.get(region).and_then(|l| l.get(*edge as usize)) else { return Vec::new() };
+                match end {
+                    None => vec![Ent::SketchRegionEdge(s, j)],
+                    Some(end) => {
+                        let Ok((a, b)) = pieces.edges[j as usize].shape.endpoints() else { return Vec::new() };
+                        let at = if *end == 0 { a } else { b };
+                        pieces.verts.iter().position(|(p, ..)| p.distance(at) < 1e-9).map(|v| Ent::SketchRegionVertex(s, v as u32)).into_iter().collect()
+                    }
+                }
+            }
             Reference::QueryVariable(name) => ctx.query_variables.get(name).map(|v| v.iter().flat_map(|r| self.from_ref(r)).collect()).unwrap_or_default(),
             other => {
                 if let Some(i) = ctx.planes.iter().position(|p| &p.reference == other) {
@@ -411,6 +504,8 @@ impl<'a> QueryCx<'a> {
                 let sk = &ctx.sketches[*s];
                 sketch_edge_shape(sk, *id)
             }
+            Ent::SketchRegionEdge(s, i) => self.region_pieces(*s).edges.get(*i as usize).map(|p| p.shape.clone()),
+            Ent::SketchRegionVertex(s, i) => self.region_pieces(*s).verts.get(*i as usize).and_then(|(p, ..)| k::make_vertex(*p).ok()),
             Ent::SketchRegion(s, key) => {
                 let sk = &ctx.sketches[*s];
                 let region = sk.regions.iter().find(|r| encode_region_key(&r.id) == *key)?;
@@ -476,7 +571,7 @@ impl<'a> QueryCx<'a> {
                     _ => "OTHER_CURVE",
                 })
             }
-            Ent::Edge(..) => {
+            Ent::Edge(..) | Ent::SketchRegionEdge(..) => {
                 let info = self.shape(e)?.edge_info().ok()?;
                 Some(match info.curve {
                     k::Curve::Line { .. } => "LINE",
@@ -520,7 +615,7 @@ impl<'a> QueryCx<'a> {
     }
 
     pub fn is_sketch(&self, e: &Ent) -> bool {
-        matches!(e, Ent::SketchBody(_) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..))
+        matches!(e, Ent::SketchBody(_) | Ent::SketchRegion(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..))
     }
 
     /// Sketch bodies too in a Part Studio loaded for a derive (std derive
@@ -560,7 +655,7 @@ impl<'a> QueryCx<'a> {
         // Sketch curves too: std tracks a sketch line onto the edge a
         // surface made from it (sheet metal flange's bend line).
         let shape = match e {
-            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) => self.shape(e)?,
+            Ent::Face(..) | Ent::Edge(..) | Ent::Vertex(..) | Ent::SketchEdge(..) | Ent::SketchVertex(..) | Ent::SketchRegionEdge(..) | Ent::SketchRegionVertex(..) => self.shape(e)?,
             _ => return None,
         };
         let points = match etype {
@@ -593,6 +688,18 @@ impl<'a> QueryCx<'a> {
         };
         let p = point();
         self.st.face_points.lock().insert(f.clone(), p);
+        p
+    }
+
+    /// Sketch `s`'s region edges and vertices ([`RegionPieces`]), worked out once a sketch.
+    pub fn region_pieces(&self, s: usize) -> Arc<RegionPieces> {
+        let sk = &self.st.ctx.sketches[s];
+        let key = (sk.feature, sk.regions.as_ptr() as usize, sk.regions.len());
+        if let Some(p) = self.st.region_pieces.lock().get(&key) {
+            return p.clone();
+        }
+        let p = Arc::new(RegionPieces::of(sk));
+        self.st.region_pieces.lock().insert(key, p.clone());
         p
     }
 
@@ -825,7 +932,7 @@ impl<'a> QueryCx<'a> {
                 other => uncached(other).map(|x| x.1),
             }
             .or_else(|| self.created_by(&Ent::Body(*b))),
-            Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) => feature_id(ctx.sketches[*s].feature),
+            Ent::SketchBody(s) | Ent::SketchRegion(s, _) | Ent::SketchEdge(s, _) | Ent::SketchVertex(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) => feature_id(ctx.sketches[*s].feature),
             Ent::Plane(_) | Ent::PlaneBody(_) => {
                 let r = self.to_ref(e);
                 self.st.plane_ops.get(&r).cloned().or_else(|| r.depends_on().and_then(feature_id))
@@ -915,14 +1022,29 @@ impl<'a> QueryCx<'a> {
     pub(super) fn adjacent(&self, e: &Ent, t: EType, by_vertex: bool) -> Vec<Ent> {
         // A sketch region is bounded by its sketch curves (std thin
         // extrude takes a picked region's edges).
-        if let Ent::SketchRegion(s, key) = e {
-            let sk = &self.st.ctx.sketches[*s];
-            let Some(region) = sk.regions.iter().find(|r| encode_region_key(&r.id) == *key) else { return Vec::new() };
-            let curves: Vec<u32> = region.id.entities().iter().map(|x| x.0).filter(|x| sk.sketch.kind(noshape_sketch::EntityId(*x)).is_some_and(|k| k != noshape_sketch::EntityKind::Point)).collect();
+        // A sketch region is bounded by its own edges (live 2059: not the sketch's entity edges); a region edge
+        // bounds the regions holding it, between its end vertices.
+        if let Ent::SketchRegion(s, _) | Ent::SketchRegionEdge(s, _) | Ent::SketchRegionVertex(s, _) = e {
+            let pieces = self.region_pieces(*s);
+            let edges: Vec<u32> = match e {
+                Ent::SketchRegion(_, key) => pieces.of_region.get(key).cloned().unwrap_or_default(),
+                Ent::SketchRegionEdge(_, i) if !by_vertex => vec![*i],
+                Ent::SketchRegionEdge(_, i) => {
+                    let ends = pieces.edges.get(*i as usize).map(|p| p.ends.clone()).unwrap_or_default();
+                    (0..pieces.edges.len() as u32).filter(|j| pieces.edges[*j as usize].ends.iter().any(|v| ends.contains(v))).collect()
+                }
+                Ent::SketchRegionVertex(_, v) => (0..pieces.edges.len() as u32).filter(|j| pieces.edges[*j as usize].ends.contains(v)).collect(),
+                _ => Vec::new(),
+            };
+            let regions = |j: &u32| pieces.edges[*j as usize].regions.iter().map(|k| Ent::SketchRegion(*s, k.clone())).collect::<Vec<_>>();
             let mut out: Vec<Ent> = match t {
-                EType::Edge => curves.iter().map(|c| Ent::SketchEdge(*s, *c)).collect(),
-                EType::Vertex => curves.iter().filter_map(|c| sk.sketch.entity(noshape_sketch::EntityId(*c))).flat_map(|x| x.point_refs().iter().map(|p| Ent::SketchVertex(*s, p.0)).collect::<Vec<_>>()).collect(),
-                EType::Face => sk.regions.iter().filter(|r| r.id.entities().iter().any(|x| curves.contains(&x.0))).map(|r| Ent::SketchRegion(*s, encode_region_key(&r.id))).collect(),
+                EType::Edge if matches!(e, Ent::SketchRegionEdge(..)) && !by_vertex => Vec::new(),
+                EType::Edge => edges.iter().map(|j| Ent::SketchRegionEdge(*s, *j)).collect(),
+                EType::Vertex => match e {
+                    Ent::SketchRegionVertex(..) => vec![e.clone()],
+                    _ => edges.iter().flat_map(|j| pieces.edges[*j as usize].ends.iter().map(|v| Ent::SketchRegionVertex(*s, *v))).collect(),
+                },
+                EType::Face => edges.iter().flat_map(regions).collect(),
                 EType::Body => vec![Ent::SketchBody(*s)],
             };
             out.retain(|x| x != e);
@@ -942,10 +1064,8 @@ impl<'a> QueryCx<'a> {
                 EType::Vertex => verts.iter().map(|v| Ent::SketchVertex(*s, *v)).collect(),
                 EType::Edge if by_vertex || matches!(e, Ent::SketchVertex(..)) => curves().map(|c| Ent::SketchEdge(*s, c)).collect(),
                 EType::Edge => Vec::new(),
-                EType::Face => match e {
-                    Ent::SketchEdge(..) => sk.regions.iter().filter(|r| r.id.entities().iter().any(|x| x.0 == *id)).map(|r| Ent::SketchRegion(*s, encode_region_key(&r.id))).collect(),
-                    _ => Vec::new(),
-                },
+                // An entity's whole edge bounds no region (live 2059: the regions have edges of their own).
+                EType::Face => Vec::new(),
                 EType::Body => vec![Ent::SketchBody(*s)],
             };
             out.retain(|x| x != e);
@@ -1587,7 +1707,7 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             sub(i, "subquery")?
                 .into_iter()
                 .filter(|e| {
-                    let Ent::Edge(b, x) = e else { return &*t == "WIRE" && matches!(e, Ent::SketchEdge(..)) };
+                    let Ent::Edge(b, x) = e else { return &*t == "WIRE" && matches!(e, Ent::SketchEdge(..) | Ent::SketchRegionEdge(..)) };
                     let n = q.topo(*b).edge_faces.get(*x).map(|f| f.len()).unwrap_or(0);
                     match &*t {
                         "WIRE" => n == 0,
@@ -2203,6 +2323,12 @@ fn edge_end_vertex(q: &QueryCx, e: &Ent, at_start: bool) -> Option<Ent> {
             let sk = &q.st.ctx.sketches[*s].sketch;
             let (a, b) = sk.endpoints(noshape_sketch::EntityId(*id))?;
             Some(Ent::SketchVertex(*s, if at_start { a.0 } else { b.0 }))
+        }
+        Ent::SketchRegionEdge(s, i) => {
+            let pieces = q.region_pieces(*s);
+            let (a, b) = pieces.edges.get(*i as usize)?.shape.endpoints().ok()?;
+            let at = if at_start { a } else { b };
+            pieces.verts.iter().position(|(p, ..)| p.distance(at) < 1e-9).map(|v| Ent::SketchRegionVertex(*s, v as u32))
         }
         _ => None,
     }

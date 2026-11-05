@@ -36,7 +36,7 @@ fn profile_points(st: &CtxState, refs: &[Reference], chordal: f64) -> Result<(Ve
     let mut edges: Vec<(Reference, Shape)> = Vec::new();
     for r in refs {
         for e in q.from_ref(r) {
-            if matches!(e, Ent::Edge(..) | Ent::SketchEdge(..))
+            if matches!(e, Ent::Edge(..) | Ent::SketchEdge(..) | Ent::SketchRegionEdge(..))
                 && let Some(s) = q.shape(&e)
                 && !edges.iter().any(|(_, x)| x.is_same(&s))
             {

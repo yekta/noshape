@@ -106,8 +106,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 11:20 (lead: SKETCH-REGION-EDGE-PIECES, then cf-hose-routing's Shell from core):
   - Hose Shell: shell_part's checks by classifier and cheap inner points (core.md note): Hose Routing 178 -> 48 ms,
     the document 718 -> 208 ms (live 491). Run 121 unchanged (51/56, 427/483); speed swings with vibe5's load.
-  - SKETCH-REGION-EDGE-PIECES: asked live how sketch edges split (REQUESTS 11:08) before changing the sketch body:
-    live's evCurveDefinition(sketchEntityQuery(spline1)) gave the whole spline while the region's edge is a piece.
+  - SKETCH-REGION-EDGE-PIECES (11:42, live 2059): a sketch's entities keep whole edges bounding nothing; its regions
+    have edges of their own (model-core region_edges: each loop's segments, joined only across a lone seam, shared
+    by the regions on either side), Reference::SketchRegionEdge. qCreatedBy(sketch, EDGE) gives both, as live: two
+    harness tests that offset or probed it took the entity edges / the region vertex. Run 122 unchanged.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

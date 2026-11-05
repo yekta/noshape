@@ -864,7 +864,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full_regen_ms pending). Its result also differs: ours 36/83/46 faces/edges/vertices, 18314.95 mm³; live 36/79/40,
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
-- [ ] P2 SKETCH-REGION-EDGE-PIECES (dx 11-05 10:00, from live 2056's DTPROBE2) qAdjacent(<a sketch region>, EDGE) gives
+- [ ] P3 SKETCH-SPLINE-END-VERTICES (dx 11-05 11:42, live 2059 (c)) live's fit spline has its own start and end
+  vertices besides its interpolation points (ends included): the Spur Gear's tooth sketch 67 vertices, ours 63 (we
+  give the ends once, as the first and last interpolation points).
+- [x] (dx 11-05 11:42: Reference::SketchRegionEdge; the FeatureScript host's region edges and vertices from
+  model-core's region_edges; the Spur Gear's tooth sketch gives live's 11 edges, lengths, trimmed splines and
+  adjacency; plain evCurveDefinition below std 1691 gives OTHER for a B-spline, as live) P2 SKETCH-REGION-EDGE-PIECES (dx 11-05 10:00, from live 2056's DTPROBE2) qAdjacent(<a sketch region>, EDGE) gives
   live the region's boundary pieces (the Spur Gear's tooth gap: spline 2.4361 ×2, addendum arc 2.6673, dedendum arc
   1.0440 mm); ours gives the whole sketch entities (the circles 106.18 / 91.70 mm, the splines 2.4979 untrimmed).
   The FeatureScript host's sketch edges are one per entity; live's sketch body splits them where they cross. No

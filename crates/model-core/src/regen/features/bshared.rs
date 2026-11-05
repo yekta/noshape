@@ -102,6 +102,11 @@ pub fn curve_edges(ev: &EvalCtx, refs: &[Reference]) -> FResult<Vec<Shape>> {
                     out.push(e);
                 }
             }
+            Reference::SketchRegionEdge { sketch, region, edge, end: None } => {
+                if let Some((e, _)) = ev.ctx.sketch(*sketch).and_then(|s| crate::regen::eval::sketch_region_edge(s, region, *edge, None)) {
+                    out.push(e);
+                }
+            }
             Reference::Sketch(sketch) => {
                 if let Some(s) = ev.ctx.sketch(*sketch) {
                     let ids: Vec<u32> = s.sketch.entities().filter(|e| !e.construction).map(|e| e.id.0).collect();
