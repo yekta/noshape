@@ -184,6 +184,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   bend_geometry, the bend solids and the flat. 2 -> 6/11; next there Corner break 1's vertex (the UI fetch's). Hole
   tables: a plain hole's SIZE as its diameter dimension shows it (Ø.394). Open with live: REQUESTS 21:01 (drawing batch 2
   recordings), 21:06 (c2 refetch by REST after ~06:00), 21:43 (Insert view's default scale: 80 mm at 1:5 / 8:1).
+- 22:19: c2 triage (lead: worst first, mine): every c2 first difference but three is the UI fetch's (empty
+  queryStrings, no SKETCH bodies; a datum plane's id, a Hole's origin, regions, loft profiles, Derived sources).
+  c2-housing-draft's Hole also has a DIN clearance path (std's tappedOrClearanceHoleTable; ours has ANSI / ISO only:
+  DIN's hole diameters equal ISO's, its counterbores don't) behind the fetch's empty origin. c2-hunting-knife's
+  Extrude 1: the same two regions as live's, 98.5 mm² smaller in total (sketch geometry: its R3.5 tip arc's ends are
+  swapped against live's params; not explained yet, waits on the REST refetch's regions). c2-extension-spring's
+  Spring sits 2 mm off in y (its regions query too). Speed: tracking's on-face answers cached (Flange 1 832 -> 649 ms).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
