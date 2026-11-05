@@ -3946,6 +3946,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   view's lower tangent edge, an ELLIPSE in live (centre (7.829, 6.0897) in, major 0.9843), is a 37-point SPLINE plus a
   0.017 in LINE in ours: that model edge is a B-spline in ours where Parasolid's is a circle. Our DXF writes model
   B-splines as SPLINE (as live does). Translated model: NOSHAPE_PARITY_SAVE + NOSHAPE_PARITY_ONLY=knob-tim.
+- [ ] P2 SM-CURVED-WALL-BEND-FILLET (dx 11-05 07:06, run 109) cf-sheet-metal-model-plus's Flange 1: 5 parts, live 2
+  (the Up to Part part loses a wall: the planar wall beside the rolled face is thickened alone). The FeatureScript
+  host's rebuild (host/sheetmetal.rs curved_wall_bends) fillets the curved wall with its flat neighbours along the
+  bends; after Flange 1 the sloped neighbour runs on past the curved wall's end (its edge moved from x −10 to −8 by
+  the flange) and k::fillet_radii fails ("radius too large or unsupported edge configuration"), so that curved
+  wall's bends are skipped silently. Tried: retrying the fillet on strips of the neighbours along the bend edges
+  (oriented as the walls): the fillet then succeeds but the part comes out a 21-face solid of −23.9 mm³ (box x −11 ..
+  −8): not kept. Next: trim the neighbour to the curved wall's span instead, or find what the strip result breaks.
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
