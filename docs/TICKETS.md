@@ -3975,6 +3975,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (lead 11-05 14:20: skasm takes Fillet 2's rest from here.)
   skasm 11-05 15:13 (lead: taken from core): the chain move done (boolean.cpp rim_chain_seams, from fillet_by_tools):
   learning-center-michael matches live to the end, 7/7 (Fillet 2 44 / 99 / 54). Left: the time.
+  skasm 11-05 15:48: the time on an idle vibe4: Fillet 2 866–872 ms (live 46), the document 881–886 (live 96): ~700 ms
+  of it OCCT's cut of the rims' rings and the mitres' balls (tori, spheres; noshape's Boolean declines them): bool.md.
 - [x] (core 11-03 13:00: the boss went through boolean.cpp fuse_on_face, which rebuilt the shell from its iterator's faces (already in the solid's orientation) and then flipped the new shell once more by the shell's; a drafted extrude's solid holds its shell REVERSED, so the part came out inside out. The same at four other sites (the unify's ReShape, through holes, the local Boolean, features.cpp's blend rebuild): the shell and solid now FORWARD. dx's document +922.936632 mm³ as live; the Boolean corpus as before (the same 4 of 974 differ without it); T1 model kernel_robustness::a_boss_on_a_drafted_blocks_top_adds_to_it, both pull directions) P1 ADD-INSIDE-OUT (core / bool; dx's parity suite 11-03, cf-parameter-pattern) an Extrude Add of a 2 mm boss
   on the top face of a drafted block leaves the part inside out: volume −922.937 mm³ (query_parts), the magnitude
   live's +922.937. The block: Extrude 1, a 20 × 10 mm rectangle on Top, depth 5 mm (#a / 2), draft 10° (#a deg,

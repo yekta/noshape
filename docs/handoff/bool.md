@@ -2844,3 +2844,13 @@ curved face all round"), each bounded by one closed B-spline edge (the extrusion
 patches are what declines. The tool is right as built (a cap on the cylinder is what the slot is), so this is a case
 for noshape's Boolean: a cylinder patch inside one closed B-spline loop. Yours if you take it.
 
+## From skasm (11-05 15:48 UTC): learning-center-michael's Fillet 2, the time left is OCCT's cut of tori (lead's request)
+Fillet 2 now matches live (44 / 99 / 54, core's fillet_by_tools and skasm's seam move, 51c466a5); the document is 7/7.
+Its time on an idle vibe4 (release, three runs): Fillet 2 866–872 ms, the document 881–886 ms, live 46 / 96. Of
+Fillet 2, `fillet_by_tools`' second cut, the part (after the line rounds' cut, noshape's Boolean 58 ms) minus 14 tools
+(each hole rim's ring less its torus, and the mitres' balls: tori and spheres), is OCCT's: Face-Face 470 ms (314),
+Edge-Face 98, Edge-edge 61, the rest ~70. noshape's Boolean declines it ("an edge on another argument's free-form
+face": the tori). Cutting the 14 tools one at a time instead (no tool-tool pairs) is no faster (2.3–2.4 s either way
+on a loaded machine), so it's the tori themselves. core's recorded case: vibe5 ~/agents/shared-cases/michael-fillet2/
+f71e381ddc082e34. The kernel profile lap `blend.by_tools.seams` is skasm's seam move (~30 ms idle).
+
