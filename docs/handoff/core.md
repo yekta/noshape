@@ -16,6 +16,13 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 18:10 UTC.**
+- Landed: face pattern stitched (ae47fdff, motor-mount-jack's Circular pattern 1 158 -> 8 ms), seam-split edges one
+  edge (2e0ec154: bushing2 6/6; shown / named / picked / measured / filleted as one; saved studios keep piece names).
+- cf-straight-spline unscored (queued): live 2097, its corner arcs appear on 3 of 8 shaft sizes, no geometric rule.
+- cf-setback-fillet stays P2 (SETBACK-FILL-PATCH): Parasolid's six-sided G1 fill is flatter than OCCT's plate and a
+  G1 Coons; no construction found. Parity on vibe5 53/56, 430/483 (straight-spline then out of the score).
+
 **State 11-05 15:13 UTC.**
 - The lead's order is done: Replace face at 1024² and its cancel (e3ba6871), SEAM-MOVER determinism (d293a184, earlier),
   Shell 4's speed: 636 -> 475 ms on vibe5 for the document's body (~0.5 s vibe4; live 627): OCCT's offset is no longer
