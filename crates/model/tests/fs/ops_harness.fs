@@ -345,10 +345,14 @@ export const opsHarness = defineFeature(function(context is Context, id is Id, d
             for (var e in evaluateQuery(context, qOwnedByBody(block, EntityType.EDGE)))
                 if (evCurveDefinition(context, { "edge" : e }) is Line)
                     lines += 1;
+            // A sheet too (std Jog's stretched wall).
+            opExtractSurface(context, sub + "x", { "faces" : qContainsPoint(qCreatedBy(sub + "b", EntityType.FACE), vector(0.5, 0.5, 3801) * mm) });
+            opPattern(context, sub + "ps", { "entities" : qCreatedBy(sub + "x", EntityType.BODY), "transforms" : [transform(m, vector(0, 0, 3800 - 5 * 3800) * mm)], "instanceNames" : ["0"] });
+            const sheetPlane = evSurfaceDefinition(context, { "face" : qOwnedByBody(qCreatedBy(sub + "ps", EntityType.BODY), EntityType.FACE) }) is Plane;
             const length = evLength(context, { "entities" : qOwnedByBody(block, EntityType.EDGE) });
             const volume = evVolume(context, { "entities" : block });
             const bounds = evBox3d(context, { "topology" : block });
-            check("a block scaled non-uniformly", planes == 6 && lines == 12 && abs(length - 140 * mm) < 1e-9 * mm && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
+            check("a block scaled non-uniformly", sheetPlane && planes == 6 && lines == 12 && abs(length - 140 * mm) < 1e-9 * mm && abs(volume - 1000 * mm ^ 3) < 1e-9 * mm ^ 3
                     && norm(bounds.maxCorner - vector(20, 10, 3805) * mm) < 1e-9 * mm && norm(bounds.minCorner - vector(0, 0, 3800) * mm) < 1e-9 * mm, [planes, lines, length, volume, bounds]);
         });
         step(context, id, "extendSheetToSurface", function(sub) {

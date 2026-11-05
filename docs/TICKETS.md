@@ -684,7 +684,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (Cut) 3553.1886 / 3553.1521, 49b0458c55418df3 (Fuse) 125.67092 / 125.67096; and 9 more "unified differently" by
   ~3e-7. So a seam move changes geometry (or the merge after it picks another surface). Cases in vibe5
   ~/agents/bool-corpora/corpus4 (and 5, 6); `bin/why.sh corpus4 0662365385035891` from a worktree prints it.
-- [ ] P2 AFFINE-PLANAR-SHEETS (dx 11-05 06:00): an affine map of a body bounded by planes and lines keeps them
+- [x] (dx 11-05 07:41: the split was right; the fixed edge's transient id, given before the fold, resolved to nothing: the "topology changed, nothing where it was" rule now only drops ordinal names (a face's boundary edge, a vertex), not an edge named by its two faces; sheets keep their planes too; sheetmetal_std T2 38/38) P2 AFFINE-PLANAR-SHEETS (dx 11-05 06:00): an affine map of a body bounded by planes and lines keeps them
   (kernel op_gtransform, cf-fix-pcb's blocks: live's planes), for solids only. On a sheet (std Jog's
   stretchClipped, features_c::jog_preserve_material_off_and_errors) the stretched planar wall then fails Jog's
   checkSplitResults: the split of the planar face (opSplitFace with trackPartialDependency tracking of the tool

@@ -600,7 +600,10 @@ impl<'a> QueryCx<'a> {
             // Nothing lies where it was: it moved, if its name still means it. An edge's or vertex's name is an
             // ordinal among its neighbours' (`Boundary`, `Vertex`): after a topology change it may name another (a
             // corner a cut took away named the new corner the cut made: std then took that one for an original).
-            let renamed = matches!(snap.etype, EType::Edge | EType::Vertex) && self.st.transient_ref(id).is_some_and(|r| !self.st.same_topology(id, r));
+            // (An edge named by its two faces keeps meaning it: std Jog's fixed edge, folded away from where its id
+            // was given.)
+            let ordinal = |r: &Reference| matches!(r, Reference::Edge(TopoName::Boundary { .. }) | Reference::Vertex(_));
+            let renamed = matches!(snap.etype, EType::Edge | EType::Vertex) && self.st.transient_ref(id).is_some_and(|r| ordinal(r) && !self.st.same_topology(id, r));
             return if renamed { Vec::new() } else { found };
         }
         // A face's name lineage holds (only edges take each other's names):
