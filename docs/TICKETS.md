@@ -225,6 +225,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-05 05:00 release (qa list 03:28, checked on green 0cbf4fa7; the latest release is v0.4.30)
+- **qa 03:28: no blocker.** On green 0cbf4fa7 (vibe3): CLI round trip 67643.716875 / 18 in all six formats; volume sweep = v0.4.25;
+  the 44 ticket documents = the previous greens; dx's cf corpus unchanged; fixed tickets hold (incl. SM-CLOSED-BUTT,
+  RUST-MIRROR-NEGATIVE, CRASH-3151 / 3388 documents open); the user's cases pass, the Gyro matrices included (SPLIT-FACE-SAME-ID
+  fixed since v0.4.29: only the picked body changes). Since v0.4.30 only greens whose sweeps were unchanged (5b52f543, 1e987921,
+  bd401fd6, 0cbf4fa7 ...). Fuzz on vibe3 since 11-04 18:00: CLI 420 seeds, 0 deaths; GUI 199 seeds, one start failure (vibe3's
+  X server refused a connection once: not the app). Updater checked through v0.4.30 on vibe3 (with a `noshape mcp` running; the
+  lead's new helper takes effect on the next update). Open, not blockers: P1 DRAFT-NONDETERMINISTIC (in v0.4.29 and earlier),
+  P3 ABOUT-DISABLED, P1 DIALOG-SWITCH-DISCARDS-NEW.
+
 ## Release blockers for the 2026-11-04 17:00 release (qa list 15:37, checked on newest green b8935557)
 - **qa 16:30: an early v0.4.26 Release run (41852299915, tag 5b449900 = 477c41683 + bump, started 14:54) was not published**: builds, sign and the Linux / Windows checks succeeded, "Check macOS arm64" was cancelled at 16:10 after 15 min (its timeout is 60; no log), so publish was skipped. 477c41683 has the three crash fixes and the Windows title bar fix; qa's list below was checked on the later b8935557 / 5a9089c7.
 - **qa 15:37: no blocker.** On green b8935557: CLI round trip Parasolid / ACIS / STEP / IGES / JT / Rhino 67643.716875 / 18
