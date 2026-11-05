@@ -2185,11 +2185,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   one", then the slabs: OCCT's union of 47 slabs 8.5 s (noshape's Boolean declines "a plane nearly along a cylinder":
   **bool**), their common invalid. Live asked whether it shells that part (REQUESTS 14:56, live/core/shell16); then
   either quadrics takes it or it fails fast. Dumps: vibe5 ~/agents/core-scratch/sh3dump (shell::dumped_shell_probe).
-  core 11-05 15:40: Shell 4 in the document (its body dumped, shell-18) spent 160 ms in OCCT's offset before quadrics
+  core 11-05 15:10: Shell 4 in the document (its body dumped, shell-18) spent 160 ms in OCCT's offset before quadrics
   (an empty offset: it can't drop the 0.1 mm skirt): the offset path is no longer tried where a kept planar face is
   lower than the wall (square to a kept planar neighbour, all of it nearer that plane than t). Shell 4 636 -> 475 ms
   on vibe5 (~0.5 s on vibe4; live 627); shell corpus (211): every outcome, volume and face count as before. Tried and
   dropped: proving a line clear of an offset face from the basis surface (the projections cost more than OCCT's pair).
+  core 11-05 15:20: live (REQUESTS 2065) fails Shell 3's part too, at once: "Could not shell part with selections."
+  in 0.36 s (it imports the body only as faulty; ours is valid). So the target is that error, fast. Ours reaches the
+  slabs after regions / offset / quadrics decline, and the slabs' union is OCCT's fuse of 47 slabs (8.5 s of the 10;
+  noshape's Boolean declines "a plane nearly along a cylinder"), then their common is invalid. **bool**: the case is
+  vibe5 ~/agents/shared-cases/shell3-slab-union (shell::dumped_shell_probe, NOSHAPE_SHELL_CASE=<dir>,
+  NOSHAPE_SHELL_DEBUG=1). A blanket slab deadline would break the corpus (its successful slab shells take up to ~6 s).
 - [ ] P0 REGEN-SPEED (core 10-29 03:05: met in release on perf.yml run 40796942944 (main 34cbea98): live-30-features full regen 35 / 41 / 53 ms (macOS / Linux / Windows; budget 80, live 171), its Extrude 1 edit commit 34 / 38 / 60 ms (budget 200), big-plate regen 159 / 230 / 306 ms (live 617); qa, please re-measure the GUI commit on a release build, the 301–785 ms were a dev build at load ~30. Was 10-27, in progress: probe `ops regen_profile::edit_commit_profile` (ignored) and
   NOSHAPE_KERNEL_PROFILE=1 (per kernel call / step); landed 327e611a volume cache, d85c3029 no volume per boolean,
   9281f41a parallel blend check: the edit commit 510 → 364 ms median in a dev build at load ~30 (quiet, min 312). Left
