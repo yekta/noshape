@@ -2,6 +2,7 @@
 //! curve swept along a direction or revolved about an axis.
 
 use crate::nurbs::{NurbsCurve, NurbsSurface};
+use std::f64::consts::TAU;
 use glam::{DVec2, DVec3};
 
 /// A surface by its parameters (u, v), OCCT's.
@@ -150,6 +151,31 @@ impl FreeSurface {
     /// The parameters of the point of it nearest `p` within `uv` (u0, u1, v0, v1), from `seed` (Newton's method on
     /// the distance's gradient), and the distance.
     pub fn param_of(&self, p: DVec3, seed: DVec2, uv: [f64; 4]) -> (DVec2, f64) {
+        // (A sphere's or torus's: by its angles, a turn at a time toward the seed's (an angle round its axis at a
+        // pole or on the axis: the seed's); Newton's lost its way near a sphere's pole, an edge through it not found
+        // on it (learning-center-michael's ball tools).)
+        let near = |a: f64, to: f64| a + TAU * ((to - a) / TAU).round();
+        let clamp = |q: DVec2| DVec2::new(q.x.clamp(uv[0].min(uv[1]), uv[0].max(uv[1])), q.y.clamp(uv[2].min(uv[3]), uv[2].max(uv[3])));
+        match *self {
+            FreeSurface::Sphere { o, x, y, z, .. } => {
+                let w = p - o;
+                let (wx, wy, wz) = (w.dot(x), w.dot(y), w.dot(z));
+                let rho = (wx * wx + wy * wy).sqrt();
+                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x) } else { seed.x };
+                let q = clamp(DVec2::new(u, wz.atan2(rho)));
+                return (q, (self.at(q.x, q.y) - p).length());
+            }
+            FreeSurface::Torus { o, x, y, z, major, .. } => {
+                let w = p - o;
+                let (wx, wy, wz) = (w.dot(x), w.dot(y), w.dot(z));
+                let rho = (wx * wx + wy * wy).sqrt();
+                let u = if rho > 1e-12 * w.length().max(1e-300) { near(wy.atan2(wx), seed.x) } else { seed.x };
+                let v = near(wz.atan2(rho - major), seed.y);
+                let q = clamp(DVec2::new(u, v));
+                return (q, (self.at(q.x, q.y) - p).length());
+            }
+            _ => {}
+        }
         let mut q = seed;
         for _ in 0..50 {
             let [s, su, sv, suu, suv, svv] = self.derivs(q.x, q.y);

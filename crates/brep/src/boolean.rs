@@ -1239,9 +1239,18 @@ impl Ctx<'_> {
         let bound = self.bound(f)?.to_vec();
         let spans = self.bound_spans(f)?;
         // (OCCT's curve ending on the boundary, as it does at the face's parameter bounds: a point there.)
+        // (On a face whose angles go round, OCCT's curve on it may be a turn off its boundary's: there too.)
         if let Path::Nurbs { .. } = path {
+            let turns: Vec<DVec2> = match (&self.faces[f].s, self.faces[f].ns.as_deref()) {
+                (Surf::Nurbs { su, sv, .. }, Some(ns)) => {
+                    let [pu, pv] = ns.periodic();
+                    [(pu, DVec2::new(TAU * su, 0.0)), (pv, DVec2::new(0.0, TAU * sv))].into_iter().filter(|x| x.0).flat_map(|x| [x.1, -x.1]).collect()
+                }
+                _ => Vec::new(),
+            };
             for (k, u) in [(0, 0.0), (1, 1.0)] {
-                if ends[k] == End::Open && distance_with(c2.at(u), &bound, spans) <= tol {
+                let q = c2.at(u);
+                if ends[k] == End::Open && std::iter::once(q).chain(turns.iter().map(|&d| q + d)).any(|q| distance_with(q, &bound, spans) <= tol) {
                     cuts[k].1 = End::Point(path.at(cuts[k].0));
                 }
             }

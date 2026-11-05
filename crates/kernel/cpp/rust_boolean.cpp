@@ -31,6 +31,7 @@
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
+#include <gp_Ax22d.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <gp_Ax2d.hxx>
 #include <IntRes2d_IntersectionPoint.hxx>
@@ -2217,6 +2218,261 @@ bool lifted(const gp_Cone& K, const std::function<gp_Pnt(double)>& gen, const gp
   return interpolated(at, t0, t1, n0, out);
 }
 
+// A surface of revolution about some axis seen in its meridian half-plane (distance from the axis, height along it):
+// a plane across the axis (z = h), a cylinder (r = R), a cone (r = R + z k), a sphere or torus (a circle about (c, h),
+// radius m; a sphere's c 0). `axis` is the surface's own where it has one (a plane's and a sphere's are free).
+struct Meridian
+{
+  enum Kind { Across, Along, Slope, Round } kind;
+  double h = 0, r = 0, k = 0, c = 0, m = 0;
+};
+
+struct Revolved
+{
+  occ::handle<Geom_Surface> s;
+  std::optional<gp_Ax1>     axis;   // its own axis (none: a plane's)
+  std::optional<gp_Dir>     normal; // a plane's
+};
+
+std::optional<Revolved> revolved(const TopoDS_Face& f)
+{
+  occ::handle<Geom_Surface> s = BRep_Tool::Surface(f);
+  while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
+    s = t->BasisSurface();
+  if (const occ::handle<Geom_Plane> p = occ::down_cast<Geom_Plane>(s))
+    return Revolved{s, std::nullopt, p->Pln().Axis().Direction()};
+  if (const occ::handle<Geom_SphericalSurface> p = occ::down_cast<Geom_SphericalSurface>(s))
+    return Revolved{s, p->Position().Axis(), std::nullopt};
+  if (const occ::handle<Geom_CylindricalSurface> p = occ::down_cast<Geom_CylindricalSurface>(s))
+    return Revolved{s, p->Axis(), std::nullopt};
+  if (const occ::handle<Geom_ConicalSurface> p = occ::down_cast<Geom_ConicalSurface>(s))
+    return Revolved{s, p->Axis(), std::nullopt};
+  if (const occ::handle<Geom_ToroidalSurface> p = occ::down_cast<Geom_ToroidalSurface>(s))
+    return Revolved{s, p->Axis(), std::nullopt};
+  return std::nullopt;
+}
+
+// `x`'s meridian about the axis `ax` (heights from its location along its direction).
+Meridian meridian_of(const Revolved& x, const gp_Ax1& ax)
+{
+  const gp_Pnt o = ax.Location();
+  const gp_Vec a(ax.Direction());
+  auto height = [&](const gp_Pnt& p) { return gp_Vec(o, p).Dot(a); };
+  if (const occ::handle<Geom_Plane> p = occ::down_cast<Geom_Plane>(x.s))
+    return Meridian{Meridian::Across, height(p->Location())};
+  if (const occ::handle<Geom_SphericalSurface> p = occ::down_cast<Geom_SphericalSurface>(x.s))
+    return Meridian{Meridian::Round, height(p->Location()), 0, 0, 0, p->Radius()};
+  if (const occ::handle<Geom_CylindricalSurface> p = occ::down_cast<Geom_CylindricalSurface>(x.s))
+    return Meridian{Meridian::Along, 0, p->Radius()};
+  if (const occ::handle<Geom_ConicalSurface> p = occ::down_cast<Geom_ConicalSurface>(x.s))
+  {
+    // (Its radius grows along its own axis direction; along `ax`, the same way or the other.)
+    const double k = std::tan(p->SemiAngle()) * (p->Axis().Direction().Dot(ax.Direction()) > 0 ? 1 : -1);
+    const double z0 = height(p->Location());
+    return Meridian{Meridian::Slope, 0, p->RefRadius() - k * z0, k};
+  }
+  const occ::handle<Geom_ToroidalSurface> t = occ::down_cast<Geom_ToroidalSurface>(x.s);
+  return Meridian{Meridian::Round, height(t->Location()), 0, 0, t->MajorRadius(), t->MinorRadius()};
+}
+
+// Where two meridians meet in the half-plane: (r, z) with r > 0; none where they touch or are one (OCCT's then).
+std::optional<std::vector<std::pair<double, double>>> meridians_meet(const Meridian& p, const Meridian& q, double tol)
+{
+  std::vector<std::pair<double, double>> out;
+  auto as_line = [](const Meridian& m, gp_Pnt2d& at, gp_Dir2d& d) {
+    if (m.kind == Meridian::Across)
+      at = gp_Pnt2d(0, m.h), d = gp_Dir2d(1, 0);
+    else if (m.kind == Meridian::Along)
+      at = gp_Pnt2d(m.r, 0), d = gp_Dir2d(0, 1);
+    else
+      at = gp_Pnt2d(m.r, 0), d = gp_Dir2d(m.k, 1);
+  };
+  const bool pr = p.kind == Meridian::Round, qr = q.kind == Meridian::Round;
+  if (!pr && !qr)
+  {
+    gp_Pnt2d a, b;
+    gp_Dir2d da, db;
+    as_line(p, a, da);
+    as_line(q, b, db);
+    const double den = da.Crossed(db);
+    if (std::abs(den) < 1e-12)
+      return std::abs(gp_Vec2d(a, b).Crossed(gp_Vec2d(da))) <= tol ? std::nullopt : std::make_optional(out); // (one line: coincident)
+    const double t = gp_Vec2d(a, b).Crossed(gp_Vec2d(db)) / den;
+    out.emplace_back(a.X() + t * da.X(), a.Y() + t * da.Y());
+  }
+  else if (pr != qr)
+  {
+    const Meridian& l = pr ? q : p;
+    const Meridian& c = pr ? p : q;
+    gp_Pnt2d a;
+    gp_Dir2d d;
+    as_line(l, a, d);
+    const gp_Vec2d w(gp_Pnt2d(c.c, c.h), a);
+    const double   b = w.Dot(gp_Vec2d(d)), cc = w.SquareMagnitude() - c.m * c.m, disc = b * b - cc;
+    if (disc < -2 * tol * c.m)
+      return out;
+    if (disc <= 2 * tol * c.m)
+      return std::nullopt; // (tangent)
+    for (const double sg : {-1.0, 1.0})
+    {
+      const double t = -b + sg * std::sqrt(disc);
+      out.emplace_back(a.X() + t * d.X(), a.Y() + t * d.Y());
+    }
+  }
+  else
+  {
+    const gp_Pnt2d a(p.c, p.h), b(q.c, q.h);
+    const double   dd = a.Distance(b);
+    if (dd < 1e-12)
+      return std::abs(p.m - q.m) <= tol ? std::nullopt : std::make_optional(out);
+    if (dd > p.m + q.m + tol || dd < std::abs(p.m - q.m) - tol)
+      return out;
+    const double   x = (dd * dd + p.m * p.m - q.m * q.m) / (2 * dd), y2 = p.m * p.m - x * x;
+    const gp_Vec2d u = gp_Vec2d(a, b) / dd, n(-u.Y(), u.X());
+    const gp_Pnt2d mid(a.X() + u.X() * x, a.Y() + u.Y() * x);
+    if (y2 <= 2 * tol * std::max(p.m, q.m))
+      return std::nullopt; // (tangent)
+    for (const double sg : {-1.0, 1.0})
+      out.emplace_back(mid.X() + n.X() * sg * std::sqrt(y2), mid.Y() + n.Y() * sg * std::sqrt(y2));
+  }
+  std::vector<std::pair<double, double>> pos;
+  for (const auto& rz : out)
+    if (rz.first > tol)
+      pos.push_back(rz);
+  return pos;
+}
+
+// Point `q`'s parameters on the cylinder, cone, sphere or torus `s`.
+void revolved_params(const occ::handle<Geom_Surface>& s, const gp_Pnt& q, double& u, double& v)
+{
+  if (const auto cy = occ::down_cast<Geom_CylindricalSurface>(s))
+    ElSLib::Parameters(cy->Cylinder(), q, u, v);
+  else if (const auto cn = occ::down_cast<Geom_ConicalSurface>(s))
+    ElSLib::Parameters(cn->Cone(), q, u, v);
+  else if (const auto sp = occ::down_cast<Geom_SphericalSurface>(s))
+    ElSLib::Parameters(sp->Sphere(), q, u, v);
+  else if (const auto to = occ::down_cast<Geom_ToroidalSurface>(s))
+    ElSLib::Parameters(to->Torus(), q, u, v);
+}
+
+// A circle's curve on face surface `s` (a plane: a circle in its coordinates; else a line across its angles at one
+// height, the angle's way by the surface's own parameters, a turn on where angle `lo` is the face's least at `t`).
+occ::handle<Geom2d_Curve> circle_on(const occ::handle<Geom_Surface>& s, const occ::handle<Geom_Circle>& c, double lo, double t)
+{
+  if (const occ::handle<Geom_Plane> p = occ::down_cast<Geom_Plane>(s))
+  {
+    const gp_Ax3 pos = p->Pln().Position();
+    auto         to2 = [&](const gp_Vec& v) { return gp_XY(v.Dot(gp_Vec(pos.XDirection())), v.Dot(gp_Vec(pos.YDirection()))); };
+    const gp_XY  ctr = to2(gp_Vec(pos.Location(), c->Circ().Location()));
+    const gp_XY  x = to2(gp_Vec(c->Circ().XAxis().Direction())), y = to2(gp_Vec(c->Circ().YAxis().Direction()));
+    return new Geom2d_Circle(gp_Ax22d(gp_Pnt2d(ctr), gp_Dir2d(x), gp_Dir2d(y)), c->Radius());
+  }
+  double u0 = 0, v0 = 0, u1 = 0, v1 = 0;
+  revolved_params(s, c->Value(0), u0, v0);
+  revolved_params(s, c->Value(0.1), u1, v1);
+  const double way = std::remainder(u1 - u0, 2 * M_PI) > 0 ? 1 : -1;
+  u0 -= 2 * M_PI * std::floor((u0 + way * t - lo) / (2 * M_PI));
+  return new Geom2d_Line(gp_Pnt2d(u0, v0), gp_Dir2d(way, 0));
+}
+
+// Two surfaces of revolution about one axis (planes across it, cylinders, cones, spheres, tori) meet in circles
+// where their meridians cross: those, exact. False where they aren't (another axis, coincident surfaces).
+bool coaxial_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntTools_Curve>& out)
+{
+  const std::optional<Revolved> a = revolved(fa), b = revolved(fb);
+  if (!a || !b)
+    return false;
+  // (Not two planes or two analytic faces the Boolean makes itself: a torus or sphere among them.)
+  auto free = [](const Revolved& x) { return !occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull() || !occ::down_cast<Geom_SphericalSurface>(x.s).IsNull(); };
+  if (!free(*a) && !free(*b))
+    return false;
+  // (The axis: either's own, a sphere's the one its angles go round, where its circles are lines across its parameters.)
+  const double tol = Precision::Confusion();
+  const std::optional<gp_Ax1> ax = a->axis ? a->axis : b->axis;
+  auto on_axis = [&](const gp_Pnt& p) { return gp_Vec(ax->Location(), p).Crossed(gp_Vec(ax->Direction())).Magnitude() <= 1e-9; };
+  for (const Revolved* x : {&*a, &*b})
+  {
+    if (x->axis && (!x->axis->Direction().IsParallel(ax->Direction(), 1e-12) || !on_axis(x->axis->Location())))
+      return false;
+    if (x->normal && !x->normal->IsParallel(ax->Direction(), 1e-12))
+      return false;
+  }
+  const Meridian ma = meridian_of(*a, *ax), mb = meridian_of(*b, *ax);
+  const std::optional<std::vector<std::pair<double, double>>> rz = meridians_meet(ma, mb, tol);
+  if (!rz)
+    return false;
+  // (Each circle starts where the sphere's or torus's angles do, its seam, as OCCT's; else anywhere.)
+  gp_Dir x0 = gp_Ax3(ax->Location(), ax->Direction()).XDirection();
+  for (const Revolved* x : {&*a, &*b})
+  {
+    gp_Ax3 pos;
+    if (const auto t = occ::down_cast<Geom_ToroidalSurface>(x->s))
+      pos = t->Position();
+    else if (const auto sp = occ::down_cast<Geom_SphericalSurface>(x->s))
+      pos = sp->Position();
+    else
+      continue;
+    const gp_Vec v = gp_Vec(pos.XDirection()) - gp_Vec(ax->Direction()) * gp_Vec(pos.XDirection()).Dot(gp_Vec(ax->Direction()));
+    if (v.Magnitude() > 1e-9)
+    {
+      x0 = gp_Dir(v);
+      break;
+    }
+  }
+  // (Only circles within both faces' heights, the range of the parameter across their angles, as OCCT's.)
+  auto within = [&](const TopoDS_Face& f, const Revolved& x, const gp_Pnt& q) {
+    if (x.normal)
+      return true;
+    double u0 = 0, u1 = 0, v0 = 0, v1 = 0, u = 0, v = 0;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    revolved_params(x.s, q, u, v);
+    if (!occ::down_cast<Geom_ToroidalSurface>(x.s).IsNull())
+      v = v0 + std::fmod(std::fmod(v - v0 + 1e-9, 2 * M_PI) + 2 * M_PI, 2 * M_PI) - 1e-9;
+    return v >= v0 - 1e-9 && v <= v1 + 1e-9;
+  };
+  for (const auto& [r, z] : *rz)
+  {
+    const gp_Pnt                   centre = ax->Location().Translated(gp_Vec(ax->Direction()) * z);
+    const occ::handle<Geom_Circle> c      = new Geom_Circle(gp_Ax2(centre, ax->Direction(), x0), r);
+    if (!within(fa, *a, c->Value(0)) || !within(fb, *b, c->Value(0)))
+      continue;
+    // (The arcs within both faces' angles, as OCCT's: each face's (start, length) along the circle.)
+    double lo[2] = {0, 0};
+    std::vector<std::pair<double, double>> arcs = {{0, 2 * M_PI}};
+    for (int i = 0; i < 2; ++i)
+    {
+      const Revolved& x = i == 0 ? *a : *b;
+      if (x.normal)
+        continue;
+      double u0 = 0, u1 = 0, v0 = 0, v1 = 0, us = 0, v = 0, ut = 0;
+      BRepTools::UVBounds(i == 0 ? fa : fb, u0, u1, v0, v1);
+      lo[i] = u0;
+      if (u1 - u0 >= 2 * M_PI - 1e-9)
+        continue;
+      revolved_params(x.s, c->Value(0), us, v);
+      revolved_params(x.s, c->Value(0.1), ut, v);
+      const bool   up    = std::remainder(ut - us, 2 * M_PI) > 0;
+      const double start = std::fmod(std::fmod(up ? u0 - us : us - u1, 2 * M_PI) + 2 * M_PI, 2 * M_PI);
+      std::vector<std::pair<double, double>> kept;
+      for (const auto& [s0, len] : arcs)
+        for (const double k : {-2 * M_PI, 0.0, 2 * M_PI})
+        {
+          const double from = std::max(s0, start + k), to = std::min(s0 + len, start + k + (u1 - u0));
+          if (to - from > 1e-9)
+            kept.emplace_back(from, to - from);
+        }
+      arcs = kept;
+    }
+    for (const auto& [from, len] : arcs)
+    {
+      const double mid = from + len / 2;
+      const occ::handle<Geom_Curve> arc = len >= 2 * M_PI - 1e-9 ? occ::handle<Geom_Curve>(c) : occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c, from, from + len));
+      out.emplace_back(arc, circle_on(a->s, c, lo[0], mid), circle_on(b->s, c, lo[1], mid), tol);
+    }
+  }
+  return true;
+}
+
 // noshape's own sections of faces `fa` and `fb`, as OCCT's IntTools_Curve gives them (the curve, its curves on `fa` and
 // `fb` in their own parameters (the same parameter), its tolerance): an extrusion against a plane across its
 // direction (the profile moved there), a cylinder along it or another extrusion along it (rulings where the profiles
@@ -2226,6 +2482,8 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   static const bool off = std::getenv("NOSHAPE_OWN_SECTIONS") != nullptr && std::string(std::getenv("NOSHAPE_OWN_SECTIONS")) == "0";
   if (off)
     return false;
+  if (coaxial_sections(fa, fb, out))
+    return true;
   const std::optional<Extruded> xa = extruded(fa), xb = extruded(fb);
   // A cone and a surface generated along its axis: that surface lifted onto it.
   const occ::handle<Geom_ConicalSurface> ka = occ::down_cast<Geom_ConicalSurface>(BRep_Tool::Surface(fa)), kb = occ::down_cast<Geom_ConicalSurface>(BRep_Tool::Surface(fb));
