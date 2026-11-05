@@ -11,8 +11,11 @@ name: Viewport performance
 # measure the runner's virtual GPU:
 #   correctness  zero-copy frames equal read-back frames and are not black;
 #   UI CPU       UI-thread CPU p95 per orbit frame <= UI_CPU_P95_MS (macOS);
-#   GPU          our GPU time per frame (wgpu timestamps) p95 <= GPU_P95_MS
-#                (macOS; builds that report it);
+#   60 fps floor every 2× row (orbit, pan, zoom) of every big model (the NIST
+#                assembly, parts-1000, pins-assembly-1000): our GPU time per frame
+#                p95 <= FLOOR_GPU_P95_MS (macOS; Metal pass times on the runners);
+#   120 fps      the NIST 2× orbit's GPU mean per frame <= TARGET_GPU_MEAN_MS:
+#                reported; a gate once met (TARGET_GATE: --gate-target);
 #   regression   fps, frame-interval p95, UI CPU p95 and GPU p95 at most 10%
 #                worse than the last successful run of this workflow on main.
 #
@@ -67,7 +70,10 @@ permissions:
 env:
   FIXTURE: ${{ inputs.fixture || 'tests/perf/nist-mtc-crada-assembly.noshape' }}
   UI_CPU_P95_MS: '4'
-  GPU_P95_MS: '6'
+  # docs/PLAN.md 2.7 (lead 11-05): the 60 fps floor and the NIST assembly's 120 fps target.
+  FLOOR_GPU_P95_MS: '16.7'
+  TARGET_GPU_MEAN_MS: '8.3'
+  TARGET_GATE: ''
   MAX_REGRESSION: '0.10'
   CARGO_TERM_COLOR: always
   # A release's first launch offers to set up the command line tool and coding agents (crates/app agent_setup.rs).
@@ -218,13 +224,13 @@ jobs:
             os: macos-15
             asset: macos-arm64.dmg
             modes: texture readback
-            gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+            gates: --stills --gate-ui-cpu-p95 UI --gate-floor-gpu-p95 FLOOR --target-gpu-mean TARGET
             variants: retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@pan:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@zoom:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames
           - name: macOS 14 (Apple silicon)
             os: macos-14
             asset: macos-arm64.dmg
             modes: texture readback
-            gates: --stills --gate-ui-cpu-p95 UI --gate-gpu-p95 GPU
+            gates: --stills --gate-ui-cpu-p95 UI --gate-floor-gpu-p95 FLOOR --target-gpu-mean TARGET
             variants: retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@pan:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@zoom:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames
           - name: Windows (WARP)
             os: windows-latest
@@ -298,6 +304,18 @@ jobs:
           COLD: ${{ inputs.cold || '' }}
         run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
+      # The 60 fps floor's other big models: their 2× orbit, pan and zoom only (the matrix's retina variants).
+      - name: Benchmarks (big models)
+        if: runner.os == 'macOS' && inputs.fixture == '' && inputs.variants == ''
+        env:
+          BASE: '0'
+          VARIANTS: ${{ matrix.variants }}
+          BENCH_ENV: ${{ inputs.env || '' }}
+        run: |
+          for doc in parts-1000 pins-assembly-1000; do
+            .github/perf/bench.sh "$BIN" "tests/perf/$doc.noshape" "$RUNNER_TEMP/perf/big-$doc" texture
+          done
+
       - name: Benchmarks (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -322,11 +340,18 @@ jobs:
           COLD: ${{ inputs.cold || '' }}
         run: |
           gates="${{ matrix.gates }}"
-          gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//GPU/$GPU_P95_MS}"
+          gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//FLOOR/$FLOOR_GPU_P95_MS}"; gates="${gates//TARGET/$TARGET_GPU_MEAN_MS $TARGET_GATE}"
           set +e
           python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD)" $gates \
             --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION"
-          echo "status=$?" >> "$GITHUB_OUTPUT"
+          status=$?
+          # The other big models: the floor only.
+          for dir in "$RUNNER_TEMP"/perf/big-*; do
+            [[ -d "$dir" ]] || continue
+            FIXTURE="tests/perf/${dir##*/big-}.noshape" python3 .github/perf/analyze.py "$dir" "${{ matrix.name }} ${dir##*/big-} ($BUILD)" \
+              --gate-floor-gpu-p95 "$FLOOR_GPU_P95_MS" || status=1
+          done
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
         if: always()
