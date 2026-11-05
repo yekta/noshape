@@ -596,6 +596,16 @@ impl<'a> QueryCx<'a> {
         p
     }
 
+    /// A shape's box ([`k::Shape::bounding_box`]), once a shape.
+    pub fn shape_box(&self, s: &k::Shape) -> Option<k::BoundingBox> {
+        if let Some(b) = self.st.shape_boxes.lock().get(s) {
+            return *b;
+        }
+        let b = s.bounding_box(false).ok();
+        self.st.shape_boxes.lock().insert(s.clone(), b);
+        b
+    }
+
     /// What a transient id stands for now. Operations rename entities, and
     /// a merged sheet's edge may even take another edge's old name: prefer
     /// what lies where the entity was (its snapshot); an entity that moved
@@ -677,11 +687,14 @@ impl<'a> QueryCx<'a> {
                 }
             }
         }
-        // The old face's box: a face whose box misses it can't be a piece of it (its inner point is costly).
+        // The old face's box and plane: a piece of it lies in its box (boxes are loose: a hundredth of its size to
+        // spare) and on its plane, and its inner point is costly.
         let old_box = snap.face.as_ref().and_then(|f| f.bounding_box(false).ok());
+        let old_plane = snap.face.as_ref().and_then(|f| f.face_plane().ok().flatten()).map(|p| (p.origin, p.normal.normalize()));
         let near_old = |e: &Ent| {
-            let (Some(o), Some(b)) = (old_box, self.shape(e).and_then(|s| s.bounding_box(false).ok())) else { return true };
-            !((o.min - DVec3::splat(TOL)).cmpgt(b.max).any() || b.min.cmpgt(o.max + DVec3::splat(TOL)).any())
+            let (Some(o), Some(b)) = (old_box, self.shape(e).and_then(|s| self.shape_box(&s))) else { return true };
+            let slack = DVec3::splat(TOL + 0.01 * o.diagonal());
+            (o.min - slack).cmple(b.min).all() && b.max.cmple(o.max + slack).all()
         };
         // Hidden bodies too: std sheet metal tracks its (hidden) definition.
         self.all_with(Some(snap.etype), true)
@@ -696,7 +709,12 @@ impl<'a> QueryCx<'a> {
             // was built from (std Hem's moved edge would come back twice).
             .filter(|e| snap.sketch || !self.is_sketch(e))
             .filter(|e| {
-                if self.shape(e).is_some_and(|s| wheres.iter().any(|w| all_on(&s, w, TOL))) {
+                // In its box first (a cached box: tracking scans every face, often).
+                let in_box = |b: Option<k::BoundingBox>, w: &[DVec3]| b.is_none_or(|b| w.iter().all(|p| (b.min - DVec3::splat(TOL)).cmple(*p).all() && p.cmple(b.max + DVec3::splat(TOL)).all()));
+                if self.shape(e).is_some_and(|s| {
+                    let b = self.shape_box(&s);
+                    wheres.iter().any(|w| in_box(b, w) && all_on(&s, w, TOL))
+                }) {
                     return true;
                 }
                 // A piece of a split face (std Jog clips its face away from the
@@ -704,7 +722,9 @@ impl<'a> QueryCx<'a> {
                 if let Some(old) = &snap.face
                     && near_old(e)
                     && let Some(m) = self.shape(e).and_then(|s| self.face_point(&s))
-                    && all_on(old, &[m], TOL)
+                    && old_box.is_none_or(|o| (o.min - DVec3::splat(TOL)).cmple(m).all() && m.cmple(o.max + DVec3::splat(TOL)).all())
+                    && old_plane.is_none_or(|(o, n)| (m - o).dot(n).abs() <= TOL)
+                    && old.contains_point(m, TOL).unwrap_or(false)
                 {
                     return true;
                 }

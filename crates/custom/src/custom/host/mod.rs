@@ -144,6 +144,8 @@ pub struct CtxState {
     pub created_cache: Mutex<CreatedCache>,
     /// Each face's inner point ([`query::QueryCx::face_point`]), by the face (held, so its identity stays its own).
     pub face_points: Mutex<HashMap<noshape_kernel::Shape, Option<glam::DVec3>>>,
+    /// Each shape's box ([`query::QueryCx::shape_box`]), by the shape (held).
+    pub shape_boxes: Mutex<HashMap<noshape_kernel::Shape, Option<noshape_kernel::BoundingBox>>>,
     /// The operation that made each construction plane (`ConstructionPlane` references; qCreatedBy).
     pub plane_ops: HashMap<Reference, FsId>,
     /// Each operation's bits of its bodies' ids (unique in this feature).
@@ -286,6 +288,7 @@ impl FsContext {
                 face_creators: Mutex::new(HashMap::new()),
                 created_cache: Mutex::new(HashMap::new()),
                 face_points: Mutex::new(HashMap::new()),
+                shape_boxes: Mutex::new(HashMap::new()),
                 topo_cache: Mutex::new(HashMap::new()),
                 sketch_order_cache: Mutex::new(HashMap::new()),
                 name_index: Mutex::new(HashMap::new()),
