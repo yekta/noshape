@@ -1332,9 +1332,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             }
         }
         let mut sides = pulled_sides(&l, n, &offset);
-        // Curved sides: the wall from its face, the pulled sides' ends where
-        // their lines leave it.
-        if l.curved.iter().any(|c| *c) {
+        // A side the pulls turn round or close up (a free side between a bend's end and another bend that pulls the
+        // wall back past it: cf-sheet-metal-model-plus's sloped wall after Flange 1, live's corner at x −11): the wall
+        // from its face less the strips, as a curved one.
+        let turned = (0..m).any(|k| (sides[k].1 - sides[k].0).dot(l.pts[(k + 1) % m] - l.pts[k]) <= TOL * TOL);
+        if turned || l.curved.iter().any(|c| *c) {
             if l.curved.iter().zip(&l.side).any(|(c, e)| *c && (def.bends.contains_key(e) || def.rips.contains(e))) {
                 return Err(fe("Curved sheet metal joints are not supported yet"));
             }
@@ -1740,23 +1742,30 @@ fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> Curv
         if mine.is_empty() {
             continue;
         }
-        let mut faces = vec![topo.faces[c].clone()];
-        faces.extend(mine.iter().map(|(_, fa, fb, _)| topo.faces[if *fa == c { *fb } else { *fa }].clone()));
-        let Ok(shell) = k::sew(&faces, 1e-7, false) else { continue };
-        let shell = shell.shape;
         let on = |p: DVec3, x: &Shape| k::make_vertex(p).ok().and_then(|v| k::distance(&v, x).ok()).is_some_and(|d| d.distance < 1e-7);
-        let edges = shell.edges();
-        let picked: Option<Vec<(usize, f64)>> = mine
-            .iter()
-            .map(|(e, _, _, b)| {
-                let (s, t) = topo.edge_ends[*e];
-                edges.iter().position(|x| on((s + t) * 0.5, x)).map(|i| (i, b.def_radius))
-            })
-            .collect();
-        let Some(picked) = picked else { continue };
-        let shapes: Vec<Shape> = picked.iter().map(|(i, _)| edges[*i].clone()).collect();
-        let radii: Vec<f64> = picked.iter().map(|(_, r)| *r).collect();
-        let Ok(res) = k::fillet_radii(&shell, &shapes, &radii) else { continue };
+        // The curved wall and its flat neighbours filleted along the bends; where that fails (a neighbour running on
+        // past the curved wall's end: cf-sheet-metal-model-plus's sloped wall after Flange 1), the same with each
+        // neighbour cut to its bend edge's span (only the fillets and the curved wall are taken).
+        let fillet = |trim: bool| -> Option<(Vec<(usize, f64)>, k::OpResult)> {
+            let mut faces = vec![topo.faces[c].clone()];
+            for (e, fa, fb, _) in &mine {
+                let flat = if *fa == c { *fb } else { *fa };
+                faces.push(if trim { span_of(topo, *e, flat)? } else { topo.faces[flat].clone() });
+            }
+            let shell = k::sew(&faces, 1e-7, false).ok()?.shape;
+            let edges = shell.edges();
+            let picked: Vec<(usize, f64)> = mine
+                .iter()
+                .map(|(e, _, _, b)| {
+                    let (s, t) = topo.edge_ends[*e];
+                    edges.iter().position(|x| on((s + t) * 0.5, x)).map(|i| (i, b.def_radius))
+                })
+                .collect::<Option<_>>()?;
+            let shapes: Vec<Shape> = picked.iter().map(|(i, _)| edges[*i].clone()).collect();
+            let radii: Vec<f64> = picked.iter().map(|(_, r)| *r).collect();
+            Some((picked, k::fillet_radii(&shell, &shapes, &radii).ok()?))
+        };
+        let Some((picked, res)) = fillet(false).or_else(|| fillet(true)) else { continue };
         let generated = |i: usize| -> Option<Shape> {
             res.history.generated(0, ShapeType::Edge, i as u32).into_iter().find(|(t, _)| *t == ShapeType::Face).and_then(|(_, f)| res.shape.sub_shape(ShapeType::Face, f as usize).ok())
         };
@@ -1792,6 +1801,21 @@ fn curved_wall_bends(topo: &Topo, bends: &[(usize, usize, usize, Bend)]) -> Curv
         walls.insert(c, wall);
     }
     (by_edge, walls, setbacks)
+}
+
+/// Flat wall `flat` cut to the span of its bend edge `e` (between the planes square to the edge at its ends).
+fn span_of(topo: &Topo, e: usize, flat: usize) -> Option<Shape> {
+    let (s, t) = topo.edge_ends[e];
+    let len = s.distance(t);
+    let dir = (t - s) / len.max(1e-300);
+    let big = topo.faces[flat].bounding_box(false).ok()?.diagonal() * 2.0;
+    let end = k::make_plane_face(&k::Plane::new(s, dir, dir.any_orthonormal_vector()), -big, big, -big, big).ok()?;
+    let slab = k::extrude(&end, dir * len).ok()?.shape;
+    let cut = k::boolean(k::BooleanOp::Common, std::slice::from_ref(&topo.faces[flat]), &[slab], &k::BooleanOptions::default()).ok()?.shape;
+    match cut.faces().as_slice() {
+        [one] => Some(one.clone()),
+        _ => None,
+    }
 }
 
 /// Fillet face `f` along `dir` as the exact cylinder of `radius` through its two straight tangent edges, facing

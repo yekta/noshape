@@ -3970,6 +3970,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Flange 1's bend zone starts (its cylinders 88.07 / 264.211 at x −11 … −8); the sloped wall's planes run x −25 … −11;
   the corner is closed by small planes 5.113 (x −11), 2.0 (x −11 … −10, y 57.03 … 58.41), 6.273 and 0.582. Our
   definition has the curved bend's edge to x −10 and the flange bend's at x −8, a 2 mm free side between them.
+  dx 11-05 07:49 (step landed): the curved wall's fillet retried with the neighbour cut to the bend's span, and a wall
+  whose pulled sides turn round (the free side between the two bends, inside the flange's pull-back) built from its
+  face less the strips: Flange 1 is one valid part now (3 parts, live 2; 68/162/94, live 61/137/78; 11 204 mm³, live
+  10 905). Left: live cuts the flange's end beside the rolled wall (its slanted 84.542 mm² face, x −10 … −8, y 56.6 …
+  77.74; our flange faces 1629 / 1632 mm², live 1539.6), stops the curved bend at x −11 (ours runs to −10), and has
+  no stray 6.7 mm³ block (ours: Part 3).
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
