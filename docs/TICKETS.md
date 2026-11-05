@@ -3975,7 +3975,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   face less the strips: Flange 1 is one valid part now (3 parts, live 2; 68/162/94, live 61/137/78; 11 204 mm³, live
   10 905). Left: live cuts the flange's end beside the rolled wall (its slanted 84.542 mm² face, x −10 … −8, y 56.6 …
   77.74; our flange faces 1629 / 1632 mm², live 1539.6), stops the curved bend at x −11 (ours runs to −10), and has
-  no stray 6.7 mm³ block (ours: Part 3).
+  no stray 6.7 mm³ block (ours: Part 3, x −10 … −8, y 2.2 … 4.7: the flange's other end). Live pulls the flange back
+  at both ends where it meets the neighbouring walls' bends (its faces y 7.77 … 77.74); ours runs it to the definition
+  ends (y 3.67 … 78.55): corners of a flange against bends it doesn't share a vertex with. Next there.
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
