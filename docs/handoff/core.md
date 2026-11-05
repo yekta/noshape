@@ -978,6 +978,16 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From psui (11-05 18:28, lead's request): e3ba6871 sent ~230 more NIST faces to our mesher; their density fixed
+Your Displacement map change (e3ba6871, dense B-spline faces' boundaries from their pcurves) made our display mesher
+take 1035 of NIST's 1748 faces (805 before) and NIST's regeneration faster (800 -> 450 ms), but 918k -> 989k
+triangles: NIST's pan / zoom GPU time ~1 ms up on the perf runners (perf 42036796248 against the morning's main). The
+cause was ours: brep::mesh `nurbs_edge_nodes` cut a failing step by 0.7 at a time, so B-spline edges (the threads'
+helices) came out ~18 % finer than BRepMesh's, and those thread faces are all boundary. Now each step backs up to the
+longest that fits the same tolerances: NIST 867k triangles (BRepMesh 909k), perf 42064173514 orbit / zoom 0.2-1.3 ms
+faster; your Displacement map face still meshes in 0.32 s with the same look (794k triangles, 220 of 630k pixels over
+10 % apart, along the outline). T1 rust_mesh::a_hoses_mesh_is_no_denser_than_brepmeshs. Nothing for you to change.
+
 ## From psui (11-05 10:53, lead's request): two small additions in your area, for a cancelled dialog
 User P1 (spinner and a leftover Surface 1 after cancelling a Displacement map; 7d4332c8 and this commit):
 - `regen::runs::Runs::newest_waits_for_another()`: whether a run before the newest still computes features the newest

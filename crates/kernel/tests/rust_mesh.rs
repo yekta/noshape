@@ -452,6 +452,22 @@ fn a_hose_swept_along_a_spline_meshes_here_within_brepmeshs_area() {
     assert_hose_meshes_here(&hose(false));
 }
 
+/// Our mesh of a B-spline-bounded shape no denser than BRepMesh's at the same deflections: each B-spline edge split
+/// into steps as long as they fit (once cut short by 0.7 at a time: 18 % more nodes on NIST's threads, as many more
+/// triangles), and the faces' triangles no more than BRepMesh's.
+#[test]
+fn a_hoses_mesh_is_no_denser_than_brepmeshs() {
+    let s = hose(false);
+    let rust = mesh(&s, true);
+    let copy = transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape;
+    let occt = mesh(&copy, false);
+    let points = |t: &Tessellation| (0..t.edges.len()).map(|i| t.edge_polyline(i).len()).sum::<usize>();
+    let tris = |t: &Tessellation| t.indices.len() / 3;
+    eprintln!("hose: edge points ours {} BRepMesh {}, triangles ours {} BRepMesh {}", points(&rust), points(&occt), tris(&rust), tris(&occt));
+    assert!(points(&rust) <= points(&occt), "edge points: ours {} against BRepMesh's {}", points(&rust), points(&occt));
+    assert!(tris(&rust) <= tris(&occt), "triangles: ours {} against BRepMesh's {}", tris(&rust), tris(&occt));
+}
+
 #[test]
 #[ignore = "T2: the hollow hose (~1 min in a debug build, BRepMesh's side)"]
 fn a_hollow_hose_meshes_here_within_brepmeshs_area() {

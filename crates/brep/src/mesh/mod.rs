@@ -198,9 +198,29 @@ fn nurbs_edge_nodes(c: &NurbsCurve, a: DVec3, b: DVec3, t0: f64, t1: f64, defl: 
             }
             h = h.max(span * 1e-9);
             let mut tries = 0;
+            let mut too_long = None;
             while !fits(u, u + dir * h) && tries < 40 {
+                too_long = Some(h);
                 h *= 0.7;
                 tries += 1;
+            }
+            // Back up towards the step that failed: the longest that fits, within a few percent (cut by 0.7 alone,
+            // steps were up to 30 % short: a thread's helical edges 18 % finer than BRepMesh's, and its faces as
+            // many triangles more).
+            if let Some(mut long) = too_long {
+                for _ in 0..4 {
+                    let mid = 0.5 * (h + long);
+                    if fits(u, u + dir * mid) {
+                        h = mid;
+                    } else {
+                        long = mid;
+                    }
+                }
+                // No sliver left at the end of the span: the rest in two equal steps.
+                let left = (to - u).abs();
+                if left - h < 0.3 * h && left > h {
+                    h = 0.5 * left;
+                }
             }
             u = if (to - (u + dir * h)) * dir <= 1e-12 * span { to } else { u + dir * h };
             params.push(u);
