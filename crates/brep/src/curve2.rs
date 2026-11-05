@@ -456,8 +456,10 @@ impl C2 {
                         None
                     }
                 };
-                // (All of it on one side: it doesn't meet the line.)
-                if self.quick_box_by(boxes).and_then(side).is_some() {
+                // (All of it on one side: it doesn't meet the line; or all behind the ray's start.)
+                if let Some(b) = self.quick_box_by(boxes)
+                    && (side(b).is_some() || ray_misses_box(b, m, d))
+                {
                     return;
                 }
                 // (A NURBS part's sample on a span clearly on one side: that side.)
@@ -761,12 +763,14 @@ impl C2 {
                 return Vec::new();
             }
         }
-        // (Decided once 5 of the 9 are within or 5 aren't; a point clearly farther than its box first.)
-        let together = |a: &C2, b: &C2| {
+        // (Decided once 5 of the 9 are within or 5 aren't; a point clearly farther than its box first, then than
+        // every chord of the other's by more than its bulge.)
+        let together = |a: &C2, b: &C2, (pb, bb): &(Vec<DVec2>, Vec<f64>)| {
             let (mut yes, mut no) = (0, 0);
             for k in 0..=8 {
                 let q = a.at(k as f64 / 8.0);
-                if b.distance_at_least(q) <= tol && b.distance(q) <= tol {
+                let near = pb.windows(2).zip(bb).any(|(w, &bulge)| chord_gap(q, q, w[0], w[1]) <= tol + bulge);
+                if near && b.distance_at_least(q) <= tol && b.distance(q) <= tol {
                     yes += 1;
                 } else {
                     no += 1;
@@ -777,12 +781,12 @@ impl C2 {
             }
             yes >= 5
         };
-        if together(self, o) || together(o, self) {
-            return Vec::new();
-        }
         let (na, nb) = (self.samples(), o.samples());
         let (pa, ba) = mine.get_or_init(|| self.chords());
         let (pb, bb) = theirs.get_or_init(|| o.chords());
+        if together(self, o, theirs.get_or_init(|| o.chords())) || together(o, self, mine.get_or_init(|| self.chords())) {
+            return Vec::new();
+        }
         let scale = pa.iter().chain(pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
         let mut out: Vec<(f64, f64)> = Vec::new();
         // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
@@ -859,6 +863,9 @@ impl C2 {
                 chords(ri * RUN..((ri + 1) * RUN).min(na), rj * RUN..((rj + 1) * RUN).min(nb), &mut out);
             }
         }
+        if out.is_empty() {
+            return out;
+        }
         out.sort_by(|x, y| x.0.total_cmp(&y.0).then(x.1.total_cmp(&y.1)));
         // (Where they touch, Newton's roots scatter along the stretch they're within `tol`: one crossing there, where
         // they're tangent (found between the scattered ones, their place by Newton only good to ~1e-9 there: an
@@ -871,11 +878,10 @@ impl C2 {
         let mut groups: Vec<Vec<(f64, f64)>> = Vec::new();
         for x in out {
             match groups.last_mut().and_then(|g| g.last().copied().map(|l| (g, l))) {
-                Some((g, last)) if o.distance(self.at(0.5 * (last.0 + x.0))) <= tol && (self.at(last.0) - self.at(x.0)).length() <= 1e3 * tol => g.push(x),
+                Some((g, last)) if (self.at(last.0) - self.at(x.0)).length() <= 1e3 * tol && o.distance(self.at(0.5 * (last.0 + x.0))) <= tol => g.push(x),
                 _ => groups.push(vec![x]),
             }
         }
-        let turn = |s: f64| self.deriv1(s).perp_dot(o.deriv1(o.param_of(self.at(s)).0));
         groups
             .into_iter()
             .map(|g| {
@@ -883,6 +889,10 @@ impl C2 {
                 if g.len() < 2 {
                     return best;
                 }
+                // (The other's parameter by the group's own, along it: its tangent there.)
+                let (f, l) = (g[0], g[g.len() - 1]);
+                let t_at = |s: f64| if l.0 > f.0 { f.1 + (s - f.0) * (l.1 - f.1) / (l.0 - f.0) } else { f.1 };
+                let turn = |s: f64| self.deriv1(s).perp_dot(o.deriv1(t_at(s).clamp(0.0, 1.0)));
                 // (Widened either way until the tangents turn past each other within the touch's reach.)
                 let (s0, s1) = (g[0].0, g[g.len() - 1].0);
                 let mut w = (s1 - s0).max(1e-9);
@@ -1003,8 +1013,20 @@ pub(crate) fn inside(p: DVec2, edges: &[C2]) -> bool {
 pub(crate) fn inside_with(p: DVec2, edges: &[C2], spans: &[SpanBoxes]) -> bool {
     const ANGLES: [f64; 4] = [0.371_1, 1.913_7, 4.170_9, 2.653_1];
     let scale = edges.iter().map(|e| e.start().abs().max_element()).fold(p.abs().max_element(), f64::max).max(1e-3);
+    // (The ray whose boxes in its way are fewest first: a gear's end face has hundreds of curves.)
+    let mut angles = ANGLES;
+    if edges.len() > 16 {
+        let ahead = |a: f64| {
+            let d = DVec2::new(a.cos(), a.sin());
+            edges.iter().enumerate().filter(|(i, e)| e.quick_box_by(spans.get(*i)).is_none_or(|b| !ray_misses_box(b, p, d))).count()
+        };
+        let counts = ANGLES.map(ahead);
+        let mut order = [0, 1, 2, 3];
+        order.sort_by_key(|&k| counts[k]);
+        angles = order.map(|k| ANGLES[k]);
+    }
     let mut odd = false;
-    for a in ANGLES {
+    for a in angles {
         let d = DVec2::new(a.cos(), a.sin());
         let mut hits = Vec::new();
         let mut clean = true;

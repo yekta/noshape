@@ -1248,10 +1248,15 @@ impl Ctx<'_> {
         }
         let samples = crate::curve2::Samples::new();
         let pts = self.faces[f].bound_pts.get_or_init(|| bound.iter().map(|_| crate::curve2::Samples::new()).collect());
+        // (Those across the boundary at a clear angle: the side flips there.)
+        let mut across: Vec<f64> = Vec::new();
         for (b, theirs) in bound.iter().zip(pts) {
-            for (u, _) in c2.intersections_with(b, tol, &samples, theirs) {
+            for (u, ub) in c2.intersections_with(b, tol, &samples, theirs) {
                 let t = t0 + (t1 - t0) * u;
                 cuts.push((t, End::Point(path.at(t))));
+                if c2.tangent(u).perp_dot(b.tangent(ub)).abs() > 0.1 {
+                    across.push(t);
+                }
             }
         }
         // The face's vertices on it (where it runs along the boundary; a NURBS curve's: those in its box).
@@ -1298,24 +1303,35 @@ impl Ctx<'_> {
         };
         // Cuts at one place (within the section's tolerance, OCCT's paves on it) are one, a vertex if any of them is.
         let mut merged: Vec<(f64, End)> = Vec::with_capacity(cuts.len());
+        let mut alone: Vec<bool> = Vec::with_capacity(cuts.len());
         for c in cuts {
             match merged.last_mut() {
                 Some(last) if apart(last.0, c.0) <= vtol => {
                     if c.1.rank() > last.1.rank() {
                         *last = c;
                     }
+                    *alone.last_mut().expect("one per cut") = false;
                 }
-                _ => merged.push(c),
+                _ => {
+                    merged.push(c);
+                    alone.push(true);
+                }
             }
         }
         let cuts = merged;
+        // (A cut that is one crossing across the boundary alone.)
+        let flips: Vec<bool> = cuts.iter().zip(&alone).map(|(c, &one)| one && matches!(c.1, End::Point(_)) && across.contains(&c.0)).collect();
         // Clear of the boundary: on a free-form face OCCT's section's curve on it against its edges' (OCCT's too), as
         // OCCT tells it: beyond the model's tolerance.
         let ctol = if let (Path::Nurbs { .. }, Surf::Nurbs { .. }) = (path, &self.faces[f].s) { self.tol } else { tol };
         let mut out: Vec<Ival> = Vec::new();
+        // (The side of the interval before, where it was clear of the boundary: across one crossing the next is the
+        // other side, no ray cast (a gear's end face: hundreds of curves a ray).)
+        let mut before: Option<bool> = None;
         for k in 0..cuts.len() - 1 {
             let (a, b) = (cuts[k], cuts[k + 1]);
             if apart(a.0, b.0) <= vtol {
+                before = None;
                 continue;
             }
             // (OCCT's curve clear of the boundary but touching it between its crossings: OCCT may put a vertex
@@ -1391,6 +1407,7 @@ impl Ctx<'_> {
                     }
                 }
             }
+            let away = dist > GREY * tol;
             let inside = if dist <= tol {
                 closed
             } else if dist <= GREY * tol {
@@ -1405,9 +1422,12 @@ impl Ctx<'_> {
                     Some((d, q)) if d > clear * ctol => inside_with(q, &bound, spans),
                     _ => closed,
                 }
+            } else if let Some(side) = before.filter(|_| flips[k]) {
+                !side
             } else {
                 inside_with(mid, &bound, spans)
             };
+            before = away.then_some(inside);
             if !inside {
                 continue;
             }
