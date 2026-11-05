@@ -117,6 +117,88 @@ pub fn clamped_knots(points: &[[f64; 2]]) -> (usize, Vec<f64>) {
     (p, knots)
 }
 
+/// The poles of the degree-`p` B-spline on `knots` ([`clamped_knots`]) through `points` at their chord-length
+/// parameters (global interpolation): a model edge's projected points lie on it, so its SPLINE runs through them,
+/// not inside its polygon (live 1857's knob silhouette: poles at the points cut a 5-point piece 0.1 mm short).
+/// The points themselves when the system can't be solved.
+pub fn interpolating_poles(points: &[[f64; 2]], p: usize, knots: &[f64]) -> Vec<[f64; 2]> {
+    let n = points.len();
+    if n <= p + 1 || knots.len() != n + p + 1 {
+        return points.to_vec();
+    }
+    let mut t = vec![0.0; n];
+    for i in 1..n {
+        t[i] = t[i - 1] + (points[i][0] - points[i - 1][0]).hypot(points[i][1] - points[i - 1][1]);
+    }
+    let total = t[n - 1];
+    if total <= 0.0 {
+        return points.to_vec();
+    }
+    for x in t.iter_mut() {
+        *x /= total;
+    }
+    // Row k: the p + 1 basis functions nonzero at t[k], from column `span - p`.
+    let basis = |u: f64| -> (usize, Vec<f64>) {
+        let span = if u >= knots[n] { n - 1 } else { (p..n).rfind(|&i| knots[i] <= u).unwrap_or(p) };
+        let mut nb = vec![0.0; p + 1];
+        let (mut left, mut right) = (vec![0.0; p + 1], vec![0.0; p + 1]);
+        nb[0] = 1.0;
+        for j in 1..=p {
+            left[j] = u - knots[span + 1 - j];
+            right[j] = knots[span + j] - u;
+            let mut saved = 0.0;
+            for r in 0..j {
+                let den = right[r + 1] + left[j - r];
+                let temp = if den.abs() < 1e-300 { 0.0 } else { nb[r] / den };
+                nb[r] = saved + right[r + 1] * temp;
+                saved = left[j - r] * temp;
+            }
+            nb[j] = saved;
+        }
+        (span - p, nb)
+    };
+    // The banded system (no pivoting: the collocation matrix is totally positive).
+    let mut a = vec![vec![0.0; n]; n];
+    for (k, &u) in t.iter().enumerate() {
+        let (first, nb) = basis(u);
+        for (j, v) in nb.into_iter().enumerate() {
+            a[k][first + j] = v;
+        }
+    }
+    let mut b: Vec<[f64; 2]> = points.to_vec();
+    let band = p + 1;
+    for col in 0..n {
+        let piv = a[col][col];
+        if piv.abs() < 1e-14 {
+            return points.to_vec();
+        }
+        for row in col + 1..(col + band + 1).min(n) {
+            let f = a[row][col] / piv;
+            if f == 0.0 {
+                continue;
+            }
+            let end = (col + band + 1).min(n);
+            let (upper, lower) = a.split_at_mut(row);
+            for (x, y) in lower[0][col..end].iter_mut().zip(&upper[col][col..end]) {
+                *x -= f * y;
+            }
+            b[row] = [b[row][0] - f * b[col][0], b[row][1] - f * b[col][1]];
+        }
+    }
+    let mut x = vec![[0.0; 2]; n];
+    for row in (0..n).rev() {
+        let mut acc = b[row];
+        for c in row + 1..(row + band + 1).min(n) {
+            acc = [acc[0] - a[row][c] * x[c][0], acc[1] - a[row][c] * x[c][1]];
+        }
+        x[row] = [acc[0] / a[row][row], acc[1] / a[row][row]];
+    }
+    if x.iter().any(|q| !q[0].is_finite() || !q[1].is_finite()) {
+        return points.to_vec();
+    }
+    x
+}
+
 pub fn fit_curve(points: &[[f64; 2]], closed: bool, tol: f64) -> Option<FitCurve> {
     let mut pts: Vec<[f64; 2]> = points.to_vec();
     pts.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-12);
@@ -218,6 +300,38 @@ mod tests {
                 [c[0] + x * rot.cos() - y * rot.sin(), c[1] + x * rot.sin() + y * rot.cos()]
             })
             .collect()
+    }
+
+    /// A cubic through points on a circle: it passes through them and between them stays on the circle.
+    #[test]
+    fn interpolating_poles_run_through_the_points() {
+        let pts: Vec<[f64; 2]> = (0..9).map(|i| {
+            let t = i as f64 / 8.0 * std::f64::consts::FRAC_PI_2;
+            [10.0 * t.cos(), 10.0 * t.sin()]
+        }).collect();
+        let (p, knots) = clamped_knots(&pts);
+        let poles = interpolating_poles(&pts, p, &knots);
+        assert_eq!(poles.len(), pts.len());
+        assert!((poles[0][0] - 10.0).abs() < 1e-12 && (poles[8][1] - 10.0).abs() < 1e-12);
+        // De Boor at the middle point's parameter: back on the circle.
+        let eval = |u: f64| -> [f64; 2] {
+            let n = poles.len();
+            let k = (p..n).rfind(|&i| knots[i] <= u).unwrap_or(p).min(n - 1);
+            let mut d: Vec<[f64; 2]> = (0..=p).map(|j| poles[j + k - p]).collect();
+            for r in 1..=p {
+                for j in (r..=p).rev() {
+                    let i = j + k - p;
+                    let den = knots[i + p - r + 1] - knots[i];
+                    let a = if den == 0.0 { 0.0 } else { (u - knots[i]) / den };
+                    d[j] = [(1.0 - a) * d[j - 1][0] + a * d[j][0], (1.0 - a) * d[j - 1][1] + a * d[j][1]];
+                }
+            }
+            d[p]
+        };
+        for u in [0.25, 0.5, 0.61] {
+            let q = eval(u);
+            assert!((q[0].hypot(q[1]) - 10.0).abs() < 1e-3, "{u}: {q:?}");
+        }
     }
 
     #[test]

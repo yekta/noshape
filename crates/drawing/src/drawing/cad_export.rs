@@ -731,17 +731,19 @@ impl Sheet<'_> {
             }
             None if l.points.len() == 2 && !l.closed => EntityType::Line(Line::from_points(p3(l.points[0]), p3(l.points[1]))),
             // A model edge of another curve: a cubic SPLINE (live 1857's
-            // VISIBLE / TANGENT_LINES), its poles the projected points.
+            // VISIBLE / TANGENT_LINES) through the projected points.
             None if MODEL_EDGES.contains(&self.g.cad_line_layer(li)) => {
                 let mut pts = l.points.clone();
                 if l.closed {
                     pts.push(pts[0]);
                 }
+                pts.dedup_by(|a, b| (a[0] - b[0]).hypot(a[1] - b[1]) < 1e-12);
                 let (degree, knots) = crate::drawing::cad_fit::clamped_knots(&pts);
+                let poles = crate::drawing::cad_fit::interpolating_poles(&pts, degree, &knots);
                 let mut e = Spline::new();
                 e.degree = degree as i32;
                 (e.flags.closed, e.flags.planar) = (l.closed, true);
-                e.control_points = pts.iter().map(|p| p3(*p)).collect();
+                e.control_points = poles.iter().map(|p| p3(*p)).collect();
                 e.knots = knots;
                 e.normal = Vector3::new(0.0, 0.0, 1.0);
                 EntityType::Spline(e)

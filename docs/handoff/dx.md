@@ -125,6 +125,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ui_script::note_dialog for modals (Create Drawing, Export Drawing, Insert view panel); ops build_start's `drawing`.
   All 8 run on ours (recordings in /root/dx-scratch/uip); the 18 dialog-button scenarios score as green's (15/18).
   Score once live records: `tools/ui-parity/run.py --app $CARGO_TARGET_DIR/debug/noshape --display :104 drw-…`.
+- 14:57: the corpus drawings again, by geometry (drw/geom.py: each entity sampled, covered by the other side's within
+  2e-3 in, per layer): knob-tim's VISIBLE 36/36, CENTERMARKS 6/6 as live, TANGENT_LINES all but the core ticket's
+  ellipse. Fixed: a model edge's SPLINE runs through the projected points (cad_fit::interpolating_poles, global cubic
+  interpolation), not with them as its poles (an iso silhouette piece was 0.1 mm inside live's). pipeflange-steven:
+  centermarks 36/36; what differs sits in Fillet 2's corners, its model (core).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
