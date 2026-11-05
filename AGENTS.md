@@ -62,7 +62,9 @@ registry), with the same options and results as the app's dialogs.
   OS (on a Mac Onshape uses Cmd for some shortcuts and keeps Control for others: check, never swap them wholesale);
   file dialogs are the OS's.
 - Onshape parity is the requirement: check how live Onshape looks and behaves before you implement or change
-  something, and match it exactly. Don't propose deviations.
+  something, and match it exactly. Don't propose deviations. Parity is Onshape's look and behaviour, not its
+  shortcomings: its size limits, caps, slowness and failures are not targets (where Onshape refuses or fails and we
+  can do the work, we do it).
 - Speed is a feature: no blocking work on the UI thread (`cx.background_spawn`), cache derived data, no per-frame
   allocation; the targets are in docs/PLAN.md 2.7. A speed regression is a P0.
 - A click always gives visible feedback within a frame (a dialog, a progress row or an error), never silence while
