@@ -67,6 +67,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (cf-sheet-metal-shaped-flange 10/10, live 2053), missing external references pointing at nothing (train-joe 12/12,
   clamp-guillem 24/25: next there its Redondeo 2, two split edges, core's CUT-CLOSED-EDGES-SPLIT kind). Run 109:
   47/56 documents, 419/483 features, custom 55/109.
+- 07:19: queued: opSplitPart's made-edge test by middles first (cf-fix-pcb's Fix PCB 2 1.36 -> 0.57 s alone, the
+  document 0.87 s vs live 0.62). Tried and ticketed, not kept: SM-CURVED-WALL-BEND-FILLET (model-plus's Flange 1,
+  a curved wall's bend fillet failing beside a neighbour that runs on past it). The full corpus run's times swing
+  with the build host's load (cf-hose-routing 0.69 / 1.15 s in two runs): one.sh <doc> gives the steady figure.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
