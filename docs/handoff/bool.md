@@ -103,6 +103,20 @@ Also cf-straight-spline (21:34): 44.2 s with yours, 15.3 s without (live 7.8 s);
   15 faces, 23 edges, 0 vertices after it (live.jsonl): Parasolid's bore rim is one closed edge with no vertex, so
   splitting it at our seam would add an edge live doesn't have. Taking that cut means the circle crossing the face's
   seam in the parameter plane only (two curves there of one edge, no vertex); not done.
+- Our own sections (bool, 11-05 11-05 11:34). The hookup: rust_boolean.cpp own_sections(fa, fb, lines) makes a pair's
+  sections as OCCT's IntTools_Curve (curve, curves on both faces, tolerance), called before IntTools_FaceFace in
+  occt_ahead and occt_sections; everything after (the build's pcurves, section_tol) is unchanged.
+  NOSHAPE_OWN_SECTIONS=0 turns it off. Landed: 07645805 an extrusion against a plane across it (the profile moved),
+  a cylinder or another extrusion along it (rulings at the profiles' 2D crossings, Geom2dAPI_InterCurveCurve), exact;
+  6ee33ab2 a cone against an extrusion or cylinder along its axis (each generator lifted to the cone, cubics
+  interpolated within 1e-8, `interpolated`); 5bda26e4 (Rust) free::apart for B-spline faces of several spans: Bézier
+  patches by knot insertion, halved while their hulls meet (the helical cut's 44 flank pairs, all empty, ~125 ms of
+  OCCT). cf-spur-gear on an idle vibe4: 2.22 s, live 2.11 s; per regeneration Gear 1 707 ms (its fillet ~400, OCCT's
+  fallbacks), Gear 4 395, Gear 5 382, Boolean 2 324, Boolean 1 192, Gears 2-3 ~110; sections now 0.5-5 ms each.
+  Not landed: a B-spline face against a plane, cylinder, cone or sphere by contouring the latter's equation on the
+  former's parameters (a side lying on it: that side's curve); it made the helical cut's 30 such pairs as OCCT's
+  (0 differ) but was lost from the worktree before landing; ~15 ms there. bool-corpus's 12 more "equivalent" cases
+  (volumes 1e-9 to 2e-6 relative) are the extrusion sections now exact.
 - cf-spur-gear after Boolean 1 (bool, 11-05 11-05 09:40). Landed 2ebf05fb: a made cylinder face across its seam angle is kept
   where its input face already ran across it (a gear flank over u 3.4 .. 9.1): the document's 14 Booleans all ours
   (Boolean 1 and Gear 5's 12-tool cut went to OCCT after a late decline: 0.94 s -> 0.2 s for Boolean 1). vibe4,
