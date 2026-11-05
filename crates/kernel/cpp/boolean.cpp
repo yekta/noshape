@@ -71,7 +71,7 @@
 #include <gp_Trsf.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
-#include <TColStd_Array1OfReal.hxx>
+#include <NCollection_Array1.hxx>
 #include <BRepLib.hxx>
 #include <BOPTools_AlgoTools.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
@@ -1321,7 +1321,7 @@ std::optional<double> swept_area(const TopoDS_Edge& e, const gp_Pnt& o, const gp
   if (t != GeomAbs_Line && t != GeomAbs_Circle && t != GeomAbs_Ellipse && t != GeomAbs_BSplineCurve && t != GeomAbs_BezierCurve)
     return std::nullopt;
   const int n = c.NbIntervals(GeomAbs_CN);
-  TColStd_Array1OfReal knots(1, n + 1);
+  NCollection_Array1<double> knots(1, n + 1);
   c.Intervals(knots, GeomAbs_CN);
   math_Vector gp(1, 10), gw(1, 10);
   math::GaussPoints(10, gp);
