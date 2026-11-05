@@ -138,6 +138,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   $EXTMAX the line extents and $LIMMAX 12,9, as live's. knob-tim and pipeflange now differ from live only in the
   title block's "1" zone labels (1.2 pt left: live centres that glyph otherwise) and the DRAWN name (the account).
   Hidden lines keep our 3 / 1.5 mm pattern: no live PDF has any (asked, REQUESTS).
+- 15:35: FeatureScript's `try` caught a cancel and the deadline ("Regeneration cancelled / timed out"): the app's
+  superseded or cancelled run went on down std's fallback branch and finished (also after a kernel op the cancel
+  stopped). Now they unwind through every `try`. (A model-plus "regression" I chased first was one.sh writing its log
+  to a relative path that didn't exist: the run never ran and I read the morning's logs; 30 runs since, 14/14.
+  one.sh refuses relative log paths now.)
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

@@ -366,6 +366,26 @@ fn a_cancelled_run_hands_back_its_frames() {
     assert!(i.take_stopped_frames().is_empty());
 }
 
+/// A cancel or the deadline goes through `try` (statement and expression, silent too): the run stops, not its
+/// fallback.
+#[test]
+fn try_does_not_catch_a_cancel_or_the_deadline() {
+    let full = "FeatureScript 3095;\nfunction spin() { var i = 0; while (true) { i += 1; } }\n\
+        function f() { try silent { spin(); } catch { return \"fallback\"; } return \"after\"; }\n\
+        function g() { try(spin()); return \"after\"; }";
+    let m = compile_module("stop", full, &NoImports).unwrap();
+    for name in ["f", "g"] {
+        let func = m.functions(name).unwrap();
+        let mut i = Interp::new();
+        let start = std::time::Instant::now();
+        i.set_cancel(Some(Box::new(move || start.elapsed() > std::time::Duration::from_millis(30))));
+        assert_eq!(i.call_set(&func, vec![]).unwrap_err().message(), "Regeneration cancelled", "{name}");
+        let mut i = Interp::new();
+        i.set_deadline(Some(std::time::Instant::now() + std::time::Duration::from_millis(30)));
+        assert_eq!(i.call_set(&func, vec![]).unwrap_err().message(), "Regeneration timed out", "{name}");
+    }
+}
+
 /// Notices of a whole source as `[line:col] message` (Onshape's panel order).
 fn notices(src: &str) -> Vec<String> {
     match compile_module(&unique_path(), src, &NoImports) {

@@ -257,6 +257,16 @@ impl Interp {
         Ok(())
     }
 
+    /// A cancel or the deadline is unwinding the run (also a native's error after the cancel: a kernel operation
+    /// stopped by it): no `try` catches it, else the feature would go on down its fallback and finish.
+    fn stopping(&mut self) -> bool {
+        if self.stopped.is_none() && self.cancel.as_ref().is_some_and(|c| c()) {
+            self.cancel = None;
+            self.stopped = Some(Vec::new());
+        }
+        self.stopped.is_some()
+    }
+
     /// The values of the frames a cancel or the deadline unwound, for the caller to free off its thread (a
     /// displacement map's million-point arrays took 0.3-0.8 s to free after the cancel).
     pub fn take_stopped_frames(&mut self) -> Vec<Vec<Value>> {
@@ -909,6 +919,7 @@ impl Interp {
                 }
                 match r {
                     Ok(flow) => Ok(flow),
+                    Err(e) if self.stopping() => Err(e),
                     Err(e) => {
                         // Unwind to this frame.
                         self.frames.truncate(depth);
@@ -1153,6 +1164,7 @@ impl Interp {
                 }
                 match r {
                     Ok(v) => Ok(v),
+                    Err(e) if self.stopping() => Err(e),
                     Err(_) => {
                         self.frames.truncate(depth);
                         self.base = base;
