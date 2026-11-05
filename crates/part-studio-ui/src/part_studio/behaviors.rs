@@ -2293,14 +2293,14 @@ impl PartStudioView {
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
-        let regen = self.regen.clone();
+        let (regen, seed) = (self.regen.clone(), self.regen_seed.clone());
         self.ui.preview_cancel.abort();
         self.ui.preview_cancel = Default::default();
         let cancel = self.ui.preview_cancel.clone();
         self.ui.preview_task = Some(cx.spawn_in(window, async move |this, cx| {
             let display = cx
                 .background_spawn(async move {
-                    let regen = super::regenerator_for(&regen, true, Some(&cancel))?;
+                    let regen = super::regenerator_for(&regen, true, Some(&cancel), &seed)?;
                     let opts = noshape_model::regen::RegenOptions { upto: Some(index), document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (!r.cancelled).then_some((r.display, r.context))
@@ -2358,14 +2358,14 @@ impl PartStudioView {
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
-        let regen = self.regen.clone();
+        let (regen, seed) = (self.regen.clone(), self.regen_seed.clone());
         self.ui.preview_tool_cancel.abort();
         self.ui.preview_tool_cancel = Default::default();
         let cancel = self.ui.preview_tool_cancel.clone();
         self.ui.preview_tool_task = Some(cx.spawn_in(window, async move |this, cx| {
             let display = cx
                 .background_spawn(async move {
-                    let regen = super::regenerator_for(&regen, true, Some(&cancel))?;
+                    let regen = super::regenerator_for(&regen, true, Some(&cancel), &seed)?;
                     let opts = noshape_model::regen::RegenOptions { upto, document_variables: doc_vars, preview_meshes: true, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), ..Default::default() };
                     let r = regen.lock().regenerate(&studio, &config, &units, &opts);
                     (!r.cancelled).then_some(r.display)

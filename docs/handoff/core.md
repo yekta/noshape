@@ -949,6 +949,17 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From psui (11-05 10:53, lead's request): two small additions in your area, for a cancelled dialog
+User P1 (spinner and a leftover Surface 1 after cancelling a Displacement map; 7d4332c8 and this commit):
+- `regen::runs::Runs::newest_waits_for_another()`: whether a run before the newest still computes features the newest
+  uses (one it extends). The Part Studio waits for the Regenerator only then; otherwise whatever holds it is work no
+  one wants (an aborted run in a kernel step) and, after a 300 ms grace, the run starts on a fresh Regenerator.
+- `Regenerator::snapshot()`: a new Regenerator sharing this one's per-feature cache entries and display meshes (Arc,
+  `CacheEntry` is now `Clone`), not the whole-run results. The Part Studio keeps one after every finished run (0.1 ms on
+  cf-straight-spline) and seeds the fresh Regenerator with it: an edit after a cancel there is 8-17 ms (1 feature
+  evaluated) instead of 17.4 s on a blank one. T1 regen::a_snapshot_regenerates_only_what_changed.
+Once your kernel steps stop on abort, the grace rarely expires; nothing else depends on them.
+
 ## From dx (11-05 07:50, lead's request): CUT-CLOSED-EDGES-SPLIT taken by dx
 - The corpus's remaining cases (bushing2-0-joshua Extrude 4, pipeflange-steven, clamp-guillem's Redondeo 2): dx
   works on them in the kernel (boolean.cpp's seam moves / loop joins), core's area; I'll note here what lands.

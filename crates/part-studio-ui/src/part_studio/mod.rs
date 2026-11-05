@@ -112,10 +112,16 @@ const TOOLBAR: &[&[&[&str]]] = &[
 /// kernel step) before it starts on a fresh one.
 const LOCK_GRACE: Duration = Duration::from_millis(300);
 
+/// The last finished run's per-feature results and display meshes ([`Regenerator::snapshot`]), shared: what a fresh
+/// Regenerator starts from (only the features after the edit regenerate: cf-straight-spline, an edit after a cancel
+/// 17.4 s on a blank one, 8-17 ms on this).
+pub(super) type RegenSeed = Arc<Mutex<Option<Regenerator>>>;
+
 /// The Regenerator a regeneration runs on: `regen` once it is free. One aborted while waiting doesn't run (`None`).
 /// Unless `waits` (an earlier run whose features it uses still computes), past [`LOCK_GRACE`] it doesn't wait for
-/// work no one wants any more that still holds `regen` (an aborted run in a kernel step): it gets a fresh one.
-pub(super) fn regenerator_for(regen: &Arc<Mutex<Regenerator>>, waits: bool, cancel: Option<&noshape_model::regen::RegenCancel>) -> Option<Arc<Mutex<Regenerator>>> {
+/// work no one wants any more that still holds `regen` (an aborted run in a kernel step): it gets a fresh one, from
+/// `seed`.
+pub(super) fn regenerator_for(regen: &Arc<Mutex<Regenerator>>, waits: bool, cancel: Option<&noshape_model::regen::RegenCancel>, seed: &RegenSeed) -> Option<Arc<Mutex<Regenerator>>> {
     let start = std::time::Instant::now();
     loop {
         if regen.try_lock_for(Duration::from_millis(20)).is_some() {
@@ -125,7 +131,8 @@ pub(super) fn regenerator_for(regen: &Arc<Mutex<Regenerator>>, waits: bool, canc
             return None;
         }
         if !waits && start.elapsed() >= LOCK_GRACE {
-            return Some(Arc::new(Mutex::new(Regenerator::new())));
+            let fresh = seed.lock().as_ref().map(Regenerator::snapshot).unwrap_or_default();
+            return Some(Arc::new(Mutex::new(fresh)));
         }
     }
 }
@@ -377,6 +384,8 @@ pub struct PartStudioView {
     edit: Option<EditSession>,
     selected_features: Vec<FeatureId>,
     regen: Arc<Mutex<Regenerator>>,
+    /// See [`RegenSeed`].
+    regen_seed: RegenSeed,
     regen_seq: u64,
     regen_task: Option<Task<()>>,
     /// The running regenerations (model regen::runs: a newer request
@@ -548,6 +557,7 @@ impl PartStudioView {
             edit: None,
             selected_features: Vec::new(),
             regen: Arc::new(Mutex::new(Regenerator::new())),
+            regen_seed: Default::default(),
             regen_seq: 0,
             regen_task: None,
             regen_runs: Default::default(),
@@ -706,6 +716,7 @@ impl PartStudioView {
         let custom2 = custom.clone();
         let regen = self.regen.clone();
         let regen2 = self.regen.clone();
+        let (seed, seed2) = (self.regen_seed.clone(), self.regen_seed.clone());
         self.regen_seq += 1;
         let seq = self.regen_seq;
         if noshape_render::perf::enabled() {
@@ -754,7 +765,7 @@ impl PartStudioView {
                     // Work no one wants any more (a cancelled preview in a kernel step that doesn't stop at once) may
                     // hold the Regenerator: past a short grace this run doesn't wait for it, it starts on a fresh one
                     // (user P1 11-05: the spinner went on after Esc until the cancelled preview's step ended).
-                    let Some(target) = regenerator_for(&regen, waits, opts.cancel.as_ref()) else {
+                    let Some(target) = regenerator_for(&regen, waits, opts.cancel.as_ref(), &seed) else {
                         return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config, units, upto, editing_sketch, doc_vars, regen);
                     };
                     let mut held = target.lock();
@@ -762,6 +773,9 @@ impl PartStudioView {
                         log::info!(target: "perf", "regen #{seq}: polled {:.1} ms, started {:.1} ms after asked, lock {:.1} ms{}", polled.as_secs_f64() * 1e3, started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3, if Arc::ptr_eq(&target, &regen) { "" } else { " (a fresh Regenerator)" });
                     }
                     let r = held.regenerate(&studio, &config, &units, &opts);
+                    if !r.cancelled {
+                        *seed.lock() = Some(held.snapshot());
+                    }
                     drop(held);
                     (r, studio, config, units, upto, editing_sketch, doc_vars, target)
                 })
@@ -825,10 +839,15 @@ impl PartStudioView {
                 let fine = cx
                     .background_spawn(async move {
                         let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars, preview_meshes: false, relative_deflection: deflection, derived: Some(derived2), custom_features: Some(custom2), cancel: Some(cancel2), touch_probe, ..Default::default() };
-                        let Some(target) = regenerator_for(&regen2, true, opts.cancel.as_ref()) else {
+                        let Some(target) = regenerator_for(&regen2, true, opts.cancel.as_ref(), &seed2) else {
                             return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config);
                         };
-                        let r = target.lock().regenerate(&studio, &config, &units, &opts);
+                        let mut held = target.lock();
+                        let r = held.regenerate(&studio, &config, &units, &opts);
+                        if !r.cancelled {
+                            *seed2.lock() = Some(held.snapshot());
+                        }
+                        drop(held);
                         (r, studio, config)
                     })
                     .await;
