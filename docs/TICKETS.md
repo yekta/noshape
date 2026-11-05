@@ -4250,6 +4250,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   bool 11-04 18:29: that subtraction (20 tooth gaps from the blank) is noshape's Boolean now: 0.25 s, OCCT's 2.0 s
   (it declined "coincident pieces differ": the blank's cylinder split at its seam under a gap's B-spline face). All 14
   of the document's Booleans are taken, 2-8x OCCT's speed.
+  core 11-05 02:34: cf-hose-routing 1092 -> 697 ms (live 491): a hose's smooth Shell 95 -> ~10 ms (its rim lookup
+  integrated every face's area, 29 ms; the sanity check's volumes by OCCT's adaptive integral at 1e-3, 1.6 ms for the
+  plain one's 51; the quadric path's check the same, its bound 1e-3); evCollision integrates each solid's volume once.
+  Shell corpus (211) and the kernel's shell tests unchanged. Left a hose: 803 min_distance calls (50 ms).
 - [x] (dx 11-04 21:29: both Setback Fillets run again, one solid with live's counts: a body another operation made
   after a split (the fill's patch) keeps its own edges where the split's lie, and opFillSurface's edges depend on its
   boundary, so std 782's join finds its matches; T1 ops_harness fillAfterSplit. Left: +0.12 % area, the fill's

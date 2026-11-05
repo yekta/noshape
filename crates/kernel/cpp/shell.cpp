@@ -166,11 +166,12 @@ double volume_of(const TopoDS_Shape& s)
   return volume_props(s).Mass();
 }
 
-// OCCT's own integral: to ~1e-4 on free-form faces, a fifth of the time of volume_of's segmented one (a check's).
+// A volume to 1e-3 (OCCT's adaptive integral at that tolerance), for sanity checks: a hose's walls in 1.6 ms, where
+// OCCT's plain integral took 51 and volume_of's segmented one ~90.
 double rough_volume_of(const TopoDS_Shape& s)
 {
   GProp_GProps g;
-  BRepGProp::VolumeProperties(s, g);
+  BRepGProp::VolumeProperties(s, g, 1e-3, true);
   return g.Mass();
 }
 
@@ -322,11 +323,15 @@ HHist shell_history(const TopoDS_Shape& solid, const TopoDS_Shape& result,
     {
       if (modified.Contains(e.Current()))
         continue;
-      const TopoDS_Face& f = TopoDS::Face(e.Current());
-      GProp_GProps       g;
+      const TopoDS_Face&  f = TopoDS::Face(e.Current());
+      BRepAdaptor_Surface fs(f);
+      // (Only a face on a removed face's kind of surface can lie on it: no area integral of the others, a hose's
+      // B-spline walls 29 ms.)
+      if (std::none_of(removed.begin(), removed.end(), [&](const TopoDS_Shape& r) { return BRepAdaptor_Surface(TopoDS::Face(r), false).GetType() == fs.GetType(); }))
+        continue;
+      GProp_GProps g;
       BRepGProp::SurfaceProperties(f, g);
       gp_Pnt c = g.CentreOfMass();
-      BRepAdaptor_Surface fs(f);
       for (const TopoDS_Shape& r : removed)
       {
         BRepAdaptor_Surface rs(TopoDS::Face(r));
@@ -2909,13 +2914,8 @@ bool by_smooth(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& remov
   bld.Add(wall, shell.Oriented(old_shell.Orientation()));
   if (!BRepCheck_Analyzer(wall).IsValid())
     return no("the wall is invalid");
-  // (A sanity check, so OCCT's plain integral: the exact ones were 180 of a hose's 235 ms.)
-  auto rough = [](const TopoDS_Shape& x) {
-    GProp_GProps g;
-    BRepGProp::VolumeProperties(x, g);
-    return g.Mass();
-  };
-  const double vw = rough(wall), vs = rough(so);
+  // (A sanity check: the exact integrals were 180 of a hose's 235 ms, OCCT's plain ones 51.)
+  const double vw = rough_volume_of(wall), vs = rough_volume_of(so);
   if (dbg)
     std::fprintf(stderr, "smooth: wall volume %.17g solid %.17g\n", vw, vs);
   if (!(vw > 0) || !(vw <= vs * (1 + 1e-3)))
@@ -4851,7 +4851,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   lap("volumes");
   if (dbg)
     std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);
-  if (!(vw > 0) || !(outward || vw <= vs * (1 + 1e-9)))
+  if (!(vw > 0) || !(outward || vw <= vs * (1 + 1e-3)))
     return no("the wall's volume is off");
   out.result  = wall;
   out.history = shell_history(solid, wall, {h}, {}, sources, removed);

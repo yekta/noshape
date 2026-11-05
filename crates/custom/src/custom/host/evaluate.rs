@@ -1106,9 +1106,11 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         _ => true,
     };
     let (tstight, gstight): (Vec<_>, Vec<_>) = (tool_solids.iter().map(|_| std::cell::OnceCell::new()).collect(), target_solids.iter().map(|_| std::cell::OnceCell::new()).collect());
+    // Each solid's volume once (a hose's routing compared each pair's anew: 49 integrals, 0.1 s a Hose Routing).
+    let (tsvol, gsvol): (Vec<std::cell::OnceCell<f64>>, Vec<std::cell::OnceCell<f64>>) = (tool_solids.iter().map(|_| std::cell::OnceCell::new()).collect(), target_solids.iter().map(|_| std::cell::OnceCell::new()).collect());
     let mut inside = Vec::new();
-    for (((tb, t), tx), tt) in tool_solids.iter().zip(&tsbox).zip(&tstight) {
-        for (((gb, g), gx), gt) in target_solids.iter().zip(&gsbox).zip(&gstight) {
+    for ((((tb, t), tx), tt), tv) in tool_solids.iter().zip(&tsbox).zip(&tstight).zip(&tsvol) {
+        for ((((gb, g), gx), gt), gv) in target_solids.iter().zip(&gsbox).zip(&gstight).zip(&gsvol) {
             if tb == gb || !meet(tx, gx) {
                 continue;
             }
@@ -1118,7 +1120,7 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 continue;
             }
             let Some(common) = k::common(t, g).ok().and_then(|c| c.shape.volume().ok()) else { continue };
-            let (vt, vg) = (t.volume().unwrap_or(0.0).abs(), g.volume().unwrap_or(0.0).abs());
+            let (vt, vg) = (*tv.get_or_init(|| t.volume().unwrap_or(0.0).abs()), *gv.get_or_init(|| g.volume().unwrap_or(0.0).abs()));
             let near = |a: f64, b: f64| (a.abs() - b).abs() <= 1e-9 * b.max(1e-15);
             if near(common, vt) && vt < vg {
                 inside.push((tb.clone(), gb.clone(), true));
