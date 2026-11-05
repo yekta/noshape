@@ -178,6 +178,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   REST after the 06:00 unlock). Fixed in ours: an edge-joint rip where the other wall's material reaches in before the
   rip (a converted box, material inward) stops each wall and its bend short of that material (c2-sm-corner-break's
   Sheet metal model 1 as live: 2 -> 5/11; run 127: no other change). Next there: Flange 1 (16 parts, live 1).
+- 22:02: c2-sm-corner-break's louver Flange 1 as live (SM-LOUVER-FLANGE-PARTS closed; runs 128-131: nothing else
+  changed): a bend on a hole's side pulls its wall back as on an outer side, with the hole's free sides in line with it;
+  a planar wall's side of a bend edge by the face classifier (wall_side; the centroid was wrong for hole edges) in
+  bend_geometry, the bend solids and the flat. 2 -> 6/11; next there Corner break 1's vertex (the UI fetch's). Hole
+  tables: a plain hole's SIZE as its diameter dimension shows it (Ø.394). Open with live: REQUESTS 21:01 (drawing batch 2
+  recordings), 21:06 (c2 refetch by REST after ~06:00), 21:43 (Insert view's default scale: 80 mm at 1:5 / 8:1).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
