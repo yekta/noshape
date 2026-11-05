@@ -2380,4 +2380,10 @@ The lead moved FILLET-OVERLAP-FAIL's rest to skasm while your queue is full (Rep
 determinism), starting from your 12:54 state: the R12.5 rims' torus seams (103 / 58 edges / vertices, live 99 / 54),
 then the time (600 ms; the rings' and balls' cut is bool's OCCT case). Anything skasm changes in features.cpp's
 fillet_by_tools or the seam movers it lists here before landing; tell skasm if you touch them meanwhile.
+15:13, landing (features.cpp fillet_by_tools: after its unify, boolean.cpp `rim_chain_seams_joined`): a hole's cylinder between two
+coaxial tori whose seam splits a torus's outer curve gets the three seams moved together to an angle where both tori's
+outer loops have a vertex (frames turned about the axis, the rims and seams rebuilt, the loops' curves shifted), then
+join_loop_pieces. Only from fillet_by_tools (studios at ScopeRule 11+), not in move_seams_off_holes. learning-center-
+michael 7/7 (Fillet 2 44 / 99 / 54 as live), T1 blend::overflowing_rounds_meeting_earlier_ones_are_lives now also
+asserts 108 / 62 with seams (was 112 / 66); kernel tests, blend corpus unchanged. Next: its time.
 

@@ -1442,9 +1442,11 @@ fn overflowing_rounds_meeting_earlier_ones_are_lives() {
     let took = t0.elapsed();
     assert!(r.is_valid());
     assert!((vol_mm3(&r) - 3569327.895499).abs() < 0.05, "{}", vol_mm3(&r));
-    // (Live's 99 edges / 54 vertices; ours 103 / 58: the R12.5 rims' tori meet the prong ends' rounds in two pieces
-    // each, split at OCCT's seam, which Parasolid's tori don't have.)
+    // Live's 99 edges / 54 vertices, ours 108 / 62 with OCCT's seams: the R12.5 rims' cylinders and tori have theirs at
+    // a vertex of the tori's outer loops, which stay one edge each where the prong ends' rounds meet them (they were
+    // split at OCCT's u = 0: 112 / 66).
     assert_eq!(r.count(ShapeType::Face), 44);
+    assert_eq!((r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (108, 62));
     let kinds = |k: &str| r.faces().iter().filter(|f| format!("{:?}", f.face_surface()).contains(k)).count();
     assert_eq!((kinds("Plane"), kinds("Cylinder"), kinds("Sphere"), kinds("Torus")), (11, 19, 6, 8));
     eprintln!("{took:?}");

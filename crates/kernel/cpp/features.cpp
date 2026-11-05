@@ -4969,7 +4969,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       cut = step;
     }
     HHist              uh;
-    const TopoDS_Shape out = unify_shape(cut, uh);
+    const TopoDS_Shape out = rim_chain_seams_joined(unify_shape(cut, uh), uh);
     if (!uh.IsNull())
       h = compose(input, h, uh);
     int solids = 0;

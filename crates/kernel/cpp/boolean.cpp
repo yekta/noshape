@@ -1969,6 +1969,367 @@ static bool valid_around(const TopoDS_Shape& out, const std::vector<TopoDS_Shape
   return true;
 }
 
+// `S` (a cylinder or torus, located) with its frame turned about its axis so that its u = 0 lies towards `p`.
+occ::handle<Geom_ElementarySurface> turned_to(const occ::handle<Geom_Surface>& S, const gp_Pnt& p)
+{
+  const occ::handle<Geom_ElementarySurface> el = occ::down_cast<Geom_ElementarySurface>(S->Copy());
+  if (el.IsNull())
+    return el;
+  const gp_Ax3 a = el->Position();
+  gp_Vec       d(a.Location(), p);
+  d -= gp_Vec(a.Direction()) * d.Dot(gp_Vec(a.Direction()));
+  if (d.Magnitude() < 1e-12)
+    return {};
+  gp_Ax3 b(a.Location(), a.Direction(), gp_Dir(d));
+  if (!a.Direct())
+    b.YReverse();
+  el->SetPosition(b);
+  return el;
+}
+
+// (u, v) of `p` on a cylinder or torus.
+gp_Pnt2d elementary_uv(const occ::handle<Geom_ElementarySurface>& S, const gp_Pnt& p)
+{
+  double u = 0, v = 0;
+  if (auto c = occ::down_cast<Geom_CylindricalSurface>(S); !c.IsNull())
+    ElSLib::Parameters(c->Cylinder(), p, u, v);
+  else if (auto t = occ::down_cast<Geom_ToroidalSurface>(S); !t.IsNull())
+    ElSLib::Parameters(t->Torus(), p, u, v);
+  return gp_Pnt2d(u, v);
+}
+
+// A hole's cylinder between two coaxial tori, its rims rounded at both ends (learning-center-michael's Fillet 2:
+// OCCT's seams at u = 0 end mid-way on each torus's outer curve and split it; Parasolid's tori have none, live's 99 /
+// 54 edges / vertices, ours 103 / 58): the three seams moved together to an angle where both tori's outer loops have a
+// vertex, the rims' vertices with them; join_loop_pieces then joins the pieces. The shape as it was where none
+// applies or where the faces don't come out valid with their areas.
+TopoDS_Shape rim_chain_seams(const TopoDS_Shape& s, HHist& hist)
+{
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face   cf = TopoDS::Face(fx.Current().Oriented(TopAbs_FORWARD));
+    const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(BRep_Tool::Surface(cf));
+    if (cs.IsNull())
+      continue;
+    const gp_Cylinder ca = cs->Cylinder();
+    // Its seams and its two rims (closed circles round its axis), nothing else.
+    std::vector<TopoDS_Edge> cseams, rims;
+    bool                     only = true;
+    ShapeIMap                seen;
+    for (TopExp_Explorer x(cf, TopAbs_EDGE); x.More() && only; x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (seen.Contains(e))
+        continue;
+      seen.Add(e);
+      if (BRep_Tool::IsClosed(e, cf))
+      {
+        cseams.push_back(e);
+        continue;
+      }
+      TopoDS_Vertex v0, v1;
+      TopExp::Vertices(e, v0, v1);
+      BRepAdaptor_Curve c(e);
+      only = !v0.IsNull() && v0.IsSame(v1) && c.GetType() == GeomAbs_Circle && c.Circle().Axis().Direction().IsParallel(ca.Axis().Direction(), 1e-9);
+      rims.push_back(e);
+    }
+    if (!only || cseams.size() != 1 || rims.size() != 2)
+      continue;
+    // Each rim's other face: a torus about the same axis with a seam.
+    struct Side
+    {
+      TopoDS_Edge                         rim;
+      TopoDS_Face                         face;
+      occ::handle<Geom_ToroidalSurface>   ts;
+      std::vector<TopoDS_Edge>            seams, rest;
+      std::vector<std::pair<double, TopoDS_Vertex>> at; // the outer loop's vertices off the seams, by angle
+    };
+    std::vector<Side> sides;
+    for (const TopoDS_Edge& rim : rims)
+    {
+      const ShapeList* fs = ef.Seek(rim);
+      if (fs == nullptr || fs->Extent() != 2)
+        break;
+      const TopoDS_Face tf = TopoDS::Face((fs->First().IsSame(cf) ? fs->Last() : fs->First()).Oriented(TopAbs_FORWARD));
+      const occ::handle<Geom_ToroidalSurface> ts = occ::down_cast<Geom_ToroidalSurface>(BRep_Tool::Surface(tf));
+      if (ts.IsNull() || !ts->Torus().Axis().IsParallel(ca.Axis(), 1e-9) || gp_Lin(ca.Axis()).Distance(ts->Torus().Location()) > 1e-9 * (1 + ca.Radius()))
+        break;
+      Side sd{rim, tf, ts, {}, {}, {}};
+      for (TopExp_Explorer x(tf, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+        if (e.IsSame(rim) || std::any_of(sd.seams.begin(), sd.seams.end(), [&](const TopoDS_Edge& q) { return q.IsSame(e); }) || std::any_of(sd.rest.begin(), sd.rest.end(), [&](const TopoDS_Edge& q) { return q.IsSame(e); }))
+          continue;
+        (BRep_Tool::IsClosed(e, tf) ? sd.seams : sd.rest).push_back(e);
+      }
+      if (sd.seams.size() != 1 || sd.rest.empty())
+        break;
+      ShapeIMap on_seam, rest_v;
+      TopExp::MapShapes(sd.seams[0], TopAbs_VERTEX, on_seam);
+      for (const TopoDS_Edge& e : sd.rest)
+        TopExp::MapShapes(e, TopAbs_VERTEX, rest_v);
+      for (int i = 1; i <= rest_v.Extent(); ++i)
+        if (!on_seam.Contains(rest_v(i)))
+          sd.at.push_back({elementary_uv(cs, BRep_Tool::Pnt(TopoDS::Vertex(rest_v(i)))).X(), TopoDS::Vertex(rest_v(i))});
+      sides.push_back(sd);
+    }
+    if (sides.size() != 2)
+      continue;
+    // Only where a torus's seam ends between two pieces of one curve (smooth, both on the same other face): what the
+    // move undoes.
+    auto splits = [&](const Side& sd) {
+      TopoDS_Vertex a0, a1;
+      TopExp::Vertices(sd.seams[0], a0, a1);
+      for (const TopoDS_Vertex& j : {a0, a1})
+      {
+        std::vector<gp_Vec>       ds;
+        std::vector<TopoDS_Shape> others;
+        for (const TopoDS_Edge& e : sd.rest)
+          for (TopExp_Explorer w(e, TopAbs_VERTEX); w.More(); w.Next())
+            if (w.Current().IsSame(j))
+            {
+              BRepAdaptor_Curve c(e);
+              gp_Pnt            p;
+              gp_Vec            d;
+              c.D1(BRep_Tool::Parameter(TopoDS::Vertex(w.Current()), e), p, d);
+              ds.push_back(d);
+              if (const ShapeList* fs = ef.Seek(e))
+                for (ShapeList::Iterator it(*fs); it.More(); it.Next())
+                  if (!it.Value().IsSame(sd.face))
+                    others.push_back(it.Value());
+              break;
+            }
+        if (ds.size() == 2 && others.size() == 2 && others[0].IsSame(others[1]) && ds[0].Magnitude() > 1e-12 && ds[1].Magnitude() > 1e-12
+            && ds[0].Crossed(ds[1]).Magnitude() <= 1e-6 * ds[0].Magnitude() * ds[1].Magnitude())
+          return true;
+      }
+      return false;
+    };
+    if (!splits(sides[0]) && !splits(sides[1]))
+      continue;
+    // The angle both outer loops have a vertex at, nearest the seam.
+    const double old = elementary_uv(cs, BRep_Tool::Pnt(TopExp::FirstVertex(cseams[0]))).X();
+    double       theta = 0, best = std::numeric_limits<double>::infinity();
+    TopoDS_Vertex V[2];
+    for (const auto& [a0, v0] : sides[0].at)
+      for (const auto& [a1, v1] : sides[1].at)
+        if (std::abs(std::remainder(a0 - a1, 2 * M_PI)) < 1e-9 && std::abs(std::remainder(a0 - old, 2 * M_PI)) < best)
+        {
+          best  = std::abs(std::remainder(a0 - old, 2 * M_PI));
+          theta = a0;
+          V[0]  = v0;
+          V[1]  = v1;
+        }
+    if (V[0].IsNull() || best < 1e-9)
+      continue;
+    const gp_Pnt toward = cs->Value(theta, 0);
+    const occ::handle<Geom_ElementarySurface> cn = turned_to(cs, toward);
+    if (cn.IsNull())
+      continue;
+    BRep_Builder B;
+    double       tol = BRep_Tool::Tolerance(cf);
+    for (const Side& sd : sides)
+      tol = std::max({tol, BRep_Tool::Tolerance(sd.face), BRep_Tool::Tolerance(sd.rim)});
+    TopoDS_Face Fc;
+    B.MakeFace(Fc, cn, tol);
+    // The rims, from the turned cylinder (their parameter its u): a vertex at u = 0.
+    double      vc[2];
+    TopoDS_Edge R[2];
+    TopoDS_Vertex VR[2];
+    for (int i = 0; i < 2; ++i)
+    {
+      vc[i] = elementary_uv(cn, BRepAdaptor_Curve(sides[(size_t)i].rim).Value(0)).Y();
+      B.MakeVertex(VR[i], cn->Value(0, vc[i]), tol);
+      B.MakeEdge(R[i], cn->VIso(vc[i]), tol);
+      B.Add(R[i], VR[i].Oriented(TopAbs_FORWARD));
+      B.Add(R[i], VR[i].Oriented(TopAbs_REVERSED));
+      B.Range(R[i], 0, 2 * M_PI);
+      B.UpdateEdge(R[i], new Geom2d_Line(gp_Pnt2d(0, vc[i]), gp_Dir2d(1, 0)), Fc, tol);
+      B.Range(R[i], Fc, 0, 2 * M_PI);
+    }
+    const int lo = vc[0] < vc[1] ? 0 : 1, hi = 1 - lo;
+    TopoDS_Edge cseam;
+    B.MakeEdge(cseam, cn->UIso(0), tol);
+    B.Add(cseam, VR[lo].Oriented(TopAbs_FORWARD));
+    B.Add(cseam, VR[hi].Oriented(TopAbs_REVERSED));
+    B.Range(cseam, vc[lo], vc[hi]);
+    B.UpdateEdge(cseam, new Geom2d_Line(gp_Pnt2d(2 * M_PI, 0), gp_Dir2d(0, 1)), new Geom2d_Line(gp_Pnt2d(0, 0), gp_Dir2d(0, 1)), Fc, tol);
+    B.Range(cseam, Fc, vc[lo], vc[hi]);
+    {
+      TopoDS_Wire W;
+      B.MakeWire(W);
+      B.Add(W, R[lo]);
+      B.Add(W, cseam.Oriented(TopAbs_FORWARD));
+      B.Add(W, R[hi].Reversed());
+      B.Add(W, cseam.Oriented(TopAbs_REVERSED));
+      W.Closed(true);
+      B.Add(Fc, W);
+    }
+    // Each torus: turned so its u = 0 lies at the vertex; its rim, a seam from the rim's vertex to the outer loop's,
+    // the loop's own curves moved by the turn.
+    TopoDS_Face Ft[2];
+    TopoDS_Edge tseam[2];
+    bool        ok = true;
+    for (int i = 0; i < 2 && ok; ++i)
+    {
+      const Side& sd = sides[(size_t)i];
+      const occ::handle<Geom_ElementarySurface> tn = turned_to(sd.ts, BRep_Tool::Pnt(V[i]));
+      if (tn.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      B.MakeFace(Ft[i], tn, tol);
+      // The old curves' u and v: the rim's v and the vertex's (u, v) on the old face as its curves have them.
+      double                    f2, l2;
+      occ::handle<Geom2d_Curve> rpc = BRep_Tool::CurveOnSurface(sd.rim, sd.face, f2, l2);
+      if (rpc.IsNull())
+      {
+        ok = false;
+        break;
+      }
+      const double v_rim = rpc->Value(f2).Y();
+      double       uV = 0, vV = 0;
+      bool         found = false;
+      for (const TopoDS_Edge& e : sd.rest)
+      {
+        TopoDS_Vertex a0, a1;
+        TopExp::Vertices(e, a0, a1);
+        if (!(a0.IsSame(V[i]) || a1.IsSame(V[i])))
+          continue;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, sd.face, f2, l2);
+        if (pc.IsNull())
+          continue;
+        const gp_Pnt2d q = pc->Value(BRep_Tool::Parameter(V[i], e));
+        uV               = q.X();
+        vV               = q.Y();
+        found            = true;
+        break;
+      }
+      if (!found)
+      {
+        ok = false;
+        break;
+      }
+      // The rim on this torus: its parameter (the cylinder's turned u) against the torus's turned u.
+      const double t1  = 1.0;
+      const double ut1 = std::remainder(elementary_uv(tn, BRepAdaptor_Curve(R[i]).Value(t1)).X(), 2 * M_PI);
+      const bool   same = std::abs(ut1 - t1) < 1e-6;
+      if (!same && std::abs(ut1 + t1) > 1e-6)
+      {
+        ok = false;
+        break;
+      }
+      const occ::handle<Geom2d_Line> rl = same ? new Geom2d_Line(gp_Pnt2d(0, v_rim), gp_Dir2d(1, 0)) : new Geom2d_Line(gp_Pnt2d(2 * M_PI, v_rim), gp_Dir2d(-1, 0));
+      B.UpdateEdge(R[i], rl, Ft[i], tol);
+      B.Range(R[i], Ft[i], 0, 2 * M_PI);
+      const TopoDS_Edge plus_u = same ? R[i] : TopoDS::Edge(R[i].Reversed());
+      // The seam: the turned torus's meridian at u = 0 (its parameter v), from the lower v to the higher.
+      const bool   up = vV > v_rim;
+      const double va = std::min(vV, v_rim), vb = std::max(vV, v_rim);
+      B.MakeEdge(tseam[i], tn->UIso(0), tol);
+      B.Add(tseam[i], (up ? VR[i] : V[i]).Oriented(TopAbs_FORWARD));
+      B.Add(tseam[i], (up ? V[i] : VR[i]).Oriented(TopAbs_REVERSED));
+      B.Range(tseam[i], va, vb);
+      B.UpdateEdge(tseam[i], new Geom2d_Line(gp_Pnt2d(2 * M_PI, 0), gp_Dir2d(0, 1)), new Geom2d_Line(gp_Pnt2d(0, 0), gp_Dir2d(0, 1)), Ft[i], tol);
+      B.Range(tseam[i], Ft[i], va, vb);
+      // The outer loop's curves, turned and put in [0, 2 pi).
+      for (const TopoDS_Edge& e : sd.rest)
+      {
+        occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, sd.face, f2, l2);
+        if (pc.IsNull())
+        {
+          ok = false;
+          break;
+        }
+        const double um = pc->Value(0.5 * (f2 + l2)).X() - uV;
+        const double k  = std::floor(um / (2 * M_PI));
+        pc              = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(-uV - 2 * M_PI * k, 0)));
+        B.UpdateEdge(e, pc, Ft[i], BRep_Tool::Tolerance(e));
+        B.Range(e, Ft[i], f2, l2);
+      }
+      if (!ok)
+        break;
+      // The loop from V as the old face ran it.
+      std::vector<TopoDS_Edge> uses;
+      for (TopoDS_Iterator w(sd.face); w.More(); w.Next())
+        for (TopoDS_Iterator x(w.Value()); x.More(); x.Next())
+          for (const TopoDS_Edge& e : sd.rest)
+            if (x.Value().IsSame(e))
+              uses.push_back(TopoDS::Edge(x.Value()));
+      std::vector<TopoDS_Edge> chain;
+      TopoDS_Vertex            at = V[i];
+      std::vector<bool>        used(uses.size(), false);
+      do
+      {
+        size_t next = uses.size();
+        for (size_t j = 0; j < uses.size() && next == uses.size(); ++j)
+          if (!used[j] && TopExp::FirstVertex(uses[j], true).IsSame(at))
+            next = j;
+        if (next == uses.size())
+        {
+          ok = false;
+          break;
+        }
+        used[next] = true;
+        chain.push_back(uses[next]);
+        at = TopExp::LastVertex(uses[next], true);
+      } while (!at.IsSame(V[i]));
+      if (!ok || chain.size() != uses.size())
+      {
+        ok = false;
+        break;
+      }
+      TopoDS_Wire W;
+      B.MakeWire(W);
+      if (up)
+      {
+        B.Add(W, plus_u);
+        B.Add(W, tseam[i].Oriented(TopAbs_FORWARD));
+        for (const TopoDS_Edge& e : chain)
+          B.Add(W, e);
+        B.Add(W, tseam[i].Oriented(TopAbs_REVERSED));
+      }
+      else
+      {
+        B.Add(W, plus_u.Reversed());
+        B.Add(W, tseam[i].Oriented(TopAbs_REVERSED));
+        for (const TopoDS_Edge& e : chain)
+          B.Add(W, e);
+        B.Add(W, tseam[i].Oriented(TopAbs_FORWARD));
+      }
+      W.Closed(true);
+      B.Add(Ft[i], W);
+      ok = BRepCheck_Analyzer(Ft[i]).IsValid() && same_area(sd.face, Ft[i]);
+    }
+    if (!ok || !BRepCheck_Analyzer(Fc).IsValid() || !same_area(cf, Fc))
+      continue;
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    rs->Replace(cf, Fc);
+    for (int i = 0; i < 2; ++i)
+      rs->Replace(sides[(size_t)i].face, Ft[i]);
+    const TopoDS_Shape out = rs->Apply(s);
+    if (out.IsNull() || !valid_around(out, {R[0], R[1], cseam, tseam[0], tseam[1]}))
+      continue;
+    if (hist.IsNull())
+      hist = new BRepTools_History();
+    HHist h = new BRepTools_History();
+    h->AddModified(cf, Fc);
+    for (int i = 0; i < 2; ++i)
+    {
+      h->AddModified(sides[(size_t)i].face, Ft[i]);
+      h->AddModified(sides[(size_t)i].rim, R[i]);
+      h->Remove(sides[(size_t)i].seams[0]);
+    }
+    h->Remove(cseams[0]);
+    hist->Merge(h);
+    return rim_chain_seams(out, hist);
+  }
+  return s;
+}
+
 // A cylinder face between one end circle and a chain of other edges round the axis whose seam splits the chain (a
 // shaft's band below spline slots, a run-out crossing the seam, cf-straight-spline; live's faces have no seams, its
 // run-out is one edge): the seam moved to run from the circle to the chain's vertex nearest it, the circle's vertex
@@ -6999,6 +7360,12 @@ OpOut op_unify_whole(const OcShape& s)
 }
 
 // The kernel's unify of a whole shape (op_unify's), for the kernel's own operations.
+TopoDS_Shape rim_chain_seams_joined(const TopoDS_Shape& s, HHist& hist)
+{
+  const TopoDS_Shape moved = rim_chain_seams(s, hist);
+  return moved.IsSame(s) ? s : join_loop_pieces(moved, hist);
+}
+
 TopoDS_Shape unify_shape(const TopoDS_Shape& s, HHist& hist)
 {
   return unify(s, hist);
