@@ -109,6 +109,13 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   the fillet circle touches both flanks and the root) has 226/612/388 faces/edges/vertices, live 186/512/328:
   the two root fillets of each gap lie on one surface, live gives one face per half-gap where ours keeps two
   (8 B-spline faces per gap, live 6). Repro: `NOSHAPE_PARITY_ONLY=cf-spur-gear` parity_models.
+- From dx (11-05 02:29): the corpus documents with custom features that are slowest against live, by where the time
+  goes (parity_models, vibe5, NOSHAPE_FS_PROFILE): cf-sheet-metal-model-plus 2.33 s (live 0.92): its std Flange's
+  sheet metal rebuild is 0.4 / 1.5 s a call, of which the glued fuse of the walls' and bends' solids (k::fuse_all, 9-11
+  solids) 234 / 509 ms, and face projections onto its B-spline rolled walls ~2 ms each (keep_names, part_sources:
+  ~400 ms); cf-hose-routing 1.05 s (live 0.49): two opShell of the hose, ~400 ms each; cf-spur-gear 3.5 s (live 2.1):
+  Boolean 2 1.26 s and Boolean 1 0.40 s (live 34 ms), the root opFillet ~290 ms and the "hobbed" opBoolean ~230 ms per
+  gear. The FeatureScript itself is a few ms in each. All kernel: yours if you take them.
 - From dx (11-04 19:28): bend centerline wires (live 2015): done in the FeatureScript host's sheet metal rebuild (a
   hidden wire per bend in the flat, associated with its joint; @evSheetMetalBendUp from the flat's bend line). The
   native path (NOSHAPE_STD_SHEET_METAL=0) makes none. A flipped flange's joint edge has no association here
