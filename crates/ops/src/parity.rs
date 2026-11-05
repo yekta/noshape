@@ -3346,6 +3346,9 @@ pub struct PartState {
     pub volume: Option<f64>,
     pub area: Option<f64>,
     pub volume_band: Option<[f64; 2]>,
+    /// Live's exact volume (evVolume at HIGH accuracy) where massproperties' band misses it (live 2058: the drive
+    /// train's 62- and 50-tooth gears).
+    pub volume_high: Option<f64>,
     pub area_band: Option<[f64; 2]>,
     pub bbox: Option<[[f64; 3]; 2]>,
     /// Live's box is the web client's body bounds (its UI fetch), loose
@@ -3431,6 +3434,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             volume: p["volume"].as_f64(),
             area: p["area"].as_f64(),
             volume_band: band(&p["volume_band"]),
+            volume_high: p["volume_high"].as_f64(),
             area_band: band(&p["area_band"]),
             bbox: f3(&p["bbox"]["min"]).zip(f3(&p["bbox"]["max"])).map(|(a, b)| [a, b]),
             // The UI fetch: its parts' centroids are massproperties' exact
@@ -3482,6 +3486,7 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             volume: p["volume"].as_f64().map(|v| v * k * k * k),
             area: p["surface_area"].as_f64().map(|a| a * k * k),
             volume_band: None,
+            volume_high: None,
             area_band: None,
             bbox: at(&p["bounding_box"]["min"]).zip(at(&p["bounding_box"]["max"])).map(|(a, b)| [a, b]),
             bbox_outer: false,
@@ -3543,6 +3548,7 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         };
         if let Some(v) = l.volume
             && !within(o.volume, v, l.volume_band)
+            && !l.volume_high.is_some_and(|h| within(o.volume, h, None))
         {
             out.push(format!("{who}: volume {:.6} mm³, live {:.6}", o.volume.unwrap_or(f64::NAN) * 1e9, v * 1e9));
         }

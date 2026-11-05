@@ -99,6 +99,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   - Drive train: live's tooth sketch and teeth match ours (REQUESTS 2056); ours is exactly blank − teeth, live's
     Part 5 4.49 mm³ less: REQUESTS 09:59 asks for live's blank and gear volumes. SKETCH-REGION-EDGE-PIECES ticketed.
   - SM-CURVED-OUTLINE-SHADOW closed: cf-sheet-metal-model-plus 14/14; run 119: 50/56, 426/483.
+- 10:51: cf-drive-train-generator 2/2: live 2058 found ours exact; the corpus volumes were massproperties' loose ones,
+  and live added volume_high (evVolume HIGH) to 11 UI-method documents; the runner accepts it. Run 120: 51/56,
+  427/483. The build host's corpus copy (vibe5:agents/dx/live-models) goes stale when live edits /root/parity/models:
+  my one.sh / runNN.sh rsync it first now.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
