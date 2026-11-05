@@ -916,7 +916,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1.0440 mm); ours gives the whole sketch entities (the circles 106.18 / 91.70 mm, the splines 2.4979 untrimmed).
   The FeatureScript host's sketch edges are one per entity; live's sketch body splits them where they cross. No
   corpus number depends on it yet (the gear's region area and its extrude match live).
-- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
+- [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
   per sheet metal rebuild (updateSheetMetalGeometry, 133-225 ms a feature): fuse_all of the walls and bends ~50 ms,

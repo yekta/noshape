@@ -537,9 +537,14 @@ fn bend_geometry(topo: &Topo, e: usize, fa: usize, fb: usize, radius: f64, front
         } else {
             // A curved wall's middle may lie behind the joint (rolled far round): inward is the side a small step
             // stays on the face.
+            // (The face classifier first: a projection of a point off a rolled wall takes ~2.5 ms.)
+            let stays = |v: DVec3| face.contains_point(joint + v * 1e-5, 1e-6).ok();
             let off = |v: DVec3| face.project_point(joint + v * 1e-5).map_or(f64::INFINITY, |pr| pr.point.distance(joint + v * 1e-5));
-            if off(a) > off(-a) {
-                a = -a;
+            match (stays(a), stays(-a)) {
+                (Some(false), Some(true)) => a = -a,
+                (Some(true), Some(false)) => {}
+                _ if off(a) > off(-a) => a = -a,
+                _ => {}
             }
         }
         Ok((a, n))

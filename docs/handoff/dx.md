@@ -143,6 +143,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   stopped). Now they unwind through every `try`. (A model-plus "regression" I chased first was one.sh writing its log
   to a relative path that didn't exist: the run never ran and I read the morning's logs; 30 runs since, 14/14.
   one.sh refuses relative log paths now.)
+- 15:58: model-plus's speed (lead): 1153 -> 870 ms, live 917 (run 125: 51/56, 427/483, unchanged). Where the time
+  went (temporary #[track_caller] counts on project_point / contains_point / distance): projections of points just off
+  a rolled wall, 1.4-4 ms each. Now by the face classifier where the decision is the same: bend_geometry's inward
+  side, evEdgeConvexity's direction into face b (the projections kept as fallbacks), thicken_names' caps by their
+  foot on the sheet (no foot, no cap: the sides aren't projected); tracking's split-piece test cached by (old face,
+  piece); Up to Part's touches checks boxes first. Left: TICKETS SM-BOOLEAN-SPEED.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem

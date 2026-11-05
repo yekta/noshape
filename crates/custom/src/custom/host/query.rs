@@ -693,6 +693,16 @@ impl<'a> QueryCx<'a> {
     /// A point of face `f`: its parameters' middle when on it, else a few others, else the nearest to the middle
     /// (the projection's search along the edges: ~0.4 ms a face, std sheet metal's thousands), once a face
     /// (tracking looks for a split face's pieces among every face, each time: model-plus's Extrude 4).
+    fn piece_on_old(&self, old: &k::Shape, piece: &k::Shape, m: DVec3, tol: f64) -> bool {
+        let key = (old.clone(), piece.clone());
+        if let Some(on) = self.st.pieces_on_old.lock().get(&key) {
+            return *on;
+        }
+        let on = old.contains_point(m, tol).unwrap_or(false);
+        self.st.pieces_on_old.lock().insert(key, on);
+        on
+    }
+
     pub fn face_point(&self, f: &k::Shape) -> Option<DVec3> {
         if let Some(p) = self.st.face_points.lock().get(f) {
             return *p;
@@ -848,10 +858,11 @@ impl<'a> QueryCx<'a> {
                 // old face's middle): an inner point on the old face.
                 if let Some(old) = &snap.face
                     && near_old(e)
-                    && let Some(m) = self.shape(e).and_then(|s| self.face_point(&s))
+                    && let Some(piece) = self.shape(e)
+                    && let Some(m) = self.face_point(&piece)
                     && old_box.is_none_or(|o| (o.min - DVec3::splat(TOL)).cmple(m).all() && m.cmple(o.max + DVec3::splat(TOL)).all())
                     && old_plane.is_none_or(|(o, n)| (m - o).dot(n).abs() <= TOL)
-                    && old.contains_point(m, TOL).unwrap_or(false)
+                    && self.piece_on_old(old, &piece, m, TOL)
                 {
                     return true;
                 }

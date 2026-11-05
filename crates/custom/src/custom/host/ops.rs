@@ -277,7 +277,11 @@ impl Bounds {
         let end = self.end.as_ref().map(extended);
         let tools: Vec<Shape> = start.iter().chain(end.iter()).cloned().collect();
         let split = k::split(std::slice::from_ref(&res.shape), &tools, &k::BooleanOptions::default())?;
-        let touches = |a: &Shape, b: &Shape| k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
+        let apart = |a: &Shape, b: &Shape| match (a.bounding_box(false), b.bounding_box(false)) {
+            (Ok(x), Ok(y)) => (x.min - y.max).max(y.min - x.max).max_element() > 1e-7,
+            _ => false,
+        };
+        let touches = |a: &Shape, b: &Shape| !apart(a, b) && k::distance(a, b).is_ok_and(|x| x.distance < 1e-7);
         // A planar bound: which side of it a point is, along the direction (+: further on).
         let side = |bound: &Shape, p: DVec3| -> Option<f64> {
             let pl = bound.faces().into_iter().next()?.face_plane().ok().flatten()?;
@@ -1286,7 +1290,37 @@ fn thicken_names(ev: &EvalCtx, sheet: &Shape, out: &Shape, t1: f64, t2: f64) -> 
     for (i, f) in out.faces().iter().enumerate() {
         let Some(p) = super::sheetmetal::inner_point(f) else { continue };
         let Ok(n) = f.normal_at_point(p) else { continue };
-        let near = sheet_faces.iter().filter_map(|sf| sf.project_point(p).ok().map(|pr| (sf, pr))).min_by(|a, b| a.1.distance.total_cmp(&b.1.distance));
+        // The nearest sheet face, nearest boxes first (a face's box farther than the best distance can't be nearer).
+        // (Ties to the first face, as a plain minimum.)
+        let mut order: Vec<(f64, usize, &Shape)> = sheet_faces.iter().enumerate().map(|(i, sf)| (sf.bounding_box(false).map_or(0.0, |b| (b.min - p).max(p - b.max).max(DVec3::ZERO).length()), i, sf)).collect();
+        order.sort_by(|a, b| a.0.total_cmp(&b.0));
+        // A cap: its point's foot a thickness along its normal lies on a sheet face (the nearest point's offset runs
+        // along the normal); no foot, no cap (the sides: projecting a point beside a rolled wall takes ~1.4 ms). The
+        // classifier and a foot on the face are cheap.
+        let nn = n.normalize_or_zero();
+        let foot = [(t1, 1.0), (t1, -1.0), (t2, 1.0), (t2, -1.0)].into_iter().find_map(|(t, sign)| {
+            let q = p - nn * (sign * t);
+            let in_box = |sf: &Shape| sf.bounding_box(false).is_ok_and(|b| (b.min - q).max(q - b.max).max_element() <= 1e-7);
+            let (j, sf) = order.iter().map(|(_, j, sf)| (*j, *sf)).find(|(_, sf)| in_box(sf) && sf.contains_point(q, 1e-7).unwrap_or(false))?;
+            sf.project_point(q).ok().filter(|pr| pr.distance < 1e-7).map(|pr| (j, sf, k::FaceProjection { distance: t, ..pr }))
+        });
+        // (The foot's face is the best so far: only faces whose boxes come nearer are projected.)
+        let Some(foot) = foot else { continue };
+        let mut near = Some(foot);
+        for (gap, i, sf) in order {
+            if near.as_ref().is_some_and(|(j, _, _)| *j == i) {
+                continue;
+            }
+            if near.as_ref().is_some_and(|(_, _, pr)| gap > pr.distance) {
+                break;
+            }
+            if let Ok(pr) = sf.project_point(p)
+                && near.as_ref().is_none_or(|(j, _, b)| pr.distance < b.distance || (pr.distance == b.distance && i < *j))
+            {
+                near = Some((i, sf, pr));
+            }
+        }
+        let near = near.map(|(_, sf, pr)| (sf, pr));
         let Some((sf, pr)) = near else { continue };
         let Ok(m) = sf.normal_at_uv(pr.u, pr.v) else { continue };
         let m = m.normalize_or_zero();

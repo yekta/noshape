@@ -710,9 +710,16 @@ pub(super) fn convexity(q: &QueryCx, e: &Ent) -> Option<&'static str> {
             kinds.push("SMOOTH");
             continue;
         }
-        // Direction into face b from the edge, tangent to b.
-        let pb = fb.project_point(p + (fb.centroid().ok()? - p) * 1e-3).ok()?.point;
-        let into_b = (pb - p).normalize_or_zero();
+        // Direction into face b from the edge, tangent to b: across the edge, the side a small step stays on b
+        // (the face classifier: projecting a point off a rolled wall takes ~2.5 ms); else towards b's middle.
+        let tangent = edge.tangent_at(info.first_param + (info.last_param - info.first_param) * t).ok();
+        let across = tangent.map(|d| nb.cross(d).normalize_or_zero()).filter(|a| a.length() > 0.5);
+        let stays = |v: DVec3| fb.contains_point(p + v * 1e-5, 1e-6).ok();
+        let into_b = match across.map(|a| (a, stays(a), stays(-a))) {
+            Some((a, Some(true), Some(false))) => a,
+            Some((a, Some(false), Some(true))) => -a,
+            _ => (fb.project_point(p + (fb.centroid().ok()? - p) * 1e-3).ok()?.point - p).normalize_or_zero(),
+        };
         kinds.push(if into_b.dot(na) < 0.0 { "CONVEX" } else { "CONCAVE" });
     }
     kinds.dedup();
