@@ -254,12 +254,9 @@ fn timed_big_assembly_round_trip() {
         let parts = call(&mut ictx, "query_parts", json!({ "tab": studio }))["parts"].as_array().unwrap().clone();
         let instances = tab("Assembly").map_or(0, |a| call(&mut ictx, "assembly_list", json!({ "tab": a }))["instances"].as_array().unwrap().len());
         report(&format!("big asm: import {n} instances {ext} -> {} part(s), {instances} instances", parts.len()), vec![ms]);
-        if ext == "igs" {
-            assert_eq!(parts.len(), n, "IGES is flat");
-        } else {
-            assert_eq!((parts.len(), instances), (1, n), "{ext}");
-            assert_eq!(parts[0]["name"], "Part 1", "{ext}");
-        }
+        // IGES too since its assembly export is live's (1755: subfigures placed by their instances).
+        assert_eq!((parts.len(), instances), (1, n), "{ext}");
+        assert_eq!(parts[0]["name"], "Part 1", "{ext}");
     }
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -52,6 +52,10 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   pipeflange's countersink rims (the cone's and the hole cylinder's seams would have to move together; ticket).
 
 **State 11-04 13:23 UTC.**
+- From dx (11-05 00:36), P0-looking: T2 ops big_plate_perf::big_plate_timing (and _tessellate_profile) fail on my tree
+  over main 1c4ab1d91: the 400 × 400 × 10 plate (Extrude 1 up from Top) and an Extrude 2 of its 400 Ø8 circles on Top,
+  Remove, Through all, default scope, now ends INFO "Selected tools and targets do not intersect." (status Ok
+  before). Nothing of mine touches extrude; the touched-parts / merge-scope work of 11-04 is my guess.
 - From dx (11-05 00:10): the whole model T2 suite on my tree over main a1ec7849a (no host change of mine involved): 194 pass,
   5 fail, all native: kernel_robustness::adjacent_regions_extrude_without_a_seam (8 faces, want 6),
   sweep_4_8_matches_onshape (Bo3 builds where Onshape says non-manifold), shell_after_chamfer_patch_matches_onshape

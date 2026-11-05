@@ -62,8 +62,10 @@ pub(crate) fn ms(d: Duration) -> f64 {
 pub(crate) fn assembly(name: &str, build: impl FnOnce(&mut Assembly)) -> (Ctx, String) {
     let dir = std::env::temp_dir().join(format!("noshape-asm-perf-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let scratch = dir.join(format!("{name}-seed.noshape"));
-    let out = dir.join(format!("{name}.noshape"));
+    // Per test: several build the same assembly at once (their seeds collided).
+    let test = std::thread::current().name().unwrap_or("main").replace("::", "-");
+    let scratch = dir.join(format!("{name}-{test}-seed.noshape"));
+    let out = dir.join(format!("{name}-{test}.noshape"));
     let _ = std::fs::remove_file(&scratch);
     let _ = std::fs::remove_file(&out);
     let mut ctx = Ctx::new();
