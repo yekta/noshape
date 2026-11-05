@@ -76,8 +76,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     resolves by name after a topology change; sheets keep planes under affine maps).
   - Landed 48f32c23: model-plus's Flange 1 is one valid part (3 parts vs live 2, +2.7 % volume); left: the flange's
     pull-back at both ends where it meets neighbouring bends, the curved bend stopping at x −11 (TICKETS).
-  - Queued: CUT-CLOSED-EDGES-SPLIT (taken from core/bool in core.md): join_loop_pieces in space: clamp-guillem 25/25,
-    run 113: 48/56 documents, 420/483 features. bushing's case needs a seam vertex Parasolid lacks (TICKETS).
+  - CUT-CLOSED-EDGES-SPLIT (taken in core.md): core landed the same join fix first (d6af88ae; mine dropped):
+    clamp-guillem 25/25, run 113: 48/56 documents, 420/483 features. bushing's case needs a seam vertex Parasolid
+    lacks; pipeflange's pieces meet a third edge (TICKETS).
   - For the lead: land slot 3 (/home/ngyekta/target-land-slot3) failed T0 twice on mold "undefined symbol anon.…"
     (stale incremental artifacts, 07:05 and 08:01); both changes went in with later batches.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),

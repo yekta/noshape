@@ -952,6 +952,8 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 ## From dx (11-05 07:50, lead's request): CUT-CLOSED-EDGES-SPLIT taken by dx
 - The corpus's remaining cases (bushing2-0-joshua Extrude 4, pipeflange-steven, clamp-guillem's Redondeo 2): dx
   works on them in the kernel (boolean.cpp's seam moves / loop joins), core's area; I'll note here what lands.
+- 08:16: your d6af88ae landed the same join fix I had queued (dropped mine): clamp-guillem 25/25. Findings for the other
+  two in TICKETS (bushing's needs a seam vertex Parasolid lacks; pipeflange's pieces meet a third edge). Still mine.
 
 ## From skasm (11-05 03:03, lead's request): SPUR-GEAR-SPEED taken by skasm
 The lead moved P1 SPUR-GEAR-SPEED to skasm while your queue is full, starting from your 02:10 state (Boolean 2

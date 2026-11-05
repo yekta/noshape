@@ -834,6 +834,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   18329.66 mm³ (after Extrude 3 already differs by split edges, CUT-CLOSED-EDGES-SPLIT). Our document:
   vibe5:~/tmp/noshape-parity-<pid>/pipeflange-steven.noshape (parity_models, NOSHAPE_PARITY_ONLY=pipeflange-steven).
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
+  dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
+  space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:
+  the outer cylinder's seam must run from its whole end circle (y 25) to the front chain, and every line to a
+  front-chain vertex crosses a side slot (the vertices at z ±12.5 lie in the slot's z ±19 band) while any other angle
+  meets a front arc between vertices: OCCT's periodic face needs one vertex Parasolid doesn't (it would take hiding a
+  vertex where only a seam meets two pieces of one curve: shown topology and picking). pipeflange-steven's Fillet 2:
+  two r 4 arcs in two pieces each at a vertex that a third edge meets (E46 / E48 with E65, E49 / E50 with E61), and a
+  volume difference (FILLET-PROPAGATION-VOLUME).
   dx 11-03 21:22: an Add does it too: prize-wheel-tim's Extrude 2 (a 2.4 × 6.8 mm centre rectangle unioned across the
   knob's r 1.88 circle at z 19.8 mm) leaves the circle's seam vertex at (0, 1.88): the top arc is two 1.30 mm arcs,
   live one 2.60 mm arc (live 20/49/32, ours 20/50/33; its only difference, 7/8 features as live).
