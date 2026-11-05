@@ -996,6 +996,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   four sides, two opposite pairs of edges joined, ribbon length c x width, c 0.3-0.9, all three pairings): larger than
   the plate on most corners (fill-1 28.2-42.4 against plate 26.93, live 26.07) and the two good ones grow too. Live's
   patches are flatter than both the plate's (least bending) and a G1 Coons'; not found which construction that is.
+  skasm 11-05 21:33 (live 2104: the patches' control nets, grids and boundaries; scripts /root/skasm-scratch/corner): Parasolid's G1
+  fill is a cubic B-spline over the plane that fits the boundary (its parameters the plane's coordinates, about 1 per
+  mm, trimmed by the boundary), within ~1e-4 mm of the boundary and 0.1 degree of tangent, bending least INSIDE the
+  boundary (OCCT's plate bends least over the whole plane: bigger). Landing as op_fill's G1 / position fill
+  (features.cpp fair_g1_fill, banded solve, 33-44 ms a corner; ScopeRule 12): the five corners against live, mm²:
+  JcC 26.064 (live 26.0706; plate 26.929), JuC 26.935 (26.9816; 27.853), RABC 35.641 (34.464; 37.926), and Setback
+  Fillet 2's RSBC 56.254 (56.875; 61.049), RkBC 44.856 (45.371; 46.353). cf-setback-fillet 3/5 -> 4/5 (Setback
+  Fillet 2 as live), Setback Fillet 1's part 4117.541 mm² (live 4116.402 ±0.84, plate 4121.687); the document 8.6 ->
+  3.0 s. Left: RABC (its middle 0.23 mm out of live's, the other two within 0.011 mm: not the plane, the knots, a
+  membrane term or the area weighting). The same fill with live's boundaries gives pipeflange's corner faces to 4
+  decimals (28.7413 / 31.3202, live 28.7417 / 31.3199): pipeflange needs those boundaries (the true rolling ball's:
+  the ball's contact on the tube while it rides the countersink rim, the rim arc, the ball's arcs at the ends and the
+  seam), then this fill G1 to its neighbours with the crease along the countersink kept: next.
 - [ ] P2 CUT-CLOSED-EDGES-SPLIT (core / bool; dx's parity suite 11-03) closed edges a cut makes come out in pieces
   dx 11-05 08:16: clamp-guillem's slot ends join now (core d6af88ae, the same fix dx had: the pieces' meeting measured in
   space, 2e-7 of u on a cylinder being 1.5e-9 m); clamp-guillem 25/25. bushing2-0-joshua's Extrude 4 is another kind:

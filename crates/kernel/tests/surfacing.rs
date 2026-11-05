@@ -414,3 +414,27 @@ fn a_long_wavy_strip_thickens_along_it() {
         assert!((l - h).abs() < 0.01 * h, "{} mm beside a {} mm helix", l * 1e3, h * 1e3);
     }
 }
+
+/// SETBACK-FILL-PATCH: a G1 fill round a setback corner (cf-setback-fillet's Setback Fillet 1, its first corner: six
+/// edges, each tangent to its fillet or plane) as Parasolid's: the least bending inside the boundary over the plane
+/// that fits it. Live's patch JcC is 26.0706 mm² (live 2061 / 2104, exact); OCCT's plate made 26.929. T1.
+#[test]
+fn a_g1_fill_of_a_setback_corner_bends_least_inside_its_boundary() {
+    set_working_scale(1000.0).unwrap();
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/fill/setback-corner-1.brep");
+    let s = read_brep(&path).unwrap();
+    let all = s.edges();
+    let faces = s.faces();
+    let boundary: Vec<FillEdge> = [0usize, 6, 11, 12, 17, 18]
+        .iter()
+        .map(|&i| {
+            let e = all[i].clone();
+            let support = faces.iter().find(|f| f.edges().iter().any(|x| x.is_same(&e))).cloned();
+            FillEdge { edge: e, support, continuity: Continuity::Tangent }
+        })
+        .collect();
+    let r = fill_surface(&boundary, &[]).unwrap().shape;
+    assert!(r.is_valid());
+    let a = area(&r) * 1e6;
+    assert!((a - 26.0706).abs() < 0.05, "{a} mm², live 26.0706");
+}

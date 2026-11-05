@@ -2441,4 +2441,9 @@ The lead gave skasm "Parasolid's corner patch where blends meet" as one capabili
 17:07 state: plate and G1 Coons ribbons both too big). skasm asks live for samples of both (control points, tangent
 grids, boundaries), fits the construction, then builds it; timeboxed to about a day after the samples. Please leave
 op_fill and the blend corners to skasm meanwhile; your notes and dumps are the starting point.
+11-05 21:33, landing in features.cpp: op_fill's G1 / position path (every edge tangent or through, no points or guides, ScopeRule
+12) is `fair_g1_fill`, not BRepOffsetAPI_MakeFilling: a cubic B-spline over the boundary's plane, least bending
+inside the boundary, banded Cholesky; it declines (and your plate / loose path runs, with live's warning) where it
+can't be within 1 degree of a support (G1 to a box's four walls). Only cf-setback-fillet changes in the model suite
+(3/5 -> 4/5); kernel and model tests, blend corpus unchanged. TICKETS SETBACK-FILL-PATCH has the numbers.
 

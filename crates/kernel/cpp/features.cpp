@@ -42,8 +42,14 @@
 #include <GC_MakeArcOfCircle.hxx>
 #include <GeomAPI_ProjectPointOnCurve.hxx>
 #include <BRepLib.hxx>
+#include <math_Vector.hxx>
+#include <math_Matrix.hxx>
+#include <math_Jacobi.hxx>
+#include <math_Gauss.hxx>
+#include <BSplCLib.hxx>
 #include <GeomConvert_SurfToAnaSurf.hxx>
 #include <GeomProjLib.hxx>
+#include <Geom2dAPI_PointsToBSpline.hxx>
 #include <ShapeAnalysis_Edge.hxx>
 #include <TopAbs.hxx>
 #include <BRepLib_FindSurface.hxx>
@@ -62,6 +68,7 @@
 #include <TopTools_HSequenceOfShape.hxx>
 #include <ShapeAnalysis_FreeBounds.hxx>
 #include <ShapeFix_Face.hxx>
+#include <ShapeAnalysis.hxx>
 #include <BRepAlgoAPI_Section.hxx>
 #include <BRepOffsetAPI_MakeThickSolid.hxx>
 #include <BRepOffsetAPI_ThruSections.hxx>
@@ -7224,6 +7231,416 @@ occ::handle<Geom_BSplineSurface> g1_coons_fill(const OcShapeList& edges, const O
 }
 } // namespace
 
+namespace {
+// One cubic B-spline basis on [a, b] in `spans` equal spans (flat knots for BSplCLib).
+struct CubicBasis
+{
+  double                    a, b;
+  int                       spans, n;
+  NCollection_Array1<double> flat;
+  CubicBasis(double a_, double b_, int s) : a(a_), b(b_), spans(s), n(s + 3), flat(1, s + 7)
+  {
+    for (int i = 1; i <= 4; ++i)
+    {
+      flat(i)         = a;
+      flat(s + 3 + i) = b;
+    }
+    for (int i = 1; i < s; ++i)
+      flat(4 + i) = a + (b - a) * i / s;
+  }
+  // The four functions not zero at t (from the returned first index, 0-based) and their derivatives up to d.
+  int eval(double t, int d, double out[3][4]) const
+  {
+    math_Matrix M(1, d + 1, 1, 4);
+    int         first = 0;
+    BSplCLib::EvalBsplineBasis(d, 4, flat, std::min(std::max(t, a), b), first, M);
+    for (int k = 0; k <= d; ++k)
+      for (int j = 0; j < 4; ++j)
+        out[k][j] = M(k + 1, j + 1);
+    return first - 1;
+  }
+};
+
+bool inside_polygon(const std::vector<gp_Pnt2d>& poly, double x, double y)
+{
+  bool in = false;
+  for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
+    if ((poly[i].Y() > y) != (poly[j].Y() > y) && x < (poly[j].X() - poly[i].X()) * (y - poly[i].Y()) / (poly[j].Y() - poly[i].Y()) + poly[i].X())
+      in = !in;
+  return in;
+}
+} // namespace
+
+// Parasolid's fill where blends meet (live 2104: Onshape's G1 fill of a setback corner, cf-setback-fillet's three
+// patches; pipeflange's corner faces): a cubic B-spline over the plane that best fits the boundary, its parameters the
+// plane's coordinates, through the boundary and tangent to each support face along its edge, the least bending inside
+// the boundary (outside it barely counts), trimmed by the boundary. With live's own boundaries it gives live's areas
+// (setback 26.05 / 26.91 / 35.1 mm², live 26.07 / 26.98 / 34.46; pipeflange 28.7413 / 31.3202, live 28.7417 /
+// 31.3199), where OCCT's plate, the least bending over the whole plane, overshoots (26.93 / 27.85 / 38.00).
+// `supports[i]` null: edge i only passed through. Null where it doesn't come out a valid face.
+std::optional<TopoDS_Face> fair_g1_fill(const std::vector<TopoDS_Edge>& edges, const std::vector<TopoDS_Face>& supports)
+{
+  if (edges.size() < 2 || supports.size() != edges.size())
+    return std::nullopt;
+  // The boundary as one wire, on copies of the edges (their curves on the new face are added to them).
+  TopoDS_Compound c0;
+  BRep_Builder    B;
+  B.MakeCompound(c0);
+  for (const TopoDS_Edge& e : edges)
+    B.Add(c0, e);
+  BRepBuilderAPI_Copy cp(c0, false, false);
+  occ::handle<NCollection_HSequence<TopoDS_Shape>> seq = new NCollection_HSequence<TopoDS_Shape>();
+  std::vector<std::pair<TopoDS_Edge, int>> copies; // copy, input index
+  for (size_t i = 0; i < edges.size(); ++i)
+  {
+    const TopoDS_Edge e = TopoDS::Edge(cp.ModifiedShape(edges[i]));
+    seq->Append(e);
+    copies.push_back({e, (int)i});
+  }
+  occ::handle<NCollection_HSequence<TopoDS_Shape>> wires;
+  ShapeAnalysis_FreeBounds::ConnectEdgesToWires(seq, Precision::Confusion(), false, wires);
+  if (wires.IsNull() || wires->Length() != 1)
+    return std::nullopt;
+  const TopoDS_Wire W = TopoDS::Wire(wires->Value(1));
+  std::unique_ptr<KernelTimer> lap = std::make_unique<KernelTimer>("fill.fair.samples");
+  // Samples: points, and the support's normal where the edge is tangent.
+  std::vector<gp_Pnt> P;
+  std::vector<gp_Dir> N;
+  std::vector<bool>   tangent;
+  std::vector<gp_Pnt> loop;
+  for (BRepTools_WireExplorer x(W); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = x.Current();
+    int                at = -1;
+    for (const auto& [ce, i] : copies)
+      if (ce.IsSame(e))
+        at = i;
+    if (at < 0)
+      return std::nullopt;
+    const BRepAdaptor_Curve c(e);
+    const int               k = 16;
+    const TopoDS_Face&      sf = supports[(size_t)at];
+    double                  f2 = 0, l2 = 0;
+    occ::handle<Geom2d_Curve> pc;
+    std::optional<BRepAdaptor_Surface> sa;
+    if (!sf.IsNull())
+    {
+      pc = BRep_Tool::CurveOnSurface(edges[(size_t)at], sf, f2, l2);
+      sa.emplace(sf);
+    }
+    for (int j = 0; j <= k; ++j)
+    {
+      const double t = c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * j / k;
+      const gp_Pnt p = c.Value(t);
+      P.push_back(p);
+      // (The loop as the wire runs: a reversed edge from its last point.)
+      if (j < k)
+        loop.push_back(c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * (e.Orientation() == TopAbs_REVERSED ? k - j : j) / k));
+      bool ok = false;
+      if (sa)
+      {
+        gp_Pnt2d uv;
+        if (!pc.IsNull())
+          uv = pc->Value(t);
+        else
+        {
+          GeomAPI_ProjectPointOnSurf pr(p, BRep_Tool::Surface(sf));
+          if (pr.NbPoints() == 0)
+            return std::nullopt;
+          double u, v;
+          pr.LowerDistanceParameters(u, v);
+          uv = gp_Pnt2d(u, v);
+        }
+        gp_Pnt q;
+        gp_Vec du, dv;
+        sa->D1(uv.X(), uv.Y(), q, du, dv);
+        const gp_Vec n = du.Crossed(dv);
+        if (n.Magnitude() > 1e-12)
+        {
+          N.push_back(gp_Dir(n));
+          ok = true;
+        }
+      }
+      if (!ok)
+        N.push_back(gp_Dir(0, 0, 1));
+      tangent.push_back(ok);
+    }
+  }
+  // The plane through them (least squares), its coordinates scaled so the boundary's box is 8 across.
+  gp_XYZ cen(0, 0, 0);
+  for (const gp_Pnt& p : P)
+    cen += p.XYZ();
+  cen /= (double)P.size();
+  math_Matrix C(1, 3, 1, 3, 0.0);
+  for (const gp_Pnt& p : P)
+  {
+    const gp_XYZ d = p.XYZ() - cen;
+    for (int r = 1; r <= 3; ++r)
+      for (int q = 1; q <= 3; ++q)
+        C(r, q) += d.Coord(r) * d.Coord(q);
+  }
+  math_Jacobi J(C);
+  if (!J.IsDone())
+    return std::nullopt;
+  int lo = 1, hi = 1;
+  for (int r = 2; r <= 3; ++r)
+  {
+    if (J.Value(r) < J.Value(lo))
+      lo = r;
+    if (J.Value(r) > J.Value(hi))
+      hi = r;
+  }
+  const int   mid = 6 - lo - hi;
+  math_Vector ev(1, 3);
+  J.Vector(hi, ev);
+  const gp_Dir e1(ev(1), ev(2), ev(3));
+  J.Vector(mid, ev);
+  gp_Dir       e2(ev(1), ev(2), ev(3));
+  const gp_Dir nz = e1.Crossed(e2);
+  e2              = nz.Crossed(e1);
+  double umin = 1e300, umax = -1e300, vmin = 1e300, vmax = -1e300, diag = 0;
+  for (const gp_Pnt& p : P)
+  {
+    const gp_XYZ d = p.XYZ() - cen;
+    umin = std::min(umin, d.Dot(e1.XYZ()));
+    umax = std::max(umax, d.Dot(e1.XYZ()));
+    vmin = std::min(vmin, d.Dot(e2.XYZ()));
+    vmax = std::max(vmax, d.Dot(e2.XYZ()));
+  }
+  diag = std::hypot(umax - umin, vmax - vmin);
+  if (diag < 1e-12)
+    return std::nullopt;
+  const double s = 8.0 / diag;
+  auto to_uv = [&](const gp_Pnt& p) { const gp_XYZ d = p.XYZ() - cen; return gp_Pnt2d(d.Dot(e1.XYZ()) * s, d.Dot(e2.XYZ()) * s); };
+  const double ue = (umax - umin) * s, ve = (vmax - vmin) * s, h = std::max(ue, ve) / 16;
+  const CubicBasis bu(umin * s, umax * s, std::max(1, (int)std::lround(ue / h))), bv(vmin * s, vmax * s, std::max(1, (int)std::lround(ve / h)));
+  const int nu = bu.n, nv = bv.n, n = nu * nv, m = 3 * n;
+  std::vector<gp_Pnt2d> poly;
+  for (const gp_Pnt& p : loop)
+    poly.push_back(to_uv(p));
+  // Normal equations: positions and tangency (weighted), plus the bending inside the boundary.
+  lap = std::make_unique<KernelTimer>("fill.fair.solve");
+  // Banded: pole (i, j) couples with poles up to (i + 3, j + 3), its three coordinates interleaved.
+  const int           bw = 3 * (3 * nv + 3) + 2;
+  std::vector<double> band((size_t)m * (bw + 1), 0.0); // (r, c), c >= r, at (r - 1) * (bw + 1) + c - r
+  auto                at = [&](int r, int c) -> double& { return band[(size_t)(r - 1) * (bw + 1) + (c - r)]; };
+  auto                add = [&](int r, int c, double v) {
+    if (c >= r)
+      at(r, c) += v;
+  };
+  math_Vector R(1, m, 0.0);
+  // (Weighted as live's fill comes out: within 1e-4 mm of the boundary, 0.1 degree of tangent.)
+  const double wpos = 1e6, wg1 = 1e4;
+  for (size_t k = 0; k < P.size(); ++k)
+  {
+    const gp_Pnt2d uv = to_uv(P[k]);
+    double         fu[3][4], fv[3][4];
+    const int      iu = bu.eval(uv.X(), 1, fu), iv = bv.eval(uv.Y(), 1, fv);
+    const gp_XYZ   target = (P[k].XYZ() - cen) * s;
+    int            idx[16];
+    double         b0[16], bdu[16], bdv[16];
+    for (int a = 0; a < 4; ++a)
+      for (int q = 0; q < 4; ++q)
+      {
+        idx[a * 4 + q] = (iu + a) * nv + (iv + q);
+        b0[a * 4 + q]  = fu[0][a] * fv[0][q];
+        bdu[a * 4 + q] = fu[1][a] * fv[0][q];
+        bdv[a * 4 + q] = fu[0][a] * fv[1][q];
+      }
+    for (int d = 0; d < 3; ++d)
+      for (int x = 0; x < 16; ++x)
+      {
+        R(1 + 3 * idx[x] + d) += wpos * b0[x] * target.Coord(d + 1);
+        for (int y = 0; y < 16; ++y)
+          add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, wpos * b0[x] * b0[y]);
+      }
+    if (!tangent[k])
+      continue;
+    for (const double* g : {bdu, bdv})
+      for (int d = 0; d < 3; ++d)
+        for (int x = 0; x < 16; ++x)
+          for (int e = 0; e < 3; ++e)
+            for (int y = 0; y < 16; ++y)
+              add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + e, wg1 * N[k].Coord(d + 1) * g[x] * N[k].Coord(e + 1) * g[y]);
+  }
+  const double gx[4] = {-0.8611363115940526, -0.3399810435848563, 0.3399810435848563, 0.8611363115940526};
+  const double gw[4] = {0.3478548451374538, 0.6521451548625461, 0.6521451548625461, 0.3478548451374538};
+  const double du_ = (bu.b - bu.a) / bu.spans, dv_ = (bv.b - bv.a) / bv.spans;
+  for (int cu = 0; cu < bu.spans; ++cu)
+    for (int cv = 0; cv < bv.spans; ++cv)
+      for (int a = 0; a < 4; ++a)
+        for (int q = 0; q < 4; ++q)
+        {
+          const double u = bu.a + du_ * (cu + 0.5 + 0.5 * gx[a]), v = bv.a + dv_ * (cv + 0.5 + 0.5 * gx[q]);
+          const double w = gw[a] * gw[q] * 0.25 * du_ * dv_ * (inside_polygon(poly, u, v) ? 1.0 : 1e-3);
+          double       fu[3][4], fv[3][4];
+          const int    iu = bu.eval(u, 2, fu), iv = bv.eval(v, 2, fv);
+          int          idx[16];
+          double       suu[16], suv[16], svv[16];
+          for (int x = 0; x < 4; ++x)
+            for (int y = 0; y < 4; ++y)
+            {
+              idx[x * 4 + y] = (iu + x) * nv + (iv + y);
+              suu[x * 4 + y] = fu[2][x] * fv[0][y];
+              suv[x * 4 + y] = fu[1][x] * fv[1][y];
+              svv[x * 4 + y] = fu[0][x] * fv[2][y];
+            }
+          for (int x = 0; x < 16; ++x)
+            for (int y = 0; y < 16; ++y)
+            {
+              const double val = w * (suu[x] * suu[y] + 2 * suv[x] * suv[y] + svv[x] * svv[y]);
+              for (int d = 0; d < 3; ++d)
+                add(1 + 3 * idx[x] + d, 1 + 3 * idx[y] + d, val);
+            }
+        }
+  // Cholesky of the band (positive definite: the bending plus the weighted conditions), then the two solves.
+  for (int r = 1; r <= m; ++r)
+  {
+    for (int q = std::max(1, r - bw); q < r; ++q)
+    {
+      const double lqr = at(q, r);
+      if (lqr == 0)
+        continue;
+      for (int c = r; c <= std::min(m, q + bw); ++c)
+        at(r, c) -= lqr * at(q, c);
+    }
+    if (!(at(r, r) > 0))
+      return std::nullopt;
+    const double dg = std::sqrt(at(r, r));
+    for (int c = r; c <= std::min(m, r + bw); ++c)
+      at(r, c) /= dg;
+  }
+  math_Vector X(1, m);
+  for (int r = 1; r <= m; ++r)
+  {
+    double v = R(r);
+    for (int q = std::max(1, r - bw); q < r; ++q)
+      v -= at(q, r) * X(q);
+    X(r) = v / at(r, r);
+  }
+  for (int r = m; r >= 1; --r)
+  {
+    double v = X(r);
+    for (int c = r + 1; c <= std::min(m, r + bw); ++c)
+      v -= at(r, c) * X(c);
+    X(r) = v / at(r, r);
+  }
+  // The surface in the part's units: its parameters the plane's coordinates.
+  NCollection_Array2<gp_Pnt> poles(1, nu, 1, nv);
+  for (int i = 0; i < nu; ++i)
+    for (int j = 0; j < nv; ++j)
+      poles(i + 1, j + 1) = gp_Pnt(cen + gp_XYZ(X(1 + 3 * (i * nv + j)), X(2 + 3 * (i * nv + j)), X(3 + 3 * (i * nv + j))) / s);
+  auto knots = [&](const CubicBasis& b, NCollection_Array1<double>& k, NCollection_Array1<int>& mlt) {
+    for (int i = 0; i <= b.spans; ++i)
+    {
+      k(i + 1)   = (b.a + (b.b - b.a) * i / b.spans) / s;
+      mlt(i + 1) = (i == 0 || i == b.spans) ? 4 : 1;
+    }
+  };
+  NCollection_Array1<double> uk(1, bu.spans + 1), vk(1, bv.spans + 1);
+  NCollection_Array1<int>    um(1, bu.spans + 1), vm(1, bv.spans + 1);
+  knots(bu, uk, um);
+  knots(bv, vk, vm);
+  occ::handle<Geom_BSplineSurface> S;
+  try
+  {
+    S = new Geom_BSplineSurface(poles, uk, vk, um, vm, 3, 3);
+  }
+  catch (const Standard_Failure&)
+  {
+    return std::nullopt;
+  }
+  // Tangent where it must be (live's fill: within 0.1 degree); not, where the supports can't all be met (G1 to a box's
+  // four walls, live 1739 FI2): the caller's fill then builds it with live's warning.
+  for (size_t k = 0; k < P.size(); ++k)
+  {
+    if (!tangent[k])
+      continue;
+    const gp_Pnt2d uv = to_uv(P[k]);
+    gp_Pnt         q;
+    gp_Vec         du, dv;
+    S->D1(uv.X() / s, uv.Y() / s, q, du, dv);
+    const gp_Vec nn = du.Crossed(dv);
+    if (nn.Magnitude() < 1e-15 || std::abs(gp_Dir(nn).Dot(N[k])) < std::cos(M_PI / 180))
+      return std::nullopt;
+  }
+  double tol = Precision::Confusion();
+  for (const TopoDS_Edge& e : edges)
+    tol = std::max(tol, BRep_Tool::Tolerance(e));
+  lap = std::make_unique<KernelTimer>("fill.fair.pcurves");
+  TopoDS_Face F;
+  B.MakeFace(F, S, tol);
+  for (TopExp_Explorer x(W, TopAbs_EDGE); x.More(); x.Next())
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+    double             f3, l3;
+    const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, f3, l3);
+    if (c3.IsNull())
+      return std::nullopt;
+    // Its curve on the face: the surface's parameters are the plane's coordinates, and it passes through the
+    // boundary, so the edge projected on the plane, fitted over the edge's own parameter (OCCT's projection onto the
+    // surface took up to 1.4 s a fill).
+    const int                   kk = 32;
+    NCollection_Array1<gp_Pnt2d> q(1, kk + 1);
+    NCollection_Array1<double>   prm(1, kk + 1);
+    for (int jj = 0; jj <= kk; ++jj)
+    {
+      prm(jj + 1)      = f3 + (l3 - f3) * jj / kk;
+      const gp_Pnt2d w = to_uv(BRepAdaptor_Curve(e).Value(prm(jj + 1)));
+      q(jj + 1)        = gp_Pnt2d(w.X() / s, w.Y() / s);
+    }
+    occ::handle<Geom2d_Curve> pc;
+    try
+    {
+      Geom2dAPI_PointsToBSpline fit2(q, prm, 3, 8, GeomAbs_C2, 1e-9 * diag);
+      // (Its knots on the edge's own range: the fit comes back on [0, 1].)
+      if (fit2.IsDone())
+        if (const occ::handle<Geom2d_BSplineCurve> b = fit2.Curve(); !b.IsNull())
+        {
+          NCollection_Array1<double> kn(1, b->NbKnots());
+          b->Knots(kn);
+          const double k0 = kn(kn.Lower()), k1 = kn(kn.Upper());
+          for (int ii = kn.Lower(); ii <= kn.Upper(); ++ii)
+            kn(ii) = f3 + (kn(ii) - k0) / (k1 - k0) * (l3 - f3);
+          NCollection_Array1<gp_Pnt2d> pp(1, b->NbPoles());
+          b->Poles(pp);
+          NCollection_Array1<int> mm(1, b->NbKnots());
+          b->Multiplicities(mm);
+          pc = new Geom2d_BSplineCurve(pp, kn, mm, b->Degree());
+        }
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+      B.UpdateEdge(e, pc, F, tol);
+    B.Range(e, F, f3, l3);
+  }
+  lap = std::make_unique<KernelTimer>("fill.fair.face");
+  try
+  {
+  B.Add(F, W);
+  // (The boundary round the face's material: the wire turned where it runs the other way in the plane's coordinates.)
+  if (!ShapeAnalysis::IsOuterBound(F))
+  {
+    TopoDS_Face G;
+    B.MakeFace(G, S, tol);
+    B.Add(G, W.Reversed());
+    F = G;
+  }
+  BRepLib::SameParameter(F, tol, true);
+  ShapeFix_Face fix(F);
+  fix.Perform();
+  const TopoDS_Face out = TopoDS::Face(fix.Face());
+  if (!BRepCheck_Analyzer(out).IsValid())
+    return std::nullopt;
+  return out;
+  }
+  catch (const Standard_Failure& x)
+  {
+      return std::nullopt;
+  }
+}
+
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               rust::Slice<const int32_t> orders, rust::Slice<const double> points,
               const OcShapeList& guides)
@@ -7286,6 +7703,23 @@ OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
       fail_op("fill surface failed");
     std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
     return make_result(args, mf.Face(), nullptr);
+  }
+  // Tangent or through on every edge, nothing else (Onshape's G1 fill of a setback corner): Parasolid's fill.
+  if (guides.items.empty() && points.empty() && supports.items.size() == edges.items.size() && !legacy_rim_seams()
+      && std::all_of(orders.begin(), orders.end(), [](int32_t o) { return o == 0 || o == 1; }))
+  {
+    std::vector<TopoDS_Edge> es;
+    std::vector<TopoDS_Face> fs;
+    for (size_t i = 0; i < edges.items.size(); ++i)
+    {
+      es.push_back(as_edge(edges.items[i], "fill boundary edge"));
+      fs.push_back(i < orders.size() && orders[i] == 1 && !supports.items[i].IsNull() ? as_face(supports.items[i], "fill support face") : TopoDS_Face());
+    }
+    if (const std::optional<TopoDS_Face> f = fair_g1_fill(es, fs))
+    {
+      std::vector<TopoDS_Shape> args(edges.items.begin(), edges.items.end());
+      return make_result(args, *f, nullptr);
+    }
   }
   // Guide curves are met to modelling tolerance (live "psb (10-24 d)":
   // within 1e-4 mm): more points on them, more iterations, a finer surface.
