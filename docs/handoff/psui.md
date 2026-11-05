@@ -571,6 +571,23 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N000000. (11-05 09:08) **Live mid-orbit (lead 11-05: motion-only cuts are parity only if live does them).** Live's
+    webgl bundle (bundle-raw/webgl.*.js, the `detail` logger): while the camera moves (frameTimer interaction, 500 ms
+    after the last move) live draws its interactive DetailSettings; they start equal to FULL and drop a step only when
+    interactive frames average over 1000/DETAIL_REDUCTION_THRESHOLD_FPS (20) = 50 ms: edge silhouettes + section
+    edges, then SSAO, then image-based (backface) silhouettes, then lowLevelBodyProportion +0.1 up to 0.9; back up a
+    step under 1000/30 ms. Always while moving: extent culling 10 px (2 px at rest). AO off for interactive frames
+    only on Mac with an AMD GPU or Apple GPU in Safari (`isInteractiveSsaoEnabled`); edge / backface silhouettes off
+    only in Safari 15. Ours does all of this already (app-core viewport.rs `interactive_style`, navigation.rs
+    DetailManager). Capture (live NIST Part Studio, SwiftShader, CDP screencast during a right-drag:
+    onshape-research/live/psui/orbit-detail/, cast/drag-vs-rest.png): part edges, outlines and AO drawn while
+    dragging; only the hover highlight is gone until release. So at our frame rates (~8 ms) live draws full detail
+    while moving: no motion-only cut is parity. Savings must change nothing.
+    **AO (exact-pixel candidates):** per frame the AO is three passes, ~0.63 ms each on the runners (occlusion and
+    filter at half size, apply full size: about the same each, so per-pass cost), and the colour pass stores its 4×
+    MSAA depth (2388×1588×4) only for the AO to read sample 0. A/B run 41999792837 (perf/psui-depthstore,
+    NOSHAPE_PERF_SKIP=depthstore / ao+depthstore) measures the store's share; if it is large, keep only sample 0
+    (Metal depth resolve, MTLMultisampleDepthResolveFilterSample0, via the vendored wgpu-hal).
 N00000. (11-05 07:19) **Speed gates landed (lead's decision 11-05, 8a0cf0d9 with cf8d8a95's r.gpu_ms):** perf.yml's
     macOS rows gate PLAN 2.7's floor (`--gate-floor-gpu-p95 16.7`: GPU frame p95 over the scripted orbit at 2×) and
     report the NIST 120 fps target (`--target-gpu-mean 8.3`; set TARGET_GATE to `--gate-target` once the mean is
