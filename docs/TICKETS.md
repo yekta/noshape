@@ -3955,7 +3955,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (oriented as the walls): the fillet then succeeds but the part comes out a 21-face solid of −23.9 mm³ (box x −11 ..
   −8): not kept. The same with the neighbour trimmed to its bend edge's span (a Common with a slab): the same
   −23.9 mm³ part, so once that curved wall's bends build, something further on in build_part breaks (next: trace
-  the pieces build_part fuses for that model).
+  the pieces build_part fuses for that model). Traced (dx 11-05): with the curved wall's bends built, every piece
+  is right but the sloped wall's slab (24 faces, 1336 mm³) is invalid (Shape::is_valid false): its outline is pulled
+  back along the curved bend (x −25 … −10) but not along the free side that runs on in line from it to x −8 (the
+  flange's), and that step breaks the slab; fuse_all (glued, plain or one at a time) then gives the −23.9 mm³
+  fragment. Pieces' sum 11 193 mm³, live's part 10 905. Next: step the pulled outline where a bend side meets a free
+  side in line (as surfaces.rs move_polygon_edges does), or the relief live puts there (ask live for the faces at
+  x −10 … −8, y 55 … 58 after Flange 1); and build_part could check its pieces' validity before fusing.
 - [x] (dx 11-05 06:59: the translator points such a constraint at nothing too, ops::pin_to_missing_reference; train-joe 12/12, clamp-guillem 24/25) P2 PARITY-MISSING-EXTERNAL-REFS (dx 11-05 06:10, run 105) live's sketches with an external reference that no
   longer resolves (its query empty: deterministicIds [""], queryString "") are WARNING "Some external references are
   missing."; the translator leaves those constraints to the solved geometry, so ours are OK: clamp-guillem's Boceto 6
