@@ -1,6 +1,6 @@
 {
  "name": "drw-create-of-part",
- "about": "right-click the part, Create Drawing of Part 1\u2026, OK with the dialog's defaults: what the new drawing tab shows (and the view on the cursor)",
+ "about": "right-click the part, Create drawing of Part 1, OK with the dialog's defaults: what the new drawing tab shows (and the view on the cursor) [live 11-05: the menu item reads \"Create Drawing of Part 1\u2026\"]",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "everyday (lead 11-05)",

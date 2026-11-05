@@ -1,6 +1,6 @@
 {
  "name": "drw-note",
- "about": "Note on the sheet: click its place, type, then click off it",
+ "about": "Note on the sheet: click its place, type, then click off it [live 11-05: the note point moved from (150, 40) to (60, 40) mm: (150, 40) is inside the ANSI title block, where a Note click places nothing and the typed letters then act as shortcuts]",
  "area": "dx",
  "ticket": "DRAWING-UI-PARITY",
  "source": "everyday (lead 11-05)",
@@ -16,7 +16,7 @@
    "do": "click",
    "on": {
     "sheet_point": [
-     150,
+     60,
      40
     ]
    }
