@@ -598,6 +598,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (native Reapply: pattern.rs instance_references; std's FeatureList re-run: the faces made under the instance's id,
   also through the pattern's merge). Also: the parity runner takes a sheet's box from live's UI fetch as an outer
   bound (cf-curve-pattern-normal's Extrude 2 matches; its next is a custom feature not loading, dx).
+- [ ] P2 SKETCH-TEXT-BOX-HEIGHT (for skasm; core 11-05 02:50) a sketch text box's height is the font's ascender line here
+  (Open Sans 2189 / 2048 = 1.069 em: sketch text.rs layout_face, box y = 1) but Onshape's is `ascent`, 0.72 of the font
+  size (live 1922 and 2044: cf-fix-pcb's 9.1444 mm box holds a 12.70 mm font, its E 9.067 mm tall). So the same box
+  (drawn, or its height dimensioned) makes letters 0.72 / 1.069 = 67 % of live's: a 10 mm box, live's capitals ~9.9 mm,
+  ours ~6.7. The parity translator now sizes texts from `ascent` (core 11-05), so it and `sketch_text`'s `height`
+  (the ascender line) change together once the box is live's.
 - [ ] P1 PARITY-SPEED-MOTOR-MOUNT (core 11-04 09:05) motor-mount-jack matches live to the end now but regenerates in
   ~440 ms against live's 53: Circular pattern 1 (a face pattern of two elliptic slot walls through the tube, ×4) 244 ms
   (live 5), Extrude 3 86 ms (live 6), Fillet 2 (the bore's full round) 71 ms (live 3). Next for core.
