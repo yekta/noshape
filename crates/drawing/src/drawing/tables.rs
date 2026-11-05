@@ -548,7 +548,8 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
                         let a = super::Annotation { format: DimFormat { precision: *precision, ..Default::default() }, ..Default::default() };
                         Some(super::build::hole_callout_text(drawing, hole, 1, &a).join("\n"))
                     };
-                    r.push(if k == 0 { size().unwrap_or_else(|| format!("Ø{}", num(h.diameter))) } else { String::new() });
+                    // (A plain hole's diameter as a dimension shows it: an ANSI inch drawing drops the leading zero.)
+                    r.push(if k == 0 { size().unwrap_or_else(|| format!("Ø{}", super::format::format_len(drawing, &f, h.diameter))) } else { String::new() });
                     r.push(if k == 0 { n.to_string() } else { String::new() });
                     rows.push(r);
                 }
