@@ -3,6 +3,21 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## "Two edges leave a vertex in one direction" in the parity documents (11-05 23:30 UTC)
+- Landed 69db1e8c: parity56 (tools/bool-share.sh parity56) 318 -> 350 of 594 taken (53.5 -> 58.9 %), OCCT time 60.4 ->
+  76.5 %; corpora, shfall and the kernel tests unchanged otherwise. The 49 cases were one document's pattern cuts (8 to
+  32 cutters, chamfered hex shapes over a cylinder): a 35 um chord on a cone drawn as a ruling up its seam; a vertex
+  0.6 um off a cone's seam given one place; pieces of a closed circle a turn off on a face going round (their places
+  can't tell either side of the seam: now by their angles); a section's end 0.6 um from a corner of both faces (now that
+  vertex); a crossing found 44 um before the end of the edge it grazes (now that end; not where a crossing lies past
+  it too, Shell's tangent touches); an edge's range 1e-6 past its curve on a face (narrowed, when the result is
+  checked). The memo test now uses two of these cuts (71dac1de, f901b748); 171341672da7c4f9 is taken
+  (a_straight_spline_cut_taken).
+- Left in that family: 17 cases "two edges..." (11 s of OCCT), 14 "a non-manifold result" (8 s): clusters of vertices
+  within 20 um of the cylinder's top corners, sections ending 10 um either side of a corner (2eafe30c0162a096 smallest).
+- parity56 has 3 fuses ours takes on main that differ from OCCT after unify (342606d0, 51f1021e: 228 edges against 229;
+  ac1b1ab0: 16 against 47): to look at.
+
 ## Shell's fuses (shfall), learning-center-michael, motor-mount (11-05 19:35 UTC)
 - shfall (vibe4 ~/agents/bool-corpora/shfall, 194 cases, 46 taken): its untaken OCCT time (258 s recorded) is
   Shell's tolerant geometry: input vertices of 0.3 mm to 1.08 m tolerance, groups of 0.17 mm, fuzzy 20 um faces.
