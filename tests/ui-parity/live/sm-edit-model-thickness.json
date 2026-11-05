@@ -1,0 +1,1077 @@
+{
+ "scenario": "sm-edit-model-thickness",
+ "recorded": "2026-11-05T01:46:27.178Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "18b69701197c4509484a5341",
+  "start": "plate",
+  "startElement": "398b1874bd7e80eca1dae624"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Sheet metal model 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Sheet metal model 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "dblclick",
+    "on": {
+     "feature": "Sheet metal model 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    313
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Faces or sketch regions to thicken",
+     "dialog": "Sheet metal model 1"
+    },
+    "dialog": {
+     "title": "Sheet metal model 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Convert",
+       "selected": false
+      },
+      {
+       "label": "Extrude",
+       "selected": false
+      },
+      {
+       "label": "Thicken",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces or sketch regions to thicken",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Edges or cylinders to bend",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Clearance from input",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Include bends",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal model 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Convert",
+        "selected": false
+       },
+       {
+        "label": "Extrude",
+        "selected": false
+       },
+       {
+        "label": "Thicken",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces or sketch regions to thicken",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Edges or cylinders to bend",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Clearance from input",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Include bends",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 27715
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Thickness"
+    }
+   },
+   "ok": true,
+   "at": [
+    385,
+    373
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "2 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "Sheet metal model 1"
+    },
+    "dialog": {
+     "title": "Sheet metal model 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Convert",
+       "selected": false
+      },
+      {
+       "label": "Extrude",
+       "selected": false
+      },
+      {
+       "label": "Thicken",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces or sketch regions to thicken",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Edges or cylinders to bend",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Clearance from input",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Include bends",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal model 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Convert",
+        "selected": false
+       },
+       {
+        "label": "Extrude",
+        "selected": false
+       },
+       {
+        "label": "Thicken",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces or sketch regions to thicken",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Edges or cylinders to bend",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Clearance from input",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Include bends",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 29962
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "type",
+    "text": "3"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "3",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "Sheet metal model 1"
+    },
+    "dialog": {
+     "title": "Sheet metal model 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Convert",
+       "selected": false
+      },
+      {
+       "label": "Extrude",
+       "selected": false
+      },
+      {
+       "label": "Thicken",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces or sketch regions to thicken",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Edges or cylinders to bend",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Clearance from input",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Include bends",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal model 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Convert",
+        "selected": false
+       },
+       {
+        "label": "Extrude",
+        "selected": false
+       },
+       {
+        "label": "Thicken",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces or sketch regions to thicken",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Edges or cylinders to bend",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Clearance from input",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Include bends",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 31814
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Thickness",
+     "text": "3 mm",
+     "selection": [
+      0,
+      4
+     ],
+     "all": true,
+     "dialog": "Sheet metal model 1"
+    },
+    "dialog": {
+     "title": "Sheet metal model 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Convert",
+       "selected": false
+      },
+      {
+       "label": "Extrude",
+       "selected": false
+      },
+      {
+       "label": "Thicken",
+       "selected": true
+      }
+     ],
+     "fields": [
+      {
+       "label": "Faces or sketch regions to thicken",
+       "kind": "query",
+       "items": [
+        "Face of Sketch 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Edges or cylinders to bend",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Clearance from input",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Include bends",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Thickness",
+       "kind": "number",
+       "text": "3 mm",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Bend radius",
+       "kind": "number",
+       "text": "2 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip direction up",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Sheet metal model 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Convert",
+        "selected": false
+       },
+       {
+        "label": "Extrude",
+        "selected": false
+       },
+       {
+        "label": "Thicken",
+        "selected": true
+       }
+      ],
+      "fields": [
+       {
+        "label": "Faces or sketch regions to thicken",
+        "kind": "query",
+        "items": [
+         "Face of Sketch 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Edges or cylinders to bend",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Clearance from input",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Include bends",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Thickness",
+        "kind": "number",
+        "text": "3 mm",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Bend radius",
+        "kind": "number",
+        "text": "2 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip direction up",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FACE",
+       "owner": "Sketch",
+       "id": "JGC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 34852
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Sheet metal model 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Sheet metal model 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null
+   },
+   "t": 38054
+  }
+ ]
+}
