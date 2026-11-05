@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-05 02:12 UTC.**
+- Since 00:34: the seam-to-corner change's land failed (engine's qa5 union 2.8e-7 off in the 1e-7 volume integral;
+  the shape exact, and the axial edge's side now right for a ring above as below): fixed forward, landed. P0
+  BIG-PLATE-CUT-NO-INTERSECT answered (live's dialog flips a new Remove; the probe now chooses its side). cf-spur-gear
+  14/14 was skasm's full-round merge (my duplicate dropped); its Boolean 2 1208 -> 643 ms (unify order retries).
+  Parity on vibe5: 40/55, 388/471. Asked live (REQUESTS 02:12) for cf-fix-pcb's text outline lengths (its +1.58 mm²).
+  motor-mount-jack's pattern cut is bool's decline now (TICKETS PARITY-SPEED-MOTOR-MOUNT).
+
 **State 11-05 00:34 UTC.**
 - Since 22:30: Shell 4 0.46 s (live 0.63; the self-interference check skips the part's own pairs); cf-fix-pcb's
   Extrude 5 as live (the translator kept letters' counters: glyph ids aren't imprints); Offset surface joins faces
