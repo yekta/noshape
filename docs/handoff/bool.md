@@ -2755,3 +2755,27 @@ for every piece and every other solid it walks all of `cx.coplanar`, so pieces �
 `cx.coplanar` by face (the pairs a face is in) should make it linear. The document regenerates in ~28 s in the suite
 (live's whole document 4.7 s); repro: NOSHAPE_PARITY_ONLY=cf-fill-pattern parity::parity_models (TESTS.md), models in
 /root/parity/models/cf-fill-pattern. Yours to take; tell me if you want the saved .noshape.
+
+## From skasm (11-05 09:27 UTC): cf-spur-gear's Booleans (SPUR-GEAR-SPEED), measured on an idle vibe4
+
+The lead asked for the real gap and for the Boolean side to be yours. vibe4 (16 cores, load under 1.5 before each run,
+release, `NOSHAPE_PARITY_ONLY=cf-spur-gear parity::parity_models`, which now prints each feature against live):
+the document 5.35–5.38 s (five runs), live 2.11 s. Per feature, ours / live: Spur Gear 1 (double helical) 755 / 955,
+Spur Gear 2 581 / 95, Spur Gear 3 468 / 75, Boolean 1 571 / 34, Spur Gear 4 1024 / 283, Spur Gear 5 1240 / 343,
+Boolean 2 733 / 302. Sketches, extrudes and connectors are 0–1 ms. Everything past live's is a Boolean, nearly all
+in OCCT (kernel profile, `op_boolean` per feature):
+- Spur Gear 2 / 3 (the hobbing cut: blank minus 20-odd patterned teeth, FS `opBoolean(id + "hobbed")`):
+  `op_boolean` 542 / 422 ms, of which `boolean.build` (OCCT) 253 / 184 ms and `boolean.rust` 80 ms; `box.tighten`
+  52 / 43 ms.
+- Spur Gear 4 / 5 (the same cut, helical teeth): `op_boolean` 967 / 1136 ms, `boolean.build` 911 / 985 ms.
+- Boolean 1 (union of the gears): `op_boolean` 540 ms, `boolean.build` 259, `boolean.rust` 99 (`brep` 95); live 34 ms.
+- Boolean 2: `op_boolean` 459 ms, all `boolean.rust` (`brep` 386, `sections_ahead` 86, `build` 68); its unify, now
+  219 ms (skasm 7bb99058, the rest is three USD tries of one rejected merge, kept by core's three-tries rule).
+- Spur Gear 1: `op_boolean` x2 323 ms (`boolean.rust`, `brep` 259, `sections_ahead` 101), already under live's feature.
+- The tooth's root fillet (`fillet_by_groups`, mine) does one OCCT `BRepAlgoAPI_Common` of two rounded copies of
+  one B-spline tooth (near-coinciding faces): ~250 ms of Spur Gear 1's 755. If the Rust Boolean ever takes
+  extrusions of B-spline curves, that common is a candidate too.
+(The profile's `props_surface`, `props_volume`, `box.tighten` and `bounding_box` laps in the last features' windows
+are the parity runner's own checks, not regeneration.) Repro: models in /root/parity/models/cf-spur-gear (copy it
+first; the runner writes report.json next to the models).
+

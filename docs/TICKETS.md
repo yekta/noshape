@@ -157,6 +157,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Faces unchanged: the model suite (40/55, 391/471) and blend corpus identical before / after, kernel tests pass.
   Left: the rejected merge is still tried three times (USD 3 x 60–90 ms). (The props_surface laps in the gear's
   kernel profile are the parity runner's own area queries (ops query::parts), not its regeneration.)
+  skasm 11-05 09:27, idle vibe4 (16 cores, load < 1.5, five runs): the document 5.35–5.38 s, live 2.11 s. Ours / live:
+  Spur Gear 1 755 / 955, 2 581 / 95, 3 468 / 75, Boolean 1 571 / 34, Spur Gear 4 1024 / 283, 5 1240 / 343,
+  Boolean 2 733 / 302; the gap is the Booleans (OCCT's build in the hobbing cuts and Boolean 1, the Rust Boolean
+  in Boolean 2): numbers in bool.md "From skasm". The three USD tries are three different wire starts of the
+  rejected cylinders (4-edge wires: tries 1 and 2 start them elsewhere), not one merge built again: nothing to
+  skip there without dropping the rule. The tooth's root fillet (Spur Gear 1, ~340 ms) is mostly one OCCT Common;
+  skipping its first common when the first round lies inside measured ~20 ms on vibe4: not landed.
 
 - [x] (core 11-05 01:44: as live's dialog, not a regression: feature_add makes the dialog's choices, and std's extrude edit logic flips a new Extrude going New -> Remove (canSetBooleanFlip, whatever the geometry, unless the flip or the merge scope is given), so from Top it points away from the plate above it, "Selected tools and targets do not intersect." in live's dialog too; the probe gives oppositeDirection false as a REST script would, and cuts the 400 holes again) P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
   and an Extrude 2 of 400 Ø8 circles sketched on Top, Remove, Through all, default scope: INFO "Selected tools and
