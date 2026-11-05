@@ -9,6 +9,7 @@
 
 pub use noshape_kernel::VERSION;
 
+pub mod about;
 pub mod analysis;
 pub mod analysis_tools;
 pub mod appearance;

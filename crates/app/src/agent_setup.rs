@@ -31,10 +31,12 @@ enum Scope {
     Everything,
 }
 
-/// The Help menu's items.
+/// The Help menu's items: the two setup dialogs, then About (live: last, after a divider).
 pub fn help_items(menu: OsMenu) -> OsMenu {
-    menu.item(OsMenuItem::new("Install command line tool…").on_click(|_, window, cx| open(Scope::Cli, window, cx)))
-        .item(OsMenuItem::new("Connect to coding agents…").on_click(|_, window, cx| open(Scope::Agents, window, cx)))
+    let menu = menu
+        .item(OsMenuItem::new("Install command line tool…").on_click(|_, window, cx| open(Scope::Cli, window, cx)))
+        .item(OsMenuItem::new("Connect to coding agents…").on_click(|_, window, cx| open(Scope::Agents, window, cx)));
+    crate::about::help_item(menu)
 }
 
 /// The two items as actions (the macOS app menu), in the active window.
@@ -44,6 +46,8 @@ pub fn init(cx: &mut App) {
     // macOS: the app menu (noshape ▸), where Mac apps put these.
     if cfg!(target_os = "macos") {
         cx.set_menus(vec![Menu::new("noshape").items([
+            MenuItem::action("About noshape", crate::about::ShowAbout),
+            MenuItem::separator(),
             MenuItem::action("Install Command Line Tool…", InstallCommandLineTool),
             MenuItem::action("Connect to Coding Agents…", ConnectCodingAgents),
             MenuItem::separator(),

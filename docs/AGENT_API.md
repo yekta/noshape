@@ -343,6 +343,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
 - **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
 - **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
+- **app**: [`app_about`](#app_about)
 
 ### ops
 
@@ -6603,4 +6604,23 @@ Examples:
 |---|---|---|---|
 | `dir` | string |  | Folder for the link (macOS, Linux). Default: /usr/local/bin, else ~/.local/bin. |
 | `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
+
+### app
+
+#### app_about
+
+What Help › About shows: the version, the copyright and the open source software components' notices.
+
+The About dialog's text: `version` (the build), `copyright`, `occt` (Open CASCADE Technology's LGPL notice) and `notices_file`, the third-party notices shipped with noshape (OCCT's LGPL 2.1 with its exception, the fonts' and every Rust package's licence) written where the system can open them, as the dialog's "Open source software components" link does. `notices` true adds their whole text (`notices_text`).
+
+Examples:
+
+```json
+{}
+{"notices": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `notices` | boolean |  | Include the notices' whole text (about 1.2 MB). Default false. |
 <!-- END GENERATED REFERENCE -->

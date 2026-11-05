@@ -326,6 +326,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("agents_disconnect", &[r##"{"agents": ["claude_desktop"]}"##]),
     ("cli_status", &[r##"{}"##]),
     ("cli_install", &[r##"{}"##, r##"{"dir": "~/.local/bin"}"##]),
+    ("app_about", &[r##"{}"##, r##"{"notices": true}"##]),
 ];
 
 /// The groups whose every operation must have examples (the coverage test).

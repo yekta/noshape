@@ -25,6 +25,7 @@ use noshape_feature_studio_ui::{feature_studio, fs_notices, fs_search, std_sourc
 use noshape_history_ui::{compare_mode, history_panel};
 // The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
 use noshape_start_ui::start_window;
+mod about;
 mod agent_setup;
 mod updates;
 mod cli_mode;
@@ -479,6 +480,7 @@ fn main() {
         files::init(cx);
         // Help › Install command line tool… / Connect to coding agents… (and the macOS app menu).
         agent_setup::init(cx);
+        about::init(cx);
         // Updates: checked at launch and every 5 minutes, a card floating at the bottom of every window.
         updates::init(cx);
         noshape_render::perf::milestone("app initialized");

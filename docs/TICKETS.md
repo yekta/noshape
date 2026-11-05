@@ -2471,7 +2471,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P3 ABOUT-DISABLED (psui) "About noshape" at the end of both Help ▾ menus (the start window's, a document's) is a
+- [x] fixed (psui 11-05: Help ▾ › About (both menus, a divider before it) and the macOS app menu's About noshape open live's About modal: our logo and wordmark, "© 2026 Yekta", Open CASCADE's LGPL line, the "Open source software components" link opening the notices shipped with the app (crates/ops/assets/THIRD-PARTY-NOTICES.txt, generated from Cargo.lock, offline), the build in the footer; no Terms & Privacy; op app_about; UI tests help_about_opens_the_about_modal, the_app_menus_about_opens_the_about_modal) P3 ABOUT-DISABLED (psui) "About noshape" at the end of both Help ▾ menus (the start window's, a document's) is a
   placeholder: always disabled (`OsMenuItem::new("About noshape").disabled(true)`, start_window.rs / workspace.rs) on every
   OS, and the macOS app menu has no About item. Clicking it does nothing (green 477c4168, Linux). Either make it open an About
   window (version, the build's commit: the start window's footer shows "0.0.0-dev.<sha>") on all three OSs, or drop it.

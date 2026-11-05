@@ -1,5 +1,6 @@
 //! The operations, by group. Each module's `ops()` lists its operations.
 
+mod about;
 mod analysis;
 mod appearance;
 mod assembly;
@@ -77,6 +78,7 @@ pub fn all() -> Vec<Op> {
     v.extend(featurestudio::ops());
     v.extend(history::ops());
     v.extend(install::ops());
+    v.extend(about::ops());
     v
 }
 

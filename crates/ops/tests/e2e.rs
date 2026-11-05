@@ -6011,6 +6011,25 @@ fn agents_and_command_line_tool_ops() {
     }
 }
 
+/// Help › About through the API: the version, the copyright, Open CASCADE's notice, and the notices file the
+/// dialog's "Open source software components" link opens (OCCT's LGPL among them); `notices` adds their text.
+#[test]
+fn about_names_the_copyright_and_the_notices() {
+    let mut ctx = Ctx::new();
+    let r = call(&mut ctx, "app_about", json!({}));
+    assert_eq!((r["name"].as_str(), r["copyright"].as_str()), (Some("noshape"), Some("© 2026 Yekta")), "{r}");
+    assert!(!r["version"].as_str().unwrap().is_empty(), "{r}");
+    assert!(r["occt"].as_str().unwrap().contains("GNU Lesser General Public License version 2.1"), "{r}");
+    assert!(r.get("notices_text").is_none(), "the text only on request");
+    let text = std::fs::read_to_string(r["notices_file"].as_str().unwrap()).unwrap();
+    assert_eq!(text, noshape_ops::about::NOTICES);
+    assert!(text.contains("Open CASCADE exception") && text.contains("GNU LESSER GENERAL PUBLIC LICENSE"));
+    let r = call(&mut ctx, "app_about", json!({ "notices": true }));
+    assert_eq!(r["notices_text"].as_str(), Some(text.as_str()));
+    let e = try_call(&mut ctx, "app_about", json!({ "notices": "yes" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("notices"), "{}", e.to_json());
+}
+
 /// MBD dimensions (drawing.md CR18): a Model definitions dimension between
 /// two holes' cylinders measures their axes' distance, and a drawing of the
 /// part shows it, with its tolerance, in the view facing its plane.

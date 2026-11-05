@@ -90,6 +90,10 @@ document's display mesh is under 0.5 s.
 
 ## Landed on main
 
+- 11-05 22:25 queued ABOUT-DISABLED: Help › About / macOS "About noshape" open the About modal (app/src/about.rs; text in
+  ops/src/about.rs, op app_about). The notices file crates/ops/assets/THIRD-PARTY-NOTICES.txt is generated:
+  `UPDATE_NOTICES=1 cargo test -p noshape-ops --lib about::` after any Cargo.lock change (its test fails until then; a
+  package with no licence file of its own needs its licence's standard text in ops/assets/licenses).
 - 11-04 22:30 queued 1dc789e7 + 1d927467: a dialog's preview / close build the scene off the UI thread
   (`apply_display_async`, scene caches behind a mutex, `display_seq` / `scene_gen` guards; UI-thread apply per dialog
   open 57-72 → 1 + 14 ms); a drawing's Ctrl+S / Ctrl+M take the Control key only (drawing_keys::control_key).
