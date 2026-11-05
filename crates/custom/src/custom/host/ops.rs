@@ -320,6 +320,13 @@ impl Bounds {
             return err("The extrude does not reach its end surface");
         }
         let shape = if kept.len() == 1 { kept[0].clone() } else { k::sew(&kept, 1e-7, false).map(|r| r.shape).unwrap_or_else(|_| Shape::compound(&kept)) };
+        // Its end along a periodic up-to face in one edge, as Parasolid's intersection is (live 2033: Sheet Metal Up to
+        // Part's rolled wall ends in one edge along the Filling Part's step, where OCCT's is a curve, a line on the
+        // step cylinder's seam and a curve).
+        let shape = match solid_end.or(end.as_ref()) {
+            Some(target) => k::join_target_seam_splits(&shape, target).map(|r| r.shape).unwrap_or(shape),
+            None => shape,
+        };
         // No history: these sheets are named by their roles alone.
         Ok(k::OpResult { shape, history: k::History::default() })
     }

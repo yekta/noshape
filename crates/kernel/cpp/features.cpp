@@ -561,16 +561,53 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
 
 // A sheet's free edges split only where the up-to target's seam crossed them (Parasolid's periodic faces have
 // none): each such pair one edge again, its curves (3D and on the face) concatenated exactly. `sheet` when there are
-// none or the result isn't valid.
-static TopoDS_Shape join_target_seam_splits(const TopoDS_Shape& sheet, const TopoDS_Shape& target, HHist& hist)
+// none or the result isn't valid. With `tangent_lines`, any two pieces both on one face of the target that meet
+// tangentially join, a straight one too, seam or not (OCCT splits an intersection where the target surface's
+// parameter wraps, and where a sheet's plane through a cylinder's axis meets it along a line: Parasolid's is one
+// curve).
+// Edges `a` and `b` (both ending at `v`) run on through it in one direction: their tangents there are parallel.
+static bool tangent_at(const TopoDS_Edge& a, const TopoDS_Edge& b, const TopoDS_Vertex& v)
+{
+  const gp_Pnt p = BRep_Tool::Pnt(v);
+  auto dir = [&](const TopoDS_Edge& e, gp_Vec& d) {
+    BRepAdaptor_Curve c(e);
+    const double      t = c.Value(c.FirstParameter()).Distance(p) < c.Value(c.LastParameter()).Distance(p) ? c.FirstParameter() : c.LastParameter();
+    gp_Pnt            q;
+    c.D1(t, q, d);
+    return d.Magnitude() > 1e-12;
+  };
+  gp_Vec da, db;
+  return dir(a, da) && dir(b, db) && da.IsParallel(db, 1e-6);
+}
+
+static TopoDS_Shape join_target_seam_splits(const TopoDS_Shape& sheet, const TopoDS_Shape& target, HHist& hist, bool tangent_lines)
 {
   std::vector<TopoDS_Edge> seams;
   for (TopExp_Explorer f(target, TopAbs_FACE); f.More(); f.Next())
     for (TopExp_Explorer e(f.Current(), TopAbs_EDGE); e.More(); e.Next())
       if (BRep_Tool::IsClosed(TopoDS::Edge(e.Current()), TopoDS::Face(f.Current())))
         seams.push_back(TopoDS::Edge(e.Current()));
-  if (seams.empty())
+  if (seams.empty() && !tangent_lines)
     return sheet;
+  // The target's faces with their boxes (most are far from a given edge: no distance computed for them).
+  std::vector<std::pair<TopoDS_Face, Bnd_Box>> faces;
+  if (tangent_lines)
+    for (TopExp_Explorer f(target, TopAbs_FACE); f.More(); f.Next())
+    {
+      Bnd_Box b;
+      BRepBndLib::Add(f.Current(), b);
+      b.Enlarge(1e-6);
+      faces.emplace_back(TopoDS::Face(f.Current()), b);
+    }
+  // Edge `e` lies on target face `f`: its middle does.
+  auto on_face = [](const TopoDS_Edge& e, const std::pair<TopoDS_Face, Bnd_Box>& f) {
+    BRepAdaptor_Curve c(e);
+    const gp_Pnt      m = c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+    if (f.second.IsOut(m))
+      return false;
+    BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(m).Vertex(), f.first);
+    return d.IsDone() && d.Value() <= std::max(BRep_Tool::Tolerance(e), 1e-7);
+  };
   TopoDS_Shape out = sheet;
   for (int round = 0; round < 64; ++round)
   {
@@ -587,18 +624,26 @@ static TopoDS_Shape join_target_seam_splits(const TopoDS_Shape& sheet, const Top
       const ShapeList *fx = ef.Seek(x), *fy = ef.Seek(y);
       if (x.IsSame(y) || fx == nullptr || fy == nullptr || fx->Extent() != 1 || fy->Extent() != 1 || !fx->First().IsSame(fy->First()))
         continue;
-      if (BRepAdaptor_Curve(x).GetType() == GeomAbs_Line || BRepAdaptor_Curve(y).GetType() == GeomAbs_Line)
-        continue;
       const TopoDS_Vertex v = TopoDS::Vertex(ve.FindKey(i));
-      const double        tol = std::max(BRep_Tool::Tolerance(v), 1e-7);
-      bool                on_seam = false;
-      for (const TopoDS_Edge& s : seams)
+      if (tangent_lines)
       {
-        BRepExtrema_DistShapeShape d(v, s);
-        on_seam = on_seam || (d.IsDone() && d.Value() <= tol);
+        if (!tangent_at(x, y, v) || std::none_of(faces.begin(), faces.end(), [&](const std::pair<TopoDS_Face, Bnd_Box>& f) { return on_face(x, f) && on_face(y, f); }))
+          continue;
       }
-      if (!on_seam)
-        continue;
+      else
+      {
+        if (BRepAdaptor_Curve(x).GetType() == GeomAbs_Line || BRepAdaptor_Curve(y).GetType() == GeomAbs_Line)
+          continue;
+        const double tol     = std::max(BRep_Tool::Tolerance(v), 1e-7);
+        bool         on_seam = false;
+        for (const TopoDS_Edge& s : seams)
+        {
+          BRepExtrema_DistShapeShape d(v, s);
+          on_seam = on_seam || (d.IsDone() && d.Value() <= tol);
+        }
+        if (!on_seam)
+          continue;
+      }
       // a runs into v, b out of it.
       a = TopoDS::Edge(x.Oriented(TopAbs_FORWARD));
       b = TopoDS::Edge(y.Oriented(TopAbs_FORWARD));
@@ -783,7 +828,7 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     result = sh;
   }
   if (sheet)
-    result = join_target_seam_splits(result, until.shape, hist);
+    result = join_target_seam_splits(result, until.shape, hist, false);
   // Parasolid's frame of the extruded cylinders (live "core (2026-10-26)"
   // (3)): z back toward the sketch, x gp_Ax2's default, origin on the axis
   // 0.002 mm past the face's far end (Onshape extrudes blind to the target's
@@ -6871,6 +6916,15 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane, P3 d
   std::vector<TopoDS_Shape> args{base.shape, w};
   HHist                     h = history_of(args, form);
   return make_result(args, form.Shape(), h.get());
+}
+
+OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target)
+{
+  require_non_null(sheet.shape, "sheet");
+  require_non_null(target.shape, "target");
+  HHist              hist;
+  const TopoDS_Shape res = join_target_seam_splits(sheet.shape, target.shape, hist, true);
+  return make_result({sheet.shape}, res, hist.get());
 }
 
 } // namespace noshape

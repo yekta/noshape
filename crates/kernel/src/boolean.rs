@@ -393,6 +393,12 @@ pub fn join_edges(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_join_edges(shape.raw()))?))
 }
 
+/// A sheet's free edges split where an up-to `target`'s seam crossed them joined into one edge again, through a
+/// straight piece too where the pieces meet tangentially (Parasolid's intersection with a periodic face is one curve).
+pub fn join_target_seam_splits(sheet: &Shape, target: &Shape) -> Result<OpResult> {
+    Ok(OpResult::from_ffi(ck(ffi::op_join_target_seam_splits(sheet.raw(), target.raw()))?))
+}
+
 /// [`unify_same_domain`] over the whole shape, whatever is known of it (a
 /// shape an earlier unify found nothing in, a local Boolean's result:
 /// boolean.cpp `UnifyScope`): the reference the fast ways are checked
