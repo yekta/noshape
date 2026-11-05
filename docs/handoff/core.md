@@ -2329,4 +2329,16 @@ document, live 0.63 s; it builds with live's volume now). skasm measures it idle
 biggest part with the result's faces and volume unchanged; anything it changes in shell.cpp it lists here before
 landing. Seed 508's failing shell and the rest of SHELL-SLOW stay yours; tell skasm if you touch the quadric path's
 timing meanwhile.
+11:32, idle vibe4 (16 cores, load < 1.5, release noshape-cli, qa's document, five runs): Shell 4 1027–1037 ms (live 627):
+the offset path's failure 224 ms (OCCT's offset 217, then "the offset is empty"), quadrics 678 (edges 117, faces 152,
+self-interference 384) and the feature's whole-result check 125 (13 BRepExtrema distances, 7.7 ms each). The
+self-interference check is mostly two edge/face pairs: straight edges 13 and 33 mm long ending on two corners of the
+ramp's offset face (a Geom_OffsetSurface of a rational B-spline), ~550 ms each serial in IntTools_EdgeFace, no
+faster with a shared context or on a sub-range (each sub-range costs the whole; sub-ranges also find a common part
+the whole range doesn't): it's evaluation bound (BSplCLib::Bohm / RationalDerivative in the cache rebuilds, half
+the samples), and so are the failed offset and quadrics' edges and faces. The whole-result check measured only
+against the faces near each point took 13 distances 100 -> 16 ms, Shell 4 950–957 ms, Part 6 unchanged; dx's
+cb1b7dfcb (face classifier, cheap inner points) landed the same cut first, so mine is dropped. Left there: the
+offset surface's evaluation (OCCT), or a quadrics-first order where the offset can't work (not found a test for it
+that keeps every corpus outcome).
 
