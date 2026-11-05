@@ -143,6 +143,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P1 SPUR-GEAR-SPEED (core; dx 11-04 19:53) cf-spur-gear regenerates in 3.9 s, live 2.1 s; all of it in kernel
   operations (core.md 19:53: Boolean 2's unify 887 ms + kernel 698 ms; Boolean 1 500 ms vs live 34 ms; the gears'
   hobbing cuts 115–482 ms and double-helical fillet 277 ms); the FeatureScript side is ~3 ms per gear.
+  core 11-05 02:10: Boolean 2 1208 -> 643 ms, the document 3.1 -> 2.8 s: the unify tried eight face orders, each
+  merging the same pair with the same volume change (-2.66e-11 m³, rejected); three such in a row now stop it (a
+  notched cylinder fused with its mirror is kept at its third order). Boolean corpus (974), blend tests, kernel and
+  model tests, the model suite (40/55, 388/471) unchanged. Left there: Boolean 2's Rust Boolean 296 ms, the gears'
+  hobbing cuts.
 
 - [x] (core 11-05 01:44: as live's dialog, not a regression: feature_add makes the dialog's choices, and std's extrude edit logic flips a new Extrude going New -> Remove (canSetBooleanFlip, whatever the geometry, unless the flip or the merge scope is given), so from Top it points away from the plate above it, "Selected tools and targets do not intersect." in live's dialog too; the probe gives oppositeDirection false as a REST script would, and cuts the 400 holes again) P0 BIG-PLATE-CUT-NO-INTERSECT (core; dx 11-05 00:38, main 1c4ab1d91) a 400 × 400 × 10 mm plate (Extrude 1 up from Top)
   and an Extrude 2 of 400 Ø8 circles sketched on Top, Remove, Through all, default scope: INFO "Selected tools and

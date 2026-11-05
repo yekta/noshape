@@ -1409,6 +1409,8 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
   // USD's result depends on the order of the faces too (a notched cylinder
   // fused with its mirror, qa OCCT-MIRROR-OVERCOUNT: one order of the same
   // faces merged to 4, the other gave 4/3 the volume from every start).
+  std::optional<std::pair<int, double>> last_reject;
+  int                                   repeats = 0;
   for (int k = 0; k < 16; ++k)
   {
     fail_if_cancelled();
@@ -1446,8 +1448,22 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
-    if (!keeps_volume(usd_volume_change(sf, image, share, u.Shape()), u.Shape()))
+    const std::optional<double> change = usd_volume_change(sf, image, share, u.Shape());
+    if (!keeps_volume(change, u.Shape()))
+    {
+      // (The same merge rejected three times running: the faces' order doesn't change it here, so neither will the
+      // rest: cf-spur-gear's Boolean 2 tried eight, 86 ms each. A notched cylinder fused with its mirror is kept at
+      // its third.)
+      int nf = 0;
+      for (TopExp_Explorer x(u.Shape(), TopAbs_FACE); x.More(); x.Next())
+        ++nf;
+      const bool same = change && last_reject && last_reject->first == nf && std::abs(last_reject->second - *change) <= 1e-12 * bv;
+      repeats         = same ? repeats + 1 : 1;
+      if (repeats >= 3)
+        break;
+      last_reject = change ? std::optional<std::pair<int, double>>({nf, *change}) : std::nullopt;
       continue;
+    }
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.history");
     if (hist.IsNull())
