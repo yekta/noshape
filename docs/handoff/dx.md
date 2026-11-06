@@ -238,6 +238,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   4; the rest after Onshape's quota resets ~05:45 11-07): 519/753, c2 differences in skasm.md (7031aa22); c2-sm-louver's
   Linear pattern 3 takes 198 s (live 5 s whole). Rerun when live ticks 2132. mimalloc re-measured 09:10 (TICKETS
   ALLOC-MIMALLOC): speed now equal, peak memory +1-9 %: not adopted. Scripts: dx-scratch/bin/mimalloc-*.sh, alloc-ab2.sh.
+- 11-06 10:30 (lead 11-06: custom features first, 2132's rerun, the two hovered-frame scenarios):
+  - Custom features: the scored corpus has 54/55 (the 109 of run 125 counted cf-straight-spline, unscored since run
+    126 by core); the one left is cf-setback-fillet's fill patch (skasm, SETBACK-FILL-PATCH). So: REQUESTS 11-06 09:13
+    asks live for 15 more cf-* documents by REST after 2132. Speed instead: cf-fill-pattern 7.1 -> 4.5 s (live 4.7;
+    qPatternInstances by type e91ccfda, sheet metal wall edges by hash 1dd52fa2). Still slower than live: cf-wave-spring
+    905 ms / 740 (thicken_names' classifier on the lofted band, 26 x 27 ms; projecting instead is slower; needs the caps
+    from the thickened surfaces), cf-fix-pcb 916 / 618 (Fix PCB 2: OCCT's split by a plane 298 ms, two tight boxes
+    73 ms: kernel), cf-sheet-metal-model-plus 1.4 s / 0.92 (Extrude 4, Up to Part, Flange 1: SM-BOOLEAN-SPEED).
+  - 2132: rerun the corpus when live ticks it (quota back ~05:45 11-07); skasm and core get their first differences.
+  - drw-dimension-radius / drw-hole-table: recorded before live's 2134 recorder fix; re-record asked (REQUESTS 09:13).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
