@@ -2165,6 +2165,22 @@ fn drawing_section_detail_views_and_annotations() {
     assert_eq!(e.param.as_deref(), Some("more_views[0]"), "{e:?}");
 }
 
+/// sketch_draw's inference takes a line to horizontal / vertical only when it is (c2-hunting-knife: the screen's 3°
+/// snapped a 2.2° blade edge flat and constrained it).
+#[test]
+fn sketch_draw_keeps_a_nearly_horizontal_line_as_drawn() {
+    let mut ctx = Ctx::new();
+    let s = new_sketch(&mut ctx, "near_horizontal.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s, "tool": "line", "points": [[71.330304287, -7.739502841], [0, -10.5]] }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": s, "tool": "line", "points": [[0, 20], [30, 20]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": s }));
+    let lines: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "line").collect();
+    assert_eq!(lines[0]["end"], json!([0.0, -10.5]), "{g}");
+    let horizontal: Vec<&Value> = g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Horizontal").collect();
+    assert_eq!(horizontal.len(), 1, "only the exactly horizontal line: {g}");
+    assert_eq!(horizontal[0]["entities"], json!([lines[1]["id"]]), "{g}");
+}
+
 #[test]
 fn sketch_draw_many_shapes_in_one_edit() {
     let mut ctx = Ctx::new();

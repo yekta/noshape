@@ -43,6 +43,9 @@ pub struct InferenceContext {
     pub snap_radius: f64,
     /// Angular tolerance for horizontal/vertical/parallel/perpendicular hints.
     pub angle_tolerance: f64,
+    /// How near a point's x or y aligns with another's (None: the snap radius).
+    #[serde(default)]
+    pub align_radius: Option<f64>,
     /// Entities to ignore (the geometry being created or dragged).
     pub exclude: Vec<EntityId>,
     /// Offer the sketch origin as a snap point and for horizontal /
@@ -71,6 +74,7 @@ impl Default for InferenceContext {
             anchor_point: None,
             snap_radius: 1e-3,
             angle_tolerance: 3f64.to_radians(),
+            align_radius: None,
             exclude: Vec::new(),
             origin: false,
             woken: Vec::new(),
@@ -199,6 +203,7 @@ fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
 /// Computes inference candidates, best first.
 pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inference> {
     let r = ctx.snap_radius.max(1e-15);
+    let ra = ctx.align_radius.unwrap_or(r);
     let mut out: Vec<Inference> = Vec::new();
     let push = |out: &mut Vec<Inference>, kind, position: DVec2, entity, reference, constraints: Vec<AutoConstraint>, priority| {
         out.push(Inference { kind, position, entity, reference, constraints, distance: (position - cursor).length(), priority });
@@ -229,10 +234,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 }
                 let dx = (pos.x - cursor.x).abs();
                 let dy = (pos.y - cursor.y).abs();
-                if dx <= r && d > r && best_v.is_none_or(|b| dx < b.0) {
+                if dx <= ra && d > r && best_v.is_none_or(|b| dx < b.0) {
                     best_v = Some((dx, e.id, *pos));
                 }
-                if dy <= r && d > r && best_h.is_none_or(|b| dy < b.0) {
+                if dy <= ra && d > r && best_h.is_none_or(|b| dy < b.0) {
                     best_h = Some((dy, e.id, *pos));
                 }
             }
@@ -293,10 +298,10 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
         if d <= r {
             push(&mut out, InferenceKind::Endpoint, DVec2::ZERO, Some(ORIGIN), None, vec![AutoConstraint::CoincidentPoint(ORIGIN)], 0);
         } else {
-            if cursor.x.abs() <= r && best_v.is_none_or(|b| cursor.x.abs() < b.0) {
+            if cursor.x.abs() <= ra && best_v.is_none_or(|b| cursor.x.abs() < b.0) {
                 best_v = Some((cursor.x.abs(), ORIGIN, DVec2::ZERO));
             }
-            if cursor.y.abs() <= r && best_h.is_none_or(|b| cursor.y.abs() < b.0) {
+            if cursor.y.abs() <= ra && best_h.is_none_or(|b| cursor.y.abs() < b.0) {
                 best_h = Some((cursor.y.abs(), ORIGIN, DVec2::ZERO));
             }
         }

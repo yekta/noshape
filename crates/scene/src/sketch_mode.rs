@@ -659,6 +659,10 @@ pub struct SketchEditor {
     pub conflicting: Vec<ConstraintId>,
     /// World units per pixel at the sketch (for snap radii).
     pub world_per_px: f64,
+    /// The agent API's headless editor: clicks snap to points only at the same place (`world_per_px`), and a line
+    /// infers horizontal / vertical / parallel / perpendicular, a point another's x or y, only when it practically
+    /// is (the screen's 3° and 9 px moved c2-hunting-knife's 2.2° blade edge and exercise-anthony's 0.03° hexagon).
+    pub exact_inference: bool,
     /// Screen to sketch map set by the app on every view change: the sketch
     /// point under the screen origin and the sketch steps of one pixel right
     /// and down. Manipulators sit on pixel centres with it (Onshape's crisp
@@ -1232,6 +1236,7 @@ impl SketchEditor {
             pressed_glyph: None,
             conflicting: Vec::new(),
             world_per_px: 1e-4,
+            exact_inference: false,
             screen_map: None,
             frame_bounds: None,
             message: None,
@@ -1421,7 +1426,8 @@ impl SketchEditor {
             anchor,
             anchor_point: self.chain_end.or_else(|| self.line_start_point()),
             snap_radius: self.world_per_px * 9.0,
-            angle_tolerance: 3f64.to_radians(),
+            angle_tolerance: if self.exact_inference { 1e-9 } else { 3f64.to_radians() },
+            align_radius: self.exact_inference.then_some(self.world_per_px * 1e-3),
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.clone(),

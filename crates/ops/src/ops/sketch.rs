@@ -87,7 +87,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Draw sketch geometry with a sketch tool (line, rectangle, circle, arc, spline, slot, polygon, ellipse, point...)",
             description: Box::leak(
                 format!(
-                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"); a point of three coordinates [x, y, z] is a model (Part Studio) position, projected onto the sketch plane: easiest on a face, whose sketch axes may be turned (the reply's `frame` gives them). One call = one edit of the sketch (\"Edit : Sketch 1\"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
+                    "Runs the sketch editor's drawing tool on the clicks you give, exactly as clicking in the sketch: inference snaps to existing points/curves within 9 µm (a line to horizontal / vertical, a point to another's x or y, only when it practically is) and adds the same automatic constraints (coincident, horizontal, vertical, tangent...). Coordinates are sketch-plane (x, y) in workspace units, or length expressions (\"10 mm\"); a point of three coordinates [x, y, z] is a model (Part Studio) position, projected onto the sketch plane: easiest on a face, whose sketch axes may be turned (the reply's `frame` gives them). One call = one edit of the sketch (\"Edit : Sketch 1\"); `shapes` draws many shapes in that one edit. Returns the created entity ids (`entity:…`), the sketch's solve state and its regions (`region:…` ids for Extrude etc.). Tools:\n{}",
                     DRAW_TOOLS.iter().map(|(n, _, h)| format!("- {n}: {h}")).collect::<Vec<_>>().join("\n")
                 )
                 .into_boxed_str(),
@@ -366,6 +366,7 @@ pub(super) fn target(od: &mut OpenDoc, tab: TabId, a: &Args) -> Result<SketchTar
 pub(super) fn editor(t: &SketchTarget) -> SketchEditor {
     let mut ed = SketchEditor::new(t.id, t.frame);
     ed.world_per_px = WORLD_PER_PX;
+    ed.exact_inference = true;
     // Tool sizes (fillet radius, offset, pattern spacing...) as the sketch
     // mode sets them for the workspace unit.
     ed.apply_unit_defaults(t.units.length);
