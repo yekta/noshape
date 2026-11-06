@@ -621,6 +621,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (atan2 / sin / cos: glibc picks FMA versions), OCCT's allocations on the Windows heap (OCCT 8's build-time
   allocator: OPT / TBB / JEMALLOC), thread pool / lock behaviour. Comparing them needs runs pinned to one CPU
   (several dry runs, keep the 7763 pairs) or a Windows box to profile.
+  skasm 11-06 11:30, lead's rule (bool's macOS: whole process -9 to -18 %, Rust-only ~-4 %, in the noise): 5
+  interleaved rounds on one Windows runner (EPYC 9V74; branch skasm/alloc-win, .github/workflows/alloc-measure.yml),
+  **Rust-only mimalloc: in the noise**, medians knurl 4.55 -> 4.51 s (-0.9 %), release-fillet-hang 3.84 -> 3.83
+  (-0.3 %, rounds swing +-17 %), fins-400 2.34 -> 2.30 (-1.7 %): not landed. **Whole process** (mimalloc 2.1.7's
+  minject on the release CLI, mimalloc-redirect.dll beside it): `--version` and MCP initialize run, but no mimalloc
+  banner (MIMALLOC_VERBOSE) and time_cli's document run fails, so it isn't measured on Windows. Making it real means
+  OCCT's allocations through mimalloc at the source (an OCCT patch: Standard::Allocate to mi_malloc, as OCCT 8's
+  build-time allocator choice does for TBB / jemalloc) plus our C++'s operator new, built in setup-occt.
 - [x] (skasm 11-06 02:25: live's runner's, not ours: it mapped Front-sketch points as Top (live 2116); re-recorded, live's
   line now gets one COINCIDENT and VERTICAL as ours: revolve-dialog-axis / -thin / -type-list match, 33 / 33 states)
   P3 SKETCH-LINE-ON-PLANE-TRACE (skasm; psui's interaction run 11-05 20:22) ui-parity `revolve-dialog-axis` step 8:
