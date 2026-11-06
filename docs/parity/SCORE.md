@@ -110,3 +110,14 @@ corpus5, the shell recordings (shfall, sh-new2, shv, shell6) and the knurl sweep
 | 2026-11-06 | 6d2434999 (00:42) | 350/594 (58.9 %) | 78.2/102.4 s (76.4 %) | 1887/2498 (75.5 %) | 520/824 s (63.1 %) | 186/490 s (38.0 %; shfall 46/191, 12 of 277 s) |
 | 2026-11-06 | 628204762 (18:22) | 350/594 (58.9 %) | 60.9/80.1 s (76.0 %) | 1893/2498 (75.8 %) | 532/790 s (67.4 %) | 143/401 s (35.7 %; shfall 51/191, 10 of 240 s; vibe4 loaded, OCCT's times ±20 %: the counts are the measure) |
 | 2026-11-06 | dx 21:39 on 8a073492 (exchange suite, 12 documents: ours imports live's STEP / Parasolid / IGES / STL 40/48 (34 at 20:20), live imports ours 23/48 (the five multi-part x_t re-import asked, P0 fix 9b48a753), ours reads ours back 44/48; fixed: multi-part Parasolid attribute chains, STL / OBJ / 3MF a part per mesh with hollows, IGES revolved faces as tori, seam-split B-spline copies one edge (motor-mount STEP); drawings: batch 3 30/35 scenarios, coverage tools 42/58, menu items 14/119, shortcuts 10/14, sheets 10/13 with batches 4-5 (22 scenarios) queued for live) | – | – | – | exchange: IGES edges / vertices of merged periodic faces (pulley 8/0, live's IGES 10/4), the o-ring's B-spline torus quarters (live 1 face), hose STEP 12/12/0 (live's STEP import 12/16/8, its model 12/12/0), cf-spur-gear STEP / IGES volume within the files' precision; drawings: export formats (re-record), hole callout and note selection (asked) |
+
+## Assemblies (asm, daily; T2 `parity_assemblies` over /root/parity/models/asm-*, docs/PARITY-SUITES.md §4)
+
+Per assembly: rebuilt through crates/ops, each occurrence placed where live has it and held while its mates are added,
+then freed: matched when ours places it within 1e-6 m / 1e-6 of live's and our mates don't move it; each mate's status
+as live's; the BOM rows (once live's corpus has bom.json). `cargo test -p noshape-ops --test all
+parity::parity_assemblies -- --ignored --nocapture` (NOSHAPE_PARITY_ASSEMBLIES for another folder).
+
+| date | main | assemblies as live | occurrences | mates | BOM rows | biggest causes (tickets) |
+|---|---|---|---|---|---|---|
+| 2026-11-06 | 0dfa4c2da (23:54) | 3/3 | 8/8 | 5/5 | – | only live's 3 small built cases so far; the public corpus (15–20 assemblies) asked of live |

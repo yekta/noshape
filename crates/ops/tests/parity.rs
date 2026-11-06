@@ -1648,13 +1648,13 @@ fn a_second_part_studio_goes_into_its_own_tab() {
 /// with `<element>.parts.json`): each rebuilt, its occurrences and mates
 /// compared with live.
 #[test]
-#[ignore = "T2: live's assemblies from /root/parity/asm-dx (other people's work, never in the repo)"]
+#[ignore = "T2: live's assemblies from /root/parity/models (other people's work, never in the repo)"]
 fn parity_assemblies() {
-    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_ASSEMBLIES").unwrap_or_else(|_| "/root/parity/asm-dx".into()));
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_ASSEMBLIES").unwrap_or_else(|_| "/root/parity/models".into()));
     let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.join("assembly.json").is_file()).collect()).unwrap_or_default();
     dirs.sort();
     let read = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok());
-    let (mut docs, mut matching, mut mates, mut mates_matching) = (0, 0, 0, 0);
+    let (mut docs, mut matching, mut mates, mut mates_matching, mut occurrences, mut occurrences_matching) = (0, 0, 0, 0, 0, 0);
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         let Some(asm) = read(&dir.join("assembly.json")) else {
@@ -1683,6 +1683,8 @@ fn parity_assemblies() {
         }
         mates += r.mates;
         mates_matching += r.mates_matching;
+        occurrences += r.occurrences;
+        occurrences_matching += r.occurrences_matching;
         println!("{name}: {}/{} occurrences placed as live, {}/{} mates as live", r.occurrences_matching, r.occurrences, r.mates_matching, r.mates);
         for d in &r.differences {
             println!("  difference: {d}");
@@ -1691,7 +1693,7 @@ fn parity_assemblies() {
             println!("  untranslated: {u}");
         }
     }
-    println!("assemblies: {matching}/{docs} as live, mates {mates_matching}/{mates}");
+    println!("assemblies: {matching}/{docs} as live, occurrences {occurrences_matching}/{occurrences}, mates {mates_matching}/{mates}");
 }
 
 /// An assembly rebuilt from live's definition: a cylinder's two instances,

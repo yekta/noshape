@@ -68,6 +68,22 @@ with live-self.json's (counts exact, volume and area within live's band or 1e-6;
 and area only); then ours is exported, and live-ours.json, once given, is compared with live-self.json the same way.
 Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n`.
 
+## 4. Assembly suite: Onshape assemblies rebuilt in noshape (asm, lead 11-06)
+
+**Corpus (live).** 15–20 public Onshape assemblies with real mates (every mate type, limits and offsets,
+subassemblies, patterns, groups, relations, configurations, standard content), copied into our account and fetched
+into `/root/parity/models/asm-<name>/` (never in the repo): `assembly.json` (the REST definition with each
+occurrence's solved transform, fixed / hidden / suppressed, patterns and subassemblies; `features` with each mate's
+status; `subAssemblyFeatures`; the assembly's `configuration`), `studios/<element>.json` + `.live.jsonl` for each Part
+Studio an instance uses (`<element>@<n>` per non-default configuration), `bom.json` (indented and flat).
+
+**Runner and score (asm).** The T2 `parity_assemblies` (crates/ops/tests/parity.rs, `rebuild_assembly` in
+crates/ops/src/parity.rs) rebuilds each through crates/ops: the Part Studios by dx's translator, the instances, mates
+between the same connectors; each occurrence placed where live has it and held while the mates are added, then freed.
+Matched: an occurrence ours places within 1e-6 m / 1e-6 of live's that our mates don't move; a mate whose status is
+live's; a BOM row equal to live's. Score per day in docs/parity/SCORE.md ("Assemblies"); each difference that isn't
+the translator's becomes a ticket.
+
 ## Score (qa, daily, docs/parity/SCORE.md)
 One line per day: models matched / total, features matched / total, scenarios matched / total, and the five biggest
 causes of difference with their tickets.
