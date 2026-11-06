@@ -713,8 +713,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   CPU time straddles 10 s: qa's flips. Fixed: face deletion gets the blend's 30 s (here then 37305.64 as on vibe5).
   Left: (a) why OCCT's Defeaturing takes seconds there (404 "Projecting edges on faces" 3.0 s, "Trimming faces"
   1.1 s; T2 kernel bool_patterns::draft_fallback_face_deletion_probe, tests/data/draft-defeature-slow.brep); (b) any
-  budget-limited step still decides by speed near its limit: hang guards, not geometry; worth a sweep for budgets
-  sitting near what real work takes.
+  budget-limited step still decides by speed near its limit: hang guards, not geometry. Swept 11-06: the kernel's
+  budgets are the blends' / Draft's / Shell's 30 s and the crash guard's self-tests; one more decides an answer:
+  the FeatureScript host's faces_cross (custom/host/evaluate.rs, SECTION_BUDGET 0.5 s CPU) answers "they cross" when
+  a section of two faces runs out of it, so a slow or busy machine can answer differently from a fast one on a
+  pathological pair (sections take ms otherwise). Not changed: needs a deterministic bound (work, not time).
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,
