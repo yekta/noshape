@@ -205,6 +205,17 @@ pub fn copy_of(a: &Body, b: &Body, tol: f64) -> Option<Rigid> {
                 pt(o1, o2) && (r.dir(a1) * s - a2).length() <= 1e-9 && dir(x1, x2) && num(r1, r2) && (g1 - g2).abs() <= 1e-12
             }
             (Surface::Nurbs { index: i1 }, Surface::Nurbs { index: i2 }) => i1 == i2,
+            // (Their curves moved above; a turn's sense goes with the axis, as a cylinder's.)
+            (Surface::Extrusion { curve: c1, dir: d1 }, Surface::Extrusion { curve: c2, dir: d2 }) => c1 == c2 && dir(d1, d2),
+            (Surface::Revolution { curve: c1, origin: o1, axis: a1 }, Surface::Revolution { curve: c2, origin: o2, axis: a2 }) => {
+                c1 == c2 && pt(o1, o2) && (r.dir(a1) * s - a2).length() <= 1e-9
+            }
+            (Surface::Torus { origin: o1, xdir: x1, ydir: y1, zdir: z1, major: m1, minor: n1 }, Surface::Torus { origin: o2, xdir: x2, ydir: y2, zdir: z2, major: m2, minor: n2 }) => {
+                pt(o1, o2) && dir(x1, x2) && dir(y1, y2) && dir(z1, z2) && num(m1, m2) && num(n1, n2)
+            }
+            (Surface::Sphere { origin: o1, xdir: x1, ydir: y1, zdir: z1, radius: r1 }, Surface::Sphere { origin: o2, xdir: x2, ydir: y2, zdir: z2, radius: r2 }) => {
+                pt(o1, o2) && dir(x1, x2) && dir(y1, y2) && dir(z1, z2) && num(r1, r2)
+            }
             _ => false,
         };
         if !ok {
@@ -271,6 +282,27 @@ mod tests {
         assert!((angle - std::f64::consts::TAU / 12.0).abs() < 1e-12);
         assert!((axis - DVec3::Z).length() < 1e-12);
         assert!((o - about).cross(DVec3::Z).length() < 1e-9, "{o}");
+    }
+
+    /// `moved_box`, its +x side an extruded B-spline (a gear cutter's flank's kind of face).
+    fn moved_extruded_box(lo: DVec3, hi: DVec3, r: &Rigid) -> Body {
+        let mut b = moved_box(lo, hi, r);
+        let poles = vec![r.point(DVec3::new(hi.x, lo.y, lo.z)), r.point(DVec3::new(hi.x, hi.y, lo.z))];
+        b.nurbs_curves.push(crate::nurbs::NurbsCurve { degree: 1, knots: vec![0.0, 0.0, 1.0, 1.0], poles, weights: Vec::new(), spans: Default::default() });
+        b.faces[1].surface = Surface::Extrusion { curve: 0, dir: r.dir(DVec3::Z) };
+        b
+    }
+
+    #[test]
+    fn rotated_copies_with_extruded_faces_are_found() {
+        let (lo, hi) = (DVec3::new(0.02, -0.001, 0.0), DVec3::new(0.03, 0.001, 0.01));
+        let bodies: Vec<Body> = (0..20).map(|k| moved_extruded_box(lo, hi, &rot_z(std::f64::consts::TAU * k as f64 / 20.0, DVec3::ZERO))).collect();
+        let refs: Vec<&Body> = bodies.iter().collect();
+        assert_eq!(families(&refs, 1e-9).len(), 1);
+        // (Its extrusion along another direction: not a copy.)
+        let mut off = bodies[1].clone();
+        off.faces[1].surface = Surface::Extrusion { curve: 0, dir: DVec3::new(0.0, 1e-6, 1.0).normalize() };
+        assert!(copy_of(&bodies[0], &off, 1e-9).is_none());
     }
 
     #[test]

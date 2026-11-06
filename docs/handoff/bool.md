@@ -3240,6 +3240,19 @@ for every piece and every other solid it walks all of `cx.coplanar`, so pieces Ã
 (live's whole document 4.7 s); repro: NOSHAPE_PARITY_ONLY=cf-fill-pattern parity::parity_models (TESTS.md), models in
 /root/parity/models/cf-fill-pattern. Yours to take; tell me if you want the saved .noshape.
 
+## From skasm (11-06 21:00 UTC): three speed changes in crates/brep for cf-spur-gear (SPUR-GEAR-SPEED)
+- `pattern::copy_of` takes extrusion, revolution, torus and sphere faces (it had no case for them, so the gears' tooth
+  cutters, extruded B-spline flanks, were 65 families of 1): their sections are moved from the first pair, and the 66-
+  and 10-argument cuts find the rotation (`symmetry`). The 21-, 13- and 33-argument ones still don't (not looked into).
+- `free::seam_cuts` skips a cylinder or cone whose seam half-plane the curve's BÃ©zier control points (over the part's
+  spans) keep clear of, by 1e-9 of their size (the hull holds the curve, so the sampled angle can't change sign there).
+- `C2::numeric_intersections`' `together` checks a point only against chord runs whose boxes (grown by tol) hold it;
+  the runs are the ones the crossing search already made.
+Gate: bool-corpus, corpus-pat, corp-spur, corpus2-6 replayed with main's and with these: every case's outcome
+(taken, equivalents, declines) identical. Profile notes for what's left (vibe, perf, frame-pointer build): OCCT's
+BRepCheck on our results ~540 ms over the document (parallel), the unify ~400 ms, `intervals_on` (2D crossings,
+`free::length`), `arrange::regions`' area integrals.
+
 ## From skasm (11-05 09:27 UTC): cf-spur-gear's Booleans (SPUR-GEAR-SPEED), measured on an idle vibe4
 
 The lead asked for the real gap and for the Boolean side to be yours. vibe4 (16 cores, load under 1.5 before each run,

@@ -369,6 +369,9 @@ pub(super) fn seam_cuts(cx: &Ctx, faces: [usize; 2], c: &NurbsCurve, t0: f64, t1
     let mut out = Vec::new();
     for f in faces {
         let Some(&Surf::Cyl { o, x, y, th0, .. }) = cx.faces.get(f).map(|g| &g.s) else { continue };
+        if off_seam(c, t0, t1, o, y * th0.cos() - x * th0.sin(), x * th0.cos() + y * th0.sin()) {
+            continue;
+        }
         // The angle from th0 in (-π, π]: a crossing where it changes sign without passing π.
         let ang = |t: f64| {
             let w = c.at(t) - o;
@@ -397,6 +400,29 @@ pub(super) fn seam_cuts(cx: &Ctx, faces: [usize; 2], c: &NurbsCurve, t0: f64, t1
     }
     out.sort_by(f64::total_cmp);
     out
+}
+
+/// Whether a NURBS curve's part from `t0` to `t1` keeps off the half-plane from an axis through `o` along `dir`
+/// (`n`: its plane's normal): its Bézier pieces' control points, whose hull holds it, all on one side of that plane
+/// or all behind the axis.
+fn off_seam(c: &NurbsCurve, t0: f64, t1: f64, o: DVec3, n: DVec3, dir: DVec3) -> bool {
+    let spans = c.spans();
+    let (lo, hi) = (t0.min(t1), t0.max(t1));
+    let (Some(&k0), Some(&k1)) = (c.knots.first(), c.knots.last()) else { return false };
+    if spans.is_empty() || lo < k0 || hi > k1 {
+        return false;
+    }
+    let (mut n_lo, mut n_hi, mut d_hi, mut size) = (f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY, 0.0_f64);
+    for q in spans[c.span_of(lo)..=c.span_of(hi)].iter().flat_map(|s| s.2.iter()) {
+        if q.w <= 0.0 {
+            return false;
+        }
+        let w = q.truncate() / q.w - o;
+        let h = w.dot(n);
+        (n_lo, n_hi, d_hi, size) = (n_lo.min(h), n_hi.max(h), d_hi.max(w.dot(dir)), size.max(w.abs().max_element()));
+    }
+    let m = 1e-9 * size;
+    n_lo > m || n_hi < -m || d_hi < -m
 }
 
 /// The distance from `p` to face `f`'s surface.

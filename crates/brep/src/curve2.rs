@@ -763,32 +763,10 @@ impl C2 {
                 return Vec::new();
             }
         }
-        // (Decided once 5 of the 9 are within or 5 aren't; a point clearly farther than its box first, then than
-        // every chord of the other's by more than its bulge.)
-        let together = |a: &C2, b: &C2, (pb, bb): &(Vec<DVec2>, Vec<f64>)| {
-            let (mut yes, mut no) = (0, 0);
-            for k in 0..=8 {
-                let q = a.at(k as f64 / 8.0);
-                let near = pb.windows(2).zip(bb).any(|(w, &bulge)| chord_gap(q, q, w[0], w[1]) <= tol + bulge);
-                if near && b.distance_at_least(q) <= tol && b.distance(q) <= tol {
-                    yes += 1;
-                } else {
-                    no += 1;
-                }
-                if yes >= 5 || no >= 5 {
-                    break;
-                }
-            }
-            yes >= 5
-        };
         let (na, nb) = (self.samples(), o.samples());
         let (pa, ba) = mine.get_or_init(|| self.chords());
         let (pb, bb) = theirs.get_or_init(|| o.chords());
-        if together(self, o, theirs.get_or_init(|| o.chords())) || together(o, self, mine.get_or_init(|| self.chords())) {
-            return Vec::new();
-        }
         let scale = pa.iter().chain(pb).fold(0.0_f64, |m, p| m.max(p.abs().max_element())).max(1e-9);
-        let mut out: Vec<(f64, f64)> = Vec::new();
         // Runs of 16 chords each, their boxes grown as the chords' below: only runs whose boxes meet are looked at.
         const RUN: usize = 16;
         let runs = |p: &[DVec2], n: usize, pad: f64, bulge: &[f64]| -> Vec<(DVec2, DVec2)> {
@@ -802,6 +780,33 @@ impl C2 {
                 .collect()
         };
         let (ra, rb) = (runs(pa, na, 4.0 * tol, ba), runs(pb, nb, 0.0, bb));
+        // (Decided once 5 of the 9 are within or 5 aren't; a point clearly farther than its box first, then than
+        // every chord of the other's by more than its bulge (only the runs' whose boxes it is in).)
+        let reach = tol + 1e-12 * scale;
+        let together = |a: &C2, b: &C2, (pb, bb): &(Vec<DVec2>, Vec<f64>), rb: &[(DVec2, DVec2)]| {
+            let (mut yes, mut no) = (0, 0);
+            for k in 0..=8 {
+                let q = a.at(k as f64 / 8.0);
+                let near = rb.iter().enumerate().any(|(r, (lo, hi))| {
+                    q.cmpge(*lo - DVec2::splat(reach)).all()
+                        && q.cmple(*hi + DVec2::splat(reach)).all()
+                        && (r * RUN..((r + 1) * RUN).min(bb.len())).any(|j| chord_gap(q, q, pb[j], pb[j + 1]) <= tol + bb[j])
+                });
+                if near && b.distance_at_least(q) <= tol && b.distance(q) <= tol {
+                    yes += 1;
+                } else {
+                    no += 1;
+                }
+                if yes >= 5 || no >= 5 {
+                    break;
+                }
+            }
+            yes >= 5
+        };
+        if together(self, o, theirs.get_or_init(|| o.chords()), &rb) || together(o, self, mine.get_or_init(|| self.chords()), &ra) {
+            return Vec::new();
+        }
+        let mut out: Vec<(f64, f64)> = Vec::new();
         let chords = |ia: std::ops::Range<usize>, ib: std::ops::Range<usize>, out: &mut Vec<(f64, f64)>| {
             for i in ia {
                 let (a0, a1) = (pa[i], pa[i + 1]);
