@@ -25,6 +25,45 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## P2 (slot corners) and the arrangement change, scoped (11-06 13:47 UTC; lead: P2, then scope it beside P3)
+P2, not landed (/root/bool-scratch/p2-wip-1106.patch): a section's end put on a face vertex straight ahead of it (within
+1000 tol and 0.1 mm), the vertex grown to reach it and reported Deleted (OCCT's new vertex in its place), the section
+edge over its curve's whole range where its bound is within that vertex's tolerance (rust_boolean.cpp), a cone's or
+cylinder's piece allowed past its face's angles by its vertices' tolerance. 2eafe30c then has OCCT's geometry and
+history exactly (records, volume to 1e-16) but merges faces to 78 edges against OCCT's 79; written out and read
+back, ours merges to 79 but invalid. parity56 349 -> 353 taken, and all 4 new ones differ (3 by one edge after the
+merge at a grown corner on the part's cylinder, 1 in history); 664e12f0 and 6745ab08, equal before, become only
+equivalent (the rule fires where OCCT keeps the vertex). Left: why the face merge splits the cylinder's seam at the
+grown corner differently (the face order it starts from: unify_in already retries orders for cylinders), and where
+OCCT replaces a vertex and where it keeps it.
+
+The arrangement change (the slab cases 0acfd0a2, 80a5941f, 9aec1f4b, 4fca980b: 62 s of OCCT's; 47587a8d: 19.6 s):
+- What happens: two edges of other arguments lie on one face (0acfd0a2's face 543: arg 37's edge 2 / arg 46's edge 4,
+  one common block, and arg 82's edge 3), the same course for 0.49 mm in 3D within a few micrometres (2e-7 apart for
+  6 um from their shared vertex, then up to ~1 um), the same curve in the face's parameters. regions() orders the
+  curves at each vertex by direction, turn and offset in 2D and declines on a tie (two edges leave a vertex in one
+  direction); a tie-break further along found them identical in 2D. In OCCT's result all three are Deleted: the face
+  they lie on is inside the fuse, so OCCT never needs them apart. 47587a8d: two lines 3 mrad apart (0.3 um at 100 um)
+  on coplanar faces; OCCT's result keeps that sliver (to check: Deleted or kept, as above).
+- The change: before regions(), curves of a face that coincide in its parameters from a shared vertex (within the
+  face's rounding: their 2D points at a few fractions of the shorter one's length the same) are one curve for that
+  face's regions: the shorter cuts the longer in 2D at its end (a 2D vertex there), the zero-width strip between
+  them isn't a region; each piece of a face then carries the edges that bound it in 3D as now, the other one of the
+  pair an edge inside it (Piece::inner) where its face is kept. Where the face holding them is kept in the result
+  and the pair part by more than their tolerances there (a real sliver, 47587a8d), decline as now: OCCT keeps a
+  face there and ours wouldn't.
+- Touches: boolean.rs's face pieces (the lsegs for regions(): a pass merging coincident ones, ~80-120 lines), arrange
+  unchanged; the kept-face check after classification (~30 lines). No change for faces without such pairs: the
+  knurls and gears have none (P0's probe: 0 pairs), so no cost there beyond the pass's check (sorting each vertex's
+  curves, done already).
+- Size: one to two days with the gate; the risk is a kept face whose coincident pair OCCT does split (the gate shows).
+- What it unlocks: the four slab cases (62 s) go past this decline; whether they are then taken is unknown (each fix
+  on them so far moved them one step on: 5a, 5b, 5c). 47587a8d (19.6 s) only if its face turns out to be removed.
+  Realistically 0-62 s of OCCT's time, 47587a8d separately.
+- P3 beside it (the merge rounds in one pass): a5f1e564 (25.5 s), f82bed32 (6.4 s), 2491a282 (4.5 s) and the other
+  "a point near two vertices" (14 cases, 17.7 s); the rounds didn't settle in 10 on f82bed32, so P3 is a design
+  change too (VV groups closed transitively before building, OCCT's order), with the same unknown of what comes next.
+
 ## Plan: partial common blocks (11-06 12:13 UTC, agreed with the lead)
 Why: OCCT's pave filler makes edges one over the part of their length where they lie within their tolerances (a
 common block over a range, IntTools_EdgeEdge's common part), with paves at that range's ends on both, and puts a
