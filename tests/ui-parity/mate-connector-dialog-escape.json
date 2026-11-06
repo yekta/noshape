@@ -1,0 +1,19 @@
+{
+ "name": "mate-connector-dialog-escape",
+ "about": "block: Mate connector tool, then Escape: the dialog's fields, then none",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

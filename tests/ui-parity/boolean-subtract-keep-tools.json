@@ -1,0 +1,53 @@
+{
+ "name": "boolean-subtract-keep-tools",
+ "about": "overlap: Boolean Subtract with Keep tools on",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Subtract"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Targets"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Keep tools"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

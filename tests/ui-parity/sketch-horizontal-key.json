@@ -1,0 +1,64 @@
+{
+ "name": "sketch-horizontal-key",
+ "about": "a slanted line, select it, H: it turns horizontal (HORIZONTAL)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     3
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     7.5,
+     0.75
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "h"
+  }
+ ]
+}

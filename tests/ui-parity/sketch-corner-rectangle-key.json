@@ -1,0 +1,43 @@
+{
+ "name": "sketch-corner-rectangle-key",
+ "about": "Sketch on Top, G (Corner rectangle), two corners: four lines with their coincidents, horizontals and verticals",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "g"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  }
+ ]
+}

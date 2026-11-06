@@ -1,0 +1,20 @@
+{
+ "name": "curve-pattern-dialog",
+ "about": "block: the Curve pattern tool (the pattern dropdown), its fields, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern",
+    "menu": "Curve pattern"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

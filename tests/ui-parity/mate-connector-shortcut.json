@@ -1,0 +1,17 @@
+{
+ "name": "mate-connector-shortcut",
+ "about": "block: the Mate connector shortcut (mod+M) with nothing selected",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "mod+m"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

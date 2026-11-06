@@ -192,7 +192,7 @@
     "before": "Extrude 1"
    }
   ],
-  "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, \u26a0)"
+  "about": "filmiss: Fillet 1 above Extrude 1, so it has a missing selection (red, ⚠)"
  },
  "pin-block": {
   "units": "mm",
@@ -725,5 +725,73 @@
    "views": "suggested"
   },
   "about": "pin-block (Part 1 and Part 2, Revolute 1 in its assembly) and a drawing of the assembly (Create Drawing of it, ANSI_A_INCH.dwt, Suggested views); opens on the drawing tab"
+ },
+ "overlap": {
+  "units": "mm",
+  "about": "two overlapping parts: Part 1 a 40 x 30 x 10 block at the origin, Part 2 a 20 x 10 x 15 block over its right edge (x 30..50, y 10..20)",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        0,
+        0
+       ],
+       [
+        40,
+        30
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "10 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        30,
+        10
+       ],
+       [
+        50,
+        20
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "15 mm",
+     "operationType": "NEW"
+    }
+   }
+  ]
  }
 }

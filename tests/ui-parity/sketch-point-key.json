@@ -1,0 +1,38 @@
+{
+ "name": "sketch-point-key",
+ "about": "Sketch on Top, Shift+S (Point) in the sketch, a point at (5, 5)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     5,
+     5
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

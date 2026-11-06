@@ -198,6 +198,43 @@ compared):
   picked live's recorder can't read the sketch (`"error": "sketch model not reached"`, its lists `null`): not compared.
 - Not compared: `focus.tag` and `features.rows[].cls` (live's DOM), `selection.items[].id` (live's entity ids).
 
+## Coverage
+
+`tools/ui-parity/coverage.py` (`--uncovered` lists what nothing exercises, `--markdown` prints the tables below)
+counts the scenarios exercising each Part Studio toolbar tool, sketch tool, Part Studio and camera menu item
+(crates/ops/src/coverage.rs) and General / Part Studio / 3D view / Sketch shortcut (the Keyboard shortcuts sheet). A
+feature tool counts for a scenario that clicks it, presses its shortcut or double-clicks a feature of its type; a
+shortcut that starts a tool counts for the tool too. Menu items labelled at run time ("Suppress Extrude 1") aren't in
+the universe. Reported with the score (docs/parity/SCORE.md).
+
+11-06, 336 scenarios (main had 312; batch 1 adds Mate connector, Curve pattern, Boolean subtract / intersect, Mid
+plane, Chamfer and 15 sketch tools and constraints):
+
+| kind | covered | scenarios per item (median) |
+|---|---|---|
+| toolbar | 25/76 | 0 |
+| sketch tool | 30/55 | 1 |
+| menu | 9/117 | 0 |
+| shortcut | 58/89 | 1 |
+
+| most-used tool (lead 11-06) | scenarios |
+|---|---|
+| Extrude | 51 |
+| Sketch | 107 |
+| Fillet | 14 |
+| Chamfer | 5 |
+| Revolve | 4 |
+| Shell | 4 |
+| Hole | 6 |
+| Linear pattern | 3 |
+| Circular pattern | 2 |
+| Curve pattern | 1 |
+| Mirror | 4 |
+| Boolean | 6 |
+| Plane | 4 |
+| Mate connector | 3 |
+| sketch tools (all 55) | 118 scenarios, 30 tools covered |
+
 ## Comparison
 
 `tools/ui-parity/run.py` compares the keys both sides record. A size that comes from where a click landed (a drawn

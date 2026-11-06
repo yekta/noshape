@@ -1,0 +1,47 @@
+{
+ "name": "boolean-subtract",
+ "about": "overlap: Boolean, Subtract tab, Part 2 as tool (Tools first), then Targets: Part 1, ✓",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools first)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Boolean"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Subtract"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Targets"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
