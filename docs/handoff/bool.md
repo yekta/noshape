@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## c2-sm-louver after the REST refetch (11-06 07:05 UTC)
+## c2-sm-louver after the REST refetch (11-06 06:59 UTC)
 - Refetched (features.json 06:18): Linear pattern 3 has its values (3.318 in, 11 instances); the document now differs
   from live first at feature 4 (Linear pattern 1: 274/816/544 against 278/820/544) and regenerates in 177 s (live 5 s),
   Linear pattern 3 173.8 s of it (live 239 ms). Its Booleans recorded: vibe4 ~/agents/bool-corpora/louver2 (exact
