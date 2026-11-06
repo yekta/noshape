@@ -1,0 +1,502 @@
+{
+ "scenario": "folder-menu-unpack",
+ "recorded": "2026-11-06T14:40:11.275Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.4 c2684ac9"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "e77427739bb665f409d75f38",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "feature": "Sketch 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    287
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 27166
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "feature": "Extrude 1"
+    },
+    "mods": "shift"
+   },
+   "ok": true,
+   "at": [
+    70,
+    313
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 29899
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "New folder"
+    }
+   },
+   "ok": true,
+   "at": [
+    155,
+    129
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "New folder",
+     "selection": [
+      0,
+      10
+     ],
+     "all": true
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "selected  ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": true,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "selected"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 32146
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "New folder (2)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "New folder (2)"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 33969
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "feature": "New folder"
+    }
+   },
+   "ok": true,
+   "at": [
+    90,
+    287
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Section view…",
+      "Suppress",
+      "Dynamic suppression",
+      "Clear selection",
+      "Expand",
+      "Collapse",
+      "Edit sketch appearance…",
+      "Add appearance to feature…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "New folder (2)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight  fake-hover context-menu-active"
+      }
+     ],
+     "rollbackAfter": "New folder (2)"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 37686
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Unpack folder"
+    }
+   },
+   "ok": false,
+   "error": "target not found: {\"menu\":\"Unpack folder\"}",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Section view…",
+      "Suppress",
+      "Dynamic suppression",
+      "Clear selection",
+      "Expand",
+      "Collapse",
+      "Edit sketch appearance…",
+      "Add appearance to feature…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 2,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Sketch 1",
+       "id": "FAgvuZAayZRza3J_0"
+      },
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "New folder (2)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight  fake-hover context-menu-active"
+      }
+     ],
+     "rollbackAfter": "New folder (2)"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 39413
+  }
+ ]
+}

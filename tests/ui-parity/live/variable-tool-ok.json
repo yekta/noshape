@@ -1,0 +1,460 @@
+{
+ "scenario": "variable-tool-ok",
+ "recorded": "2026-11-06T14:51:18.225Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.4 c2684ac9"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "9a37b5adeb8068fda1f25bd9",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Variable"
+    }
+   },
+   "ok": true,
+   "at": [
+    1283,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "#? = 0 mm"
+    },
+    "dialog": {
+     "title": "#? = 0 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "#? = 0 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#? = 0 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "#? = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 26657
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "#? = 0 mm"
+    },
+    "dialog": {
+     "title": "#? = 0 mm",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Assigned",
+       "selected": true
+      },
+      {
+       "label": "Measured",
+       "selected": false
+      },
+      {
+       "label": "From import",
+       "selected": false
+      },
+      {
+       "label": "Length",
+       "selected": true
+      },
+      {
+       "label": "Angle",
+       "selected": false
+      },
+      {
+       "label": "Number",
+       "selected": false
+      },
+      {
+       "label": "Any",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Name",
+       "kind": "text",
+       "text": "",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "Value",
+       "kind": "number",
+       "text": "0 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "#? = 0 mm",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Assigned",
+        "selected": true
+       },
+       {
+        "label": "Measured",
+        "selected": false
+       },
+       {
+        "label": "From import",
+        "selected": false
+       },
+       {
+        "label": "Length",
+        "selected": true
+       },
+       {
+        "label": "Angle",
+        "selected": false
+       },
+       {
+        "label": "Number",
+        "selected": false
+       },
+       {
+        "label": "Any",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Name",
+        "kind": "text",
+        "text": "",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "Value",
+        "kind": "number",
+        "text": "0 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "#? = 0 mm",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "#? = 0 mm"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 28468
+  }
+ ]
+}
