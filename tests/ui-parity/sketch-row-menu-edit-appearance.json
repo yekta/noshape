@@ -1,0 +1,25 @@
+{
+ "name": "sketch-row-menu-edit-appearance",
+ "about": "block: right-click Sketch 1, Edit sketch appearance…, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit sketch appearance…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

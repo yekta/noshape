@@ -218,14 +218,14 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 |---|---|---|
 | toolbar | 25/76 | 0 |
 | sketch tool | 43/55 | 1 |
-| menu | 27/117 | 0 |
+| menu | 33/117 | 0 |
 | shortcut | 59/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
-| Extrude | 53 |
-| Sketch | 121 |
-| Fillet | 15 |
+| Extrude | 54 |
+| Sketch | 124 |
+| Fillet | 16 |
 | Chamfer | 6 |
 | Revolve | 5 |
 | Shell | 5 |
@@ -233,11 +233,11 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 | Linear pattern | 5 |
 | Circular pattern | 4 |
 | Curve pattern | 1 |
-| Mirror | 4 |
+| Mirror | 5 |
 | Boolean | 6 |
 | Plane | 7 |
 | Mate connector | 3 |
-| sketch tools (all 55) | 112 scenarios, 43 tools covered |
+| sketch tools (all 55) | 115 scenarios, 43 tools covered |
 
 ### Drawings
 `tools/ui-parity/coverage_drawing.py` counts the drw-* scenarios exercising each drawing tool and drawing menu item

@@ -1,0 +1,29 @@
+{
+ "name": "face-menu-revolve",
+ "about": "block: right-click the top face, Revolve…: its dialog with the face, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Revolve…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "feature-menu-show-dimensions",
+ "about": "block: right-click Extrude 1, Show dimensions",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show dimensions"
+   }
+  }
+ ]
+}

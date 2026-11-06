@@ -1,0 +1,39 @@
+{
+ "name": "dialog-query-rclick-clear-all",
+ "about": "block: an edge, Shift+F, right-click Entities to fillet, Clear all",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "field": "Entities to fillet"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Clear all"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

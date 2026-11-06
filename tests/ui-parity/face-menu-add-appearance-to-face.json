@@ -1,0 +1,29 @@
+{
+ "name": "face-menu-add-appearance-to-face",
+ "about": "block: right-click the top face, Add appearance to face…, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add appearance to face…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "name": "face-menu-delete-part",
+ "about": "block: right-click the top face, Delete Part 1…: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete Part 1…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

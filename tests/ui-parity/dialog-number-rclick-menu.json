@@ -1,0 +1,37 @@
+{
+ "name": "dialog-number-rclick-menu",
+ "about": "block: the top face, Shift+E, right-click Depth: its menu's rows, then Escape twice",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 6)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
