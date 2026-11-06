@@ -224,8 +224,8 @@ pub fn render<V: 'static>(props: Props, key: &'static str, view: &Entity<V>, on:
                 .border_b_1()
                 .border_color(pal.border)
                 .child(crate::ui::panel_title(key, div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("Section view")))
-                .child(div().id("sec-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::assets::icon("dialog-ok", 24., cx)).on_click(act(Action::Accept)))
-                .child(div().id("sec-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(act(Action::Cancel))),
+                .child(crate::ui_script::mark(div().id("sec-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::assets::icon("dialog-ok", 24., cx)).on_click(act(Action::Accept)), || "button:ok".into()))
+                .child(crate::ui_script::mark(div().id("sec-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().hover(|d| d.bg(pal.panel_hover)).child(crate::assets::icon("dialog-cancel", 24., cx)).on_click(act(Action::Cancel)), || "button:cancel".into())),
         )
         .child(h_flex().child(tab("Exclude", !props.include, false)).child(tab("Include", props.include, true)))
         .child(

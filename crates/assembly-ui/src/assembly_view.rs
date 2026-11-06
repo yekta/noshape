@@ -4452,7 +4452,8 @@ impl AssemblyView {
             if !self.feature_passes(noshape_model::assembly::ops::RowKind::Connector, &c.name, msg.is_some(), c.suppressed, c.hidden, false) {
                 continue;
             }
-            items.push((c.id, self.connector_row(c, msg, cx)));
+            let row = self.connector_row(c, msg, cx);
+            items.push((c.id, crate::ui_script::wrap(row, || format!("mate:{}", c.name))));
         }
         for m in &asm.mates {
             // Live (qa5 asm-056): a pattern's mates are listed under its row.
@@ -4471,7 +4472,8 @@ impl AssemblyView {
                 continue;
             }
             let icon = icon_path(relation_icon(r.relation_type));
-            items.push((r.id, self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx)));
+            let row = self.feature_row(FeatureRow { id: r.id, icon, name: r.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            items.push((r.id, crate::ui_script::wrap(row, || format!("mate:{}", r.name))));
         }
         // Live (behaviours "qa (2026-10-28, P3) assembly E2 follow-up"; GROUP-ROW-ERROR):
         // a group over mated members is red with the mates' error.
@@ -4493,7 +4495,8 @@ impl AssemblyView {
             let tail = if hidden { " (Hidden)" } else { "" };
             let tooltip = Some(if err { format!("{} has error: {SAME_GROUP}{tail}", g.name) } else { format!("{}{tail}", g.name) });
             let row = self.feature_row(FeatureRow { id: g.id, icon: icon_path("group"), name: g.name.clone(), ok: !err, inactive: g.suppressed, message: err.then(|| SAME_GROUP.to_string()), has_limits: false, hidden: Some(hidden), tooltip, implicit: vec![] }, cx);
-            items.push((g.id, if editing { div().bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element() } else { row }));
+            let row = if editing { div().bg(pal.accent_soft).font_weight(FontWeight::BOLD).child(row).into_any_element() } else { row };
+            items.push((g.id, crate::ui_script::wrap(row, || format!("mate:{}", g.name))));
         }
         items.sort_by_key(|(id, _)| id.0);
         let (mut mate_ids, mut mate_rows): (Vec<MateId>, Vec<AnyElement>) = items.into_iter().unzip();
