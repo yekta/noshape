@@ -1,0 +1,51 @@
+{
+ "name": "shell-face-thickness-typed",
+ "about": "block: the top face, Shell, Thickness 2, Enter, ✓",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Shell"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Thickness"
+   }
+  },
+  {
+   "do": "type",
+   "text": "2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

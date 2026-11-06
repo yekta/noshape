@@ -1,0 +1,34 @@
+{
+ "name": "fillet-two-edges-then-key",
+ "about": "block: an edge, Shift+click a second edge, Shift+F: Fillet with both",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     40,
+     7.5,
+     10
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  }
+ ]
+}

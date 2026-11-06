@@ -1,0 +1,23 @@
+{
+ "name": "select-space-clears",
+ "about": "block: click the top face, then Space (Clear selection)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Space"
+  }
+ ]
+}

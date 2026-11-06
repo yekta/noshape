@@ -1,0 +1,30 @@
+{
+ "name": "select-face-shift-click-second",
+ "about": "block: click the top face, Shift+click the front face: two faces",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   },
+   "mods": "shift"
+  }
+ ]
+}

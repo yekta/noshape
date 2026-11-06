@@ -1,0 +1,17 @@
+{
+ "name": "revolve-key-nothing-selected",
+ "about": "block: Shift+W with nothing selected: the Revolve dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+w"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "name": "select-part-in-list",
+ "about": "block: click Part 1 in the parts list",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  }
+ ]
+}

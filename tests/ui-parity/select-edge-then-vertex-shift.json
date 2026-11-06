@@ -1,0 +1,30 @@
+{
+ "name": "select-edge-then-vertex-shift",
+ "about": "block: click an edge, Shift+click a vertex: one edge, one vertex",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "vertex": [
+     0,
+     0,
+     10
+    ]
+   },
+   "mods": "shift"
+  }
+ ]
+}

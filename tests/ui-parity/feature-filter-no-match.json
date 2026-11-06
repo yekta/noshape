@@ -1,0 +1,19 @@
+{
+ "name": "feature-filter-no-match",
+ "about": "block-fillet: the feature list's filter, type \"zzz\": no rows",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Filter by name or type"
+   }
+  },
+  {
+   "do": "type",
+   "text": "zzz"
+  }
+ ]
+}

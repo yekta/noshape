@@ -1,0 +1,15 @@
+{
+ "name": "select-top-plane",
+ "about": "block: click the Top plane in the graphics",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  }
+ ]
+}

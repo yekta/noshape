@@ -1,0 +1,25 @@
+{
+ "name": "select-empty-click-clears",
+ "about": "block: click the top face, then empty space: nothing selected",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  }
+ ]
+}
