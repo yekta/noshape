@@ -3,6 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## c2-sm-louver: the 174 s is upstream of the Boolean (11-06 07:29 UTC)
+- Linear pattern 3 (PART, ADD, Merge with all) 188 s here: op_unify 156 s (unify.patches 154 s, unify.reordered 116 s)
+  on the fuse's invalid 1382-face result, op_boolean 30 s. The fuse's inputs are wrong: its merge scope holds ten
+  311-face copies of the panel (one earlier feature's, not sheet metal), so the fuse is 10 full panels overlapping
+  at 84 mm steps. Live's scope after Sheet metal model 3: Part 1 278 faces, Parts 3, 6-15 56 faces each (Linear
+  pattern 2's instances), Part 16 13/14 faces; Linear pattern 3 only grows Part 16 (11 small instances: 94 faces).
+- Ours already differs at feature 4 (Linear pattern 1: Part 1 274 faces, live 278); the ten copies are our panel's
+  (same box, shifted) where live's Linear pattern 2 copies its 56-face Part 3, a part ours doesn't have apart. Sheet
+  metal semantics (who owns c2-sm-*), not the Boolean. With live's inputs the fuse is 11 touching 14-face parts.
+- Also: the native pattern's Merge with all (extrude::scope) takes every solid, active sheet metal parts too; std's
+  takes qAllModifiableSolidBodies and throws SHEET_METAL_CAN_ONLY_REMOVE for an Add into active sheet metal
+  (boolean.fs processNewBodyIfNeeded). The unify's 40 s per pass on an invalid shape is core's (boolean.cpp unify_in).
+
 ## c2-sm-louver after the REST refetch (11-06 06:59 UTC)
 - Refetched (features.json 06:18): Linear pattern 3 has its values (3.318 in, 11 instances); the document now differs
   from live first at feature 4 (Linear pattern 1: 274/816/544 against 278/820/544) and regenerates in 177 s (live 5 s),
