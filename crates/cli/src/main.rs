@@ -11,6 +11,11 @@
 //! objects, booleans) and taken as strings otherwise. Results print as JSON;
 //! failures print `{"error": ..., "message": ..., "param": ...}` and exit 2.
 
+// The system heap is slow for our many small allocations on Windows (WINDOWS-RUST-SLOW).
+#[cfg(windows)]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
     std::process::exit(noshape_cli::run(std::env::args_os().collect()));
 }

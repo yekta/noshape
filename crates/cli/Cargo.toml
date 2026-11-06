@@ -21,6 +21,10 @@ base64 = "0.22"
 dirs = "6"
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }
 
+[target.'cfg(windows)'.dependencies]
+# The global allocator on Windows (WINDOWS-RUST-SLOW: the system heap is slow for many small allocations).
+mimalloc = { version = "0.1", default-features = false }
+
 # Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
 [[test]]
 name = "all"

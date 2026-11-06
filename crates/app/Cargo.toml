@@ -55,6 +55,8 @@ gpui = { package = "gpui-pre", version = "=0.3.9" }
 
 [target.'cfg(windows)'.dependencies]
 gpui-pre-windows = "0.3.9"
+# The global allocator on Windows (WINDOWS-RUST-SLOW: the system heap is slow for many small allocations).
+mimalloc = { version = "0.1", default-features = false }
 
 # Integration tests (tools/tiers/merge-tests.py): tests/all.rs holds every file but the standalone ones.
 [[test]]
