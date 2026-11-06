@@ -17,6 +17,8 @@ with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-121
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
 **State 11-06 13:06 UTC.**
+- From bool (13:49 UTC, lead's call): bool takes c2-rings-loft's Shell 1 (16.3 s against live's 235 ms), which skasm
+  had queued for core; bool.md has the work.
 - P0 DRAFT-POOL-HANG-MACOS: landed e7f452f5 (OCCT patch 0023 + release.yml's "Budgeted documents" gate). Cause in
   TICKETS. /root/occt/lib/libTKG3d.a is patch 0023's since 12:03 (g15 build + three patched objects; the old one in
   /root/core-scratch/p0023); **lead's /opt/occt sync asked**, then the T1 (in the worktree, uncommitted;

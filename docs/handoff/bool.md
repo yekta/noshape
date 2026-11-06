@@ -25,6 +25,14 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
+P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change
+for coincident curves are parked with their scope notes below: each Shell stage moved shfall's cases one step without
+taking them. Now: real documents slower than live where the Boolean or Shell dominates (/root/parity/report.json's
+speed section): c2-rings-loft (Shell 1 16.3 s / live 235 ms, Fillet 1 728 / 23 ms; taken from core's queue),
+c2-valve-config (Extrude 3 774 / 56, Extrude 2 296 / 10, Circular pattern 1 711 / 67), cf-fix-pcb (OCCT's split by a
+plane 298 ms, two exact boxes 73 ms; 2.1 s / 618 ms), cf-planetary-gears (2.07 s / 0.54; BOOL-RUST-GEARS-SLOW P0).
+
 ## P2 (slot corners) and the arrangement change, scoped (11-06 13:47 UTC; lead: P2, then scope it beside P3)
 P2, not landed (/root/bool-scratch/p2-wip-1106.patch): a section's end put on a face vertex straight ahead of it (within
 1000 tol and 0.1 mm), the vertex grown to reach it and reported Deleted (OCCT's new vertex in its place), the section
