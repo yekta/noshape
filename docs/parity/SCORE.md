@@ -73,6 +73,14 @@ psui 11-06 12:08: the whole suite on main 0d395f78 (vibe5, shards.sh) against li
 (our Properties modal isn't in the recorded state yet, psui), sketch-mirror-tool (one entity reads selected after a mirror,
 psui).
 
+psui 11-06 14:47: the whole suite on 5ab5b13a (queued; vibe5, shards.sh): **378/382 scenarios, 2452/2463 states**
+(the Properties modal in since 12:45; paste rows are compared only in scenarios that copy something: live's session
+clipboard carried a sketch into 6 older recordings). Live's first recordings of batches 5-7 (not on main yet,
+/root/parity/ui/live): **23/34 scenarios, 201/222 states** (9/18 before today's fixes); left: account memory (Hole
+settings, 2), live runner artefacts (a menu pick by prefix, 3: REQUESTS), Mirror's Face mirror focus (asked live),
+Export as DXF/DWG's modal (EXPORT-DXF-DIALOG), the server round trip after Suppress, a measurement's chip "Unknown of".
+Coverage: toolbar 47/76, sketch tools 43/55, menus 62/117, shortcuts 59/89 (batches 6-9 with live).
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
