@@ -2358,6 +2358,12 @@ impl<'a> Translator<'a> {
                         _ => Some(json!({ "tool": "ellipse", "points": [at(cx, cy), pt(0.0), pt(std::f64::consts::FRAC_PI_2)], "construction": construction })),
                     }
                 }
+                // Onshape's points are start, control, end; ours are clicked start, end, control. Its rho: the RHO
+                // constraint (`constraints`) sets the Rho dimension our conic gets.
+                "BTCurveGeometryConic" => {
+                    let p: Vec<f64> = g["points"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
+                    (p.len() == 6).then(|| json!({ "tool": "conic", "points": [at(p[0], p[1]), at(p[4], p[5]), at(p[2], p[3])], "construction": construction }))
+                }
                 "BTCurveGeometryInterpolatedSpline" => {
                     let flat: Vec<f64> = g["interpolationPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
                     let derivs = ["startDerivativeX", "startDerivativeY", "endDerivativeX", "endDerivativeY"].iter().any(|k| num(k).abs() > 1e-12);
@@ -2580,6 +2586,19 @@ impl<'a> Translator<'a> {
         }
     }
 
+    /// A conic's RHO: our conic's Rho dimension (made with it) set to live's value.
+    fn conic_rho(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
+        let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned().unwrap_or(Value::Null);
+        let conic = par("localFirst")["value"].as_str().and_then(|v| self.sketch_entities.get(&(oid.to_string(), v.to_string()))).cloned().ok_or("its conic not translated")?;
+        let rho = par("rho");
+        let value = rho["expression"].as_str().map(str::to_string).or_else(|| rho["value"].as_f64().map(|v| v.to_string())).ok_or("no rho")?;
+        let ours = self.call("sketch_get", json!({ "sketch": id }))?;
+        let dim = ours["constraints"].as_array().into_iter().flatten().find(|d| d["type"] == "Rho" && d["entities"].as_array().is_some_and(|e| e.iter().any(|x| x == conic.as_str()))).and_then(|d| d["id"].as_str().map(str::to_string)).ok_or("our conic has no Rho dimension")?;
+        self.call("sketch_set_dimension", json!({ "sketch": id, "dimension": dim, "value": value }))?;
+        self.sketch_edits += 1;
+        Ok(())
+    }
+
     /// The sketch's geometric constraints as ours (the geometry already
     /// satisfies them: they keep it so when variables or configurations
     /// change a dimension). Coincidences our inference merged into one point
@@ -2604,6 +2623,12 @@ impl<'a> Translator<'a> {
                 "CURVATURE" => "curvature",
                 // Dimensions: `dimensions`.
                 "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
+                "RHO" => {
+                    if let Err(e) = self.conic_rho(oid, id, c) {
+                        problems.push(format!("RHO on {}: {e}", c["entityId"].as_str().unwrap_or("?")));
+                    }
+                    continue;
+                }
                 _ => {
                     *missed.entry(format!("{ty} (no counterpart)")).or_default() += 1;
                     continue;
@@ -3142,6 +3167,25 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
                         let t = t0 + (t1 - t0) * i as f64 / 64.0;
                         let (c, s) = (t.cos(), sense * t.sin());
                         [cx + a * c * xd - b * s * yd, cy + a * c * yd + b * s * xd]
+                    })
+                    .collect(),
+            )
+        }
+        // A conic: the rational quadratic Bézier of its start, control and end, the control's weight rho / (1 - rho).
+        "BTCurveGeometryConic" => {
+            let p: Vec<f64> = g["points"].as_array()?.iter().filter_map(Value::as_f64).collect();
+            let rho = g["rho"].as_f64()?;
+            if p.len() != 6 || !(0.0..1.0).contains(&rho) {
+                return None;
+            }
+            let w = rho / (1.0 - rho);
+            Some(
+                (0..=16)
+                    .map(|i| {
+                        let t = i as f64 / 16.0;
+                        let (a, b, c) = ((1.0 - t) * (1.0 - t), 2.0 * t * (1.0 - t) * w, t * t);
+                        let d = a + b + c;
+                        [(a * p[0] + b * p[2] + c * p[4]) / d, (a * p[1] + b * p[3] + c * p[5]) / d]
                     })
                     .collect(),
             )

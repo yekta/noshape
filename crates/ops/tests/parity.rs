@@ -1015,6 +1015,41 @@ fn onshapes_constraints_dont_move_the_sketch() {
     assert!(half["center"][1].as_f64().unwrap() < 0.0, "{half}");
 }
 
+/// A conic as live stores it (BTCurveGeometryConic: start, control, end and rho; c2-valve-config's Sketch 1): ours
+/// through the same three points, its Rho dimension set by the RHO constraint, its ends dimensioned by reference.
+#[test]
+fn a_conic_is_translated_with_its_rho() {
+    let line = |id: &str, p: [f64; 2], d: [f64; 2], t: f64| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": t, "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": p[0], "pntY": p[1], "dirX": d[0], "dirY": d[1] } });
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let q = |id: &str, e: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": e });
+    let c = |ty: &str, params: Vec<Value>| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "parameters": params });
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [
+              { "btType": "BTMSketchCurveSegment-155", "entityId": "k", "startPointId": "k.start", "endPointId": "k.end", "startParam": 0.0, "endParam": 1.0,
+                "geometry": { "btType": "BTCurveGeometryConic-2284", "rho": 0.6, "points": [0.046, 0.001, 0.046, 0.0085, 0.055, 0.0085] } },
+              line("e", [0.055, 0.0085], [0.0, -1.0], 0.0075),
+              line("b", [0.055, 0.001], [-1.0, 0.0], 0.009)
+          ],
+          "constraints": [
+              c("COINCIDENT", vec![s("localFirst", "k.end"), s("localSecond", "e.start")]),
+              c("COINCIDENT", vec![s("localFirst", "b.end"), s("localSecond", "k.start")]),
+              c("RHO", vec![s("localFirst", "k"), q("rho", "0.6")]),
+              c("DISTANCE", vec![s("localFirst", "k.end"), s("localSecond", "b.start"), s("direction", "MINIMUM"), q("length", "7.5 mm")])
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("conic.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let k = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "conic").unwrap_or_else(|| panic!("{g}"));
+    assert_eq!((k["start"].clone(), k["control"].clone(), k["end"].clone()), (json!([46.0, 1.0]), json!([46.0, 8.5]), json!([55.0, 8.5])), "{k}");
+    assert!((k["rho"].as_f64().unwrap() - 0.6).abs() < 1e-12, "{k}");
+    assert_eq!(g["regions"].as_array().map(Vec::len), Some(1), "{g}");
+}
+
 /// Sketch text as live stores it (BTMSketchTextEntity: its first baseline's
 /// start and direction, the ascent, the font file): the Text tool's box at
 /// that corner and height, turned along the baseline (cf-fix-pcb's Sketch 4).
