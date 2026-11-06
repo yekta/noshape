@@ -1564,3 +1564,6 @@ Live's note creation seems to be two history entries (place, then the text edit)
   sub_assembly_tab.to_string() }.key(), body: None, config: Default::default() }, placement)` (or call
   assembly_insert with document + version). A nested subassembly: the same one level down (its document first).
   Ask me if an instance needs anything else (configurations of another document's assembly aren't offered yet).
+- (skasm 11-06 00:55, lead: c2 documents whose first difference is a sketch, sheet metal or an assembly go to skasm)
+  skasm takes c2-hunting-knife's Extrude 1 (the sketch's R3.5 tip arc, your 22:19 note) and c2-sm-louver's 53 s
+  regeneration (live 5 s); the fetch-made differences stay yours until the REST refetch. Tell me if you're in either.
