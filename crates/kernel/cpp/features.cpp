@@ -2840,6 +2840,93 @@ static bool planar_sides(const TopoDS_Shape& loft, TopoDS_Shape& result, HHist& 
   return true;
 }
 
+// The loft's edges that are pieces of its sections (its ends' rims) on the sections' own curves (lines, circles, the
+// sketch's splines), as Parasolid keeps them; ThruSections leaves its own B-spline copies (c2-impeller-loft's ten
+// edges all splines, live's 4 circles, 3 lines, 3 splines). Each edge whose ends and middle are a piece's takes its
+// curve, its curves on its faces fitted to it again. On a copy first: the shape changed only if that comes out valid
+// with its volume.
+static void restore_section_curves(TopoDS_Shape& out, const std::vector<TopoDS_Wire>& wires)
+{
+  struct Piece
+  {
+    occ::handle<Geom_Curve> c;
+    double                  f, l;
+    gp_Pnt                  a, b, m;
+  };
+  std::vector<Piece> pieces;
+  for (const TopoDS_Wire& w : wires)
+    for (TopExp_Explorer x(w, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      TopLoc_Location    loc;
+      double             f, l;
+      occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, loc, f, l);
+      if (c.IsNull() || BRep_Tool::Degenerated(e))
+        continue;
+      if (!loc.IsIdentity())
+        c = occ::down_cast<Geom_Curve>(c->Transformed(loc.Transformation()));
+      pieces.push_back({c, f, l, c->Value(f), c->Value(l), c->Value(0.5 * (f + l))});
+    }
+  // Per edge of `s`: the piece it is (its curve, reversed when it runs the other way), if any.
+  auto matches = [&](const TopoDS_Shape& s) {
+    std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom_Curve>, double, double>> found;
+    ShapeIMap                                                                      edges;
+    TopExp::MapShapes(s, TopAbs_EDGE, edges);
+    for (int i = 1; i <= edges.Extent(); ++i)
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(edges(i));
+      double             f, l;
+      TopLoc_Location    loc;
+      const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, loc, f, l);
+      if (c.IsNull() || BRep_Tool::Degenerated(e) || occ::down_cast<Geom_BSplineCurve>(c).IsNull())
+        continue;
+      const gp_Pnt a = BRep_Tool::Pnt(TopExp::FirstVertex(e)), b = BRep_Tool::Pnt(TopExp::LastVertex(e));
+      const gp_Pnt m = BRepAdaptor_Curve(e).Value(0.5 * (f + l));
+      const double tol = std::max(BRep_Tool::Tolerance(e), 1e-7);
+      for (const Piece& p : pieces)
+      {
+        const bool same = a.Distance(p.a) <= tol && b.Distance(p.b) <= tol, back = a.Distance(p.b) <= tol && b.Distance(p.a) <= tol;
+        if ((!same && !back) || m.Distance(p.m) > 10 * tol)
+          continue;
+        if (same)
+          found.emplace_back(e, p.c, p.f, p.l);
+        else
+        {
+          occ::handle<Geom_Curve> r = p.c->Reversed();
+          found.emplace_back(e, r, p.c->ReversedParameter(p.l), p.c->ReversedParameter(p.f));
+        }
+        break;
+      }
+    }
+    return found;
+  };
+  auto apply = [](const std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom_Curve>, double, double>>& found) {
+    BRep_Builder B;
+    for (const auto& [e, c, f, l] : found)
+    {
+      TopoDS_Edge E = e;
+      B.UpdateEdge(E, c, BRep_Tool::Tolerance(E));
+      B.Range(E, f, l, true);
+      B.SameRange(E, false);
+      B.SameParameter(E, false);
+      BRepLib::SameParameter(E, BRep_Tool::Tolerance(E));
+    }
+  };
+  if (pieces.empty())
+    return;
+  BRepBuilderAPI_Copy cp(out, true, false);
+  const auto          trial = matches(cp.Shape());
+  if (trial.empty())
+    return;
+  apply(trial);
+  GProp_GProps g0, g1;
+  BRepGProp::VolumeProperties(out, g0);
+  BRepGProp::VolumeProperties(cp.Shape(), g1);
+  if (!BRepCheck_Analyzer(cp.Shape()).IsValid() || std::abs(g1.Mass() - g0.Mass()) > 1e-6 * std::abs(g0.Mass()))
+    return;
+  apply(matches(out));
+}
+
 static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool closed,
                        rust::Slice<const double> start_points, const LoftEnds& ends, bool allow_natural,
                        const TopoDS_Shape& path = TopoDS_Shape(), int path_count = 0)
@@ -3021,6 +3108,8 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
       }
     }
   }
+  if (!std::getenv("NOSHAPE_LOFT_SPLINE_EDGES"))
+    restore_section_curves(out, wires);
   HistoryBuilder hb(args, out);
   hb.add_history(h.get());
   if (!closed)

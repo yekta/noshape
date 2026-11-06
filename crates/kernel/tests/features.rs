@@ -94,6 +94,20 @@ fn loft_end_condition_normal() {
     assert!(l.shape.is_valid());
 }
 
+/// c2-impeller-loft's Loft (live: its ends' rims the sketches' 4 circles and 3 lines): a loft's edges on its sections
+/// keep the sections' curves, not ThruSections' B-spline copies; a square to a circle with Normal to profile, its 4
+/// lines and the circle's 4 arcs, valid.
+#[test]
+fn a_lofts_rims_keep_their_sections_curves() {
+    let r = rect_face(&Plane::xy(), 4.0, 4.0);
+    let c = make_wire_2d(&Plane::xy().offset(5.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 2.0 }]).unwrap();
+    let l = loft(&[r, c], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), ..Default::default() }).unwrap();
+    assert!(l.shape.is_valid());
+    let kinds = |want: fn(&Curve) -> bool| l.shape.edges().iter().filter(|e| e.edge_info().is_ok_and(|i| want(&i.curve))).count();
+    assert_eq!(kinds(|c| matches!(c, Curve::Line { .. })), 4, "the square's lines");
+    assert_eq!(kinds(|c| matches!(c, Curve::Circle { .. })), 4, "the circle's arcs");
+}
+
 #[test]
 fn extrude_variants() {
     let f = rect_face(&Plane::xy(), 2.0, 2.0);

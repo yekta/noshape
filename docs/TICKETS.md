@@ -607,6 +607,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (time_cli.py --limit 180 on tests/budget/*.noshape, every platform, every release). T1
   `kernel_core::an_offset_face_far_outside_its_parameters_fails_at_once` (landed after the 11-06 /opt/occt sync).
   Still: any other OCCT loop that checks no deadline hangs off Linux only; the gate is how one shows.
+- [ ] P2 LOFT-VERTEX-MATCH (core 11-06, parity: c2-impeller-loft's Loft Gehäuse, its first difference) **how Parasolid
+  splits a section with fewer vertices**: a D-shaped profile (lines 60, 72.42, 72.42, a 120.35 spline) lofted to a
+  Ø65 circle: live splits the circle at (0, ±21.19, -9.35) and (0, ±23.55, -56.40), 40.7° and 133.6° from its top
+  (arcs 46.155, 52.683 x 3: the side arcs equal the bottom one); ours by the profile's arc-length shares (46.155,
+  45.476, 75.575, 36.998). The side face then 14,973.2 mm² against live's 15,106.4 (-0.9 %), the part 254,217.8 mm³
+  against 257,078.4 (-1.1 %); the face whose arc agrees, 588.6 against 589.9. Not proportion, nearest points, or
+  angles about the centroids (all tried); one example doesn't fix the rule: live lofts of a square / D to a circle
+  varying the sizes would. Its edges' kinds (the sections' lines and circles) now as live's.
 - [ ] P2 SEAM-SPLIT-FACE-GROUP (core, lead 11-06: take it if more documents show it) **a cylinder wall between a
   thread's turns is one face in live, one per turn here**: c2-helical-sweep's Sweep 1 (a V profile cut along an 8-turn
   helix round a Ø50.8 cylinder) gives 14/25/21 faces / edges / vertices, live 6/10/6: OCCT cuts the wall at the
