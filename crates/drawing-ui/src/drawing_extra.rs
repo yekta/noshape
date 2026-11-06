@@ -954,6 +954,21 @@ impl DrawingEditor {
             }
             Tool::Break { parent: Some(pid), first, vertical } => {
                 let Some(pl) = self.placement(*pid) else { return };
+                // Placed, waiting for ✓: its two lines (view coordinates on the break's axis).
+                if let Some((_, b)) = self.break_dlg.as_ref().and_then(|d| d.pending.clone()) {
+                    let k = if b.vertical { 0 } else { 1 };
+                    for x in [b.a, b.b] {
+                        let mut at = pl.to_view(pl.min);
+                        at[k] = x;
+                        let s = pl.to_sheet(at);
+                        if b.vertical {
+                            overlay.lines.push((vec![[s[0], pl.min[1] - 3.0], [s[0], pl.max[1] + 3.0]], true));
+                        } else {
+                            overlay.lines.push((vec![[pl.min[0] - 3.0, s[1]], [pl.max[0] + 3.0, s[1]]], true));
+                        }
+                    }
+                    return;
+                }
                 let mut xs = vec![self.cursor];
                 if let Some(f) = first {
                     xs.push(*f);
@@ -1087,13 +1102,17 @@ impl DrawingEditor {
                     self.tool = Tool::Break { parent: v, first: Some(c), vertical };
                 }
             }
+            // The two lines wait for ✓ (live: Esc or another tool leaves nothing).
             Tool::Break { parent: Some(v), first: Some(f), vertical } => {
                 let Some(pl) = self.placement(v) else { return true };
-                let (style, gap_mm) = self.break_dlg.as_ref().map(|d| (d.style, d.gap)).unwrap_or((BreakStyle::ZigZag, 6.0));
-                if let Some(b) = noshape_scene::drawing_tools::view_break(&pl, vertical, f, c, style, gap_mm) {
-                    self.edit_view("Break view", v, cx, |dv| dv.breaks.push(b));
+                let (style, gap_mm) = self.break_dlg.as_ref().map(|d| (d.style, d.gap)).unwrap_or((BreakStyle::ZigZag, 10.0));
+                if let Some(b) = noshape_scene::drawing_tools::view_break(&pl, vertical, f, c, style, gap_mm)
+                    && let Some(d) = &mut self.break_dlg
+                {
+                    d.pending = Some((v, b));
                 }
-                self.tool = Tool::Select;
+                self.tool = Tool::Break { parent: Some(v), first: None, vertical };
+                self.update_preview(cx);
             }
             Tool::Ordinate { origin: None, .. } => {
                 if let Some(p) = self.any_point(c) {
@@ -1897,29 +1916,33 @@ impl DrawingEditor {
         });
     }
 
+    /// A break line's menu (live "The Break view tool" (b)): Edit... · Paste · Paste as table | Clear selection ·
+    /// Zoom to fit · Delete.
     pub fn break_entries(&self, view: ViewId, index: usize) -> Vec<MenuEntry> {
-        let mut out = Vec::new();
-        let Some(b) = self.drawing.sheets[self.sheet].view(view).and_then(|v| v.breaks.get(index)).cloned() else { return out };
-        let styles = [("Zig zag", BreakStyle::ZigZag), ("Small zig zag", BreakStyle::SmallZigZag), ("Curve", BreakStyle::Curve), ("Straight", BreakStyle::Straight)]
-            .into_iter()
-            .map(|(n, st)| MenuEntry::check(n, b.style == st, move |t, _, cx| t.edit_view("Break style", view, cx, |v| if let Some(b) = v.breaks.get_mut(index) { b.style = st })))
-            .collect();
-        out.push(MenuEntry::Submenu("Break line style".into(), styles));
-        let gaps = [3.0, 6.0, 10.0, 15.0]
-            .into_iter()
-            .map(|g| MenuEntry::check(format!("{g} mm"), (b.gap_mm - g).abs() < 1e-9, move |t, _, cx| t.edit_view("Break gap", view, cx, |v| if let Some(b) = v.breaks.get_mut(index) { b.gap_mm = g })))
-            .collect();
-        out.push(MenuEntry::Submenu("Gap".into(), gaps));
-        out.push(MenuEntry::Separator);
-        out.push(MenuEntry::item("Delete break", move |t, _, cx| {
-            t.selection.clear();
-            t.edit_view("Delete break", view, cx, |v| {
-                if index < v.breaks.len() {
-                    v.breaks.remove(index);
-                }
-            })
-        }));
-        out
+        if self.drawing.sheets[self.sheet].view(view).and_then(|v| v.breaks.get(index)).is_none() {
+            return Vec::new();
+        }
+        vec![
+            MenuEntry::item("Edit...", move |t, w, cx| t.edit_break(view, index, w, cx)),
+            crate::drawing_props::paste_always(),
+            MenuEntry::item("Paste as table", |t, _, cx| {
+                t.paste_as_table(cx);
+            }),
+            MenuEntry::Separator,
+            MenuEntry::item("Clear selection", |t, _, cx| {
+                t.selection.clear();
+                t.redraw(cx);
+            }),
+            MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)),
+            MenuEntry::item("Delete", move |t, _, cx| {
+                t.selection.clear();
+                t.edit_view("Delete break", view, cx, |v| {
+                    if index < v.breaks.len() {
+                        v.breaks.remove(index);
+                    }
+                })
+            }),
+        ]
     }
 
     // ------------------------------------------------------------ panels

@@ -290,7 +290,7 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
         Tool::Section { .. } => "Section view",
         Tool::AlignedSection { .. } => "Aligned section view",
         Tool::Detail { .. } => "Detail view",
-        Tool::Crop { .. } => "Crop view",
+        Tool::Crop { .. } | Tool::CropPoly { .. } => "Crop view",
         Tool::Break { .. } => "Break view",
         Tool::Dimension { kind, .. } => match kind {
             DimTool::Linear => "Dimension",

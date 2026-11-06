@@ -1,7 +1,8 @@
 //! Drawing editor: Onshape's Break view dialog (while the Break view tool
 //! is active): Horizontal or Vertical, the break line type (Zig zag, Small
-//! zig zag, Curve, Straight) and the gap distance; then two clicks in the
-//! view place the break lines.
+//! zig zag, Curve, Straight) and the gap distance; two clicks in the view
+//! place the break lines, ✓ applies the break (Esc leaves nothing; live
+//! "The Break view tool"). A break line's Edit... reopens it on that break.
 
 use crate::drawing_view::*;
 use crate::theme::p;
@@ -11,7 +12,7 @@ use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use noshape_model::drawing::BreakStyle;
+use noshape_model::drawing::{BreakStyle, ViewBreak, ViewId};
 
 const STYLES: [(&str, BreakStyle); 4] = [("Zig zag", BreakStyle::ZigZag), ("Small zig zag", BreakStyle::SmallZigZag), ("Curve", BreakStyle::Curve), ("Straight", BreakStyle::Straight)];
 
@@ -21,6 +22,10 @@ pub struct BreakDlg {
     /// Gap distance (mm on the sheet).
     pub gap: f64,
     pub gap_input: Entity<InputState>,
+    /// The two lines placed, waiting for ✓: the view and its break.
+    pub pending: Option<(ViewId, ViewBreak)>,
+    /// The view's break being edited (Edit... on a break line).
+    pub edit: Option<(ViewId, usize)>,
     _sub: Subscription,
 }
 
@@ -30,9 +35,10 @@ impl DrawingEditor {
         let active = matches!(self.tool, Tool::Break { .. });
         match (self.break_dlg.is_some(), active) {
             (false, true) => {
+                // Live: 10 mm in a millimetre drawing, 0.5 in in an inch one.
                 let mm = self.drawing.units_mm;
-                let text = if mm { "6 mm".to_string() } else { "0.25 in".to_string() };
-                let gap = crate::drawing_section::parse_depth(&text, mm).unwrap_or(0.006) * 1000.0;
+                let text = if mm { "10 mm".to_string() } else { "0.5 in".to_string() };
+                let gap = crate::drawing_section::parse_depth(&text, mm).unwrap_or(0.010) * 1000.0;
                 let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text));
                 let sub = cx.subscribe(&st, move |this: &mut Self, st, ev: &InputEvent, cx| {
                     if matches!(ev, InputEvent::Change)
@@ -42,7 +48,7 @@ impl DrawingEditor {
                         d.gap = v * 1000.0;
                     }
                 });
-                self.break_dlg = Some(BreakDlg { style: BreakStyle::ZigZag, gap, gap_input: st, _sub: sub });
+                self.break_dlg = Some(BreakDlg { style: BreakStyle::ZigZag, gap, gap_input: st, pending: None, edit: None, _sub: sub });
             }
             (true, false) => self.break_dlg = None,
             _ => {}
@@ -57,9 +63,49 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Edit... on a break line: the dialog on that break (its lines shown), ✓ replaces it.
+    pub fn edit_break(&mut self, view: ViewId, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(b) = self.current_sheet().view(view).and_then(|v| v.breaks.get(index)).cloned() else { return };
+        self.set_tool(Tool::Break { parent: Some(view), first: None, vertical: b.vertical }, cx);
+        self.sync_break_dlg(window, cx);
+        let mm = self.drawing.units_mm;
+        let text = if mm { format!("{} mm", b.gap_mm) } else { format!("{} in", b.gap_mm / 25.4) };
+        if let Some(d) = &mut self.break_dlg {
+            d.style = b.style;
+            d.gap = b.gap_mm;
+            d.gap_input.update(cx, |i, cx| i.set_value(text, window, cx));
+            d.pending = Some((view, b));
+            d.edit = Some((view, index));
+        }
+        self.update_preview(cx);
+        cx.notify();
+    }
+
+    /// ✓: the placed break applied (or the edited one replaced) with the dialog's line type and gap.
+    pub fn apply_break(&mut self, cx: &mut Context<Self>) {
+        let Some(d) = &self.break_dlg else { return };
+        let Some((view, mut b)) = d.pending.clone() else { return };
+        b.style = d.style;
+        b.gap_mm = d.gap;
+        let edit = d.edit;
+        match edit {
+            Some((v, i)) => self.edit_view("Break view", v, cx, |dv| {
+                if let Some(x) = dv.breaks.get_mut(i) {
+                    *x = b;
+                }
+            }),
+            None => self.edit_view("Break view", view, cx, |dv| dv.breaks.push(b)),
+        }
+        self.tool = Tool::Select;
+        self.break_dlg = None;
+        self.update_preview(cx);
+        cx.notify();
+    }
+
     pub fn render_break_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.break_dlg.as_ref()?;
         let Tool::Break { vertical, .. } = self.tool else { return None };
+        let ready = d.pending.is_some();
         let pal = p();
         let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {
             div()
@@ -112,6 +158,21 @@ impl DrawingEditor {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd3d7d9))
                         .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Break view"))
+                        .child(crate::ui_script::wrap(
+                            div()
+                                .id("brk-ok")
+                                .w(px(28.))
+                                .h(px(27.))
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .cursor_pointer()
+                                .bg(gpui_kit::rgb(if ready { 0x009500 } else { crate::drawing_chrome::OK_DISABLED }))
+                                .child(crate::drawing_chrome::ok_check(18.))
+                                .when(ready, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_break(cx))))
+                                .into_any_element(),
+                            || "button:ok".into(),
+                        ))
                         .child(
                             div()
                                 .id("brk-cancel")
@@ -128,7 +189,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(h_flex().child(tab("brk-h", "Horizontal", !vertical, false, cx)).child(tab("brk-v", "Vertical", vertical, true, cx)))
+                        .child(h_flex().child(tab("brk-v", "Vertical", vertical, true, cx)).child(tab("brk-h", "Horizontal", !vertical, false, cx)))
                         .child(row("Break line", styles.into_any_element()))
                         .child(row("Gap distance", div().w(px(130.)).child(Input::new(&d.gap_input).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(2.))).into_any_element()))
                         .child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click in the view to place the two break lines")),
