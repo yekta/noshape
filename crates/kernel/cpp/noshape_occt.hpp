@@ -52,7 +52,10 @@ struct UnifyScope;   // internal.hpp, the unify
   #include <ctime>
 // The crash guards' jumps save the signal mask only on macOS: Linux's on_crash blocks nothing (SA_NODEFER, empty
 // sa_mask), so its jump leaves the mask as it was and skips a syscall a kernel call; macOS's _longjmp out of the
-// handler failed the budget's fault test (CI 11-06).
+// handler failed the budget's fault test (CI 11-06). Likely why (Darwin's libc, not checked on a Mac): only its
+// mask-restoring longjmp also clears the thread's on-the-alternate-signal-stack state (the handler runs SA_ONSTACK);
+// after a _longjmp the kernel still thinks the thread is on that stack, so the next fault isn't delivered as the
+// guard expects.
 #ifdef __APPLE__
   #define NOSHAPE_GUARD_SAVES_MASK 1
 #else
