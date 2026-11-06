@@ -1,0 +1,65 @@
+# bool's measurement (not for main): the knurl and the release documents on macOS arm64, in one job on one runner,
+# with the system heap, mimalloc as Rust's allocator (skasm's setup, --cfg bool_mimalloc), mimalloc for the whole
+# process (DYLD_INSERT_LIBRARIES, OCCT's C++ heap too), and OCCT's thread pool at 1 and 2 threads.
+name: bool arm64 measure
+on:
+  push:
+    branches: [bool/arm-measure]
+jobs:
+  measure:
+    runs-on: macos-15
+    timeout-minutes: 330
+    env:
+      CARGO_TERM_COLOR: never
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build tools
+        run: |
+          command -v ninja || brew install ninja
+          brew install mimalloc
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+      - name: C and C++ compiler
+        uses: ./.github/actions/setup-cxx
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+      - name: openNURBS (Rhino export)
+        uses: ./.github/actions/setup-opennurbs
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1-vendored-${{ hashFiles('vendor/**') }}
+          cache-directories: target-vendored
+          save-if: false
+      - name: Vendored crates' builds into target/
+        run: python3 .github/ci/vendored_builds.py restore
+      - name: Build the CLI (system heap)
+        run: cargo build --release --locked -p noshape-cli && cp target/release/noshape-cli "$RUNNER_TEMP/cli-base"
+      - name: Build the CLI (mimalloc as Rust's allocator)
+        env:
+          RUSTFLAGS: --cfg bool_mimalloc
+          CARGO_TARGET_DIR: target-mi
+        run: cargo build --release --locked -p noshape-cli && cp target-mi/release/noshape-cli "$RUNNER_TEMP/cli-crate"
+      - name: Measure
+        run: |
+          set -x
+          sysctl -n machdep.cpu.brand_string; sysctl -n hw.ncpu hw.perflevel0.physicalcpu hw.perflevel1.physicalcpu || true
+          mi=$(brew --prefix mimalloc)/lib/libmimalloc.dylib; ls -la "$mi"
+          t=$RUNNER_TEMP
+          w() { printf '#!/bin/bash\n%s\nexec %s "$@"\n' "$2" "$3" > "$t/$1"; chmod +x "$t/$1"; }
+          w base "" "$t/cli-base"
+          w crate "" "$t/cli-crate"
+          w dyld "export DYLD_INSERT_LIBRARIES=$mi" "$t/cli-base"
+          w occt1 "export NOSHAPE_OCCT_THREADS=1" "$t/cli-base"
+          w occt2 "export NOSHAPE_OCCT_THREADS=2" "$t/cli-base"
+          # (mimalloc actually loaded in the whole-process run: its banner.)
+          MIMALLOC_VERBOSE=1 "$t/dyld" --version 2>&1 | head -5 || true
+          docs="tests/perf/knurl-d25x25-45-45.noshape tests/perf/release-fillet-hang.noshape tests/perf/fins-400.noshape tests/perf/live-30-features.noshape"
+          py=$(command -v python3)
+          for round in 1 2; do
+            for v in base crate dyld occt1 occt2; do
+              echo "== round $round $v"
+              $py .github/release/time_cli.py "$t/$v" $docs | grep -E "noshape:" | sed "s/^/$v /"
+            done
+          done 2>&1 | tee "$t/measure.txt"
+          { echo '```'; cat "$t/measure.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

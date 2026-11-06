@@ -12,7 +12,7 @@
 //! failures print `{"error": ..., "message": ..., "param": ...}` and exit 2.
 
 // The system heap is slow for our many small allocations on Windows (WINDOWS-RUST-SLOW).
-#[cfg(windows)]
+#[cfg(any(windows, all(target_os = "macos", bool_mimalloc)))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
