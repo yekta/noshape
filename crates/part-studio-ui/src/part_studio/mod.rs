@@ -4476,6 +4476,11 @@ impl PartStudioView {
                 } else {
                     this.ui.part_anchor = Some(id1.clone());
                     this.pick_body(id1.clone(), cx);
+                    // Live (ui-parity boolean-subtract): a part picked from the list into a dialog gives the keyboard
+                    // back to its active selection field (a list row takes no focus, unlike the graphics).
+                    if let Some(e) = &this.edit {
+                        e.dialog.update(cx, |d, _| d.keyboard_left = false);
+                    }
                 }
             }))
             .os_context_menu(move |menu, _, _| {

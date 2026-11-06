@@ -3296,6 +3296,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P2 SKETCH-SCREEN-SPACE-REACH (skasm) live measures a sketch's pick and inference reach on the screen, after the view's
+  projection; ours in sketch units (`world_per_px` × px). In the default trimetric view a Top-plane sketch's y is foreshortened
+  far more than its x, and live behaves accordingly (ui-parity, start `empty`, Sketch on Top): sketch-horizontal-key draws
+  (0, 0) → (30, 3) and live infers HORIZONTAL (3 mm in y is inside its reach), sketch-vertical-key draws (0, 0) → (3, 30) and
+  live infers no VERTICAL (3 mm in x isn't); sketch-offset clicks 3 mm below the picked line and live hits the line again
+  (the preview goes, nothing is made), where ours misses it. Live's reach is 10 px (woolsthorpe `getInferenceRadius`), now
+  ours too (psui 11-06, `INFERENCE_PX`), but measured in sketch units it misses all three. Needs the plane-to-screen
+  scale per direction (or the projected distance) in pick and inference. (psui 2026-11-06)
 - [ ] P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection

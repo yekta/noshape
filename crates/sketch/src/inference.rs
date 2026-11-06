@@ -358,7 +358,12 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                 None if horizontal => (InferenceKind::Horizontal, None, AutoConstraint::HorizontalLine),
                 None => (InferenceKind::Vertical, None, AutoConstraint::VerticalLine),
             };
-            if near(ang, 0.0) {
+            // Live (woolsthorpe `getInferenceRadius`, 10 px; ui-parity sketch-horizontal-key: (0, 0) to (30, 3) snaps
+            // level): a line turns horizontal or vertical while the pointer is within the inference reach of the
+            // horizontal / vertical through its start, a distance on screen, not an angle.
+            let reach = ctx.align_radius.unwrap_or(ctx.snap_radius);
+            let near_axis = |horizontal: bool| if horizontal { d.y.abs() <= reach && d.y.abs() < d.x.abs() } else { d.x.abs() <= reach && d.x.abs() <= d.y.abs() };
+            if near_axis(true) {
                 let (kind, on, c) = line_kind(true);
                 push(&mut out, kind, DVec2::new(cursor.x, a.y), on, Some(a), vec![c], 2);
                 // A horizontal line ending in vertical alignment with a woken
@@ -367,7 +372,7 @@ pub fn infer(sk: &Sketch, cursor: DVec2, ctx: &InferenceContext) -> Vec<Inferenc
                     push(&mut out, InferenceKind::AlignVertical, DVec2::new(vpos.x, a.y), Some(vp), Some(vpos), vec![c, AutoConstraint::VerticalWith(vp)], 1);
                 }
             }
-            if near(ang, PI / 2.0) {
+            if near_axis(false) {
                 let (kind, on, c) = line_kind(false);
                 push(&mut out, kind, DVec2::new(a.x, cursor.y), on, Some(a), vec![c], 2);
                 if let Some((_, hp, hpos)) = best_h {

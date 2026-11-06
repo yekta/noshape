@@ -64,6 +64,10 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 let b = &ev.ctx.bodies[i];
                 NamedShape { shape: b.shape.clone(), names: b.shape_names() }
             }).collect();
+            if op == "INTERSECTION" && targets.is_empty() && tools_idx.len() < 2 {
+                // Live (ui-parity boolean-intersect): one part fails, as Union's (opBoolean's input check).
+                return err("Need at least two parts or surfaces for a Boolean operation.");
+            }
             if op == "INTERSECTION" && targets.is_empty() {
                 // Intersect all tools with each other: keep the common volume in the first.
                 // Live ("qa5 booleans"): the common volume is a new part (new

@@ -397,6 +397,10 @@ pub struct GlyphInfo {
     pub external: bool,
 }
 
+/// How far inference reaches, in pixels (live woolsthorpe `getInferenceRadius`: 10 px at the view's scale): snapping to
+/// points, a line turning horizontal or vertical.
+const INFERENCE_PX: f64 = 10.0;
+
 /// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
 /// not solver constraints but the entity's link in `SketchData::external_refs`.
 const USE_GLYPH_BASE: u32 = 0xC000_0000;
@@ -1426,7 +1430,7 @@ impl SketchEditor {
             tool: if self.tangent_mode { SketchTool::TangentArc } else { self.tool.inference_tool() },
             anchor,
             anchor_point: self.chain_end.or_else(|| self.line_start_point()),
-            snap_radius: self.world_per_px * if self.exact_inference { 0.1 } else { 9.0 },
+            snap_radius: self.world_per_px * if self.exact_inference { 0.1 } else { INFERENCE_PX },
             angle_tolerance: if self.exact_inference { 1e-9 } else { 3f64.to_radians() },
             align_radius: self.exact_inference.then_some(self.world_per_px * 1e-3),
             exclude: Vec::new(),
@@ -1928,12 +1932,28 @@ impl SketchEditor {
                 // While previewing, the picked curves stay selected (live: orange) and a click picks under the pointer.
                 let ids: Vec<EntityId> = if self.selection.is_empty() || self.offset_pending.is_some() { hovered.into_iter().filter(|e| !is_point(&data.sketch, *e)).collect() } else { std::mem::take(&mut self.selection) };
                 if ids.is_empty() {
-                    // Live (ui-parity sketch-offset): a click on empty space drops the preview; nothing is made.
-                    if self.offset_pending.take().is_some() {
-                        self.selection.clear();
-                        return EditOutcome::redraw();
+                    // Live (ui-parity sketch-offset-key): a click away from the curves places the previewed offset
+                    // through the pointer, on its side, and opens its distance box.
+                    if self.offset_pending.is_none() {
+                        return EditOutcome::none();
                     }
-                    return EditOutcome::none();
+                    if let Some((mid, n)) = self.offset_frame(&data.sketch) {
+                        let want = (p - mid).dot(n);
+                        let sign = if (self.offset_flip != self.offset_out) != self.offset_flip_base(&data.sketch) { -1.0 } else { 1.0 };
+                        if want.abs() > self.world_per_px {
+                            if (want < 0.0) != (sign < 0.0) {
+                                self.offset_flip = !self.offset_flip;
+                            }
+                            self.offset_distance = want.abs();
+                        }
+                    }
+                    // (Placed by a click the tool ends: live's tool is none after it.)
+                    let out = self.commit_offset(data);
+                    if out.changed {
+                        self.tool = Tool::Select;
+                        self.offset_repeat = false;
+                    }
+                    return out;
                 }
                 if self.offset_repeat && self.offset_pending.is_none() {
                     // Later clicks offset by the same distance right away.
@@ -1945,6 +1965,17 @@ impl SketchEditor {
                     // selection). Live (qa4 OFF-TOAST): a curve off the chain
                     // is not added, only warned about.
                     Some(p) => {
+                        // Live (ui-parity sketch-offset): a picked curve clicked again leaves the offset; with none
+                        // left the preview goes and nothing is made.
+                        if ids.iter().all(|e| p.contains(e)) {
+                            p.retain(|e| !ids.contains(e));
+                            if p.is_empty() {
+                                self.offset_pending = None;
+                                self.selection.clear();
+                                return EditOutcome::redraw();
+                            }
+                        }
+                        let Some(p) = self.offset_pending.as_mut() else { return EditOutcome::redraw() };
                         for e in ids {
                             if p.contains(&e) {
                                 continue;
@@ -8836,6 +8867,33 @@ mod tests {
     }
 
     #[test]
+    fn a_click_in_space_places_the_offset_through_the_pointer() {
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        click(&mut ed, &mut d, v(0.0075, 0.0));
+        assert!(ed.offset_pending.is_some(), "picking the line previews its offset");
+        // Live (ui-parity sketch-offset-key): the click 5 mm below makes the offset there and opens its distance box.
+        click(&mut ed, &mut d, v(0.0075, -0.005));
+        assert_eq!(count(&d, EntityKind::Line), 2);
+        let cid = ed.dim_edit.as_ref().expect("its distance box").constraint;
+        assert!(matches!(d.sketch.constraint(cid).map(|c| &c.kind), Some(ConstraintKind::Distance { value, .. }) if (*value - 0.005).abs() < 1e-9));
+        let below = d.sketch.entities().filter_map(|e| d.sketch.curve(e.id)).any(|c| (c.start_point().y + 0.005).abs() < 1e-9);
+        assert!(below, "on the pointer's side");
+        // The picked line clicked again: no offset, nothing previewed (live ui-parity sketch-offset).
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        click(&mut ed, &mut d, v(0.0075, 0.0));
+        click(&mut ed, &mut d, v(0.02, 0.0));
+        assert!(ed.offset_pending.is_none() && ed.selection.is_empty());
+        assert_eq!(count(&d, EntityKind::Line), 1);
+        // With nothing previewed a click in space makes nothing.
+        let (mut ed, mut d) = editor(Tool::Offset);
+        d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        click(&mut ed, &mut d, v(0.08, 0.08));
+        assert_eq!(count(&d, EntityKind::Line), 1);
+    }
+
+    #[test]
     fn offset_preview_arrow_and_repeat() {
         let (mut ed, mut d) = editor(Tool::Offset);
         let l1 = d.sketch.add_line(v(0.01, 0.01), v(0.03, 0.01));
@@ -8844,11 +8902,6 @@ mod tests {
         assert!(ed.offset_pending.is_some(), "picking a curve previews the offset");
         assert_eq!(ed.selection, vec![l1], "the picked curve stays selected (live)");
         assert_eq!(count(&d, EntityKind::Line), 2, "nothing is created yet");
-        // Live (ui-parity sketch-offset): a click on empty space drops the preview.
-        click(&mut ed, &mut d, v(0.08, 0.08));
-        assert!(ed.offset_pending.is_none() && ed.selection.is_empty());
-        assert_eq!(count(&d, EntityKind::Line), 2);
-        click(&mut ed, &mut d, v(0.02, 0.01));
         let (base, tip) = ed.offset_arrow(&d.sketch).unwrap();
         // drag the arrow to the other side: 4 mm below the line
         ed.pointer_move(&mut d, tip, false, false);

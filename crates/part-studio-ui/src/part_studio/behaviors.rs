@@ -992,6 +992,9 @@ impl PartStudioView {
         // part-studio/440: Part 1 in Transform's field lights up Extrude 1;
         // psui/m-03: not while another field is active).
         let picked = self.edit.as_ref().map(|e| e.dialog.read(cx).active_refs());
+        // A part's creators as before the edited feature (live ui-parity boolean-subtract: Part 1 in Targets lights up
+        // Extrude 1 only, not Extrude 2 whose cut the preview shows on it).
+        let display = self.edit.as_ref().and(self.ui.preview_before.as_deref()).unwrap_or(&self.display);
         for r in picked.as_ref().unwrap_or(&self.selection) {
             // A point on an edge (its midpoint, an end) stands for that edge (live ui-parity fillet-asymmetric-toggle:
             // an edge clicked at its midpoint lights up Extrude 1).
@@ -1002,7 +1005,7 @@ impl PartStudioView {
             match r {
                 Reference::Body(b) => {
                     out.insert(b.feature);
-                    if let Some(bd) = self.display.body(b) {
+                    if let Some(bd) = display.body(b) {
                         out.extend(bd.face_refs.iter().filter_map(|f| f.depends_on()));
                     }
                 }

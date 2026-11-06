@@ -150,6 +150,14 @@ impl FeatureDialog {
                     let cur = values.enum_(s.id);
                     tabs.extend(options.iter().map(|(id, l)| json!({ "label": crate::i18n::spec(l), "selected": cur == *id })));
                 }
+                // The Mate connector's row of icon buttons (render_axis_buttons): Reorient secondary axis is a plain
+                // button (live: "other", no text) and Flip primary axis a flip toggle.
+                ParamKind::Enum { .. } if s.hints.has(Hints::MATE_CONNECTOR_AXIS_TYPE) => {
+                    fields.push(json!({ "label": null, "kind": "other", "text": "", "state": "ok" }));
+                }
+                ParamKind::Bool { .. } if s.hints.has(Hints::PRIMARY_AXIS) => {
+                    fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": values.bool(s.id), "state": "ok" }));
+                }
                 ParamKind::Enum { options, .. } => {
                     let cur = values.enum_(s.id);
                     let text = options.iter().find(|(id, _)| *id == cur).map(|(_, l)| crate::i18n::spec(l)).unwrap_or_default();
