@@ -381,6 +381,7 @@ jobs:
           sparse-checkout: |
             .github/release
             tests/perf
+            tests/budget
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.asset }}
