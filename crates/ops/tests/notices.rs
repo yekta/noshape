@@ -37,7 +37,7 @@ fn generate() -> String {
     let packages: HashMap<&str, &serde_json::Value> = meta["packages"].as_array().unwrap().iter().map(|p| (p["id"].as_str().unwrap(), p)).collect();
     let nodes: HashMap<&str, &serde_json::Value> = meta["resolve"]["nodes"].as_array().unwrap().iter().map(|n| (n["id"].as_str().unwrap(), n)).collect();
     // The app and what it links: normal dependencies on every platform (not build scripts' or tests').
-    let app = packages.values().find(|p| p["name"] == "noshape" && p["manifest_path"].as_str().unwrap().contains("crates/app")).expect("the app package")["id"].as_str().unwrap();
+    let app = packages.values().find(|p| p["name"] == "noshape" && Path::new(p["manifest_path"].as_str().unwrap()).ends_with("crates/app/Cargo.toml")).expect("the app package")["id"].as_str().unwrap();
     let mut seen: BTreeSet<&str> = BTreeSet::new();
     let mut queue = VecDeque::from([app]);
     while let Some(id) = queue.pop_front() {
