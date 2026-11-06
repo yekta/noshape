@@ -251,6 +251,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-06 05:00 release (qa list 03:20, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 03:48: still no blocker on green 9521ecf1** (dx's FeatureScript compiled to closures, skasm's ellipse parity): the
+  volume sweep, dx's cf corpus and the 44 ticket documents = 2532af01.
 - **qa 03:20: no new blocker.** On green 2532af01 (vibe3), the full CLI smoke = v0.4.32's: round trip 67643.716875 / 18 in all
   six formats, volume sweep = v0.4.32, fixed tickets hold, and the user's cases pass (knurl, vase, split-and-chamfer, Y Ribs, the
   Gyro matrices: only the picked body changes). RELEASE-BUILD-FILLET-HANG opens in 7 s. The 44 ticket documents and dx's cf
