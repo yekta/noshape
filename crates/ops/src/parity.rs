@@ -1560,7 +1560,11 @@ impl<'a> Translator<'a> {
         // sketch's own curves decide: a piece of a ring that the face's edge
         // split off is no inner loop (live motor-mount-jack's Extrude 3), a
         // piece of an inner region is.
-        if let Some((sk, rest)) = text.split("qSketchRegion(id + \"").nth(1).and_then(|r| r.split_once('"')) {
+        // (Written `id + "F…"` or `id+"F…"`.)
+        fn region_of(t: &str) -> Option<(&str, &str)> {
+            t.split("qSketchRegion(").skip(1).find_map(|r| r.trim_start().strip_prefix("id")?.trim_start().strip_prefix('+')?.trim_start().strip_prefix('"')?.split_once('"'))
+        }
+        if let Some((sk, rest)) = region_of(text) {
             let ours = self.feature_ids.get(sk).cloned().ok_or_else(|| format!("sketch {sk} was not built"))?;
             let g = self.call("sketch_get", json!({ "sketch": ours }))?;
             // (Not the face's imprinted pieces: sketch faces, not regions.)
