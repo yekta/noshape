@@ -70,6 +70,19 @@ corpus2-6 47-49 each, parity56 7, shfall 650, direct-corpus / sh-new2 / knurls (
 0acfd0a2's pieces of arguments 28/46 and 60/61 together 0.69 mm (of 2 mm) and 0.34 mm (of 1 mm). Also pairs between
 the same two vertices that bulge apart in the middle (together 11 um from each end, 0.57 um apart between): OCCT's EE
 gives those common parts at both ends too.
+P1 tried, not landed (11-06 13:23 UTC; /root/bool-scratch/p1-wip2-1106.patch, arrange-tie-wip-1106.patch):
+- A vertex where two edges part after running together from a shared one (the bounding sphere of their points there,
+  made for the next round): 2 differences in every corpus (one-tool fuses, 4 edges more than OCCT's) and shfall 51 ->
+  47. OCCT's edge with edge takes a short coincident stretch next to a shared vertex as a touch, not a common part
+  (IntTools_EdgeEdge::IsIntersection: range ends within 5000 x tol of the other's ends, tangents within 5e-3 rad):
+  the premise was wrong for these. A piece wholly along another edge with its end vertex put on it (OCCT's common
+  part proper) is right but takes nothing here.
+- What the cases are, looked at again: the slab cases' two B-spline edges (0acfd0a2's face 543, args 37/46 and 82)
+  are within their own 2e-7 for 6 um from vertex 160 and then part (3D), but map to the same 2D curve on the face
+  (they differ across the surface, not along it): the arrangement can't order them (a tie-break by where they are a
+  quarter on found them identical in 2D). OCCT keeps them as two edges on the face. 47587a8d's 3 mrad lines: the same
+  (OCCT keeps the sliver). So these need the face's arrangement to tell apart curves coincident in its parameters
+  but not in space (OCCT's BuilderFace works with each edge's own pcurve and 3D tolerance), not P1.
 
 ## mimalloc on macOS, measured to land (11-06 11:17 UTC; lead: land only if nothing gets worse beyond noise): not landed
 - The change (branch bool/macos-mimalloc, c9a9ea42): the mimalloc crate with `override` (malloc's default zone, so
