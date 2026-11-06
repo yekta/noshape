@@ -209,7 +209,7 @@ public:
   ~CancelIndicator() override { Show(nullptr); }
   bool UserBreak() override
   {
-    if (work_step() || cancelled(myFlag) || myOver)
+    if (work_step() || budget_spent() || cancelled(myFlag) || myOver)
       return true;
     const auto now = std::chrono::steady_clock::now();
     // (A CPU clock is a system call: every 5 ms.)
@@ -344,15 +344,16 @@ struct PoolContext
 {
   const std::atomic<bool>* cancel;
   Deadline*                deadline;
+  std::atomic<bool>*       spent;
 };
-thread_local PoolContext t_pool_context{nullptr, nullptr};
+thread_local PoolContext t_pool_context{nullptr, nullptr, nullptr};
 } // namespace
 
 extern "C" void* noshape_pool_capture()
 {
-  if (t_cancel == nullptr && t_deadline == nullptr)
+  if (t_cancel == nullptr && t_deadline == nullptr && t_spent == nullptr)
     return nullptr;
-  t_pool_context = {t_cancel, t_deadline};
+  t_pool_context = {t_cancel, t_deadline, t_spent};
   return &t_pool_context;
 }
 
@@ -360,10 +361,11 @@ extern "C" void* noshape_pool_enter(void* context)
 {
   if (context == nullptr)
     return nullptr;
-  PoolContext* previous = new PoolContext{t_cancel, t_deadline};
+  PoolContext* previous = new PoolContext{t_cancel, t_deadline, t_spent};
   const PoolContext* c  = static_cast<const PoolContext*>(context);
   t_cancel              = c->cancel;
   t_deadline            = c->deadline;
+  t_spent               = c->spent;
   return previous;
 }
 
@@ -374,6 +376,7 @@ extern "C" void noshape_pool_leave(void* previous)
   const PoolContext* p = static_cast<const PoolContext*>(previous);
   t_cancel             = p->cancel;
   t_deadline           = p->deadline;
+  t_spent              = p->spent;
   delete p;
 }
 
@@ -398,7 +401,7 @@ size_t RustMemoryWatch::budget_mb() { return memory_budget() >> 20; }
 
 extern "C" int noshape_should_break()
 {
-  if (work_step())
+  if (work_step() || budget_spent())
     return 1;
   Deadline* const d = t_deadline;
   if (cancelled(t_cancel))

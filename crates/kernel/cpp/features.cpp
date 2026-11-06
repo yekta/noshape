@@ -5035,6 +5035,9 @@ void add_images(const HHist& h, const TopoDS_Shape& x, const TopoDS_Shape& from,
 // neighbours extended back), then trimmed back to the part. That is the
 // solid Parasolid makes (G46: 44487.2158 mm³, 9/21/14 faces/edges/vertices
 // against Onshape's 44487.2085, 9/21/14). Null when it doesn't apply.
+// Its face removal's work bound (break-hook and progress checks): ~0.5 s of it on vibe5 (~4 us a step), 55 times the
+// blend corpus' cases where it works (2,727 steps; NOSHAPE_WORK_TRACE=1 prints them).
+constexpr uint64_t PAST_END_DEFEATURE_WORK = 150000;
 std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
                                                                    const std::vector<double>& rs)
 {
@@ -5090,10 +5093,10 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
     df.AddFacesToRemove(faces);
     df.SetToFillHistory(true);
     {
-      // (0.5 s at most: removing two faces of a knob's grip took 68 s and gave nothing, dx's FILLET-31S-FAIL; where it
-      // works, 9-13 ms in the blend corpus.)
-      const KernelTimer    timer("blend.past_end.defeature");
-      const ScopedDeadline step(0.5);
+      // (Bounded by work, not time, so the fallback applies alike on any machine: removing two faces of a knob's grip
+      // took 68 s and gave nothing, dx's FILLET-31S-FAIL; where it works, 9-13 ms in the blend corpus.)
+      const KernelTimer timer("blend.past_end.defeature");
+      const ScopedWork  step(PAST_END_DEFEATURE_WORK);
       try
       {
         df.Build(new_cancel_indicator()->Start());
@@ -5102,7 +5105,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_past_end_faces(const TopoDS
       {
         return std::nullopt;
       }
-      if (step.d.hit.load())
+      if (std::getenv("NOSHAPE_WORK_TRACE"))
+        std::fprintf(stderr, "work: blend.past_end.defeature %llu steps%s\n", (unsigned long long)step.w.used, step.w.hit ? " (spent)" : "");
+      if (step.w.hit)
         return std::nullopt;
     }
     if (!df.IsDone() || df.HasErrors())

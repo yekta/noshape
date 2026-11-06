@@ -772,6 +772,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   much work"). T1: kernel boolean_groups::a_sections_work_bound_answers_alike_at_any_speed (the same step count with
   every core busy; one step fewer fails), custom host::evaluate::tests::faces_cross_gives_up_by_work_alike_at_any_load.
   Corpus run 137 unchanged or better (521/753).
+  core 11-06 13:30, the sweep (lead's item 2), rule in docs/TESTS.md "Budgets": (1) every feature's evaluation is a
+  budget scope (kernel with_budget_scope, regen): once a time budget runs out, every later stop check of the feature
+  says stop and budgeted ops fail at once, on its threads, OCCT's pool and noshape's Rust blend (break hook), so no
+  fallback succeeds past it; one that still comes out whole is "Error regenerating." (std REGEN_ERROR). T1 kernel
+  boolean_groups::a_fillet_under_a_short_budget_gives_up (the fallback's same fillet fails in the scope). (2) The
+  last time cut inside a feature, the fillet past-end fallback's 0.5 s face removal, is a work bound (ScopedWork,
+  150,000 steps; the corpus' cases 2,727). Left by time, visibly failing: FeatureScript's 60 s, Replace face's 90 s,
+  the display mesh's 60 s. Open: the memory budget still hands a Rust Boolean to OCCT by the machine's state.
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,

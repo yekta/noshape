@@ -72,6 +72,15 @@ void fail_invalid(const std::string& msg) { throw std::runtime_error("invalid: "
 void fail_op(const std::string& msg) { throw std::runtime_error("failed: " + msg); }
 
 thread_local Deadline* t_deadline = nullptr;
+thread_local std::atomic<bool>* t_spent = nullptr;
+static_assert(sizeof(std::atomic<bool>) == 1, "a Rust AtomicBool is one byte");
+
+size_t set_budget_scope(size_t flag)
+{
+  const size_t previous = reinterpret_cast<size_t>(t_spent);
+  t_spent               = reinterpret_cast<std::atomic<bool>*>(flag);
+  return previous;
+}
 thread_local WorkBudget* t_work = nullptr;
 
 double steady_seconds()

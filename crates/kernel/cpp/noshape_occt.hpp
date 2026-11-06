@@ -213,6 +213,20 @@ struct Deadline
 #endif
 };
 extern thread_local Deadline* t_deadline;
+// The feature being regenerated's record that a time budget ran out in it (kernel::with_budget_scope). Once set,
+// every later stop check of the feature says stop and budgeted ops fail at once: the feature fails as without a
+// fallback, never another route quietly succeeding past a budget (docs/TESTS.md "Budgets").
+extern thread_local std::atomic<bool>* t_spent;
+inline bool budget_spent()
+{
+  std::atomic<bool>* const s = t_spent;
+  return s != nullptr && s->load(std::memory_order_relaxed);
+}
+inline void mark_spent()
+{
+  if (std::atomic<bool>* const s = t_spent)
+    s->store(true, std::memory_order_relaxed);
+}
 // A bound by work, not time: the break hook's and the progress indicator's checks on this thread (a build run
 // serially makes as many on any machine, at any load). Past `limit` they say stop.
 struct WorkBudget
@@ -232,6 +246,26 @@ inline bool work_step()
     w->hit = true;
   return w->hit;
 }
+// A work bound for one step (its OCCT pairs serial, so every check is this thread's): `hit` once spent. The outer
+// one comes back after.
+struct ScopedWork
+{
+  WorkBudget        w;
+  WorkBudget* const outer;
+  const int         pairs;
+  explicit ScopedWork(uint64_t limit) : outer(t_work), pairs(noshape_bop_set_pairs_parallel_here(0))
+  {
+    w.limit = limit;
+    t_work  = &w;
+  }
+  ~ScopedWork()
+  {
+    noshape_bop_set_pairs_parallel_here(pairs);
+    t_work = outer;
+  }
+  ScopedWork(const ScopedWork&)            = delete;
+  ScopedWork& operator=(const ScopedWork&) = delete;
+};
 double                        steady_seconds();
 // The deadline's clock now.
 double deadline_now(const Deadline& d);
@@ -259,6 +293,8 @@ struct ScopedDeadline
 template <class F>
 int run_budgeted(double cpu_seconds, F&& f)
 {
+  if (budget_spent())
+    return 1;
   // (NOSHAPE_PORTABLE_BUDGET: the deadline also on Linux, to test it there.)
 #if defined(__linux__) && !defined(NOSHAPE_PORTABLE_BUDGET)
   if (budget_jmp != nullptr)
@@ -289,6 +325,8 @@ int run_budgeted(double cpu_seconds, F&& f)
     crash_guard       = crash_outer;
     t_deadline        = deadline_outer;
     noshape_bop_set_pairs_parallel_here(pairs_outer);
+    if (budget_reason == 1)
+      mark_spent();
     return budget_reason;
   }
   // First the deadline: OCCT's builds stop at it by throwing, so what they
@@ -323,14 +361,20 @@ int run_budgeted(double cpu_seconds, F&& f)
   {
     done();
     if (d.hit.load())
+    {
+      mark_spent();
       return 1;
+    }
     if (budget_cancel != nullptr && budget_cancel->load(std::memory_order_relaxed))
       return 2;
     throw;
   }
   done();
   if (d.hit.load())
+  {
+    mark_spent();
     return 1;
+  }
 #else
   // Wall time here (the indicator's checks are cheap and portable); the
   // earlier of this and an enclosing budget's.
@@ -351,13 +395,17 @@ int run_budgeted(double cpu_seconds, F&& f)
     {
       if (outer != nullptr && outer->at <= d.at)
         outer->hit.store(true);
+      mark_spent();
       return 1;
     }
     throw;
   }
   t_deadline = outer;
   if (d.hit.load())
+  {
+    mark_spent();
     return 1;
+  }
 #endif
   return 0;
 }
@@ -909,6 +957,8 @@ OpOut op_rib(const OcShape& base, const OcShape& wire, const PlaneF& plane,
 void                     set_memory_budget_mb(uint64_t mb);
 void                     set_bop_parallel(bool on);
 void                     set_bop_pairs_parallel(bool on);
+// This thread's feature-evaluation spent flag (a Rust AtomicBool's address, 0 none); returns the one before.
+size_t                   set_budget_scope(size_t flag);
 rust::String             last_unify_path();
 rust::String             last_shell_path();
 OpOut                    op_unify_whole(const OcShape& s);

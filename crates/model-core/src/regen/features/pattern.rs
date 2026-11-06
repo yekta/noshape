@@ -1785,7 +1785,7 @@ fn reapply_as_tools(ev: &mut EvalCtx, seeds: &[&EffectiveFeature], ops: &[String
     } else {
         use rayon::prelude::*;
         let legacy = noshape_kernel::kernel_legacy();
-        instances.par_iter().map(|i| noshape_kernel::with_kernel_legacy(legacy, || instance(i))).collect()
+        instances.par_iter().map(|i| noshape_kernel::with_kernel_legacy(legacy.clone(), || instance(i))).collect()
     };
     let mut tools: Vec<Vec<NamedShape>> = vec![Vec::new(); seeds.len()];
     let mut ok = 0usize;

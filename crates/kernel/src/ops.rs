@@ -461,15 +461,46 @@ pub fn legacy_blend_pairs() -> bool {
     LEGACY_BLEND_PAIRS.with(|c| c.get())
 }
 
+thread_local! {
+    static BUDGET_SCOPE: std::cell::RefCell<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Sets this thread's budget scope (see [`with_budget_scope`]) and returns the one before.
+fn set_budget_scope(scope: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>) -> Option<std::sync::Arc<std::sync::atomic::AtomicBool>> {
+    ffi::set_budget_scope(scope.as_ref().map_or(0, |a| std::sync::Arc::as_ptr(a) as usize));
+    BUDGET_SCOPE.with(|c| c.replace(scope))
+}
+
+/// `f` as one feature's evaluation for the kernel's time budgets (blends', Draft's, Shell's, a call budget's): once one
+/// runs out in it, every later kernel step of it stops and every budgeted op fails at once, on this thread and the
+/// work it hands on ([`with_kernel_legacy`], OCCT's pool), so the feature fails as it does without a fallback, never
+/// another route quietly succeeding past the budget (a faster machine would have taken the first). Returns whether one
+/// ran out.
+pub fn with_budget_scope<T>(f: impl FnOnce() -> T) -> (T, bool) {
+    struct Restore(Option<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            if let Some(before) = self.0.take() {
+                set_budget_scope(before);
+            }
+        }
+    }
+    let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let _restore = Restore(Some(set_budget_scope(Some(flag.clone()))));
+    let out = f();
+    (out, flag.load(std::sync::atomic::Ordering::Relaxed))
+}
+
 /// This thread's Part Studio settings ([`set_legacy_topology`], [`set_legacy_blend_finish`], [`set_legacy_rim_seams`],
-/// [`set_legacy_blend_pairs`], [`crate::set_rust_blend`]), to hand to another.
-#[derive(Clone, Copy, Debug)]
+/// [`set_legacy_blend_pairs`], [`crate::set_rust_blend`]) and its budget scope, to hand to another.
+#[derive(Clone, Debug)]
 pub struct KernelLegacy {
     topology: bool,
     blend_finish: bool,
     rim_seams: bool,
     blend_pairs: bool,
     rust_blend: Option<bool>,
+    budget: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 pub fn kernel_legacy() -> KernelLegacy {
@@ -479,6 +510,7 @@ pub fn kernel_legacy() -> KernelLegacy {
         rim_seams: legacy_rim_seams(),
         blend_pairs: legacy_blend_pairs(),
         rust_blend: crate::brep_bridge::rust_blend_mode(),
+        budget: BUDGET_SCOPE.with(|c| c.borrow().clone()),
     }
 }
 
@@ -490,6 +522,7 @@ pub fn set_kernel_legacy(l: KernelLegacy) -> KernelLegacy {
         rim_seams: set_legacy_rim_seams(l.rim_seams),
         blend_pairs: set_legacy_blend_pairs(l.blend_pairs),
         rust_blend: crate::set_rust_blend(l.rust_blend),
+        budget: set_budget_scope(l.budget),
     }
 }
 

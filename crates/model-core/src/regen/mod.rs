@@ -553,17 +553,25 @@ impl Regenerator {
                         // Every boolean of the feature on this thread stops
                         // when the run is aborted (not only boolean_into's).
                         let cancel = opts.cancel.clone();
-                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                            let mut run = || {
-                                eval_sub_features(&mut ev, &subs, units, &outer_vars)?;
-                                ev.check_bounds(specs)?;
-                                declines.scope(&f.type_id, || eval_fn(&mut ev))
-                            };
-                            match &cancel {
-                                Some(c) => c.scope(run),
-                                None => run(),
-                            }
-                        }));
+                        // A kernel time budget that runs out stops the rest of the feature too (with_budget_scope);
+                        // should it still come out whole, a route past the budget made it: an error, as a faster
+                        // machine's first route would be the one (docs/TESTS.md "Budgets"; std REGEN_ERROR's text).
+                        let (mut result, spent) = noshape_kernel::with_budget_scope(|| {
+                            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                let mut run = || {
+                                    eval_sub_features(&mut ev, &subs, units, &outer_vars)?;
+                                    ev.check_bounds(specs)?;
+                                    declines.scope(&f.type_id, || eval_fn(&mut ev))
+                                };
+                                match &cancel {
+                                    Some(c) => c.scope(run),
+                                    None => run(),
+                                }
+                            }))
+                        });
+                        if spent && matches!(result, Ok(Ok(()))) {
+                            result = Ok(Err(eval::FeatureError::new("Error regenerating.")));
+                        }
                         // Stopped part-way: don't cache a half-done feature.
                         if aborted() {
                             return cancelled();

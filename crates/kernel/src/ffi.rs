@@ -710,6 +710,7 @@ pub(crate) mod ffi {
         fn set_bop_parallel(on: bool);
         /// OCCT patch 0004's pair intersections on the thread pool.
         fn set_bop_pairs_parallel(on: bool);
+        fn set_budget_scope(flag: usize) -> usize;
         /// Which way this thread's last op_boolean went (BOOLEAN-SPEEDUP corpus).
         fn last_boolean_path() -> String;
         /// Which way this thread's last op_unify went: "known", "scoped", "whole".

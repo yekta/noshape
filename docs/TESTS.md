@@ -119,6 +119,22 @@ Every test that isn't `#[ignore]`d. A T1 test must be:
 - **fast:** a test over ~5 s on this machine belongs in T2 unless it guards a P0/P1 path nothing faster covers;
 - **free of known-difference lists** (KNOWN in the oracles): progress must never turn T1 red.
 
+## Budgets (core, 11-06)
+
+A time budget is a hang guard, never a choice of geometry: the same document must regenerate to the same result on a
+fast and a slow machine, idle or loaded. So:
+- **A budget that runs out fails the feature.** The kernel's time budgets (blends', Draft's, Shell's 30 s, a call
+  budget) run inside the feature's `with_budget_scope` (regen): once one runs out, every later kernel step of that
+  feature stops and every budgeted op fails at once, on all its threads, so no fallback can quietly succeed past it;
+  a feature that still comes out whole after one is an error ("Error regenerating."). Off Linux a budget is a deadline
+  OCCT polls; a loop that polls nothing hangs there alone (DRAFT-POOL-HANG-MACOS): release.yml's "Budgeted documents"
+  opens tests/budget/*.noshape on every platform under a limit.
+- **A step that may be cut short to try another route is bounded by work, not time:** `ScopedWork` (C++) /
+  `with_section_work` count OCCT's break-hook and progress checks on the thread, its pairs serial, so the cut falls at
+  the same step everywhere. Calibrate the limit with NOSHAPE_WORK_TRACE=1 against the cases where the step works.
+- Not a geometry choice, so still by time: FeatureScript's 60 s limit and Replace face's 90 s (they fail visibly).
+- Still machine-dependent (open): the memory budget (a Rust Boolean past it gives way to OCCT's).
+
 ## UI keystroke tests
 
 Keyboard and focus behaviour (what qa's OTF-FIRST-KEY-style tickets are about) is tested on GPUI's test platform,

@@ -413,4 +413,17 @@ fn a_fillet_under_a_short_budget_gives_up() {
     assert!(e.contains("took too long"), "{e:?} after {:?}", t.elapsed());
     let full = fillet(&plate, &edges, 1.0).unwrap().shape;
     assert_eq!(full.count(ShapeType::Solid), 1);
+    // In one feature's budget scope, a budget run out stops the rest: the same fillet without a short budget, as a
+    // fallback would try it, fails at once; and the scope says so (core's determinism sweep, docs/TESTS.md "Budgets").
+    set_rust_blend(Some(false));
+    let (after, spent) = with_budget_scope(|| {
+        let first = with_blend_budget(1e-9, || fillet(&plate, &edges, 1.0));
+        assert!(first.is_err());
+        fillet(&plate, &edges, 1.0)
+    });
+    set_rust_blend(None);
+    assert!(spent);
+    assert!(after.err().is_some_and(|e| e.to_string().contains("took too long")));
+    let (again, spent) = with_budget_scope(|| fillet(&plate, &edges, 1.0));
+    assert!(!spent && again.is_ok());
 }
