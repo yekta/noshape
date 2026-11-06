@@ -1,0 +1,19 @@
+{
+ "name": "asm-rack-pinion-relation-open-escape",
+ "about": "The Rack and pinion relation dialog opens and closes (Esc).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Rack and pinion relation"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

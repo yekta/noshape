@@ -1,0 +1,26 @@
+{
+ "name": "asm-face-menu-view-normal-to",
+ "about": "Part 2's face menu: View normal to (its top face).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View normal to"
+   }
+  }
+ ]
+}

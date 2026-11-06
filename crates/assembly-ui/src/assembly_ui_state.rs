@@ -29,6 +29,9 @@ impl AssemblyView {
             let a = v.as_array()?;
             Some(DVec3::new(a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?) * 1e-3)
         };
+        if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
+            return crate::view_cube::ui_cell_point(name, self.cube_origin, vp.camera.rotation);
+        }
         if t.get("empty").is_some() {
             // From the middle outwards, off every part's box on screen and the open dialog (as the Part Studio's).
             let size = vp.size();

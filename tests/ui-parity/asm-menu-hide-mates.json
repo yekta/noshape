@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-hide-mates",
+ "about": "Part 2's row menu: Hide mates (Revolute 1).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide mates"
+   }
+  }
+ ]
+}

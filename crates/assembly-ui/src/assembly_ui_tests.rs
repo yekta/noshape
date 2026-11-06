@@ -343,3 +343,52 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
     })
     .unwrap();
 }
+
+/// Enter with the focus in the graphics accepts the open dialog as its ✓ (behaviours "Enter accepts the open
+/// dialog"; ui-parity asm-connector-menu): the Mate connector dialog at Part 2's origin, then the Group dialog.
+#[gpui::test]
+fn enter_in_the_graphics_accepts_the_open_dialog(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "enter-accepts");
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update_window(window, |_, w, cx| w.activate_window()).unwrap();
+    let enter = |cx: &mut TestAppContext| {
+        cx.update_window(window, |_, w, cx| {
+            let focus = view.read(cx).focus.clone();
+            w.focus(&focus, cx);
+            w.dispatch_keystroke(gpui_kit::Keystroke::parse("enter").unwrap(), cx);
+            w.draw(cx).clear(cx);
+        })
+        .unwrap();
+        cx.run_until_parked();
+    };
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.mc_at_instance_origin(pin, w, cx);
+            assert!(v.mc.is_some());
+        });
+    })
+    .unwrap();
+    enter(cx);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.mc.is_none(), "{:?}", v.message);
+        assert_eq!(v.assembly(cx).unwrap().connectors.len(), 1);
+    });
+    cx.update_window(window, |_, _, cx| {
+        view.update(cx, |v, cx| {
+            let (block, pin) = (instance(v, "Part 1 <1>", cx), instance(v, "Part 2 <1>", cx));
+            v.selected.clear();
+            v.create_group(cx);
+            v.toggle_group_member(block, cx);
+            v.toggle_group_member(pin, cx);
+        });
+    })
+    .unwrap();
+    enter(cx);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        assert!(v.ui.group.is_none(), "{:?}", v.message);
+        assert_eq!(v.assembly(cx).unwrap().groups.len(), 1);
+    });
+}

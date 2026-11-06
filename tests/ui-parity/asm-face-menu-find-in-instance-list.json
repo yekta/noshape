@@ -1,0 +1,26 @@
+{
+ "name": "asm-face-menu-find-in-instance-list",
+ "about": "Part 2's face menu: Find in instance list.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Find in instance list"
+   }
+  }
+ ]
+}

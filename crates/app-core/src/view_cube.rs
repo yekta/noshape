@@ -31,6 +31,31 @@ thread_local! {
     static DRAGS: std::cell::RefCell<std::collections::HashMap<EntityId, CubeDrag>> = Default::default();
 }
 
+/// Where a ui-parity `{"view_cube": name}` target shows (tests/ui-parity/README.md), in window coordinates: the
+/// centre of the points the cube's own hit test gives to that cell, for a cube drawn at `origin` and turned by
+/// `rotation`.
+pub fn ui_cell_point(name: &str, origin: Option<Point<Pixels>>, rotation: DQuat) -> Result<Point<Pixels>, String> {
+    let cell = match name {
+        "Top" => [0, 0, 1],
+        "Bottom" => [0, 0, -1],
+        "Front" => [0, -1, 0],
+        "Back" => [0, 1, 0],
+        "Right" => [1, 0, 0],
+        "Left" => [-1, 0, 0],
+        "Isometric" => [1, -1, 1],
+        _ => return Err(format!("no view cube cell {name}")),
+    };
+    let origin = origin.ok_or("the view cube isn't drawn")?;
+    // Pixels from the widget centre, y up.
+    let hits: Vec<DVec2> = (-25..=25).flat_map(|i| (-25..=25).map(move |j| DVec2::new(i as f64 * 3.0, j as f64 * 3.0))).filter(|p| widget_hit(rotation, *p) == Some(CubeCell(cell))).collect();
+    if hits.is_empty() {
+        return Err(format!("the view cube's {name} isn't visible"));
+    }
+    let c = hits.iter().sum::<DVec2>() / hits.len() as f64;
+    let center = DVec2::from(noshape_render::overlay::view_cube::CENTER);
+    Ok(origin + point(px((center.x + c.x) as f32), px((center.y - c.y) as f32)))
+}
+
 /// `offset` kept inside the margins of a `viewport` (logical px) for a cube
 /// placed at its default spot (15 px from the top-right corner).
 fn clamp_offset(offset: Point<Pixels>, viewport: DVec2) -> Point<Pixels> {

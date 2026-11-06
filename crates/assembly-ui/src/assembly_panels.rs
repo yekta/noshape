@@ -398,7 +398,7 @@ impl AssemblyView {
         }
     }
 
-    fn accept_mc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn accept_mc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.mc.as_ref().is_some_and(|s| s.implicit) {
             self.close_mc(window, cx);
             return;
@@ -1206,7 +1206,7 @@ impl AssemblyView {
         }
     }
 
-    fn accept_pattern(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn accept_pattern(&mut self, cx: &mut Context<Self>) {
         let Some(s) = &self.pattern else { return };
         let pat = match self.pattern_from_session(s, cx) {
             Ok(p) => p,
@@ -2932,7 +2932,7 @@ impl AssemblyView {
 
     /// ✓: replace every instance to replace (and, with Replace all
     /// instances, the others of the same source) with the replacement.
-    fn accept_replace(&mut self, cx: &mut Context<Self>) {
+    pub(super) fn accept_replace(&mut self, cx: &mut Context<Self>) {
         let Some(s) = &self.replace_panel else { return };
         let Some((source, base)) = s.replacement.clone() else { return };
         if s.instances.is_empty() {

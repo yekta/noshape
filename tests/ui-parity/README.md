@@ -90,6 +90,10 @@ other string an Enum id.
   picked where it shows in the current view; `{"sketch_point": [x, y]}` on the active sketch plane (mm);
   `{"plane": "Top"}`, `{"origin": true}`, `{"empty": true}` (empty graphics area).
 - `{"view_cube": "Top"}`, `{"view_cube": "Isometric"}`.
+- In an assembly: `{"instance": "Part 2 <1>"}` an instance list row by its text: also the assembly's own row
+  (`"start two-blocks asm"`), an instance folder (`"Folder 1"`) and `"Mate features"` (the folder, whatever its
+  count); `{"mate": "Revolute 1"}` a row under Mate features (a mate, connector, relation, group or mate folder);
+  `{"face": [x, y, z], "instance": "Part 2 <1>"}` a point in that instance's part coordinates.
 
 A target a side can't find makes that step `"ok": false` with `"error"`; the run goes on.
 

@@ -1,0 +1,37 @@
+{
+ "name": "asm-face-menu-clear-selection",
+ "about": "Click Part 2's face, right-click it: Clear selection.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Clear selection"
+   }
+  }
+ ]
+}

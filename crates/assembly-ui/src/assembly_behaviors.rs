@@ -1543,7 +1543,13 @@ impl AssemblyView {
     }
 
     /// Folder row (instance list or Mate features list).
+    /// A folder's row, a ui-parity target (`instance:<name>`, a folder of mates `mate:<name>`).
     pub(super) fn folder_row(&self, folder: &noshape_model::assembly::ListFolder, cx: &mut Context<Self>) -> AnyElement {
+        let row = self.folder_row_inner(folder, cx);
+        crate::ui_script::wrap(row, || format!("{}:{}", if folder.is_mate_folder() { "mate" } else { "instance" }, folder.name))
+    }
+
+    fn folder_row_inner(&self, folder: &noshape_model::assembly::ListFolder, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let id = folder.id;
         let mate_folder = folder.is_mate_folder();

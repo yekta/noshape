@@ -1,0 +1,27 @@
+{
+ "name": "asm-empty-menu-clear-selection",
+ "about": "Select Part 2's row, then the empty graphics menu: Clear selection.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Clear selection"
+   }
+  }
+ ]
+}

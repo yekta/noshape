@@ -1,0 +1,29 @@
+{
+ "name": "asm-root-menu-rename",
+ "about": "The assembly row's menu: Rename, type Top, Enter.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "start two-blocks asm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Top"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

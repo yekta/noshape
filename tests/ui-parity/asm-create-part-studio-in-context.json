@@ -1,0 +1,19 @@
+{
+ "name": "asm-create-part-studio-in-context",
+ "about": "Create Part Studio in context opens; Esc.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Create Part Studio in context"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

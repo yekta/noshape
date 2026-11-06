@@ -403,26 +403,7 @@ impl PartStudioView {
             Some(DVec3::new(a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2).and_then(Value::as_f64).unwrap_or(0.0)) * 1e-3)
         };
         if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
-            let cell = match name {
-                "Top" => [0, 0, 1],
-                "Bottom" => [0, 0, -1],
-                "Front" => [0, -1, 0],
-                "Back" => [0, 1, 0],
-                "Right" => [1, 0, 0],
-                "Left" => [-1, 0, 0],
-                "Isometric" => [1, -1, 1],
-                _ => return Err(format!("no view cube cell {name}")),
-            };
-            let origin = self.ui.cube_origin.ok_or("the view cube isn't drawn")?;
-            let rot = vp.camera.rotation;
-            // The points the cube's own hit test gives to that cell; their centre (pixels from the widget centre, y up).
-            let hits: Vec<DVec2> = (-25..=25).flat_map(|i| (-25..=25).map(move |j| DVec2::new(i as f64 * 3.0, j as f64 * 3.0))).filter(|p| super::view_cube::widget_hit(rot, *p) == Some(super::view_cube::CubeCell(cell))).collect();
-            if hits.is_empty() {
-                return Err(format!("the view cube's {name} isn't visible"));
-            }
-            let c = hits.iter().sum::<DVec2>() / hits.len() as f64;
-            let center = DVec2::from(noshape_render::overlay::view_cube::CENTER);
-            return Ok(origin + point(px((center.x + c.x) as f32), px((center.y - c.y) as f32)));
+            return super::view_cube::ui_cell_point(name, self.ui.cube_origin, vp.camera.rotation);
         }
         let world = if let Some(name) = t.get("plane").and_then(Value::as_str) {
             let p = self.display.planes.iter().find(|p| p.name == name && !p.hidden).ok_or_else(|| format!("no shown plane {name}"))?;

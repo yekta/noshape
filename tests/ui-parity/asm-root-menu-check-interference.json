@@ -1,0 +1,25 @@
+{
+ "name": "asm-root-menu-check-interference",
+ "about": "The assembly row's menu: Check interference… opens; Esc.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "start two-blocks asm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Check interference…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

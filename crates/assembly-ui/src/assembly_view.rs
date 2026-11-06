@@ -4288,7 +4288,10 @@ impl AssemblyView {
         // Top-level nodes by instance (`AssemblyResult::node` searches them in turn).
         let top: HashMap<InstanceId, &InstanceNode> = result.nodes.iter().filter_map(|n| Some((*n.path.first()?, n))).filter(|(_, n)| n.path.len() == 1).collect();
         if !filtering || tree {
-            rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.assembly_row(cx)));
+            rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| {
+                let row = this.assembly_row(cx);
+                crate::ui_script::wrap(row, || format!("instance:{}", this.doc.read(cx).session.doc.tab(this.tab).map(|t| t.name.as_str()).unwrap_or_default()))
+            }));
         }
         if !filtering {
             rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| this.origin_row(cx)));
@@ -4541,8 +4544,7 @@ impl AssemblyView {
         let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some()) + usize::from(new_group.is_some());
         let mate_error = result.mates.iter().any(|m| !m.ok) || result.relations.iter().any(|r| !r.ok);
         if !filtering || (tree && !mate_rows.is_empty()) {
-            rows.push(
-                crate::ui::tree_row("mates-folder", false)
+            let folder = crate::ui::tree_row("mates-folder", false)
                     // Live (ui-parity asm-fastened-two-faces): also while a new mate has a picked connector.
                     .when(self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || new_mate.as_ref().is_some_and(|m| m.4), related_row)
                     .cursor_pointer()
@@ -4558,8 +4560,8 @@ impl AssemblyView {
                         }
                         cx.notify();
                     }))
-                    .into_any_element(),
-            );
+                    .into_any_element();
+            rows.push(crate::ui_script::wrap(folder, || "instance:Mate features".into()));
         }
         if filtering && !tree {
             rows.extend(mate_rows);
@@ -6210,6 +6212,28 @@ impl AssemblyView {
 
 impl AssemblyView {
     /// Esc.
+    /// Enter with the focus in the graphics or the list accepts the open dialog, as its ✓ (behaviours "Enter
+    /// accepts the open dialog"); a focused dialog takes Enter itself first.
+    fn on_accept(&mut self, _: &Accept, window: &mut Window, cx: &mut Context<Self>) {
+        if self.mate.is_some() {
+            self.accept_mate(window, cx);
+        } else if self.mc.is_some() {
+            self.accept_mc(window, cx);
+        } else if self.ui.folder_name.is_some() {
+            self.close_folder_name(true, window, cx);
+        } else if self.replace_panel.is_some() {
+            self.accept_replace(cx);
+        } else if self.pattern.is_some() {
+            self.accept_pattern(cx);
+        } else if self.ui.group.is_some() {
+            self.accept_group(cx);
+        } else if self.relation.is_some() {
+            self.accept_relation(cx);
+        } else if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_some()) {
+            self.close_section_dialog(true, window, cx);
+        }
+    }
+
     fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
         // Esc also dismisses an info notice (Onshape's go with Esc).
         if self.message.as_ref().is_some_and(|(err, _)| !*err) {
@@ -6375,6 +6399,7 @@ impl AssemblyView {
             }))
             .on_action(cx.listener(|this, _: &SearchTools, window, cx| this.open_tool_search(window, cx)))
             .on_action(cx.listener(Self::on_cancel))
+            .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, _, cx| {
                 if !this.mate_undo(false, cx) {

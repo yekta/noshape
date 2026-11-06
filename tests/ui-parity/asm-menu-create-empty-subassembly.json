@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-create-empty-subassembly",
+ "about": "Part 2's row menu: Create empty subassembly.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create empty subassembly"
+   }
+  }
+ ]
+}

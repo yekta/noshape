@@ -1,0 +1,27 @@
+{
+ "name": "asm-show-mates-mode",
+ "about": "Show mates mode on from the toolbar, Part 2's row clicked, the tool clicked again (off).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Show mates mode"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Show mates mode"
+   }
+  }
+ ]
+}

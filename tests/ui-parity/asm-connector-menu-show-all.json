@@ -1,0 +1,49 @@
+{
+ "name": "asm-connector-menu-show-all",
+ "about": "A mate connector at Part 2's origin, its row's menu: Hide, then Show all mate connectors.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add mate connector to instance origin…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Mate connector 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Mate connector 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show all mate connectors"
+   }
+  }
+ ]
+}

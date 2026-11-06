@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-edit-in-context",
+ "about": "Part 2's row menu: Edit in context (the Part Studio opens in context).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 3",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit in context"
+   }
+  }
+ ]
+}

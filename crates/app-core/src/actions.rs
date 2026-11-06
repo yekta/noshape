@@ -344,6 +344,8 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("i", InsertInstance, asm),
         KeyBinding::new("m", FastenMate, asm),
         KeyBinding::new("j", ToggleMates, asm),
+        // Enter accepts the open assembly dialog with the focus in the graphics (a focused dialog takes it first).
+        KeyBinding::new("enter", Accept, asm),
         KeyBinding::new("h", ToggleShowMatesMode, asm),
         KeyBinding::new("shift-s", ToggleSnapMode, asm),
         // Snap drag: a flips the dragged connector's primary axis, q reorients its secondary axis.
