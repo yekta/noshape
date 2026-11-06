@@ -36,6 +36,16 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 21:20: new standing job (lead 20:2x): both parity suites on the newest green every 4 h, on this machine.**
+`qa-scratch/bin/qa-suites-loop.sh` (setsid; pid in qa-scratch/suites-loop.pid; stop: touch qa-scratch/suites/stop) runs
+`qa-suites.sh`: a checkout at the green in noshape-wt/qa-suite, tools/ui-parity/shards.sh on a copy of the green binary
+(displays :471–476), then `cargo test -p noshape-ops --test all parity::parity_models -- --ignored` built in /root/target-qa
+(GCC 15 baseline flags; ~17 min build, ~10 min run, 5.5 GB). One line per run to /tmp/lead/suites-status (time, green,
+models, features, scenarios, states); qa-scratch/suites/<run>/worse.txt lists documents / scenarios worse than the previous
+run: report those to the lead and the owner (drw-* dx, sketch-* / sm-* skasm, other part studio scenarios psui, models by
+area). SCORE.md: one line a day from a run. First run 70e75ac4: models 58/86, features 593/924, scenarios 462/486
+(2966/3001 states), 45 min in all.
+
 **11-06 18:00: v0.4.33 (published 17:36, run 42249878030, tag 996ab4b1) checked: good, no blocker.** Published Linux files =
 the smoked ones byte for byte, SHA256SUMS OK, 11 assets, every Release job green. Smoke = v0.4.32 (fillet-hang 9 s). Budget
 table: draft-pool-hang macOS 6.95 s, Windows 10.38 s (DRAFT-POOL-HANG-MACOS verified). Stock ubuntu:24.04: the CLI runs and opens
