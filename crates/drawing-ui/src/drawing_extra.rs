@@ -1658,41 +1658,12 @@ impl DrawingEditor {
 
     // ------------------------------------------------------------ menus
 
+    /// A view's source submenus (its root base view's): Configuration, Exploded view, Display state; the view menu
+    /// takes them after View orientation.
     pub fn view_extra_entries(&self, id: ViewId, cx: &App) -> Vec<MenuEntry> {
         let mut out = Vec::new();
         let sheet = &self.drawing.sheets[self.sheet];
         let Some(v) = sheet.view(id).cloned() else { return out };
-        let mut crop = vec![
-            MenuEntry::item("Rectangle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: false }, cx)),
-            MenuEntry::item("Circle", move |t, _, cx| t.set_tool(Tool::Crop { parent: Some(id), first: None, circle: true }, cx)),
-            MenuEntry::item("Polygon", move |t, _, cx| t.set_tool(Tool::CropPoly { parent: Some(id), points: vec![], spline: false }, cx)),
-            MenuEntry::item("Spline", move |t, _, cx| t.set_tool(Tool::CropPoly { parent: Some(id), points: vec![], spline: true }, cx)),
-        ];
-        if v.crop.is_some() {
-            crop.push(MenuEntry::item("Remove crop", move |t, _, cx| t.edit_view("Remove crop", id, cx, |v| v.crop = None)));
-        }
-        out.push(MenuEntry::Submenu("Crop".into(), crop));
-        let mut brk = vec![
-            MenuEntry::item("Vertical break lines", move |t, _, cx| t.set_tool(Tool::Break { parent: Some(id), first: None, vertical: true }, cx)),
-            MenuEntry::item("Horizontal break lines", move |t, _, cx| t.set_tool(Tool::Break { parent: Some(id), first: None, vertical: false }, cx)),
-        ];
-        if !v.breaks.is_empty() {
-            brk.push(MenuEntry::item("Remove all breaks", move |t, _, cx| t.edit_view("Remove breaks", id, cx, |v| v.breaks.clear())));
-        }
-        out.push(MenuEntry::Submenu("Break".into(), brk));
-        out.push(MenuEntry::Submenu(
-            "More section views".into(),
-            vec![
-                MenuEntry::item("Jogged section view", move |t, _, cx| t.set_tool(Tool::JoggedSection { parent: Some(id), points: vec![], done: false }, cx)),
-                MenuEntry::item("Aligned section view", move |t, _, cx| t.set_tool(Tool::AlignedSection { parent: Some(id), center: None, a: None, b: None }, cx)),
-                MenuEntry::item("Partial section view", move |t, _, cx| t.set_tool(Tool::Section { parent: Some(id), p0: None, line: None, partial: true, jogs: vec![] }, cx)),
-                MenuEntry::item("Broken-out section", move |t, _, cx| t.set_tool(Tool::BrokenOut { parent: Some(id), points: vec![], done: false }, cx)),
-            ],
-        ));
-        if matches!(v.kind, ViewKind::Section { .. } | ViewKind::AlignedSection { .. }) {
-            out.push(MenuEntry::item("Flip section direction", move |t, _, cx| t.flip_section(id, cx)));
-        }
-        // Source-dependent entries (root base view).
         if let Some(root) = views::root_view(sheet, id).and_then(|r| sheet.view(r)).cloned()
             && let ViewKind::Base { source, config, .. } = &root.kind
         {
@@ -1775,12 +1746,10 @@ impl DrawingEditor {
                         );
                     }
                     out.push(MenuEntry::Submenu("Display state".into(), ds));
-                    out.push(MenuEntry::item("Insert BOM table", move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Bom, view: Some(id), origin: None }, cx)));
                 }
                 _ => {}
             }
         }
-        out.push(MenuEntry::item("Insert hole table", move |t, _, cx| t.set_tool(Tool::Table { kind: TableTool::Hole, view: Some(id), origin: None }, cx)));
         out
     }
 
