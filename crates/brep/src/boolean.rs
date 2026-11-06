@@ -2602,9 +2602,8 @@ impl Ctx<'_> {
             if !boxes_meet(c, c, lo, hi, GREY * tol + rc.abs()) {
                 return Ok(());
             }
-            // (Through the apex exactly: only the apex in common, a vertex the plane holds; no section. Past it, on
-            // the other nappe (a radius below zero: a valve seat's cone and a plane beyond its apex): none either.)
-            if rc.abs() <= tol || rc < -GREY * tol {
+            // (Through the apex exactly: only the apex in common, a vertex the plane holds; no section.)
+            if rc.abs() <= tol {
                 return Ok(());
             }
             if rc <= GREY * tol {

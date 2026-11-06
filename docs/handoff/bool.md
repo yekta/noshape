@@ -37,6 +37,10 @@ scratch /root/bool-scratch.
   "an invalid result": the valve's tool has tolerant vertices (0.21 mm) where its arc and its B-spline edge meet off the
   cone; ours maps the arc at its circle's height and the vertex by projection, 0.1 mm apart in the face's parameters
   (OCCT uses the input edges' own curves on the face). 
+  (17:09 UTC) The apex fix landed (d49d0f96) and is reverted: past the apex the four cuts decline later ("a face lost",
+  "an invalid result": the tool's tolerant vertex merged off the cone), the valve 690 -> 1104 ms (Circular pattern 1
+  274 -> 546, Extrude 2 111 -> 207). It goes back with the tolerant vertices' places on a cone (the input edges'
+  own curves on the face), when the cuts are taken.
 - c2-rings-loft 6.8 s here / live 1.6 s (Shell 1 6.5 s / 235 ms): the model is wrong upstream (Revolve 1 "Select the
   axis to revolve around.", Fillet 1 "Failed to fillet selections.", Extrude 1's centroid off), so Shell 1 gets a
   13-face part instead of live's 17-face ring and fails ("Could not shell part with selections."), its slab route
