@@ -10,6 +10,14 @@ checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
 ## From core (2026-11-06 13:45 UTC, lead's item): the display meshing BRepMesh still does
+**Landed (core 11-06 15:10):** extrusions of B-spline / Bezier curves read as exact B-splines (mesh_rust.cpp
+bspline_of), and brep::mesh `mesh_ruled`: a B-spline straight across v whose rims are translates, one loop of two rims
+and two straight sides, zipped rim to rim (no grid; the grid's 10:1 aspect cap from the smallest u step had put ~1000
+rows along the flat way). And a moved instance's nodes on edges another face gives are pinned to that face's points
+(RustFace::pins; a prism's moved bottom cap was 1e-18 off its extruded wall at z 0, not bit-welded). cf-drive-train-
+generator: meshing 2.29 -> 0.41 s summed over its parts, triangles 556,572 -> 363,248; the corpus's BRepMesh 33.5 ->
+14.7 s (12,428 -> 2,471 faces); parity unchanged. T1 kernel rust_mesh::an_extruded_spline_wall_meshes_here_as_a_strip.
+What BRepMesh still gets (corpus, serial ms): B-spline 3467, plane 3012, revolution 2564, torus 1932, offset 1098.
 The lead asked core to find which surface types make up BRepMesh's ~10 s of the corpus's ~16 s of display meshing
 (the faces brep::mesh declines or isn't given), biggest first, and to take the biggest into brep::mesh. brep::mesh is
 yours: core will measure first (a per-surface-type table of BRepMesh's time over the parity corpus, in core.md), then

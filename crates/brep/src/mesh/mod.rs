@@ -424,7 +424,11 @@ fn in_parallel<T: Send>(n: usize, run: usize, f: impl Fn(usize) -> T + Sync) -> 
 /// One face, its edges' nodes from `nodes`.
 fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[Option<EdgeNodes>], defl: Deflection, nurbs: MeshNurbs, pcurves: Option<&[Vec<Option<u32>>]>) -> Option<FaceMesh> {
     match face.surface {
-        MeshSurface::Nurbs { index } => mesh_grid(edges, face, nurbs.surfaces.get(index as usize)?, nodes, defl, pcurves.map(|p| (p, nurbs.curves))),
+        MeshSurface::Nurbs { index } => {
+            let s = nurbs.surfaces.get(index as usize)?;
+            let pc = pcurves.map(|p| (p, nurbs.curves));
+            mesh_ruled(edges, face, s, nodes, pc).or_else(|| mesh_grid(edges, face, s, nodes, defl, pc))
+        }
         MeshSurface::Plane { origin, normal, xdir } => mesh_plane(vertices, edges, face, origin, normal, xdir, nodes),
         // A strip's rows, else (a piece bounded by other curves: a knurl's lands) a grid as a B-spline's.
         MeshSurface::Cylinder { origin, axis, xdir, direct, radius } => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, radius, 0.0, 0.0), nodes, defl),
@@ -436,6 +440,73 @@ fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[O
         MeshSurface::Sphere { .. } => None,
         MeshSurface::Other => None,
     }
+}
+
+/// A B-spline straight across v (degree 1, one span: an extruded curve, a gear's tooth flank) in one loop of two rims
+/// (constant v) and two straight sides (constant u, a node at each end): the rims' nodes zipped by u, no grid. The
+/// grid put ~1000 rows along the straight way of cf-drive-train-generator's flanks (590,000 triangles each; core 11-06).
+fn mesh_ruled(edges: &[MeshEdge], face: &MeshFace, s: &NurbsSurface, nodes: &[Option<EdgeNodes>], pcurves: Option<FaceCurves>) -> Option<FaceMesh> {
+    if s.vdegree != 1 || s.nv != 2 || face.loops.len() != 1 || face.loops[0].len() != 4 || s.nu == 0 {
+        return None;
+    }
+    // Its rims each other's translates (an extrusion): the straight lines between them are the surface's, so the
+    // rims' own nodes are fine enough across it.
+    let along = s.poles[1] - s.poles[0];
+    let size = s.poles.iter().fold(0.0f64, |m, p| m.max(p.abs().max_element())).max(along.length());
+    if (0..s.nu).any(|i| (s.poles[i * 2 + 1] - s.poles[i * 2] - along).length() > 1e-9 * size) {
+        return None;
+    }
+    let (points, per_use) = loop_nodes(edges, &face.loops[0], nodes)?;
+    let edge_nodes: Vec<Vec<Vec<u32>>> = vec![per_use.iter().map(|idx| idx.iter().map(|&i| i as u32).collect()).collect()];
+    let uv = uv_from_curves(face, &edge_nodes, nodes, pcurves?, s, &points)?;
+    let ((u0, u1), (v0, v1)) = GridSurface::range(s);
+    let (tu, tv) = (1e-9 * (u1 - u0).abs().max(1.0), 1e-9 * (v1 - v0).abs().max(1.0));
+    // Rims by their v, each its nodes by u; the sides straight (their two ends only).
+    let mut rims: Vec<(f64, Vec<usize>)> = Vec::new();
+    let mut sides = 0;
+    for idx in &per_use {
+        let (lo, hi) = idx.iter().fold((DVec2::splat(f64::MAX), DVec2::splat(f64::MIN)), |(lo, hi), &i| (lo.min(uv[i]), hi.max(uv[i])));
+        if hi.y - lo.y <= tv {
+            rims.push((lo.y, idx.clone()));
+        } else if hi.x - lo.x <= tu && idx.len() == 2 {
+            sides += 1;
+        } else {
+            return None;
+        }
+    }
+    if rims.len() != 2 || sides != 2 {
+        return None;
+    }
+    rims.sort_by(|a, b| a.0.total_cmp(&b.0));
+    for r in &mut rims {
+        r.1.sort_by(|&a, &b| uv[a].x.total_cmp(&uv[b].x));
+    }
+    let (a, b) = (&rims[0].1, &rims[1].1);
+    if (uv[a[0]].x - uv[b[0]].x).abs() > tu || (uv[a[a.len() - 1]].x - uv[b[b.len() - 1]].x).abs() > tu {
+        return None;
+    }
+    // Zipped by u, counter-clockwise on (u, v) (about Su × Sv).
+    let mut triangles = Vec::with_capacity(a.len() + b.len());
+    let (mut i, mut j) = (0, 0);
+    while i + 1 < a.len() || j + 1 < b.len() {
+        let next_a = i + 1 < a.len() && (j + 1 >= b.len() || uv[a[i + 1]].x <= uv[b[j + 1]].x);
+        if next_a {
+            triangles.push([a[i] as u32, a[i + 1] as u32, b[j] as u32]);
+            i += 1;
+        } else {
+            triangles.push([a[i] as u32, b[j + 1] as u32, b[j] as u32]);
+            j += 1;
+        }
+    }
+    let normals = uv.iter().map(|q| {
+        let d = s.d1(q.x, q.y);
+        d[1].cross(d[2]).normalize_or_zero()
+    });
+    let normals: Vec<DVec3> = normals.collect();
+    if normals.contains(&DVec3::ZERO) {
+        return None;
+    }
+    Some(FaceMesh { points, normals, triangles, edge_nodes })
 }
 
 fn mesh_revolved(edges: &[MeshEdge], face: &MeshFace, s: &Revolved, nodes: &[Option<EdgeNodes>], defl: Deflection) -> Option<FaceMesh> {

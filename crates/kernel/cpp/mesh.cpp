@@ -1295,6 +1295,13 @@ void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float>
           np[0] = (float)nv[0] * sgn, np[1] = (float)nv[1] * sgn, np[2] = (float)nv[2] * sgn;
         }
       }
+      if (r.moved && r.pins)
+        for (const auto& [k, x] : *r.pins)
+          if (k < nn)
+          {
+            float* pp = &positions[3 * (vbase + k)];
+            pp[0] = (float)x.X(), pp[1] = (float)x.Y(), pp[2] = (float)x.Z();
+          }
       for (uint32_t t = 0; t < nt; ++t)
       {
         const uint32_t* tp = tris + 3 * (size_t)(r.t0 + t);

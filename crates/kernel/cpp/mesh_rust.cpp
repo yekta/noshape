@@ -8,6 +8,11 @@
 #include <BRep_Tool.hxx>
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_BSplineSurface.hxx>
+#include <Geom_BezierCurve.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <GeomConvert.hxx>
+#include <BRepTools.hxx>
+#include <NCollection_Array2.hxx>
 #include <Geom_Circle.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom_ConicalSurface.hxx>
@@ -186,11 +191,59 @@ double push_bspline_surface(std::vector<double>& out, const occ::handle<Geom_BSp
 }
 
 // A face's B-spline surface (under a rectangular trim too), or null.
-occ::handle<Geom_BSplineSurface> bspline_of(occ::handle<Geom_Surface> s)
+// A face's surface as a B-spline with its own parameters, where it is one: a B-spline, or a B-spline or Bezier curve
+// extruded along a line (exactly: the curve's poles at the face's two v bounds, degree 1 across, the curve's weights
+// in both rows; S(u, v) = C(u) + v D as OCCT's). A gear's tooth flanks are such (cf-drive-train-generator's 1928, and
+// with them the gear's plates and cylinders their edges are shared with, 10.8 s of BRepMesh; core 11-06).
+occ::handle<Geom_BSplineSurface> bspline_of(occ::handle<Geom_Surface> s, const TopoDS_Face& f)
 {
   while (const occ::handle<Geom_RectangularTrimmedSurface> t = occ::down_cast<Geom_RectangularTrimmedSurface>(s))
     s = t->BasisSurface();
-  return occ::down_cast<Geom_BSplineSurface>(s);
+  if (const occ::handle<Geom_BSplineSurface> b = occ::down_cast<Geom_BSplineSurface>(s))
+    return b;
+  const occ::handle<Geom_SurfaceOfLinearExtrusion> ex = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s);
+  if (ex.IsNull())
+    return {};
+  occ::handle<Geom_Curve> c = ex->BasisCurve();
+  while (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  occ::handle<Geom_BSplineCurve> bc = occ::down_cast<Geom_BSplineCurve>(c);
+  if (bc.IsNull())
+    if (const occ::handle<Geom_BezierCurve> bz = occ::down_cast<Geom_BezierCurve>(c))
+      bc = GeomConvert::CurveToBSplineCurve(bz);
+  if (bc.IsNull() || bc->IsPeriodic())
+    return {};
+  double u0, u1, v0, v1;
+  BRepTools::UVBounds(f, u0, u1, v0, v1);
+  if (!(v1 > v0))
+    return {};
+  const double margin = 0.01 * (v1 - v0);
+  v0 -= margin;
+  v1 += margin;
+  const gp_Vec d(ex->Direction());
+  const int    n = bc->NbPoles();
+  NCollection_Array2<gp_Pnt> poles(1, n, 1, 2);
+  NCollection_Array2<double> weights(1, n, 1, 2);
+  for (int i = 1; i <= n; ++i)
+  {
+    poles(i, 1)   = bc->Pole(i).Translated(d * v0);
+    poles(i, 2)   = bc->Pole(i).Translated(d * v1);
+    weights(i, 1) = weights(i, 2) = bc->Weight(i);
+  }
+  NCollection_Array1<double> vk(1, 2);
+  NCollection_Array1<int>    vm(1, 2);
+  vk(1) = v0;
+  vk(2) = v1;
+  vm(1) = vm(2) = 2;
+  try
+  {
+    return bc->IsRational() ? new Geom_BSplineSurface(poles, weights, bc->Knots(), vk, bc->Multiplicities(), vm, bc->Degree(), 1)
+                            : new Geom_BSplineSurface(poles, bc->Knots(), vk, bc->Multiplicities(), vm, bc->Degree(), 1);
+  }
+  catch (const Standard_Failure&)
+  {
+    return {};
+  }
 }
 
 } // namespace
@@ -309,6 +362,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     std::vector<uint32_t>  uses, loop_ends;
     // A B-spline face's: each use's edge on it (BRepMesh's own fallback has its own).
     std::vector<occ::handle<Geom2d_BSplineCurve>> pcurves;
+    occ::handle<Geom_BSplineSurface>              nurbs;
   };
   std::vector<FaceIn> read(face_of.size());
   in_chunks((int)face_of.size(), parallel, [&](int j1) {
@@ -325,7 +379,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const occ::handle<Geom_ConicalSurface>     con = mf ? occ::handle<Geom_ConicalSurface>() : occ::down_cast<Geom_ConicalSurface>(s);
     const occ::handle<Geom_ToroidalSurface>    tor = mf ? occ::handle<Geom_ToroidalSurface>() : occ::down_cast<Geom_ToroidalSurface>(s);
     const occ::handle<Geom_SphericalSurface>   sph = mf ? occ::handle<Geom_SphericalSurface>() : occ::down_cast<Geom_SphericalSurface>(s);
-    const occ::handle<Geom_BSplineSurface>     bss = mf ? occ::handle<Geom_BSplineSurface>() : bspline_of(s);
+    const occ::handle<Geom_BSplineSurface>     bss = mf ? occ::handle<Geom_BSplineSurface>() : bspline_of(s, f);
+    r.nurbs                                        = bss;
     bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull() || (!bss.IsNull() && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
@@ -401,8 +456,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     if (read[j].surface[0] == 5)
     {
       TopLoc_Location loc;
-      const occ::handle<Geom_Surface> s = BRep_Tool::Surface(TopoDS::Face(faces(face_of[j])), loc);
-      read[j].surface[1]                = push_bspline_surface(in.nurbs, bspline_of(s), loc);
+      BRep_Tool::Surface(TopoDS::Face(faces(face_of[j])), loc);
+      read[j].surface[1] = push_bspline_surface(in.nurbs, read[j].nurbs, loc);
     }
   in.face_loops.push_back(0);
   in.loop_uses.push_back(0);
@@ -472,6 +527,8 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   };
   std::vector<PolyFrom> from((size_t)edges.Extent());
   std::vector<int>      ks;
+  // The moved instances' uses: (face, edge, its count's place in out.use_nodes).
+  std::vector<std::tuple<int, int, size_t>> instance_uses;
   for (int i = 1; i <= faces.Extent(); ++i)
   {
     if (!fresh[(size_t)i] || first[(size_t)i] == 0 || !meshes[(size_t)first[(size_t)i]].out)
@@ -503,9 +560,31 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
           ks.push_back(edges.FindIndex(ei.Value()));
     for (const int k : ks)
     {
-      if (k > 0 && from[(size_t)k - 1].face == 0)
+      // (A face meshed in place before a moved instance: its nodes are the edge's own.)
+      if (k > 0 && (from[(size_t)k - 1].face == 0 || (meshes[(size_t)from[(size_t)k - 1].face].moved && !moved)))
         from[(size_t)k - 1] = {i, at, nbase};
+      if (moved && k > 0)
+        instance_uses.emplace_back(i, k, at);
       at += 1 + use_nodes[at];
+    }
+  }
+  // A moved instance's nodes on an edge another face's polyline gives: that face's points (moved as it is).
+  for (const auto& [i, k, at] : instance_uses)
+  {
+    const PolyFrom& pf = from[(size_t)k - 1];
+    if (pf.face == 0 || pf.face == i || use_nodes[pf.at] != use_nodes[at])
+      continue;
+    RustFace&       r   = meshes[(size_t)i];
+    const RustFace& src = meshes[(size_t)pf.face];
+    if (!r.pins)
+      r.pins = std::make_shared<std::vector<std::pair<uint32_t, gp_XYZ>>>();
+    for (uint32_t c = 0; c < use_nodes[at]; ++c)
+    {
+      const uint32_t node = pf.base + use_nodes[pf.at + 1 + c];
+      gp_XYZ         p(nodes[3 * node], nodes[3 * node + 1], nodes[3 * node + 2]);
+      if (src.moved)
+        src.to.Transforms(p);
+      r.pins->emplace_back(use_nodes[at + 1 + c], p);
     }
   }
   in_chunks(edges.Extent(), parallel, [&](int k) {

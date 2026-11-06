@@ -554,3 +554,18 @@ fn a_degenerate_face_doesnt_hold_the_display_mesh() {
     // (~1 s here; up to 2 s a stopped face.)
     assert!(t.elapsed().as_secs_f64() < 30.0, "{:?}", t.elapsed());
 }
+
+/// A profile with a spline side extruded: the wall a B-spline curve's linear extrusion (as a gear's tooth flanks:
+/// cf-drive-train-generator's 1,928 sent its plates and cylinders to BRepMesh with them, 1.3 s), now meshed here as
+/// a strip between its rims: every face here, within BRepMesh's area, watertight, no denser than BRepMesh.
+#[test]
+fn an_extruded_spline_wall_meshes_here_as_a_strip() {
+    let mm = |x: f64, y: f64| DVec3::new(x, y, 0.0) * MM;
+    let spline = make_interpolated_spline(&[mm(0.0, 0.0), mm(10.0, 3.0), mm(20.0, -2.0), mm(30.0, 4.0), mm(40.0, 0.0)], &[], false).unwrap();
+    let wire = make_wire(&[spline, make_line(mm(40.0, 0.0), mm(40.0, -10.0)).unwrap(), make_line(mm(40.0, -10.0), mm(0.0, -10.0)).unwrap(), make_line(mm(0.0, -10.0), mm(0.0, 0.0)).unwrap()]).unwrap();
+    let s = extrude(&make_face_from_wire(&wire, true).unwrap(), DVec3::Z * 10.0 * MM).unwrap().shape;
+    assert_hose_meshes_here(&s);
+    let rust = mesh(&s, true);
+    let occt = mesh(&transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape, false);
+    assert!(rust.indices.len() <= occt.indices.len(), "triangles: ours {} against BRepMesh's {}", rust.indices.len() / 3, occt.indices.len() / 3);
+}

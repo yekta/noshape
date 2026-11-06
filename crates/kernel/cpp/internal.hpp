@@ -174,6 +174,10 @@ struct RustFace
   uint32_t                       n0 = 0, n1 = 0, t0 = 0, t1 = 0;
   bool                           moved = false;
   gp_Trsf                        to;
+  // A moved instance's nodes on edges whose polyline another face gives (local node, its place there): the same
+  // points bit for bit, not the first face's moved (a prism's bottom cap, its top's moved, next to an extruded wall
+  // meshed on the bottom edge's own nodes: 1e-18 apart at z 0).
+  std::shared_ptr<std::vector<std::pair<uint32_t, gp_XYZ>>> pins;
 };
 // Meshes the `fresh` faces it takes (analytic ones): each is marked in `taken` with its mesh in `meshes` (per
 // face index), and their edges' polylines go to `polys` (per edge index, the FORWARD edge's way). Returns how
