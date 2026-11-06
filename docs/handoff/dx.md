@@ -206,10 +206,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   101 -> 77 ns, call 199 -> 138, vector(x, y) 297 -> 92, length vector + length vector 680 -> 513. Corpus run 133
   (before the last four changes) vs 132: same scores, total regen 31.4 -> 30.0 s (cf-spur-gear 1692 -> 1123 ms,
   model-plus 1004 -> 871, shaped-flange 930 -> 792, wave-spring 649 -> 547). What's left for 1 s: the points loop's
-  3 s is half memory (a point holds three ValueWithUnits maps, ~500 MB at 1024²: page faults and zeroing) and half
-  allocation and refcounting per unit operation. Next: ValueWithUnits as a compact value (no map, no allocation per
-  operation, ~1/4 the memory); measured too: jemalloc / mimalloc as the global allocator take 30-37 % off the points
-  loop (LD_PRELOAD; not ours to decide alone: lead).
+  3 s was half memory (a point's three ValueWithUnits maps, ~500 MB at 1024²) and half allocation and refcounting.
+- 11-06 00:11: P1 FeatureScript speed, second round (queued with the first): a map of exactly "unit" and "value" holds
+  only its two values (Map's UnitValue: one 72-byte allocation, read without a lookup; every Value::Map and as_map
+  caller unchanged); evFaceTangentPlanes' values made on up to 8 threads; std's size() native; a local's member or
+  element read in its slot; append's two arguments without a vector. The feature 9.98 -> 4.4 s (dev, vibe5); its
+  loops 5.9 -> 2.7 s (opt-level 3: 2.5 s, with jemalloc preloaded 2.3 s). The script's own part (FS profile, line
+  105: inflated by the profiler) 9.9 -> 5.2 s. Corpus run 135 vs 132: scores unchanged (54/72, 489/753), total regen
+  31.4 -> 29.2 s. Left for the lead's 1 s: ~2.5-3x more, which takes a compiled form of the interpreter (today a tree
+  walk: ~30-60 ns a node, 75 ns a bare loop pass) and values without per-operation refcounting, plus a faster
+  allocator (jemalloc / mimalloc: -10-30 % here; the lead's call). c2-sm-louver's 14 s is one coincident Boolean of
+  Linear pattern 3 whose UI-fetched values are distance 0, count 0 (the REST refetch first).
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
