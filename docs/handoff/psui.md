@@ -585,6 +585,12 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N00000000. (11-06 00:20) **perf 42117840554 (main@aadc61e, first macOS 26 run):** macOS 26 green, no regression; NIST 2×
+    orbit / pan / zoom GPU mean 6.86 / 6.79 / 6.19 ms (p95 ≤ 8.01), the 120 fps target met; parts-1000 and
+    pins-assembly-1000 ≤ 6.4 ms. macOS 15 failed two false regressions, readback pan / zoom GPU p95 7.20 -> 11.16 /
+    7.57 -> 11.32: the whole-run p95 holds the first windows' runner stalls (single frames of 67 and 107 ms GPU), the last
+    window's p95 is 7.10 / 7.66 (= baseline); same code on macOS 26 7.21 / 7.05; macOS 15 readback p95 on main today
+    swings 7.4-14.4 ms run to run. Lead's call whether analyze.py should drop warm-up windows or report readback rows only.
 N0000000. (11-05 13:40) **Landed today, speed:** 5423c54a a closed solid's back faces culled in the color pass
     (live's solid faces are one-sided: webgl bundle `isTwoSided: false`, CULL_FACE BACK by default): NIST 2× orbit GPU
     mean -1 ms (macOS 14, 8.40 -> 7.45 avg) / -0.5 ms (macOS 15), perf 42015953579; byte-identical with edges and in
