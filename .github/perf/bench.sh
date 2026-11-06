@@ -26,6 +26,9 @@
 # comparable with each other; compare settings for fps in separate jobs
 # (BENCH_ENV), GPU time (`w.gpu_wait`) within a job.
 # ONLY (`<label>:<kind>` separated by spaces) runs just those.
+# OPEN_DOCS (documents separated by spaces): each opened 3 times (`NOSHAPE_PERF_SCRIPT=open`, which quits once the
+# full model is on screen), one `BENCH OPEN <doc> model=<ms> full=<ms>` line per run in open.log: "opening document"
+# to the first frame drawing the model (its preview display) and the refined one (PLAN 2.7 ≤ 0.5 s), with AB_BIN too.
 # LATENCY_DOC: also `NOSHAPE_PERF_SCRIPT=ui-latency` on that Part Studio (feature dialogs opened and list rows
 # clicked, the UI thread's part of showing each: `latency.log`), with AB_BIN too.
 # AB_BIN / AB_OUT: every run (but the pick bench) also with another build (the previous release, the same-job
@@ -120,6 +123,37 @@ latency() {
   grep -a "BENCH SUMMARY\|panicked\|ERROR" "$log" | cut -c1-400
   rm -rf "$work"
 }
+# Document open → its model on screen (perf_script.rs `open`).
+open_times() {
+  local bin=$1 out=$2
+  mkdir -p "$out"
+  local log="$out/open.log"
+  for doc in $OPEN_DOCS; do
+    for run in 1 2 3; do
+      local work run_log
+      work=$(mktemp -d)
+      for ext in "" -wal -shm; do [[ -f "$doc$ext" ]] && cp "$doc$ext" "$work/open.noshape$ext"; done
+      run_log="$work/run.log"
+      env NOSHAPE_PERF=1 NOSHAPE_PERF_SCRIPT=open NOSHAPE_PRESENT="${MODES[0]}" RUST_LOG=info ${BENCH_ENV//,/ } \
+        "$bin" "$work/open.noshape" > "$run_log" 2>&1 &
+      local pid=$!
+      for _ in $(seq 180); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+      kill "$pid" 2>/dev/null; sleep 1; kill -9 "$pid" 2>/dev/null
+      awk -v doc="$(basename "$doc" .noshape)" '
+        /opening document: / { for (i = 1; i <= NF; i++) if ($i == "document:") o = $(i + 1) }
+        /open: preview model frame presented: / { for (i = 1; i <= NF; i++) if ($i == "presented:") p = $(i + 1) }
+        /open: full model frame presented: / { for (i = 1; i <= NF; i++) if ($i == "presented:") f = $(i + 1) }
+        END { if (p == "") p = f; printf "BENCH OPEN %s model=%s full=%s\n", doc, (p == "" ? "-" : p - o), (f == "" ? "-" : f - o) }
+      ' "$run_log" | tee -a "$log"
+      rm -rf "$work"
+    done
+  done
+}
+if [[ -n ${OPEN_DOCS:-} && ( -z ${ONLY:-} || " $ONLY " == *" open:"* ) ]]; then
+  open_times "$BIN" "$OUT"
+  # (A baseline before the `open` script would wait out every run.)
+  if [[ -n ${AB_BIN:-} ]] && grep -aq "open: preview model frame presented" "$AB_BIN"; then open_times "$AB_BIN" "$AB_OUT"; fi
+fi
 if [[ -n ${LATENCY_DOC:-} && ( -z ${ONLY:-} || " $ONLY " == *" latency:"* ) ]]; then
   latency "$BIN" "$OUT"
   [[ -n ${AB_BIN:-} ]] && latency "$AB_BIN" "$AB_OUT"

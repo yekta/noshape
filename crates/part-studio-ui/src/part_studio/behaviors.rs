@@ -308,6 +308,8 @@ pub struct UiState {
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
     /// `NOSHAPE_PERF`: the opened studio's first preview (1) and full (2) displays had their frames armed.
     pub open_frames: u8,
+    /// The opened studio's first full display was applied (until then its scenes build off the UI thread).
+    pub first_full_shown: bool,
     /// The open "Export as DXF/DWG" modal's File name (the suite reads its focus).
     pub cad_export_file: Option<WeakEntity<gpui_kit::component::input::InputState>>,
     pub appearance_hover: Vec<Reference>,
@@ -682,6 +684,7 @@ impl UiState {
             section_parts: None,
             appearance_edit: None,
             open_frames: 0,
+            first_full_shown: false,
             cad_export_file: None,
             appearance_hover: Vec::new(),
             analysis: None,

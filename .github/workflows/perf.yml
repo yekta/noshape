@@ -326,6 +326,8 @@ jobs:
           BENCH_ENV: ${{ inputs.env || '' }}
           COLD: ${{ inputs.cold || '' }}
           LATENCY_DOC: ${{ runner.os == 'macOS' && inputs.fixture == '' && 'tests/perf/live-30-features.noshape' || '' }}
+          # Document open → the model on screen (PLAN 2.7 ≤ 0.5 s) on the runners' real GPU.
+          OPEN_DOCS: ${{ runner.os == 'macOS' && inputs.fixture == '' && 'tests/perf/live-30-features.noshape tests/perf/big-plate.noshape tests/perf/parts-1000.noshape tests/perf/nist-mtc-crada-assembly.noshape' || '' }}
         run: AB_OUT="$RUNNER_TEMP/perf/base" .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
       # The 60 fps floor's other big models: their 2× orbit, pan and zoom only (the matrix's retina variants).

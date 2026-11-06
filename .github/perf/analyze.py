@@ -60,6 +60,24 @@ LATENCY = re.compile(
     r"UI-thread CPU \(the action \+ that frame\) p50 (?P<cpu>[\d.]+) p95 (?P<cpup95>[\d.]+) ms")
 
 
+# bench.sh OPEN_DOCS: one line per run, document open → the model on screen (preview) and the refined model.
+OPEN = re.compile(r"BENCH OPEN (?P<doc>\S+) model=(?P<model>[\d.]+|-) full=(?P<full>[\d.]+|-)")
+TARGET_OPEN_MS = 500.0
+
+
+def open_rows(out):
+    """Per document in `out`/open.log: the runs' median open → model and open → full (ms; None when not shown)."""
+    path = os.path.join(out or "", "open.log")
+    if not out or not os.path.exists(path):
+        return []
+    runs = {}
+    for m in OPEN.finditer(open(path, encoding="utf-8", errors="replace").read()):
+        runs.setdefault(m["doc"], []).append(m)
+    med = lambda xs: sorted(xs)[len(xs) // 2] if xs else None
+    return [{"doc": d, "n": len(ms), "model": med([float(m["model"]) for m in ms if m["model"] != "-"]), "full": med([float(m["full"]) for m in ms if m["full"] != "-"])}
+            for d, ms in runs.items()]
+
+
 def latency_rows(out):
     """The ui-latency rows of `out` (mode `latency`, kind dialog-open / row-click)."""
     path = os.path.join(out or "", "latency.log")
@@ -284,6 +302,11 @@ def main():
     for r in lat:
         lines.append(f"- {r['kind'].replace('-', ' ')} ({int(r['n'])} samples, UI latency): UI-thread CPU (action + its frame) p50 "
                      f"{r['cpu']:.1f} ms, p95 {r['cpup95']:.1f} ms; action to its frame's paint p50 {r['p50']:.1f} ms, p95 {r['p95']:.1f} ms")
+    for r in open_rows(args.out):
+        shown = "not shown" if r["model"] is None else f"{r['model']:.0f} ms"
+        full = "" if r["full"] is None else f", refined {r['full']:.0f} ms"
+        met = "" if r["model"] is None else f"; target {TARGET_OPEN_MS:.0f} ms: {'met' if r['model'] <= TARGET_OPEN_MS else 'not met'}"
+        lines.append(f"- open {r['doc']} ({r['n']} runs, median): the model on screen {shown}{full}{met}")
     failures = []
     ran = {r["mode"] for r in rows if not r.get("missing")}
     if args.stills and not {"texture", "readback"} <= ran:

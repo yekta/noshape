@@ -825,11 +825,15 @@ impl PartStudioView {
                     let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);
                 }
-                // A dialog's preview: its scene is built off the UI thread.
-                if this.edit.is_some() {
+                // A dialog's preview, and the opened studio's first displays (NIST's full scene: ~300 ms): their
+                // scenes are built off the UI thread.
+                if this.edit.is_some() || !this.ui.first_full_shown {
                     this.apply_display_async(display, window, cx);
                 } else {
                     this.apply_display(display, window, cx);
+                }
+                if !refine {
+                    this.ui.first_full_shown = true;
                 }
                 this.note_done(done_studio, upto, done_config, full.clone());
                 this.perf_script_note("display applied");
@@ -871,11 +875,12 @@ impl PartStudioView {
                     this.note_open_display(true, fine.display.regen_ms);
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
-                    if this.edit.is_some() {
+                    if this.edit.is_some() || !this.ui.first_full_shown {
                         this.apply_display_async(display, window, cx);
                     } else {
                         this.apply_display(display, window, cx);
                     }
+                    this.ui.first_full_shown = true;
                     this.note_done(studio, upto, config, full);
                     this.perf_script_step(cx);
                 });

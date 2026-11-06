@@ -105,7 +105,8 @@ def forget_old_query_states(live):
     for step in [{"state": live.get("start")}] + live.get("steps", []):
         for d in [(step.get("state") or {}).get("dialog")] + list((step.get("state") or {}).get("dialogs") or []):
             for f in (d or {}).get("fields", []) if isinstance(d, dict) else []:
-                if isinstance(f, dict) and f.get("kind") == "query":
+                # (An array's box too: live ui-parity loft-dialog's Profiles read "ok" then.)
+                if isinstance(f, dict) and f.get("kind") in ("query", "other"):
                     f.pop("state", None)
     return live
 
