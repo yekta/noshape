@@ -1,0 +1,32 @@
+{
+ "name": "sketch-intersection-tool",
+ "about": "the Intersection tool (the Use dropdown) with nothing to intersect, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: sketch tools)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Use",
+    "menu": "Intersection"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

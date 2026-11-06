@@ -66,7 +66,8 @@ def main():
     shortcuts = op(args.app, "ui_shortcuts")["tabs"]
 
     items = {}  # (category, name) -> set of scenarios
-    tool_of = {}  # a name a scenario clicks -> (category, name)
+    tool_of = {}  # a Part Studio toolbar name a scenario clicks -> (category, name)
+    sketch_tool_of = {}  # the same in a sketch
     for tid in toolbar_ids():
         name = types.get(tid, {}).get("name", tid)
         items[("toolbar", name)] = set()
@@ -74,7 +75,11 @@ def main():
     for _, label in coverage_rs({"sketch"}, "SHORTCUTS"):
         name = label.rstrip("*")
         items[("sketch tool", name)] = set()
-        tool_of.setdefault(name.lower(), ("sketch tool", name))
+        sketch_tool_of[name.lower()] = ("sketch tool", name)
+    # The sketch toolbar's own tooltips where they differ from the shortcut sheet's names.
+    for tip, name in (("mirror", "Mirror sketch"), ("use / project edges", "Use"), ("center rectangle", "Center point rectangle"), ("fillet", "Sketch fillet"), ("chamfer", "Sketch chamfer")):
+        if ("sketch tool", name) in items:
+            sketch_tool_of[tip] = ("sketch tool", name)
     menu_of = {}
     for area, label in coverage_rs({"partStudio", "view"}, "MENUS"):
         items[("menu", label)] = set()
@@ -88,13 +93,14 @@ def main():
             items[item] = set()
             # A shortcut that starts a tool exercises the tool too (Sketch › Line, `l`).
             tool = row["name"].rstrip("*").lower()
-            also = [tool_of[tool]] if tool in tool_of else []
+            in_sketch = tab["tab"] == "Sketch"
+            also = [(sketch_tool_of if in_sketch else tool_of)[tool]] if tool in (sketch_tool_of if in_sketch else tool_of) else []
             for alt in str(row.get("keys") or "").split(" / "):
                 if alt.strip():
-                    key_of[norm_key(alt)].extend([item] + also)
+                    key_of[norm_key(alt)].extend((it, in_sketch) for it in [item] + also)
     for t in types.values():
         if t.get("shortcut"):
-            key_of[norm_key(t["shortcut"])].append(("toolbar", t["name"]))
+            key_of[norm_key(t["shortcut"])].append((("toolbar", t["name"]), False))
 
     unmatched = defaultdict(int)
     starts = json.loads((Path(args.scenarios) / "starts.json").read_text())
@@ -105,28 +111,42 @@ def main():
         name = sc.get("name", path.stem)
         start = starts.get(sc.get("start"), {}) if isinstance(sc.get("start"), str) else {}
         feature_type = {f.get("name"): ("sketch" if f.get("type") == "newSketch" else f.get("type")) for f in start.get("features", [])}
+        # Whether the step is in a sketch (its toolbar and keys are the sketch's).
+        sketching = False
         for step in sc.get("steps", []):
             on = step.get("on") or {}
             if "tool" in on:
+                tools = sketch_tool_of if sketching else tool_of
                 for label in (on.get("menu"), on["tool"]):
-                    if label and label.lower() in tool_of:
-                        items[tool_of[label.lower()]].add(name)
+                    if label and label.lower() in tools:
+                        items[tools[label.lower()]].add(name)
                         break
                 else:
                     unmatched[f"tool {on['tool']}" + (f" › {on['menu']}" if on.get("menu") else "")] += 1
+                if on["tool"] == "Sketch":
+                    sketching = True
+                elif not sketching or on["tool"].lower() in tool_of and on["tool"].lower() not in sketch_tool_of:
+                    sketching = False
+            if on.get("button") == "ok":
+                sketching = False
             if "menu" in on and "tool" not in on:
                 if on["menu"].lower() in menu_of:
                     items[menu_of[on["menu"].lower()]].add(name)
                 else:
                     unmatched[f"menu {on['menu']}"] += 1
             if step.get("do") == "key":
-                for item in key_of.get(norm_key(step.get("key", "")), []):
-                    if item in items:
+                key = norm_key(step.get("key", ""))
+                for item, sketch_key in key_of.get(key, []):
+                    if item in items and sketch_key == sketching:
                         items[item].add(name)
+                if key == "shift+s" and not sketching:
+                    sketching = True
             if step.get("do") == "dblclick" and "feature" in on:
                 row = on["feature"]
                 ftype = feature_type.get(row) or by_name.get(re.sub(r"\s+\d+$", "", row).lower())
                 tname = types.get(ftype, {}).get("name")
+                if ftype == "sketch":
+                    sketching = True
                 if tname and ("toolbar", tname) in items:
                     items[("toolbar", tname)].add(name)
 

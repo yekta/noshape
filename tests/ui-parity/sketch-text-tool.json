@@ -1,0 +1,40 @@
+{
+ "name": "sketch-text-tool",
+ "about": "the Text tool, click at the origin: its text box and fields, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: sketch tools)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Text"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
