@@ -1940,6 +1940,20 @@ with 0003b and 0004 on Linux, macOS and Windows.
   (kernel `legacy_blend_pairs`, `brep::blend(.., pairs)`). Corpus cases whose OCCT came through its merge / overlap
   paths are listed in `<corpus>/live` (their history convention differs: untouched faces Modified / edges Kept).
 
+## OCCT builds and the compiler (11-06)
+- /root/occt (and every host's /opt/occt by the lead's sync) is now one clean build: CI's scripts/build-occt.sh, the
+  current patches, GCC 15.2, `-march=x86-64` (vibe5 ~/agents/core-cc/occt-g15). The old patchwork is in
+  /root/occt.avx-1106-0247: eleven of its libraries (TKMesh, TKTopAlgo, TKFillet, TKBool, TKBRep, TKGeomBase,
+  TKShHealing, TKDESTEP, TKV3d, ...) had been rebuilt on the vibe hosts, whose GCC 14 / 15 default to x86-64-v3, so
+  green ran AVX2 / FMA code releases don't (qa's 1.5x green-vs-release on release-fillet-hang; green now = release).
+- When you rebuild an OCCT library: on the vibe hosts pass `-march=x86-64` (CFLAGS / CXXFLAGS), or build on this
+  machine; check with `objdump -d` for `ymm` / `vfmadd` / `v...sd`. FMA changed learning-center-michael's Fillet 2
+  (math_DirectPolynomialRoots' roots), so v3 code also changes parity.
+- Compiler alone, at baseline: GCC 13 5.11 s, 14 5.03, 15 4.89 on release-fillet-hang (vibe5), the corpus the same;
+  CI builds with GCC 15 since 2532af01 (setup-cxx). Measurement kit: vibe5 ~/agents/core-cc (build.sh, time.py,
+  mix.sh / mixobj.sh for library and object bisects).
+- Next of mine there: MESH-AVX2 (TICKETS).
+
 ## Next, in order
 (lead 10-29: big structural wins, land small and often, stop when returns flatten.)
 0. (10-30 20:12) MEM-RUNAWAY-508 landed (2feeebcb, a7023995); the 0007w / 0008 libs are in /root/occt here since 19:10
