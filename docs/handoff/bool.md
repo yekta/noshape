@@ -3,6 +3,39 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Plan: per-entity tolerances (11-06 02:40 UTC, agreed with the lead)
+Why: the Boolean runs with one tolerance, `tol` = the largest ordinary tolerance among its inputs (rust_boolean.cpp
+`max_tol`: vertices, edges and faces up to kMaxTol 1e-5, tolerant ones handled apart), where OCCT's pave filler tests
+each pair of entities by their own tolerances (+ fuzzy). With a few 1e-5 entities in a Shell input every test in the
+Boolean gets 20 um of slack: a tool edge 17 um off a plane counts as lying on it (47587a8d), two vertices 17 um apart
+in one argument stay apart (OCCT's rule) while their edges overlap.
+
+Which tolerance each test uses (now -> target, OCCT's):
+- Vertex with vertex (Pool::find/find_tol, input merging): max(tol, tv + tw) -> tv + tw + fuzzy (BOPAlgo VV).
+- Vertex on an edge (split_reach/split_tol): max(tol, te + tv) -> te + tv + fuzzy (VE).
+- Vertex on a face (side(), surface_distance checks): max(tol, tv + tf) -> tv + tf + fuzzy (VF).
+- Edge on a face (edge_on_surface: plane/cylinder by its vertices and middle at `tol`; on_free_surface max(tol, te +
+  tf)) -> te + tf + fuzzy (EF common block).
+- Edge with edge (common blocks in get_sedge: `reach` = max(tol, sections' tolerances)) -> te + tg + fuzzy (EE).
+- Sections: placing (intervals_on: tol / vtol = max(tol, curve tolerance)) and their ends (section_from) -> the
+  section's own tolerance (OCCT's TolReached3d, our own sections' exact 1e-7) and the faces' (pave on a curve: tv + tc).
+- Coplanar/coincident faces (same_surface, plane pairs) -> tf + tg + fuzzy.
+- The grey band (GREY x tol, ambiguity margins and declines) -> GREY x the local pair's tolerance, never below 1e-7.
+`tol` stays as the floor (1e-7, or the fuzzy value) and for what isn't a pair test (lengths, 2D arrangement).
+
+Stages (each gated on 0 differences from OCCT and no fewer cases taken on: the corpora (bool-corpus, corpus2-6,
+direct-corpus, sh-new2), parity56, shfall, the knurl sweep (kall, k*, kg*, kh*) and the gear cases (cf-spur-gear,
+gears, gpf; bool_patterns' gear tests); timing of the knurls and gears no worse than 5 %):
+1. Carry each entity's tolerance where the test is (vertices: Pool::t already; edges: GEdge::t; faces: GFace::t;
+   sections: NCurve::tol): no behaviour change; a debug switch printing every pair test that would change.
+2. Vertex tests (VV, VE, VF) by the pair's own tolerances.
+3. Edge on face and edge with edge (common blocks) by the pair's own.
+4. Sections' placing and ends by the curve's and faces' own.
+5. The grey band by the local tolerance; then lower `tol` to the floor and drop the tolerant-input preflight in
+   rust_boolean.cpp where stage 2-4 cover it (fewer "a tolerant input" declines).
+Expected: Shell's slab Booleans (shfall) stop borrowing 20 um everywhere; the risk is the knurls (sub-micrometre
+slivers tested at today's tol) and the gears (many near-tangent sections): they gate every stage.
+
 ## Shell's "a section without ends"; the slot corners' vertex (11-06 02:05 UTC)
 - Landed 018a8298 (no case taken yet, gate unchanged): a section's end within a face vertex's own tolerance ends at
   that vertex; an input vertex splitting another argument's edge splits its own argument's edge along it too; an arc on
