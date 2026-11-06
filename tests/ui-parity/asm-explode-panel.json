@@ -1,0 +1,21 @@
+{
+ "name": "asm-explode-panel",
+ "about": "The Exploded views panel opens from the right strip and closes.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Exploded views"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Exploded views"
+   }
+  }
+ ]
+}

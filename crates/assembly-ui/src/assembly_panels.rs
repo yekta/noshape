@@ -2215,6 +2215,7 @@ impl AssemblyView {
                 .tooltip(crate::ui::tooltip("Add exploded view"))
                 .child("Add exploded view")
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_exploded_view(cx)))
+                .map(|d| crate::ui_script::mark(d, || "button:Add exploded view".into()))
         };
         let title = div().pt(px(4.)).child(
             div()
@@ -2267,6 +2268,7 @@ impl AssemblyView {
                 tree = tree.child(
                     h_flex()
                         .id(SharedString::from(format!("ex-row-{i}")))
+                        .map(|d| crate::ui_script::mark(d, || format!("panel_row:{name}")))
                         .h(px(26.))
                         .border_l(px(5.))
                         .border_color(if active { blue.into() } else { gpui_kit::transparent_black() })

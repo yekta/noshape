@@ -488,8 +488,9 @@ impl AssemblyView {
                         .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.open_sub_position_menu(r, s, ev.position(), window, cx))),
                 );
             }
+            let target = format!("panel_row:{name}");
             let entries = self.np_row_menu(r, name);
-            rows = rows.child(div().id(SharedString::from(format!("np-row-{r}"))).child(row).os_context_menu(move |menu, window, cx| fill_menu(menu, entries.clone(), view.clone(), window, cx)));
+            rows = rows.child(div().id(SharedString::from(format!("np-row-{r}"))).map(|d| crate::ui_script::mark(d, || target)).child(row).os_context_menu(move |menu, window, cx| fill_menu(menu, entries.clone(), view.clone(), window, cx)));
         }
         // The italic "Name" add row.
         let n = asm.named_positions.len();
@@ -576,7 +577,8 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .tooltip(crate::ui::tooltip("Add a new named position for this assembly"))
                                 .child("Add named position")
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_named_position_row(None, cx))),
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_named_position_row(None, cx)))
+                                .map(|d| crate::ui_script::mark(d, || "button:Add a new named position for this assembly".into())),
                         ),
                     )
                     .child(div().pr(px(10.)).child(div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0xaaaaaa))))),

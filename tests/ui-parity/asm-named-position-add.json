@@ -1,0 +1,21 @@
+{
+ "name": "asm-named-position-add",
+ "about": "Named positions panel: Add named position.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Named positions"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add a new named position for this assembly"
+   }
+  }
+ ]
+}

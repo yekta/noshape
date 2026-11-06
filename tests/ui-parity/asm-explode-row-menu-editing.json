@@ -1,0 +1,31 @@
+{
+ "name": "asm-explode-row-menu-editing",
+ "about": "Explode 1 added (being edited), its row's menu; Esc.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Exploded views"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add exploded view"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Explode 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

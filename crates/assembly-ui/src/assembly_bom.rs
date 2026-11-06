@@ -309,6 +309,7 @@ impl AssemblyView {
             .child(
                 div()
                     .id("bom-more")
+                    .map(|d| crate::ui_script::mark(d, || "panel_more:Bill of materials".into()))
                     .relative()
                     .ml(px(4.))
                     .w(px(25.))

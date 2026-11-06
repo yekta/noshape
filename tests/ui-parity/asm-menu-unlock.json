@@ -1,0 +1,52 @@
+{
+ "name": "asm-menu-unlock",
+ "about": "Part 2 moved to a new subassembly, locked (Lock/follow position to… ▸ Lock current position), then that row's menu: Unlock.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to new subassembly"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly 1 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Lock/follow position to…"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Lock current position"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unlock"
+   }
+  }
+ ]
+}

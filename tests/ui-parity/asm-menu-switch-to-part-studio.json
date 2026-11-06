@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-switch-to-part-studio",
+ "about": "Part 2's row menu: Switch to Part Studio 1 (its Part Studio's tab opens).",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Switch to Part Studio 1"
+   }
+  }
+ ]
+}

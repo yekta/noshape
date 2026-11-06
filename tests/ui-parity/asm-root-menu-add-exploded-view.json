@@ -1,0 +1,25 @@
+{
+ "name": "asm-root-menu-add-exploded-view",
+ "about": "The assembly row's menu: Add exploded view…; Esc.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "start two-blocks asm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add exploded view…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

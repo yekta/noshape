@@ -1,0 +1,37 @@
+{
+ "name": "asm-explode-duplicate",
+ "about": "Explode 1 added, editing left, its row's menu › Duplicate.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Exploded views"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add exploded view"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Explode 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Duplicate"
+   }
+  }
+ ]
+}

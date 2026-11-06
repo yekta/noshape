@@ -3407,6 +3407,7 @@ impl AssemblyView {
                 .when(on, |d| d.border_r_0())
                 .child(crate::assets::icon(icon, 20., cx))
                 .tooltip(crate::ui::tooltip(tip))
+                .map(|d| crate::ui_script::mark(d, || format!("button:{tip}")))
         };
         let toggle = |this: &mut Self, panel: SidePanel, cx: &mut Context<Self>| {
             this.panel = if this.panel == Some(panel) { None } else { Some(panel) };

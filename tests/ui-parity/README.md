@@ -94,6 +94,11 @@ other string an Enum id.
   (`"start two-blocks asm"`), an instance folder (`"Folder 1"`) and `"Mate features"` (the folder, whatever its
   count); `{"mate": "Revolute 1"}` a row under Mate features (a mate, connector, relation, group or mate folder);
   `{"face": [x, y, z], "instance": "Part 2 <1>"}` a point in that instance's part coordinates.
+- An assembly's right-hand panels (asm, 11-06): the strip's buttons by tooltip (`{"button": "Exploded views"}`,
+  `"Named positions"`, `"BOM Table"`, `"Configuration panel"`), a panel's buttons by tooltip (`"Add exploded view"`,
+  `"Add a new named position for this assembly"`), `{"panel_row": "Explode 1"}` a row of the open panel by its text
+  (an exploded view, a named position), `{"panel_more": "Bill of materials"}` the open panel's ⋯; the assembly's
+  Configuration panel takes the Part Studio's targets (`"Add configuration input"`, `config_more`).
 
 A target a side can't find makes that step `"ok": false` with `"error"`; the run goes on.
 

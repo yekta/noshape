@@ -1,0 +1,37 @@
+{
+ "name": "asm-config-input-menu-visibility-conditions",
+ "about": "The assembly's List input's ⋯ › Visibility conditions…; Esc.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 5",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": "Configuration"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Visibility conditions…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

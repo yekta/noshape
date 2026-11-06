@@ -265,7 +265,8 @@ impl AssemblyView {
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Assembly"))
             // Live (dom/assembly-panel-configuration).
             .tooltip(crate::ui::tooltip("Add configuration input to create multiple variants of this assembly"))
-            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)))
+            .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this assembly".into()));
         let caret = div()
             .id("acfg-configure-more")
             .w(px(26.))
@@ -512,6 +513,7 @@ impl AssemblyView {
                 let (v, iid) = (view.clone(), iid.clone());
                 div()
                     .id(SharedString::from(format!("acfg-more-{iid}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("config_more:{}", input.name)))
                     .size(px(25.))
                     .flex()
                     .items_center()
@@ -820,7 +822,8 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
-            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)));
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)))
+            .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this assembly".into()));
         let caret = div()
             .id("acfg-add-input-more")
             .w(px(22.))
@@ -945,7 +948,7 @@ impl AssemblyView {
             let all_folded = !ids.is_empty() && ids.iter().all(|id| self.ui.cfg_folded.contains(id));
             let view = cx.entity();
             row = row.child(
-                div().id("acfg-panel-more").size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                div().id("acfg-panel-more").map(|d| crate::ui_script::mark(d, || "config_more:".into())).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
                     let (view, ids) = (view.clone(), ids.clone());
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         let (v1, v2, ids) = (view.clone(), view.clone(), ids.clone());

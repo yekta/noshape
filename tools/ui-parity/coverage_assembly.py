@@ -40,6 +40,11 @@ MOST_USED = ["Insert", "Fastened mate", "Revolute mate", "Mate connector", "Slid
              "Ball mate", "Pin slot mate", "Parallel mate", "Tangent mate", "Replace instance", "Exploded views",
              "Named positions", "Bill of materials", "Gear relation", "Assembly mirror", "Width mate"]
 PANELS = ["Exploded views", "Named positions", "Bill of materials"]
+# The right strip's buttons by tooltip ({"button": …}) that open the panels.
+PANEL_BUTTONS = {"Exploded views": "Exploded views", "Named positions": "Named positions", "BOM Table": "Bill of materials"}
+# Shortcut-sheet commands without a toolbar button of their own, exercised by the tools that run them: "Mate relation"
+# (no default key) opens the relation dialog, as the four relation tools do.
+SAME_AS = {"Mate relation": ["Gear relation", "Rack and pinion relation", "Screw relation", "Linear relation"]}
 
 
 def area_of(name):
@@ -124,8 +129,12 @@ def main():
                         break
                 else:
                     unmatched[f"tool {on['tool']}"] += 1
+            elif on.get("button") in PANEL_BUTTONS:
+                items[("panel", PANEL_BUTTONS[on["button"]])].add(name)
             elif "menu" in on and "dropdown" not in on:
                 hit = menu_of.get(norm(on["menu"])) or tool_of.get(norm(on["menu"]))
+                # An item labelled at run time ("Switch to Part Studio 1" for "Switch to Part Studio").
+                hit = hit or next((v for k, v in menu_of.items() if norm(on["menu"]).startswith(k + " ")), None)
                 if hit:
                     items[hit].add(name)
                 else:
@@ -133,6 +142,12 @@ def main():
             if step.get("do") == "key":
                 for item in key_of.get(norm_key(step.get("key", "")), []):
                     items[item].add(name)
+
+    for name, tools in SAME_AS.items():
+        hit = tool_of.get(norm(name))
+        if hit:
+            for t in tools:
+                items[hit] |= items.get(tool_of.get(norm(t)), set())
 
     by_area = defaultdict(lambda: [0, 0])
     for (kind, n), s in items.items():
