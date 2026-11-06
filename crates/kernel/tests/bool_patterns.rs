@@ -1041,6 +1041,21 @@ fn walls_usd_leaves_apart_are_merged_after_it() {
     assert_eq!((u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge)), (32, 77));
 }
 
+/// c2-sm-louver's Linear pattern 3 fuse (bool's trace, 11-06), its result (tests/data/unify): 1382 faces, invalid (ten
+/// overlapping copies of the panel from an upstream sheet-metal difference). Our unify took 124-156 s on it: the
+/// cylinder-patch merge checked the whole shape for each of ~300 pairs (an invalid input never passes), and its three
+/// reordered tries did it again. Now ~1.2 s; the bound is generous (any machine), the old cost far past it.
+#[test]
+fn an_invalid_fuse_result_unifies_in_bounded_time() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/unify/louver-fuse-invalid.brep");
+    let ours = k::read_brep(&path).expect("the fuse's result");
+    let t = std::time::Instant::now();
+    let u = k::unify_same_domain(&ours).expect("unified").shape;
+    let secs = t.elapsed().as_secs_f64();
+    assert_eq!((ours.count(k::ShapeType::Face), u.count(k::ShapeType::Face)), (1382, 1173), "USD's merges as before");
+    assert!(secs < 30.0, "unify took {secs:.1} s");
+}
+
 /// Shell's common with hyperbola edges (14218a58), our result (tests/data/unify): walls on one cylinder USD leaves
 /// apart, merged after it, and USD's joining of their boundary's edges then left the shape invalid. That merge is
 /// dropped then: valid, OCCT's counts (42 faces, 100 edges).

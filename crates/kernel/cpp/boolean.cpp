@@ -3788,7 +3788,7 @@ TopoDS_Shape merge_apex_cones(const TopoDS_Shape& s, HHist& hist)
 // second's other edges (lines along the axis and circles round it), on the
 // first's surface. The shape unchanged when there's no such pair or the
 // merge doesn't come out valid with the same volume.
-TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
+TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool valid_known = false)
 {
   ShapeAncMap ef;
   unique_ancestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
@@ -3949,6 +3949,14 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
     occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
     rs->Replace(a.Oriented(TopAbs_FORWARD), TF);
     rs->Remove(b);
+    // (An invalid input can't come out valid: no merge, at the cost of one check, not one per pair (c2-sm-louver's
+    // invalid 1382-face fuse: 304 checks, 121 s).)
+    if (!valid_known)
+    {
+      if (!BRepCheck_Analyzer(s).IsValid())
+        return s;
+      valid_known = true;
+    }
     const TopoDS_Shape out = rs->Apply(c);
     if (out.IsNull() || !BRepCheck_Analyzer(out).IsValid())
       continue;
@@ -3970,8 +3978,8 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist)
       if (shared(e, eb))
         h->Remove(e);
     hist->Merge(h);
-    // One pair at a time: the shape changed, look again.
-    return merge_cylinder_patches(out, hist);
+    // One pair at a time: the shape changed, look again (it is valid).
+    return merge_cylinder_patches(out, hist, true);
   }
   return s;
 }
@@ -4501,7 +4509,9 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   const bool   may    = cylinder_faces_apart(s0);
   const HHist  before = may ? copy(hist) : HHist();
   TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
-  if (may && !r.IsSame(s0) && cylinder_faces_apart(r))
+  // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none, after
+  // three more passes.)
+  if (may && !r.IsSame(s0) && cylinder_faces_apart(r) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");
     GProp_GProps      v0;
@@ -7552,6 +7562,7 @@ OpOut op_unify(const OcShape& s)
   }
   const UnifyScope* sc = unify_local_on() ? s.myUnifyScope.get() : nullptr;
   t_unify_path         = sc != nullptr ? "scoped" : "whole";
+  dump_op("unify", s.shape, {}, sc != nullptr ? "unify scoped" : "unify whole");
   HHist        hist;
   bool         clean = false;
   TopoDS_Shape res   = unify_in(s.shape, hist, sc, &clean);
