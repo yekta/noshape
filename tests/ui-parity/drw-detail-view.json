@@ -1,55 +1,60 @@
 {
- "name": "drw-detail-view",
- "about": "Detail view of the Front view's top-right corner: the default circle profile (centre, then a point on it 6 mm off), placed on free sheet space",
- "area": "dx",
- "ticket": "DRAWING-UI-PARITY",
- "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
- "start": "hole-plate-drawing",
- "steps": [
-  {
-   "do": "click",
-   "on": {
-    "tool": "Detail view"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "view_point": {
-     "view": "Front",
-     "at": [
-      16,
-      -20,
-      16
-     ]
+  "name": "drw-detail-view",
+  "about": "Detail view of the Front view's top-right corner: the default circle profile (centre, then a point on it 6 mm off), placed on free sheet space",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            16,
+            -20,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            22,
+            -20,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          60
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
     }
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "view_point": {
-     "view": "Front",
-     "at": [
-      22,
-      -20,
-      16
-     ]
-    }
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "sheet_point": [
-     60,
-     60
-    ]
-   }
-  },
-  {
-   "do": "key",
-   "key": "Escape"
-  }
- ]
+  ],
+  "export": [
+    "PDF",
+    "DXF",
+    "DWG"
+  ]
 }

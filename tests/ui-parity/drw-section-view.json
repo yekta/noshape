@@ -1,48 +1,53 @@
 {
- "name": "drw-section-view",
- "about": "Section view of the Top view, cut across the middle in y, placed below it [live 11-05: live's flow is tool \u2192 (Horizontal tab for a cut along x) \u2192 click a snap point on the view's geometry (here the left edge's midpoint, y = 15) \u2192 click to place; the view is not selected first, there is no second point and no Enter]",
- "area": "dx",
- "ticket": "DRAWING-UI-PARITY",
- "source": "everyday (lead 11-05)",
- "start": "block-drawing",
- "steps": [
-  {
-   "do": "click",
-   "on": {
-    "tool": "Section view"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "tab": "Horizontal"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "view_edge": {
-     "view": "Top",
-     "at": [
-      0,
-      15,
-      10
-     ]
+  "name": "drw-section-view",
+  "about": "Section view of the Top view, cut across the middle in y, placed below it [live 11-05: live's flow is tool → (Horizontal tab for a cut along x) → click a snap point on the view's geometry (here the left edge's midpoint, y = 15) → click to place; the view is not selected first, there is no second point and no Enter]",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "everyday (lead 11-05)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            0,
+            15,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          81,
+          125
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
     }
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "sheet_point": [
-     81,
-     125
-    ]
-   }
-  },
-  {
-   "do": "key",
-   "key": "Escape"
-  }
- ]
+  ],
+  "export": [
+    "PDF",
+    "DXF",
+    "DWG"
+  ]
 }

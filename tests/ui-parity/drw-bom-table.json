@@ -1,29 +1,34 @@
 {
- "name": "drw-bom-table",
- "about": "BOM table of the assembly drawing: the tool (Insert Assembly 1, its defaults), click to place its top-right corner near the sheet's top right",
- "area": "dx",
- "ticket": "DRAWING-UI-PARITY",
- "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
- "start": "pin-block-asm-drawing",
- "steps": [
-  {
-   "do": "click",
-   "on": {
-    "tool": "BOM table"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "sheet_point": [
-     260,
-     200
-    ]
-   }
-  },
-  {
-   "do": "key",
-   "key": "Escape"
-  }
- ]
+  "name": "drw-bom-table",
+  "about": "BOM table of the assembly drawing: the tool (Insert Assembly 1, its defaults), click to place its top-right corner near the sheet's top right",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "BOM table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          260,
+          200
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ],
+  "export": [
+    "PDF",
+    "DXF",
+    "DWG"
+  ]
 }

@@ -42,5 +42,10 @@
       "do": "key",
       "key": "Escape"
     }
+  ],
+  "export": [
+    "PDF",
+    "DXF",
+    "DWG"
   ]
 }

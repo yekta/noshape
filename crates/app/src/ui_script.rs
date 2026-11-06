@@ -557,8 +557,23 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             }
             steps.push(rec);
         }
+        // The drawing's exports after the last step (`"export": ["PDF", "DXF", "DWG"]`), beside the recording as
+        // <recording>.<ext>, for tools/drawing-export to compare with live's.
+        let mut exported = Vec::new();
+        for format in scenario["export"].as_array().cloned().unwrap_or_default().iter().filter_map(Value::as_str) {
+            let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() else { break };
+            let file = out_path().with_extension(format.to_lowercase());
+            match cx.update(|_, cx| d.read(cx).ui_export(format, cx)).map_err(|e| e.to_string()).and_then(|r| r) {
+                Ok(bytes) => match std::fs::write(&file, bytes) {
+                    Ok(()) => exported.push(json!(file.display().to_string())),
+                    Err(e) => eprintln!("UI-SCRIPT export {format}: {e}"),
+                },
+                Err(e) => eprintln!("UI-SCRIPT export {format}: {e}"),
+            }
+        }
         let recording = json!({
             "scenario": scenario["name"],
+            "exported": exported,
             "recorded": utc_now(),
             "app": { "name": "noshape", "version": noshape_ops::VERSION, "platform": std::env::consts::OS, "active": active },
             "start": start,
