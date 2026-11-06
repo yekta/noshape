@@ -3,6 +3,24 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Parity fuses unlike OCCT's; slot corners (11-06 02:30 UTC)
+- Landed 0797fb5b: OCCT's route groups 8+ tools it takes as apart (group_disjoint, a mesh check) and never intersects
+  one group's tools; the check missed flat sheets sharing an edge, so OCCT's fuse left them apart (ac1b1ab0: 47 edges
+  after merging faces) where ours, one fuse of them all, joined them (16). Sheets aren't grouped now: OCCT's alike,
+  ours taken. bool_patterns::sheet_fuses_with_touching_tools_as_occts_or_declined; parity56 is in gate2 (whyall.sh,
+  compared with OCCT run there: NOSHAPE_BREP_VS_OCCT=1). parity56's `unstable` lists 956e7cc644b071b7 (a 1739-tool cut:
+  ours says its plate's untouched edges Kept, OCCT's route Modified; on main before, geometry alike).
+- Slot corners (the same document's 31 cuts left: 17 "two edges", 14 "a non-manifold result"): OCCT's section of the
+  part's cylinder and a slot's cone stops 10.6 um short of the corner where the slot's round end meets its side
+  (vertex 27, on the cylinder), its tolerance 1e-7; OCCT's result has no vertex there but a new one in the tool's
+  vertex's place (its history: the tool vertex Deleted) and the section's edge reaching it. Tried (patches in
+  /root/bool-scratch/slot-corner-wip*-1106.patch): a crossing that isn't across merged into a face vertex nearby, and a
+  curve's own end snapped to a vertex of one face on the other's surface straight ahead of it. Either takes them with
+  counts like OCCT's at best but the history unlike (tool vertex Modified, not Deleted; the section edge's middle 6 um
+  off): not landed. Needs OCCT's pave filler there (a new vertex at the curve's end, its tolerance holding the corner).
+  71dac1de: a section along the cylinder's top circle crossing out 1.5 um past a tool vertex on it (a crossing, not
+  the curve's end).
+
 ## "Two edges leave a vertex in one direction" in the parity documents (11-05 23:30 UTC)
 - Landed 69db1e8c: parity56 (tools/bool-share.sh parity56) 318 -> 350 of 594 taken (53.5 -> 58.9 %), OCCT time 60.4 ->
   76.5 %; corpora, shfall and the kernel tests unchanged otherwise. The 49 cases were one document's pattern cuts (8 to
