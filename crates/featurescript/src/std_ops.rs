@@ -71,6 +71,7 @@ pub fn apply(op: Op, decl: &FnDecl, args: &mut [Value], compact: bool) -> Option
             }
             Some(Value::Array(Arc::new(args.iter_mut().map(std::mem::take).collect()), tag))
         }
+        (Op::Units | Op::Vectors, _) if compact && let Some(v) = compact_arithmetic(op, &decl.name, args) => Some(v),
         (Op::Units, _) => units(&decl.name, args, compact),
         (Op::Vectors, _) => vectors(decl, args, compact),
         _ => None,
@@ -89,6 +90,40 @@ fn map_len(v: &Value) -> Option<usize> {
     match v {
         Value::Map(m, _) => Some(m.len()),
         Value::Quantity(..) => Some(2),
+        _ => None,
+    }
+}
+
+/// std's arithmetic on compact operands only, as f64 arithmetic: a length's sum, difference and scaling, a Vector's
+/// elementwise sum, difference, scaling and negation (a unitless Vector scaled by a length: a Vector of lengths).
+/// What [`units`] and [`vectors`] answer for these (the same unit by id; any NaN: none, they decide).
+fn compact_arithmetic(op: Op, name: &str, args: &[Value]) -> Option<Value> {
+    let ok = |x: f64| (!x.is_nan()).then_some(x);
+    let scaled = |c: &Compact, f: &dyn Fn(f64) -> f64, unit: UnitId| -> Option<Value> {
+        let mut v = c.v;
+        for x in v.iter_mut().take(c.len()) {
+            *x = ok(f(*x))?;
+        }
+        Some(Value::Vector(Compact { v, unit, len: c.len }))
+    };
+    // (units.fs' operators on lengths, vector.fs' on Vectors: as resolved.)
+    match (op, name, args) {
+        (Op::Units, "operator+" | "operator-", [Value::Quantity(a, u), Value::Quantity(b, w)]) if u == w => ok(if name == "operator+" { a + b } else { a - b }).map(|x| Value::Quantity(x, *u)),
+        (Op::Units, "operator-", [Value::Quantity(a, u)]) => ok(-a).map(|x| Value::Quantity(x, *u)),
+        (Op::Units, "operator*", [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) | (Op::Units, "operator*", [Value::Number(n, Tag::NONE), Value::Quantity(a, u)]) => ok(a * n).map(|x| Value::Quantity(x, *u)),
+        (Op::Units, "operator/", [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) => ok(a / n).map(|x| Value::Quantity(x, *u)),
+        (Op::Vectors, "operator+" | "operator-", [Value::Vector(a), Value::Vector(b)]) if a.unit == b.unit && a.len == b.len => {
+            let mut v = a.v;
+            for (i, x) in v.iter_mut().enumerate().take(a.len()) {
+                *x = ok(if name == "operator+" { *x + b.v[i] } else { *x - b.v[i] })?;
+            }
+            Some(Value::Vector(Compact { v, unit: a.unit, len: a.len }))
+        }
+        (Op::Vectors, "operator-", [Value::Vector(a)]) => scaled(a, &|x| -x, a.unit),
+        (Op::Vectors, "operator*", [Value::Vector(a), Value::Number(n, Tag::NONE)]) | (Op::Vectors, "operator*", [Value::Number(n, Tag::NONE), Value::Vector(a)]) => scaled(a, &|x| x * n, a.unit),
+        (Op::Vectors, "operator/", [Value::Vector(a), Value::Number(n, Tag::NONE)]) => scaled(a, &|x| x / n, a.unit),
+        // (A unitless Vector and a length: each element number * length, the length's unit.)
+        (Op::Vectors, "operator*", [Value::Vector(a), Value::Quantity(q, u)]) | (Op::Vectors, "operator*", [Value::Quantity(q, u), Value::Vector(a)]) if a.unit.0 == 0 => scaled(a, &|x| q * x, *u),
         _ => None,
     }
 }

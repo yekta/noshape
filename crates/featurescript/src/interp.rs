@@ -260,7 +260,8 @@ pub(crate) struct Site {
     pub generation: u64,
     pub sig: ([u32; 6], u8),
     pub decl: Arc<FnDecl>,
-    pub op: crate::std_ops::Op,
+    /// The std operator it is (none: a function to run).
+    pub op: Option<crate::std_ops::Op>,
 }
 
 /// A resolved call: the overload (none: an operator's overloads don't apply) and the std operator it is. The set is
@@ -274,7 +275,13 @@ struct Resolved {
 /// What overload resolution reads of the arguments ([`TypeRef::matches`]): each one's standard type, tag and whether
 /// it is an enum member; `None` past six arguments or tags.
 pub(crate) fn signature(args: &[Value]) -> Option<([u32; 6], u8)> {
-    if args.len() > 6 {
+    signature_of(args.iter())
+}
+
+/// [`signature`] of values held elsewhere.
+pub(crate) fn signature_of<'a>(args: impl ExactSizeIterator<Item = &'a Value>) -> Option<([u32; 6], u8)> {
+    let n = args.len();
+    if n > 6 {
         return None;
     }
     let mut sig = [0u32; 6];
@@ -285,7 +292,7 @@ pub(crate) fn signature(args: &[Value]) -> Option<([u32; 6], u8)> {
         }
         *s = u32::from(matches!(a, Value::Enum(..))) << 31 | (a.std_type() as u32) << 27 | t;
     }
-    Some((sig, args.len() as u8))
+    Some((sig, n as u8))
 }
 
 impl Default for Interp {
@@ -648,18 +655,7 @@ impl Interp {
             let [x, y] = pair;
             // (x's copy gone first: the local's array is then the only one, grown in place.)
             drop(x);
-            if let Value::Array(arr, tag) = &mut self.stack[idx] {
-                let v = Arc::make_mut(arr);
-                if &*d.name == "append" {
-                    v.push(y);
-                } else {
-                    if let Value::Array(b, _) = y.shallow().into_owned() {
-                        v.extend(Arc::unwrap_or_clone(b));
-                    }
-                    // @concatenateArrays answers an untagged array.
-                    *tag = Tag::NONE;
-                }
-            }
+            self.grow_slot(idx, &*d.name == "append", y);
             return Ok(Flow::Normal);
         }
         let Some(c) = d.compiled.get() else {
@@ -667,6 +663,29 @@ impl Interp {
         };
         self.stack[idx] = self.invoke_in(c, pair.into(), &[], false)?;
         Ok(Flow::Normal)
+    }
+
+    /// std's append (`append`) or concatenateArrays on the array in stack slot `idx`, in place.
+    pub(crate) fn grow_slot(&mut self, idx: usize, append: bool, y: Value) {
+        if let Value::Array(arr, tag) = &mut self.stack[idx] {
+            let v = Arc::make_mut(arr);
+            if append {
+                v.push(y);
+            } else {
+                if let Value::Array(b, _) = y.shallow().into_owned() {
+                    v.extend(Arc::unwrap_or_clone(b));
+                }
+                // @concatenateArrays answers an untagged array.
+                *tag = Tag::NONE;
+            }
+        }
+    }
+
+    /// Whether `set` resolved to std's append (`Some(true)`) or concatenateArrays (`Some(false)`) for arguments of
+    /// `sig` ([`Interp::resolved`]), for a call site to keep.
+    pub(crate) fn std_grow_site(&self, set: &Arc<OverloadSet>, sig: ([u32; 6], u8)) -> Option<bool> {
+        let d = self.resolved.get(&(Arc::as_ptr(set) as usize, false, sig.0, sig.1))?.decl.as_ref()?;
+        (&*d.module == "onshape/std/containers.fs").then(|| &*d.name == "append")
     }
 
     fn call_grown(&mut self, slot: u32, callee: &Callee, rest: &[Ex], pos: Pos) -> R<Flow> {
@@ -820,7 +839,11 @@ impl Interp {
             _ => return None,
         };
         let r = self.resolved.get(&(ptr, try_, sig.0, sig.1))?;
-        Some(Site { generation: self.overloads_generation, sig, decl: r.decl.clone()?, op: r.op? })
+        // (An operator site keeps std's operators only: the others' bodies run through binop's rules.)
+        if operator.is_some() && r.op.is_none() {
+            return None;
+        }
+        Some(Site { generation: self.overloads_generation, sig, decl: r.decl.clone()?, op: r.op })
     }
 
     /// Every loaded overload of operator `OPERATORS[i]`.
@@ -889,7 +912,7 @@ impl Interp {
     }
 
     /// Run `f` on the arguments on the stack from `base` (a call's, evaluated there: no vector of them).
-    fn invoke_at(&mut self, f: &CompiledFn, base: usize) -> R<Value> {
+    pub(crate) fn invoke_at(&mut self, f: &CompiledFn, base: usize) -> R<Value> {
         if self.frames.len() >= MAX_DEPTH {
             self.discard_from(base);
             return Err(self.error("Maximum call stack depth exceeded."));

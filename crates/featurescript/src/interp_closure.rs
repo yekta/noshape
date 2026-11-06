@@ -129,12 +129,32 @@ pub(crate) fn statement(s: &St) -> CSt {
                 && matches!(x.k, ExK::Local(s) if s == slot)
             {
                 let (set, y, vpos) = (set.clone(), expression(y), value.pos);
+                // (The site's std append / concatenateArrays kept for its arguments' types: grown without a
+                // resolution per element.)
+                let site: std::sync::OnceLock<(u64, ([u32; 6], u8), bool)> = std::sync::OnceLock::new();
                 return Box::new(move |i| {
                     i.tick()?;
                     i.pos = vpos;
                     let y = y(i)?;
                     i.pos = vpos;
-                    i.grow_one(slot, &set, y)
+                    let idx = i.base + slot as usize;
+                    let sig = signature_of([&i.stack[idx], &y].into_iter());
+                    if let (Some((generation, s, append)), Some(sig)) = (site.get(), sig)
+                        && *s == sig
+                        && *generation == crate::compile::overloads_generation()
+                        && matches!(i.stack[idx], Value::Array(..))
+                    {
+                        i.grow_slot(idx, *append, y);
+                        return Ok(Flow::Normal);
+                    }
+                    let r = i.grow_one(slot, &set, y);
+                    if site.get().is_none()
+                        && let Some(sig) = sig
+                        && let Some(append) = i.std_grow_site(&set, sig)
+                    {
+                        let _ = site.set((crate::compile::overloads_generation(), sig, append));
+                    }
+                    r
                 });
             }
             if op.is_none()
@@ -427,7 +447,8 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 if let (Some(s), Some(sig)) = (site.get(), sig)
                     && s.sig == sig
                     && s.generation == crate::compile::overloads_generation()
-                    && let Some(v) = crate::std_ops::apply(s.op, &s.decl, &mut pair, i.compact)
+                    && let Some(op) = s.op
+                    && let Some(v) = crate::std_ops::apply(op, &s.decl, &mut pair, i.compact)
                 {
                     return Ok(v);
                 }
@@ -521,9 +542,19 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     && s.generation == crate::compile::overloads_generation()
                 {
                     let compact = i.compact;
-                    if let Some(v) = crate::std_ops::apply(s.op, &s.decl, &mut i.stack[base..], compact) {
-                        i.stack.truncate(base);
-                        return Ok(v);
+                    match s.op {
+                        Some(op) => {
+                            if let Some(v) = crate::std_ops::apply(op, &s.decl, &mut i.stack[base..], compact) {
+                                i.stack.truncate(base);
+                                return Ok(v);
+                            }
+                        }
+                        // (A function: run on its arguments where they are.)
+                        None => {
+                            if let Some(c) = s.decl.compiled.get() {
+                                return i.invoke_at(c, base);
+                            }
+                        }
                     }
                 }
                 let r = i.call_set_at(&set, base);

@@ -1046,6 +1046,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   4.13 -> 3.45 s; the corpus' CPU and peak memory unchanged. Left for 1 s (release, the script's part ~2 s): std
   operators' resolution per operation (~100-200 ns each, five per sample), host-made points and planes as maps and
   arrays (evFaceTangentPlanes' million; next: the host making compact points), the precondition loop.
+  11-06 06:00: stage 2 landed (27ebff7c), then the host's planes compact (7536b120: release 3.03 -> 2.37 s), call sites
+  keeping their std operator / function / append (6784c19f, release 2.24 s), compact arithmetic as f64s (queued):
+  dev loops 1.41 -> 1.11 s, the feature 2.57 -> 2.23 s; adding two length vectors 239 -> 126 ns, a call 220 -> 152.
+  Each step identical on all 78 corpus documents (the T2 differential, reference = tree walker on maps and arrays).
 - [ ] P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
   measure app-wide with and without (the corpus' regeneration, the interpreter benchmarks, cold start, peak memory on
   the big documents). First pass with the system libmimalloc 3.2 preloaded (also OCCT's heap): corpus regen 30.1 ->
