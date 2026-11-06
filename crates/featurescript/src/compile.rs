@@ -932,6 +932,7 @@ impl Cx<'_> {
             module: self.module.clone(),
             version: self.version,
             pos: def.pos,
+            closures: OnceLock::new(),
         };
         (compiled, outer)
     }

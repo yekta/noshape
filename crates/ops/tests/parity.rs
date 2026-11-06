@@ -432,6 +432,83 @@ fn parity_models() {
 /// (NOSHAPE_PARITY_BUILD, else this checkout's commit), models and features
 /// matched, the scenarios column left to psui's runner, the five biggest
 /// causes (qa adds their tickets).
+/// FS-COMPILED-INTERP: every corpus document (live's models, as parity_models translates them) reopened with its
+/// FeatureScript run by the tree walker, then by closures, then by the tree walker again: its feature list (statuses,
+/// messages, notices, without times) and its parts' measures alike in all three. A document whose two tree-walker
+/// runs differ from each other is reported apart (a difference of its own, not the closures').
+#[test]
+#[ignore = "T2: live's models from /root/parity/models; NOSHAPE_PARITY_ONLY=<doc> for one"]
+fn fs_closures_answer_as_the_tree_walker() {
+    let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.join("features.json").is_file()).collect()).unwrap_or_default();
+    dirs.sort();
+    // Times left out; measures to 7 significant digits (a kernel's volume moves in its 10th from run to run:
+    // cf-sheet-metal-shaped-flange's 119029.738509 / .738464 mm³ with either).
+    fn timeless(v: &mut Value) {
+        match v {
+            Value::Object(m) => {
+                m.retain(|k, _| !k.ends_with("_ms") && k != "ms");
+                m.values_mut().for_each(timeless);
+            }
+            Value::Array(a) => a.iter_mut().for_each(timeless),
+            Value::Number(n) if n.is_f64() => {
+                if let Some(x) = n.as_f64().filter(|x| *x != 0.0) {
+                    let scale = 10f64.powi(6 - x.abs().log10().floor() as i32);
+                    *v = json!((x * scale).round() / scale);
+                }
+            }
+            _ => {}
+        }
+    }
+    let state = |path: &Path, tree: bool| -> String {
+        noshape_featurescript::interp::set_tree_walker_default(tree);
+        let mut ctx = Ctx::new();
+        let mut out = Vec::new();
+        for (tool, args) in [("document_open", json!({ "path": path.to_str().unwrap_or_default() })), ("feature_list", json!({})), ("query_parts", json!({}))] {
+            let r = noshape_ops::registry::by_tool_name(tool).map(|op| noshape_ops::registry::run(&mut ctx, op, &args));
+            let mut v = match r {
+                Some(Ok(r)) => r.value,
+                Some(Err(e)) => json!({ "error": format!("{e:?}") }),
+                None => json!({ "error": "no such op" }),
+            };
+            timeless(&mut v);
+            out.push(v);
+        }
+        serde_json::to_string(&out).unwrap_or_default()
+    };
+    let (mut same, mut differ, mut unsteady) = (0, Vec::new(), Vec::new());
+    for dir in dirs {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        if only.as_ref().is_some_and(|o| *o != name) || !dir.join("live.jsonl").is_file() {
+            continue;
+        }
+        let Some((features, live, refs)) = read_model(&dir) else { continue };
+        noshape_featurescript::interp::set_tree_walker_default(false);
+        run_model(&name, &features, &live, &refs);
+        let path = scratch(&format!("{name}.noshape"));
+        let (tree, closures, again) = (state(&path, true), state(&path, false), state(&path, true));
+        // Where two states part (on char boundaries), with some context.
+        let parting = |a: &str, b: &str| {
+            let at = a.char_indices().zip(b.chars()).find(|((_, x), y)| x != y).map_or(a.len().min(b.len()), |((i, _), _)| i);
+            let near = |s: &str| s.char_indices().filter(|(i, _)| *i + 80 >= at && *i <= at + 120).map(|(_, c)| c).collect::<String>();
+            format!("at byte {at}: {:?} / {:?}", near(a), near(b))
+        };
+        if tree != again {
+            println!("{name}: two tree-walker runs differ {}", parting(&tree, &again));
+            unsteady.push(name);
+        } else if tree != closures {
+            println!("{name}: closures differ {}", parting(&tree, &closures));
+            differ.push(name);
+        } else {
+            same += 1;
+        }
+    }
+    noshape_featurescript::interp::set_tree_walker_default(false);
+    println!("fs closures: {same} documents as the tree walker, {} differ {differ:?}; {} differ between two tree-walker runs {unsteady:?}", differ.len(), unsteady.len());
+    assert!(differ.is_empty(), "closures differ from the tree walker: {differ:?}");
+}
+
 fn score_row(docs: usize, total_docs: usize, matching: usize, features: usize, (custom_matching, custom_total): (usize, usize), causes: &[(String, usize)]) -> String {
     let days = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() / 86_400).unwrap_or(0) as i64;
     // Civil date from days since 1970-01-01 (H. Hinnant's algorithm).

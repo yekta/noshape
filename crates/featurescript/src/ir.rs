@@ -38,11 +38,13 @@ impl TypeRef {
     }
 }
 
+#[derive(Clone)]
 pub struct Ex {
     pub pos: Pos,
     pub k: ExK,
 }
 
+#[derive(Clone)]
 pub enum Callee {
     Overloads(Arc<OverloadSet>),
     Value(Box<Ex>),
@@ -54,6 +56,7 @@ pub enum Callee {
     Missing(Name, usize),
 }
 
+#[derive(Clone)]
 pub enum ExK {
     Lit(Value),
     Local(u32),
@@ -84,17 +87,20 @@ pub enum ExK {
     Switch(Box<Ex>, Vec<(Ex, Ex)>),
 }
 
+#[derive(Clone)]
 pub enum Acc {
     Member(Value),
     Index(Ex),
     Box,
 }
 
+#[derive(Clone)]
 pub struct St {
     pub pos: Pos,
     pub k: StK,
 }
 
+#[derive(Clone)]
 pub enum StK {
     Let { slot: u32, ty: Option<TypeRef>, init: Option<Ex> },
     Assign { slot: u32, path: Vec<Acc>, op: Option<(BinOp, Option<Arc<OverloadSet>>)>, value: Ex },
@@ -135,6 +141,8 @@ pub struct CompiledFn {
     /// Its module's `FeatureScript <version>;` (natives answer each library version in its own terms).
     pub version: Option<u32>,
     pub pos: Pos,
+    /// Its body compiled to closures, on its first run ([`crate::interp`]'s `closure`).
+    pub closures: OnceLock<crate::interp::closure::Body>,
 }
 
 /// A top-level function, predicate or operator declaration.

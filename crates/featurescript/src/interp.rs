@@ -15,6 +15,10 @@ use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
+#[path = "interp_closure.rs"]
+pub(crate) mod closure;
+pub use closure::set_tree_walker_default;
+
 /// A runtime builtin (`@name`).
 pub type NativeFn = fn(&mut Interp, Vec<Value>) -> R<Value>;
 
@@ -138,7 +142,7 @@ pub fn native_at(name: &str, version: Option<u32>) -> Option<NativeFn> {
 
 // ---------------------------------------------------------------- interpreter
 
-enum Flow {
+pub(crate) enum Flow {
     Normal,
     Break,
     Continue,
@@ -193,6 +197,9 @@ pub struct Interp {
     pub profile: Option<LineProfile>,
     /// Cancelled or timed out: the frames' values left as the calls unwind ([`Interp::take_stopped_frames`]).
     stopped: Option<Vec<Vec<Value>>>,
+    /// Run function bodies with the tree walker, not their closures ([`closure`]; NOSHAPE_FS_TREE=1: the reference
+    /// of the differential test).
+    pub tree_walker: bool,
 }
 
 /// Time spent running each source line (module, 1-based line), including
@@ -274,6 +281,7 @@ impl Interp {
             failed_check: None,
             profile: None,
             stopped: None,
+            tree_walker: closure::tree_walker_default(),
         }
     }
 
@@ -574,6 +582,37 @@ impl Interp {
         Some(self.call_grown(slot, callee, &args[1..], pos))
     }
 
+    /// `x = append(x, y)` or `x = concatenateArrays(x, y)` with y evaluated: x grown in place when std's (the tree
+    /// walker's and the closures' alike).
+    fn grow_one(&mut self, slot: u32, set: &Arc<OverloadSet>, y: Value) -> R<Flow> {
+        let idx = self.base + slot as usize;
+        let pair = [self.stack[idx].clone(), y];
+        let (d, _) = self.resolve_cached(set, &pair)?;
+        if matches!(pair[0], Value::Array(..)) && &*d.module == "onshape/std/containers.fs" {
+            let [x, y] = pair;
+            // (x's copy gone first: the local's array is then the only one, grown in place.)
+            drop(x);
+            if let Value::Array(arr, tag) = &mut self.stack[idx] {
+                let v = Arc::make_mut(arr);
+                if &*d.name == "append" {
+                    v.push(y);
+                } else {
+                    if let Value::Array(b, _) = y {
+                        v.extend(Arc::unwrap_or_clone(b));
+                    }
+                    // @concatenateArrays answers an untagged array.
+                    *tag = Tag::NONE;
+                }
+            }
+            return Ok(Flow::Normal);
+        }
+        let Some(c) = d.compiled.get() else {
+            return Err(self.error(format!("Function {} is not compiled", d.name)));
+        };
+        self.stack[idx] = self.invoke(c, pair.into(), &[], false)?;
+        Ok(Flow::Normal)
+    }
+
     fn call_grown(&mut self, slot: u32, callee: &Callee, rest: &[Ex], pos: Pos) -> R<Flow> {
         enum Grow {
             Push,
@@ -585,32 +624,7 @@ impl Interp {
             self.pos = pos;
             let y = self.eval(y)?;
             self.pos = pos;
-            let idx = self.base + slot as usize;
-            let pair = [self.stack[idx].clone(), y];
-            let (d, _) = self.resolve_cached(set, &pair)?;
-            if matches!(pair[0], Value::Array(..)) && &*d.module == "onshape/std/containers.fs" {
-                let [x, y] = pair;
-                // (x's copy gone first: the local's array is then the only one, grown in place.)
-                drop(x);
-                if let Value::Array(arr, tag) = &mut self.stack[idx] {
-                    let v = Arc::make_mut(arr);
-                    if &*d.name == "append" {
-                        v.push(y);
-                    } else {
-                        if let Value::Array(b, _) = y {
-                            v.extend(Arc::unwrap_or_clone(b));
-                        }
-                        // @concatenateArrays answers an untagged array.
-                        *tag = Tag::NONE;
-                    }
-                }
-                return Ok(Flow::Normal);
-            }
-            let Some(c) = d.compiled.get() else {
-                return Err(self.error(format!("Function {} is not compiled", d.name)));
-            };
-            self.stack[idx] = self.invoke(c, pair.into(), &[], false)?;
-            return Ok(Flow::Normal);
+            return self.grow_one(slot, set, y);
         }
         self.pos = pos;
         let mut a = Vec::with_capacity(rest.len() + 1);
@@ -863,8 +877,14 @@ impl Interp {
     }
 
     fn run_body(&mut self, f: &CompiledFn) -> R<Value> {
+        // The body's closures ([`closure`]), made on its first run; the tree walker when asked or profiling.
+        let compiled = (!self.tree_walker && self.profile.is_none()).then(|| f.closures.get_or_init(|| closure::compile_fn(f)));
         if let Some(p) = &f.precondition {
-            match self.exec(p)? {
+            let flow = match compiled.and_then(|c| c.precondition.as_ref()) {
+                Some(cp) => cp(self)?,
+                None => self.exec(p)?,
+            };
+            match flow {
                 Flow::False => {
                     // Live: "Precondition of guarded failed (x > 0)", at the
                     // failing statement; the text is the statement's source or
@@ -879,14 +899,19 @@ impl Interp {
             }
         }
         let predicate = f.kind == FnKind::Predicate;
-        let v = match &f.body {
-            FnBody::Expr(e) => self.eval(e)?,
-            FnBody::Block(stmts) => match self.exec_block(stmts)? {
-                Flow::Normal => Value::bool(predicate).or_undefined(!predicate),
-                Flow::Return(v) => v,
-                Flow::False => Value::bool(false),
-                Flow::Break | Flow::Continue => return Err(self.error("break or continue outside of a loop")),
+        let flow = match (compiled, &f.body) {
+            (Some(c), _) => match &c.body {
+                closure::CBody::Expr(e) => Flow::Return(e(self)?),
+                closure::CBody::Block(stmts) => closure::run_block(self, stmts)?,
             },
+            (None, FnBody::Expr(e)) => Flow::Return(self.eval(e)?),
+            (None, FnBody::Block(stmts)) => self.exec_block(stmts)?,
+        };
+        let v = match flow {
+            Flow::Normal => Value::bool(predicate).or_undefined(!predicate),
+            Flow::Return(v) => v,
+            Flow::False => Value::bool(false),
+            Flow::Break | Flow::Continue => return Err(self.error("break or continue outside of a loop")),
         };
         if let Some(t) = f.returns
             && !t.matches(&v)
@@ -910,7 +935,13 @@ impl Interp {
 
     /// A condition; `at` locates its error (Onshape: the statement).
     fn cond(&mut self, e: &Ex, what: &str, at: Pos) -> R<bool> {
-        match self.eval(e)? {
+        let v = self.eval(e)?;
+        self.cond_value(v, what, at)
+    }
+
+    /// A condition's value as a boolean (`at` locates its error).
+    fn cond_value(&mut self, v: Value, what: &str, at: Pos) -> R<bool> {
+        match v {
             Value::Bool(b, _) => Ok(b),
             other => {
                 self.pos = at;
@@ -1241,25 +1272,10 @@ impl Interp {
                 }
                 Ok(Value::map(m))
             }
-            ExK::Neg(x, ov) => {
+            ExK::Neg(x, _) => {
                 let v = self.eval(x)?;
                 self.pos = e.pos;
-                if let Value::Number(n, Tag::NONE) = v {
-                    return Ok(Value::num(-n));
-                }
-                let _ = ov;
-                let mut one = [v];
-                if !one[0].tag().is_none()
-                    && let Some(set) = self.operator_set(1)
-                    && let Some(r) = self.try_overload(&set, &mut one)?
-                {
-                    return Ok(r);
-                }
-                let [v] = one;
-                match v {
-                    Value::Number(n, _) => Ok(Value::num(-n)),
-                    _ => Err(self.error("Operand for '-' was not a number.")),
-                }
+                self.negated(v)
             }
             ExK::Not(x) => match self.eval(x)? {
                 Value::Bool(b, _) => Ok(Value::bool(!b)),
@@ -1341,13 +1357,7 @@ impl Interp {
                 match callee {
                     Callee::Overloads(set) => self.call_set(set, a),
                     Callee::Value(_) => self.call_value(&f.unwrap_or_default(), a),
-                    Callee::Native(n, name) => {
-                        let saved = std::mem::replace(&mut self.native_name, name.clone());
-                        let r = n(self, a);
-                        self.native_name = saved;
-                        self.native_stopped(&r);
-                        r
-                    }
+                    Callee::Native(n, name) => self.call_native(*n, name, a),
                     Callee::MissingNative(name) => Err(self.error(format!("@{name} is not supported"))),
                     Callee::Missing(name, n) => Err(self.error(format!("Function {name} with {n} argument(s) not found"))),
                 }
@@ -1443,6 +1453,34 @@ impl Interp {
                 Ok(Value::Undefined)
             }
         }
+    }
+
+    /// `-v` (unary minus): a number's, else an operator overload's.
+    fn negated(&mut self, v: Value) -> R<Value> {
+        if let Value::Number(n, Tag::NONE) = v {
+            return Ok(Value::num(-n));
+        }
+        let mut one = [v];
+        if !one[0].tag().is_none()
+            && let Some(set) = self.operator_set(1)
+            && let Some(r) = self.try_overload(&set, &mut one)?
+        {
+            return Ok(r);
+        }
+        let [v] = one;
+        match v {
+            Value::Number(n, _) => Ok(Value::num(-n)),
+            _ => Err(self.error("Operand for '-' was not a number.")),
+        }
+    }
+
+    /// A native's call with its arguments (its errors read "@name: …").
+    fn call_native(&mut self, n: NativeFn, name: &Name, a: Vec<Value>) -> R<Value> {
+        let saved = std::mem::replace(&mut self.native_name, name.clone());
+        let r = n(self, a);
+        self.native_name = saved;
+        self.native_stopped(&r);
+        r
     }
 
     pub fn index(&mut self, base: Value, idx: &Value) -> R<Value> {
