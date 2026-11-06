@@ -100,8 +100,14 @@ def main():
             in_sketch = tab["tab"] == "Sketch"
             also = [(sketch_tool_of if in_sketch else tool_of)[tool]] if tool in (sketch_tool_of if in_sketch else tool_of) else []
             for alt in str(row.get("keys") or "").split(" / "):
-                if alt.strip():
-                    key_of[norm_key(alt)].extend((it, in_sketch) for it in [item] + also)
+                if not alt.strip():
+                    continue
+                # "shift ← → ↑ ↓": any of the arrows with the modifiers.
+                arrows = [a for a in ("←", "→", "↑", "↓") if a in alt]
+                names = {"←": "arrowleft", "→": "arrowright", "↑": "arrowup", "↓": "arrowdown"}
+                variants = [re.sub(r"\s*[←→↑↓](\s*[←→↑↓])*", " " + names[a], alt).strip() for a in arrows] if arrows else [alt]
+                for v in variants:
+                    key_of[norm_key(v)].extend((it, in_sketch) for it in [item] + also)
     for t in types.values():
         if t.get("shortcut"):
             key_of[norm_key(t["shortcut"])].append((("toolbar", t["name"]), False))
@@ -134,6 +140,11 @@ def main():
             if on.get("button") == "ok":
                 sketching = False
             if "menu" in on and "tool" not in on:
+                # The sketch diagnostics' rows start their tools.
+                diag = on["menu"].rstrip("…").lower()
+                if sketching and diag in sketch_tool_of:
+                    items[sketch_tool_of[diag]].add(name)
+                    continue
                 if on["menu"].lower() in menu_of:
                     items[menu_of[on["menu"].lower()]].add(name)
                 else:

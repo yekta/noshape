@@ -237,9 +237,9 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 | kind | covered | scenarios per item (median) |
 |---|---|---|
 | toolbar | 47/76 | 1 |
-| sketch tool | 53/55 | 1 |
+| sketch tool | 55/55 | 1 |
 | menu | 78/117 | 1 |
-| shortcut | 74/89 | 1 |
+| shortcut | 78/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
@@ -257,7 +257,7 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 | Boolean | 6 |
 | Plane | 7 |
 | Mate connector | 4 |
-| sketch tools (all 55) | 134 scenarios, 53 tools covered |
+| sketch tools (all 55) | 134 scenarios, 55 tools covered |
 
 ### Drawings
 `tools/ui-parity/coverage_drawing.py` counts the drw-* scenarios exercising each drawing tool and drawing menu item
