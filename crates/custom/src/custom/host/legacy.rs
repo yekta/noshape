@@ -23,7 +23,8 @@ pub const QUERIES_SINCE: u32 = 2581;
 /// The current native `name`, its result in the raw form.
 fn raw_call(name: &str, i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let Some(f) = noshape_featurescript::interp::native(name) else { return Err(i.error(format!("Builtin {name} not found"))) };
-    let raw = to_builtin(&f(i, a)?);
+    // (Its result in maps and arrays first: a plane's compact origin is units dropped like a map's.)
+    let raw = to_builtin(&f(i, a)?.materialized());
     Ok(if name == "evDistance" { with_mesh_flags(raw) } else { raw })
 }
 

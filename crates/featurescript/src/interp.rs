@@ -17,7 +17,7 @@ use std::time::Instant;
 
 #[path = "interp_closure.rs"]
 pub(crate) mod closure;
-pub use closure::{set_compact_default, set_tree_walker_default};
+pub use closure::{compact_default as compact_values, set_compact_default, set_tree_walker_default};
 
 /// A runtime builtin (`@name`).
 pub type NativeFn = fn(&mut Interp, Vec<Value>) -> R<Value>;

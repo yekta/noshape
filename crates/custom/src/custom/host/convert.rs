@@ -183,14 +183,25 @@ pub fn point2_value(p: DVec2) -> Value {
     Value::Array(Arc::new(vec![length_value(p.x), length_value(p.y)]), vector_tag())
 }
 
+/// A Vector of three lengths (`unit` meters) or numbers, compact while FeatureScript runs on compact values (the host
+/// reads it back with vec3_of).
+fn compact3(p: DVec3, length: bool) -> Option<Value> {
+    use noshape_featurescript::value::{Compact, UnitId, VecLen, unit_id, vector_tag};
+    if !noshape_featurescript::interp::compact_values() || vector_tag().is_none() {
+        return None;
+    }
+    let unit = if length { unit_id(&unit_spec(&[("meter", 1.0)]))? } else { UnitId(0) };
+    Some(Value::Vector(Compact { v: [pos0(p.x), pos0(p.y), pos0(p.z)], unit, len: VecLen::Three }))
+}
+
 pub fn plane_value(f: &PlaneFrame) -> Value {
     // (Its keys made once: a Displacement map asks for a million planes.)
     static KEYS: std::sync::LazyLock<[Value; 3]> = std::sync::LazyLock::new(|| ["origin", "normal", "x"].map(Value::key));
     static TAG: OnceLock<Tag> = OnceLock::new();
     let mut m = Map::new();
-    m.insert(KEYS[0].clone(), point_value(f.origin));
-    m.insert(KEYS[1].clone(), dir_value(f.normal));
-    m.insert(KEYS[2].clone(), dir_value(f.x));
+    m.insert(KEYS[0].clone(), compact3(f.origin, true).unwrap_or_else(|| point_value(f.origin)));
+    m.insert(KEYS[1].clone(), compact3(f.normal, false).unwrap_or_else(|| dir_value(f.normal)));
+    m.insert(KEYS[2].clone(), compact3(f.x, false).unwrap_or_else(|| dir_value(f.x)));
     Value::Map(Arc::new(m), kept_tag(&TAG, "surfaceGeometry.fs", "Plane"))
 }
 
