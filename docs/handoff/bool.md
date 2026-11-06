@@ -3,6 +3,17 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Slot corners: where (1) stands (11-06 02:25 UTC)
+- With the section's end snapped to the slot's corner (pave-wip2-1106.patch), 2eafe30c's result has OCCT's counts
+  (31 / 79 / 50) and the same three edges at each corner; OCCT's new vertex sits 7.1 um from the corner and its section
+  edge is 10.6 um longer (OCCT extends the curve to it). After unify_same_domain ours has 78 edges against 79: on the
+  part's cylinder (face 0, the same surface and frame in both) ours ends with a vertical edge z 0 - 0.0874 at another
+  angle where OCCT keeps the seam z 0 - 0.0883, and joins the two arc pieces at the old seam vertex (0.0883) that
+  OCCT keeps apart. So the face merge places the seam by how face 0 is split near the corner: not found yet.
+- Tools: /root/bool-scratch/corner_edges.rs.keep (a kernel example: A=, B= breps, each one's edges after unify that
+  the other lacks, and the cylinder faces' frames); NOSHAPE_BREP_DUMP=<dir> on the replay writes both results (make
+  the dir on the build host first).
+
 ## Plan: per-entity tolerances (11-06 02:09 UTC, agreed with the lead)
 Why: the Boolean runs with one tolerance, `tol` = the largest ordinary tolerance among its inputs (rust_boolean.cpp
 `max_tol`: vertices, edges and faces up to kMaxTol 1e-5, tolerant ones handled apart), where OCCT's pave filler tests
