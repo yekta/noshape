@@ -26,6 +26,8 @@
 # comparable with each other; compare settings for fps in separate jobs
 # (BENCH_ENV), GPU time (`w.gpu_wait`) within a job.
 # ONLY (`<label>:<kind>` separated by spaces) runs just those.
+# LATENCY_DOC: also `NOSHAPE_PERF_SCRIPT=ui-latency` on that Part Studio (feature dialogs opened and list rows
+# clicked, the UI thread's part of showing each: `latency.log`), with AB_BIN too.
 # AB_BIN / AB_OUT: every run (but the pick bench) also with another build (the previous release, the same-job
 # baseline perf.yml compares with), alternating which goes first.
 set -u
@@ -102,3 +104,23 @@ for run in "${RUNS[@]}"; do
     one "$BIN" "$OUT" 1
   fi
 done
+# The UI latency of a feature dialog's opening and a list row's click (perf_script.rs), once.
+latency() {
+  local bin=$1 out=$2
+  mkdir -p "$out"
+  local log="$out/latency.log" work
+  work=$(mktemp -d)
+  cp "$LATENCY_DOC" "$work/latency.noshape"
+  echo "== latency $(basename "$LATENCY_DOC") ($bin)"
+  env NOSHAPE_PERF=1 NOSHAPE_PERF_SCRIPT=ui-latency NOSHAPE_PRESENT="${MODES[0]}" RUST_LOG=info ${BENCH_ENV//,/ } \
+    "$bin" "$work/latency.noshape" > "$log" 2>&1 &
+  local pid=$!
+  wait_for 'BENCH SUMMARY row-click' "$log" $((DELAY + 300)) || echo "::warning::no latency BENCH SUMMARY"
+  kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
+  grep -a "BENCH SUMMARY\|panicked\|ERROR" "$log" | cut -c1-400
+  rm -rf "$work"
+}
+if [[ -n ${LATENCY_DOC:-} && ( -z ${ONLY:-} || " $ONLY " == *" latency:"* ) ]]; then
+  latency "$BIN" "$OUT"
+  [[ -n ${AB_BIN:-} ]] && latency "$AB_BIN" "$AB_OUT"
+fi

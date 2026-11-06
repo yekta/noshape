@@ -17,6 +17,8 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
   --target-gpu-mean  PLAN 2.7's target for this document (NIST: 120 fps): the 2× orbit's GPU mean per frame <= MS,
                      reported; with --gate-target a gate (on once met, so it can't regress);
   --gate-p95         frame-interval p95;
+  --gate-latency-cpu-p95  the ui-latency rows (latency.log: dialog open, row click): the UI thread's CPU p95 in the
+                     action and its frame at most MS (PLAN 2.7 psui: a click shows within a frame);
   The statistics above are the steady state: the benchmark leaves its first frames (the camera starting to move)
   out and reports their maxima apart, in "First frames";
   --gate-first-frames-gpu  every run's first frames: our GPU time per frame at most MS (the hitch as the camera
@@ -50,8 +52,28 @@ SUMMARY = re.compile(
     r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms(?P<done> \(submit to done\))?)?"
     r"(?: \| first (?P<warmup>\d+) frames max: frame interval (?P<firstiv>[\d.]+) ms, UI CPU (?P<firstcpu>[\d.]+) ms, GPU (?P<firstgpu>[\d.]+) ms)?")
 
+# perf_script.rs `ui-latency` (bench.sh LATENCY_DOC): a feature dialog's opening and a list row's click, from the
+# action to the end of the paint of the first frame showing it, and the UI thread's CPU in the action and that frame.
+LATENCY = re.compile(
+    r"BENCH SUMMARY (?P<kind>dialog-open|row-click): (?P<n>\d+) samples \| action to the end of the paint of the first frame "
+    r"showing it mean (?P<mean>[\d.]+) p50 (?P<p50>[\d.]+) p95 (?P<p95>[\d.]+) max (?P<max>[\d.]+) ms .*?"
+    r"UI-thread CPU \(the action \+ that frame\) p50 (?P<cpu>[\d.]+) p95 (?P<cpup95>[\d.]+) ms")
+
+
+def latency_rows(out):
+    """The ui-latency rows of `out` (mode `latency`, kind dialog-open / row-click)."""
+    path = os.path.join(out or "", "latency.log")
+    if not out or not os.path.exists(path):
+        return []
+    text = open(path, encoding="utf-8", errors="replace").read()
+    return [{"mode": "latency", "log": "latency.log", **{k: (float(v) if k != "kind" else v) for k, v in m.groupdict().items()}}
+            for m in LATENCY.finditer(text)]
+
+
 # (metric, label, higher is better) compared against the baseline.
 COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95", "UI CPU p95", False), ("gpup95", "GPU p95", False)]
+# The latency rows' p95 is the action to its frame's paint.
+COMPARED_LATENCY = [("p95", "action to frame p95", False), ("cpup95", "UI CPU p95", False)]
 # Smallest change that counts as a regression, whatever the percentage: below it a runner's jitter decides
 # (v0.4.11 macOS 15: UI CPU p95 0.79 -> 0.87 ms failed as +10%).
 MIN_CHANGE = {"fps": 2.0, "p95": 2.0, "cpup95": 0.5, "gpup95": 0.5}
@@ -90,7 +112,7 @@ def load_baseline(path, fixture):
         return json.load(open(one, encoding="utf-8"))
     # Logs: another build measured in this job (bench.sh AB_OUT).
     if glob.glob(os.path.join(path, "*-*.log")):
-        return {"label": os.environ.get("AB_LABEL") or "another build measured in this job", "fixture": fixture, "runs": runs(path)}
+        return {"label": os.environ.get("AB_LABEL") or "another build measured in this job", "fixture": fixture, "runs": runs(path) + latency_rows(path)}
     sums = [json.load(open(f, encoding="utf-8")) for f in sorted(glob.glob(os.path.join(path, "*", "summary.json")))]
     sums = [x for x in sums if x.get("fixture") == fixture]
     if not sums:
@@ -214,6 +236,7 @@ def main():
     ap.add_argument("--report-regressions", action="store_true")
     ap.add_argument("--gate-first-frames-gpu", type=float)
     ap.add_argument("--confirm")
+    ap.add_argument("--gate-latency-cpu-p95", type=float)
     ap.add_argument("--confirm-baseline")
     args = ap.parse_args()
     rows = runs(args.out)
@@ -257,6 +280,10 @@ def main():
                          f"max {float(m['max']):.1f} ms; target {TARGET_PICK_MS:.0f} ms: {'met' if p95 <= TARGET_PICK_MS else 'not met'}")
         else:
             lines.append(f"- selection: no pick BENCH SUMMARY in {os.path.basename(log)}")
+    lat = latency_rows(args.out)
+    for r in lat:
+        lines.append(f"- {r['kind'].replace('-', ' ')} ({int(r['n'])} samples, UI latency): UI-thread CPU (action + its frame) p50 "
+                     f"{r['cpu']:.1f} ms, p95 {r['cpup95']:.1f} ms; action to its frame's paint p50 {r['p50']:.1f} ms, p95 {r['p95']:.1f} ms")
     failures = []
     ran = {r["mode"] for r in rows if not r.get("missing")}
     if args.stills and not {"texture", "readback"} <= ran:
@@ -323,6 +350,14 @@ def main():
             lines.append(f"Gate first frames ({r['mode']} {r['kind']}) GPU max {r['firstgpu']:.2f} <= {args.gate_first_frames_gpu} ms: {'OK' if ok else 'FAILED'}")
             if not ok:
                 failures.append(f"first frames: {r['mode']} {r['kind']} GPU max {r['firstgpu']:.2f} ms > {args.gate_first_frames_gpu} ms")
+    if args.gate_latency_cpu_p95 is not None:
+        if not lat:
+            lines.append("Gate UI latency: not measured (no latency.log)")
+        for r in lat:
+            ok = r["cpup95"] <= args.gate_latency_cpu_p95
+            lines.append(f"Gate UI latency ({r['kind']}) UI-thread CPU p95 {r['cpup95']:.2f} <= {args.gate_latency_cpu_p95} ms: {'OK' if ok else 'FAILED'}")
+            if not ok:
+                failures.append(f"UI latency: {r['kind']} UI-thread CPU p95 {r['cpup95']:.2f} ms > {args.gate_latency_cpu_p95} ms")
     flagged = set()
     # The benchmark document (perf.yml FIXTURE): a baseline of another one
     # (a run dispatched with `fixture`, e.g. live-30's 24 instances against
@@ -333,19 +368,19 @@ def main():
         lines += ["", f"Baseline ({base.get('label', '?')}) measured {base.get('fixture') or 'an unrecorded document'}, not {fixture or '?'}: not compared."]
     elif base is not None:
         lines += ["", f"Against the baseline ({base.get('label', '?')}), max {args.max_regression * 100:.0f}% worse:"]
-        again = runs(args.confirm) if args.confirm else None
-        again_base = runs(args.confirm_baseline) if args.confirm_baseline and glob.glob(os.path.join(args.confirm_baseline, "*-*.log")) else None
+        again = runs(args.confirm) + latency_rows(args.confirm) if args.confirm else None
+        again_base = runs(args.confirm_baseline) + latency_rows(args.confirm_baseline) if args.confirm_baseline and os.path.isdir(args.confirm_baseline) else None
 
         def regressed(metric, higher_better, now, was):
             worse = (was - now) / was if higher_better else (now - was) / was
             return worse > args.max_regression and abs(now - was) > MIN_CHANGE[metric]
 
-        for r in measured:
+        for r in measured + lat:
             b = next((x for x in base.get("runs", []) if x.get("mode") == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
             if not b:
                 continue
             notes = []
-            for metric, label, higher_better in COMPARED:
+            for metric, label, higher_better in (COMPARED_LATENCY if r["mode"] == "latency" else COMPARED):
                 now, was = r.get(metric), b.get(metric)
                 if now is None or was is None or was == 0:
                     continue
@@ -384,7 +419,7 @@ def main():
     with open(os.path.join(args.out, "regressed.txt"), "w", encoding="utf-8") as f:
         f.write(" ".join(sorted(flagged)))
     with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:
-        json.dump({"label": args.label, "fixture": fixture, "runs": rows, "failures": failures}, f, indent=1)
+        json.dump({"label": args.label, "fixture": fixture, "runs": rows + lat, "failures": failures}, f, indent=1)
     for f in failures:
         print(f"::error::{args.label}: {f}")
     sys.exit(1 if failures else 0)
