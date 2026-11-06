@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Slot corners: where (1) stands (11-06 02:25 UTC)
+## Slot corners: where (1) stands (11-06 02:11 UTC)
 - With the section's end snapped to the slot's corner (pave-wip2-1106.patch), 2eafe30c's result has OCCT's counts
   (31 / 79 / 50) and the same three edges at each corner; OCCT's new vertex sits 7.1 um from the corner and its section
   edge is 10.6 um longer (OCCT extends the curve to it). After unify_same_domain ours has 78 edges against 79: on the
