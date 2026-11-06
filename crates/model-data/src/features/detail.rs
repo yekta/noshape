@@ -64,7 +64,7 @@ pub fn face_blend() -> FeatureType {
         ParamSpec::flip("flipSide1", "Flip side 1"),
         ParamSpec::query("side2", "Side 2", QueryFilter::ANY_FACE),
         ParamSpec::flip("flipSide2", "Flip side 2"),
-        ParamSpec::bool("propagation", "Propagation", true).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("propagation", "Propagation", true).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::enum_("propagationType", "Propagation type", &[("TANGENT", "Tangent"), ("ADJACENT", "Adjacent"), ("CUSTOM", "Custom")])
             .visible(|v| v.bool("propagation")),
         ParamSpec::num("propagationAngle", "Maximum angle", NumSpec::angle(0.0, 0.0, 180.0))

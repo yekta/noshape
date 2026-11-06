@@ -139,11 +139,13 @@ pub fn query_variable() -> FeatureType {
     let created = move |v: &ParamValues| st(v, "CREATED_BY");
     let adjacent = move |v: &ParamValues| st(v, "ADJACENT");
     let p = vec![
-        ParamSpec::text("name", "Name", "").hints(Hints::UNCONFIGURABLE),
+        // QUERY_VARIABLE_NAME: the Name has the keyboard on opening, Selections stays the active field (live ui-parity
+        // query-variable-tool), as Variable's.
+        ParamSpec::text("name", "Name", "").hints(Hints::UNCONFIGURABLE | Hints::INITIAL_FOCUS),
         ParamSpec::text("description", "Description", ""),
         ParamSpec::enum_("selectionType", "Selection type", SELECTION_TYPE),
         ParamSpec::enum_("seedType", "Entity type", &[("FACE", "Face"), ("EDGE", "Edge")]).visible(seeded),
-        ParamSpec::query("selectionQuery", "Selections", ANY_ENTITY).hints(Hints::INITIAL_FOCUS).visible(move |v| st(v, "SELECTION")),
+        ParamSpec::query("selectionQuery", "Selections", ANY_ENTITY).visible(move |v| st(v, "SELECTION")),
         ParamSpec::query("createdByFeatures", "Created by features", QueryFilter::FEATURE).visible(created),
         ParamSpec::query("seedBodies", "Entities", QueryFilter::BODY | QueryFilter::WIRE_BODY).visible(move |v| any(v, &["OWNED_BY", "EDGE_CONVEXITY"])),
         ParamSpec::query("seedFaces", "Faces", QueryFilter::ANY_FACE).visible(face_seed),

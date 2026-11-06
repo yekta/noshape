@@ -325,7 +325,7 @@ pub fn edit_curve() -> FeatureType {
         .item_template("#index: #x;#y;#z")
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::PREVENT_ARRAY_REORDER)
         .visible(cps),
-        ParamSpec::bool("showDetails", "Show details", true).hints(Hints::GROUP_HEADER),
+        ParamSpec::bool("showDetails", "Show details", true).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
         ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),

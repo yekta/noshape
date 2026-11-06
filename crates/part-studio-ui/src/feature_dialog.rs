@@ -370,7 +370,7 @@ impl FeatureDialog {
         let collapsed_groups = ty
             .params
             .iter()
-            .filter(|s| s.hints.has(Hints::GROUP_HEADER) && !s.hints.has(Hints::GROUP_LABEL) && matches!(s.kind, ParamKind::Bool { default: true }) && feature.params.bool(s.id))
+            .filter(|s| s.hints.has(Hints::GROUP_HEADER) && !s.hints.has(Hints::GROUP_LABEL) && !s.hints.has(Hints::GROUP_OPEN) && matches!(s.kind, ParamKind::Bool { default: true }) && feature.params.bool(s.id))
             .map(|s| s.id.to_string())
             .collect();
         let mut d = Self {
@@ -2764,13 +2764,10 @@ impl FeatureDialog {
                                         // Focused before it is drawn: its Enter baseline here, so the first Enter
                                         // after typing applies the text and only the next commits (EXPR-ENTER-COMMITS).
                                         this.baselines.insert(p.clone(), text.to_string());
-                                        // The new expression field takes the keyboard.
-                                        let input = this.ensure_input(&p, text, window, cx);
-                                        input.update(cx, |s, cx| {
-                                            s.focus(window, cx);
-                                            s.select_all(window, cx);
-                                        });
-                                    })
+                                    });
+                                    // The keyboard stays outside: the new field isn't focused (live ui-parity
+                                    // dialog-checkbox-rclick-convert).
+                                    Self::leave_keyboard_after_menu(&v, window, cx);
                                 }));
                                 match &bool_unconfigure {
                                     Some(pid) => configure_items(m, &view, pid, true),

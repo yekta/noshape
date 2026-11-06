@@ -189,6 +189,13 @@ impl FeatureDialog {
                         || self.field_error(s.id).is_some();
                     fields.push(json!({ "label": label, "kind": "number", "text": shown.unwrap_or(text), "state": if bad { "error" } else { "ok" }, "focused": focused }));
                 }
+                // A Part Studio picker (Derived's, Form's): its label and what it shows, as one control (live ui-parity
+                // derived-tool: "Part Studio Select Part Studio…").
+                ParamKind::Text { .. } if (s.id == "partStudio" && self.ty.id == "importDerived") || (s.id == "formPartStudio" && self.ty.id == "sheetMetalFormed") => {
+                    let value = if s.id == "partStudio" { self.derived_reference_value() } else { values.text(s.id).to_string() };
+                    let shown = self.reference_shown(noshape_model::params::ReferenceKind::PartStudio, &value);
+                    fields.push(json!({ "label": label, "kind": "other", "text": format!("{} {shown}", crate::i18n::spec(s.label)), "state": "ok" }));
+                }
                 ParamKind::Text { .. } => {
                     let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or_else(|| (false, values.text(s.id).to_string()));
                     fields.push(json!({ "label": label, "kind": "text", "text": text, "focused": focused, "state": "ok" }));

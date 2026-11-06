@@ -270,6 +270,9 @@ impl Hints {
     /// the feature's editing logic with `clickedButton` = its id (Routing
     /// curve's Process, Reset triad).
     pub const BUTTON: Self = Self(1 << 27);
+    /// With GROUP_HEADER on a boolean on by default: the group starts unfolded (FeatureScript `"Collapsed By
+    /// Default" : false`; live ui-parity face-blend-tool).
+    pub const GROUP_OPEN: Self = Self(1 << 28);
 
     pub const fn or(self, other: Self) -> Self {
         Self(self.0 | other.0)

@@ -579,6 +579,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Size to Part Studio", Op("feature_size_plane")),
     ("partStudio:Thickness analysis…", Op("analysis_thickness")),
     ("partStudio:Transform sketch entities", Op("sketch_transform")),
+    ("partStudio:Turn curvature color map off", Op("analysis_curvature_map")),
     ("partStudio:Turn off section view", Op("render_image")),
     ("partStudio:Turn thickness analysis off", Op("view_display")),
     ("partStudio:Unpack folder", Op("feature_unpack_folder")),

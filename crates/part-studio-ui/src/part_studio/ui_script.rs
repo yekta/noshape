@@ -144,12 +144,31 @@ impl PartStudioView {
             }
             None => (Vec::new(), None),
         };
-        // As the list draws them: a run of parts a filter leaves out is one "…" row.
+        // As the list draws them (render_parts_list): Parts' rows, then each other section's heading ("Surfaces (1)",
+        // live ui-parity offset-surface-tool) and its rows unless collapsed; a run of parts a filter leaves out is one
+        // "…" row.
         let mut parts: Vec<String> = Vec::new();
-        for b in &self.display.bodies {
-            let name = if noshape_model::interaction::filter_row(&self.ui.filter_query, &b.name, b.hidden) == Some(false) { "…" } else { &b.name };
-            if !(name == "…" && parts.last().is_some_and(|p| p == "…")) {
-                parts.push(name.to_string());
+        for (title, key) in [("Parts", "parts"), ("Composite parts", "composites"), ("Surfaces", "surfaces"), ("Curves", "curves")] {
+            let bodies: Vec<_> = self.display.bodies.iter().filter(|b| super::part_section(b) == key).collect();
+            if key != "parts" {
+                if bodies.is_empty() {
+                    continue;
+                }
+                parts.push(format!("{title} ({})", bodies.len()));
+                if self.ui.collapsed_sections.contains(key) {
+                    continue;
+                }
+            }
+            let mut gap = false;
+            for b in bodies {
+                if noshape_model::interaction::filter_row(&self.ui.filter_query, &b.name, b.hidden) == Some(false) {
+                    if !std::mem::replace(&mut gap, true) {
+                        parts.push("…".into());
+                    }
+                    continue;
+                }
+                gap = false;
+                parts.push(b.name.clone());
             }
         }
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
@@ -159,7 +178,7 @@ impl PartStudioView {
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
-        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
+        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
         if in_dialog.is_some() {

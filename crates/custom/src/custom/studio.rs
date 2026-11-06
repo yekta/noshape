@@ -424,6 +424,10 @@ fn collect_in(module: &Arc<CompiledModule>, s: &ast::Stmt, conds: &[Arc<Compiled
                 && let Some(p) = out.iter_mut().rev().find(|p| p.id == driver)
             {
                 p.hints = p.hints | Hints::GROUP_HEADER;
+                // "Collapsed By Default" : false: it starts unfolded when its box is on (Face blend's Propagation).
+                if a.get("Collapsed By Default").and_then(|v| v.as_bool()) == Some(false) {
+                    p.hints = p.hints | Hints::GROUP_OPEN;
+                }
             }
             collect_in(module, stmt, conds, Some((&a, annotation)), roots, out);
         }

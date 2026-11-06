@@ -141,6 +141,13 @@ pub fn part_value(key: &str, body: &noshape_model::BodyId) -> String {
 impl FeatureDialog {
     /// The parameter row: label, then the bordered field (blue while its
     /// panel is open).
+    /// What a reference field shows: the chosen source's name, "Missing Part Studio" for one that is gone, else
+    /// its placeholder ("Select Part Studio…").
+    pub fn reference_shown(&self, kind: ReferenceKind, value: &str) -> String {
+        let gone = kind == ReferenceKind::PartStudio && !value.trim().is_empty() && !value.starts_with("ext:") && value_name(&self.ref_sources, value).is_none();
+        value_name(&self.ref_sources, value).unwrap_or_else(|| if gone { "Missing Part Studio".into() } else { texts(kind).1.to_string() })
+    }
+
     pub fn render_reference_field(&mut self, label: &'static str, path: &str, kind: ReferenceKind, value: &str, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let (icon, placeholder) = texts(kind);

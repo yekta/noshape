@@ -4853,6 +4853,135 @@ impl PartStudioView {
     /// opens or closes it, a double-click does nothing; its menu is Rename |
     /// Add selection to folder… | Suppress, Dynamic suppression ▸ | Roll to
     /// here | Expand ▸, Collapse ▸ | Delete, Unpack folder.
+    /// The feature list's menu for several selected features (`clicked`: the row right-clicked). Live (request 1675):
+    /// what the selection holds decides the menu: sketches add their hide items and Section view…, each kind its own
+    /// appearance item. On a new folder holding them (`folder`; live ui-parity folder-rclick-menu) it has no Add
+    /// selection to folder…, and the folder's Expand / Collapse follow Clear selection.
+    fn selection_feature_menu(view: &Entity<Self>, clicked: FeatureId, targets: Vec<FeatureId>, folder: Option<u32>, menu: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>) -> crate::os_menu::OsMenu {
+        let item = |label: &str, f: ViewAction| {
+            let v = view.clone();
+            crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+        };
+        let (manually_suppressed, suppressed, has_expr, swatch) = {
+            let this = view.read(cx);
+            let f = this.studio(cx).and_then(|s| s.feature(clicked)).cloned();
+            let status = this.display.feature_state(clicked).map(|s| s.status);
+            let manual = f.as_ref().is_some_and(|f| f.suppressed);
+            (manual, manual || status == Some(FeatureStatus::Suppressed), f.as_ref().is_some_and(|f| f.suppression_expr.is_some()), this.sketch_swatch(clicked, cx))
+        };
+        let (sketches, others): (Vec<FeatureId>, Vec<FeatureId>) = {
+            let this = view.read(cx);
+            targets.iter().copied().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
+        };
+        let (sketches_shown, planes, sketch_swatch) = {
+            let this = view.read(cx);
+            (
+                this.display.sketches.iter().any(|s| sketches.contains(&s.feature) && !s.hidden),
+                others.iter().any(|f| this.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(*f))),
+                sketches.first().map(|s| this.sketch_swatch(*s, cx)),
+            )
+        };
+        let t = targets.clone();
+        let section = item("Section view…", Box::new(move |this, w, cx| {
+            let refs: Vec<Reference> = t
+                .iter()
+                .map(|&f| {
+                    if this.display.sketches.iter().any(|s| s.feature == f) {
+                        Reference::Sketch(f)
+                    } else if this.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(f)) {
+                        Reference::FeaturePlane(f)
+                    } else {
+                        Reference::Feature(f)
+                    }
+                })
+                .collect();
+            this.section_through_all(&refs, w, cx);
+        }))
+        .icon_name("menu-section-view");
+        let mut m = menu;
+        if folder.is_none() {
+            let t = targets.clone();
+            m = m.item(item("Add selection to folder…", Box::new(move |this, window, cx| this.open_folder_prompt(t.clone(), window, cx)))).separator();
+        }
+        if !sketches.is_empty() && others.is_empty() {
+            // Sketches alone: Hide (or Show) them.
+            let refs: Vec<Reference> = sketches.iter().map(|f| Reference::Feature(*f)).collect();
+            m = m.item(item(if sketches_shown { "Hide" } else { "Show" }, Box::new(move |this, _, cx| this.set_visibility(&refs, sketches_shown, cx))));
+        } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown) {
+            // A shown sketch with other features: Hide other / all sketches (a hidden one has none, live
+            // ui-parity feature-row-rclick-other-selected).
+            m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
+        }
+        if !sketches.is_empty() || planes {
+            m = m.item(section);
+        }
+        // Unsuppress on a feature its expression suppresses drops the expression (live assembly/142).
+        let t = targets.clone();
+        m = m.item(if has_expr && suppressed {
+            item("Unsuppress", Box::new(move |this, _, cx| this.clear_dynamic_suppression(clicked, cx)))
+        } else {
+            item(if manually_suppressed { "Unsuppress" } else { "Suppress" }, Box::new(move |this, _, cx| this.set_suppressed(t.clone(), !manually_suppressed, cx)))
+        });
+        let vd = view.clone();
+        m = if has_expr {
+            let (v1, v2) = (vd.clone(), vd);
+            m.submenu("Edit dynamic suppression", window, cx, move |sm, _, _| {
+                sm.item(crate::os_menu::OsMenuItem::new("Edit expression…").on_click(move |_, w, cx| v1.update(cx, |this, cx| this.edit_dynamic_suppression(clicked, w, cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Remove expression").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.remove_dynamic_suppression(clicked, cx))))
+            })
+        } else {
+            m.submenu("Dynamic suppression", window, cx, move |sm, _, _| {
+                sm.item(crate::os_menu::OsMenuItem::new("Add expression…").on_click(move |_, w, cx| vd.update(cx, |this, cx| this.edit_dynamic_suppression(clicked, w, cx))))
+            })
+        };
+        m = m.separator().item(item("Clear selection", Box::new(|this, _, cx| {
+            this.selection.clear();
+            this.selected_features.clear();
+            this.refresh_scene(false, cx);
+            cx.notify();
+        })));
+        if let Some(fid) = folder {
+            let (ve, vc) = (view.clone(), view.clone());
+            m = m.separator().submenu("Expand", window, cx, move |sm, _, _| {
+                let (v1, v2) = (ve.clone(), ve.clone());
+                sm.item(crate::os_menu::OsMenuItem::new("Expand selected").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.set_folder_collapsed(fid, false, cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Expand all").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_all_folders_collapsed(false, cx))))
+            });
+            m = m.submenu("Collapse", window, cx, move |sm, _, _| {
+                let (v1, v2) = (vc.clone(), vc.clone());
+                sm.item(crate::os_menu::OsMenuItem::new("Collapse selected").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.set_folder_collapsed(fid, true, cx))))
+                    .item(crate::os_menu::OsMenuItem::new("Collapse all").on_click(move |_, _, cx| v2.update(cx, |this, cx| this.set_all_folders_collapsed(true, cx))))
+            });
+        }
+        m = m.separator();
+        // "Edit sketch appearance…" / "Edit appearance of 2 sketches…", "Add appearance to feature…" / "Add appearance
+        // to 2 features…".
+        match sketches.as_slice() {
+            [] => {}
+            [one] => {
+                let one = *one;
+                m = m.item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).swatch(sketch_swatch.unwrap_or(swatch)));
+            }
+            all => {
+                let all = all.to_vec();
+                m = m.item(item(&format!("Edit appearance of {} sketches…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))));
+            }
+        }
+        match others.as_slice() {
+            [] => {}
+            [one] => {
+                let one = *one;
+                m = m.item(item("Add appearance to feature…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).icon_name("add-appearance"));
+            }
+            all => {
+                let all = all.to_vec();
+                m = m.item(item(&format!("Add appearance to {} features…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))).icon_name("add-appearance"));
+            }
+        }
+        let t = targets;
+        m.separator().item(item("Delete", Box::new(move |this, _, cx| this.delete_features(t.clone(), cx))).icon_name("menu-delete"))
+    }
+
     fn render_folder_row(&self, fd: &noshape_model::partstudio::Folder, slot: (usize, f32), cx: &mut Context<Self>) -> AnyElement {
         let id = fd.id;
         let collapsed = self.folder_collapsed(fd);
@@ -4908,6 +5037,16 @@ impl PartStudioView {
         let row = crate::ui::with_lazy_side_tooltip(row, self.row_anchor(slot), move |_| SharedString::from(tip.clone()));
         let view = cx.entity();
         row.os_context_menu(move |menu, window, cx| {
+            // A new folder still holding its selected features: the selection's menu (live ui-parity
+            // folder-rclick-menu), the selection kept.
+            let held = {
+                let this = view.read(cx);
+                (this.ui.fresh_folder == Some(id)).then(|| this.selected_features.clone()).filter(|f| !f.is_empty())
+            };
+            if let Some(ids) = held {
+                let clicked = ids[0];
+                return Self::selection_feature_menu(&view, clicked, ids, Some(id), menu, window, cx);
+            }
             // Live 1714: a folder row already selected offers Clear selection.
             let was_selected = view.read(cx).ui.selected_folder == Some(id);
             view.update(cx, |this, cx| this.select_folder(id, cx));
@@ -5596,82 +5735,7 @@ impl PartStudioView {
                 this.open_folder_prompt(t, window, cx);
             }));
             if multi {
-                // Live (request 1675): what the selection holds decides the
-                // menu: sketches add their hide items and Section view…, each
-                // kind its own appearance item.
-                let (sketches, others): (Vec<FeatureId>, Vec<FeatureId>) = {
-                    let this = view.read(cx);
-                    targets(this).into_iter().partition(|f| this.display.sketches.iter().any(|s| s.feature == *f))
-                };
-                let (sketches_shown, planes, sketch_swatch) = {
-                    let this = view.read(cx);
-                    (
-                        this.display.sketches.iter().any(|s| sketches.contains(&s.feature) && !s.hidden),
-                        others.iter().any(|f| this.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(*f))),
-                        sketches.first().map(|s| this.sketch_swatch(*s, cx)),
-                    )
-                };
-                let section = item("Section view…", Box::new(move |this, w, cx| {
-                    let refs: Vec<Reference> = targets(this)
-                        .into_iter()
-                        .map(|f| {
-                            if this.display.sketches.iter().any(|s| s.feature == f) {
-                                Reference::Sketch(f)
-                            } else if this.display.planes.iter().any(|p| p.reference == Reference::FeaturePlane(f)) {
-                                Reference::FeaturePlane(f)
-                            } else {
-                                Reference::Feature(f)
-                            }
-                        })
-                        .collect();
-                    this.section_through_all(&refs, w, cx);
-                }))
-                .icon_name("menu-section-view");
-                let mut m = menu.item(folder).separator();
-                if !sketches.is_empty() && others.is_empty() {
-                    // Sketches alone: Hide (or Show) them.
-                    let refs: Vec<Reference> = sketches.iter().map(|f| Reference::Feature(*f)).collect();
-                    m = m.item(item(if sketches_shown { "Hide" } else { "Show" }, Box::new(move |this, _, cx| this.set_visibility(&refs, sketches_shown, cx))));
-                } else if let Some(&keep) = sketches.first().filter(|_| sketches_shown) {
-                    // A shown sketch with other features: Hide other / all sketches (a hidden one has none, live
-                    // ui-parity feature-row-rclick-other-selected).
-                    m = m.item(item("Hide other sketches", Box::new(move |this, _, cx| this.hide_sketches(Some(keep), cx)))).item(item("Hide all sketches", Box::new(|this, _, cx| this.hide_sketches(None, cx))));
-                }
-                if !sketches.is_empty() || planes {
-                    m = m.item(section);
-                }
-                let m = m.item(suppress);
-                let mut m = dynamic(m, window, cx).separator().item(item("Clear selection", Box::new(|this, _, cx| {
-                    this.selection.clear();
-                    this.selected_features.clear();
-                    this.refresh_scene(false, cx);
-                    cx.notify();
-                }))).separator();
-                // "Edit sketch appearance…" / "Edit appearance of 2 sketches…",
-                // "Add appearance to feature…" / "Add appearance to 2 features…".
-                match sketches.as_slice() {
-                    [] => {}
-                    [one] => {
-                        let one = *one;
-                        m = m.item(item("Edit sketch appearance…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).swatch(sketch_swatch.unwrap_or(swatch)));
-                    }
-                    all => {
-                        let all = all.to_vec();
-                        m = m.item(item(&format!("Edit appearance of {} sketches…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))));
-                    }
-                }
-                match others.as_slice() {
-                    [] => {}
-                    [one] => {
-                        let one = *one;
-                        m = m.item(item("Add appearance to feature…", Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Feature(one, None), w, cx))).icon_name("add-appearance"));
-                    }
-                    all => {
-                        let all = all.to_vec();
-                        m = m.item(item(&format!("Add appearance to {} features…", all.len()), Box::new(move |this, w, cx| this.edit_appearance(appearance::EditTarget::Features(all.clone()), w, cx))).icon_name("add-appearance"));
-                    }
-                }
-                return m.separator().item(delete);
+                return Self::selection_feature_menu(&view, id, targets(view.read(cx)), None, menu, window, cx);
             }
             // Roll to here unless the bar is right after the feature; Roll to
             // end while the bar isn't at the end (live qa4 r5 s2 rollback
@@ -5735,9 +5799,9 @@ impl PartStudioView {
                     let t: Vec<Reference> = targets(this).into_iter().map(Reference::Feature).collect();
                     this.set_visibility(&t, !hidden, cx);
                 })).icon_name(if hidden { "eye" } else { "eye-off" }));
-                // Live 1714: a hidden sketch's row offers Show all sketches
-                // while other sketches are hidden too.
-                let others_hidden = is_sketch && hidden && view.read(cx).display.sketches.iter().any(|s| s.hidden && s.feature != id);
+                // Live 1714, ui-parity sketch-rows-hide-other-sketches: a hidden sketch's row offers Show all
+                // sketches when there are other sketches, shown or not (one sketch alone: Show only).
+                let others_hidden = is_sketch && hidden && view.read(cx).display.sketches.iter().any(|s| s.feature != id);
                 if others_hidden {
                     m = m.item(item("Show all sketches", Box::new(|this, _, cx| {
                         let all: Vec<Reference> = this.display.sketches.iter().filter(|s| s.hidden).map(|s| Reference::Feature(s.feature)).collect();

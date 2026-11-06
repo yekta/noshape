@@ -499,6 +499,11 @@ pub fn display_name_computed(f: &Feature, shown: &dyn Fn(&str) -> Option<String>
     if f.type_id == "routingCurve" && !f.custom_name {
         return format!("Routing curve ({})", shown("curveLength").unwrap_or_else(|| "0 mm".into()));
     }
+    // std's name template "###name" (live ui-parity query-variable-tool: "#?" until it is named).
+    if f.type_id == "queryVariable" && !f.custom_name {
+        let name = f.params.text("name");
+        return format!("#{}", if name.trim().is_empty() { "?" } else { name.trim() });
+    }
     if f.type_id != "assignVariable" || f.custom_name {
         return f.name.clone();
     }
@@ -1429,5 +1434,10 @@ mod tests {
         assert_eq!(display_name(v), "#? = 25 mm");
         v.custom_name = true;
         assert_eq!(display_name(v), "Variable 1");
+        // Query variable: "###name" (live ui-parity query-variable-tool).
+        let mut q = PartStudio::new().new_feature("queryVariable", &noshape_units::UnitPrefs::default()).unwrap();
+        assert_eq!(display_name(&q), "#?");
+        q.params.set("name", ParamValue::Text("holes".into()));
+        assert_eq!(display_name(&q), "#holes");
     }
 }

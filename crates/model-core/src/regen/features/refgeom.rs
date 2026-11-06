@@ -499,7 +499,8 @@ pub fn refresh_open_composites(ctx: &mut crate::regen::context::Context) {
 pub fn query_variable(ev: &mut EvalCtx) -> FResult<()> {
     let name = ev.params.text("name").trim().trim_start_matches('#').to_string();
     if name.is_empty() || !name.chars().next().is_some_and(|c| c.is_alphabetic() || c == '_') || !name.chars().all(|c| c.is_alphanumeric() || c == '_') {
-        return err("Variable name must be a letter followed by a string of letters or numbers.");
+        // The Name is at fault, not the empty Selections (live ui-parity query-variable-tool).
+        return crate::regen::eval::err_at(&["name"], "Variable name must be a letter followed by a string of letters or numbers.");
     }
     let st = ev.enum_("selectionType").to_string();
     // std sets each additional query's lowercase type for its row label

@@ -787,6 +787,10 @@ pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
 /// [`ui_state`] of a menu held elsewhere (the graphics area's context menu).
 pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> {
     let m = menu.read(cx);
+    // An open submenu is the list (live's recorder reads the deepest one: ui-parity folder-menu-collapse-all).
+    if let Some(sub) = m.open_submenu() {
+        return menu_state(sub, cx);
+    }
     let mut rows = Vec::new();
     let (mut highlighted, mut disabled) = (None, Vec::new());
     for (ix, item) in m.items.iter().enumerate() {

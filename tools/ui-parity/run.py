@@ -88,6 +88,16 @@ def run_one(app, scenario, out, display, timeout):
 QUERY_STATE_SINCE = "2026-11-06T10:50"
 
 
+# Live's recorder reads the Section view panel and the appearance editor as dialogs in its recordings from 2026-11-06
+# 15:20 on; before, they were no dialog, so ours isn't compared against those.
+PANEL_DIALOGS_SINCE = "2026-11-06T15:00"
+
+
+def is_panel_dialog(d):
+    t = (d or {}).get("title") if isinstance(d, dict) else None
+    return t in ("Section view", "Appearance") or bool(re.match(r"Face appearance \d+$", str(t or "")))
+
+
 def forget_old_query_states(live):
     """Drop the selection fields' `state` from a recording made before live's recorder could read it."""
     if str(live.get("recorded", "")) >= QUERY_STATE_SINCE:
@@ -272,14 +282,19 @@ def copies(live):
     return False
 
 
-def drop_clipboard_rows(state):
+# Rows only Onshape's paid plans show (live's account is free: its Show analysis tools menu has no Thickness
+# analysis); ours has them, as parity is behaviour, not a plan's limits. Not compared.
+PLAN_ROWS = {"Thickness analysis…", "Edit thickness analysis", "Turn thickness analysis off"}
+
+
+def drop_rows(state, drop):
     lst = (state or {}).get("list")
     if not isinstance(lst, dict) or lst.get("kind") != "context-menu":
         return state
     rows = lst.get("rows") or []
     hl = lst.get("highlighted")
     hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
-    lst["rows"] = [r for r in rows if r not in CLIPBOARD_ROWS]
+    lst["rows"] = [r for r in rows if r not in drop]
     lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
     return state
 
@@ -300,8 +315,10 @@ def compare(live, ours):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
-        if clipboard_free:
-            a, b = drop_clipboard_rows(a), drop_clipboard_rows(b)
+        if str(live.get("recorded", "")) < PANEL_DIALOGS_SINCE and a.get("dialog") is None and is_panel_dialog(b.get("dialog")):
+            b["dialog"] = None
+        drop = PLAN_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
+        a, b = drop_rows(a, drop), drop_rows(b, drop)
         # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
         for side in (a, b):
             d = side.get("dialog")

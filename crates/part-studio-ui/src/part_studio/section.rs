@@ -390,14 +390,34 @@ impl PartStudioView {
         self.ui.section_snap = None;
     }
 
+    /// The planes' chips: number and name. Live (skb 10-24 assembly section, qa4-r5-s9-5): a chip is named by its
+    /// plane's nearest standard direction, whatever was picked (a face, a connector: "Section plane 1 (Top)"); a
+    /// turned plane has no name; Flip plane names the other side (live: "Section plane 2 (Back)").
+    fn section_chips(&self) -> Vec<(usize, String)> {
+        self.ui.section.iter().map(|pl| (pl.number, if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() })).collect()
+    }
+
+    /// The open Section view panel as live's recorder reads it (ui-parity face-menu-section-view: a feature-style
+    /// dialog with its Exclude / Include tabs and two selection fields).
+    pub(super) fn section_dialog_state(&self) -> Option<serde_json::Value> {
+        let d = self.ui.section_dialog.as_ref()?;
+        let planes: Vec<String> = self.section_chips().into_iter().map(|(n, l)| if l.is_empty() { format!("Section plane {n}") } else { format!("Section plane {n} ({l})") }).collect();
+        let items: Vec<String> = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
+        let ok = if planes.is_empty() { "disabled" } else { "enabled" };
+        Some(serde_json::json!({
+            "title": "Section view", "titleState": "ok", "kind": "feature",
+            "tabs": [{ "label": "Exclude", "selected": !d.include }, { "label": "Include", "selected": d.include }],
+            "fields": [
+                { "label": "Section planes", "kind": "query", "items": planes, "active": !d.items_active, "state": "ok" },
+                { "label": if d.include { "Items to include" } else { "Items to exclude" }, "kind": "query", "items": items, "active": d.items_active, "state": "ok" },
+            ],
+            "error": null, "ok": ok,
+        }))
+    }
+
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.ui.section_dialog.as_ref()?;
-        // Live (skb 10-24 assembly section, qa4-r5-s9-5): a chip is named by
-        // its plane's nearest standard direction, whatever was picked (a
-        // face, a connector: "Section plane 1 (Top)"); a turned plane has no
-        // name.
-        // Flip plane names the other side (live: "Section plane 2 (Back)").
-        let planes = self.ui.section.iter().map(|pl| (pl.number, if pl.label.starts_with("Section plane") { String::new() } else if pl.flipped { opposite_name(direction_name(pl.normal)).to_string() } else { direction_name(pl.normal).to_string() })).collect();
+        let planes = self.section_chips();
         let items = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
         let props = crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes, active: d.active, items, popup: d.popup };
         Some(crate::section_dialog::render(props, "ps-section", &cx.entity(), Self::on_section_action, cx))

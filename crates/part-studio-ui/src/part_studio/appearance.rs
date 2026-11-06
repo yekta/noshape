@@ -512,6 +512,24 @@ impl PartStudioView {
         (title, faces)
     }
 
+    /// The open appearance editor as live's recorder reads it (ui-parity face-menu-add-appearance-to-face,
+    /// sketch-row-menu-edit-appearance): a feature-style dialog titled as drawn, with its "Faces or features" field
+    /// (a face appearance, a feature's) or none (a part's, a sketch's); ✓ is enabled for a new face appearance or
+    /// once something changed.
+    pub(super) fn appearance_dialog_state(&self, cx: &App) -> Option<serde_json::Value> {
+        let e = self.ui.appearance_edit.as_ref()?;
+        let (title, faces) = self.appearance_heading(&e.target, cx);
+        let items: Vec<String> = match &e.target {
+            EditTarget::Faces(refs, _) => refs.iter().map(|r| self.labeler(cx)(r)).collect(),
+            EditTarget::Feature(f, _) => self.studio(cx).and_then(|s| s.feature(*f)).map(|x| vec![x.name.clone()]).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let fields: Vec<serde_json::Value> = faces.map(|_| serde_json::json!({ "label": "Faces or features", "kind": "query", "items": items, "active": true, "state": "ok" })).into_iter().collect();
+        let changed = e.initial != (e.rgb, e.transparency, e.tessellation);
+        let ok = if changed || matches!(e.target, EditTarget::Faces(_, None)) { "enabled" } else { "disabled" };
+        Some(serde_json::json!({ "title": title.to_string(), "titleState": "ok", "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": ok }))
+    }
+
     pub(super) fn render_appearance_editor(&mut self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.ui.appearance_edit.as_ref()?;
         let pal = p();

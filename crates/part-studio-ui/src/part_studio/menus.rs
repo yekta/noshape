@@ -92,6 +92,14 @@ impl PartStudioView {
             s.feature(sketch).map(|g| (sketch, g.name.clone()))
         });
         let planar = target_ref.as_ref().is_some_and(|r| self.frame_of_ref(r).is_some());
+        // A face in a section plane (the cut): its menu offers View normal to section plane (live ui-com/03; not
+        // another face's, ui-parity face-section-edit-section-view).
+        let in_section_plane = target_ref.as_ref().and_then(|r| self.frame_of_ref(r)).is_some_and(|f| {
+            self.ui.section.iter().any(|s| {
+                let (n, d) = s.clip();
+                f.normal.dot(n).abs() > 1.0 - 1e-9 && (n.dot(f.origin) - d).abs() < 1e-7
+            })
+        });
         let linear_edge = target_ref.as_ref().is_some_and(|r| self.linear_edge_direction(r).is_some());
         let plane_name = target_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let paste_sketch = Self::clipboard_has_sketch(cx);
@@ -576,7 +584,7 @@ impl PartStudioView {
                     }
                     if planar {
                         m = m.item(normal_to(&r));
-                        if section && k == PickKind::Face {
+                        if section && in_section_plane && k == PickKind::Face {
                             m = m.item(item("View normal to section plane", Box::new(|this, _, cx| this.view_normal_to_section(cx))));
                         }
                     } else if linear_edge {
@@ -1076,6 +1084,7 @@ impl PartStudioView {
         let btn = |id: SharedString, icon: &'static str, on: bool, cx: &App| crate::ui::icon_button(id, icon, 30., on, cx);
         let view = cx.entity();
         let thickness_on = self.ui.thickness.is_some();
+        let curvature_on = matches!(self.ui.analysis, Some(super::analysis::Analysis::Curvature));
         let analysis_on = self.ui.analysis.is_some() || self.ui.analysis_tool.is_some() || self.ui.zebra.is_some() || self.ui.reflection.is_some() || self.ui.thickness.is_some();
         let mut out = vec![
             div()
@@ -1111,7 +1120,7 @@ impl PartStudioView {
                         .item(tool("Interference detection…", K::Interference))
                         .item(tool("Zebra stripes…", K::Zebra))
                         .item(tool("Reflection analysis…", K::Reflection))
-                        .item(crate::os_menu::OsMenuItem::new("Curvature color map").on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
+                        .item(if curvature_on { crate::os_menu::OsMenuItem::new("Turn curvature color map off") } else { crate::os_menu::OsMenuItem::new("Curvature color map") }.on_click(move |_, w, cx| v.update(cx, |this, cx| this.toggle_analysis(super::analysis::Analysis::Curvature, w, cx))))
                         .item(tool("Draft analysis…", K::Draft));
                     // Once on, the menu edits or turns it off (Help).
                     let m = if thickness_on {
