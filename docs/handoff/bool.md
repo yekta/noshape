@@ -25,6 +25,25 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## mimalloc on macOS, measured to land (11-06 11:17 UTC; lead: land only if nothing gets worse beyond noise): not landed
+- The change (branch bool/macos-mimalloc, c9a9ea42): the mimalloc crate with `override` (malloc's default zone, so
+  OCCT's allocations too; the bundled mimalloc 3.3.2) and MiMalloc as the global allocator, app and CLI, macOS only.
+  Its banner shows at startup; the base build has none.
+- Measured on 5 macos-15 runners (M1 virtual, 3 cores), the two builds of one runner's build job beside each other
+  on each, alternating which goes first (.github/alloc on the branch; b / a = median of the rounds' ratios):
+  run 42187899790 (b = the change): knurl 0.953, fins-400 0.945, release-fillet-hang 1.013; app start on
+  live-30-features 1.046, on the NIST assembly 1.035; peak RSS: CLI knurl 1.097, fins-400 1.162, release 1.019, the
+  app on the NIST assembly 1.187 (522-570 -> 628-689 MB, every round); perf.yml's viewport bench (bench.sh AB_BIN,
+  NIST, texture / readback / 2x): no regression that repeats (readback UI CPU p95 -2 to -16 %; the first texture
+  orbit's GPU p95 +8 to +66 % in 4 of 5, but b always launches first there, compiling the shaders).
+  run 42207708501 (b with MIMALLOC_PURGE_DELAY=0): knurl 0.961, fins-400 1.067, release 1.023, the repository's 10
+  documents 1.017; peak RSS still 1.08-1.21.
+  run 42208413502 (b = the base build with Homebrew's mimalloc 3.6.1 preloaded): knurl 0.941, fins-400 0.876, release
+  0.989, the 10 documents 0.918; peak RSS 1.02-1.17.
+- So: a few percent faster on the CLI documents (more with 3.6.1 than with the crate's 3.3.2), 10-20 % more peak
+  memory every time. Not landed. The arm64 knurl gap is mostly the runners (3 cores; base 3.5-5.3 s between
+  runners). tests/budget/draft-pool-hang.noshape didn't open within 30 min through the CLI on macOS, either build.
+
 ## macOS arm64 allocator measurement (11-06 08:16 UTC; run 42178325902, branch bool/arm-measure)
 - Runner: Apple M1 (Virtual), 3 cores (hw.ncpu 3). time_cli.py, two rounds each, seconds (knurl-d25x25-45-45 /
   release-fillet-hang / fins-400; live-30-features 0.07-0.08 everywhere):
