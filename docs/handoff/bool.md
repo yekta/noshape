@@ -132,6 +132,16 @@ ForceInterfEE: apart past te + tg + 2 max(tv)) that coincide in the face's param
 curve's tolerance (OCCT's new vertex: the section's TolR3D; ours the floor since stage 4, so points 0.2-0.5 um apart
 stay apart and regroup 4 rounds: a5f1e564, 25 s), and OCCT's bound pave (a section curve ending inside both faces: a
 vertex there, not "a section without ends").
+Stage 5b (11-06 09:57 UTC): OCCT's bound pave: an OCCT section curve ending inside both faces ends at a new vertex
+there of the curve's tolerance (BOPAlgo_PaveFiller::PutBoundPaveOnCurve), not "a section without ends"; Pool::add_tol
+(a new point of its curves' tolerance) for the three places that did it by hand. Gate: corpora and parity56 0
+differences, shfall 51 of 194 as before; four "section without ends" cases (35 s of OCCT's: a5f1e564 25 s, f82bed32,
+d12e739d, 9fccb94d) one step on; knurls and gears the same, times level. Tried and left out: every new point (section
+crossings, section ends) by its curve's tolerance, OCCT's rule: lost the knurl k25-25 ("an edge off a plane past its
+tolerance": its OCCT sections of ~1e-6 more tolerant than its Boolean) and a section end's lost a face in
+slivers_between_two_caps; OCCT gives a section's end on a face's boundary the edge's pave, not the curve's
+tolerance. Next in a5f1e564: a vertex 36 mm on along a B-spline face's edge lands 1.2 mm back in the face's
+parameters (the surface's parameter mapping folding near its seam), "two edges leave a vertex in one direction".
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 

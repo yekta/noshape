@@ -756,6 +756,20 @@ impl Pool {
         }
         Ok(self.push(p))
     }
+
+    /// A new point of tolerance `t` (its curves', OCCT's new vertex): the vertex within reach, grown to `t`, else new.
+    fn add_tol(&mut self, p: DVec3, t: f64) -> R<u32> {
+        if t <= self.floor {
+            return self.add(p);
+        }
+        Ok(match self.find_tol(p, t)? {
+            Some(w) => {
+                self.grow(w, t);
+                w
+            }
+            None => self.push_tol(p, t),
+        })
+    }
 }
 
 /// The sphere bounding spheres `m` (OCCT's merged vertex, BRepLib::BoundingVertex): one of them where it holds the
@@ -1720,6 +1734,15 @@ impl Ctx<'_> {
                 let (a, b) = (of(fs), of(ft));
                 a.into_iter().filter(|w| b.contains(w)).map(|w| (w, (cx.p(w) - p).length())).filter(|x| x.1 <= reach).min_by(|x, y| x.1.total_cmp(&y.1)).map(|x| x.0)
             };
+            // (OCCT's curve ending inside both faces: a new vertex at its end of the curve's tolerance, OCCT's bound
+            // pave.)
+            if let (End::Open, Path::Nurbs { id, .. }) = (end, &path)
+                && x.1 == End::Open
+                && y.1 == End::Open
+                && cx.ncurves[*id as usize].sec.is_some()
+            {
+                return Ok(Some(cx.pool.add_tol(path.at(x.0), stol)?));
+            }
             let v = match end {
                 End::Open => return Ok(None),
                 End::Vertex(v) => v,
@@ -1854,16 +1877,7 @@ impl Ctx<'_> {
             for k in 0..2 {
                 ends[k] = match iv[k].1 {
                     End::Vertex(v) => v,
-                    End::Point(p) if te.max(self.boundary_tol(f, p)) > self.tol => {
-                        let t = te.max(self.boundary_tol(f, p));
-                        match self.pool.find_tol(p, t)? {
-                            Some(w) => {
-                                self.pool.grow(w, t);
-                                w
-                            }
-                            None => self.pool.push_tol(p, t),
-                        }
-                    }
+                    End::Point(p) if te.max(self.boundary_tol(f, p)) > self.tol => self.pool.add_tol(p, te.max(self.boundary_tol(f, p)))?,
                     End::Point(p) => self.pool.add(p)?,
                     End::Open => return Err(Decline("an edge's piece without ends")),
                 };
@@ -4564,12 +4578,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
             let reach = cx.seg_edge_tol[f][i].max(cx.seg_edge_tol[f][j]);
             if reach > tol {
-                match cx.pool.find_tol(p, reach)? {
-                    Some(w) => cx.pool.grow(w, reach),
-                    None => {
-                        cx.pool.push_tol(p, reach);
-                    }
-                }
+                cx.pool.add_tol(p, reach)?;
             } else {
                 cx.pool.add(p)?;
             }
