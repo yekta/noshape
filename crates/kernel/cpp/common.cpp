@@ -1974,6 +1974,7 @@ void install_crash_guard()
       struct sigaction sa;
       std::memset(&sa, 0, sizeof sa);
       sa.sa_sigaction = on_crash;
+      // Nothing blocked while it runs: the guards' sigsetjmp doesn't save the mask for its jump to restore.
       sa.sa_flags     = SA_SIGINFO | SA_ONSTACK | SA_NODEFER;
       sigemptyset(&sa.sa_mask);
       sigaction(sig, &sa, &g_previous[sig]);

@@ -415,7 +415,9 @@ bool run_guarded(F&& f) noexcept
 #ifdef __linux__
   const BudgetSnapshot budget;
 #endif
-  if (sigsetjmp(env, 1) != 0)
+  // The mask not saved (a syscall on every kernel call: 13 % of c2-sm-louver's regeneration): on_crash blocks
+  // nothing (SA_NODEFER, empty sa_mask), so its jump leaves the mask as it was.
+  if (sigsetjmp(env, 0) != 0)
   {
     crash_guard = outer;
     t_deadline  = deadline;
@@ -506,7 +508,8 @@ static void trycatch_timed(Try&& func, Fail&& fail) noexcept
 #ifdef __linux__
   const noshape::BudgetSnapshot budget;
 #endif
-  if (sigsetjmp(env, 1) != 0)
+  // (The mask not saved: see run_guarded's.)
+  if (sigsetjmp(env, 0) != 0)
   {
     noshape::crash_guard = outer;
     noshape::t_deadline  = deadline;
