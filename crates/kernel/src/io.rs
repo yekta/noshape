@@ -160,9 +160,19 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
 pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let t = ck(ffi::read_iges_tree(path_str(path)?))?;
     if t.instances.is_empty() && !t.parts.names.is_empty() {
-        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit());
+        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(iges_whole).collect();
     }
-    Ok(vec![ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() }])
+    Ok(vec![iges_whole(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() })?])
+}
+
+/// An IGES part's faces on one surface merged, as Onshape imports them: IGES writers split a periodic face (Onshape's
+/// own: a cylinder in halves, a torus in quarters; the exchange suite's pulley read 16 faces for live's 9). Its face
+/// colours follow their faces.
+fn iges_whole(mut p: ImportedShape) -> Result<ImportedShape> {
+    let r = crate::unify_same_domain(&p.shape)?;
+    p.face_colors = p.face_colors.iter().filter_map(|(f, c)| Some((*r.history.modified(0, crate::ShapeType::Face, *f as u32).first()? as usize, *c))).collect();
+    p.shape = r.shape;
+    Ok(p)
 }
 
 /// An IGES file whose roots are shared shapes placed (subfigure instances,
@@ -174,7 +184,8 @@ pub fn read_iges_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAs
     if t.instances.is_empty() {
         return Ok(None);
     }
-    Ok(Some((t.root.clone(), step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?, pvz_instances_of(&t.instances))))
+    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(iges_whole).collect::<Result<Vec<_>>>()?;
+    Ok(Some((t.root.clone(), parts, pvz_instances_of(&t.instances))))
 }
 
 /// A Parasolid transmit file (.x_t / .x_b) holding an assembly: the top

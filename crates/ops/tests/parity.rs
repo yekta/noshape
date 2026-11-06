@@ -409,7 +409,10 @@ fn exchange_round_trip() {
             // (An STL is one mesh of all the parts, its facets within the export's chordal tolerance: its volume
             // within 1 % of theirs.)
             let total = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
+            // (IGES: as Onshape's import, faces on one surface merged: a sheet metal model's coplanar walls one face; by
+            // volume and area.)
             let diff = match back {
+                Ok(b) if format == "IGES" => differences(&mesh_counts(native.clone()), &mesh_counts(b)),
                 Ok(b) if format == "STL" => {
                     let (a, n) = (total(&b), total(&native));
                     if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, the parts' {:.3}", a * 1e9, n * 1e9)] }

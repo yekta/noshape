@@ -113,6 +113,24 @@ fn an_onshape_file_of_three_parts_reads_as_them() {
     assert_eq!(read_parasolid(&p, LengthUnit::Millimeter).unwrap().count(ShapeType::Solid), 3);
 }
 
+/// An IGES part whose faces come split on one surface (IGES writers split periodic faces: Onshape's own writes a
+/// cylinder in halves) reads with them merged, as Onshape's import (the exchange suite's pulley: 16 faces, live 9).
+#[test]
+fn an_iges_parts_faces_on_one_surface_read_merged() {
+    let dir = std::env::temp_dir().join(format!("noshape-iges-merge-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let cylinder = make_cylinder(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 10.0, 20.0, std::f64::consts::TAU).unwrap();
+    // Halved through its axis: its side and caps in two pieces each, one solid still (the pieces glued).
+    let halves = split_by_plane(&cylinder, &Plane::new(DVec3::ZERO, DVec3::X, DVec3::Y)).unwrap().shape;
+    let one = fuse(&halves.solids()[0], &halves.solids()[1]).map(|r| r.shape).unwrap_or(halves.clone());
+    assert!(one.count(ShapeType::Face) > 3, "{} faces written", one.count(ShapeType::Face));
+    let path = dir.join("halves.igs");
+    write_iges(&path, std::slice::from_ref(&one), LengthUnit::Millimeter).unwrap();
+    let parts = read_iges_parts(&path, LengthUnit::Millimeter).unwrap();
+    assert_eq!(parts.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 3);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
 /// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
 /// both read back as the parts.
