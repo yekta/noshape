@@ -62,6 +62,11 @@ and the face's own tolerances (Pool::pair); the stage 1 probe removed (its tests
 parity56 identical, 0 differences; shfall 46/194 as before (5 slab cases now decline earlier, "an edge nearly on
 another argument's face": between the pair's tolerance and the old grey band, stage 5's); knurls and gears the same,
 times within 1 %. Next: 3b, edge with edge (get_sedge's common blocks need each piece's edge tolerance).
+Stage 3b (11-06 04:53 UTC): edge with edge (get_sedge's common blocks) by the two pieces' own tolerances: each piece
+carries its edge's (GEdge::t, seg_edge_tol for edges lying on faces) or its section's (NCurve::tol), a merged piece the
+larger. Gate: corpora and parity56 identical, 0 differences; shfall 46/194 (4 declines one step on); knurls and gears
+the same; cf-spur-gear against OCCT's time on the same run +3 % on average over 5 rounds on a loaded vibe4 (+5 %, +5 %,
++4 %, +6 %, 0 %), the knurls level. Next: stage 4 (sections' placing and ends, new points by their section's tolerance).
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 

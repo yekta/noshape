@@ -778,6 +778,8 @@ struct SEdge {
     seg: Seg,
     /// The input edges it is (a piece of).
     origins: Vec<usize>,
+    /// Its tolerance: the largest of its edges' and sections' own.
+    t: f64,
 }
 
 /// A piece of an input face.
@@ -4588,7 +4590,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let mut sedges: Vec<SEdge> = Vec::new();
     let mut sedge_of: HashMap<(u32, u32), Vec<usize>> = HashMap::default();
     // The split edge of `s` (made if new), and whether it runs the other way.
-    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg| -> (usize, bool) {
+    // (`te`: the piece's edge's own tolerance, 0 for a section's: its curve's.)
+    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg, te: f64| -> (usize, bool) {
         let key = (s.v[0].min(s.v[1]), s.v[0].max(s.v[1]));
         let mid = cx.seg_at(&s, 0.5);
         let list = sedge_of.entry(key).or_default();
@@ -4604,7 +4607,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
                 _ => 0.0,
             };
-            let reach = cx.tol.max(stol(&o.g) + stol(&s.g));
+            // (Within the two's own tolerances (OCCT's common block of two edges, or of a section and an edge).)
+            let ts = te.max(stol(&s.g));
+            let reach = cx.pool.pair(sedges[i].t, ts);
             let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
                 || (s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
@@ -4616,7 +4621,6 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             // them is narrower than 100 tol.)
             let together = match (o.g, s.g) {
                 (Geo::Nurbs { id: a, .. }, Geo::Nurbs { id: b, .. }) if a != b && cx.ncurves[a as usize].sec.is_some() && cx.ncurves[b as usize].sec.is_some() => {
-                    let reach = cx.tol.max(stol(&o.g) + stol(&s.g));
                     [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(o, cx.seg_at(&s, t)).1 <= reach)
                         && [0.25, 0.5, 0.75].iter().all(|&t| cx.seg_param(&s, cx.seg_at(o, t)).1 <= reach)
                 }
@@ -4653,11 +4657,17 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     (Geo::Ell { e: e1, t0: a1, sweep: s1, .. }, Geo::Ell { e: e2, t0: a2, sweep: s2, .. }) => e1.deriv(a1 + 0.5 * s1).dot(e2.deriv(a2 + 0.5 * s2)) < 0.0,
                     _ => o.v[0] != s.v[0],
                 };
+                let ts = te.max(stol(&s.g));
+                sedges[i].t = sedges[i].t.max(ts);
                 return (i, rev);
             }
         }
         list.push(sedges.len());
-        sedges.push(SEdge { seg: s, origins: Vec::new() });
+        let t = te.max(match s.g {
+            Geo::Nurbs { id, .. } if cx.ncurves[id as usize].sec.is_some() => cx.ncurves[id as usize].tol,
+            _ => 0.0,
+        });
+        sedges.push(SEdge { seg: s, origins: Vec::new(), t });
         (sedges.len() - 1, false)
     };
     let involved: Vec<bool> = (0..ns).map(|s| meets[s * ns..(s + 1) * ns].iter().any(|&m| m)).collect();
@@ -4829,7 +4839,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let mut pieces = Vec::with_capacity(chain.len() - 1);
         let parts = if matches!(s.g, Geo::Apex { .. }) { apex_parts(&cx, e)? } else { cx.pieces_of(&s, &chain) };
         for piece in parts {
-            let (si, rev) = get_sedge(&cx, &mut sedges, piece);
+            let (si, rev) = get_sedge(&cx, &mut sedges, piece, cx.edges[e].t);
             if !sedges[si].origins.contains(&e) {
                 sedges[si].origins.push(e);
             }
@@ -4874,6 +4884,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // (Where the curves added to faces and the sections are split, on all threads; taken in order.)
     // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
+    // (Each one's edge's own tolerance, 0 for a section's.)
+    let extra_te: Vec<f64> = (0..cx.faces.len()).flat_map(|f| cx.seg_edge_tol[f].iter().copied()).collect();
     let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
     // (A section at a vertex within its own error too (OCCT's approximation's): two sections crossing in a face's
     // plane are that far apart in space there (a knurl groove's flank's section with the cylinder and with another
@@ -4896,11 +4908,11 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         w == piece.v[1] && [0.0, 0.25, 0.5, 0.75, 1.0].iter().all(|&t| (cx.seg_at(piece, t) - cx.p(w)).length() <= tol.max(cx.pool.t[w as usize]))
     };
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
-    for (&(f, s), chain) in extra_segs.iter().zip(extra_chains) {
+    for ((&(f, s), chain), &te) in extra_segs.iter().zip(extra_chains).zip(&extra_te) {
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
-            face_extra[f].push(get_sedge(&cx, &mut sedges, piece).0);
+            face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
@@ -4910,7 +4922,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
-            let (si, _) = get_sedge(&cx, &mut sedges, piece);
+            let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0);
             section_faces.push((si, fs));
             section_faces.push((si, ft));
         }
