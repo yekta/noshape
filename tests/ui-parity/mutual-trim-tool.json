@@ -1,0 +1,20 @@
+{
+ "name": "mutual-trim-tool",
+ "about": "block: Offset surface › Mutual trim: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Offset surface",
+    "menu": "Mutual trim"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "end-cap-tool",
+ "about": "block: the End cap tool: its dialog or panel, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "End cap"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

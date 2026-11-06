@@ -1,0 +1,20 @@
+{
+ "name": "corner-break-tool",
+ "about": "plate: Sheet metal model › Corner break: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Corner break"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

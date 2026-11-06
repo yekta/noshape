@@ -1,0 +1,19 @@
+{
+ "name": "frame-tool",
+ "about": "block: the Frame tool: its dialog or panel, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Frame"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "frame-trim-tool",
+ "about": "block: the Frame trim tool: its dialog or panel, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Frame trim"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

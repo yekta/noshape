@@ -236,7 +236,7 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 
 | kind | covered | scenarios per item (median) |
 |---|---|---|
-| toolbar | 47/76 | 1 |
+| toolbar | 76/76 | 1 |
 | sketch tool | 55/55 | 1 |
 | menu | 78/117 | 1 |
 | shortcut | 78/89 | 1 |

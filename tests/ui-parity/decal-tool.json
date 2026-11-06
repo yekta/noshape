@@ -1,0 +1,20 @@
+{
+ "name": "decal-tool",
+ "about": "block: Transform › Decal: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the toolbar's remaining tools; batch 13)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Transform",
+    "menu": "Decal"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
