@@ -1748,7 +1748,8 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 Ent::Body(b) => bodies.contains(&q.st.ctx.bodies[b].id),
                 _ => false,
             };
-            filter(q.all(None).into_iter().filter(of).collect())
+            // (Only the entities of the type asked: std's Fill pattern asks once per instance.)
+            filter(q.all(entity_type).into_iter().filter(of).collect())
         }
         "CONTAINED_IN_COMPOSITE" | "COMPOSITE_CONTAINING" | "SOURCE_MESH" => Vec::new(),
         "VERTEX_ADJACENT" | "EDGE_ADJACENT" => {
