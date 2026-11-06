@@ -1082,6 +1082,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   pinned to 4 cores: the Displacement map's loops 4.15 -> 3.6 s, but a call 345 -> 365 ns, length * number 340 ->
   400 ns; cold start (window shown, :104) 524-701 vs 523-600 ms, the app's peak RSS on model-plus 815 vs 820 MB. Not
   adopted (small FS steps and FS-heavy documents regress); to measure again after FS-COMPILED-INTERP's stage 2.
+  11-06 09:10, again on main 9cb2159f (the crate, Rust's heap; A/B builds of the same tree): FS loops (vibe4) 1.00 vs
+  1.00 s, steps equal or a little faster (append 104 -> 83 ns); the corpus (vibe5 at load 27): median document -7 %,
+  user CPU 655-682 vs 691-716 s, its heavy three re-timed on idle vibe4 equal (impeller-loft 18.4-18.5 vs 18.6-19.8 s,
+  rings-loft 7.3-8.4 vs 7.2-9.0, sm-louver 193-201 vs 190-197); peak RSS up: the corpus 2.66-2.75 -> 2.76-2.83 GB,
+  sm-louver 1.07 -> 1.17-1.18 GB, the app on model-plus 790-798 -> 801-808 MB; cold start equal (501-568 vs
+  517-537 ms). No longer slower, but no gain beyond noise and more memory: not adopted.
 - [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
