@@ -270,7 +270,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   to back = v0.4.32's (knurl, vase, the hang document: within the noise). Greens since the 05:00 list (fa886aef … f471368e,
   incl. bool's tolerance stages 4–5c, dx's compiled FeatureScript, core's OCCT patches 0023–0025 and its mesher): the volume
   sweep, dx's cf corpus and the 44 ticket documents unchanged, except a4433e68's P2 BOOL-TOL4-DRAFT-VOLUME (0.18 mm³ on one
-  fuzz document) and b7afdb57's Draft fix. Fuzz on vibe3 since: 480 CLI seeds (v0.4.32 and greens, half fallback off),
+  fuzz document) and b7afdb57's Draft fix. Fuzz on vibe3 since: 441 CLI seeds (v0.4.32, v0.4.33 and greens, half fallback off),
   0 deaths; three new P2 BOOL-DECLINE reasons. Still to check on the published v0.4.33: the Release run's budget table
   (DRAFT-POOL-HANG-MACOS on macOS / Windows), the updater, the GUI rows and the title bar. Open, not blockers: P2
   UPDATE-HELPER-LINUX-PARITY, P2 SAVED-MIRROR-REF-CHANGE, P2 BOOL-TOL4-DRAFT-VOLUME.
