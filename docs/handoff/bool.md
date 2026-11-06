@@ -3,6 +3,20 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## The knurl on macOS arm64 (11-06 06:45 UTC; lead: release timing 4.63 s against Linux's 2.60)
+- Allocator contention, by every measure on Linux: with glibc on one heap (MALLOC_ARENA_MAX=1, every thread on one
+  lock: what a malloc that scales worse across threads does) the knurl replay k25-15 goes 1.24 -> 2.4 s (OCCT's own
+  14 -> 21.6 s) and the release document tests/perf/knurl-d25x25-45-45.noshape through the CLI 7.2-8.2 -> 11.5-11.8 s
+  (this machine). macOS's malloc is known to scale worse across threads than glibc's; the ratio there is 1.78.
+- Where (perf on the CLI with one heap; /root/bool-scratch/knurl-cli.perf): 38 % of the allocator samples free OCCT
+  sequences node by node (NCollection_BaseSequence::ClearSeq), 8 % lists (BaseList::PClear), the resolved callers
+  IntPatch_PrmPrmIntersection (OCCT's surface-surface walking) reached from rust_boolean.cpp's occt_ahead, which runs
+  the knurl's free-form sections as parallel jobs; our own Rust code is a few percent.
+- Linux with mimalloc preloaded: knurl 7.37 / 6.74 -> 6.77 / 6.60 s, release-fillet-hang 11.48 / 11.11 -> 11.05 /
+  10.93 s (glibc copes; the gain should be on macOS). Options: (a) mimalloc for the whole process on macOS (its malloc
+  zone override, C++'s allocations included: the app and CLI binaries, an app-wide change); (b) OCCT's sections for
+  free-form pairs run on fewer threads on macOS. Either needs a measurement on macOS arm64 (GitHub's runners).
+
 ## Slot corners: where (1) stands (11-06 02:11 UTC)
 - With the section's end snapped to the slot's corner (pave-wip2-1106.patch), 2eafe30c's result has OCCT's counts
   (31 / 79 / 50) and the same three edges at each corner; OCCT's new vertex sits 7.1 um from the corner and its section
