@@ -112,6 +112,29 @@ fn structural_native(name: &str) -> bool {
     MOVERS.contains(&name) && !HOST_NATIVES.read().contains_key(name)
 }
 
+/// How a native takes its arguments ([`Interp::call_native`]): settled by the natives registered before compiling.
+#[derive(Clone, Copy)]
+pub(crate) enum NativeArgs {
+    /// This crate's @size: a compact value's length without its array.
+    Size,
+    /// A host native's fields read compact ([`register_compact_fields`]).
+    Keep(&'static [&'static str]),
+    /// This crate's natives that move elements: the top level without compact values.
+    Structural,
+    /// Without compact values all the way down.
+    Plain,
+}
+
+pub(crate) fn native_args(name: &str) -> NativeArgs {
+    if name == "size" && structural_native(name) {
+        return NativeArgs::Size;
+    }
+    if let Some(keep) = COMPACT_FIELDS.read().get(name).copied() {
+        return NativeArgs::Keep(keep);
+    }
+    if structural_native(name) { NativeArgs::Structural } else { NativeArgs::Plain }
+}
+
 /// Values the host substitutes for top-level constants, by (module path,
 /// name): std features the host evaluates itself.
 type Overrides = HashMap<(Arc<str>, Arc<str>), Value>;
@@ -242,6 +265,14 @@ pub struct Interp {
 pub struct LineProfile {
     pub times: HashMap<(Arc<str>, u32), std::time::Duration>,
     active: HashMap<(Arc<str>, u32), u32>,
+    /// Functions (at their declaration's line) and natives ("@name") timed instead of lines: the closures run.
+    pub functions: bool,
+}
+
+impl LineProfile {
+    pub fn functions() -> Self {
+        Self { functions: true, ..Default::default() }
+    }
 }
 
 /// The overloads a call chooses from.
@@ -262,6 +293,29 @@ pub(crate) struct Site {
     pub decl: Arc<FnDecl>,
     /// The std operator it is (none: a function to run).
     pub op: Option<crate::std_ops::Op>,
+    /// Its arithmetic, a units.fs or vector.fs operator's.
+    pub arith: Option<crate::std_ops::Arith>,
+    /// Its arguments' [`quick_sig`] when it decides `sig` (else 0).
+    pub kinds: u16,
+}
+
+/// Arguments' kinds when they are untagged numbers or compact values (else 0, as for none or over 8): their
+/// signature is their kinds'.
+pub(crate) fn quick_sig<'a>(args: impl IntoIterator<Item = &'a Value>) -> u16 {
+    let mut sig = 0u16;
+    for (n, v) in args.into_iter().enumerate() {
+        let kind = match v {
+            Value::Number(_, Tag::NONE) => 1,
+            Value::Quantity(..) => 2,
+            Value::Vector(..) => 3,
+            _ => return 0,
+        };
+        if n == 8 {
+            return 0;
+        }
+        sig = sig << 2 | kind;
+    }
+    sig
 }
 
 /// A resolved call: the overload (none: an operator's overloads don't apply) and the std operator it is. The set is
@@ -387,17 +441,19 @@ impl Interp {
             let (tx, rx) = std::sync::mpsc::channel::<Value>();
             std::thread::Builder::new().name("fs-free".into()).spawn(move || rx.into_iter().for_each(drop)).ok().map(|_| tx)
         });
-        for v in self.stack.drain(base..) {
-            let big = match &v {
+        // (Read in place: a frame's numbers aren't moved to be dropped.)
+        for v in &mut self.stack[base..] {
+            let big = match v {
                 Value::Array(a, _) => a.len() >= BIG && Arc::strong_count(a) == 1,
                 Value::Map(m, _) => m.len() >= BIG && Arc::strong_count(m) == 1,
                 _ => false,
             };
             if big && let Some(tx) = DROPPER.as_ref() {
                 // (Sent, or dropped here should the thread be gone.)
-                let _ = tx.send(v);
+                let _ = tx.send(std::mem::take(v));
             }
         }
+        self.stack.truncate(base);
     }
 
     pub fn module(&self) -> &Arc<str> {
@@ -843,7 +899,11 @@ impl Interp {
         if operator.is_some() && r.op.is_none() {
             return None;
         }
-        Some(Site { generation: self.overloads_generation, sig, decl: r.decl.clone()?, op: r.op })
+        let arith = match r.op {
+            Some(crate::std_ops::Op::Units | crate::std_ops::Op::Vectors) => r.decl.as_ref().and_then(|d| crate::std_ops::arith(&d.name)),
+            _ => None,
+        };
+        Some(Site { generation: self.overloads_generation, sig, decl: r.decl.clone()?, op: r.op, arith, kinds: 0 })
     }
 
     /// Every loaded overload of operator `OPERATORS[i]`.
@@ -945,9 +1005,13 @@ impl Interp {
         let saved_base = std::mem::replace(&mut self.base, base);
         let saved_module = std::mem::replace(&mut self.module, f.module.clone());
         let saved_version = std::mem::replace(&mut self.module_version, f.version);
-        self.frames.push(TraceFrame { function: f.name.clone(), module: saved_module.clone(), pos: call_pos });
-        let r = self.run_body(f);
-        self.frames.pop();
+        // (The caller's module kept in its frame, taken back from it: each call pops its own.)
+        self.frames.push(TraceFrame { function: f.name.clone(), module: saved_module, pos: call_pos });
+        let r = match &self.profile {
+            Some(p) if p.functions => self.timed((f.module.clone(), f.pos.line), |i| i.run_body(f)),
+            _ => self.run_body(f),
+        };
+        let saved_module = self.frames.pop().map(|fr| fr.module).unwrap_or_default();
         // (Once stopped, every frame's values to the caller, returned or not: a script that caught a kernel
         // operation's cancel ran on and freed the displacement map's points table here, 0.5-0.9 s.)
         if r.is_err() && self.stopped.is_none() && self.cancel.as_ref().is_some_and(|c| c()) {
@@ -966,7 +1030,7 @@ impl Interp {
 
     fn run_body(&mut self, f: &CompiledFn) -> R<Value> {
         // The body's closures ([`closure`]), made on its first run; the tree walker when asked or profiling.
-        let compiled = (!self.tree_walker && self.profile.is_none()).then(|| f.closures.get_or_init(|| closure::compile_fn(f)));
+        let compiled = (!self.tree_walker && self.profile.as_ref().is_none_or(|p| p.functions)).then(|| f.closures.get_or_init(|| closure::compile_fn(f)));
         if let Some(p) = &f.precondition {
             let flow = match compiled.and_then(|c| c.precondition.as_ref()) {
                 Some(cp) => cp(self)?,
@@ -1039,12 +1103,19 @@ impl Interp {
     }
 
     fn exec(&mut self, s: &St) -> R<Flow> {
-        let Some(p) = self.profile.as_mut() else { return self.exec_statement(s) };
-        let key = (self.module.clone(), s.pos.line);
+        if self.profile.as_ref().is_none_or(|p| p.functions) {
+            return self.exec_statement(s);
+        }
+        self.timed((self.module.clone(), s.pos.line), |i| i.exec_statement(s))
+    }
+
+    /// `run`, its time added to `key`'s in the profile (once while `key` is active).
+    fn timed<T>(&mut self, key: (Arc<str>, u32), run: impl FnOnce(&mut Self) -> T) -> T {
+        let Some(p) = self.profile.as_mut() else { return run(self) };
         let depth = p.active.entry(key.clone()).or_insert(0);
         *depth += 1;
         let start = (*depth == 1).then(Instant::now);
-        let r = self.exec_statement(s);
+        let r = run(self);
         if let Some(p) = self.profile.as_mut() {
             if let Some(d) = p.active.get_mut(&key) {
                 *d -= 1;
@@ -1571,23 +1642,23 @@ impl Interp {
     }
 
     /// A native's call with its arguments (its errors read "@name: …").
-    fn call_native(&mut self, n: NativeFn, name: &Name, mut a: Vec<Value>) -> R<Value> {
+    fn call_native(&mut self, n: NativeFn, name: &Name, a: Vec<Value>) -> R<Value> {
+        self.call_native_as(n, name, a, native_args(name))
+    }
+
+    pub(crate) fn call_native_as(&mut self, n: NativeFn, name: &Name, mut a: Vec<Value>, kind: NativeArgs) -> R<Value> {
         // The host reads maps and arrays: its natives' arguments without compact values all the way down; this
         // crate's natives that only move elements need their top level so (no scan of a big array per call).
         // (@size of a compact value: its length, without making its array; std's preconditions ask per element.)
-        if &**name == "size"
-            && let [v @ (Value::Vector(..) | Value::Quantity(..))] = a.as_slice()
-            && !HOST_NATIVES.read().contains_key("size")
-        {
+        if let (NativeArgs::Size, [v @ (Value::Vector(..) | Value::Quantity(..))]) = (kind, a.as_slice()) {
             return Ok(Value::num(match v {
                 Value::Vector(c) => c.len(),
                 _ => 2,
             } as f64));
         }
-        let keep = COMPACT_FIELDS.read().get(&**name).copied();
-        if let Some(keep) = keep {
+        if let NativeArgs::Keep(keep) = kind {
             a = a.into_iter().map(|v| materialized_but(v, keep)).collect();
-        } else if structural_native(name) {
+        } else if matches!(kind, NativeArgs::Size | NativeArgs::Structural) {
             for v in a.iter_mut().filter(|v| v.is_compact()) {
                 *v = v.shallow().into_owned();
             }
@@ -1604,7 +1675,10 @@ impl Interp {
             a = a.into_iter().map(Value::materialized).collect();
         }
         let saved = std::mem::replace(&mut self.native_name, name.clone());
-        let r = n(self, a);
+        let r = match &self.profile {
+            Some(p) if p.functions => self.timed((format!("@{name}").into(), 0), |i| n(i, a)),
+            _ => n(self, a),
+        };
         self.native_name = saved;
         self.native_stopped(&r);
         r

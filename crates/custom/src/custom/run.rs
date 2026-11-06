@@ -11,7 +11,7 @@ use super::studio::{ParamDecl, ParamKindFs};
 use crate::params::{NumKind, ParamValue, ParamValues, ReferenceKind, fill_defaults};
 use crate::reference::FeatureId;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
-use noshape_featurescript::interp::{Interp, Notice};
+use noshape_featurescript::interp::{Interp, LineProfile, Notice};
 use noshape_featurescript::ir::GlobalCell;
 use noshape_featurescript::value::{Map, Value, type_info};
 use parking_lot::Mutex;
@@ -268,11 +268,13 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
                     let mut i = Interp::new();
                     i.set_deadline(Some(Instant::now() + TIME_LIMIT));
                     i.set_cancel(cancel.clone().map(|c| Box::new(move || c.aborted()) as Box<dyn Fn() -> bool + Send>));
-                    // NOSHAPE_FS_PROFILE=1: each custom feature's slowest lines on stderr, as the dialog's editing logic.
-                    let print = std::env::var_os("NOSHAPE_FS_PROFILE").is_some();
-                    if profiling() || print {
-                        i.profile = Some(Default::default());
+                    // NOSHAPE_FS_PROFILE=1: each custom feature's slowest lines on stderr, as the dialog's editing logic
+                    // (=fn: its functions and natives, the closures running).
+                    let print = std::env::var_os("NOSHAPE_FS_PROFILE");
+                    if profiling() || print.is_some() {
+                        i.profile = Some(if print.as_deref() == Some("fn".as_ref()) { LineProfile::functions() } else { Default::default() });
                     }
+                    let print = print.is_some();
                     let t = Instant::now();
                     let f = i.global(&cell);
                     let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));

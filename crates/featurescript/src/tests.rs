@@ -705,7 +705,11 @@ fn interpreter_step_costs() {
     let m = compile_module(&unique_path(), &src, &NoImports).unwrap_or_else(|e| panic!("{}", e.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")));
     let mut interp = Interp::new();
     let mut base = 0.0;
+    let only = std::env::var("NOSHAPE_FS_STEP").ok();
     for (k, (name, _)) in steps.iter().enumerate() {
+        if k > 0 && only.as_deref().is_some_and(|o| o != *name) {
+            continue;
+        }
         let f = m.functions(&format!("s{k}")).expect("step");
         let t = std::time::Instant::now();
         interp.call_set(&f, vec![Value::num(n as f64)]).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
@@ -715,6 +719,18 @@ fn interpreter_step_costs() {
         }
         println!("{name}: {ns:.0} ns ({:.0} over the loop)", ns - base);
     }
+}
+
+/// An error's trace: each call with its caller's module (the host's empty one first), within a module and into std.
+#[test]
+fn a_trace_names_each_callers_module() {
+    let path = unique_path();
+    let src = "FeatureScript 3044;\nimport(path : \"onshape/std/common.fs\", version : \"3044.0\");\nfunction f() { return g(); }\nfunction g() { return abs(\"a\"); }\n";
+    let m = compile_module(&path, src, &NoImports).unwrap_or_else(|e| panic!("{}", e.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")));
+    let Err(e) = Interp::new().call_set(&m.functions("f").expect("f"), vec![]) else { panic!("abs of a string fails") };
+    let trace: Vec<(&str, &str)> = e.trace.iter().map(|t| (&*t.function, &*t.module)).collect();
+    assert_eq!(trace, [("f", ""), ("g", path.as_str()), ("abs", path.as_str())]);
+    assert_eq!(&*e.module, "onshape/std/math.fs");
 }
 
 /// A value (compact Vectors held in it) stays 32 bytes: arrays of numbers grow by a third at most.

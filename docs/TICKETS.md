@@ -1065,6 +1065,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   keeping their std operator / function / append (6784c19f, release 2.24 s), compact arithmetic as f64s (queued):
   dev loops 1.41 -> 1.11 s, the feature 2.57 -> 2.23 s; adding two length vectors 239 -> 126 ns, a call 220 -> 152.
   Each step identical on all 78 corpus documents (the T2 differential, reference = tree walker on maps and arrays).
+  11-06 07:33: under 1 s. Preconditions' checks compiled (std's evFaceTangentPlanes loop no longer walked), natives'
+  argument handling settled per call site and @size without a vector, compound assignments and local operands on
+  the site cache, sites matching numbers and compact values by kind (no signature), the arithmetic chosen once per
+  site, length constants (std's `meter`) read compact, frames dropped in place. Release, vibe5: the feature
+  1.92 -> 1.67 s; its own 1.24 s (NOSHAPE_FS_PROFILE=fn: per function and native, closures running), of which
+  @evFaceTangentPlanes 0.24 and @opCreateBSplineSurface 0.08: the script ~0.9 s. Loops (vibe4) 1.18 -> 1.00 s;
+  dev (vibe5) loops 1.11 -> 0.83 s, the feature 2.23 -> 1.97 s; a cached length op 50-65 -> 30-45 ns. Identical on
+  all 78 documents. mimalloc preloaded on the new loops: 1.00 -> 1.04 s (points +5 %), steps equal.
 - [ ] P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
   measure app-wide with and without (the corpus' regeneration, the interpreter benchmarks, cold start, peak memory on
   the big documents). First pass with the system libmimalloc 3.2 preloaded (also OCCT's heap): corpus regen 30.1 ->

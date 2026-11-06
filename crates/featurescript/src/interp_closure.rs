@@ -87,6 +87,79 @@ fn walked(e: &Ex) -> CEx {
     Box::new(move |i| i.eval_in(&e))
 }
 
+/// @size of an array, a map or a compact value (a ValueWithUnits: its unit and value).
+fn size_of(v: &Value) -> Option<usize> {
+    match v {
+        Value::Array(a, _) => Some(a.len()),
+        Value::Map(m, _) => Some(m.len()),
+        Value::Vector(c) => Some(c.len()),
+        Value::Quantity(..) => Some(2),
+        _ => None,
+    }
+}
+
+/// An append site's resolution: its generation, signature, append (else concatenateArrays), and the array's tag and
+/// element's kind standing for the signature.
+type GrowSite = (u64, ([u32; 6], u8), bool, Option<(Tag, u16)>);
+
+/// A binary operator's call site: its std operator kept for its operands' types (+ - * /).
+struct BinSite {
+    op: BinOp,
+    operator: Option<usize>,
+    ov: Option<Arc<OverloadSet>>,
+    site: std::sync::OnceLock<Site>,
+}
+
+impl BinSite {
+    fn new(op: BinOp, ov: Option<Arc<OverloadSet>>) -> Self {
+        // (+ - * /: the site's std operator kept for its operands' types: no resolution per operation.)
+        let operator = match op {
+            BinOp::Add => Some(0),
+            BinOp::Sub => Some(1),
+            BinOp::Mul => Some(2),
+            BinOp::Div => Some(3),
+            _ => None,
+        };
+        Self { op, operator, ov, site: std::sync::OnceLock::new() }
+    }
+
+    fn apply(&self, i: &mut Interp, va: Value, vb: Value) -> R<Value> {
+        let Some(operator) = self.operator else { return i.binop_in(self.op, va, vb, self.ov.as_ref()) };
+        // (Numbers and compact values: their kinds stand for their signature; std's arithmetic on them as f64s.)
+        let kinds = quick_sig([&va, &vb]);
+        let mut pair = [va, vb];
+        if kinds != 0
+            && i.compact
+            && let Some(s) = self.site.get()
+            && s.kinds == kinds
+            && s.generation == crate::compile::overloads_generation()
+            && let (Some(op), Some(arith)) = (s.op, s.arith)
+            && let Some(v) = crate::std_ops::compact_as(op, arith, &pair)
+        {
+            return Ok(v);
+        }
+        let sig = signature(&pair);
+        if let (Some(s), Some(sig)) = (self.site.get(), sig)
+            && s.sig == sig
+            && s.generation == crate::compile::overloads_generation()
+            && let Some(op) = s.op
+            && let Some(v) = crate::std_ops::apply(op, &s.decl, &mut pair, i.compact)
+        {
+            return Ok(v);
+        }
+        let [va, vb] = pair;
+        let r = i.binop_in(self.op, va, vb, self.ov.as_ref());
+        if self.site.get().is_none()
+            && let Some(sig) = sig
+            && let Some(mut s) = i.std_site(Some(operator), None, sig)
+        {
+            s.kinds = kinds;
+            let _ = self.site.set(s);
+        }
+        r
+    }
+}
+
 /// A loop body's flow: Some to leave the loop with (`Break`: normally).
 fn after_body(flow: Flow) -> Option<Flow> {
     match flow {
@@ -131,15 +204,27 @@ pub(crate) fn statement(s: &St) -> CSt {
                 let (set, y, vpos) = (set.clone(), expression(y), value.pos);
                 // (The site's std append / concatenateArrays kept for its arguments' types: grown without a
                 // resolution per element.)
-                let site: std::sync::OnceLock<(u64, ([u32; 6], u8), bool)> = std::sync::OnceLock::new();
+                // (An array of its tag and a number or compact element: their kinds stand for their signature.)
+                let site: std::sync::OnceLock<GrowSite> = std::sync::OnceLock::new();
                 return Box::new(move |i| {
                     i.tick()?;
                     i.pos = vpos;
                     let y = y(i)?;
                     i.pos = vpos;
                     let idx = i.base + slot as usize;
+                    let kinds = match &i.stack[idx] {
+                        Value::Array(_, t) => Some((*t, quick_sig([&y]))).filter(|k| k.1 != 0),
+                        _ => None,
+                    };
+                    if let Some((generation, _, append, Some(k))) = site.get()
+                        && kinds == Some(*k)
+                        && *generation == crate::compile::overloads_generation()
+                    {
+                        i.grow_slot(idx, *append, y);
+                        return Ok(Flow::Normal);
+                    }
                     let sig = signature_of([&i.stack[idx], &y].into_iter());
-                    if let (Some((generation, s, append)), Some(sig)) = (site.get(), sig)
+                    if let (Some((generation, s, append, _)), Some(sig)) = (site.get(), sig)
                         && *s == sig
                         && *generation == crate::compile::overloads_generation()
                         && matches!(i.stack[idx], Value::Array(..))
@@ -152,7 +237,7 @@ pub(crate) fn statement(s: &St) -> CSt {
                         && let Some(sig) = sig
                         && let Some(append) = i.std_grow_site(&set, sig)
                     {
-                        let _ = site.set((crate::compile::overloads_generation(), sig, append));
+                        let _ = site.set((crate::compile::overloads_generation(), sig, append, kinds));
                     }
                     r
                 });
@@ -163,7 +248,7 @@ pub(crate) fn statement(s: &St) -> CSt {
             {
                 return walked_statement(s);
             }
-            let (v, op) = (expression(value), op.clone());
+            let (v, op) = (expression(value), op.as_ref().map(|(o, ov)| BinSite::new(*o, ov.clone())));
             let idx = slot as usize;
             Box::new(move |i| {
                 i.tick()?;
@@ -172,9 +257,12 @@ pub(crate) fn statement(s: &St) -> CSt {
                 let at = i.base + idx;
                 i.stack[at] = match &op {
                     None => rhs,
-                    Some((o, ov)) => {
+                    Some(site) => {
                         let old = std::mem::take(&mut i.stack[at]);
-                        i.binop_in(*o, old, rhs, ov.as_ref())?
+                        match (&old, &rhs) {
+                            (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) => i.num_op(site.op, *x, *y)?,
+                            _ => site.apply(i, old, rhs)?,
+                        }
                     }
                 };
                 Ok(Flow::Normal)
@@ -186,6 +274,23 @@ pub(crate) fn statement(s: &St) -> CSt {
                 i.tick()?;
                 e(i)?;
                 Ok(Flow::Normal)
+            })
+        }
+        StK::Check(e, text) => {
+            let (e, text) = (expression(e), text.clone());
+            Box::new(move |i| {
+                i.tick()?;
+                match e(i)? {
+                    Value::Bool(true, _) => Ok(Flow::Normal),
+                    Value::Bool(false, _) => {
+                        i.failed_check = Some((pos, text.clone()));
+                        Ok(Flow::False)
+                    }
+                    other => {
+                        i.pos = pos;
+                        Err(i.error(format!("Precondition or predicate statement must evaluate to boolean, value is {}", other.error_type())))
+                    }
+                }
             })
         }
         StK::Block(b) => {
@@ -348,9 +453,20 @@ pub(crate) fn expression(e: &Ex) -> CEx {
         }
         ExK::Global(c) => {
             let c = c.clone();
+            // (A length constant, std's `meter`, read compact once its value is known: no map shared per read.)
+            let compact: std::sync::OnceLock<Option<Value>> = std::sync::OnceLock::new();
             Box::new(move |i| {
+                if i.compact
+                    && let Some(Some(v)) = compact.get()
+                {
+                    return Ok(v.clone());
+                }
                 i.pos = pos;
-                i.global_in(&c)
+                let v = i.global_in(&c)?;
+                if i.compact && compact.get().is_none() {
+                    let _ = compact.set(crate::std_ops::quantity_of(&v));
+                }
+                Ok(v)
             })
         }
         ExK::Array(items) => {
@@ -400,6 +516,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 ExK::Local(s) => Some(s as usize),
                 _ => None,
             };
+            let site = BinSite::new(op, ov);
             if let (Some(sa), Some(sb)) = (local(a), local(b)) {
                 return Box::new(move |i| {
                     if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&i.stack[i.base + sa], &i.stack[i.base + sb]) {
@@ -409,7 +526,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                     let (va, vb) = (i.stack[i.base + sa].clone(), i.stack[i.base + sb].clone());
                     i.pos = pos;
-                    i.binop_in(op, va, vb, ov.as_ref())
+                    site.apply(i, va, vb)
                 });
             }
             if let (Some(sa), Some(y)) = (local(a), number(b)) {
@@ -421,19 +538,10 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                     let va = i.stack[i.base + sa].clone();
                     i.pos = pos;
-                    i.binop_in(op, va, Value::num(y), ov.as_ref())
+                    site.apply(i, va, Value::num(y))
                 });
             }
             let (a, b) = (expression(a), expression(b));
-            // (+ - * /: the site's std operator kept for its operands' types: no resolution per operation.)
-            let operator = match op {
-                BinOp::Add => Some(0),
-                BinOp::Sub => Some(1),
-                BinOp::Mul => Some(2),
-                BinOp::Div => Some(3),
-                _ => None,
-            };
-            let site: std::sync::OnceLock<Site> = std::sync::OnceLock::new();
             Box::new(move |i| {
                 let va = a(i)?;
                 let vb = b(i)?;
@@ -441,26 +549,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&va, &vb) {
                     return i.num_op(op, *x, *y);
                 }
-                let Some(operator) = operator else { return i.binop_in(op, va, vb, ov.as_ref()) };
-                let mut pair = [va, vb];
-                let sig = signature(&pair);
-                if let (Some(s), Some(sig)) = (site.get(), sig)
-                    && s.sig == sig
-                    && s.generation == crate::compile::overloads_generation()
-                    && let Some(op) = s.op
-                    && let Some(v) = crate::std_ops::apply(op, &s.decl, &mut pair, i.compact)
-                {
-                    return Ok(v);
-                }
-                let [va, vb] = pair;
-                let r = i.binop_in(op, va, vb, ov.as_ref());
-                if site.get().is_none()
-                    && let Some(sig) = sig
-                    && let Some(s) = i.std_site(Some(operator), None, sig)
-                {
-                    let _ = site.set(s);
-                }
-                r
+                site.apply(i, va, vb)
             })
         }
         ExK::And(a, b) => {
@@ -536,7 +625,9 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                 }
                 i.pos = pos;
-                let sig = signature(&i.stack[base..]);
+                // (Numbers and compact values: their kinds stand for their signature.)
+                let kinds = quick_sig(&i.stack[base..]);
+                let sig = if kinds != 0 && site.get().is_some_and(|s| s.kinds == kinds) { site.get().map(|s| s.sig) } else { signature(&i.stack[base..]) };
                 if let (Some(s), Some(sig)) = (site.get(), sig)
                     && s.sig == sig
                     && s.generation == crate::compile::overloads_generation()
@@ -560,8 +651,9 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 let r = i.call_set_at(&set, base);
                 if site.get().is_none()
                     && let Some(sig) = sig
-                    && let Some(s) = i.std_site(None, Some(&set), sig)
+                    && let Some(mut s) = i.std_site(None, Some(&set), sig)
                 {
+                    s.kinds = kinds;
                     let _ = site.set(s);
                 }
                 r
@@ -637,8 +729,23 @@ pub(crate) fn expression(e: &Ex) -> CEx {
             })
         }
         ExK::Call(Callee::Native(n, name), args) => {
-            let (n, name) = (*n, name.clone());
-            let args: Vec<CEx> = args.iter().map(expression).collect();
+            let (n, name, kind) = (*n, name.clone(), native_args(name));
+            let mut args: Vec<CEx> = args.iter().map(expression).collect();
+            // (@size of an array, a map or a compact value: its length, without a vector of arguments.)
+            if matches!(kind, NativeArgs::Size)
+                && args.len() == 1
+                && let Some(x) = args.pop()
+            {
+                return Box::new(move |i| {
+                    i.pos = pos;
+                    let v = x(i)?;
+                    if let Some(len) = size_of(&v) {
+                        return Ok(Value::num(len as f64));
+                    }
+                    i.pos = pos;
+                    i.call_native_as(n, &name, vec![v], kind)
+                });
+            }
             Box::new(move |i| {
                 i.pos = pos;
                 let mut a = Vec::with_capacity(args.len());
@@ -646,7 +753,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     a.push(x(i)?);
                 }
                 i.pos = pos;
-                i.call_native(n, &name, a)
+                i.call_native_as(n, &name, a, kind)
             })
         }
         ExK::Call(Callee::Value(fx), args) => {

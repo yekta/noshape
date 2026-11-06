@@ -98,6 +98,34 @@ fn map_len(v: &Value) -> Option<usize> {
 /// elementwise sum, difference, scaling and negation (a unitless Vector scaled by a length: a Vector of lengths).
 /// What [`units`] and [`vectors`] answer for these (the same unit by id; any NaN: none, they decide).
 fn compact_arithmetic(op: Op, name: &str, args: &[Value]) -> Option<Value> {
+    compact_as(op, arith(name)?, args)
+}
+
+/// An arithmetic operator of units.fs or vector.fs (unary `operator-`: `Sub`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Arith {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+pub fn arith(name: &str) -> Option<Arith> {
+    Some(match name {
+        "operator+" => Arith::Add,
+        "operator-" => Arith::Sub,
+        "operator*" => Arith::Mul,
+        "operator/" => Arith::Div,
+        _ => return None,
+    })
+}
+
+/// [`compact_arithmetic`] of operator `a` (a call site's, found once).
+pub fn compact_as(op: Op, arith: Arith, args: &[Value]) -> Option<Value> {
+    #[cfg(test)]
+    if OFF.with(|o| o.get()) {
+        return None;
+    }
     let ok = |x: f64| (!x.is_nan()).then_some(x);
     let scaled = |c: &Compact, f: &dyn Fn(f64) -> f64, unit: UnitId| -> Option<Value> {
         let mut v = c.v;
@@ -106,24 +134,59 @@ fn compact_arithmetic(op: Op, name: &str, args: &[Value]) -> Option<Value> {
         }
         Some(Value::Vector(Compact { v, unit, len: c.len }))
     };
+    // (A length's number and unit id: compact, or a map of only its unit and an untagged number (std's `meter`),
+    // which the general path answers alike: its value set in a compact length of its unit.)
+    let q = |v: &Value| -> Option<(f64, UnitId)> {
+        match v {
+            Value::Quantity(x, u) => Some((*x, *u)),
+            Value::Map(..) => match quantity_of(v)? {
+                Value::Quantity(x, u) => Some((x, u)),
+                _ => None,
+            },
+            _ => None,
+        }
+    };
+    if let (Op::Units, [x, y]) = (op, args) {
+        match (arith, q(x), q(y), x, y) {
+            (Arith::Add | Arith::Sub, Some((x, u)), Some((y, w)), ..) if u == w => return ok(if arith == Arith::Add { x + y } else { x - y }).map(|z| Value::Quantity(z, u)),
+            (Arith::Mul, Some((x, u)), None, _, Value::Number(n, Tag::NONE)) | (Arith::Mul, None, Some((x, u)), Value::Number(n, Tag::NONE), _) => return ok(x * n).map(|z| Value::Quantity(z, u)),
+            (Arith::Div, Some((x, u)), None, _, Value::Number(n, Tag::NONE)) => return ok(x / n).map(|z| Value::Quantity(z, u)),
+            (Arith::Div, Some((x, u)), Some((y, w)), ..) if u == w && exponents(unit_value(u)).is_some() => return ok(x * (1.0 / y)).map(Value::num),
+            _ => {}
+        }
+    }
     // (units.fs' operators on lengths, vector.fs' on Vectors: as resolved.)
-    match (op, name, args) {
-        (Op::Units, "operator+" | "operator-", [Value::Quantity(a, u), Value::Quantity(b, w)]) if u == w => ok(if name == "operator+" { a + b } else { a - b }).map(|x| Value::Quantity(x, *u)),
-        (Op::Units, "operator-", [Value::Quantity(a, u)]) => ok(-a).map(|x| Value::Quantity(x, *u)),
-        (Op::Units, "operator*", [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) | (Op::Units, "operator*", [Value::Number(n, Tag::NONE), Value::Quantity(a, u)]) => ok(a * n).map(|x| Value::Quantity(x, *u)),
-        (Op::Units, "operator/", [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) => ok(a / n).map(|x| Value::Quantity(x, *u)),
-        (Op::Vectors, "operator+" | "operator-", [Value::Vector(a), Value::Vector(b)]) if a.unit == b.unit && a.len == b.len => {
+    match (op, arith, args) {
+        (Op::Units, Arith::Add | Arith::Sub, [Value::Quantity(a, u), Value::Quantity(b, w)]) if u == w => ok(if arith == Arith::Add { a + b } else { a - b }).map(|x| Value::Quantity(x, *u)),
+        (Op::Units, Arith::Sub, [Value::Quantity(a, u)]) => ok(-a).map(|x| Value::Quantity(x, *u)),
+        (Op::Units, Arith::Mul, [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) | (Op::Units, Arith::Mul, [Value::Number(n, Tag::NONE), Value::Quantity(a, u)]) => ok(a * n).map(|x| Value::Quantity(x, *u)),
+        // (One unit cancelling: `lhs * reciprocal(rhs)`'s number, its exponents plain numbers.)
+        (Op::Units, Arith::Div, [Value::Quantity(a, u), Value::Quantity(b, w)]) if u == w && exponents(unit_value(*u)).is_some() => ok(a * (1.0 / b)).map(Value::num),
+        (Op::Units, Arith::Div, [Value::Quantity(a, u), Value::Number(n, Tag::NONE)]) => ok(a / n).map(|x| Value::Quantity(x, *u)),
+        (Op::Vectors, Arith::Add | Arith::Sub, [Value::Vector(a), Value::Vector(b)]) if a.unit == b.unit && a.len == b.len => {
             let mut v = a.v;
             for (i, x) in v.iter_mut().enumerate().take(a.len()) {
-                *x = ok(if name == "operator+" { *x + b.v[i] } else { *x - b.v[i] })?;
+                *x = ok(if arith == Arith::Add { *x + b.v[i] } else { *x - b.v[i] })?;
             }
             Some(Value::Vector(Compact { v, unit: a.unit, len: a.len }))
         }
-        (Op::Vectors, "operator-", [Value::Vector(a)]) => scaled(a, &|x| -x, a.unit),
-        (Op::Vectors, "operator*", [Value::Vector(a), Value::Number(n, Tag::NONE)]) | (Op::Vectors, "operator*", [Value::Number(n, Tag::NONE), Value::Vector(a)]) => scaled(a, &|x| x * n, a.unit),
-        (Op::Vectors, "operator/", [Value::Vector(a), Value::Number(n, Tag::NONE)]) => scaled(a, &|x| x / n, a.unit),
+        (Op::Vectors, Arith::Sub, [Value::Vector(a)]) => scaled(a, &|x| -x, a.unit),
+        (Op::Vectors, Arith::Mul, [Value::Vector(a), Value::Number(n, Tag::NONE)]) | (Op::Vectors, Arith::Mul, [Value::Number(n, Tag::NONE), Value::Vector(a)]) => scaled(a, &|x| x * n, a.unit),
+        (Op::Vectors, Arith::Div, [Value::Vector(a), Value::Number(n, Tag::NONE)]) => scaled(a, &|x| x / n, a.unit),
         // (A unitless Vector and a length: each element number * length, the length's unit.)
-        (Op::Vectors, "operator*", [Value::Vector(a), Value::Quantity(q, u)]) | (Op::Vectors, "operator*", [Value::Quantity(q, u), Value::Vector(a)]) if a.unit.0 == 0 => scaled(a, &|x| q * x, *u),
+        (Op::Vectors, Arith::Mul, [Value::Vector(a), Value::Quantity(q, u)]) | (Op::Vectors, Arith::Mul, [Value::Quantity(q, u), Value::Vector(a)]) if a.unit.0 == 0 => scaled(a, &|x| q * x, *u),
+        _ => None,
+    }
+}
+
+/// A ValueWithUnits map of only its unit and an untagged number as a compact length (its unit interned).
+pub fn quantity_of(v: &Value) -> Option<Value> {
+    let Value::Map(m, t) = v else { return None };
+    if Some(*t) != vwu_tag() {
+        return None;
+    }
+    match m.unit_value()? {
+        (unit, Value::Number(x, Tag::NONE)) => Some(Value::Quantity(*x, unit_id(unit)?)),
         _ => None,
     }
 }

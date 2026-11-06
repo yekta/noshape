@@ -232,6 +232,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   3.03 s; the differential (T2 parity::fs_closures_answer_as_the_tree_walker) now runs the reference as the tree walker
   on maps and arrays (NOSHAPE_FS_TREE=1 NOSHAPE_FS_PLAIN=1). Run 135-on-main scores 493 features: skasm's translator
   (c2-hunting-knife's Sketch 12), not this.
+- 11-06 07:33: FeatureScript's part of the Displacement map under 1 s in release (~0.9 s; the feature 1.92 -> 1.67 s,
+  TICKETS FS-COMPILED-INTERP); NOSHAPE_FS_PROFILE=fn times functions and natives with the closures running (=1 still
+  times lines on the tree walker). Run 136 on live's partial 2132 (REST features.json for all 20 c2, sketch bodies for
+  4; the rest after Onshape's quota resets ~05:45 11-07): 519/753, c2 differences in skasm.md (7031aa22); c2-sm-louver's
+  Linear pattern 3 takes 198 s (live 5 s whole). Rerun when live ticks 2132. Next: mimalloc's full re-measure.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
