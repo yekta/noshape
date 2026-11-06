@@ -567,6 +567,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (all three in CI); build with CXXFLAGS=-DNOSHAPE_PORTABLE_BUDGET to try the deadline path on Linux.
 
 ## Rust Boolean (bool)
+- [ ] P2 BOOL-TOL4-DRAFT-VOLUME (bool) **since per-entity tolerances stage 4 (e17bb36e1, green a4433e68) the Rust Boolean
+  takes a Draft that OCCT did, with a different volume**: /root/qa-scratch/tickets/slow1151-pre.noshape (also
+  slow1151-before-extrude), stepped with bin/rbbisect.py. Draft 4 gives Part 1 30022.224 mm³ / 49 faces on a4433e68; fa886aef and
+  a4433e68 with NOSHAPE_BOOL_RUST=0 both give 30022.404 / 49 (−0.18 mm³, 6 ppm). It carries through to the end: 8 × 40183.8115
+  instead of 8 × 40183.9505 (66 faces each). Every other one of the 44 ticket documents, the volume sweep, dx's cf corpus and the
+  CLI smoke are unchanged. Which is right? A fuzz document, so there's no live value; the face counts agree, so one result has
+  or misses a sliver. vibe3:~/qa/cli/rb1151-*.txt. (qa 2026-11-06 05:58, build a4433e68)
 - [x] verified (qa 11-02 08:39, qa-scratch/bin/smcut.py on the CLI: flange 20295.0752 / 34, hem 22074.8607 / 43, cut **20805.4123 / 61 = live** on green f9aa29c3 and on the v0.4.20 release) fixed (skasm 11-02 08:30: `sheetmetal_std::qa4_s1_enclosure_as_live` passes on main, 20805.4123 / 61, now in the T1 run) P1 RUST-SM-CUT-VOLUME (skasm 11-01 03:30, wrong geometry on the Rust Boolean) T2
   `sheetmetal_std::qa4_s1_enclosure_as_live` fails on main 67473dfc: the Extrude Remove through the flanged enclosure's
   bends (std's sheet-metal-aware cut) gives 20812.4163 mm³ / 61 faces where live (and the test) has 20805.4123 / 61;
