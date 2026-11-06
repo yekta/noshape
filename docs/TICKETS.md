@@ -741,7 +741,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   budget (10 s, "a face deletion takes milliseconds"): failed here, so the Draft took another way. Under load the
   CPU time straddles 10 s: qa's flips. Fixed: face deletion gets the blend's 30 s (here then 37305.64 as on vibe5).
   Left: (a) why OCCT's Defeaturing takes seconds there (404 "Projecting edges on faces" 3.0 s, "Trimming faces"
-  1.1 s; T2 kernel bool_patterns::draft_fallback_face_deletion_probe, tests/data/draft-defeature-slow.brep); (b) any
+  1.1 s; T2 kernel bool_patterns::draft_fallback_face_deletion_probe, tests/data/draft-defeature-slow.brep). core 11-06
+  12:15: the edges' pcurve projections (ProjLib polar: 84,044 point projections, 7,089 of them a global grid search on
+  the face's degree-9 B-spline). OCCT patch 0024 keeps a grid's B-spline span caches across its rows (each was rebuilt
+  per row), 0025 keeps each projected point of a projection (39 % were asked again by its fits): 4.6 -> 3.56 -> 2.93 s
+  on vibe5, the result byte-identical (BRep written and compared), kernel / model suites green. What's left is the
+  global searches of three edges' fits (1.26 s, every one needed) and the Boolean's own pairs; (b) any
   budget-limited step still decides by speed near its limit: hang guards, not geometry. Swept 11-06: the kernel's
   budgets are the blends' / Draft's / Shell's 30 s and the crash guard's self-tests; one more decides an answer:
   the FeatureScript host's faces_cross (custom/host/evaluate.rs, SECTION_BUDGET 0.5 s CPU) answers "they cross" when

@@ -1,0 +1,53 @@
+--- a/src/ModelingData/TKGeomBase/ProjLib/ProjLib_ComputeApproxOnPolarSurface.cxx
++++ b/src/ModelingData/TKGeomBase/ProjLib/ProjLib_ComputeApproxOnPolarSurface.cxx
+@@ -56,6 +56,10 @@
+ #include <gp_Vec2d.hxx>
+ #include <Extrema_GenLocateExtPS.hxx>
+ #include <Extrema_ExtPS.hxx>
++
++#include <cstdint>
++#include <cstring>
++#include <unordered_map>
+ #include <GCPnts_QuasiUniformAbscissa.hxx>
+ #include <Standard_DomainError.hxx>
+ // #include <GeomLib_IsIso.hxx>
+@@ -474,7 +478,8 @@
+ 
+ class ProjLib_PolarFunction : public AppCont_Function
+ {
+-  aFuncStruct myStruct;
++  aFuncStruct                                    myStruct;
++  mutable std::unordered_map<uint64_t, gp_Pnt2d> myKept;
+ 
+ public:
+   ProjLib_PolarFunction(const occ::handle<Adaptor3d_Curve>&   C,
+@@ -501,13 +506,27 @@
+ 
+   double LastParameter() const override { return myStruct.myCurve->LastParameter(); }
+ 
+-  gp_Pnt2d Value(const double t) const { return Function_Value(t, myStruct); }
++  gp_Pnt2d Value(const double t) const
++  {
++    // noshape: each parameter's projection kept: the fits ask for the same parameters again (four in ten of a Draft
++    // fallback's 84,000), each a local and often a global search on the surface.
++    uint64_t aKey;
++    std::memcpy(&aKey, &t, sizeof(aKey));
++    const auto aKept = myKept.find(aKey);
++    if (aKept != myKept.end())
++    {
++      return aKept->second;
++    }
++    const gp_Pnt2d aPnt = Function_Value(t, myStruct);
++    myKept.emplace(aKey, aPnt);
++    return aPnt;
++  }
+ 
+   bool Value(const double                  theT,
+              NCollection_Array1<gp_Pnt2d>& thePnt2d,
+              NCollection_Array1<gp_Pnt>& /*thePnt*/) const override
+   {
+-    thePnt2d(1) = Function_Value(theT, myStruct);
++    thePnt2d(1) = Value(theT);
+     return true;
+   }
+ 

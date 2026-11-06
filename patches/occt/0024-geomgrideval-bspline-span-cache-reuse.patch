@@ -1,0 +1,75 @@
+--- a/src/ModelingData/TKG3d/GeomGridEval/GeomGridEval_BSplineSurface.cxx
++++ b/src/ModelingData/TKG3d/GeomGridEval/GeomGridEval_BSplineSurface.cxx
+@@ -19,6 +19,8 @@
+ #include <NCollection_Array1.hxx>
+ #include <NCollection_Array2.hxx>
+ 
++#include <vector>
++
+ namespace
+ {
+ 
+@@ -167,13 +169,10 @@
+   const int aLowV = theVParams.Lower();
+ 
+   NCollection_Array2<ResultT> aGrid(1, aNbU, 1, aNbV);
+-  occ::handle<BSplSLib_Cache> aCache = new BSplSLib_Cache(theData.UDegree,
+-                                                          theData.IsUPeriodic,
+-                                                          *theData.UFlatKnots,
+-                                                          theData.VDegree,
+-                                                          theData.IsVPeriodic,
+-                                                          *theData.VFlatKnots,
+-                                                          theData.Weights);
++  // noshape: each span pair's cache built once (at the span's middle) while its U span lasts, not again for every row:
++  // a cache depends only on its span, and rebuilding it per row was a third of a Defeaturing's seconds.
++  occ::handle<BSplSLib_Cache>                              aCache;
++  std::vector<std::pair<int, occ::handle<BSplSLib_Cache>>> aRowCaches; // (V span, cache) of the current U span
+ 
+   int    aPrevUSpan    = -1;
+   int    aUSpanSize    = 0;
+@@ -201,6 +200,7 @@
+     if (aUSpan != aPrevUSpan)
+     {
+       aPrevUSpan = aUSpan;
++      aRowCaches.clear();
+       aUSpanEnd  = theData.UFlatKnots->Value(aUSpan + 1);
+       aUSpanSize = countSpanSize(theUParams,
+                                  *theData.UFlatKnots,
+@@ -250,12 +250,31 @@
+         aUseCache = (aUSpanSize * aVSpanSize >= THE_CACHE_THRESHOLD);
+         if (aUseCache)
+         {
+-          aCache->BuildCache(aAdjU,
+-                             aAdjV,
+-                             *theData.UFlatKnots,
+-                             *theData.VFlatKnots,
+-                             *theData.Poles,
+-                             theData.Weights);
++          aCache.Nullify();
++          for (const auto& aKept : aRowCaches)
++          {
++            if (aKept.first == aVSpan)
++            {
++              aCache = aKept.second;
++            }
++          }
++          if (aCache.IsNull())
++          {
++            aCache = new BSplSLib_Cache(theData.UDegree,
++                                        theData.IsUPeriodic,
++                                        *theData.UFlatKnots,
++                                        theData.VDegree,
++                                        theData.IsVPeriodic,
++                                        *theData.VFlatKnots,
++                                        theData.Weights);
++            aCache->BuildCache(aUSpanMid,
++                               aVSpanMid,
++                               *theData.UFlatKnots,
++                               *theData.VFlatKnots,
++                               *theData.Poles,
++                               theData.Weights);
++            aRowCaches.emplace_back(aVSpan, aCache);
++          }
+         }
+       }
+ 
