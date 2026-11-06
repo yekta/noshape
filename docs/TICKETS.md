@@ -714,11 +714,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [x] fixed (lead 11-06: app-core's rust-embed has `debug-embed`, so every profile embeds the icons; green 10:05 has no build-tree asset path) P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
 ## Core modelling (core)
-- [ ] P2 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
+- [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet
   Ansaugflansch zum Gehaeuse 1.3 s, Fillet 4 1.2 s, Delete face 1 0.6 s.** Repro: /root/psui-scratch/open-slow/
   c2-rings-loft.noshape, c2-impeller-loft.noshape (+ -wal / -shm); per-feature times with NOSHAPE_PERF=1 (`regen[preview]`)
   or feature_list's regen_ms. Table: docs/handoff/psui.md "Document open, per document".
+  core 11-06 22:15: the impeller's time is mostly failing: Shell Gehäuse fails (live OK) after ~7 s (OCCT's offset
+  refuses the loft's C0-knotted side face; the slabs' fuse 4.7 s, empty), and 14 features behind it fail or do nothing,
+  Fillet Ansaugflansch 5.3 s failing. Being fixed by building the inner walls directly (handoff/core.md).
+  **Also (lead): a feature that ends up failing shouldn't spend 5–7 s getting there**: the failure paths (Shell's
+  offset → planes → quadrics → slabs, a fillet's retries and fallbacks) are to be checked for fallbacks tried after it's
+  already clear none will work.
 - [x] P0 RELEASE-BUILD-FILLET-HANG (core + lead: release-build only) **a saved document hangs every release build on open,
   while green (dev) builds of the same code open it in 7–8 s**: /root/qa-scratch/tickets/hang4539/step98.noshape (+ -wal; CLI
   fuzz seed 4539 on the v0.4.30 release; 74 features, the last Fillet 6, radius 0.5 mm). `qa-fstat.py <cli> <doc>` (open +

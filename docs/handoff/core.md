@@ -16,6 +16,19 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-06 22:15 UTC: c2-impeller-loft's open (OPEN-SLOW-SHELL-FILLET, P1).**
+- Not slow work: Shell Gehäuse fails ("Could not shell part with selections.", live OK, 6 faces, 45,273 mm³) after
+  ~7 s, and 14 later features fail or do nothing behind it (Fillet 4, Move face 2, Delete face 2, Fillet Ansaugflansch
+  5.3 s failing, ...). Repro: NOSHAPE_DUMP_OPS on psui's document gives shell-0 (the loft: 4 faces, both planar ends
+  removed, 2.5 mm inward); `shell::dumped_shell_probe` with NOSHAPE_SHELL_CASE.
+- Why: the loft's big side face is three ThruSections patches merged (`merge_tangent_sides`) with C0 knots left where
+  the speeds can't be matched along the whole joint (G1 only). BRepOffset refuses C0 surfaces at once (error 3,
+  C0Geometry). Split into C1 pieces (ShapeUpgrade_ShapeDivideContinuity), BRepOffset runs 3 s and returns nothing,
+  MakeThickSolidByJoin fails (Intersection) or gives an invalid 182,333 mm³ solid (Arc); the slabs' fuse (6 tools)
+  takes 4.7 s and comes out empty. Tightest radius 2.93 mm (wall 2.5). Attempts: /root/core-scratch/shell-c0-split-attempt.diff.
+- Next: inner walls built directly (each kept face's offset surface, trimmed by its neighbour's along their offset
+  corner and by the removed planes), the smooth path extended to faces meeting at an angle.
+
 **State 11-06 19:46 UTC (parity, the lead's order).**
 - cf-surface-pattern's Plane 4 (Mid plane of Extrude 5's start cap edge, live normal -x): the extrude already turns
   cap edges to run as their sketch lines were drawn (`drawn_edge_directions`; edges are handed out FORWARD, so
