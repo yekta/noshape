@@ -1269,7 +1269,8 @@ fn a_used_entity_is_used() {
 }
 
 /// A text converted to an expression (c2-valve-config's Sketch 3: `toString(roundToPrecision(#espesor_material/mm, 0))`,
-/// live's "6"): ours an expression text, evaluated on regeneration, not live's empty value.
+/// live's "6"): ours an expression text, evaluated on regeneration, not live's empty value; its height dimensioned on
+/// the box's left side by live's name for it.
 #[test]
 fn a_text_expression_is_translated_as_one() {
     let features = json!({ "features": [
@@ -1282,7 +1283,12 @@ fn a_text_expression_is_translated_as_one() {
                   { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorHorizontal", "value": false },
                   { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorVertical", "value": false }
               ] }],
-          "constraints": [] }
+          // Its height by its box's left side (live's name for it).
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "LENGTH", "parameters": [
+              { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "t.sketch_text.left" },
+              { "btType": "BTMParameterEnum-145", "parameterId": "direction", "value": "MINIMUM" },
+              { "btType": "BTMParameterQuantity-147", "parameterId": "length", "expression": "4.5 mm" }
+          ] }] }
     ], "sketches": { "sketches": [{ "featureId": "FS", "geomEntities": [
         { "id": "t", "entityType": "sketchText", "startPoint": [-0.0018872, 0.002], "direction": [0.0037744, 0.0], "textAscent": 0.0045, "text": "" }
     ] }] } });
@@ -1293,6 +1299,8 @@ fn a_text_expression_is_translated_as_one() {
     assert_eq!(step.status.as_deref(), Some("Ok"), "{:?}", step.message);
     let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
     assert_eq!(g["texts"][0]["text"], "toString(roundToPrecision(6 mm / mm, 0))", "{g}");
+    let dims = g["constraints"].as_array().unwrap().iter().filter(|c| c["id"].as_str().is_some_and(|i| i.starts_with("dim:"))).count();
+    assert_eq!(dims, 1, "the height: {g}");
     // "6": its outline and its counter, where live's MIDPOINT solved it (the stored baseline is at y 7 mm): centred
     // on x 0 between y 2 and 6.5 mm.
     let regions = g["regions"].as_array().unwrap();

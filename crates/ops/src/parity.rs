@@ -2602,7 +2602,7 @@ impl<'a> Translator<'a> {
             self.use_projected(&oid, &id, u, problems);
         }
         for t in &texts {
-            if let Err(e) = self.sketch_text(&id, t, map) {
+            if let Err(e) = self.sketch_text(&oid, &id, t, map) {
                 problems.push(format!("sketch text {}: {e}", t["entityId"].as_str().unwrap_or("?")));
             }
         }
@@ -2638,7 +2638,7 @@ impl<'a> Translator<'a> {
     /// A text entity as the Text tool makes it: its first baseline's start,
     /// the ascent as height, the font file's family and style, mirrored as
     /// live's; turned when its baseline isn't along our x.
-    fn sketch_text(&mut self, id: &str, t: &Value, map: SketchMap) -> Result<(), String> {
+    fn sketch_text(&mut self, oid: &str, id: &str, t: &Value, map: SketchMap) -> Result<(), String> {
         let param = |name: &str| t["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).map(|p| p["value"].clone()).unwrap_or(Value::Null);
         let num = |k: &str| t[k].as_f64().ok_or_else(|| format!("no {k}"));
         let (x, y, dx, dy, ascent) = (num("baselineStartX")?, num("baselineStartY")?, num("baselineDirectionX")?, num("baselineDirectionY")?, num("ascent")?);
@@ -2683,6 +2683,16 @@ impl<'a> Translator<'a> {
             args["expression"] = json!(true);
         }
         let made = self.call("sketch_text", args)?;
+        // Its box's baseline and left side by live's names (ours: bottom, right, top, left; the bottom on the
+        // baseline), for the constraints and dimensions on them (c2-valve-config's height of 4.5 mm, its left side's
+        // midpoint). Not the right and top: their place is the text's width, which our font's advances give a hair
+        // off live's (c2-hex-bookcase-derived's MIDPOINT on a right side moved it 0.0125 mm).
+        let lines: Vec<String> = made["created"].as_array().into_iter().flatten().filter(|c| c["type"] == "line").filter_map(|c| c["id"].as_str().map(str::to_string)).collect();
+        if let (Some(tid), [bottom, _, _, left]) = (t["entityId"].as_str(), lines.as_slice()) {
+            for (side, line) in [("baseline", bottom), ("left", left)] {
+                self.sketch_entities.insert((oid.to_string(), format!("{tid}.sketch_text.{side}")), line.clone());
+            }
+        }
         let angle = (ahead[1] - start[1]).atan2(ahead[0] - start[0]);
         if angle.abs() > 1e-9 {
             let created: Vec<String> = made["created"].as_array().into_iter().flatten().filter_map(|c| c["id"].as_str().map(str::to_string)).collect();
