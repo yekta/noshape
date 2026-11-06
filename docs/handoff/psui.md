@@ -585,6 +585,14 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N000000000. (11-06 00:45) **First-frames hitch (lead 11-06):** the bench's gated stats are the steady state (its first
+    30 frames left out); their max per frame is its own row ("First frames", analyze.py; `--gate-first-frames-gpu MS`
+    once it's under a frame) and each frame is logged (`BENCH FIRST FRAMES`). In every Mac run the first window has
+    one color pass of 66-134 ms, one sil-cull of 41-49 ms (never again), overlay 10-16 ms, r.prep 20-41 ms. Diagnosis
+    run 42137141138 (perf/psui-firstframes): `preroll@pan` (NOSHAPE_PERF_BENCH_PREROLL=10: still frames first: the
+    idle wait's or the move's?) and `nosil@pan` (NOSHAPE_SIL_CULL=0). Suspects: sil-cull's new runs (buffers
+    zero-filled on first use), first draws of instances only the moving view shows (LOD boxes), GPU wake after the
+    60 s idle.
 N00000000. (11-06 00:20) **perf 42117840554 (main@aadc61e, first macOS 26 run):** macOS 26 green, no regression; NIST 2×
     orbit / pan / zoom GPU mean 6.86 / 6.79 / 6.19 ms (p95 ≤ 8.01), the 120 fps target met; parts-1000 and
     pins-assembly-1000 ≤ 6.4 ms. macOS 15 failed two false regressions, readback pan / zoom GPU p95 7.20 -> 11.16 /
