@@ -644,9 +644,16 @@ function points(table is array, planes is array)
         .map(|k| {
             let (u, v) = ((k / n) as f64 / n as f64, (k % n) as f64 / n as f64);
             let (s, c) = (u * std::f64::consts::TAU).sin_cos();
-            let origin = Value::Array(Arc::new(vec![length(0.025 * c), length(0.025 * s), length(0.06 * v)]), vector);
-            let normal = Value::Array(Arc::new(vec![Value::num(c), Value::num(s), Value::num(0.0)]), vector);
-            let x = Value::Array(Arc::new(vec![Value::num(-s), Value::num(c), Value::num(0.0)]), vector);
+            // (As the host makes them: compact while FeatureScript runs on compact values.)
+            let three = |p: [f64; 3], unit: Option<&Value>| match (crate::interp::compact_values(), unit) {
+                (true, Some(u)) => Value::Vector(crate::value::Compact { v: p, unit: crate::value::unit_id(u).expect("meter"), len: crate::value::VecLen::Three }),
+                (true, None) => Value::Vector(crate::value::Compact { v: p, unit: crate::value::UnitId(0), len: crate::value::VecLen::Three }),
+                (false, Some(_)) => Value::Array(Arc::new(p.iter().map(|x| length(*x)).collect()), vector),
+                (false, None) => Value::Array(Arc::new(p.iter().map(|x| Value::num(*x)).collect()), vector),
+            };
+            let origin = three([0.025 * c, 0.025 * s, 0.06 * v], Some(&meter));
+            let normal = three([c, s, 0.0], None);
+            let x = three([-s, c, 0.0], None);
             Value::Map(Arc::new(Map::from([(keys[0].clone(), origin), (keys[1].clone(), normal), (keys[2].clone(), x)])), plane)
         })
         .collect();

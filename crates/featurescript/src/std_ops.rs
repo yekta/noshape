@@ -163,17 +163,40 @@ fn control_point_matrix(v: &Value) -> bool {
     true
 }
 
-/// A ValueWithUnits: its map (none: compact), tag, value and unit.
+/// A ValueWithUnits: its map (none: compact), tag, value and unit (a compact one's by id, its map fetched only when
+/// read).
 struct Vwu<'a> {
     map: Option<&'a Arc<Map>>,
     tag: Tag,
     value: f64,
-    unit: &'a Value,
+    unit: Unit<'a>,
+}
+
+#[derive(Clone, Copy)]
+enum Unit<'a> {
+    Id(UnitId),
+    Map(&'a Value),
+}
+
+/// The unit map of `u`.
+fn unit_of<'a>(u: &Unit<'a>) -> &'a Value {
+    match u {
+        Unit::Id(id) => unit_value(*id),
+        Unit::Map(v) => v,
+    }
+}
+
+/// Whether two units are the same map (two ids: the same id; the table holds each map once).
+fn same_unit(a: &Unit, b: &Unit) -> bool {
+    match (a, b) {
+        (Unit::Id(x), Unit::Id(y)) => x == y,
+        _ => unit_of(a) == unit_of(b),
+    }
 }
 
 fn vwu(v: &Value) -> Option<Vwu<'_>> {
     if let Value::Quantity(x, u) = v {
-        return Some(Vwu { map: None, tag: vwu_tag()?, value: *x, unit: unit_value(*u) });
+        return Some(Vwu { map: None, tag: vwu_tag()?, value: *x, unit: Unit::Id(*u) });
     }
     let Value::Map(map, tag) = v else { return None };
     if Some(*tag) != vwu_tag() {
@@ -184,7 +207,7 @@ fn vwu(v: &Value) -> Option<Vwu<'_>> {
         None => (map.get(&UNIT_KEY)?, map.get(&VALUE_KEY)?),
     };
     let Value::Number(value, Tag::NONE) = value else { return None };
-    Some(Vwu { map: Some(map), tag: *tag, value: *value, unit })
+    Some(Vwu { map: Some(map), tag: *tag, value: *value, unit: Unit::Map(unit) })
 }
 
 fn number(v: &Value) -> Option<f64> {
@@ -299,7 +322,7 @@ fn product(tag: Tag, u1: &Value, u2: &Value, x: f64, compact: bool) -> Option<Va
 
 /// `reciprocal`: every exponent negated, the value inverted.
 fn reciprocal(v: &Vwu) -> Option<(Value, f64)> {
-    let (m, t) = exponents(v.unit)?;
+    let (m, t) = exponents(unit_of(&v.unit))?;
     let unit: Map = m.iter().map(|(k, e)| Some((k.clone(), Value::num(finite(-number(e)?)?)))).collect::<Option<_>>()?;
     Some((Value::Map(Arc::new(unit), t), 1.0 / v.value))
 }
@@ -325,7 +348,7 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>, compact: bool) -> Option
     match name {
         "operator+" | "operator-" => {
             let (a, b) = (vwu(a)?, vwu(b)?);
-            if a.unit != b.unit {
+            if !same_unit(&a.unit, &b.unit) {
                 return None;
             }
             let x = if name == "operator+" { a.value + b.value } else { a.value - b.value };
@@ -333,17 +356,17 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>, compact: bool) -> Option
             set(if !unique(&a) && unique(&b) && plain(&a) && plain(&b) { 1 } else { 0 }, x)
         }
         "operator*" => match (vwu(a), vwu(b)) {
-            (Some(a), Some(b)) => product(a.tag, a.unit, b.unit, a.value * b.value, compact).map(Out::New),
+            (Some(a), Some(b)) => product(a.tag, unit_of(&a.unit), unit_of(&b.unit), a.value * b.value, compact).map(Out::New),
             (Some(a), None) => set(0, a.value * number(b)?),
             (None, Some(b)) => set(1, b.value * number(a)?),
             (None, None) => None,
         },
         "operator/" => match (vwu(a), vwu(b)) {
             // (The units cancel: `lhs * reciprocal(rhs)`'s number, without their maps.)
-            (Some(a), Some(b)) if a.unit == b.unit && exponents(a.unit).is_some() => finite(a.value * (1.0 / b.value)).map(Out::Num),
+            (Some(a), Some(b)) if same_unit(&a.unit, &b.unit) && exponents(unit_of(&a.unit)).is_some() => finite(a.value * (1.0 / b.value)).map(Out::Num),
             (Some(a), Some(b)) => {
                 let (unit, r) = reciprocal(&b)?;
-                product(a.tag, a.unit, &unit, a.value * r, compact).map(Out::New)
+                product(a.tag, unit_of(&a.unit), &unit, a.value * r, compact).map(Out::New)
             }
             (Some(a), None) => set(0, a.value / number(b)?),
             (None, Some(b)) => {
@@ -363,7 +386,7 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>, compact: bool) -> Option
             (None, None) => None,
         },
         "operator<" => match (vwu(a), vwu(b)) {
-            (Some(a), Some(b)) => (a.unit == b.unit).then(|| Out::New(Value::bool(a.value < b.value))),
+            (Some(a), Some(b)) => same_unit(&a.unit, &b.unit).then(|| Out::New(Value::bool(a.value < b.value))),
             (Some(a), None) => (number(b)? == 0.0).then(|| Out::New(Value::bool(a.value < 0.0))),
             (None, Some(b)) => (number(a)? == 0.0).then(|| Out::New(Value::bool(0.0 < b.value))),
             (None, None) => None,

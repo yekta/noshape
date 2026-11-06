@@ -190,18 +190,31 @@ fn compact3(p: DVec3, length: bool) -> Option<Value> {
     if !noshape_featurescript::interp::compact_values() || vector_tag().is_none() {
         return None;
     }
-    let unit = if length { unit_id(&unit_spec(&[("meter", 1.0)]))? } else { UnitId(0) };
+    // (The meter's id found once.)
+    static METER: OnceLock<UnitId> = OnceLock::new();
+    let unit = match length {
+        true => match METER.get() {
+            Some(id) => *id,
+            None => *METER.get_or_init(|| unit_id(&unit_spec(&[("meter", 1.0)])).unwrap_or(UnitId(0))),
+        },
+        false => UnitId(0),
+    };
+    if length && unit.0 == 0 {
+        return None;
+    }
     Some(Value::Vector(Compact { v: [pos0(p.x), pos0(p.y), pos0(p.z)], unit, len: VecLen::Three }))
 }
 
 pub fn plane_value(f: &PlaneFrame) -> Value {
     // (Its keys made once: a Displacement map asks for a million planes.)
-    static KEYS: std::sync::LazyLock<[Value; 3]> = std::sync::LazyLock::new(|| ["origin", "normal", "x"].map(Value::key));
+    // (Its keys made once, in their order: "normal" < "origin" < "x".)
+    static KEYS: std::sync::LazyLock<[Value; 3]> = std::sync::LazyLock::new(|| ["normal", "origin", "x"].map(Value::key));
     static TAG: OnceLock<Tag> = OnceLock::new();
-    let mut m = Map::new();
-    m.insert(KEYS[0].clone(), compact3(f.origin, true).unwrap_or_else(|| point_value(f.origin)));
-    m.insert(KEYS[1].clone(), compact3(f.normal, false).unwrap_or_else(|| dir_value(f.normal)));
-    m.insert(KEYS[2].clone(), compact3(f.x, false).unwrap_or_else(|| dir_value(f.x)));
+    let m = Map::from_sorted(vec![
+        (KEYS[0].clone(), compact3(f.normal, false).unwrap_or_else(|| dir_value(f.normal))),
+        (KEYS[1].clone(), compact3(f.origin, true).unwrap_or_else(|| point_value(f.origin))),
+        (KEYS[2].clone(), compact3(f.x, false).unwrap_or_else(|| dir_value(f.x))),
+    ]);
     Value::Map(Arc::new(m), kept_tag(&TAG, "surfaceGeometry.fs", "Plane"))
 }
 

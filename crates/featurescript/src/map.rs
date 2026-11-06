@@ -63,6 +63,22 @@ impl Map {
         self.len() == 0
     }
 
+    /// A map of `entries` the caller keeps in strictly ascending key order (no comparisons made: a host's million
+    /// planes).
+    pub fn from_sorted(entries: Vec<(Value, Value)>) -> Map {
+        debug_assert!(entries.windows(2).all(|w| w[0].0 < w[1].0), "keys in ascending order");
+        Map(Repr::Small(entries)).settled()
+    }
+
+    /// A small map that is a unit and a value held as such; a long one as a B-tree.
+    fn settled(self) -> Map {
+        match &self.0 {
+            Repr::Small(v) if v.len() > SMALL => v.iter().cloned().collect(),
+            Repr::Small(v) if v.len() == 2 && unit_value_slot(&v[0].0) == Some(0) && unit_value_slot(&v[1].0) == Some(1) => v.iter().cloned().collect(),
+            _ => self,
+        }
+    }
+
     /// `{ "unit" : unit, "value" : value }`.
     pub fn with_unit_value(unit: Value, value: Value) -> Map {
         Map(Repr::UnitValue([unit, value]))

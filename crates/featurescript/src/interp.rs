@@ -254,6 +254,15 @@ const OPERATORS: [&str; 7] = ["operator+", "operator-", "operator*", "operator/"
 /// arguments' types ([`signature`]).
 type ResolveKey = (usize, bool, [u32; 6], u8);
 
+/// A compiled call site's last std operator: what [`Interp::resolved`] answered for these argument types in this
+/// generation of the overload registries (the closures check both before using it).
+pub(crate) struct Site {
+    pub generation: u64,
+    pub sig: ([u32; 6], u8),
+    pub decl: Arc<FnDecl>,
+    pub op: crate::std_ops::Op,
+}
+
 /// A resolved call: the overload (none: an operator's overloads don't apply) and the std operator it is. The set is
 /// kept so its address isn't reused while it keys this.
 struct Resolved {
@@ -264,7 +273,7 @@ struct Resolved {
 
 /// What overload resolution reads of the arguments ([`TypeRef::matches`]): each one's standard type, tag and whether
 /// it is an enum member; `None` past six arguments or tags.
-fn signature(args: &[Value]) -> Option<([u32; 6], u8)> {
+pub(crate) fn signature(args: &[Value]) -> Option<([u32; 6], u8)> {
     if args.len() > 6 {
         return None;
     }
@@ -564,6 +573,16 @@ impl Interp {
 
     /// Call the best overload of `set` for the arguments on the stack from `base`.
     fn call_set_at(&mut self, set: &Arc<OverloadSet>, base: usize) -> R<Value> {
+        // (A std function answered from the cache's own entry: no copy of its declaration.)
+        self.check_generation();
+        if let Some((sig, n)) = signature(&self.stack[base..])
+            && let Some(r) = self.resolved.get(&(Arc::as_ptr(set) as usize, false, sig, n))
+            && let (Some(d), Some(op)) = (&r.decl, r.op)
+            && let Some(v) = crate::std_ops::apply(op, d, &mut self.stack[base..], self.compact)
+        {
+            self.stack.truncate(base);
+            return Ok(v);
+        }
         let (decl, op) = match self.resolve_cached_at(set, base) {
             Ok(found) => found,
             Err(e) => {
@@ -790,6 +809,18 @@ impl Interp {
             self.resolved.insert(k, Resolved { _set: set.clone(), decl: Some(decl.clone()), op });
         }
         Ok((decl, op))
+    }
+
+    /// The std operator the cache resolved for operator `i` (`call`: a function's call set instead) on arguments of
+    /// `sig`, for a call site to keep ([`Site`]).
+    pub(crate) fn std_site(&mut self, operator: Option<usize>, call: Option<&Arc<OverloadSet>>, sig: ([u32; 6], u8)) -> Option<Site> {
+        let (ptr, try_) = match (operator, call) {
+            (Some(i), _) => (Arc::as_ptr(self.operator_sets.get(i)?.as_ref()?.as_ref()?) as usize, true),
+            (None, Some(set)) => (Arc::as_ptr(set) as usize, false),
+            _ => return None,
+        };
+        let r = self.resolved.get(&(ptr, try_, sig.0, sig.1))?;
+        Some(Site { generation: self.overloads_generation, sig, decl: r.decl.clone()?, op: r.op? })
     }
 
     /// Every loaded overload of operator `OPERATORS[i]`.
@@ -1608,8 +1639,20 @@ impl Interp {
     fn try_overload(&mut self, set: &Arc<OverloadSet>, args: &mut [Value]) -> R<Option<Value>> {
         self.check_generation();
         let key = signature(args).map(|(sig, n)| (Arc::as_ptr(set) as usize, true, sig, n));
+        // (A std operator answered from the cache's own entry: no copy of its declaration.)
+        if let Some(r) = key.and_then(|k| self.resolved.get(&k)) {
+            match (&r.decl, r.op) {
+                (None, _) => return Ok(None),
+                (Some(d), Some(op)) => {
+                    if let Some(v) = crate::std_ops::apply(op, d, args, self.compact) {
+                        return Ok(Some(v));
+                    }
+                }
+                _ => {}
+            }
+        }
         let found = match key.and_then(|k| self.resolved.get(&k)) {
-            Some(r) => r.decl.clone().map(|d| (d, r.op)),
+            Some(r) => r.decl.clone().map(|d| (d, None)),
             None => {
                 let found = match set.fns.iter().any(|f| f.arity() == args.len() && Self::satisfies(&f.param_types, args)) {
                     true => {

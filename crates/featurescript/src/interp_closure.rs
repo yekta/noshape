@@ -405,6 +405,15 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 });
             }
             let (a, b) = (expression(a), expression(b));
+            // (+ - * /: the site's std operator kept for its operands' types: no resolution per operation.)
+            let operator = match op {
+                BinOp::Add => Some(0),
+                BinOp::Sub => Some(1),
+                BinOp::Mul => Some(2),
+                BinOp::Div => Some(3),
+                _ => None,
+            };
+            let site: std::sync::OnceLock<Site> = std::sync::OnceLock::new();
             Box::new(move |i| {
                 let va = a(i)?;
                 let vb = b(i)?;
@@ -412,7 +421,25 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&va, &vb) {
                     return i.num_op(op, *x, *y);
                 }
-                i.binop_in(op, va, vb, ov.as_ref())
+                let Some(operator) = operator else { return i.binop_in(op, va, vb, ov.as_ref()) };
+                let mut pair = [va, vb];
+                let sig = signature(&pair);
+                if let (Some(s), Some(sig)) = (site.get(), sig)
+                    && s.sig == sig
+                    && s.generation == crate::compile::overloads_generation()
+                    && let Some(v) = crate::std_ops::apply(s.op, &s.decl, &mut pair, i.compact)
+                {
+                    return Ok(v);
+                }
+                let [va, vb] = pair;
+                let r = i.binop_in(op, va, vb, ov.as_ref());
+                if site.get().is_none()
+                    && let Some(sig) = sig
+                    && let Some(s) = i.std_site(Some(operator), None, sig)
+                {
+                    let _ = site.set(s);
+                }
+                r
             })
         }
         ExK::And(a, b) => {
@@ -473,6 +500,8 @@ pub(crate) fn expression(e: &Ex) -> CEx {
         ExK::Call(Callee::Overloads(set), args) => {
             let set = set.clone();
             let args: Vec<CEx> = args.iter().map(expression).collect();
+            // (The site's std function kept for its arguments' types: no resolution per call.)
+            let site: std::sync::OnceLock<Site> = std::sync::OnceLock::new();
             Box::new(move |i| {
                 i.pos = pos;
                 let base = i.stack.len();
@@ -486,7 +515,25 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                 }
                 i.pos = pos;
-                i.call_set_at(&set, base)
+                let sig = signature(&i.stack[base..]);
+                if let (Some(s), Some(sig)) = (site.get(), sig)
+                    && s.sig == sig
+                    && s.generation == crate::compile::overloads_generation()
+                {
+                    let compact = i.compact;
+                    if let Some(v) = crate::std_ops::apply(s.op, &s.decl, &mut i.stack[base..], compact) {
+                        i.stack.truncate(base);
+                        return Ok(v);
+                    }
+                }
+                let r = i.call_set_at(&set, base);
+                if site.get().is_none()
+                    && let Some(sig) = sig
+                    && let Some(s) = i.std_site(None, Some(&set), sig)
+                {
+                    let _ = site.set(s);
+                }
+                r
             })
         }
         ExK::Member(b, k, safe) => {
