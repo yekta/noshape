@@ -1749,3 +1749,33 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   Replace / relation / Insert dialogs aren't in the recorded state (only the mate dialog is): to write from live's
   recordings. Enter in the graphics doesn't accept the connector / Group dialogs (only their OK / a field's Enter):
   live's batch 1 will say.
+
+## Assemblies: handed to asm (lead 11-06 20:33 UTC)
+From now assemblies are asm's (worktree noshape-wt/asm, vibe3). skasm keeps sketches, sheet metal, the c2 sketch and
+sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open assembly threads:
+- **Live requests pending** (REQUESTS.md): 2156 batch 1, 25 asm-* scenarios (mate types, Mate connector, Insert by
+  tool and I, Group, patterns, Mirror, Replicate, Replace instance, Gear relation, Shift+S, instance / mate row
+  menus); its question (2) on whether the recorder can click and read the right-hand panels (Bill of materials,
+  Exploded views, Named positions), and with what target names. 2158 batch 2, 20 menu scenarios (new target
+  `{"empty": true}`). Both are on main; neither is recorded yet. Ask live to send the answers to asm.
+- **Batch 3** (exploded views, named positions, BOM panels) isn't written: it waits for 2156 (2). Ours follows
+  live's target names.
+- **Recorded state**: `assembly_ui_state.rs` writes the mate dialog and (c5557dd4) Mate connector, Group, the
+  patterns / Mirror / Replicate, relations and Replace instance in live's field format (`other_dialogs`). Insert has
+  its title only (kind "other"). The field labels and kinds are read from std and our dialogs, not yet from live: expect
+  corrections when batch 1 compares. `list` is the open context menu (the OS menu first, then ours).
+- **To check first when batch 1 arrives** (seen in ours, live unknown):
+  - Enter with the pointer in the graphics doesn't accept the Mate connector or Group dialog (only OK or Enter in a
+    field does). asm-mate-connector-on-face and asm-group-two-instances end with Enter there.
+  - A mate connector made by a face click + Enter isn't created.
+  - Group with two list rows + Enter makes no group.
+  - The Cylindrical dialog stays open after Enter.
+  Nobody has asked live about Enter in the graphics on its own; batch 1's recordings will answer it.
+- **Batch 2's menu items**: where live's dumped menu has an item our menus lack, I wrote the scenario with an item
+  ours has. The missing ones show up as menu-row differences once live records.
+- **UIP-ASM-FASTENED-FLAKY** (P2, open): fixed in 17:00's land (a pick that shows the background ends the mate pause;
+  `Viewport::pick_under_pointer`, `hover_unconfirmed`), not reproduced here. psui was asked to re-run it on vibe5;
+  close it once that's 4/4.
+- **Coverage**: `tools/ui-parity/coverage_assembly.py [--uncovered]` (toolbar 23/31, menu items 18/86 with batches 1-2;
+  `MOST_USED` orders the gaps). parity_assemblies data: vibe5:~/agents/skasm/parity-asm (10/10 documents, 13/13 mates
+  at 11-04).
