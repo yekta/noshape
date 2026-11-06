@@ -4,7 +4,7 @@
     analyze.py <output dir> <label> [--stills] [--gate-ui-cpu-p95 MS] [--gate-gpu-p95 MS]
                [--gate-floor-gpu-p95 MS] [--target-gpu-mean MS [--gate-target]]
                [--gate-p95 MS] [--gate-mode MODE] [--baseline DIR --max-regression FRACTION]
-               [--report-regressions]
+               [--gate-first-frames-gpu MS] [--report-regressions]
 
 Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
 <output dir>/summary.json (the next runs' baseline). Gates, on the orbit run of
@@ -17,6 +17,10 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
   --target-gpu-mean  PLAN 2.7's target for this document (NIST: 120 fps): the 2× orbit's GPU mean per frame <= MS,
                      reported; with --gate-target a gate (on once met, so it can't regress);
   --gate-p95         frame-interval p95;
+  The statistics above are the steady state: the benchmark leaves its first frames (the camera starting to move)
+  out and reports their maxima apart, in "First frames";
+  --gate-first-frames-gpu  every run's first frames: our GPU time per frame at most MS (the hitch as the camera
+                     starts moving);
   --baseline         every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
                      --max-regression worse than in DIR/summary.json, and worse by more
                      than the metric's noise floor (MIN_CHANGE);
@@ -33,7 +37,8 @@ SUMMARY = re.compile(
     r"p50 (?P<p50>[\d.]+) p95 (?P<p95>[\d.]+) p99 (?P<p99>[\d.]+) max (?P<max>[\d.]+) ms \| over 16.7 ms: (?P<o16>\d+) "
     r"\((?P<o16p>\d+)%\), over 8.3 ms: (?P<o8>\d+) \((?P<o8p>\d+)%\) \| UI-thread CPU per frame mean (?P<cpu>[\d.]+) p95 (?P<cpup95>[\d.]+) ms"
     r"(?: \| window draw per frame mean (?P<draw>[\d.]+) p95 (?P<drawp95>[\d.]+) ms, drawable wait mean (?P<wait>[\d.]+) p95 (?P<waitp95>[\d.]+) ms)?"
-    r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms(?P<done> \(submit to done\))?)?")
+    r"(?: \| GPU per frame mean (?P<gpu>[\d.]+) p95 (?P<gpup95>[\d.]+) ms(?P<done> \(submit to done\))?)?"
+    r"(?: \| first (?P<warmup>\d+) frames max: frame interval (?P<firstiv>[\d.]+) ms, UI CPU (?P<firstcpu>[\d.]+) ms, GPU (?P<firstgpu>[\d.]+) ms)?")
 
 # (metric, label, higher is better) compared against the baseline.
 COMPARED = [("fps", "fps", True), ("p95", "frame-interval p95", False), ("cpup95", "UI CPU p95", False), ("gpup95", "GPU p95", False)]
@@ -170,6 +175,7 @@ def main():
     ap.add_argument("--baseline")
     ap.add_argument("--max-regression", type=float, default=0.10)
     ap.add_argument("--report-regressions", action="store_true")
+    ap.add_argument("--gate-first-frames-gpu", type=float)
     args = ap.parse_args()
     rows = runs(args.out)
     lines = [f"### Viewport benchmark: {args.label}", "",
@@ -186,6 +192,13 @@ def main():
                      f"{int(r['o8'])} ({int(r['o8p'])}%) | {int(r['o16'])} ({int(r['o16p'])}%) | {r['cpu']:.2f}, {r['cpup95']:.2f} ms | {draw} | {gpu} | {renders} |")
     if rows:
         lines += ["", f"GPU: {rows[0]['adapter']}"]
+    # The warm-up the steady-state rows above leave out: a slow frame here is a hitch as the camera starts moving.
+    first = [r for r in rows if not r.get("missing") and r.get("warmup") is not None]
+    if first:
+        lines += ["", "First frames (the camera starting to move; left out of the rows above), max per frame:", "",
+                  "| run | frames | frame interval | UI CPU | GPU |", "|---|---|---|---|---|"]
+        for r in first:
+            lines.append(f"| {r['mode']} {r['kind']} | {int(r['warmup'])} | {r['firstiv']:.2f} ms | {r['firstcpu']:.2f} ms | {r['firstgpu']:.2f} ms |")
     # Launch order: texture orbit (the job's first: cold shader caches), then
     # the rest.
     started = sorted((r for r in rows if r.get("frame_ms") is not None), key=lambda r: (r["log"] != "texture-orbit.log", r["log"]))
@@ -262,6 +275,15 @@ def main():
             lines.append(f"{what} 120 fps (2× orbit) GPU mean {r['gpu']:.2f} <= {args.target_gpu_mean} ms: {'met' if met else 'not met'}")
             if args.gate_target and not met:
                 failures.append(f"120 fps target: 2× orbit GPU mean {r['gpu']:.2f} ms > {args.target_gpu_mean} ms")
+    if args.gate_first_frames_gpu is not None:
+        for r in measured:
+            if r.get("firstgpu") is None:
+                lines.append(f"Gate first frames ({r['mode']} {r['kind']}): not reported by this build (skipped)")
+                continue
+            ok = r["firstgpu"] <= args.gate_first_frames_gpu
+            lines.append(f"Gate first frames ({r['mode']} {r['kind']}) GPU max {r['firstgpu']:.2f} <= {args.gate_first_frames_gpu} ms: {'OK' if ok else 'FAILED'}")
+            if not ok:
+                failures.append(f"first frames: {r['mode']} {r['kind']} GPU max {r['firstgpu']:.2f} ms > {args.gate_first_frames_gpu} ms")
     base_path = os.path.join(args.baseline, "summary.json") if args.baseline else None
     # The benchmark document (perf.yml FIXTURE): a baseline of another one
     # (a run dispatched with `fixture`, e.g. live-30's 24 instances against

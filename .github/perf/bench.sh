@@ -81,7 +81,7 @@ for run in "${RUNS[@]}"; do
     fi
     wait_for 'BENCH SUMMARY' "$log" $((DELAY + 600)) || echo "::warning::no BENCH SUMMARY for $mode $kind"
     kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
-    grep -a "viewport frames\|GPU:\|orbit bench\|BENCH SUMMARY\|regen\[\|panicked\|ERROR" "$log" | cut -c1-400
+    grep -a "viewport frames\|GPU:\|orbit bench\|BENCH FIRST\|BENCH SUMMARY\|regen\[\|panicked\|ERROR" "$log" | cut -c1-400
     rm -rf "$work"
   }
 done

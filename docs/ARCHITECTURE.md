@@ -219,7 +219,9 @@ like a 125 Hz mouse drag (after zooming to fit) and logs the presented fps
 and a `BENCH SUMMARY` line: presentation path, device pixels, presented fps,
 window renders, frame-interval mean/p50/p95/p99/max, frames over 16.7 / 8.3 ms
 and **UI-thread CPU time per frame** (thread CPU clock, so it holds on a busy
-machine); with `NOSHAPE_PERF_BENCH=zoom` it scroll-zooms instead. GPU cost analysis:
+machine), all over the steady state: the first 30 frames (the camera starting to move) are reported apart, their
+maxima in the summary and each frame in `BENCH FIRST FRAMES` (`NOSHAPE_PERF_BENCH_PREROLL=<ticks>` redraws the still
+view first); with `NOSHAPE_PERF_BENCH=zoom` it scroll-zooms instead. GPU cost analysis:
 `NOSHAPE_PERF_MSAA=<n>` and `NOSHAPE_PERF_SKIP=lines,meshes`.
 
 ## Application structure (crates/app)

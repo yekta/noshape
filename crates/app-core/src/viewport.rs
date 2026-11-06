@@ -42,6 +42,12 @@ fn bench_driven_by_frames() -> bool {
     *ON.get_or_init(|| std::env::var("NOSHAPE_PERF_BENCH_DRIVE").is_ok_and(|v| v == "frames"))
 }
 
+/// `NOSHAPE_PERF_BENCH_PREROLL=<ticks>`: the benchmark redraws the still view this many ticks before it moves.
+fn bench_preroll() -> u64 {
+    static N: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *N.get_or_init(|| std::env::var("NOSHAPE_PERF_BENCH_PREROLL").ok().and_then(|v| v.parse().ok()).unwrap_or(0))
+}
+
 /// `style` with what Onshape's interactive detail settings leave out.
 fn interactive_style(style: noshape_render::Style, d: &nav::DetailSettings) -> noshape_render::Style {
     let mut s = style;
@@ -424,6 +430,13 @@ pub struct Viewport {
 /// delay, the camera is rotated every 8 ms (like a 125 Hz mouse during a
 /// right-drag) until `<frames>` frames were presented; then fps and the
 /// stage timings are logged.
+/// The benchmark's warm-up: its first frames (the camera starting to move) are reported apart (`first … frames max`,
+/// each frame in `BENCH FIRST FRAMES`) and left out of the steady-state statistics the gates compare.
+const BENCH_WARMUP: usize = 30;
+
+/// The per-frame samples the benchmark keeps (its GPU time, and the stages its first frames are reported by).
+const BENCH_SERIES: [&str; 7] = ["r.gpu_ms", "r.done_ms", "r.prep", "r.encode_submit", "r.pass.sil-cull", "r.pass.color", "r.pass.overlay"];
+
 struct OrbitBench {
     frames: u64,
     started: Option<Instant>,
@@ -1512,8 +1525,9 @@ impl Viewport {
             let Some(b) = &mut self.bench else { return false };
             log::info!(target: "perf", "orbit bench: start ({} frames, {} instances, {:.0}x{:.0} logical px, scale {})", b.frames, self.scene.instances.len(), f32::from(self.bounds.size.width), f32::from(self.bounds.size.height), self.scale);
             noshape_render::perf::reset();
-            noshape_render::perf::series_start("r.gpu_ms");
-            noshape_render::perf::series_start("r.done_ms");
+            for stage in BENCH_SERIES {
+                noshape_render::perf::series_start(stage);
+            }
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
             match b.kind {
@@ -1531,14 +1545,35 @@ impl Viewport {
             let el = b.started.map(|t| t.elapsed().as_secs_f64()).unwrap_or(1.0);
             log::info!(target: "perf", "orbit bench: {presented} frames in {:.0} ms = {:.1} fps", el * 1000.0, presented as f64 / el);
             log::info!(target: "perf", "orbit bench: {} window renders for {presented} presented frames", b.renders);
-            let over = |ms: f32| b.intervals.iter().filter(|&&i| i > ms).count();
+            let kind = match b.kind {
+                BenchKind::Orbit => "orbit",
+                BenchKind::Zoom => "zoom",
+                BenchKind::Pan => "pan",
+                BenchKind::Drag => "drag",
+                BenchKind::Pick => "pick",
+                BenchKind::Hover => "hover",
+            };
+            let mut series: Vec<(&str, Vec<f32>)> = BENCH_SERIES.iter().map(|&k| (k, noshape_render::perf::series_take(k))).collect();
+            series.extend([("v.frame_interval", b.intervals.clone()), ("ui_cpu", b.ui_cpu.clone())]);
+            // Each frame of the warm-up (a hitch the user sees when the camera starts moving), then left out of the
+            // steady-state statistics below.
+            let firsts: Vec<String> = series.iter().filter(|(_, v)| !v.is_empty()).map(|(k, v)| format!("{k} {}", v.iter().take(BENCH_WARMUP).map(|x| format!("{x:.1}")).collect::<Vec<_>>().join(" "))).collect();
+            log::info!(target: "perf", "BENCH FIRST FRAMES {kind}: {}", firsts.join(" | "));
+            let first_max = |v: &[f32]| v.iter().take(BENCH_WARMUP).fold(0.0f32, |m, &x| m.max(x));
+            let steady = |v: &mut Vec<f32>| -> Vec<f32> { v.split_off(BENCH_WARMUP.min(v.len())) };
+            let take = |series: &mut Vec<(&str, Vec<f32>)>, k: &str| series.iter_mut().find(|(n, _)| *n == k).map(|(_, v)| std::mem::take(v)).unwrap_or_default();
+            let (mut gpu_all, mut done_all) = (take(&mut series, "r.gpu_ms"), take(&mut series, "r.done_ms"));
+            let first_gpu = if gpu_all.is_empty() { first_max(&done_all) } else { first_max(&gpu_all) };
+            let (first_iv, first_ui) = (first_max(&b.intervals), first_max(&b.ui_cpu));
+            let mut intervals = steady(&mut b.intervals);
+            let over = |ms: f32| intervals.iter().filter(|&&i| i > ms).count();
             let (over60, over120) = (over(1000.0 / 60.0 + 1.0), over(1000.0 / 120.0 + 1.0));
-            let iv = noshape_render::perf::Stats::of(&mut b.intervals);
-            let ui = noshape_render::perf::Stats::of(&mut b.ui_cpu);
-            let draw = noshape_render::perf::Stats::of(&mut b.window_draw);
-            let wait = noshape_render::perf::Stats::of(&mut b.drawable_wait);
-            let gpu = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.gpu_ms"));
-            let done = noshape_render::perf::Stats::of(&mut noshape_render::perf::series_take("r.done_ms"));
+            let iv = noshape_render::perf::Stats::of(&mut intervals);
+            let ui = noshape_render::perf::Stats::of(&mut steady(&mut b.ui_cpu));
+            let draw = noshape_render::perf::Stats::of(&mut steady(&mut b.window_draw));
+            let wait = noshape_render::perf::Stats::of(&mut steady(&mut b.drawable_wait));
+            let gpu = noshape_render::perf::Stats::of(&mut steady(&mut gpu_all));
+            let done = noshape_render::perf::Stats::of(&mut steady(&mut done_all));
             // Our GPU time per frame: from timestamp queries where the device has them, else (Metal) each frame's
             // submit to done (its GPU work, plus any wait behind the frame before it).
             let gpu = if gpu.n > 0 {
@@ -1551,15 +1586,7 @@ impl Viewport {
             let (w, h) = ((f32::from(self.bounds.size.width) * self.scale).round(), (f32::from(self.bounds.size.height) * self.scale).round());
             log::info!(
                 target: "perf",
-                "BENCH SUMMARY {} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms | window draw per frame mean {:.2} p95 {:.2} ms, drawable wait mean {:.2} p95 {:.2} ms{gpu}",
-                match b.kind {
-                    BenchKind::Orbit => "orbit",
-                    BenchKind::Zoom => "zoom",
-                    BenchKind::Pan => "pan",
-                    BenchKind::Drag => "drag",
-                    BenchKind::Pick => "pick",
-                    BenchKind::Hover => "hover",
-                },
+                "BENCH SUMMARY {kind} ({}): {w}x{h} device px, {} instances | presented {:.1} fps, {} window renders | frame interval mean {:.2} p50 {:.2} p95 {:.2} p99 {:.2} max {:.2} ms | over 16.7 ms: {over60} ({:.0}%), over 8.3 ms: {over120} ({:.0}%) | UI-thread CPU per frame mean {:.2} p95 {:.2} ms | window draw per frame mean {:.2} p95 {:.2} ms, drawable wait mean {:.2} p95 {:.2} ms{gpu} | first {BENCH_WARMUP} frames max: frame interval {first_iv:.2} ms, UI CPU {first_ui:.2} ms, GPU {first_gpu:.2} ms",
                 match (self.shown_texture.is_some(), bench_driven_by_frames()) {
                     (true, false) => "frames on the GPU",
                     (true, true) => "frames on the GPU, driven by frames",
@@ -1593,6 +1620,12 @@ impl Viewport {
             noshape_render::perf::record("v.bench_tick", now - t);
         }
         let (kind, ticks, grab) = (b.kind, b.ticks, b.grab);
+        if ticks <= bench_preroll() {
+            // The view redrawn as it is before the camera moves (whether a first-frames hitch is the move's or any
+            // frame's after the idle wait).
+            self.request_frame(cx);
+            return true;
+        }
         let size = self.size();
         let h = size.y;
         match kind {
