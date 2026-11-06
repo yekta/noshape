@@ -239,7 +239,9 @@ impl FeatureDialog {
                     if !(s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS)) {
                         text.push(format!("Add {item_label}"));
                     }
-                    fields.push(json!({ "label": label, "kind": "other", "text": text.join(" "), "state": "ok" }));
+                    // Invalid when the feature's error blames it (live ui-parity fill-tool: an empty Edges array).
+                    let state = if self.field_error(s.id).is_some() { "error" } else { "ok" };
+                    fields.push(json!({ "label": label, "kind": "other", "text": text.join(" "), "state": state }));
                 }
                 _ => {}
             }

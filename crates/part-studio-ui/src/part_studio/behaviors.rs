@@ -1387,6 +1387,10 @@ impl PartStudioView {
                 d.set_value("makeCopy", ParamValue::Bool(true), cx);
             });
         }
+        // The menu's setup is how the dialog opens, not a step (live ui-parity part-menu-copy-here: Undo off).
+        if let Some(e) = &mut self.edit {
+            e.history = super::DraftHistory::new(&e.dialog.read(cx).feature);
+        }
     }
 
     /// Name of default geometry (renamed or Origin / Top / Front / Right).
