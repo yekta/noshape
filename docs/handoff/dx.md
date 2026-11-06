@@ -29,6 +29,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   as many (`parts_by_count`).
 - 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
   profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+## 11-06 23:31 UTC: drawing menus (lead: the biggest gap)
+- drw-* batches 6-10 written and filed (REQUESTS 22:47 onward): 108 scenarios; tools 44/58, menus 47/108 (the 14 rows
+  of the view menu's unreachable Crop / Break / More section views submenus and Insert BOM / hole table removed with
+  that code: live's view menu has none; its tables come from Insert custom table of … / Insert BOM for …).
+- Fixed from behaviours.md: the empty sheet's menu with a selection (Paste · Copy · Paste as table | Clear selection ·
+  Zoom to fit); Break view (✓ applies, Esc leaves nothing, Vertical | Horizontal, 10 mm / 0.5 in, a break line's
+  menu Edit... · Paste · Paste as table | Clear selection · Zoom to fit · Delete). Our callout with no BOM row reads
+  "----" and is red: live's (request 1647).
+- Waiting on live's recordings: batches 4-10, batch 3's three questions, the dialogs ours doesn't record yet (Drawing
+  / Sheet properties, Move to sheet, Show/hide edges / sketches, table properties, Resize, Adjust linestyle, Break /
+  Crop view, Hatch).
+
 ## 11-06 22:30 UTC: exchange, lead's rule (match live where it is cleaner; its import's losses are its shortcoming)
 - Ours imports live's files 44/48 at 22:00, hose IGES since (12/12/0 as its model). IGES: B-spline faces on analytic
   surfaces rebuilt on them, a face's pieces on copies of one B-spline merged, a whole torus made with its seams (o-ring:
