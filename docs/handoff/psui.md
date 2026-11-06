@@ -609,6 +609,18 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N0000000000000. (11-06 18:06) **Remembered feature values and batches 10-12 (lead 11-06).** Hole memory is ours as live
+    found it (1987: on ✓, per account and type, every document, lengths per document unit; `feature_settings`). The
+    suite's two Hole differences were live's account state: a scenario's `"remembered"` (README) seeds the run's config
+    (main.rs keeps the memory under the driver when NOSHAPE_UI_REMEMBERED is set); the seeds in hole-metric-tab /
+    hole-countersink-tab are inferred from live's dialogs, asked live to confirm (REQUESTS 17:28). A real bug it showed:
+    std's holeEditLogic copies the hidden V2 sizes back on a table switch and ours had none (custom
+    `hole_v2_synced`). Batches 10 (camera menu, sketch dimension menu), 11 (configurations: targets config_more /
+    config_row) and 12 (shortcuts, last sketch tools) filed with live. Coverage: toolbar 47/76, sketch tools 55/55,
+    menus 78/117, shortcuts 78/89 (the rest of the shortcuts are tabs, windows, assembly and mate keys). Next: the
+    toolbar's remaining 29 (surfaces, curves, sheet metal, frames), menus' remaining 39 (appearance panel rows,
+    folders' Rename, expressions on number fields), and live's recordings as they arrive.
+
 N000000000000. (11-06 15:23) **ui-parity coverage and live's batches (lead 11-06: menus are the biggest gap).** Batches
     6-9 (58 scenarios: menus, then the toolbar's uncovered tools) are on main and filed in live/REQUESTS.md (12:39,
     12:55, 13:18, 13:22). Coverage: toolbar 47/76, sketch tools 43/55, menus 62/117, shortcuts 59/89. Live's first
