@@ -1,6 +1,6 @@
 {
  "scenario": "plane-mid-plane",
- "recorded": "2026-11-06T09:36:55.527Z",
+ "recorded": "2026-11-06T10:52:15.715Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "cf7c072b03862528d1a33e9e",
+  "element": "4f3800d3fa24e770a346e093",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -92,7 +92,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": null,
@@ -135,7 +135,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": null,
@@ -217,7 +217,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 35030
+   "t": 28472
   },
   {
    "step": 2,
@@ -257,7 +257,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": null,
@@ -293,7 +293,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": null,
@@ -368,7 +368,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 39859
+   "t": 32962
   },
   {
    "step": 3,
@@ -400,7 +400,7 @@
         "Top plane"
        ],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": null,
@@ -438,7 +438,7 @@
          "Top plane"
         ],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": null,
@@ -519,7 +519,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 48940
+   "t": 37158
   },
   {
    "step": 4,
@@ -684,7 +684,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 62426
+   "t": 45679
   },
   {
    "step": 5,
@@ -749,7 +749,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 65301
+   "t": 47940
   },
   {
    "step": 6,
@@ -814,7 +814,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 69482
+   "t": 52095
   }
  ]
 }

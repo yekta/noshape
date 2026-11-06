@@ -1,6 +1,6 @@
 {
  "name": "shell-face-thickness-typed",
- "about": "block: the top face, Shell, Thickness 2, Enter, ✓",
+ "about": "block: the top face, Shell, Shell thickness 2 (live's label), Enter, ✓",
  "area": "psui",
  "source": "coverage 11-06 (lead: selection, filters, most-used tools)",
  "start": "block",
@@ -24,7 +24,7 @@
   {
    "do": "click",
    "on": {
-    "field": "Thickness"
+    "field": "Shell thickness"
    }
   },
   {

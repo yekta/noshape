@@ -1,6 +1,6 @@
 {
  "name": "sketch-circumscribed-polygon",
- "about": "Sketch on Top, Circumscribed polygon (the polygon dropdown): centre, then a corner",
+ "about": "Sketch on Top, Circumscribed polygon (the polygon dropdown): centre, then a corner; live keeps the polygon pending (its sides count editable) after the corner click until Enter, and Escape cancels it, so Enter commits it",
  "area": "psui",
  "source": "coverage 11-06 (lead: most-used tools first)",
  "start": "empty",
@@ -41,6 +41,10 @@
      0
     ]
    }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
   },
   {
    "do": "key",
