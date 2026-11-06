@@ -1056,6 +1056,19 @@ fn an_invalid_fuse_result_unifies_in_bounded_time() {
     assert!(secs < 30.0, "unify took {secs:.1} s");
 }
 
+/// DRAFT-NONDETERMINISTIC (qa's cli-draft-hang2): the face deletion in a Draft's fallback (faces 5, 14, 15 of the
+/// dumped shape) timed: past its 10 s CPU budget here, under it on vibe5, so the Draft's result depended on the machine.
+#[test]
+#[ignore = "T2 probe: timing"]
+fn draft_fallback_face_deletion_probe() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/draft-defeature-slow.brep");
+    let s = k::read_brep(&path).expect("the shape");
+    let faces: Vec<k::Shape> = [5usize, 14, 15].iter().map(|&i| s.sub_shape(k::ShapeType::Face, i).unwrap()).collect();
+    let t = std::time::Instant::now();
+    let r = k::delete_faces(&s, &faces);
+    println!("delete faces: {:?} in {:.2} s", r.as_ref().map(|r| r.shape.count(k::ShapeType::Face)).map_err(|e| e.to_string()), t.elapsed().as_secs_f64());
+}
+
 /// Shell's common with hyperbola edges (14218a58), our result (tests/data/unify): walls on one cylinder USD leaves
 /// apart, merged after it, and USD's joining of their boundary's edges then left the shape invalid. That merge is
 /// dropped then: valid, OCCT's counts (42 faces, 100 edges).

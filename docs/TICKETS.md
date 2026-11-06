@@ -705,6 +705,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   decides Draft 4 / 6. Output: vibe3:~/qa/cli/dn-v32.out.
   qa 11-06 03:20: **green 2532af01 flips too** (built at baseline like the release since 11-06): 1 / 12 opens gave 37305.64,
   Draft 7 Ok in 2 / 12, load 3–5.7 (vibe3:~/qa/cli/dn-g2532af01.out). So it isn't release-only; it's rarer on a faster build.
+  core 11-06 10:00: **found: a CPU budget decided it.** The same binary gives 29954.56 on this Skylake every time and
+  37305.64 on vibe5 (Zen 5) every time, 24 / 24 under load; NOSHAPE_DUMP_OPS on both: identical inputs up to a face
+  deletion in a Draft's fallback (draft_reblend: the blends deleted, drafted, filleted again; faces 5, 14, 15 of a
+  16-face part) that takes 4.5 s on vibe5 and over 10 s here, past op_defeature's budget, a third of the blend
+  budget (10 s, "a face deletion takes milliseconds"): failed here, so the Draft took another way. Under load the
+  CPU time straddles 10 s: qa's flips. Fixed: face deletion gets the blend's 30 s (here then 37305.64 as on vibe5).
+  Left: (a) why OCCT's Defeaturing takes seconds there (404 "Projecting edges on faces" 3.0 s, "Trimming faces"
+  1.1 s; T2 kernel bool_patterns::draft_fallback_face_deletion_probe, tests/data/draft-defeature-slow.brep); (b) any
+  budget-limited step still decides by speed near its limit: hang guards, not geometry; worth a sweep for budgets
+  sitting near what real work takes.
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,

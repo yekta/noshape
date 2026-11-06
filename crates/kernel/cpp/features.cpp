@@ -7975,8 +7975,9 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
 {
   OpOut out;
-  // A face deletion takes milliseconds; a third of a blend's budget.
-  const int r = run_budgeted(blend_budget_seconds() / 3, [&] { out = op_defeature_unbudgeted(s, faces); });
+  // A blend's budget: a third of it (10 s) decided a Draft's fallback by the machine's speed (DRAFT-NONDETERMINISTIC:
+  // qa's cli-draft-hang2 deletes three faces in 4.5 s on vibe5, 12 s on a Skylake or under load).
+  const int r = run_budgeted(blend_budget_seconds(), [&] { out = op_defeature_unbudgeted(s, faces); });
   if (r == 1)
     fail_op("delete faces took too long");
   if (r == 2)
