@@ -759,10 +759,14 @@ impl PartStudioView {
                     let Some(ed) = this.sketch.as_ref() else { return false };
                     let Some(d) = this.sketch_data(cx) else { return false };
                     let r = ed.world_per_px * 10.0;
-                    match d.sketch.point(e) {
-                        Some(q) => (q - p).length() <= r,
+                    // On screen, as the pick that hovered it (SKETCH-SCREEN-SPACE-REACH).
+                    let screen = ed.screen_metric();
+                    match (d.sketch.point(e), screen) {
+                        (Some(q), Some(m)) => m.len(q - p) <= r,
+                        (Some(q), None) => (q - p).length() <= r,
                         // Text box lines stand for their glyphs; keep them.
-                        None => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
+                        (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_distance_to(e, p, &m).is_some_and(|x| x <= r),
+                        (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
                     }
                 };
                 // A stale hover (the pick lags behind fast moves) doesn't count.
@@ -773,9 +777,10 @@ impl PartStudioView {
                     }
                     let r = ed.world_per_px * 5.0;
                     let data = self.sketch_data(cx)?;
+                    let screen = ed.screen_metric();
                     match self.context.as_ref().and_then(|c| c.sketches.iter().find(|s| s.feature == ed.feature)) {
-                        Some(s) => data.sketch.pick_with_report(p, r, &s.report),
-                        None => data.sketch.pick(p, r),
+                        Some(s) => data.sketch.pick_with_report_on_screen(p, r, &s.report, screen.as_ref()),
+                        None => data.sketch.pick_on_screen(p, r, screen.as_ref()),
                     }
                 });
                 // Dimensions and constraints to planes, model edges / vertices and

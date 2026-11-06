@@ -7,6 +7,42 @@ use glam::DVec2;
 use serde::{Deserialize, Serialize};
 use std::f64::consts::{PI, TAU};
 
+/// Sketch vectors as the view shows them: the plane's projection onto the screen, in sketch units at the view's
+/// scale (along a foreshortened direction a vector is shorter than it is). Live measures pick and inference reach
+/// on the screen (SKETCH-SCREEN-SPACE-REACH).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScreenMetric(pub glam::DMat2);
+
+impl ScreenMetric {
+    /// `v`'s length on screen.
+    pub fn len(&self, v: DVec2) -> f64 {
+        (self.0 * v).length()
+    }
+
+    /// The farthest a sketch distance within `r` on screen can be (`r` over the projection's smallest stretch), for
+    /// box tests before the distance.
+    pub fn reach(&self, r: f64) -> f64 {
+        let m = self.0;
+        let f = m.x_axis.length_squared() + m.y_axis.length_squared();
+        let det = m.determinant().abs();
+        let smallest = ((f - (f * f - 4.0 * det * det).max(0.0).sqrt()) * 0.5).max(0.0).sqrt();
+        r / smallest.max(1e-12)
+    }
+
+    /// How far `v`'s end is on screen from the line through its start along `along`.
+    pub fn off_line(&self, v: DVec2, along: DVec2) -> f64 {
+        let (v, d) = (self.0 * v, self.0 * along);
+        if d.length_squared() > 0.0 { v.perp_dot(d).abs() / d.length() } else { v.length() }
+    }
+
+    /// The point of segment `a`–`b` nearest `p` on screen.
+    pub fn closest_on_segment(&self, a: DVec2, b: DVec2, p: DVec2) -> DVec2 {
+        let (d, w) = (self.0 * (b - a), self.0 * (p - a));
+        let t = if d.length_squared() > 0.0 { (w.dot(d) / d.length_squared()).clamp(0.0, 1.0) } else { 0.0 };
+        a + (b - a) * t
+    }
+}
+
 /// Axis-aligned bounding box.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BBox {

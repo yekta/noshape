@@ -45,7 +45,7 @@ pub mod tools;
 
 pub use constraints::{reflect, Constraint, ConstraintKind, DistanceMode, Hints};
 pub use entities::{Entity, EntityKind, Geometry};
-pub use geom::{BBox, Curve2};
+pub use geom::{BBox, Curve2, ScreenMetric};
 pub use ids::{ConstraintId, EntityId};
 pub use inference::{infer, AutoConstraint, Inference, InferenceContext, InferenceKind, SketchTool, ORIGIN};
 pub use nurbs::Nurbs;

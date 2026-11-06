@@ -397,9 +397,10 @@ pub struct GlyphInfo {
     pub external: bool,
 }
 
-/// How far inference reaches, in pixels (live woolsthorpe `getInferenceRadius`: 10 px at the view's scale): snapping to
-/// points, a line turning horizontal or vertical.
-const INFERENCE_PX: f64 = 10.0;
+/// How far inference reaches on screen, in pixels: snapping to points and curves, a line turning horizontal or
+/// vertical. Live draws its inferences 15 px wide (woolsthorpe INFERENCE_POINT_SIZE_PX / INFERENCE_LINE_WIDTH_PX) and
+/// picks the pointer's pixel (INFERENCE_PICK_RADIUS_PX 0).
+const INFERENCE_PX: f64 = 7.5;
 
 /// Glyph ids of "Use" links (Onshape's use glyph on projected geometry):
 /// not solver constraints but the entity's link in `SketchData::external_refs`.
@@ -1448,6 +1449,7 @@ impl SketchEditor {
             exclude: Vec::new(),
             origin: true,
             woken: self.woken.clone(),
+            screen: self.screen_metric(),
         };
         let mut best = noshape_sketch::infer(sk, p, &ctx).into_iter().next();
         // Elliptical arc: the end snaps to the construction ellipse's axis points.
@@ -1514,7 +1516,7 @@ impl SketchEditor {
             // inferences (a point: alignment, live "skb (10-25) sketch
             // inference"): what lies within 9 px of it (the GPU hover
             // arrives a move late), else the hover.
-            if let Some(h) = data.sketch.pick(p, self.world_per_px * 9.0).or(self.hover) {
+            if let Some(h) = data.sketch.pick_on_screen(p, self.world_per_px * 9.0, self.screen_metric().as_ref()).or(self.hover) {
                 self.woken.retain(|e| *e != h);
                 self.woken.insert(0, h);
                 self.woken.truncate(10);
@@ -2077,6 +2079,7 @@ impl SketchEditor {
                     }
                     // Picks that fit but can't take the constraint: nothing is added.
                     if let Some(kind) = make_constraint(&data.sketch, c, &ids)
+                        && !data.sketch.constraints().any(|x| x.kind == kind)
                         && data.sketch.add_constraint(kind).is_ok()
                     {
                         if !solve_after_constraint(&mut data.sketch, c, &ids) {
@@ -2305,6 +2308,17 @@ impl SketchEditor {
         probe.is_some_and(|q| (q - mid).dot(n) < 0.0)
     }
 
+    /// How the view shows the plane, for pick and inference reach measured on screen as live's (none headless, or
+    /// before the view has set its map).
+    pub fn screen_metric(&self) -> Option<noshape_sketch::ScreenMetric> {
+        if self.exact_inference {
+            return None;
+        }
+        let (_, ex, ey) = self.screen_map?;
+        let m = glam::DMat2::from_cols(ex, ey);
+        (m.determinant().abs() > 1e-30).then(|| noshape_sketch::ScreenMetric(m.inverse() * self.world_per_px))
+    }
+
     /// A sketch point in screen pixels (itself without a screen map).
     fn plane_to_screen(&self, p: DVec2) -> DVec2 {
         let Some((o, ex, ey)) = self.screen_map else { return p };
@@ -2475,7 +2489,7 @@ impl SketchEditor {
     /// Trim tool: trim the curve under `p` (click, or each curve a drag crosses).
     fn trim_at(&mut self, data: &mut SketchData, p: DVec2, hovered: Option<EntityId>) -> EditOutcome {
         let r = self.world_per_px * 6.0;
-        let id = hovered.or_else(|| data.sketch.pick(p, r));
+        let id = hovered.or_else(|| data.sketch.pick_on_screen(p, r, self.screen_metric().as_ref()));
         let Some(id) = id else { return EditOutcome::none() };
         let res = if is_point(&data.sketch, id) {
             // Standalone points are deleted.
@@ -7261,7 +7275,7 @@ pub fn already_coincident(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> b
 
 /// Apply constraint `c` to a selection: n-ary constraints chain the first
 /// entity with each other one, one-entity constraints apply to each entity.
-/// Returns the number of constraints added.
+/// Returns the number of constraints applied: added, or there already (not added again).
 pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) -> Result<usize, String> {
     let mut kinds: Vec<ConstraintKind> = Vec::new();
     let pts = ids.iter().all(|e| is_point(sk, *e));
@@ -7300,7 +7314,13 @@ pub fn apply_constraint(sk: &mut Sketch, c: ConstraintTool, ids: &[EntityId]) ->
     }
     let mut n = 0;
     let mut last_err = None;
+    // One the sketch already has isn't added again, but counts as applied (live, ui-parity sketch-horizontal-key: H on
+    // a horizontal line adds nothing and clears the selection).
     for k in kinds {
+        if sk.constraints().any(|c| c.kind == k) {
+            n += 1;
+            continue;
+        }
         match sk.add_constraint(k) {
             Ok(_) => n += 1,
             Err(e) => last_err = Some(e.to_string()),
@@ -8015,6 +8035,76 @@ mod tests {
             assert!(d.sketch.point(p).unwrap().y.abs() < 1e-12);
             assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: Some(o) } if a == p && d.sketch.entity(o).is_some_and(|e| e.reference_only))));
         }
+    }
+
+    /// Live measures inference and pick reach on screen (SKETCH-SCREEN-SPACE-REACH; ui-parity sketch-horizontal-key,
+    /// sketch-vertical-key, sketch-offset): in a view that shows the plane's y four times shorter than its x, a line
+    /// 1.5 mm (15 px of the plane's x) off level is 3.75 px off on screen, inside the 7.5 px reach, so Horizontal; one
+    /// 1.5 mm off plumb is 15 px off, so no Vertical; a click 2.5 mm below a line (6.25 px) picks it.
+    #[test]
+    fn reach_is_measured_on_the_screen() {
+        let foreshortened = |ed: &mut SketchEditor| ed.screen_map = Some((DVec2::ZERO, v(PX, 0.0), v(0.0, -4.0 * PX)));
+        let (mut ed, mut d) = editor(Tool::Line);
+        foreshortened(&mut ed);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.04, 0.0115));
+        let level = d.sketch.entities().find(|e| e.kind() == EntityKind::Line).unwrap().id;
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { a, b: None } if a == level)), "Horizontal: 3.75 px off on screen");
+        let (mut ed, mut d) = editor(Tool::Line);
+        foreshortened(&mut ed);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.0115, 0.04));
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { .. })), "no Vertical: 15 px off on screen");
+        // Without the view (headless): in the plane, 15 px off level is no Horizontal.
+        let (mut ed, mut d) = editor(Tool::Line);
+        click(&mut ed, &mut d, v(0.01, 0.01));
+        click(&mut ed, &mut d, v(0.04, 0.0115));
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { .. })));
+        // A pick 2.5 mm below a line: 6.25 px on screen.
+        let (mut ed, mut d) = editor(Tool::Select);
+        let line = d.sketch.add_line(v(0.0, 0.02), v(0.03, 0.02));
+        assert_eq!(d.sketch.pick_on_screen(v(0.015, 0.0175), PX * 9.0, ed.screen_metric().as_ref()), None, "in the plane: 25 px");
+        foreshortened(&mut ed);
+        assert_eq!(d.sketch.pick_on_screen(v(0.015, 0.0175), PX * 9.0, ed.screen_metric().as_ref()), Some(line), "on screen: 6.25 px");
+    }
+
+    /// The reach in live's own view of a Top sketch (behaviours 2155: x 3.0 / 0.87 px, y 1.7 / -1.5 px a mm on
+    /// screen), as its recordings: (0, 0) to (30, 3) turns horizontal (5.7 px off level), (0, 0) to (3, 30) not
+    /// vertical (7.9 px off plumb); a point at (10, 5) isn't put on the line along y = 0 (9.6 px off it).
+    #[test]
+    fn reach_matches_lives_recordings() {
+        let lives = |ed: &mut SketchEditor| {
+            let px_per_m = glam::DMat2::from_cols(v(3.0, 0.867), v(1.7, -1.5)) * 1e3;
+            let per_px = px_per_m.inverse();
+            ed.screen_map = Some((DVec2::ZERO, per_px.x_axis, per_px.y_axis));
+        };
+        let drawn = |to: DVec2| {
+            let (mut ed, mut d) = editor(Tool::Line);
+            lives(&mut ed);
+            click(&mut ed, &mut d, v(0.0, 0.0));
+            click(&mut ed, &mut d, to);
+            d
+        };
+        let d = drawn(v(0.030, 0.003));
+        assert!(d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Horizontal { b: None, .. })), "Horizontal");
+        let d = drawn(v(0.003, 0.030));
+        assert!(!d.sketch.constraints().any(|c| matches!(c.kind, ConstraintKind::Vertical { .. })), "no Vertical");
+        let (mut ed, mut d) = editor(Tool::Point);
+        lives(&mut ed);
+        let line = d.sketch.add_line(v(0.0, 0.0), v(0.030, 0.0));
+        click(&mut ed, &mut d, v(0.010, 0.005));
+        assert!(!d.sketch.constraints().any(|c| c.kind.entities().contains(&line)), "not on the line");
+    }
+
+    /// A constraint the sketch already has isn't added again, and counts as applied (live, ui-parity
+    /// sketch-horizontal-key: H on a line drawn horizontal adds nothing and clears the selection).
+    #[test]
+    fn an_existing_constraint_isnt_added_again() {
+        let mut sk = Sketch::new();
+        let l = sk.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Horizontal, &[l]), Ok(1));
+        assert_eq!(apply_constraint(&mut sk, ConstraintTool::Horizontal, &[l]), Ok(1), "applied: it's there");
+        assert_eq!(sk.constraints().count(), 1);
     }
 
     #[test]
