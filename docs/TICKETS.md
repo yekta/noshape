@@ -631,6 +631,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P0 RELEASE-BUDGET-STEP-SPARSE (lead / core) **v0.4.33 can't publish: release.yml's "Budgeted documents" step fails on
+  every platform** (Release run 42240367775: Check Linux and Check Windows failed, macOS's check still queued): `time_cli.py
+  --limit 180 "$cli" tests/budget/*.noshape` gets the pattern itself (`FileNotFoundError: 'tests/budget/*.noshape'`), because
+  the check job's checkout is sparse (`.github/release` and `tests/perf` only) and tests/budget isn't in it. The step came in
+  with e7f452f5. Main still has the same sparse list. Fix: add `tests/budget` to that sparse-checkout, then re-run the checks.
+  The binaries themselves are good: on the run's Linux artifact the smoke = v0.4.32, the CLI runs and opens the budget
+  document on a stock ubuntu:24.04, draft-pool-hang opens in 19 s (v0.4.32 48 s, vibe3), and the Draft opens give 37305.64
+  12 / 12. (qa 2026-11-06 16:05, Release run 42240367775)
 - [ ] P2 WINDOWS-RUST-SLOW (skasm, lead 11-06 05:00) core's release timing step had Windows at ~2x Linux on fins-400 /
   knurl (2.81 / 5.70 s against 1.36 / 2.60) but 1.2x on the OCCT-heavy release-fillet-hang. skasm 11-06 07:15:
   **mostly runner hardware.** Hosted runners of one OS land on different CPUs (the timing table now names them,
