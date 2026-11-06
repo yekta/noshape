@@ -580,6 +580,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (quick_boolean builds without the indicator), Draft, defeaturing: their builds need the indicator's range passed
   (Build(range) where OCCT takes one) or a check between steps. Test: kernel `a_section_under_a_call_budget_gives_up`
   (all three in CI); build with CXXFLAGS=-DNOSHAPE_PORTABLE_BUDGET to try the deadline path on Linux.
+- [x] P0 DRAFT-POOL-HANG-MACOS (core, lead 11-06 from bool: tests/budget/draft-pool-hang.noshape didn't open in 30 min
+  on macos-15 runners, 26 s on Linux): not a budget's clock. Shell 20's Boolean (BOPTools PointNearEdge) evaluated an
+  offset face at u = -1.4e9 (its range 0..6), a singular point; Geom_OffsetSurfaceUtils' retry steps towards the centre
+  by less than the numbers' spacing there and looped forever, OCCT checking no deadline. Linux's CPU timer jumped out
+  (Shell 20 failed at 45 s, the document 26 s); macOS / Windows have the deadline alone. Reproduced on Linux with
+  -DNOSHAPE_PORTABLE_BUDGET (endless). **OCCT patch 0023**: a shift that doesn't move the point fails at once; the
+  document opens in 4 s on both paths (Shell 20 fails in 8 s, as before). Gate: release.yml "Budgeted documents"
+  (time_cli.py --limit 180 on tests/budget/*.noshape, every platform, every release). T1
+  `kernel_core::an_offset_face_far_outside_its_parameters_fails_at_once` lands after the /opt/occt sync. Still: any
+  other OCCT loop that checks no deadline hangs off Linux only; the gate is how one shows.
 
 ## Rust Boolean (bool)
 - [ ] P2 BOOL-TOL4-DRAFT-VOLUME (bool) **since per-entity tolerances stage 4 (e17bb36e1, green a4433e68) the Rust Boolean

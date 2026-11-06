@@ -1,0 +1,29 @@
+--- a/src/ModelingData/TKG3d/Geom/Geom_OffsetSurfaceUtils.pxx
++++ b/src/ModelingData/TKG3d/Geom/Geom_OffsetSurfaceUtils.pxx
+@@ -555,14 +555,23 @@
+   double aDU   = theU - theUStart;
+   double aDV   = theV - theVStart;
+   double aStep = std::max(2. * std::sqrt(aDU * aDU + aDV * aDV), Precision::PConfusion());
+-  if (aStep >= aDist)
++  if (!(aStep < aDist))
+   {
+     return false;
+   }
+ 
+   aStep /= aDist;
+-  theU += aDirU * aStep;
+-  theV += aDirV * aStep;
++  // noshape: a shift that doesn't move the point (or leaves the numbers) fails as one past the centre: from a start
++  // far outside the parameters (BOPTools' PointNearEdge asked for u = -1.4e9 on a face of 0..6) the step was below the
++  // numbers' spacing there and the retry loops never ended (endless on macOS and Windows, with no CPU timer).
++  const double aU = theU + aDirU * aStep;
++  const double aV = theV + aDirV * aStep;
++  if (!std::isfinite(aU) || !std::isfinite(aV) || (aU == theU && aV == theV))
++  {
++    return false;
++  }
++  theU = aU;
++  theV = aV;
+ 
+   return true;
+ }

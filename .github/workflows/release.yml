@@ -562,6 +562,19 @@ jobs:
           $py .github/release/time_cli.py "$cli" tests/perf/release-fillet-hang.noshape tests/perf/live-30-features.noshape \
             tests/perf/fins-400.noshape tests/perf/knurl-d25x25-45-45.noshape
 
+      # A gate: the documents whose operations run into the kernel's budgets open on every platform within the limit.
+      # Linux stops a budgeted op by its CPU timer, macOS and Windows only where OCCT checks the deadline, so a loop
+      # that doesn't check it hangs there alone (draft-pool-hang never opened on macOS while it took 26 s on Linux, 11-06).
+      - name: Budgeted documents
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cli=$(ls "$(cygpath -u "$RUNNER_TEMP")"/cli/noshape-cli-*/noshape-cli.exe); py=python
+          else
+            cli=$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli); py=python3
+          fi
+          $py .github/release/time_cli.py --limit 180 "$cli" tests/budget/*.noshape
+
   publish:
     needs: [bundle, sign, verify]
     if: github.ref_type == 'tag' && !inputs.dry_run

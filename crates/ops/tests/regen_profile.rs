@@ -253,7 +253,11 @@ fn edit_commit_profile() {
 /// couldn't stop OCCT pool work (patch 0004's parallel pairs; the first patch
 /// 0005, which also held the budget in serial pool loops). Its Drafts must stop
 /// at their budget (30 s of CPU each): the document opens in well under the
-/// 4 minutes it ran before qa stopped it (green 989f756b: 26 s).
+/// 4 minutes it ran before qa stopped it (green 989f756b: 26 s). Its 26 s were
+/// Shell 20's OCCT offset evaluation that never ended, stopped there by Linux's
+/// CPU timer alone: on macOS the document never opened (bool, 11-06). With OCCT
+/// patch 0023 it ends at once, the document in 4 s; release.yml's "Budgeted
+/// documents" opens it on every platform.
 #[test]
 #[ignore = "T2: a CLI-fuzz document with budgeted drafts (~30-70 s)"]
 fn the_draft_pool_hang_document_opens() {

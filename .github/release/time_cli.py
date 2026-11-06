@@ -1,8 +1,9 @@
-"""time_cli.py <cli> <doc>...: each document opened through the CLI's MCP server (document_open, then
+"""time_cli.py [--limit S] <cli> <doc>...: each document opened through the CLI's MCP server (document_open, then
 feature_list), best of three, in seconds; a table on stdout and in the job summary: the release's speed per platform
 (green builds opened tests/perf/release-fillet-hang.noshape 1.5x faster than v0.4.32 only because their OCCT had
-x86-64-v3 code; 11-06)."""
-import json, os, shutil, subprocess, sys, tempfile, time
+x86-64-v3 code; 11-06). With --limit, a gate: a document not open within S seconds (the CLI is stopped then) fails
+the step (tests/budget/draft-pool-hang.noshape never opened on macOS while its budgets held on Linux; 11-06)."""
+import json, os, shutil, subprocess, sys, tempfile, threading, time
 
 
 class Cli:
@@ -35,13 +36,24 @@ class Cli:
         self.p.wait(timeout=60)
 
 
-def once(cli, doc, tmp):
+def once(cli, doc, tmp, limit):
     copy = os.path.join(tmp, "t-" + os.path.basename(doc))
     shutil.copy(doc, copy)
     c = Cli(cli)
+    stop = threading.Timer(limit, c.p.kill) if limit else None
     t = time.monotonic()
-    c.call("document_open", {"path": copy})
-    n = len(c.call("feature_list", {})["features"])
+    if stop:
+        stop.start()
+    try:
+        c.call("document_open", {"path": copy})
+        n = len(c.call("feature_list", {})["features"])
+    except RuntimeError:
+        if limit and time.monotonic() - t >= limit:
+            raise RuntimeError(f"{os.path.basename(doc)}: not open after {limit:.0f} s (the CLI stopped)")
+        raise
+    finally:
+        if stop:
+            stop.cancel()
     dt = time.monotonic() - t
     c.close()
     os.remove(copy)
@@ -66,13 +78,25 @@ def cpu():
 
 
 def main():
-    cli, docs = sys.argv[1], sys.argv[2:]
+    args = sys.argv[1:]
+    limit = None
+    if args[:1] == ["--limit"]:
+        limit, args = float(args[1]), args[2:]
+    cli, docs = args[0], args[1:]
     hw = cpu()
     print(f"cpu: {hw}", flush=True)
     rows = []
     with tempfile.TemporaryDirectory() as tmp:
         for doc in docs:
-            runs = [once(cli, doc, tmp) for _ in range(3)]
+            try:
+                runs = [once(cli, doc, tmp, limit) for _ in range(3)]
+            except RuntimeError as e:
+                print(f"error: {e}", flush=True)
+                summary = os.environ.get("GITHUB_STEP_SUMMARY")
+                if summary:
+                    with open(summary, "a", encoding="utf-8") as f:
+                        f.write(f"### Budgeted documents ({os.environ.get('RUNNER_OS', '?')}): {e}\n\n")
+                sys.exit(1)
             rows.append((os.path.basename(doc), min(r[0] for r in runs), runs[0][1]))
             print(f"{rows[-1][0]}: {rows[-1][1]:.2f} s ({rows[-1][2]} features)", flush=True)
     table = "| document | open + feature list (best of 3) | features |\n|---|---|---|\n" + "".join(f"| {d} | {t:.2f} s | {n} |\n" for d, t, n in rows)
