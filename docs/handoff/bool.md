@@ -3,6 +3,24 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Shell's "a section without ends"; the slot corners' vertex (11-06 02:05 UTC)
+- Landed 018a8298 (no case taken yet, gate unchanged): a section's end within a face vertex's own tolerance ends at
+  that vertex; an input vertex splitting another argument's edge splits its own argument's edge along it too; an arc on
+  a cylinder is drawn at its circle's height (two circles 0.1 mm apart between one pair of tolerant vertices).
+- 47587a8d (OCCT's 70 s common) now stops at "two edges leave a vertex in one direction" on its plane face 2: the
+  tool's own edge 181 rises 17 um off the plane yet counts as lying on it, because this Boolean's tolerance is the
+  inputs' largest (2e-5 here) where OCCT tests an edge on a face with the two's own (1e-7 each); its two vertices,
+  one argument's, stay apart (OCCT's rule), so in the plane two edges overlap. A tolerance-policy question (the
+  Boolean's tol against per-entity tolerances), not a local fix. 3dbad70e / a3d403a5: a 0.1 mm-radius partial
+  cylinder whose circle section ends at the face's gap angle 0.24 mm off its boundary. d4939cfd, f82bed32 not looked at.
+- Slot corners (pave-filler vertex): OCCT replaces the slot's corner vertex (on the part's cylinder) with a new one at
+  the same place, its tolerance grown to the section's end 10.6 um away (non-destructive mode: the old one Deleted),
+  and the section edge ends there. Ours with the curve's end snapped to the corner (and tangent crossings merged into
+  it): counts as OCCT's, but after merging faces 78 edges against 79 (ours joins two edges through the corner).
+  WIP: /root/bool-scratch/pave-wip-1106.patch (both rules, a DBG_ADD print, brep_replay's NOSHAPE_BREP_WHYNOT prints
+  why a result isn't equivalent). Next: mark the corner Deleted (deleted_v) and keep its edges apart in unify as OCCT's
+  new vertex does.
+
 ## Parity fuses unlike OCCT's; slot corners (11-06 01:25 UTC)
 - Landed 0797fb5b: OCCT's route groups 8+ tools it takes as apart (group_disjoint, a mesh check) and never intersects
   one group's tools; the check missed flat sheets sharing an edge, so OCCT's fuse left them apart (ac1b1ab0: 47 edges
