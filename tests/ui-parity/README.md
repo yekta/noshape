@@ -207,33 +207,35 @@ feature tool counts for a scenario that clicks it, presses its shortcut or doubl
 shortcut that starts a tool counts for the tool too. Menu items labelled at run time ("Suppress Extrude 1") aren't in
 the universe. Reported with the score (docs/parity/SCORE.md).
 
-11-06, 383 scenarios (main had 311 in the morning; batch 1 adds Mate connector, Curve pattern, Boolean subtract /
+11-06, 399 scenarios (main had 311 in the morning; batch 1 adds Mate connector, Curve pattern, Boolean subtract /
 intersect, Mid plane, Chamfer and 15 sketch tools and constraints; batch 2 the face, part, feature and empty-space
 context menus; batch 3 selection, the feature list's filter, Fillet, Revolve, Shell and Three point plane; batch 4 14
-more sketch tools: the dropdowns' members, sketch fillet / chamfer, mirror, patterns, split, text):
+more sketch tools: the dropdowns' members, sketch fillet / chamfer, mirror, patterns, split, text; batch 5 Hole's tabs
+and sizes, the patterns' types and axes, Mirror's types, Point normal and Line angle planes, Extrude's Through all and
+flip, the feature menu's Suppress / Unsuppress and Delete):
 
 | kind | covered | scenarios per item (median) |
 |---|---|---|
 | toolbar | 25/76 | 0 |
 | sketch tool | 43/55 | 1 |
-| menu | 26/117 | 0 |
+| menu | 27/117 | 0 |
 | shortcut | 59/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
-| Extrude | 51 |
+| Extrude | 53 |
 | Sketch | 121 |
-| Fillet | 14 |
-| Chamfer | 5 |
+| Fillet | 15 |
+| Chamfer | 6 |
 | Revolve | 5 |
 | Shell | 5 |
-| Hole | 6 |
-| Linear pattern | 3 |
-| Circular pattern | 2 |
+| Hole | 9 |
+| Linear pattern | 5 |
+| Circular pattern | 4 |
 | Curve pattern | 1 |
-| Mirror | 3 |
+| Mirror | 4 |
 | Boolean | 6 |
-| Plane | 5 |
+| Plane | 7 |
 | Mate connector | 3 |
 | sketch tools (all 55) | 112 scenarios, 43 tools covered |
 

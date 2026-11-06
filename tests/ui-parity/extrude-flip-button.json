@@ -1,0 +1,33 @@
+{
+ "name": "extrude-flip-button",
+ "about": "block: the top face, Shift+E, the direction flip, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Opposite direction"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

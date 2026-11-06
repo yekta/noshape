@@ -1,0 +1,19 @@
+{
+ "name": "fillet-measurement-list-escape",
+ "about": "block-fillet: edit Fillet 1 (double-click), its fields, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block-fillet",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Fillet 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

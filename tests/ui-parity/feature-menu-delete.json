@@ -1,0 +1,25 @@
+{
+ "name": "feature-menu-delete",
+ "about": "block: right-click Extrude 1, Delete",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

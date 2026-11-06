@@ -1,0 +1,32 @@
+{
+ "name": "linear-pattern-feature-type",
+ "about": "block: Linear pattern, type Feature pattern, Extrude 1 from the list, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part pattern",
+    "pick": "Feature pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

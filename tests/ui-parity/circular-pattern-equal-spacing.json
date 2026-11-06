@@ -1,0 +1,26 @@
+{
+ "name": "circular-pattern-equal-spacing",
+ "about": "block: Circular pattern, untick Equal spacing: the fields change, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Linear pattern",
+    "menu": "Circular pattern"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Equal spacing"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

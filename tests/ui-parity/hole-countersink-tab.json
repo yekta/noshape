@@ -1,0 +1,25 @@
+{
+ "name": "hole-countersink-tab",
+ "about": "block: Hole, the Countersink tab: its fields, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Hole"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Countersink"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
