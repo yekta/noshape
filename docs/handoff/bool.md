@@ -25,6 +25,18 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## macOS arm64 allocator measurement (11-06 08:16 UTC; run 42178325902, branch bool/arm-measure)
+- Runner: Apple M1 (Virtual), 3 cores (hw.ncpu 3). time_cli.py, two rounds each, seconds (knurl-d25x25-45-45 /
+  release-fillet-hang / fins-400; live-30-features 0.07-0.08 everywhere):
+  base (system malloc) 4.50 4.14 / 4.18 4.35 / 1.80 1.64; crate (mimalloc as Rust's global allocator, skasm's
+  setup) 3.82 4.52 / 3.70 4.42 / 1.75 1.61; dyld (mimalloc 3.6.1 for the whole process, DYLD_INSERT_LIBRARIES, its
+  banner shown) 3.94 3.91 / 3.30 3.70 / 1.35 1.50; occt1 (NOSHAPE_OCCT_THREADS=1) 5.71 5.60 / 4.35 4.41 / 2.55
+  2.36; occt2 4.61 4.32 / 5.16 3.78 / 1.75 1.87.
+- Means against base: whole-process mimalloc -9 % / -18 % / -17 %; Rust-only mimalloc -4 % / -5 % / -2 % (within
+  the rounds' spread: OCCT's C++ allocations don't go through it); fewer OCCT threads slower (+31 % / +3 % / +43 % at
+  1). Whole-process is the one that counts (mimalloc's override, so OCCT's new/malloc use it too). The VM has 3 cores,
+  part of the gap to Linux's 2.60 s on its runner.
+
 ## The knurl on macOS arm64 (11-06 06:38 UTC; lead: release timing 4.63 s against Linux's 2.60)
 - Allocator contention, by every measure on Linux: with glibc on one heap (MALLOC_ARENA_MAX=1, every thread on one
   lock: what a malloc that scales worse across threads does) the knurl replay k25-15 goes 1.24 -> 2.4 s (OCCT's own
