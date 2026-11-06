@@ -262,6 +262,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-06 05:00 release (qa list 03:20, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 12:24: the release still to be cut must contain e7f452f5** (OCCT patch 0023, P0 DRAFT-POOL-HANG-MACOS: v0.4.32 never
+  finishes opening tests/budget/draft-pool-hang.noshape on macOS / Windows). Greens since the 04:43 line, through e7f452f5, are
+  unchanged in the sweeps except b7afdb57's DRAFT-NONDETERMINISTIC fix (verified: cli-draft-hang2 = 37305.6428 every open).
 - **qa 05:58: no blocker on green a4433e68** (bool's tolerances, stage 4), one small change: slow1151-pre / -before-extrude's
   parts are 40183.8115 mm³, not 40183.9505, because the Rust Boolean now takes Draft 4 (0.18 mm³ under OCCT's result; P2
   BOOL-TOL4-DRAFT-VOLUME). Its full CLI smoke = b1fcb30d's results; the volume sweep and dx's cf corpus are unchanged; so are
