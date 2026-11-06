@@ -1,0 +1,25 @@
+{
+ "name": "part-menu-properties",
+ "about": "block: right-click Part 1, Properties…, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

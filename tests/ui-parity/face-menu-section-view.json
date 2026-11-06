@@ -1,0 +1,29 @@
+{
+ "name": "face-menu-section-view",
+ "about": "block: right-click the top face, Section view…, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

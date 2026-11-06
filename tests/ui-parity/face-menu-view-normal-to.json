@@ -1,0 +1,25 @@
+{
+ "name": "face-menu-view-normal-to",
+ "about": "block: right-click the top face, View normal to",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View normal to"
+   }
+  }
+ ]
+}

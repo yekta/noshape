@@ -1,0 +1,25 @@
+{
+ "name": "part-menu-delete",
+ "about": "block: right-click Part 1, Delete…: the Delete part dialog with Part 1, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,29 @@
+{
+ "name": "feature-menu-rename",
+ "about": "block: right-click Extrude 1, Rename, type Base, Enter",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Base"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

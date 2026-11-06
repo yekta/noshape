@@ -1,0 +1,21 @@
+{
+ "name": "empty-menu-zoom-to-fit",
+ "about": "block: right-click empty space, Zoom to fit",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Zoom to fit"
+   }
+  }
+ ]
+}

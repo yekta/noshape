@@ -207,14 +207,15 @@ feature tool counts for a scenario that clicks it, presses its shortcut or doubl
 shortcut that starts a tool counts for the tool too. Menu items labelled at run time ("Suppress Extrude 1") aren't in
 the universe. Reported with the score (docs/parity/SCORE.md).
 
-11-06, 336 scenarios (main had 312; batch 1 adds Mate connector, Curve pattern, Boolean subtract / intersect, Mid
-plane, Chamfer and 15 sketch tools and constraints):
+11-06, 355 scenarios (main had 311 in the morning; batch 1 adds Mate connector, Curve pattern, Boolean subtract /
+intersect, Mid plane, Chamfer and 15 sketch tools and constraints; batch 2 the face, part, feature and empty-space
+context menus):
 
 | kind | covered | scenarios per item (median) |
 |---|---|---|
 | toolbar | 25/76 | 0 |
 | sketch tool | 30/55 | 1 |
-| menu | 9/117 | 0 |
+| menu | 26/117 | 0 |
 | shortcut | 58/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |

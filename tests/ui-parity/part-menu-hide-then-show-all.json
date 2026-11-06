@@ -1,0 +1,33 @@
+{
+ "name": "part-menu-hide-then-show-all",
+ "about": "block: right-click Part 1, Hide; right-click empty space, Show all parts",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show all parts"
+   }
+  }
+ ]
+}

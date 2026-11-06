@@ -1,0 +1,21 @@
+{
+ "name": "empty-menu-isometric",
+ "about": "block: right-click empty space (its menu's rows), Isometric",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Isometric"
+   }
+  }
+ ]
+}

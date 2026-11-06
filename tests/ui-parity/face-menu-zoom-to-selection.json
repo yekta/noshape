@@ -1,0 +1,25 @@
+{
+ "name": "face-menu-zoom-to-selection",
+ "about": "block: right-click the top face, Zoom to selection",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, most-used first)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Zoom to selection"
+   }
+  }
+ ]
+}
