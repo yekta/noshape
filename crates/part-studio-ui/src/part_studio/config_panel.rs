@@ -1036,6 +1036,8 @@ impl PartStudioView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Part Studio"))
+            // (By its tooltip, as live's runner finds it.)
+            .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this Part Studio".into()))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-configure-more")
@@ -1226,7 +1228,7 @@ impl PartStudioView {
                     let (v1, v2) = (cx.entity(), cx.entity());
                     let all_folded = studio_inputs.iter().all(|id| self.ui.cfg_folded.contains(id));
                     let ids = studio_inputs.clone();
-                    div().id("cfg-panel-more").ml(px(6.)).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                    div().id("cfg-panel-more").map(|d| crate::ui_script::mark(d, || "config_more:".into())).ml(px(6.)).size(px(26.)).flex().items_center().justify_center().cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
                         let (v1, v2, ids) = (v1.clone(), v2.clone(), ids.clone());
                         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                             let (v1, v2, ids) = (v1.clone(), v2.clone(), ids.clone());
@@ -1421,6 +1423,8 @@ impl PartStudioView {
                 let is_variable = matches!(input.kind, ConfigInputKind::Variable { .. });
                 div()
                     .id(SharedString::from(format!("cfg-more-{iid}")))
+                    // The parity suite opens an input's ⋯ by the input's name ({"config_more": "Configuration"}).
+                    .map(|d| crate::ui_script::mark(d, || format!("config_more:{}", input.name)))
                     .size(px(25.))
                     .flex()
                     .items_center()
@@ -1592,6 +1596,7 @@ impl PartStudioView {
                     let (da, db, vr) = (iid.clone(), rk.clone(), view.clone());
                     let mut row = h_flex()
                         .id(SharedString::from(format!("cfg-row-{iid}-{rk}")))
+                        .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
                         .border_l_1()
                         .border_color(grid)
                         .child(
@@ -2871,6 +2876,7 @@ impl PartStudioView {
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
             // Live (dom panel-configurations-full): the button's tooltip.
             .tooltip(crate::ui::tooltip("Add configuration input to create multiple variants of this Part Studio"))
+            .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this Part Studio".into()))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-add-input-more")

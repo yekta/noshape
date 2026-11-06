@@ -1,0 +1,45 @@
+{
+ "name": "config-depth-configure",
+ "about": "block: the Configuration panel (right strip), Configure Part Studio (a List input \"Configuration\", row Default); double-click Extrude 1, right-click Depth, Configure, ✓",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: configurations; batch 11)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  }
+ ]
+}

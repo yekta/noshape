@@ -93,6 +93,12 @@ other string an Enum id.
 
 A target a side can't find makes that step `"ok": false` with `"error"`; the run goes on.
 
+### Configurations (psui, 11-06)
+
+`{"button": "Configuration panel"}` (the right strip), `{"button": "Add configuration input"}` (Configure Part
+Studio, or the panel's bottom button: by their shared tooltip), `{"config_more": "<input name>"}` an input's ⋯,
+`{"config_more": ""}` the panel's own ⋯ (by Filter inputs), `{"config_row": "<row name>"}` a List input's row.
+
 ### Drawings (dx, 11-05)
 A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create
 Drawing of that part with that template (the dialog's Suggested views or No views), and the run opens on that drawing
@@ -232,12 +238,12 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 |---|---|---|
 | toolbar | 47/76 | 1 |
 | sketch tool | 43/55 | 1 |
-| menu | 71/117 | 1 |
+| menu | 78/117 | 1 |
 | shortcut | 59/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
-| Extrude | 56 |
+| Extrude | 57 |
 | Sketch | 131 |
 | Fillet | 16 |
 | Chamfer | 6 |

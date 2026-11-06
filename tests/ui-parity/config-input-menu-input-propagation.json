@@ -1,0 +1,37 @@
+{
+ "name": "config-input-menu-input-propagation",
+ "about": "block: the Configuration panel (right strip), Configure Part Studio (a List input \"Configuration\", row Default); the input's ⋯, Input propagation…: its dialog, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: configurations; batch 11)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": "Configuration"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Input propagation…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

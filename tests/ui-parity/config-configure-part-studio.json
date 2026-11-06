@@ -1,0 +1,21 @@
+{
+ "name": "config-configure-part-studio",
+ "about": "block: the Configuration panel (right strip), Configure Part Studio (a List input \"Configuration\", row Default); its state",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: configurations; batch 11)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  }
+ ]
+}

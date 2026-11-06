@@ -1,0 +1,33 @@
+{
+ "name": "feature-menu-configure-suppression",
+ "about": "block: the Configuration panel (right strip), Configure Part Studio (a List input \"Configuration\", row Default); right-click Extrude 1, Configure suppression",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: configurations; batch 11)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure suppression"
+   }
+  }
+ ]
+}

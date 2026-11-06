@@ -1,0 +1,31 @@
+{
+ "name": "config-panel-more-menu",
+ "about": "block: the Configuration panel (right strip), Configure Part Studio (a List input \"Configuration\", row Default); the panel's ⋯ (by Filter inputs): its rows, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: configurations; batch 11)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": ""
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
