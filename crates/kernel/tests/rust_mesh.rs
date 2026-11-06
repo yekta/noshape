@@ -89,7 +89,8 @@ fn assert_normals_with(s: &Shape, rust: &Tessellation, occt: &Tessellation, tria
             // (None at an apex itself.)
             let Ok(exact) = f.normal_at_point(*q) else { continue };
             assert!(n.dot(exact) > 1.0 - 1e-5, "face {i}: the normal at {q} is {:.3}° off the surface's", n.angle_between(exact).to_degrees());
-            if let Some(m) = at.get(b) {
+            // (Where BRepMesh's is the surface's: at a sphere's pole its own is turned round.)
+            if let Some(m) = at.get(b).filter(|m| m.dot(exact) > 1.0 - 1e-5) {
                 assert!(n.dot(*m) > 1.0 - 1e-5, "face {i}: the normal at {q} is {:.3}° off BRepMesh's", n.angle_between(*m).to_degrees());
             }
         }
@@ -568,4 +569,32 @@ fn an_extruded_spline_wall_meshes_here_as_a_strip() {
     let rust = mesh(&s, true);
     let occt = mesh(&transform(&s, &Transform::Translate(DVec3::ZERO), true).unwrap().shape, false);
     assert!(rust.indices.len() <= occt.indices.len(), "triangles: ours {} against BRepMesh's {}", rust.indices.len() / 3, occt.indices.len() / 3);
+}
+
+/// A Ø40 sphere cut by a plane tilted 30°: the sphere's face keeps its top pole (a degenerate edge) and is bounded by
+/// a circle that isn't a row of its parameters, so it isn't a strip: meshed here on the grid across its pole (as
+/// knob-jason's fillet corners, cf-setback-fillet's and clamp-guillem's 91 faces, BRepMesh's before), within
+/// BRepMesh's area, watertight.
+#[test]
+fn a_sphere_cut_aslant_meshes_here_across_its_pole() {
+    let ball = make_sphere(&Plane::xy(), 20.0 * MM, TAU).unwrap();
+    let slab = make_box_corners(DVec3::new(-50.0, -50.0, -60.0) * MM, DVec3::new(50.0, 50.0, -5.0) * MM).unwrap();
+    let tilted = transform(&slab, &Transform::Rotate { origin: DVec3::ZERO, axis: DVec3::X, angle: 30f64.to_radians() }, true).unwrap().shape;
+    let s = cut(&ball, &tilted).unwrap().shape;
+    assert_hose_meshes_here(&s);
+}
+
+/// A vase: a spline profile revolved round Z, whole and through 270°: its wall a surface of revolution (as
+/// c2-valve-config's, cf-o-ring-generator's and c2-housing-draft's 45, BRepMesh's before), meshed here on its grid:
+/// within BRepMesh's area, watertight.
+#[test]
+fn a_revolved_spline_meshes_here() {
+    let mm = |x: f64, z: f64| DVec3::new(x, 0.0, z) * MM;
+    let spline = make_interpolated_spline(&[mm(10.0, 0.0), mm(15.0, 10.0), mm(8.0, 20.0), mm(12.0, 30.0)], &[], false).unwrap();
+    let wire = make_wire(&[spline, make_line(mm(12.0, 30.0), mm(0.0, 30.0)).unwrap(), make_line(mm(0.0, 30.0), mm(0.0, 0.0)).unwrap(), make_line(mm(0.0, 0.0), mm(10.0, 0.0)).unwrap()]).unwrap();
+    let profile = make_face_from_wire(&wire, true).unwrap();
+    for angle in [TAU, 0.75 * TAU] {
+        let s = revolve(&profile, DVec3::ZERO, DVec3::Z, angle).unwrap().shape;
+        assert_hose_meshes_here(&s);
+    }
 }

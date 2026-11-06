@@ -18,6 +18,14 @@ rows along the flat way). And a moved instance's nodes on edges another face giv
 generator: meshing 2.29 -> 0.41 s summed over its parts, triangles 556,572 -> 363,248; the corpus's BRepMesh 33.5 ->
 14.7 s (12,428 -> 2,471 faces); parity unchanged. T1 kernel rust_mesh::an_extruded_spline_wall_meshes_here_as_a_strip.
 What BRepMesh still gets (corpus, serial ms): B-spline 3467, plane 3012, revolution 2564, torus 1932, offset 1098.
+**Then (core 11-06 16:00):** the grid meshes across an apex or pole (a degenerate edge: its nodes' u the edge's
+parameters, kept apart, their two-node triangles dropped, the normal a hair inside the face; `degenerate_edges_run_along_u`),
+the steps' angular rule ignores samples whose first derivative collapses there; surfaces of revolution of a planar
+B-spline / Bezier / circle / ellipse curve (`MeshSurface::Revolution`, bridge kind 6; a conic converted, its nodes
+then projected). knob-jason's, cf-setback-fillet's and clamp-guillem's 91 such faces and knob-kraut's revolutions
+meshed here; the corpus's BRepMesh 14.7 -> 13.1 s (2,471 -> 1,920 faces). Still BRepMesh's: faces with ellipse edges
+(cf-o-ring-generator's rings, c2-valve-config, c2-housing-draft): brep::mesh has no ellipse edge. The normals check in
+rust_mesh compares with BRepMesh only where BRepMesh matches the surface (its sphere pole normal is turned round).
 The lead asked core to find which surface types make up BRepMesh's ~10 s of the corpus's ~16 s of display meshing
 (the faces brep::mesh declines or isn't given), biggest first, and to take the biggest into brep::mesh. brep::mesh is
 yours: core will measure first (a per-surface-type table of BRepMesh's time over the parity corpus, in core.md), then

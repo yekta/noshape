@@ -119,6 +119,7 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
             4 => MeshSurface::Sphere { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], direct: s[12] > 0.5 },
             3 => MeshSurface::Torus { origin: v3(s, 1), axis: v3(s, 4), xdir: v3(s, 7), radius: s[10], minor: s[11], direct: s[12] > 0.5 },
             5 => nurbs_at(s[1], true).map_or(MeshSurface::Other, |index| MeshSurface::Nurbs { index }),
+            6 => nurbs_at(s[1], false).map_or(MeshSurface::Other, |curve| MeshSurface::Revolution { curve, origin: v3(s, 2), axis: v3(s, 5) }),
             _ => MeshSurface::Other,
         };
         let (l0, l1) = (input.face_loops[f] as usize, input.face_loops[f + 1] as usize);

@@ -34,6 +34,9 @@ pub enum MeshSurface {
     Sphere { origin: DVec3, axis: DVec3, xdir: DVec3, direct: bool, radius: f64 },
     /// A B-spline (made non-periodic): [`MeshNurbs::surfaces`]`[index]`.
     Nurbs { index: u32 },
+    /// OCCT's surface of revolution: [`MeshNurbs::curves`]`[curve]` (in a plane through the axis) turned by u
+    /// round the line through `origin` along unit `axis`; v is the curve's parameter.
+    Revolution { curve: u32, origin: DVec3, axis: DVec3 },
     /// Any other surface: the face is declined (BRepMesh meshes it), its loops tell which edges it is on.
     Other,
 }
@@ -438,7 +441,78 @@ fn mesh_face(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, nodes: &[O
         MeshSurface::Torus { .. } => None,
         MeshSurface::Sphere { origin, axis, xdir, direct, radius } if radius > 0.0 => mesh_revolved(edges, face, &Revolved::new(origin, axis, xdir, direct, 0.0, 0.0, radius), nodes, defl),
         MeshSurface::Sphere { .. } => None,
+        MeshSurface::Revolution { curve, origin, axis } => {
+            let s = Revolution::new(nurbs.curves.get(curve as usize)?, origin, axis)?;
+            mesh_grid(edges, face, &s, nodes, defl, pcurves.map(|p| (p, nurbs.curves)))
+        }
         MeshSurface::Other => None,
+    }
+}
+
+/// A curve in a plane through an axis turned round it (OCCT's surface of revolution): `origin + R(u) (C(v) - origin)`.
+struct Revolution<'a> {
+    c: &'a NurbsCurve,
+    origin: DVec3,
+    axis: DVec3,
+    /// The curve's plane's direction away from the axis (u 0's).
+    e0: DVec3,
+    vknots: Vec<f64>,
+}
+
+impl<'a> Revolution<'a> {
+    fn new(c: &'a NurbsCurve, origin: DVec3, axis: DVec3) -> Option<Revolution<'a>> {
+        let axis = axis.try_normalize()?;
+        let off = |p: DVec3| (p - origin) - axis * (p - origin).dot(axis);
+        let e0 = c.poles.iter().map(|&p| off(p)).max_by(|a, b| a.length().total_cmp(&b.length()))?.try_normalize()?;
+        let mut vknots = c.knots.clone();
+        vknots.dedup();
+        Some(Revolution { c, origin, axis, e0, vknots })
+    }
+    /// `x` (a vector from the axis' origin) turned by `u` round the axis.
+    fn turn(&self, x: DVec3, (s, c): (f64, f64)) -> DVec3 {
+        x * c + self.axis.cross(x) * s + self.axis * (self.axis.dot(x) * (1.0 - c))
+    }
+}
+
+impl GridSurface for Revolution<'_> {
+    fn degenerate_edges_run_along_u(&self) -> bool {
+        true
+    }
+    fn name(&self) -> &'static str {
+        "revolution"
+    }
+    fn closed(&self) -> bool {
+        true
+    }
+    fn range(&self) -> ((f64, f64), (f64, f64)) {
+        ((f64::NEG_INFINITY, f64::INFINITY), self.c.range())
+    }
+    fn breaks(&self, along_u: bool) -> &[f64] {
+        if along_u { &[] } else { &self.vknots }
+    }
+    fn derivs(&self, u: f64, v: f64) -> [DVec3; 6] {
+        let t = u.sin_cos();
+        let [c, c1, c2] = self.c.derivs(v);
+        let p = self.origin + self.turn(c - self.origin, t);
+        let su = self.axis.cross(p - self.origin);
+        let sv = self.turn(c1, t);
+        [p, su, sv, self.axis.cross(su), self.axis.cross(sv), self.turn(c2, t)]
+    }
+    fn at(&self, u: f64, v: f64) -> DVec3 {
+        self.origin + self.turn(self.c.at(v) - self.origin, u.sin_cos())
+    }
+    fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64) {
+        let wrap = |d: f64| d - (d / TAU).round() * TAU;
+        // u: the point's angle round the axis from the curve's plane; v: its place turned back into that plane.
+        let x = p - self.origin;
+        let r = x - self.axis * x.dot(self.axis);
+        let mut u = if r.length() > 0.0 { self.e0.cross(r).dot(self.axis).atan2(self.e0.dot(r)) } else { seed.map_or(0.0, |s| s.x) };
+        if let Some(s) = seed {
+            u = s.x + wrap(u - s.x);
+        }
+        let back = self.origin + self.turn(x, (-u).sin_cos());
+        let (v, _) = self.c.param_of(back);
+        (DVec2::new(u, v), (GridSurface::at(self, u, v) - p).length())
     }
 }
 
@@ -960,6 +1034,11 @@ trait GridSurface: Sync {
     /// The parameters of a point near the surface (the nearest to `seed`'s where the surface closes) and its
     /// distance from there.
     fn param_of(&self, p: DVec3, seed: Option<DVec2>) -> (DVec2, f64);
+    /// Whether an apex's or pole's degenerate edge runs along its u by its own parameters (a cone's, sphere's or
+    /// torus's, as the bridge reads them).
+    fn degenerate_edges_run_along_u(&self) -> bool {
+        false
+    }
 }
 
 impl GridSurface for NurbsSurface {
@@ -1037,6 +1116,9 @@ impl GridSurface for NurbsSurface {
 }
 
 impl GridSurface for Revolved {
+    fn degenerate_edges_run_along_u(&self) -> bool {
+        true
+    }
     fn name(&self) -> &'static str {
         "revolved"
     }
@@ -1132,19 +1214,42 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     if !s.closed() && !face.loops.iter().flatten().all(|u| seen.insert(u.edge)) {
         return Err("a seam");
     }
-    // An apex or pole has no parameters of its own.
-    if face.loops.iter().flatten().any(|u| edges.get(u.edge as usize).is_none_or(|e| e.curve == Some(Curve::Degenerate))) {
+    if face.loops.iter().flatten().any(|u| edges.get(u.edge as usize).is_none()) {
+        return Err("an edge not meshed here");
+    }
+    let degenerate = |u: &Use| edges[u.edge as usize].curve == Some(Curve::Degenerate);
+    // An apex or pole has no parameters of its own: its edge's (along u) where the surface reads them so, else its
+    // curve's on the face (below).
+    let has_pole = face.loops.iter().flatten().any(degenerate);
+    if has_pole && !s.degenerate_edges_run_along_u() && pcurves.is_none() {
         return Err("a degenerate edge");
     }
     let mut points: Vec<DVec3> = Vec::new();
     let mut rings: Vec<Vec<usize>> = Vec::with_capacity(face.loops.len());
-    let mut edge_nodes = Vec::with_capacity(face.loops.len());
+    let mut edge_nodes: Vec<Vec<Vec<u32>>> = Vec::with_capacity(face.loops.len());
     for l in &face.loops {
         let (pts, per_use) = loop_nodes(edges, l, nodes).ok_or("an edge not meshed here")?;
         let base = points.len();
         rings.push((base..base + pts.len()).collect());
         edge_nodes.push(per_use.into_iter().map(|idx| idx.into_iter().map(|i| (base + i) as u32).collect()).collect());
         points.extend(pts);
+    }
+    // A pole's nodes: their u (the edge's parameters), one point but kept apart below.
+    let mut pole_u: Vec<Option<f64>> = vec![None; points.len()];
+    for (l, uses) in face.loops.iter().enumerate() {
+        for (k, u) in uses.iter().enumerate() {
+            if !degenerate(u) {
+                continue;
+            }
+            let n = nodes.get(u.edge as usize).and_then(|n| n.as_ref()).ok_or("an edge not meshed here")?;
+            let ids = &edge_nodes[l][k];
+            if ids.len() != n.params.len() {
+                return Err("a degenerate edge");
+            }
+            for (&id, &t) in ids.iter().zip(&n.params) {
+                pole_u[id as usize] = Some(t);
+            }
+        }
     }
     // The boundary on the parameter plane, each node from the last's parameters.
     let dbg_t = std::time::Instant::now();
@@ -1174,6 +1279,9 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
             }
             if d.is_nan() || d > off || !q.is_finite() {
                 return Err("a boundary node off the surface");
+            }
+            if let Some(u) = pole_u[k].filter(|_| s.degenerate_edges_run_along_u()) {
+                q.x = u;
             }
             // A closed surface's first node on its seam: on the side its next node goes on from (a rim running towards
             // smaller u from u0 crossed the whole period: a Replace face's displaced tube).
@@ -1254,6 +1362,10 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     }
     // Each loop closes on the parameter plane (none round a closed surface's period).
     for r in &rings {
+        // (A pole's u is its edge's, not its point's.)
+        if pole_u[r[0]].is_some() {
+            continue;
+        }
         let last = uv[r[r.len() - 1]];
         let (mut q, _) = s.param_of(points[r[0]], Some(last));
         if periodic {
@@ -1282,7 +1394,7 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
         for (k, &i) in walk.iter().enumerate() {
             cluster.push(i);
             let next = walk.get(k + 1).copied();
-            if next.is_none_or(|j| (points[j] - points[i]).length() >= near) {
+            if next.is_none_or(|j| (points[j] - points[i]).length() >= near || pole_u[i].is_some() || pole_u[j].is_some()) {
                 kept.push(*cluster.iter().reduce(|a, b| if least(points[*b], points[*a]) { b } else { a }).expect("one"));
                 cluster.clear();
             }
@@ -1321,14 +1433,17 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
                     let d = if along_u { s.derivs(t, c) } else { s.derivs(c, t) };
                     let (first, second) = if along_u { (d[1], d[3]) } else { (d[2], d[5]) };
                     d2 = d2.max(second.length());
-                    d1 = d1.min(first.length());
+                    // (Not at an apex or pole, where the rows meet whatever the step.)
+                    if first.length() > 1e-9 * (1.0 + d[0].abs().max_element()) {
+                        d1 = d1.min(first.length());
+                    }
                 }
             }
             let span = w[1] - w[0];
             let mut h = span;
             if d2 > 0.0 {
                 h = h.min((8.0 * defl.linear / d2).sqrt());
-                if d1 > 0.0 {
+                if d1 > 0.0 && d1 < f64::MAX {
                     h = h.min(defl.angular * d1 / d2);
                 }
             }
@@ -1477,7 +1592,12 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     }
     let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
     let inner: Vec<usize> = (nb..nb + interior.len()).collect();
-    let triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
+    let mut triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
+    // (A triangle with two of a pole's nodes is a point and a segment: none.)
+    if has_pole {
+        let at_pole = |k: u32| pole_u.get(k as usize).is_some_and(|u| u.is_some());
+        triangles.retain(|t| t.iter().filter(|&&k| at_pole(k)).count() < 2);
+    }
     if dbg {
         eprintln!("mesh grid: triangulated {:?}", dbg_t.elapsed());
     }
@@ -1490,6 +1610,16 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     }
     points.extend(d1[nb..].iter().map(|d| d[0]));
     let mut normals: Vec<DVec3> = d1.iter().map(|d| d[1].cross(d[2]).normalize_or_zero()).collect();
+    // (A pole's ∂u is all but nothing there, ∂u × ∂v turned any way: the surface's normal a hair inside the face
+    // from it, which tends to the pole's.)
+    let vmid = 0.5 * (lo.y + hi.y);
+    for (k, u) in pole_u.iter().enumerate() {
+        if u.is_some() {
+            let q = nodes[k];
+            let d = s.d1(q.x, q.y + (vmid - q.y).signum() * 1e-6 * (hi.y - lo.y));
+            normals[k] = d[1].cross(d[2]).normalize_or_zero();
+        }
+    }
     if normals.contains(&DVec3::ZERO) {
         let mut acc = vec![DVec3::ZERO; normals.len()];
         for t in &triangles {

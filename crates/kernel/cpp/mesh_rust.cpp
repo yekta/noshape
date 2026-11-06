@@ -10,6 +10,8 @@
 #include <Geom_BSplineSurface.hxx>
 #include <Geom_BezierCurve.hxx>
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
+#include <Geom_Ellipse.hxx>
 #include <GeomConvert.hxx>
 #include <BRepTools.hxx>
 #include <NCollection_Array2.hxx>
@@ -246,6 +248,59 @@ occ::handle<Geom_BSplineSurface> bspline_of(occ::handle<Geom_Surface> s, const T
   }
 }
 
+// A surface of revolution's curve as a B-spline (a B-spline's or Bezier's, open) and its axis, when the curve lies in
+// a plane through the axis (noshape's mesher finds a point's parameters so: its angle, then the curve's nearest).
+occ::handle<Geom_BSplineCurve> revolved_curve(const occ::handle<Geom_Surface>& s, gp_Ax1& axis)
+{
+  const occ::handle<Geom_SurfaceOfRevolution> rv = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+  if (rv.IsNull())
+    return {};
+  const occ::handle<Geom_Curve> c0 = rv->BasisCurve();
+  occ::handle<Geom_Curve>       c  = c0;
+  while (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  occ::handle<Geom_BSplineCurve> bc = occ::down_cast<Geom_BSplineCurve>(c);
+  try
+  {
+    if (bc.IsNull() && !occ::down_cast<Geom_BezierCurve>(c).IsNull())
+      bc = GeomConvert::CurveToBSplineCurve(c);
+    // A circle or ellipse exactly (rational), on its own parameters: the faces' curves on it then don't fit them
+    // and the mesher finds its nodes' parameters on it instead.
+    else if (bc.IsNull() && (!occ::down_cast<Geom_Circle>(c).IsNull() || !occ::down_cast<Geom_Ellipse>(c).IsNull()))
+      bc = GeomConvert::CurveToBSplineCurve(c0);
+    if (!bc.IsNull() && bc->IsPeriodic())
+    {
+      bc = occ::down_cast<Geom_BSplineCurve>(bc->Copy());
+      bc->SetNotPeriodic();
+    }
+  }
+  catch (const Standard_Failure&)
+  {
+    return {};
+  }
+  if (bc.IsNull())
+    return {};
+  axis                = rv->Axis();
+  const gp_XYZ o      = axis.Location().XYZ(), k = axis.Direction().XYZ();
+  gp_XYZ       e0     = gp_XYZ(0, 0, 0);
+  double       size   = 0;
+  for (int i = 1; i <= bc->NbPoles(); ++i)
+  {
+    const gp_XYZ d   = bc->Pole(i).XYZ() - o;
+    const gp_XYZ off = d - k * d.Dot(k);
+    size             = std::max(size, d.Modulus());
+    if (off.Modulus() > e0.Modulus())
+      e0 = off;
+  }
+  if (e0.Modulus() <= 1e-12 * std::max(size, 1e-9))
+    return {};
+  const gp_XYZ n = k.Crossed(e0.Normalized());
+  for (int i = 1; i <= bc->NbPoles(); ++i)
+    if (std::abs((bc->Pole(i).XYZ() - o).Dot(n)) > 1e-9 * std::max(size, 1e-9))
+      return {};
+  return bc;
+}
+
 } // namespace
 
 // B-spline faces in noshape's mesher (NOSHAPE_MESH_BSPLINE=0: BRepMesh's, as before).
@@ -363,6 +418,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     // A B-spline face's: each use's edge on it (BRepMesh's own fallback has its own).
     std::vector<occ::handle<Geom2d_BSplineCurve>> pcurves;
     occ::handle<Geom_BSplineSurface>              nurbs;
+    occ::handle<Geom_BSplineCurve>                revolved; // a surface of revolution's curve
   };
   std::vector<FaceIn> read(face_of.size());
   in_chunks((int)face_of.size(), parallel, [&](int j1) {
@@ -381,7 +437,10 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const occ::handle<Geom_SphericalSurface>   sph = mf ? occ::handle<Geom_SphericalSurface>() : occ::down_cast<Geom_SphericalSurface>(s);
     const occ::handle<Geom_BSplineSurface>     bss = mf ? occ::handle<Geom_BSplineSurface>() : bspline_of(s, f);
     r.nurbs                                        = bss;
-    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull() || (!bss.IsNull() && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    gp_Ax1                                     rev_axis;
+    if (!mf && bss.IsNull())
+      r.revolved = revolved_curve(s, rev_axis);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!bss.IsNull() || !r.revolved.IsNull()) && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
@@ -399,7 +458,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
           continue;
         }
         r.uses.push_back(static_cast<uint32_t>(2 * (k - 1) + (ei.Value().Orientation() == TopAbs_REVERSED ? 1 : 0)));
-        r.pcurves.push_back(bss.IsNull() ? occ::handle<Geom2d_BSplineCurve>() : pcurve_of(TopoDS::Edge(ei.Value()), f));
+        r.pcurves.push_back(bss.IsNull() && r.revolved.IsNull() ? occ::handle<Geom2d_BSplineCurve>() : pcurve_of(TopoDS::Edge(ei.Value()), f));
       }
       r.loop_ends.push_back(static_cast<uint32_t>(r.uses.size()));
     }
@@ -437,6 +496,14 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     }
     else if (ok && !bss.IsNull())
       sv[0] = 5; // a B-spline: flattened below, in turn (sv[1]: where in in.nurbs)
+    else if (ok && !r.revolved.IsNull())
+    {
+      // A surface of revolution: its curve flattened below (sv[1]), the axis' origin and direction.
+      const gp_Ax1 a = rev_axis.Transformed(loc.Transformation());
+      sv[0]          = 6;
+      put3(sv + 2, a.Location().XYZ());
+      put3(sv + 5, a.Direction().XYZ());
+    }
     else if (ok)
     {
       // Kind, origin, axis, x direction, radius, half-angle, whether the frame is right-handed.
@@ -459,6 +526,12 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       BRep_Tool::Surface(TopoDS::Face(faces(face_of[j])), loc);
       read[j].surface[1] = push_bspline_surface(in.nurbs, read[j].nurbs, loc);
     }
+    else if (read[j].surface[0] == 6)
+    {
+      TopLoc_Location loc;
+      BRep_Tool::Surface(TopoDS::Face(faces(face_of[j])), loc);
+      read[j].surface[1] = push_bspline(in.nurbs, read[j].revolved, loc);
+    }
   in.face_loops.push_back(0);
   in.loop_uses.push_back(0);
   for (const FaceIn& r : read)
@@ -466,7 +539,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const uint32_t u0 = (uint32_t)in.uses.size();
     in.uses.insert(in.uses.end(), r.uses.begin(), r.uses.end());
     for (size_t k = 0; k < r.uses.size(); ++k)
-      in.pcurves.push_back(r.surface[0] == 5 && k < r.pcurves.size() && !r.pcurves[k].IsNull() ? push_pcurve(in.nurbs, r.pcurves[k]) : -1.0);
+      in.pcurves.push_back((r.surface[0] == 5 || r.surface[0] == 6) && k < r.pcurves.size() && !r.pcurves[k].IsNull() ? push_pcurve(in.nurbs, r.pcurves[k]) : -1.0);
     for (const uint32_t e : r.loop_ends)
       in.loop_uses.push_back(u0 + e);
     in.surfaces.insert(in.surfaces.end(), r.surface.begin(), r.surface.end());
