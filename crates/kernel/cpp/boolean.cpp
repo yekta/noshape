@@ -92,6 +92,8 @@
 #include <BRepTools_History.hxx>
 #include <BRepTools_Modification.hxx>
 #include <BRepTools_Modifier.hxx>
+#include <Geom_SurfaceOfRevolution.hxx>
+#include <ShapeCustom_SweptToElementary.hxx>
 #include <BRepTools.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -7841,6 +7843,38 @@ OpOut op_unify_edges(const OcShape& s)
 
 namespace
 {
+// Surfaces of revolution that are a torus, sphere, cylinder or cone made those (an IGES writer's revolved faces: a
+// torus in quarters, each its own surface, which UnifySameDomain doesn't merge). OCCT's modification for the
+// revolutions only, its pcurve copy fixed for faces it doesn't change (it read a null surface for a torus face next
+// to a converted one).
+class RevolutionToElementary : public ShapeCustom_SweptToElementary
+{
+public:
+  static bool revolution(const occ::handle<Geom_Surface>& s) { return !s.IsNull() && s->IsKind(STANDARD_TYPE(Geom_SurfaceOfRevolution)); }
+
+  bool NewSurface(const TopoDS_Face& F, occ::handle<Geom_Surface>& S, TopLoc_Location& L, double& Tol, bool& RevWires, bool& RevFace) override
+  {
+    if (!revolution(BRep_Tool::Surface(F)))
+      return false;
+    return ShapeCustom_SweptToElementary::NewSurface(F, S, L, Tol, RevWires, RevFace);
+  }
+
+  bool NewCurve2d(const TopoDS_Edge& E, const TopoDS_Face& F, const TopoDS_Edge& NewE, const TopoDS_Face& NewF, occ::handle<Geom2d_Curve>& C, double& Tol) override
+  {
+    if (revolution(BRep_Tool::Surface(F)))
+      return ShapeCustom_SweptToElementary::NewCurve2d(E, F, NewE, NewF, C, Tol);
+    if (E.IsSame(NewE))
+      return false;
+    double f, l;
+    C = BRep_Tool::CurveOnSurface(E, F, f, l);
+    if (C.IsNull())
+      return false;
+    C   = occ::down_cast<Geom2d_Curve>(C->Copy());
+    Tol = BRep_Tool::Tolerance(E);
+    return true;
+  }
+};
+
 // Whether two faces lie on one plane, or (`periodic`) one cylinder, cone, sphere or torus (the cheap test before a merge).
 bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
 {
@@ -7890,8 +7924,30 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
       out.face_map.push_back((uint32_t)i);
     return out;
   };
+  // Revolved faces as the surfaces they are (periodic: IGES); the faces' map goes through it.
+  TopoDS_Shape                        shape     = s.shape;
+  occ::handle<RevolutionToElementary> rev       = new RevolutionToElementary;
+  BRepTools_Modifier                  mod;
+  bool                                converted = false;
+  if (periodic)
+  {
+    bool any_rev = false;
+    for (int i = 1; i <= fm.Extent() && !any_rev; ++i)
+      any_rev = RevolutionToElementary::revolution(BRep_Tool::Surface(TopoDS::Face(fm(i))));
+    if (any_rev)
+    {
+      mod.Init(shape);
+      mod.Perform(rev);
+      if (mod.IsDone() && BRepCheck_Analyzer(mod.ModifiedShape(shape)).IsValid())
+      {
+        shape     = mod.ModifiedShape(shape);
+        converted = true;
+      }
+    }
+  }
+  auto converted_face = [&](const TopoDS_Shape& f) { return converted ? mod.ModifiedShape(f) : f; };
   ShapeAncMap ef;
-  TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
   // Only across edges between faces on one analytic surface: the others kept (a healed thread's B-spline faces merged
   // into one whose boundary doesn't close).
   bool                                                   any = false;
@@ -7906,7 +7962,7 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
   }
   if (!any)
     return as_is();
-  ShapeUpgrade_UnifySameDomain u(s.shape, true, true, false);
+  ShapeUpgrade_UnifySameDomain u(shape, true, true, false);
   u.KeepShapes(keep);
   u.Build();
   // (A merge that leaves a face it can't close: the part as read.)
@@ -7919,9 +7975,9 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
   const occ::handle<BRepTools_History> h = u.History();
   for (int i = 1; i <= fm.Extent(); ++i)
   {
-    const TopoDS_Shape&               f   = fm(i);
-    const NCollection_List<TopoDS_Shape>& mod = h->Modified(f);
-    const int                         k   = nm.FindIndex(mod.IsEmpty() ? f : mod.First());
+    const TopoDS_Shape                    f     = converted_face(fm(i));
+    const NCollection_List<TopoDS_Shape>& after = h->Modified(f);
+    const int                             k     = nm.FindIndex(after.IsEmpty() ? f : after.First());
     out.face_map.push_back(k > 0 ? (uint32_t)(k - 1) : UINT32_MAX);
   }
   return out;
