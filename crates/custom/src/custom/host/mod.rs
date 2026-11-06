@@ -98,6 +98,9 @@ pub type ByBody<T> = Mutex<HashMap<usize, (Arc<crate::regen::context::Body>, Arc
 /// [`CtxState::created_cache`]: by (feature id, entity type), the answer and what it was worked out from.
 pub type CreatedCache = HashMap<(FsId, Option<query::EType>), (query::CreatedSeen, Vec<query::Ent>)>;
 
+/// An attribute filter's matches: how many attributes it has looked at, and the positions of those it matched.
+type AttrMatches = (usize, Arc<Vec<usize>>);
+
 pub struct CtxState {
     pub ctx: Context,
     /// The Part Studio feature being evaluated.
@@ -174,7 +177,7 @@ pub struct CtxState {
     attr_index: Mutex<Option<HashMap<Reference, Vec<usize>>>>,
     /// `attrs`' positions an attribute filter matches, by the filter, and how many of `attrs` it has looked at
     /// (appended ones are looked at when next asked: [`Self::attributes_matching`]).
-    attr_filters: Mutex<HashMap<String, (usize, Arc<Vec<usize>>)>>,
+    attr_filters: Mutex<HashMap<String, AttrMatches>>,
     /// `debug()` entities as they were when debugged (std debugs points,
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
