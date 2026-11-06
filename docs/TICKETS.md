@@ -3372,11 +3372,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (the preview goes, nothing is made), where ours misses it. Live's reach is 10 px (woolsthorpe `getInferenceRadius`), now
   ours too (psui 11-06, `INFERENCE_PX`), but measured in sketch units it misses all three. Needs the plane-to-screen
   scale per direction (or the projected distance) in pick and inference. (psui 2026-11-06)
+  skasm 11-06 (lead: P1): done on local branch skasm/screen-reach, held until our default view's scale matches live's
+  (live request 15:39): the three scenarios' clicks sit 0.1-1.6 % inside the 10 px edge at our runner's zoom
+  (0.275 mm / px at 1919 x 992); handoff/skasm.md "11-06 afternoon".
 - [ ] P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
   build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
   field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
   count, the feature rows' `related` and Undo follow (6/9 states). The other three runs match 9/9. A pick or hover
   landing some runs and not others; the suite counts it as a difference when it does. (psui 2026-11-06)
+  skasm 11-06 17:00: the undone pick's part (live 2023) was un-paused by a hover the viewport cleared on a fast move
+  before its pick (the 5 mm jump leaves the picked rectangle; whether the move counts as fast is timing), so the
+  click picked Part 2. Now only a pick showing the background ends the pause; the viewport says so when such a pick
+  confirms a cleared hover. Not reproduced here (green 12/12, ours 8/8 on this machine): psui, please re-run it on
+  vibe5 (release) a few times.
 - [x] verified d0526d18 (qa 11-03 17:06: sketch-slot-on-line matches, 11/11; sketch-extend-to-line still 13/14 against its one recording, which live's two re-runs (behaviours 09:20 addition) contradict: re-record asked) (skasm 11-03 16:30: Slot's picked curves stay selected while its preview is pending, cleared when it commits (Enter, the next click, Esc). Extend's JFF is that one recording's: live re-ran it twice (behaviours 1866 09:20 addition) and nothing was selected after Extend's click, as in ours.) P3 SKETCH-TOOL-PICK-SELECTION (skasm) a curve clicked with the Slot or Extend tool is selected in live, not in ours:
   live's ui-parity recordings sketch-slot-on-line (step 8: the line clicked with Slot → selection 1 SKETCH_ENTITY, the slot
   previews; Enter makes it) and sketch-extend-to-line (step 12: the line clicked with Extend → selection 1) vs ours on
