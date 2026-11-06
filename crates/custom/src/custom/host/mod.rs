@@ -172,6 +172,8 @@ pub struct CtxState {
     attrs: Vec<(Reference, Value)>,
     /// `attrs`' positions by entity, built when first asked after a change ([`Self::attributes_of`]).
     attr_index: Mutex<Option<HashMap<Reference, Vec<usize>>>>,
+    /// `attrs`' positions an attribute filter matches, by the filter ([`Self::attributes_matching`]).
+    attr_filters: Mutex<HashMap<String, Arc<Vec<usize>>>>,
     /// `debug()` entities as they were when debugged (std debugs points,
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
@@ -313,6 +315,7 @@ impl FsContext {
                 variables: BTreeMap::new(),
                 attrs: attributes,
                 attr_index: Mutex::new(None),
+                attr_filters: Mutex::new(HashMap::new()),
                 debug_entities: Vec::new(),
                 computed: Vec::new(),
                 manipulators: Vec::new(),
@@ -390,7 +393,19 @@ impl CtxState {
     /// The attributes to change (their index is rebuilt when next asked).
     pub fn attributes_mut(&mut self) -> &mut Vec<(Reference, Value)> {
         *self.attr_index.get_mut() = None;
+        self.attr_filters.get_mut().clear();
         &mut self.attrs
+    }
+
+    /// The positions of the attributes a filter `key` matches, kept until the attributes change (std's
+    /// qAttributeFilter: c2-sm-louver's 839 filters each went through its 7586 attributes).
+    pub fn attributes_matching(&self, key: String, matches: impl Fn(&Value) -> bool) -> Arc<Vec<usize>> {
+        if let Some(found) = self.attr_filters.lock().get(&key) {
+            return found.clone();
+        }
+        let found: Arc<Vec<usize>> = Arc::new(self.attrs.iter().enumerate().filter(|(_, (_, v))| matches(v)).map(|(k, _)| k).collect());
+        self.attr_filters.lock().insert(key, found.clone());
+        found
     }
 
     /// The attributes of entity `r` (`{ name, attribute }`), in order: from an index of them all (std asks this of

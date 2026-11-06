@@ -1579,19 +1579,33 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             let base = b.start + a1 * b.setback;
             let on_plane = |w: f64| (plane.length() > 0.5 && b.dir.dot(plane).abs() > 1e-6).then(|| (v - turn(base, sign * w / neutral)).dot(plane) / b.dir.dot(plane));
             let ease = on_plane(0.0).zip(on_plane(ba)).map(|(p0, p1)| (ta - p0, tb - p1));
-            let mut sections = Vec::new();
-            for k in 0..=steps {
+            let at = |k: usize| {
                 let w = ba * (k as f64 - 1.0) / (steps - 2) as f64;
                 let t = match (on_plane(w), ease) {
                     (Some(t), Some((e0, e1))) => t + e0 + (e1 - e0) * w / ba,
                     _ => ta + (tb - ta) * w / ba,
                 };
-                let (t_in, t_out) = if i == 0 { (t, t - reach) } else { (t, t + reach) };
-                let (s_lo, s_hi) = (-back - (front + back), front + (front + back));
-                let quad: Vec<DVec3> = [(t_in, s_lo), (t_out, s_lo), (t_out, s_hi), (t_in, s_hi)].iter().map(|(t, s)| turn(base + b.dir * *t + n1 * *s, sign * w / neutral)).collect();
-                sections.push(k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?);
-            }
-            let cutter = k::loft(&sections, &k::LoftOptions { solid: true, ruled: false, closed: false, ..Default::default() }).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
+                (w, t)
+            };
+            let out_of = |t: f64| if i == 0 { t - reach } else { t + reach };
+            let t0 = at(0).1;
+            let cutter = if (0..=steps).all(|k| (at(k).1 - t0).abs() < 1e-9) {
+                // The end square to the bend (every section at one place along it): the slab past it, planar (the
+                // loft of those sections, a B-spline, made c2-sm-louver's Extrude 3 / 4 ~15 % slower).
+                let size = bend.bounding_box(false).map(|bb| bb.diagonal()).unwrap_or(1.0) + reach;
+                let face = k::make_plane_face(&k::Plane::from_normal(base + b.dir * t0, b.dir), -size, size, -size, size).map_err(|e| fe(e.to_string()))?;
+                k::extrude(&face, b.dir * (out_of(t0) - t0)).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape
+            } else {
+                let mut sections = Vec::new();
+                for k in 0..=steps {
+                    let (w, t_in) = at(k);
+                    let t_out = out_of(t_in);
+                    let (s_lo, s_hi) = (-back - (front + back), front + (front + back));
+                    let quad: Vec<DVec3> = [(t_in, s_lo), (t_out, s_lo), (t_out, s_hi), (t_in, s_hi)].iter().map(|(t, s)| turn(base + b.dir * *t + n1 * *s, sign * w / neutral)).collect();
+                    sections.push(k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?);
+                }
+                k::loft(&sections, &k::LoftOptions { solid: true, ruled: false, closed: false, ..Default::default() }).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape
+            };
             bend = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), &[cutter], &k::BooleanOptions::default()).map_err(|e| fe(format!("Sheet metal bend failed: {e}")))?.shape;
         }
         // Round corner reliefs: the flat circle wrapped onto the bend (angle

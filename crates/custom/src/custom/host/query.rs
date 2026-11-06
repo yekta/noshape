@@ -1977,17 +1977,29 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             let pattern = query.get("attributePattern").clone();
             let exact = query.get("valueToMatchExactly").clone();
             // The entities with a matching attribute, once (thousands of entities and attributes after a pattern).
-            let having: std::collections::HashSet<&Reference> = q
-                .st
-                .attributes()
-                .iter()
-                .filter(|(_, v)| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern))
-                .map(|(x, _)| x)
-                .collect();
+            let key = format!("{name:?}\u{1}{pattern:?}\u{1}{exact:?}");
+            let matching = q.st.attributes_matching(key, |v| (name.is_undefined() || *v.get("name") == name) && (exact.is_undefined() || *v.get("attribute") == exact) && attr_matches(v.get("attribute"), &pattern));
+            let attrs = q.st.attributes();
+            let having: std::collections::HashSet<&Reference> = matching.iter().map(|&k| &attrs[k].0).collect();
             if having.is_empty() {
                 return Ok(Vec::new());
             }
             let base = if query.get("subquery").is_undefined() { q.all_with(None, true) } else { sub(i, "subquery")? };
+            // A few attributed entities among thousands (a sheet metal model after its patterns: c2-sm-louver's 839
+            // filters of ~7 among ~9000 took 3.2 s): those found by their references, not every entity's reference
+            // built and hashed. (Still each kept one's own reference among them, as below.)
+            if having.len() * 16 < base.len() {
+                let mut found: std::collections::HashSet<Ent> = std::collections::HashSet::new();
+                let resolved = having.iter().all(|r| {
+                    let es = q.from_ref(r);
+                    let some = !es.is_empty();
+                    found.extend(es);
+                    some
+                });
+                if resolved {
+                    return Ok(base.into_iter().filter(|e| found.contains(e) && having.contains(&q.to_ref(e)) && q.shown(e)).collect());
+                }
+            }
             base.into_iter().filter(|e| having.contains(&q.to_ref(e))).collect()
         }
         "EDGE_CONVEXITY_FILTER" => {
