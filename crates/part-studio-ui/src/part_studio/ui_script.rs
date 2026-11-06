@@ -193,7 +193,8 @@ impl PartStudioView {
         let tool = if right_of_construction && ed.construction_shown(sk) {
             Some("Construction".to_string())
         } else {
-            (ed.tool != T::Select).then(|| crate::ui::onshape_title(ed.tool.label()).split(" (").next().unwrap_or_default().to_string())
+            let shown = ed.shown_tool();
+            (shown != T::Select).then(|| crate::ui::onshape_title(shown.label()).split(" (").next().unwrap_or_default().to_string())
         };
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
         let mut entities: Vec<String> = sk

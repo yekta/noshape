@@ -196,8 +196,9 @@ impl FeatureDialog {
                 ParamKind::Query { .. } => {
                     let refs = values.query(s.id).to_vec();
                     let items: Vec<String> = self.query_rows(s, &refs).into_iter().map(|r| r.0).collect();
-                    // Missing picks are red; an empty field the feature's error blames isn't (live: a new Extrude's).
-                    let missing = refs.iter().any(|r| self.ref_missing(r)) || (!refs.is_empty() && self.field_error(s.id).is_some());
+                    // Live (behaviours "psui (2144)"): a field the feature's error blames is invalid, empty or not (drawn
+                    // red only while another field is active), and so is one with missing picks.
+                    let missing = refs.iter().any(|r| self.ref_missing(r)) || self.field_error(s.id).is_some();
                     fields.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(s.id), "state": if missing { "error" } else { "ok" } }));
                 }
                 // A table (the Hole's type and size): one select per level, each with its own label (live's recorder

@@ -22,8 +22,8 @@ fn fillet_keeps_length_dimensions_on_trimmed_lines() {
     // Fillet the top-right corner (right and top lines).
     let corner = r.points[2];
     let res = sk.fillet_corner(corner, 0.5).unwrap();
-    // The corner survives as a construction "virtual sharp".
-    assert!(sk.entity(corner).is_some_and(|e| e.construction), "virtual sharp kept");
+    // The corner survives as Onshape's "visual sharp", a plain point.
+    assert!(sk.entity(corner).is_some_and(|e| !e.construction), "virtual sharp kept");
     // Dimensions keep their ids and values; the trimmed ones now measure to the sharp.
     for (cid, val) in [(w, 4.0), (h, 3.0)] {
         let c = sk.constraint(cid).expect("dimension kept");
@@ -46,16 +46,23 @@ fn fillet_keeps_length_dimensions_on_trimmed_lines() {
     assert_eq!(sk.regions().len(), 1);
 }
 
+/// Live (behaviours "skb (1) sketch fillet", ui-parity sketch-fillet-corner-value): without dimensions too, the old
+/// corner stays as a point coincident with both lines.
 #[test]
-fn fillet_without_dimensions_still_removes_the_corner() {
+fn fillet_keeps_the_corner_as_a_visual_sharp() {
     let mut sk = Sketch::new();
     let p = sk.add_point(v(0.0, 0.0));
     let a = sk.add_point(v(3.0, 0.0));
     let b = sk.add_point(v(0.0, 3.0));
-    sk.add_line_between(p, a).unwrap();
-    sk.add_line_between(p, b).unwrap();
+    let la = sk.add_line_between(p, a).unwrap();
+    let lb = sk.add_line_between(p, b).unwrap();
     sk.fillet_corner(p, 0.4).unwrap();
-    assert!(sk.entity(p).is_none());
+    assert!(sk.entity(p).is_some_and(|e| e.kind() == EntityKind::Point && !e.construction));
+    for l in [la, lb] {
+        assert!(sk.constraints().any(|c| matches!(c.kind, ConstraintKind::Coincident { a, b } if a == p && b == l)), "on {l:?}");
+    }
+    assert!(sk.solve().is_solved());
+    assert!(sk.point(p).unwrap().length() < 1e-9, "at the old corner");
 }
 
 #[test]

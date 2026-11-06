@@ -4029,7 +4029,7 @@ impl PartStudioView {
         // Constraint buttons not applicable to the selection are disabled.
         let data = self.sketch_data(cx);
         let (active, construction, selection) = match &self.sketch {
-            Some(ed) => (ed.tool, data.as_ref().is_some_and(|d| ed.construction_shown(&d.sketch)), ed.selection.clone()),
+            Some(ed) => (ed.shown_tool(), data.as_ref().is_some_and(|d| ed.construction_shown(&d.sketch)), ed.selection.clone()),
             None => (Tool::Select, false, Vec::new()),
         };
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).

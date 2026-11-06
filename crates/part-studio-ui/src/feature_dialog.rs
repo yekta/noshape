@@ -1473,6 +1473,10 @@ impl FeatureDialog {
     /// The error a field shows: the feature's error when the regeneration
     /// names this parameter.
     pub fn field_error(&self, id: &str) -> Option<String> {
+        // Live (ui-parity sketch-circumscribed-polygon): a sketch without its plane is red but blames no field.
+        if self.feature.type_id == "sketch" {
+            return None;
+        }
         let (FeatureStatus::Error, msg) = self.status.as_ref()? else { return None };
         if !self.faulty.is_empty() {
             return self.faulty.iter().any(|f| f == id).then(|| msg.clone());

@@ -63,6 +63,23 @@ def run_one(app, scenario, out, display, timeout):
     return None
 
 
+# Live's recorder reads a selection field's invalid state (behaviours "psui (2144)") in its recordings from 2026-11-06
+# 10:52 on; before, it always read "ok", so older recordings don't say.
+QUERY_STATE_SINCE = "2026-11-06T10:50"
+
+
+def forget_old_query_states(live):
+    """Drop the selection fields' `state` from a recording made before live's recorder could read it."""
+    if str(live.get("recorded", "")) >= QUERY_STATE_SINCE:
+        return live
+    for step in [{"state": live.get("start")}] + live.get("steps", []):
+        for d in [(step.get("state") or {}).get("dialog")] + list((step.get("state") or {}).get("dialogs") or []):
+            for f in (d or {}).get("fields", []) if isinstance(d, dict) else []:
+                if isinstance(f, dict) and f.get("kind") == "query":
+                    f.pop("state", None)
+    return live
+
+
 def first_difference(a, b, path=""):
     """The first key path where `a` (live) and `b` (ours) differ, with both values. Keys only one side records
     (a side's debugging aids) are not compared; the selection compares its count only until both record kind and owner."""
@@ -328,7 +345,7 @@ def main():
         except (OSError, ValueError) as e:
             print(f"{name}: {e}")
             continue
-        m, n, first = compare(json.loads(live.read_text()), ours)
+        m, n, first = compare(forget_old_query_states(json.loads(live.read_text())), ours)
         steps_ok, steps_all = steps_ok + m, steps_all + n
         if first is None:
             score += 1

@@ -162,7 +162,7 @@ fn fillet_lines() {
     sk.add_line_between(p, a).unwrap();
     sk.add_line_between(p, b).unwrap();
     let res = sk.fillet_corner(p, 0.4).unwrap();
-    assert!(sk.entity(p).is_none());
+    assert!(sk.entity(p).is_some(), "the corner stays as the visual sharp (live)");
     let arc = *res.created.iter().find(|e| sk.kind(**e) == Some(EntityKind::Arc)).unwrap();
     if let Curve2::Arc { center, .. } = sk.curve(arc).unwrap() {
         assert!(close(center.y, 0.4, 1e-9));

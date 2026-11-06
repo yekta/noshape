@@ -173,10 +173,13 @@ impl PartStudioView {
             let zoom_sel = |r: &Reference| {
                 let r = r.clone();
                 item("Zoom to selection", Box::new(move |this, _, cx| {
+                    // (The right-clicked entity zooms with the selection; live leaves the selection as it was.)
+                    let previous = this.selection.clone();
                     if !this.selection.contains(&r) {
                         this.selection.push(r.clone());
                     }
                     this.zoom_to_selection(cx);
+                    this.selection = previous;
                 }))
             };
             let normal_to = |r: &Reference| {
@@ -234,9 +237,11 @@ impl PartStudioView {
                                 this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
                             })))
                             .item(item("Make transparent…", Box::new(move |this, w, cx| {
-                                this.selection = vec![Reference::Body(bt.clone())];
+                                // (The part is the menu's target, not a selection: live leaves the selection as it was.)
+                                let previous = std::mem::replace(&mut this.selection, vec![Reference::Body(bt.clone())]);
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                                this.selection = previous;
                             })))
                             .separator();
                     }
@@ -420,9 +425,11 @@ impl PartStudioView {
                                 this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
                             })))
                             .item(item("Make transparent…", Box::new(move |this, w, cx| {
-                                this.selection = vec![Reference::Body(b3.clone())];
+                                // (The part is the menu's target, not a selection: live leaves the selection as it was.)
+                                let previous = std::mem::replace(&mut this.selection, vec![Reference::Body(b3.clone())]);
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                                this.selection = previous;
                             })))
                             .separator()
                             .item(icon_item(&format!("Create Drawing of {body_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| {
@@ -514,9 +521,11 @@ impl PartStudioView {
                                 this.isolate(super::behaviors::IsolateMode::Isolate, w, cx);
                             })))
                             .item(item("Make transparent…", Box::new(move |this, w, cx| {
-                                this.selection = vec![Reference::Body(b3.clone())];
+                                // (The part is the menu's target, not a selection: live leaves the selection as it was.)
+                                let previous = std::mem::replace(&mut this.selection, vec![Reference::Body(b3.clone())]);
                                 this.hover = None;
                                 this.isolate(super::behaviors::IsolateMode::Transparent, w, cx);
+                                this.selection = previous;
                             })));
                         if k == PickKind::Face && section {
                             // Live (ui-com/03): with a section view on, its

@@ -512,7 +512,6 @@ impl Sketch {
         // Length dimensions of trimmed lines are kept by re-targeting them to
         // the "virtual sharp" (the old corner point, kept as a construction
         // point on both lines), so the design intent survives the fillet.
-        let mut retargeted = false;
         for (id, corner) in [(a, ca), (b, cb)] {
             if self.kind(id) != Some(EntityKind::Line) {
                 continue;
@@ -527,9 +526,7 @@ impl Sketch {
                 })
                 .collect();
             for (cid, value) in lens {
-                if self.retarget_constraint(cid, ConstraintKind::Distance { a: far, b: ca, value, mode: crate::constraints::DistanceMode::Center }).is_ok() {
-                    retargeted = true;
-                }
+                let _ = self.retarget_constraint(cid, ConstraintKind::Distance { a: far, b: ca, value, mode: crate::constraints::DistanceMode::Center });
             }
         }
         let pa = self.add_point(ta);
@@ -551,16 +548,12 @@ impl Sketch {
         self.add_c(&mut res, ConstraintKind::Tangent { a: b, b: arc });
         self.add_c(&mut res, ConstraintKind::Radius { curve: arc, value: radius });
         let mut olds: Vec<EntityId> = if ca == cb { vec![ca] } else { vec![ca, cb] };
-        // Keep the corner as a virtual sharp when dimensions or constraints
-        // still refer to it.
-        let keep_sharp = retargeted || self.constraints().any(|c| c.kind.entities().contains(&ca));
-        if keep_sharp && self.users_of_point(ca).is_empty() {
+        // The old corner stays as Onshape's `visualSharp`: a point coincident with both curves (behaviours "skb (1)
+        // sketch fillet", ui-parity sketch-fillet-corner-value), whatever refers to it; dimensions to the corner keep it.
+        if self.users_of_point(ca).is_empty() {
             olds.retain(|p| *p != ca);
-            let _ = self.set_construction(ca, true);
             for id in [a, b] {
-                if matches!(self.kind(id), Some(EntityKind::Line)) {
-                    self.add_c(&mut res, ConstraintKind::Coincident { a: ca, b: id });
-                }
+                self.add_c(&mut res, ConstraintKind::Coincident { a: ca, b: id });
             }
             res.modified.push(ca);
         }

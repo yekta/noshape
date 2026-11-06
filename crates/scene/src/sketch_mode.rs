@@ -1251,6 +1251,12 @@ impl SketchEditor {
         }
     }
 
+    /// The tool the toolbar shows active: Tangent arc while Shift+A (or a press at the chain's end) switches a Line
+    /// chain to its tangent arc (live ui-parity sketch-line-tangent-arc-switch), else the tool.
+    pub fn shown_tool(&self) -> Tool {
+        if self.tangent_mode && self.tool == Tool::Line { Tool::TangentArc } else { self.tool }
+    }
+
     pub fn set_tool(&mut self, tool: Tool) {
         // Pressing the active tool's key again toggles back to select.
         let previous = self.tool;
@@ -1383,6 +1389,12 @@ impl SketchEditor {
             self.xf_offset = DVec2::ZERO;
             self.xf_angle = 0.0;
             self.xf_scale = 1.0;
+            self.set_tool(Tool::Select);
+            return true;
+        }
+        // Live (ui-parity sketch-chamfer-tool): the corner a fillet / chamfer previews doesn't stay selected.
+        if matches!(self.tool, Tool::Fillet | Tool::Chamfer) && self.pending_corner.take().is_some() {
+            self.selection.clear();
             self.set_tool(Tool::Select);
             return true;
         }
@@ -2008,6 +2020,8 @@ impl SketchEditor {
                         self.mirror_axis = Some(axis);
                         let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| *e != axis).collect();
                         if ids.is_empty() {
+                            // Live (ui-parity sketch-mirror-tool): the mirror line shows selected.
+                            self.selection = vec![axis];
                             self.message = Some("Select entities to be mirrored.".into());
                             return EditOutcome::redraw();
                         }
@@ -2577,7 +2591,9 @@ impl SketchEditor {
         match data.sketch.mirror(ids, axis) {
             Ok(r) => {
                 self.finish_create(data, &r.created);
-                self.message = Some("Click more entities to mirror (Esc to finish)".into());
+                // Live (ui-parity sketch-mirror-tool): nothing stays selected, the prompt stays.
+                self.selection.clear();
+                self.message = Some("Select entities to be mirrored.".into());
                 EditOutcome::changed()
             }
             Err(e) => {
@@ -8864,6 +8880,19 @@ mod tests {
         assert!(ed.apply_pattern(&mut d).changed);
         assert_eq!(count(&d, EntityKind::Circle), 9);
         assert!(d.sketch.solve().is_solved());
+    }
+
+    /// Live (ui-parity sketch-mirror-tool): the mirror line shows selected; once a curve is mirrored nothing is.
+    #[test]
+    fn mirror_selects_its_line_then_nothing() {
+        let (mut ed, mut d) = editor(Tool::Mirror);
+        let axis = d.sketch.add_line(v(0.0, -0.01), v(0.0, 0.03));
+        d.sketch.add_line(v(0.005, 0.0), v(0.02, 0.01));
+        click(&mut ed, &mut d, v(0.0, 0.02));
+        assert_eq!(ed.selection, vec![axis]);
+        click(&mut ed, &mut d, v(0.00875, 0.0025));
+        assert_eq!(count(&d, EntityKind::Line), 3);
+        assert!(ed.selection.is_empty(), "{:?}", ed.selection);
     }
 
     #[test]

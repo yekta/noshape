@@ -3313,6 +3313,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
+  (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance
+  point, shapes.rs `polygon`), 3 × COINCIDENT, HORIZONTAL. Same geometry; the constraint list (Constraint manager, the
+  glyphs) differs. Needs Onshape's polygon by REST (its constraints and their parameters). (psui 2026-11-06)
 - [ ] P2 SKETCH-SCREEN-SPACE-REACH (skasm) live measures a sketch's pick and inference reach on the screen, after the view's
   projection; ours in sketch units (`world_per_px` × px). In the default trimetric view a Top-plane sketch's y is foreshortened
   far more than its x, and live behaves accordingly (ui-parity, start `empty`, Sketch on Top): sketch-horizontal-key draws

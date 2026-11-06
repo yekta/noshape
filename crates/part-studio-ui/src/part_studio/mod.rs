@@ -5771,6 +5771,16 @@ impl PartStudioView {
                     this.selection = prev;
                 })));
             }
+            // Live (ui-parity feature-menu-add-to-folder): with something selected, Clear selection.
+            let something_selected = { let v = view.read(cx); !v.selection.is_empty() || !v.selected_features.is_empty() };
+            if something_selected {
+                m = m.item(item("Clear selection", Box::new(|this, _, cx| {
+                    this.selection.clear();
+                    this.selected_features.clear();
+                    this.refresh_scene(false, cx);
+                    cx.notify();
+                })));
+            }
             m = m.separator().item(item("Show dependencies…", Box::new(move |this, _, cx| {
                 this.ui.dependencies = Some(id);
                 cx.notify();
