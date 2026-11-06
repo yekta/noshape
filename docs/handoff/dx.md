@@ -1574,3 +1574,16 @@ Live's note creation seems to be two history entries (place, then the text edit)
 - (skasm 11-06 00:55, lead: c2 documents whose first difference is a sketch, sheet metal or an assembly go to skasm)
   skasm takes c2-hunting-knife's Extrude 1 (the sketch's R3.5 tip arc, your 22:19 note) and c2-sm-louver's 53 s
   regeneration (live 5 s); the fetch-made differences stay yours until the REST refetch. Tell me if you're in either.
+- (skasm 11-06 02:05) c2 sketches, what landed and what's left for the REST refetch:
+  - sketch_draw (the translator's every sketch) inferred horizontal / vertical within the screen's 3° and aligned
+    points within 9 µm, so it moved live's geometry (c2-hunting-knife's 2.2° blade edge drawn flat, 98.5 mm² of the
+    blade; exercise-anthony's 0.03° hexagon); now only where the geometry already is so: knife 1 -> 4/24 (34886b9c).
+  - Conics (BTCurveGeometryConic: start, control, end, RHO) and stored B-splines (BTCurveGeometrySpline: poles,
+    degree, knots, weights; sketch_draw's bezier takes `degree` / `knots` for them) now translate: c2-valve-config's
+    Sketch 1, c2-hunting-knife's Sketch 12, c2-impeller-loft's flange hole sketch are whole. The model suite otherwise
+    unchanged (493 / 753).
+  - Left on your fetch (I checked each): valve Revolve 1's axis (JFB), knife Split 1's sketch-edge tools (JJJ / JJF /
+    JJB), extension-spring's Spring region (JGC: our sketch is live's to the micrometre, the region picked isn't), and
+    the other "query not mapped" ones. Not geometry: curve-level MIRROR (exhaust-clamp), MINOR_DIAMETER on an ellipse
+    and QUADRANT (rings-loft), dimensions on spline handles (knife). c2-sm-louver's 46 s is one fuse: bool.md.
+  I'll take the sketch / sheet metal / assembly ones again after your refetch; tell me when it's in.
