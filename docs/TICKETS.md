@@ -2711,7 +2711,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
-- [ ] P2 EXPORT-DXF-DIALOG (psui) a sketch's (and a planar face's) "Export as DXF/DWG…" opens live's modal "Export as
+- [x] P2 EXPORT-DXF-DIALOG (psui; done 11-06: flat_export.rs's modal for flats, sketches and planar faces; a face's
+  File name "<studio> - <part>" is a guess, asked live) a sketch's (and a planar face's) "Export as DXF/DWG…" opens live's modal "Export as
   DXF/DWG" (ui-parity sketch-row-menu-export-dxf): File name (with "View export rules"), Format DXF / DWG, Version
   (Release 14 …), Units (Millimeter), Use workspace units ✓, Options (Download …), Export splines as polylines ☐, Set
   z-height to zero and normals to positive ✓; Export / Cancel; the File name input focused, its text selected. Ours goes

@@ -81,6 +81,12 @@ settings, 2), live runner artefacts (a menu pick by prefix, 3: REQUESTS), Mirror
 Export as DXF/DWG's modal (EXPORT-DXF-DIALOG), the server round trip after Suppress, a measurement's chip "Unknown of".
 Coverage: toolbar 47/76, sketch tools 43/55, menus 62/117, shortcuts 59/89 (batches 6-9 with live).
 
+psui 11-06 16:49: the whole suite with live's batches 5-9 on main (447 recordings), on 21064380 (queued): **417/447
+scenarios, 2770/2849 states**. Left in the Part Studio: account memory (Hole, 2), live runner artefacts (menu pick by
+prefix, 3; a new sketch's owner, 1), the server round trip after Suppress, Mirror's Face mirror focus (asked live), a
+number field's right-click focus (psui handoff), "Unknown of" chips, skasm's three sketch ones, the mirror line
+(SKETCH-MIRROR-LINE-SELECTED), the flaky asm-fastened-undo-picks (UIP-ASM-FASTENED-FLAKY); the rest are drw-* (dx).
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
