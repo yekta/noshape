@@ -143,6 +143,9 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"annotation": "1.575"}`: an annotation by its shown text; `{"doc_tab": "Part 1 Drawing 1"}`: a document tab;
 - `{"sheet_tab": "Sheet2"}`: a sheet by its name: its tab at the drawing's top left, or its row in the Sheets panel
   when that is open (click, double-click, rclick);
+- `"export": ["PDF", "DXF", "DWG"]` (a scenario key): after the last step each runner exports the drawing in those
+  formats with the Export dialog's defaults, beside its recording as `<scenario>.pdf` / `.dxf` / `.dwg`;
+  `tools/drawing-export/compare.py <live dir> <ours dir>` compares them (export fidelity, lead 11-06);
 - `{"tool": …}` the drawing toolbar's tools by tooltip, as in a Part Studio.
 
 Its state adds `"drawing"` (`null` outside a drawing tab):
