@@ -1600,6 +1600,115 @@ impl<'a> Translator<'a> {
         Err(format!("query not mapped (no live geometry for {}): {}", if ids.is_empty() { "it".to_string() } else { ids.join(", ") }, text.chars().take(80).collect::<String>()))
     }
 
+    /// Where an [`EdgeSide`] points in our sketch (its coordinates): None where its curves aren't ours, aren't lines,
+    /// circles or arcs, or don't meet at one point.
+    fn edge_side_probe(&self, sk: &str, g: &Value, q: &EdgeSide) -> Option<glam::DVec2> {
+        use glam::DVec2;
+        #[derive(Clone, Copy)]
+        enum C {
+            Line(DVec2, DVec2),
+            /// Centre, radius and an arc's start angle and sweep (anticlockwise).
+            Circle(DVec2, f64, Option<(f64, f64)>),
+        }
+        let pt = |v: &Value| Some(DVec2::new(v[0].as_f64()?, v[1].as_f64()?));
+        let curve = |live: &str| -> Option<C> {
+            let ours = self.sketch_entities.get(&(sk.to_string(), live.to_string()))?;
+            let e = g["entities"].as_array()?.iter().find(|e| e["id"] == ours.as_str())?;
+            match e["type"].as_str()? {
+                "line" => Some(C::Line(pt(&e["start"])?, pt(&e["end"])?)),
+                "circle" => Some(C::Circle(pt(&e["center"])?, e["radius"].as_f64()?, None)),
+                "arc" => {
+                    let c = pt(&e["center"])?;
+                    let (a, b) = (pt(&e["start"])? - c, pt(&e["end"])? - c);
+                    let a0 = a.y.atan2(a.x);
+                    let sweep = (b.y.atan2(b.x) - a0).rem_euclid(std::f64::consts::TAU);
+                    Some(C::Circle(c, a.length(), Some((a0, if sweep == 0.0 { std::f64::consts::TAU } else { sweep }))))
+                }
+                _ => None,
+            }
+        };
+        let size = |c: C| match c {
+            C::Line(a, b) => a.distance(b),
+            C::Circle(_, r, _) => r,
+        };
+        let tangent = |c: C, p: DVec2| match c {
+            C::Line(a, b) => (b - a).normalize_or_zero(),
+            C::Circle(o, _, _) => (p - o).perp().normalize_or_zero(),
+        };
+        let edge = curve(&q.edge)?;
+        let tol = 1e-6 * size(edge).max(1.0);
+        let on = |c: C, p: DVec2| match c {
+            C::Line(a, b) => {
+                let d = b - a;
+                (p - (a + d * ((p - a).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0))).length() <= tol
+            }
+            C::Circle(o, r, arc) => (p.distance(o) - r).abs() <= tol && arc.is_none_or(|(a0, sweep)| ((p - o).to_angle() - a0).rem_euclid(std::f64::consts::TAU) <= sweep + tol / r || ((p - o).to_angle() - a0).rem_euclid(std::f64::consts::TAU) >= std::f64::consts::TAU - tol / r),
+        };
+        // Where two curves meet (a tangent touch once).
+        let meet = |a: C, b: C| -> Vec<DVec2> {
+            let mut pts = match (a, b) {
+                (C::Line(p, q), C::Line(u, v)) => {
+                    let (d, e) = (q - p, v - u);
+                    let den = d.perp_dot(e);
+                    if den.abs() < 1e-300 { Vec::new() } else { vec![p + d * ((u - p).perp_dot(e) / den)] }
+                }
+                (C::Line(p, q), C::Circle(o, r, _)) | (C::Circle(o, r, _), C::Line(p, q)) => {
+                    let d = (q - p).normalize_or_zero();
+                    let t0 = (o - p).dot(d);
+                    let h2 = r * r - (p + d * t0 - o).length_squared();
+                    if h2 < -tol * r { Vec::new() } else { let h = h2.max(0.0).sqrt(); vec![p + d * (t0 - h), p + d * (t0 + h)] }
+                }
+                (C::Circle(o1, r1, _), C::Circle(o2, r2, _)) => {
+                    let dist = o1.distance(o2);
+                    if dist < 1e-300 { Vec::new() } else {
+                        let a = (dist * dist + r1 * r1 - r2 * r2) / (2.0 * dist);
+                        let h2 = r1 * r1 - a * a;
+                        let (m, n) = (o1 + (o2 - o1) * (a / dist), (o2 - o1).perp() / dist);
+                        if h2 < -tol * r1 { Vec::new() } else { let h = h2.max(0.0).sqrt(); vec![m - n * h, m + n * h] }
+                    }
+                }
+            };
+            pts.retain(|p| on(a, *p) && on(b, *p));
+            pts.dedup_by(|x, y| x.distance(*y) <= tol);
+            pts
+        };
+        // (A twentieth of the edge along it, on it; to the side by half the other curve's distance there, at most a
+        // twentieth of that: between the two where they touch (a tangent line's cusp beside a circle), and clear of
+        // the regions' tessellation, 1e-5 of their size.)
+        let step = 0.05 * size(edge);
+        let along = |p: DVec2, by: f64| match edge {
+            C::Line(a, b) => p + (b - a).normalize_or_zero() * by,
+            C::Circle(o, r, _) => o + DVec2::from_angle(by / r).rotate(p - o),
+        };
+        let distance = |c: C, p: DVec2| match c {
+            C::Line(a, b) => {
+                let d = b - a;
+                (p - (a + d * ((p - a).dot(d) / d.length_squared().max(1e-300)).clamp(0.0, 1.0))).length()
+            }
+            C::Circle(o, r, _) => (p.distance(o) - r).abs(),
+        };
+        let (at, other) = match &q.vertex {
+            Some(([a, b], flag)) => {
+                let (ca, cb) = (curve(a)?, curve(b)?);
+                let [v] = meet(ca, cb)[..] else { return None };
+                if !on(edge, v) {
+                    return None;
+                }
+                let other = if *a == q.edge { cb } else { ca };
+                (along(v, if *flag < 0.0 { step } else { -step }), Some(other))
+            }
+            None => (
+                match edge {
+                    C::Line(a, b) => (a + b) * 0.5,
+                    C::Circle(o, r, arc) => o + DVec2::from_angle(arc.map_or(0.0, |(a0, sweep)| a0 + 0.5 * sweep)) * r,
+                },
+                None,
+            ),
+        };
+        let off = other.map_or(0.05 * step, |c| (0.5 * distance(c, at)).min(0.05 * step));
+        Some(at + tangent(edge, at).perp() * (off * q.side.signum()))
+    }
+
     /// A sketch region query (Onshape's packed form: a FACE whose
     /// TOPOLOGY is the sketch entities bounding it): our region whose
     /// interior point lies inside those curves. `None`: not a region query.
@@ -1680,7 +1789,7 @@ impl<'a> Translator<'a> {
                 return Ok(only["id"].as_str().map(whole));
             }
         }
-        let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
+        let mut bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
         if let [only] = bounded.as_slice() {
             return Ok(only["id"].as_str().map(whole));
         }
@@ -1699,15 +1808,39 @@ impl<'a> Translator<'a> {
                 return Ok(only["id"].as_str().map(whole));
             }
         }
-        // One circle named, whole, and the face's side of it (`…}),-1.0]])]`, the query's last orientation): -1 the
-        // region it is a hole of, +1 the one inside it (cf-lighten's rings around its holes).
-        if bounded.len() > 1 && !derived && let [circle] = named.as_slice()
-            && g["entities"].as_array().into_iter().flatten().any(|e| e["id"] == circle.as_str() && e["type"] == "circle")
+        // A text query's face by its edge and side (a piece of a curve from where two curves meet, `INTERSECT`; or the
+        // whole curve): the region at a point a hair along that piece from the vertex (-1: the piece starting there, +1:
+        // ending there) and a hair to the face's side (+1 its left, as a loop runs; a circle's inside).
+        if bounded.len() != 1 && !derived
+            && let Some(q) = edge_side_query(text)
+            && let Some(probe) = self.edge_side_probe(&sk, &g, &q)
+        {
+            let k = per_unit(&g["units"]);
+            let at: [f64; 3] = std::array::from_fn(|i| (o[i] + probe.x * x[i] + probe.y * y[i]) * k);
+            let found = self.call("sketch_get", json!({ "sketch": ours, "at": mm(at) }))?;
+            let ids: Vec<&str> = found["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str()).collect();
+            if let [only] = ids.as_slice() {
+                return Ok(Some(whole(only)));
+            }
+        }
+        // The face's edge on a circle or arc and the face's side of it (`…}),-1.0]])]`, the query's last orientation):
+        // -1 the regions outside that circle, +1 those inside (cf-lighten's rings around its holes, the link beside them).
+        if bounded.len() > 1 && !derived
+            && let Some(curve) = face_edge_entity(text).and_then(|e| self.sketch_entities.get(&(sk.clone(), e)).cloned())
+            && let Some(e) = g["entities"].as_array().into_iter().flatten().find(|e| e["id"] == curve.as_str() && (e["type"] == "circle" || e["type"] == "arc"))
             && let Some(side) = text.rfind("]])]").and_then(|end| text[..end].rsplit_once(',')).and_then(|(_, n)| n.trim().parse::<f64>().ok())
         {
-            let inside = |r: &Value| r["outer"].as_array().is_some_and(|o| o.iter().any(|x| x == circle.as_str()));
-            if let [only] = bounded.iter().filter(|r| inside(r) == (side > 0.0)).collect::<Vec<_>>().as_slice() {
-                return Ok(only["id"].as_str().map(whole));
+            let p = |v: &Value| Some(glam::DVec2::new(v[0].as_f64()?, v[1].as_f64()?));
+            let center = p(&e["center"]);
+            let radius = e["radius"].as_f64().or_else(|| Some(p(&e["start"])?.distance(center?)));
+            if let (Some(c), Some(r)) = (center, radius) {
+                let kept: Vec<&Value> = bounded.iter().filter(|g| p(&g["inside"]).is_some_and(|q| (q.distance(c) < r) == (side > 0.0))).collect();
+                if let [only] = kept.as_slice() {
+                    return Ok(only["id"].as_str().map(whole));
+                }
+                if !kept.is_empty() && kept.len() < bounded.len() {
+                    bounded = kept.into_iter().cloned().collect();
+                }
             }
         }
         // One line named and no region bounded by it: it lies along another curve that bounds the region instead
@@ -3823,6 +3956,47 @@ fn geometry_kind(t: &str) -> String {
 
 /// Whether two sketch curves (sketch_get entities) cross or touch, within
 /// `tol`: lines, circles and arcs (an arc as its circle); others may.
+/// A text region query's face, by its IMPRINT edge: the live sketch entity the edge is derived from, the vertex that
+/// bounds its piece (the two live entities meeting there and its orientation), and the face's side of the edge.
+struct EdgeSide {
+    edge: String,
+    vertex: Option<([String; 2], f64)>,
+    side: f64,
+}
+
+fn edge_side_query(text: &str) -> Option<EdgeSide> {
+    let edge = face_edge_entity(text)?;
+    let side = text.rfind("]])]").and_then(|end| text[..end].rsplit_once(',')).and_then(|(_, n)| n.trim().parse::<f64>().ok())?;
+    let entity_of = |name: &str| -> Option<String> {
+        let def = text.split(&format!("var {name}=sketchEntityQuery(")).nth(1)?;
+        def.split(')').next().and_then(|args| args.rsplit('"').nth(1)).map(str::to_string)
+    };
+    let after = &text[text.find("\"IMPRINT\",EntityType.EDGE,{")?..];
+    let vertex = after.split_once("topologyDisambiguation([[").filter(|(before, _)| !before.contains("derivedFrom")).and_then(|(_, rest)| {
+        let (name, rest) = rest.split_once(',')?;
+        let flag: f64 = rest.split(']').next()?.trim().parse().ok()?;
+        let def = text.split(&format!("var {}=makeQuery(", name.trim())).nth(1)?;
+        let pair = def.split("\"INTERSECT\",EntityType.VERTEX,{\"derivedFrom\":[").nth(1)?.split(']').next()?;
+        let (a, b) = pair.split_once(',')?;
+        Some(([entity_of(a.trim())?, entity_of(b.trim())?], flag))
+    });
+    Some(EdgeSide { edge, vertex, side })
+}
+
+/// The live sketch entity an IMPRINT edge of a text query is derived from (`"derivedFrom":subQk`, its
+/// `var subQk=sketchEntityQuery(…,"<id>")`, or `"derivedFrom":sketchEntityQuery(…,"<id>")`).
+fn face_edge_entity(text: &str) -> Option<String> {
+    let at = text.find("\"IMPRINT\",EntityType.EDGE")?;
+    let from = &text[at..][text[at..].find("\"derivedFrom\":")? + 14..];
+    let last_quoted = |q: &str| q.split(')').next().and_then(|args| args.rsplit('"').nth(1)).map(str::to_string);
+    if let Some(rest) = from.strip_prefix("sketchEntityQuery(") {
+        return last_quoted(rest);
+    }
+    let name: String = from.chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+    let def = text.split(&format!("var {name}=sketchEntityQuery(")).nth(1)?;
+    last_quoted(def)
+}
+
 fn curves_meet(a: &Value, b: &Value, tol: f64) -> bool {
     let p = |v: &Value| Some(glam::DVec2::new(v[0].as_f64()?, v[1].as_f64()?));
     let circle = |e: &Value| -> Option<(glam::DVec2, f64)> {
