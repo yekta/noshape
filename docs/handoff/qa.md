@@ -36,6 +36,16 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 17:29:** v0.4.33: the first run (42240367775) failed only its new "Budgeted documents" check (sparse checkout without
+tests/budget: P0 RELEASE-BUDGET-STEP-SPARSE, fixed by the lead 996ab4b1); the re-run 42249878030's binaries differ byte-wise
+from the first (same source; the build isn't reproducible), so the smoke ran again on them: = v0.4.32. Stock ubuntu:24.04
+(docker here): the CLI runs and opens the budget document. **DRAFT-POOL-HANG-MACOS verified** from the re-run's table (macOS
+6.95 s, Windows 10.38 s). DRAFT-NONDETERMINISTIC verified on b7afdb57 (24 / 24 opens, 4 / 4 on one core) and on v0.4.33 (12 / 12).
+Greens through 49446083 unchanged; a7f4c4f9 (core's loft edges keep the sections' curves) moves the vase by about 1e-8
+(loft 437876.2995 → .2950, shells ±0.005 mm³): expected from exact section curves, not filed. 0ac149fd (bool's Split by a
+plane in Rust): Gyro matrices unchanged. Release fuzz now on v0.4.33's re-run binary (bin/w-v33.sh → rel/noshape-cli-0.4.33b).
+At publish: the updater, GUI rows, title bar; the 17:00 list is written (no code blocker).
+
 **11-06 09:13:** still no 05:00 Release run (none cut by 09:13); the list in TICKETS stands. Greens since: fa886aef, a4433e68 (bool's
 tolerances stage 4: **P2 BOOL-TOL4-DRAFT-VOLUME**, slow1151's Draft 4 now taken by the Rust Boolean, 0.18 mm³ under OCCT), 9d64259f,
 3ea570b7, 5b14f339 (also GUI rows: identical to v0.4.32), efd5533d, 3be27d0f, 9cb2159f, de022225 (stage 5a; full smoke = a4433e68),

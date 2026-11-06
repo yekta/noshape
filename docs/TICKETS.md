@@ -597,7 +597,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (quick_boolean builds without the indicator), Draft, defeaturing: their builds need the indicator's range passed
   (Build(range) where OCCT takes one) or a check between steps. Test: kernel `a_section_under_a_call_budget_gives_up`
   (all three in CI); build with CXXFLAGS=-DNOSHAPE_PORTABLE_BUDGET to try the deadline path on Linux.
-- [x] P0 DRAFT-POOL-HANG-MACOS (core, lead 11-06 from bool: tests/budget/draft-pool-hang.noshape didn't open in 30 min
+- [x] verified v0.4.33 (qa 11-06 17:29: Release run 42249878030's budget table, `time_cli.py --limit 180`: draft-pool-hang.noshape
+  opens in 6.95 s on macOS arm64 and 10.38 s on Windows x86_64 (v0.4.32 never finished there); Linux on vibe3 19 s, v0.4.32 48 s)
+  P0 DRAFT-POOL-HANG-MACOS (core, lead 11-06 from bool: tests/budget/draft-pool-hang.noshape didn't open in 30 min
   on macos-15 runners, 26 s on Linux): not a budget's clock. Shell 20's Boolean (BOPTools PointNearEdge) evaluated an
   offset face at u = -1.4e9 (its range 0..6), a singular point; Geom_OffsetSurfaceUtils' retry steps towards the centre
   by less than the numbers' spacing there and looped forever, OCCT checking no deadline. Linux's CPU timer jumped out
