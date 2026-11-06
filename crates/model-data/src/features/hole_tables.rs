@@ -746,6 +746,30 @@ mod tests {
         assert!(v.bool("hasClearance"));
     }
 
+    /// Live 1987 / ui-parity hole-metric-tab, hole-countersink-tab: the Units tab switches to the other system's
+    /// remembered Standard (an inch Hole goes to Metric as the last committed metric one, Tapped M6x1.00), and a
+    /// Standard without countersink sizes leaves the remembered countersink diameter.
+    #[test]
+    fn a_units_or_style_switch_keeps_the_remembered_standard_and_sizes() {
+        let mut v = ParamValues::default();
+        v.set("unitsSystem", ParamValue::Enum("INCH".into()));
+        v.set("styleV2", ParamValue::Enum("SIMPLE".into()));
+        v.set("ansiHoleTableEx", ParamValue::Lookup(p(&["Drilled", "1/4 (0.25)"])));
+        v.set("isoHoleTableEx", ParamValue::Lookup(p(&["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)", "None"])));
+        v.set("cSinkDiameterV3", ParamValue::Expr(ExprValue::new("13.44 mm")));
+        v.set("unitsSystem", ParamValue::Enum("METRIC".into()));
+        assert!(sync_hole_standard(&mut v));
+        assert_eq!(v.lookup("isoHoleTableEx")[2], "M6");
+        assert_eq!(v.expr("tapDrillDiameterV3").unwrap().text, "5 mm");
+        assert_eq!(v.enum_("threadStandard"), "ISO");
+        v.set("unitsSystem", ParamValue::Enum("INCH".into()));
+        v.set("styleV2", ParamValue::Enum("C_SINK".into()));
+        v.set("ansiHoleTable", ParamValue::Lookup(p(&["Drilled", "1/4 (0.25)"])));
+        assert!(sync_hole_standard(&mut v));
+        assert_eq!(v.expr("holeDiameterV3").unwrap().text, "0.25 in");
+        assert_eq!(v.expr("cSinkDiameterV3").unwrap().text, "13.44 mm");
+    }
+
     #[test]
     fn known_values() {
         let m5 = values(&p(&["ISO", "Tapped", "Straight tap", "M5", "0.80 mm", "None"])).unwrap();

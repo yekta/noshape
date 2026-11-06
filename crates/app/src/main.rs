@@ -403,8 +403,9 @@ fn main() {
     }
     noshape_render::perf::process_start();
     // Feature dialogs' remembered values last across sessions (live 1987); not under the ui-parity driver, whose
-    // runs must not depend on one another.
-    if std::env::var_os("NOSHAPE_UI_SCRIPT").is_none() {
+    // runs must not depend on one another, unless the run starts from given ones (its own config dir's, the
+    // scenario's "remembered": live's account state).
+    if std::env::var_os("NOSHAPE_UI_SCRIPT").is_none() || std::env::var_os("NOSHAPE_UI_REMEMBERED").is_some() {
         noshape_app_core::feature_settings::enable();
     }
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,naga=warn,wgpu=warn,zbus=warn,tracing=warn")).init();

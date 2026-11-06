@@ -32,12 +32,32 @@ LATER_KEYS = ["undo", "sketch", "assembly", "drawing"]
 NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 
 
+def remembered_settings(seed):
+    """A scenario's "remembered" (what live's account last committed per feature type, behaviours 1987) as the app's
+    feature_settings.json: type → group ("", "length:Millimeter", "angle:Degree") → parameter → value. Plain values:
+    a list is a Lookup path, a bool a Bool, a string in a length / angle group an expression, else an Enum."""
+    def value(group, v):
+        if isinstance(v, list):
+            return {"t": "Lookup", "v": v}
+        if isinstance(v, bool):
+            return {"t": "Bool", "v": v}
+        if group or isinstance(v, (int, float)):
+            return {"t": "Expr", "v": {"text": str(v)}}
+        return {"t": "Enum", "v": v}
+    return {ty: {g: {p: value(g, v) for p, v in params.items()} for g, params in groups.items()} for ty, groups in seed.items()}
+
+
 def run_one(app, scenario, out, display, timeout):
     env = dict(os.environ)
+    config = tempfile.mkdtemp(prefix="noshape-uip-config-")
+    seed = json.loads(Path(scenario).read_text()).get("remembered")
+    if seed:
+        Path(config, "feature_settings.json").write_text(json.dumps(remembered_settings(seed)))
+        env["NOSHAPE_UI_REMEMBERED"] = "1"
     env.update({
         "NOSHAPE_UI_SCRIPT": str(scenario),
         "NOSHAPE_UI_STATE_OUT": str(out),
-        "NOSHAPE_CONFIG_DIR": tempfile.mkdtemp(prefix="noshape-uip-config-"),
+        "NOSHAPE_CONFIG_DIR": config,
         "NOSHAPE_NO_NATIVE_DIALOGS": "1",
         "DISPLAY": display,
     })

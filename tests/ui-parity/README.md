@@ -51,6 +51,20 @@ list's rows (the assembly's own, Origin, instances, "Mate features (n)", its row
 [{"name", "fixed", "transform"}], "mates": [{"name", "type", "status"}]}` as live's REST gives them (type
 "REVOLUTE", status "OK"); a mate selected in the list is a `FEATURE` item.
 
+### remembered (psui, 11-06)
+
+Onshape remembers a feature dialog's REMEMBER_PREVIOUS_VALUE parameters per account, saved on ✓ (behaviours 1987;
+ours: `feature_settings`), so a Hole opens with what live's account last committed. A scenario whose recording
+depends on that says what the account held, and our run starts from it (run.py writes it as the run's
+`feature_settings.json`):
+
+    "remembered": {"hole": {"": {"unitsSystem": "INCH", "isoHoleTableEx": ["Tapped", "Straight tap", "M6", "1.00 mm (Coarse)", "None"]},
+                            "length:Millimeter": {"tappedDepthV3": "10 mm"}}}
+
+Feature type → group ("" for values without units, "length:<unit>" / "angle:<unit>" per document unit) → parameter →
+value: a list is a Lookup path, a bool a Bool, a string in a length / angle group (or a number) an expression, any
+other string an Enum id.
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.

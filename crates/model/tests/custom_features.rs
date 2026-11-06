@@ -4027,3 +4027,35 @@ export const idProbe = defineFeature(function(context is Context, id is Id, defi
     let out: Vec<String> = ids.iter().map(|f| custom::run::output_of(*f).expect("probe output").output).collect();
     assert!(out[0].contains("transientId") && out[0] != out[1], "{out:?}");
 }
+
+/// Live 1987 / ui-parity hole-countersink-tab: a Hole opened with a remembered countersink diameter keeps it when the
+/// Countersink tab switches the table (std's holeEditLogic copies the V2 sizes, synced from the V3 ones, back).
+#[test]
+fn hole_countersink_tab_keeps_the_remembered_diameter() {
+    let fx = Fixture::new(&studio(""));
+    let ps = PartStudio::new();
+    let ctx = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &fx.units, &RegenOptions::default()).context;
+    let f = PartStudio::new().new_feature("hole", &fx.units).unwrap();
+    assert!(custom::std_feature::has_editing_logic("hole"), "std's Hole editing logic");
+    let mut p = f.params.clone();
+    p.set("unitsSystem", ParamValue::Enum("INCH".into()));
+    p.set("styleV2", ParamValue::Enum("SIMPLE".into()));
+    p.set("ansiHoleTableEx", ParamValue::Lookup(vec!["Drilled".into(), "1/4 (0.25)".into()]));
+    p.set("ansiHoleTable", ParamValue::Lookup(vec!["Drilled".into(), "1/4 (0.25)".into()]));
+    p.set("cSinkDiameterV3", ParamValue::Expr(noshape_units::ExprValue::new("13.44 mm")));
+    // Opening the dialog (the first run, old = {}).
+    if let Some(seeded) = custom::std_feature::editing_logic_in((*ctx).clone(), "hole", f.id, &f.name, &fx.units, &noshape_model::params::ParamValues::default(), &p, &[], true) {
+        for (k, v) in seeded.0.into_iter().filter(|(k, _)| f.params.get(k).is_some()) {
+            p.set(&k, v);
+        }
+    }
+    let mut c_sink = p.clone();
+    c_sink.set("styleV2", ParamValue::Enum("C_SINK".into()));
+    let changed = custom::std_feature::editing_logic_in((*ctx).clone(), "hole", f.id, &f.name, &fx.units, &p, &c_sink, &["styleV2".to_string()], true).expect("editing logic ran");
+    let d = changed.get("cSinkDiameterV3").or(c_sink.get("cSinkDiameterV3"));
+    let mm = match d {
+        Some(ParamValue::Expr(e)) => noshape_units::evaluate_as(&e.text, noshape_units::Dim::LENGTH, &fx.units, &std::collections::BTreeMap::new()).map(|q| q.value * 1000.0).unwrap_or(f64::NAN),
+        other => panic!("{other:?}"),
+    };
+    assert!((mm - 13.44).abs() < 1e-6, "{mm} mm");
+}

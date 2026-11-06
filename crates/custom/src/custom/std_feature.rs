@@ -234,7 +234,36 @@ pub fn editing_logic_in_clicked(
     let (module, std) = logic_std_name(type_id)?;
     let f = loaded(module, std)?;
     let editing = f.editing.as_ref()?;
-    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, old, new, specified, creating, clicked)
+    let (old, new) = (hole_v2_synced(type_id, old), hole_v2_synced(type_id, new));
+    super::run::run_editing_logic(ctx, feature, name, units, editing, &f.params, &f.specs, &old, &new, specified, creating, clicked)
+}
+
+/// A Hole's hidden V2 sizes as std's `syncHoleDefinitionV3Params` leaves them after every run of its editing logic:
+/// the V3 ones. Ours keeps only the V3 parameters, and holeEditLogic copies the V2 ones back when the table changes
+/// (a remembered 13.44 mm countersink became the 10 mm default on the Countersink tab: ui-parity
+/// hole-countersink-tab).
+fn hole_v2_synced(type_id: &str, values: &crate::params::ParamValues) -> crate::params::ParamValues {
+    const V2_V3: [(&str, &str); 10] = [
+        ("holeDiameterV2", "holeDiameterV3"),
+        ("tapDrillDiameterV2", "tapDrillDiameterV3"),
+        ("cBoreDiameter", "cBoreDiameterV3"),
+        ("cBoreDepth", "cBoreDepthV3"),
+        ("cSinkDiameter", "cSinkDiameterV3"),
+        ("cSinkAngle", "cSinkAngleV3"),
+        ("holeDepthComputed", "holeDepthComputedV3"),
+        ("holeDepth", "holeDepthV3"),
+        ("tipAngle", "tipAngleV3"),
+        ("tappedDepth", "tappedDepthV3"),
+    ];
+    let mut v = values.clone();
+    if type_id == "hole" {
+        for (v2, v3) in V2_V3 {
+            if let Some(x) = values.get(v3).filter(|_| values.get(v2).is_none()) {
+                v.set(v2, x.clone());
+            }
+        }
+    }
+    v
 }
 
 /// Std's "Manipulator Change Function" of built-in feature `type_id` after
