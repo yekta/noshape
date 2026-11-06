@@ -1818,9 +1818,17 @@ impl<'a> Translator<'a> {
             let k = per_unit(&g["units"]);
             let at: [f64; 3] = std::array::from_fn(|i| (o[i] + probe.x * x[i] + probe.y * y[i]) * k);
             let found = self.call("sketch_get", json!({ "sketch": ours, "at": mm(at) }))?;
-            let ids: Vec<&str> = found["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str()).collect();
-            if let [only] = ids.as_slice() {
+            // (A sketch on a face: its pieces of the face where no region of its own curves holds the point, cf-lighten's
+            // pockets.)
+            let at_point: Vec<&Value> = found["regions"].as_array().into_iter().flatten().collect();
+            let own: Vec<&str> = at_point.iter().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str()).collect();
+            if let [only] = own.as_slice() {
                 return Ok(Some(whole(only)));
+            }
+            if let ([], [piece]) = (own.as_slice(), at_point.as_slice())
+                && let Some(id) = piece["id"].as_str()
+            {
+                return Ok(Some(id.to_string()));
             }
         }
         // The face's edge on a circle or arc and the face's side of it (`…}),-1.0]])]`, the query's last orientation):

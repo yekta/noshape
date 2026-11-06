@@ -1133,7 +1133,11 @@ fn ev_collision_detection(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     };
     let (tbox, gbox): (Vec<_>, Vec<_>) = (ts.iter().map(|h| bbox(&h.2)).collect(), gs.iter().map(|h| bbox(&h.2)).collect());
     let (tsbox, gsbox): (Vec<_>, Vec<_>) = (tool_solids.iter().map(|s| bbox(&s.1)).collect(), target_solids.iter().map(|s| bbox(&s.1)).collect());
-    let one = |r: &crate::reference::Reference| super::query::query_of_refs(&cx, std::slice::from_ref(r));
+    // (Each its transient query, as live's qTransient(id): an older std's evCollision wraps the raw ids itself.)
+    let one = |r: &crate::reference::Reference| match super::query::transient_queries(&cx, std::slice::from_ref(r)) {
+        Value::Array(a, _) if a.len() == 1 => a[0].clone(),
+        _ => super::query::query_of_refs(&cx, std::slice::from_ref(r)),
+    };
     let clash = |kind: &str| std_enum("clashtype.gen.fs", "ClashType", kind).unwrap_or_else(|| Value::str(kind));
     // Solid body pairs where one holds the other (live "fs (10-25 f)"):
     // (tool body, target body, the tool is the inner one).
