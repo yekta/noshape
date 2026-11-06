@@ -1,0 +1,28 @@
+{
+  "name": "drw-sheet-duplicate",
+  "about": "Sheet1 duplicated from its tab's menu, then Sheet1 clicked again",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing sheets, the sheet-tab target)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Duplicate"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    }
+  ]
+}

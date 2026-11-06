@@ -1,0 +1,38 @@
+{
+  "name": "drw-sheet-keys",
+  "about": "Two sheets, then Home, End, Page Up and Page Down move between them",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing sheets, the sheet-tab target)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Duplicate"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Home"
+    },
+    {
+      "do": "key",
+      "key": "End"
+    },
+    {
+      "do": "key",
+      "key": "PageUp"
+    },
+    {
+      "do": "key",
+      "key": "PageDown"
+    }
+  ]
+}

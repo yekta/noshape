@@ -1,0 +1,34 @@
+{
+  "name": "drw-sheet-rename",
+  "about": "Sheet1 renamed from its tab's menu",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing sheets, the sheet-tab target)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Rename..."
+      }
+    },
+    {
+      "do": "key",
+      "key": "mod+a"
+    },
+    {
+      "do": "type",
+      "text": "Front sheet"
+    },
+    {
+      "do": "key",
+      "key": "Enter"
+    }
+  ]
+}

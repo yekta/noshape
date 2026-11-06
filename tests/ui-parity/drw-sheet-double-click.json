@@ -1,0 +1,20 @@
+{
+  "name": "drw-sheet-double-click",
+  "about": "A double-click on Sheet1's tab (rename), then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing sheets, the sheet-tab target)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "dblclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

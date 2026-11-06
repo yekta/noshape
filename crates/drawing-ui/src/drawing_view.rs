@@ -374,8 +374,8 @@ pub struct DrawingEditor {
     /// Where the last right-click menu opened (editor px), and the small
     /// dialogs opened from it.
     pub menu_at: [f64; 2],
-    /// The canvas' right-click menu while it is open.
-    pub canvas_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
+    /// A right-click menu of the drawing's own (the canvas', a sheet tab's) while it is open: in live's drawing iframe.
+    pub frame_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
     pub move_sheet: Option<crate::drawing_move_sheet::MoveSheetDlg>,
     pub table_props: Option<crate::drawing_move_sheet::TablePropsDlg>,
     pub linestyle: Option<crate::drawing_linestyle::LinestyleDlg>,
@@ -631,7 +631,7 @@ impl DrawingEditor {
             datum_at: None,
             datum_target_letter: None,
             menu_at: [0.0; 2],
-            canvas_menu: None,
+            frame_menu: None,
             move_sheet: None,
             table_props: None,
             linestyle: None,

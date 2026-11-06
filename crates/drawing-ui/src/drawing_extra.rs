@@ -246,6 +246,7 @@ impl DrawingEditor {
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
+            self.frame_menu = Some(menu.downgrade());
             crate::os_menu::open(position, menu, window, cx);
         }
         cx.notify();
@@ -513,9 +514,11 @@ impl DrawingEditor {
         let mut tabs = h_flex().absolute().top(px(4.)).left(px(4.)).gap(px(2.));
         for (i, s) in self.drawing.sheets.iter().enumerate() {
             let active = i == self.sheet;
+            let name = s.name.clone();
             tabs = tabs.child(
                 div()
                     .id(("dr-sheet-chip", i))
+                    .map(|d| crate::ui_script::mark(d, || format!("sheet_tab:{name}")))
                     .occlude()
                     .h(px(20.))
                     .px(px(5.))
@@ -617,7 +620,9 @@ impl DrawingEditor {
             // Dragged: the selected rows when this one is among them.
             let rows: Vec<usize> = if selected && sel_rows.len() > 1 { sel_rows.clone() } else { vec![i] };
             let drag = SheetDrag { rows };
+            let name = s.name.clone();
             crate::ui::tree_row(("dr-sheet-tab", i), selected && !active)
+                .map(|d| crate::ui_script::mark(d, || format!("sheet_tab:{name}")))
                 .relative()
                 .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
                 // The drop goes before this row (upper half) or after it.
@@ -841,6 +846,7 @@ impl DrawingEditor {
                     .child(
                         div()
                             .id("dr-add-sheet")
+                            .map(|d| crate::ui_script::mark(d, || "button:Insert sheet".into()))
                             .absolute()
                             .right(px(2.))
                             .top(px(4.))

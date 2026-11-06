@@ -2005,7 +2005,7 @@ impl DrawingEditor {
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
-            self.canvas_menu = Some(menu.downgrade());
+            self.frame_menu = Some(menu.downgrade());
             crate::os_menu::open(position, menu, window, cx);
         }
         cx.notify();

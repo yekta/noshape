@@ -1,0 +1,34 @@
+{
+  "name": "drw-sheet-move-down",
+  "about": "Sheet1 moved below its duplicate from its tab's menu",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing sheets, the sheet-tab target)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Duplicate"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_tab": "Sheet1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Move down"
+      }
+    }
+  ]
+}

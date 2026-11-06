@@ -97,6 +97,8 @@ fn keystroke(key: &str) -> Option<Keystroke> {
         "Space" => "space",
         "Home" => "home",
         "End" => "end",
+        "PageUp" => "pageup",
+        "PageDown" => "pagedown",
         k if k.len() > 1 && k.starts_with('F') => return Keystroke::parse(&[spec.join("-"), k.to_lowercase()].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join("-")).ok(),
         k => k,
     };
@@ -163,7 +165,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))

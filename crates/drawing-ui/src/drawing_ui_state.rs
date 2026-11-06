@@ -269,11 +269,11 @@ impl DrawingEditor {
         })
     }
 
-    /// The open menu or list: a menu of the window's (a document tab's), else a list a control noted; not the
-    /// canvas' context menu, which is in live's drawing iframe where its recorder can't read it (live drw-note-delete,
-    /// drw-view-properties: list null, focus other).
+    /// The open menu or list: a menu of the window's (a document tab's), else a list a control noted; not a context
+    /// menu of the drawing's own, which is in live's drawing iframe where its recorder can't read it (live
+    /// drw-note-delete, drw-view-properties: list null, focus other).
     fn ui_list(&self, cx: &App) -> Option<Value> {
-        if self.canvas_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
+        if self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
             return None;
         }
         noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)
