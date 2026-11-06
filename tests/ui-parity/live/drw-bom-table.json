@@ -1,6 +1,6 @@
 {
  "scenario": "drw-bom-table",
- "recorded": "2026-11-05T22:34:08.252Z",
+ "recorded": "2026-11-06T00:27:30.146Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "26c94d16441d76fa069e27e0",
+  "element": "199b7c7306d7c683a85c6f9e",
   "start": "pin-block-asm-drawing",
   "startElement": "9e8b7f196e8cee81ff4a1105"
  },
@@ -286,7 +286,7 @@
      "selection": []
     }
    },
-   "t": 226087
+   "t": 224213
   },
   {
    "step": 2,
@@ -426,15 +426,10 @@
        "text": "Item Quantity Part number Description 1 1 2 1"
       }
      ],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Isometric"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 244116
+   "t": 240972
   },
   {
    "step": 3,
@@ -565,15 +560,10 @@
        "text": "Item Quantity Part number Description 1 1 2 1"
       }
      ],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Isometric"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 259817
+   "t": 257675
   }
  ]
 }
