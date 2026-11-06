@@ -72,3 +72,4 @@ corpus5, the shell recordings (shfall, sh-new2, shv, shell6) and the knurl sweep
 | date | main | parity: count | parity: OCCT time | all: count | all: OCCT time | all but knurls: OCCT time |
 |---|---|---|---|---|---|---|
 | 2026-11-05 | 38f9abc52 (17:29) | 318/594 (53.5 %) | 43.3/73.0 s (59.4 %) | 1855/2498 (74.3 %) | 495/790 s (62.7 %) | 135/430 s (31.3 %; shfall's 191 Shell fuses, 266 s, 4 % taken) |
+| 2026-11-06 | 6d2434999 (00:42) | 350/594 (58.9 %) | 78.2/102.4 s (76.4 %) | 1887/2498 (75.5 %) | 520/824 s (63.1 %) | 186/490 s (38.0 %; shfall 46/191, 12 of 277 s) |
