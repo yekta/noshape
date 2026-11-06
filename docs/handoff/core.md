@@ -16,6 +16,26 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-06 14:26 UTC.**
+- P0 DRAFT-POOL-HANG-MACOS confirmed on runners (run 42222728542): without 0023 not open after 900 s on macos-15 and
+  windows; with it 8.75 s (M1, 3 cores) and 8.03 s (EPYC, 4 cores). Kernel CI (kernel-os.yml) on main: warm 2-3 min.
+- Determinism sweep (item 2): committed in the worktree (058106357), not landed: the lead's release at 17:00 first.
+- Mesher share (item 3), measured: NOSHAPE_MESH_BREPMESH_STATS=<file> (mesh.cpp, uncommitted) meshes each face BRepMesh
+  gets alone too and logs its surface type, ms, triangles. Parity corpus (vibe5): 33.5 s serial over 12,428 faces:
+  plane 50.6 %, B-spline 16.8, revolution 9.0, extrusion 7.8, cylinder 4.8, torus 4.3, offset 3.2. Per document:
+  cf-drive-train-generator 10.8 s (planes 9.1), cf-spur-gear 3.3, c2-impeller-loft 2.2, cf-o-ring-generator 2.1,
+  cf-wave-spring 1.8, cf-planetary-gears 1.5. The planes aren't declined for themselves: of 39,822 faces brep::mesh
+  could mesh 36,223 but 7,024 are lost to a neighbour it can't (settle); 3,599 it can't at all (extrusions first).
+  The gears: tooth flanks are extrusions of degree-14 B-splines (1,928 in drive-train), so their plates (9.1 s) and
+  3,884 cylinders go to BRepMesh with them.
+  Tried: extrusions of B-spline / Bezier curves read as exact B-splines (/root/core-scratch/extrusion-mesh.diff):
+  BRepMesh then gets none of the three gear documents' faces, the plates take 158 ms here, but brep::mesh's grid on
+  the flanks is slower than BRepMesh was (drive-train's feature list 1.9 -> 4.5 s): the grid's 10:1 aspect cap from
+  the smallest u step puts ~1000 rows along the flat way (293 x 1015 nodes, 590k triangles a flank); against the
+  median step 2.8 s, still slower (degree-14 evaluation per node). The way: flanks (1,928 of 1,928 one loop of four
+  uses) meshed as strips, the two rims' edge nodes zipped (no grid, no evaluation but normals), as mesh_strip does
+  for revolved faces. Instrumentation: /root/core-scratch/mesh-instrumentation.diff (NOSHAPE_MESH_FACE_TIMES).
+
 **State 11-06 13:06 UTC.**
 - From bool (13:49 UTC, lead's call): bool takes c2-rings-loft's Shell 1 (16.3 s against live's 235 ms), which skasm
   had queued for core; bool.md has the work.

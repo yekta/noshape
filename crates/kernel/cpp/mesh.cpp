@@ -1,6 +1,7 @@
 // Tessellation: one BRepMesh call, then flat buffers filled in a single pass.
 #include <condition_variable>
 #include <BRepBuilderAPI_Copy.hxx>
+#include <mutex>
 #include <optional>
 #include "internal.hpp"
 #include "planar_cdt.hpp"
@@ -909,6 +910,40 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         if (fresh[(size_t)i] && !taken[(size_t)i])
           B.Add(c, m->faces(i));
       meshed = c;
+    }
+    // NOSHAPE_MESH_BREPMESH_STATS=<file>: each face BRepMesh gets, meshed alone too (on a copy, the same
+    // parameters), its surface type, time and triangles appended (core's breakdown of BRepMesh's share, 11-06).
+    if (const char* stats = std::getenv("NOSHAPE_MESH_BREPMESH_STATS"))
+    {
+      static std::mutex stats_lock;
+      std::string       lines;
+      for (TopExp_Explorer x(meshed, TopAbs_FACE); x.More(); x.Next())
+      {
+        const TopoDS_Face   f = TopoDS::Face(x.Current());
+        BRepAdaptor_Surface a(f, false);
+        static const char*  names[] = {"plane", "cylinder", "cone", "sphere", "torus", "bezier", "bspline", "revolution", "extrusion", "offset", "other"};
+        const int           t       = std::min((int)a.GetType(), 10);
+        std::string         what    = names[t];
+        if (a.GetType() == GeomAbs_BSplineSurface)
+          what += " d" + std::to_string(a.UDegree()) + "x" + std::to_string(a.VDegree()) + " p" + std::to_string(a.NbUPoles() * a.NbVPoles());
+        BRepBuilderAPI_Copy one(f, false, false);
+        const auto          t0 = std::chrono::steady_clock::now();
+        BRepMesh_IncrementalMesh alone;
+        alone.SetShape(one.Shape());
+        alone.ChangeParameters() = prm;
+        alone.ChangeParameters().InParallel = false;
+        alone.Perform();
+        const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        TopLoc_Location l;
+        const occ::handle<Poly_Triangulation> tri = BRep_Tool::Triangulation(TopoDS::Face(one.Shape()), l);
+        lines += what + "\t" + std::to_string(ms) + "\t" + std::to_string(tri.IsNull() ? 0 : tri->NbTriangles()) + "\n";
+      }
+      const std::lock_guard<std::mutex> g(stats_lock);
+      if (FILE* out = std::fopen(stats, "a"))
+      {
+        std::fputs(lines.c_str(), out);
+        std::fclose(out);
+      }
     }
     // BRepMesh's faces on a copy (not on the model's faces, which other parts and threads may share), the lock
     // released meanwhile; a mesh body's faces (their triangulation is their geometry) as before, in place.
