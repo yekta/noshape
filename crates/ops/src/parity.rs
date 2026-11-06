@@ -4308,21 +4308,36 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
 /// How ours differs from live after a feature (empty: it matches). Parts
 /// are paired by volume and box; counts exact, volume and area within live's
 /// band or 1e-6 relative, centroids and boxes within 1e-6 m.
-/// Whether live's import of its own export (`own`) loses detail against its model (`model`, its Parasolid import):
-/// part for part (by volume) as many faces, edges and vertices or more, some more (live's STEP of cf-hose-routing
-/// splits its tubes' ring edges: 12/16/8 for the model's 12/12/0). Not a target: ours keeps the model's.
-pub fn splits_its_model(own: &[PartState], model: &[PartState]) -> bool {
+/// Live's import of its own export (`own`) where it loses detail against its model (`model`, its Parasolid import):
+/// part for part (by volume, within 1 %: a STEP's approximated sweep) as many faces, edges and vertices or more, some
+/// more (live's STEP of cf-hose-routing splits its tubes' ring edges: 12/16/8 for the model's 12/12/0). Then what ours
+/// is held to: the model's counts, the import's volume and area. Not a target to split them as live does.
+pub fn model_topology(own: &[PartState], model: &[PartState]) -> Option<Vec<PartState>> {
     if own.len() != model.len() || own.is_empty() {
-        return false;
+        return None;
     }
     let by_volume = |v: &[PartState]| {
-        let mut v: Vec<(f64, u64, u64, u64)> = v.iter().map(|p| (p.volume.unwrap_or(0.0), p.faces, p.edges, p.vertices)).collect();
-        v.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut v: Vec<PartState> = v.to_vec();
+        v.sort_by(|a, b| a.volume.unwrap_or(0.0).total_cmp(&b.volume.unwrap_or(0.0)));
         v
     };
-    let (a, b) = (by_volume(own), by_volume(model));
-    let pairs = || a.iter().zip(&b);
-    pairs().all(|(o, m)| (o.0 - m.0).abs() <= 1e-3 * m.0.abs() && o.1 >= m.1 && o.2 >= m.2 && o.3 >= m.3) && pairs().any(|(o, m)| (o.1, o.2, o.3) != (m.1, m.2, m.3))
+    let (mut a, b) = (by_volume(own), by_volume(model));
+    let close = |x: &PartState, y: &PartState| {
+        let (u, v) = (x.volume.unwrap_or(0.0), y.volume.unwrap_or(0.0));
+        (u - v).abs() <= 1e-2 * v.abs()
+    };
+    if !a.iter().zip(&b).all(|(o, m)| close(o, m) && o.faces >= m.faces && o.edges >= m.edges && o.vertices >= m.vertices) {
+        return None;
+    }
+    if a.iter().zip(&b).all(|(o, m)| (o.faces, o.edges, o.vertices) == (m.faces, m.edges, m.vertices)) {
+        return None;
+    }
+    for (o, m) in a.iter_mut().zip(&b) {
+        (o.faces, o.edges, o.vertices) = (m.faces, m.edges, m.vertices);
+        o.face_types = m.face_types.clone();
+        o.edge_types = m.edge_types.clone();
+    }
+    Some(a)
 }
 
 pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
