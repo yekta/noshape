@@ -65,6 +65,13 @@ dx 11-05 16:35: the 8 drawing scenarios (drw-*) against live's recordings (2063,
 dx 11-05 20:43: drw-* against live's re-recordings (2068): **7/8 scenarios, 42/45 states**; left: Insert view's default scale (drw-insert-front-and-right, REQUESTS).
 dx 11-06 01:08: all 16 drw-* against live's recordings (batches 1-2, 2131 / 2133 / 2134): **14/16 scenarios, 92/94 states**; left: two hovered frames live's recorder reports as VIEW (drw-dimension-radius step 4, drw-hole-table step 3).
 
+psui 11-06 12:08: the whole suite on main 0d395f78 (vibe5, shards.sh) against live's recordings of coverage batches 1-4:
+**377/382 scenarios, 2450/2463 states**. Coverage (tests/ui-parity/README.md, coverage.py): toolbar 25/76, sketch tools
+43/55, menus 27/117, shortcuts 59/89; batch 5 (17) is with live. Left: sketch-horizontal-key, sketch-offset
+(SKETCH-SCREEN-SPACE-REACH, skasm), sketch-circumscribed-polygon (SKETCH-POLYGON-CONSTRAINTS, skasm), part-menu-properties
+(our Properties modal isn't in the recorded state yet, psui), sketch-mirror-tool (one entity reads selected after a mirror,
+psui).
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and
