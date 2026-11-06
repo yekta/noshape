@@ -647,7 +647,8 @@ fn pvz_instances_of(list: &[ffi::PvzInstance]) -> Vec<PvzInstance> {
 }
 
 /// Read an STL or OBJ file as Onshape imports it: mesh bodies (a compound of
-/// a solid of the closed pieces and a shell per open piece). Coordinates are
+/// a solid per closed piece, the pieces inside it its cavities, and a shell
+/// per open piece). Coordinates are
 /// in `file_unit` (mesh files carry none); returned in meters.
 /// 3MF, glTF and GLB files carry their units: they come in millimetres, so
 /// pass [`LengthUnit::Millimeter`] for them.

@@ -21,6 +21,8 @@
 #include <BRepCheck_Analyzer.hxx>
 #include <BRep_Builder.hxx>
 #include <BRep_Tool.hxx>
+#include <Bnd_Box.hxx>
+#include <TopLoc_Location.hxx>
 #include <Poly_Triangulation.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS_Iterator.hxx>
@@ -225,31 +227,137 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
   return out;
 }
 
+namespace {
+// A closed piece's triangles (its face's triangulation, located) and box.
+struct Closed
+{
+  std::vector<std::array<gp_Pnt, 3>> tris;
+  Bnd_Box                            box;
+};
+
+Closed closed_of(const TopoDS_Face& f)
+{
+  Closed          c;
+  TopLoc_Location loc;
+  const auto      tri = BRep_Tool::Triangulation(f, loc);
+  if (tri.IsNull())
+    return c;
+  const gp_Trsf t = loc.Transformation();
+  for (int k = 1; k <= tri->NbTriangles(); ++k)
+  {
+    int i1, i2, i3;
+    tri->Triangle(k).Get(i1, i2, i3);
+    c.tris.push_back({tri->Node(i1).Transformed(t), tri->Node(i2).Transformed(t), tri->Node(i3).Transformed(t)});
+    for (const gp_Pnt& p : c.tris.back())
+      c.box.Add(p);
+  }
+  return c;
+}
+
+// Whether `p` is inside the closed piece `c`: a ray along +x crosses its triangles an odd number of times (the
+// triangles' y-z projections, edges half-open so a crossing on an edge counts once).
+bool inside(const Closed& c, const gp_Pnt& p)
+{
+  if (c.box.IsOut(p))
+    return false;
+  bool in = false;
+  for (const auto& t : c.tris)
+  {
+    const double y0 = t[0].Y() - p.Y(), z0 = t[0].Z() - p.Z(), y1 = t[1].Y() - p.Y(), z1 = t[1].Z() - p.Z(), y2 = t[2].Y() - p.Y(), z2 = t[2].Z() - p.Z();
+    // The signed areas of the origin with each edge: all one sign when the ray goes through.
+    const double a = y0 * z1 - z0 * y1, b = y1 * z2 - z1 * y2, d = y2 * z0 - z2 * y0;
+    const bool   pos = a > 0 || (a == 0 && (y1 - y0 > 0 || (y1 == y0 && z1 - z0 > 0)));
+    const bool   pos_b = b > 0 || (b == 0 && (y2 - y1 > 0 || (y2 == y1 && z2 - z1 > 0)));
+    const bool   pos_d = d > 0 || (d == 0 && (y0 - y2 > 0 || (y0 == y2 && z0 - z2 > 0)));
+    if (pos != pos_b || pos != pos_d)
+      continue;
+    const double area = a + b + d;
+    if (area == 0)
+      continue;
+    // Where the ray meets the triangle's plane, by the barycentric weights.
+    const double x = (b * t[0].X() + d * t[1].X() + a * t[2].X()) / area;
+    if (x > p.X())
+      in = !in;
+  }
+  return in;
+}
+} // namespace
+
 TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces)
 {
   BRep_Builder    b;
   TopoDS_Compound c;
   b.MakeCompound(c);
-  TopoDS_Solid solid;
-  bool         any_closed = false;
-  for (const MeshPiece& p : pieces)
+  // Closed pieces: a solid each, with the pieces inside it as its cavities (Onshape's import: one part per connected
+  // mesh, a mesh inside another the other's hollow; live exchange suite 2147).
+  std::vector<size_t> closed;
+  for (size_t i = 0; i < pieces.size(); ++i)
   {
-    TopoDS_Shell sh;
-    b.MakeShell(sh);
-    b.Add(sh, p.face);
-    sh.Closed(p.closed);
-    if (!p.closed)
+    if (pieces[i].closed)
     {
-      b.Add(c, sh);
+      closed.push_back(i);
       continue;
     }
-    if (!any_closed)
-      b.MakeSolid(solid);
-    any_closed = true;
-    b.Add(solid, sh);
+    TopoDS_Shell sh;
+    b.MakeShell(sh);
+    b.Add(sh, pieces[i].face);
+    sh.Closed(false);
+    b.Add(c, sh);
   }
-  if (any_closed)
-    b.Add(c, solid);
+  std::vector<Closed> geo;
+  for (size_t i : closed)
+    geo.push_back(closed_of(pieces[i].face));
+  // Each piece's containers (by a point of its first triangle's centre), the innermost the one contained by most.
+  const size_t                     n = closed.size();
+  std::vector<std::vector<size_t>> in(n);
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (geo[i].tris.empty())
+      continue;
+    const auto&  t = geo[i].tris.front();
+    const gp_Pnt p((t[0].XYZ() + t[1].XYZ() + t[2].XYZ()) / 3);
+    for (size_t j = 0; j < n; ++j)
+      if (j != i && !geo[j].box.IsOut(geo[i].box) && inside(geo[j], p))
+        in[i].push_back(j);
+  }
+  std::vector<int> solid_of(n, -1);
+  std::vector<TopoDS_Solid> solids;
+  auto shell = [&](size_t i) {
+    TopoDS_Shell sh;
+    b.MakeShell(sh);
+    b.Add(sh, pieces[closed[i]].face);
+    sh.Closed(true);
+    return sh;
+  };
+  // Outer pieces (inside an even number of others) start a solid; one inside an odd number is a cavity of its
+  // innermost container.
+  for (size_t i = 0; i < n; ++i)
+    if (in[i].size() % 2 == 0)
+    {
+      solid_of[i] = (int)solids.size();
+      solids.emplace_back();
+      b.MakeSolid(solids.back());
+      b.Add(solids.back(), shell(i));
+    }
+  for (size_t i = 0; i < n; ++i)
+  {
+    if (in[i].size() % 2 == 0)
+      continue;
+    size_t outer = in[i].front();
+    for (size_t j : in[i])
+      if (in[j].size() > in[outer].size())
+        outer = j;
+    if (solid_of[outer] < 0)
+      continue;
+    // A cavity faces inward (an STL's pieces each face out).
+    double vol = 0;
+    for (const auto& t : geo[i].tris)
+      vol += t[0].XYZ().Dot(t[1].XYZ().Crossed(t[2].XYZ()));
+    const TopoDS_Shell sh = shell(i);
+    b.Add(solids[solid_of[outer]], vol > 0 ? TopoDS::Shell(sh.Reversed()) : sh);
+  }
+  for (const TopoDS_Solid& s : solids)
+    b.Add(c, s);
   return c;
 }
 

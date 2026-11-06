@@ -67,6 +67,27 @@ fn stl_mesh_body() {
     assert_eq!(t.positions.len(), 36, "faceted: 12 triangles x 3 corners");
 }
 
+/// An STL of several bodies as Onshape imports it (live exchange suite 2147): a part per connected mesh, a mesh inside
+/// another that one's hollow (its volume taken out).
+#[test]
+fn stl_pieces_are_parts_and_a_piece_inside_is_a_hollow() {
+    let mm = 1e-3;
+    let boxed = |a: f64, b: f64| make_box_corners(DVec3::splat(a * mm), DVec3::splat(b * mm)).unwrap();
+    let shapes = Shape::compound(&[boxed(0.0, 30.0), boxed(10.0, 20.0), make_box_corners(DVec3::new(40.0 * mm, 0.0, 0.0), DVec3::new(50.0 * mm, 10.0 * mm, 10.0 * mm)).unwrap()]);
+    let dir = std::env::temp_dir().join(format!("noshape-meshparts-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("three.stl");
+    write_stl(&shapes, &path, 1e-5, StlFormat::Binary).unwrap();
+    let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    let solids = s.solids();
+    assert_eq!(solids.len(), 2, "the outer box (with its hollow) and the box beside it");
+    let mut vols: Vec<f64> = solids.iter().map(|x| volume_properties(x).unwrap().mass / (mm * mm * mm)).collect();
+    vols.sort_by(f64::total_cmp);
+    // (An STL's coordinates are float32.)
+    assert!((vols[0] - 1000.0).abs() < 1e-6 * 27000.0 && (vols[1] - (27000.0 - 1000.0)).abs() < 1e-6 * 27000.0, "{vols:?}");
+}
+
 /// Display meshing leaves no triangulation on a B-rep shape (OCCT's booleans
 /// on a meshed shape are several times slower; mesh.cpp `mesh_fill`), and
 /// meshing it again gives the same mesh; a mesh body keeps its triangles.

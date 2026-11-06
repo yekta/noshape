@@ -319,8 +319,8 @@ struct MeshPiece
   bool        closed = false;
 };
 std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector<std::array<int, 3>> tris, double weld);
-// A body per closed group / open piece: closed pieces in one solid (a shell
-// each), each open piece a shell; returned as a compound of them.
+// A body per closed piece (the closed pieces inside it its cavities) and per
+// open piece (a shell); returned as a compound of them.
 TopoDS_Shape mesh_compound(const std::vector<MeshPiece>& pieces);
 // 3MF / glTF / GLB triangles of every placed object, in millimetres
 // (mesh_formats.cpp); false for other files.
