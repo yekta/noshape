@@ -1271,10 +1271,13 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         for s in shapes {
             let mut res = k::thicken(&s, t1, t2)?;
             // The sides along a many-face sheet's boundary: one face per plane (cf-belt's end rings, live 22 faces).
-            if s.faces().len() > 1 {
+            let caps = if s.faces().len() > 1 {
                 res.shape = k::unify_same_domain(&res.shape)?.shape;
-            }
-            let names = thicken_names(ev, &s, &res.shape, t1, t2);
+                None
+            } else {
+                from_faces(&s, &res)
+            };
+            let names = thicken_names(ev, &s, &res.shape, t1, t2, caps.as_deref());
             tools.push(NamedShape::new(res.shape, names));
         }
         add_bodies(ev, tools, BodyKind::Solid)
@@ -1282,12 +1285,34 @@ fn op_thicken(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
+/// Which of a thickened sheet's faces come from its faces (the caps can only be those; the sides come from its edges),
+/// by the thicken's history and the sheet's faces kept as they are. `None` when the history names none.
+fn from_faces(sheet: &Shape, res: &k::OpResult) -> Option<Vec<bool>> {
+    let out = res.shape.faces();
+    let mut from = vec![false; out.len()];
+    for r in &res.history.records {
+        if r.input_kind == ShapeType::Face && r.output_kind == ShapeType::Face && r.relation != k::Relation::Deleted && let Some(x) = from.get_mut(r.output_index as usize) {
+            *x = true;
+        }
+    }
+    let sheet_faces = sheet.faces();
+    for (x, f) in from.iter_mut().zip(&out) {
+        *x = *x || sheet_faces.iter().any(|g| g.is_same(f));
+    }
+    from.contains(&true).then_some(from)
+}
+
 /// A thickened sheet's names: its caps (the faces `t1` along the sheet's normal and `t2` against it) as
 /// qCapEntity finds them (std's sheet metal boolean checks a cut through a rolled wall by them), the sides fresh.
-fn thicken_names(ev: &EvalCtx, sheet: &Shape, out: &Shape, t1: f64, t2: f64) -> Vec<Name> {
+/// `from_faces` ([`from_faces`]): the faces that can be caps (a side's foot isn't looked for: on a lofted wave
+/// spring's band each search took ~27 ms).
+fn thicken_names(ev: &EvalCtx, sheet: &Shape, out: &Shape, t1: f64, t2: f64, from_faces: Option<&[bool]>) -> Vec<Name> {
     let sheet_faces = sheet.faces();
     let mut roles = BTreeMap::new();
     for (i, f) in out.faces().iter().enumerate() {
+        if from_faces.is_some_and(|c| !c.get(i).copied().unwrap_or(true)) {
+            continue;
+        }
         let Some(p) = super::sheetmetal::inner_point(f) else { continue };
         let Ok(n) = f.normal_at_point(p) else { continue };
         // The nearest sheet face, nearest boxes first (a face's box farther than the best distance can't be nearer).
