@@ -36,6 +36,17 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 18:00: v0.4.33 (published 17:36, run 42249878030, tag 996ab4b1) checked: good, no blocker.** Published Linux files =
+the smoked ones byte for byte, SHA256SUMS OK, 11 assets, every Release job green. Smoke = v0.4.32 (fillet-hang 9 s). Budget
+table: draft-pool-hang macOS 6.95 s, Windows 10.38 s (DRAFT-POOL-HANG-MACOS verified). Stock ubuntu:24.04: the CLI runs and opens
+documents. GUI rows (vibe3 :63, qa-relgui433.sh) pixel-identical to v0.4.32. Title bar: all five menus open, About enabled
+(tickets/titlebar-menus-linux-v0433.png). Updater 0.4.32 → 0.4.33 (v0.4.32's helper, a fresh `noshape mcp`): ends on 0.4.33,
+g34 reopened; the mcp copy again left on the deleted binary, no helper log (UPDATE-HELPER-LINUX-PARITY). Memory: the seed
+508 / 685 fuzz peaks (752 / 649 MB against 748 / 501) are not comparable across releases any more (the sessions diverge at
+step 3: face / edge names changed), so qa measures fixed documents now: `HWMCLI=<cli> HWMOUT=<file> python3 bin/qa-fstat.py
+bin/hwmwrap.sh <doc>` over tests/perf: fins-400 262 → 269 MB, knurl 392 → 406, NIST assembly 441 → 444, fillet-hang 306 → 304
+(sub-second documents end before the sampler reads them). Fuzz: v0.4.33's loop runs (bin/w-v33.sh → rel/noshape-cli-0.4.33b).
+
 **11-06 17:29:** v0.4.33: the first run (42240367775) failed only its new "Budgeted documents" check (sparse checkout without
 tests/budget: P0 RELEASE-BUDGET-STEP-SPARSE, fixed by the lead 996ab4b1); the re-run 42249878030's binaries differ byte-wise
 from the first (same source; the build isn't reproducible), so the smoke ran again on them: = v0.4.32. Stock ubuntu:24.04
