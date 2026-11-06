@@ -309,6 +309,8 @@ pub struct Viewport {
     drag: Drag,
     press_pos: DVec2,
     last_pos: DVec2,
+    /// The hover was cleared by a fast move before a pick said what is under the pointer.
+    hover_unconfirmed: bool,
     /// Selected entities, shown in the cursor image (Onshape's
     /// selection-count cursor: 1-5, "5+" for more). Set by the owner.
     pub selection_count: usize,
@@ -609,6 +611,7 @@ impl Viewport {
             drag: Drag::None,
             press_pos: DVec2::ZERO,
             last_pos: DVec2::ZERO,
+            hover_unconfirmed: false,
             selection_count: 0,
             menu_open: false,
             tool_cursor: None,
@@ -957,6 +960,12 @@ impl Viewport {
 
     /// Pick id at a viewport-local position from the cached pick rectangle:
     /// `None` when the cache does not cover the position (ask the GPU).
+    /// What the last pick shows under the pointer: `Some(None)` the background, `None` not known (no pick there
+    /// yet: a jump out of the picked rectangle, a scene rebuilt since).
+    pub fn pick_under_pointer(&self) -> Option<Option<u32>> {
+        self.pick_at(self.last_pos)
+    }
+
     fn pick_at(&self, local: DVec2) -> Option<Option<u32>> {
         let pick = self.pick_cache.as_ref()?;
         let (x, y) = self.device_px(local);
@@ -1089,7 +1098,13 @@ impl Viewport {
     fn set_hover(&mut self, id: Option<u32>, cx: &mut Context<Self>) {
         if self.hover != id {
             self.hover = id;
+            self.hover_unconfirmed = false;
             cx.emit(ViewportEvent::Hover(id));
+        } else if id.is_none() && self.hover_unconfirmed {
+            // The background a fast move's clear only assumed, now known: said again (the assembly's paused part
+            // waits for it: UIP-ASM-FASTENED-FLAKY).
+            self.hover_unconfirmed = false;
+            cx.emit(ViewportEvent::Hover(None));
         }
     }
 
@@ -2121,7 +2136,9 @@ impl Viewport {
                         // is still under the pointer; nothing new until the
                         // pointer pauses.
                         if self.hover.is_some() && self.pick_at(p) != Some(self.hover) {
+                            let unknown = self.pick_at(p).is_none();
                             self.set_hover(None, cx);
+                            self.hover_unconfirmed = unknown;
                         }
                         self.paused_hover = Some(cx.spawn(async move |this, cx| {
                             cx.background_executor().timer(wait).await;

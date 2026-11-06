@@ -261,10 +261,13 @@ mod tests {
         let visible = |s: &str| blocks(s).into_iter().map(|b| b.1).collect::<Vec<_>>().join(" ").split_whitespace().collect::<Vec<_>>().join(" ");
         let Ok(raw) = std::fs::read_to_string("/root/onshape-research/live/dom/ui-e-tool-descriptions-live.json") else { return };
         let live: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        // Tools added after the capture (10-22): Flow (live 1716).
+        let newer = ["Flow"];
         for (group, table) in [("partStudio", PART_STUDIO), ("sketch", SKETCH), ("assembly", ASSEMBLY)] {
             let map = live[group].as_object().unwrap();
-            assert_eq!(map.len(), table.len(), "{group}");
-            for (title, _) in table {
+            let captured: Vec<&str> = table.iter().map(|(t, _)| *t).filter(|t| !newer.contains(t)).collect();
+            assert_eq!(map.len(), captured.len(), "{group}");
+            for title in &captured {
                 let shown = map[*title].as_str().unwrap().split_whitespace().collect::<Vec<_>>().join(" ");
                 assert_eq!(visible(text_of(title, table)), shown, "{group} {title}");
             }

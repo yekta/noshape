@@ -2473,8 +2473,10 @@ impl AssemblyView {
                 let changed = changed_overlay || t.as_ref().map(|t| (&t.path, &t.reference)) != self.hover.as_ref().map(|h| (&h.path, &h.reference));
                 self.hover = t;
                 // The pointer on the background (it moved since the undo: a rebuilt scene's empty pick isn't one)
-                // ends the undone part's pause (live 2023).
-                if self.hover.is_none() && overlay.is_none() && self.ui.mate_spent.is_some_and(|(_, at)| at != self.pointer) {
+                // ends the undone part's pause (live 2023): by a pick there, not a highlight a fast move cleared
+                // before its pick (a 5 mm jump over the same part: UIP-ASM-FASTENED-FLAKY).
+                let on_background = self.viewport.read(cx).pick_under_pointer() == Some(None);
+                if self.hover.is_none() && overlay.is_none() && on_background && self.ui.mate_spent.is_some_and(|(_, at)| at != self.pointer) {
                     self.ui.mate_spent = None;
                 }
                 self.update_capture(cx);
