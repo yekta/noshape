@@ -417,6 +417,45 @@ fn configured_box(field: &'static str, value: String) -> AnyElement {
 }
 
 impl MetaForm {
+    /// The interaction suite's `state.dialog` for this modal, in live's recorder's form: its inputs, selects and checkboxes
+    /// by label (required ones with " *"), in order. Live's reader takes Category's typeahead input (empty) and leaves the
+    /// Description textarea out.
+    fn note_ui_state(&self, numbered: bool, sourced: bool, titled: bool, item: bool, cx: &App) {
+        crate::ui_script::note_dialog(|| {
+            let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
+            let input = |label: &str, value: String| serde_json::json!({ "label": label, "kind": "input", "value": value });
+            let check = |label: &str, on: bool| serde_json::json!({ "label": label, "kind": "checkbox", "value": on });
+            let mut fields = vec![input("Name *", text(&self.name)), input("Category", String::new())];
+            if numbered {
+                let state = self.state.clone().unwrap_or_else(|| RELEASE_STATES[0].to_string());
+                fields.extend([input("Part number", text(&self.part_number)), input("Revision", text(&self.revision)), serde_json::json!({ "label": "State *", "kind": "select", "value": state })]);
+            }
+            if sourced {
+                fields.extend([input("Vendor", text(&self.vendor)), input("Project", text(&self.project)), input("Product line", text(&self.product_line))]);
+            }
+            if let Some(m) = &self.material {
+                fields.push(input("Material", m.clone()));
+            }
+            if titled {
+                fields.extend([input("Title 1", text(&self.titles[0])), input("Title 2", text(&self.titles[1])), input("Title 3", text(&self.titles[2])), check("Not revision managed", self.not_revision_managed)]);
+            }
+            if item {
+                fields.push(check("Exclude from all BOMs", self.exclude_from_bom));
+                fields.push(serde_json::json!({ "label": "Unit of measure", "kind": "select", "value": self.unit.clone().unwrap_or_else(|| DEFAULT_UNIT.to_string()) }));
+                if self.material.is_some() || self.computed_mass.is_some() {
+                    fields.push(check("Mass Override", self.mass_on));
+                }
+            }
+            // Undo and Redo are icon buttons (no text).
+            let mut buttons = vec!["", ""];
+            if self.reset_to.is_some() {
+                buttons.push("Reset all");
+            }
+            buttons.extend(["Apply", "Save", "Close"]);
+            serde_json::json!({ "kind": "modal", "title": "Properties", "fields": fields, "buttons": buttons })
+        });
+    }
+
     /// A text field, or its configured box.
     fn field(&self, name: &'static str, st: &Entity<InputState>, cx: &App) -> AnyElement {
         if self.configured.contains(&name) { configured_box(name, st.read(cx).value().to_string()) } else { text_field(st) }
@@ -501,6 +540,7 @@ impl Render for MetaForm {
         let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio");
         let titled = kind != "Onshape Feature Studio";
         let item = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File");
+        self.note_ui_state(numbered, sourced, titled, item, cx);
         let mut form = v_flex()
             .w_full()
             .gap(px(15.))
@@ -814,7 +854,7 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
     let on_save: SaveFn = Rc::new(on_save);
     let form = cx.new(|cx| MetaForm::new(spec, on_save, window, cx));
     let name = form.read(cx).name.clone();
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
     name.update(cx, |s, cx| s.focus(window, cx));
 }
@@ -829,7 +869,7 @@ pub fn open_properties_with_card(spec: MetaSpec, card: ItemCard, on_save: impl F
         f
     });
     let name = form.read(cx).name.clone();
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 
@@ -849,7 +889,7 @@ pub fn open_part_properties_configured(spec: MetaSpec, reset_to: Option<MetaValu
         f
     });
     let name = form.read(cx).name.clone();
-    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).child(form.clone())));
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
     name.update(cx, |s, cx| s.focus(window, cx));
 }

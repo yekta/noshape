@@ -42,6 +42,9 @@ impl PartStudioView {
             let mut f = crate::feature_dialog::field_focus("Filter by name or type", st);
             f["kind"] = "filter".into();
             f
+        } else if crate::ui_script::open_dialog().is_some_and(|d| d["kind"] == "modal") {
+            // A modal holds the keyboard (live part-menu-properties: "other").
+            json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
         } else {
             json!({ "kind": "none", "label": null, "text": null, "selection": null, "all": false })
         };

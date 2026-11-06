@@ -2020,8 +2020,6 @@ impl SketchEditor {
                         self.mirror_axis = Some(axis);
                         let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| *e != axis).collect();
                         if ids.is_empty() {
-                            // Live (ui-parity sketch-mirror-tool): the mirror line shows selected.
-                            self.selection = vec![axis];
                             self.message = Some("Select entities to be mirrored.".into());
                             return EditOutcome::redraw();
                         }
@@ -8882,14 +8880,14 @@ mod tests {
         assert!(d.sketch.solve().is_solved());
     }
 
-    /// Live (ui-parity sketch-mirror-tool): the mirror line shows selected; once a curve is mirrored nothing is.
+    /// Live (ui-parity sketch-mirror-tool): once a curve is mirrored nothing stays selected and the prompt stays.
     #[test]
-    fn mirror_selects_its_line_then_nothing() {
+    fn mirror_leaves_nothing_selected() {
         let (mut ed, mut d) = editor(Tool::Mirror);
-        let axis = d.sketch.add_line(v(0.0, -0.01), v(0.0, 0.03));
+        d.sketch.add_line(v(0.0, -0.01), v(0.0, 0.03));
         d.sketch.add_line(v(0.005, 0.0), v(0.02, 0.01));
         click(&mut ed, &mut d, v(0.0, 0.02));
-        assert_eq!(ed.selection, vec![axis]);
+        assert_eq!(ed.message.as_deref(), Some("Select entities to be mirrored."));
         click(&mut ed, &mut d, v(0.00875, 0.0025));
         assert_eq!(count(&d, EntityKind::Line), 3);
         assert!(ed.selection.is_empty(), "{:?}", ed.selection);

@@ -2672,6 +2672,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 SKETCH-MIRROR-LINE-SELECTED (psui) live shows the sketch Mirror's mirror line selected once picked (ui-parity
+  sketch-mirror-tool step 14: selection 1); ours doesn't. Selecting it in `Tool::Mirror` (sketch_mode.rs) made the next click
+  on the curve to mirror find no hover in the app (4 of 4 runs, vibe5; the editor's unit test, which sets the hover itself,
+  mirrors fine), so it's reverted until that's understood: something in the Part Studio's GPU hover with a selected sketch
+  line in the Mirror tool. (psui 2026-11-06)
 - [x] fixed (psui 11-05: Help ▾ › About (both menus, a divider before it) and the macOS app menu's About noshape open live's About modal: our logo and wordmark, "© 2026 Yekta", Open CASCADE's LGPL line, the "Open source software components" link opening the notices shipped with the app (crates/ops/assets/THIRD-PARTY-NOTICES.txt, generated from Cargo.lock, offline), the build in the footer; no Terms & Privacy; op app_about; UI tests help_about_opens_the_about_modal, the_app_menus_about_opens_the_about_modal) P3 ABOUT-DISABLED (psui) "About noshape" at the end of both Help ▾ menus (the start window's, a document's) is a
   placeholder: always disabled (`OsMenuItem::new("About noshape").disabled(true)`, start_window.rs / workspace.rs) on every
   OS, and the macOS app menu has no About item. Clicking it does nothing (green 477c4168, Linux). Either make it open an About
