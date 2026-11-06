@@ -1,0 +1,67 @@
+# core's reproduction (not for main): tests/budget/draft-pool-hang.noshape through the CLI on macOS and Windows, with
+# OCCT as on main (base: patch 0023 removed) and with patch 0023 (fix). Base is expected to hit the limit.
+name: core budget repro
+on:
+  push:
+    branches: [core/budget-repro]
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_RELEASE_LTO: 'false'
+  CARGO_PROFILE_RELEASE_CODEGEN_UNITS: '16'
+jobs:
+  repro:
+    name: ${{ matrix.os }} ${{ matrix.variant }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, windows-latest]
+        variant: [base, fix]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Base OCCT (patch 0023 removed)
+        if: matrix.variant == 'base'
+        shell: bash
+        run: rm patches/occt/0023-offset-surface-shift-progress.patch
+      - name: Vendored crates' file dates
+        shell: bash
+        run: find vendor -type f -exec touch -t 202001010000 {} +
+      - name: Build tools (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          command -v ninja || brew install ninja
+          xcrun -f metal || xcodebuild -downloadComponent MetalToolchain
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+      - name: C and C++ compiler
+        uses: ./.github/actions/setup-cxx
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+      - name: openNURBS (Rhino export)
+        uses: ./.github/actions/setup-opennurbs
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: occt-V8_0_1-vendored-${{ hashFiles('vendor/**') }}
+          cache-directories: target-vendored
+          save-if: false
+      - name: Vendored crates' builds into target/
+        shell: bash
+        run: $(command -v python3 || command -v python) .github/ci/vendored_builds.py restore
+      - name: Build the CLI
+        shell: pwsh
+        run: cargo build --release --locked -p noshape-cli
+      - name: Budgeted documents
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then cli=target/release/noshape-cli.exe; py=python; else cli=target/release/noshape-cli; py=python3; fi
+          $py .github/release/time_cli.py --limit 900 "$cli" tests/budget/*.noshape
