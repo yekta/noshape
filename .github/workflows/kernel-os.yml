@@ -1,0 +1,83 @@
+# The kernel's C++ on macOS and Windows on every push to main that changes it (the bridge, its build script or OCCT's
+# patches): the 3-hourly CI is the only other build there, and an MSVC / clang break sat on main for 3 hours (11-06,
+# ee41a720). cargo check of noshape-kernel runs its build script, which compiles the bridge against the cached OCCT.
+name: Kernel (macOS, Windows)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - crates/kernel/cpp/**
+      - crates/kernel/build.rs
+      - patches/occt/**
+      - .github/workflows/kernel-os.yml
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+concurrency:
+  group: kernel-os-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kernel:
+    name: Kernel ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest] # ci.yml's, so OCCT's cached install is the same
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build tools (macOS, for an OCCT build when a patch changed)
+        if: runner.os == 'macOS'
+        run: command -v ninja || brew install ninja
+
+      - name: MSVC developer environment (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
+          }
+
+      - name: C and C++ compiler
+        uses: ./.github/actions/setup-cxx
+
+      - name: OpenCascade
+        uses: ./.github/actions/setup-occt
+
+      # (Its Rhino export compiles only with it.)
+      - name: openNURBS
+        uses: ./.github/actions/setup-opennurbs
+
+      - name: C/C++ through ccache
+        id: ccache
+        uses: ./.github/actions/setup-ccache
+        with:
+          name: kernel-check
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: kernel-check
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # (PowerShell on Windows: in Git Bash /usr/bin/link shadows MSVC's link.exe.)
+      - name: Check the kernel (its build script compiles the C++)
+        shell: pwsh
+        run: cargo check --locked -p noshape-kernel
+
+      - name: Save the C/C++ cache
+        if: always() && github.ref == 'refs/heads/main' && steps.ccache.outputs.dir != '' && steps.ccache.outputs.hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.ccache.outputs.dir }}
+          key: ${{ steps.ccache.outputs.key }}
