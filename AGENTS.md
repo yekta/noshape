@@ -17,8 +17,9 @@ the app's target shape). A crate never depends on a crate above it.
   by planes, cylinders and cones (and a line's or faces' common), which `op_boolean`, Shell and Thicken try before
   OCCT (docs/BOOLEAN-SPEEDUP.md phase 3, docs/handoff/bool.md); psui's display mesher (`brep::mesh`).
 - `crates/kernel`: the OpenCascade (OCCT) bridge: C++ in `crates/kernel/cpp`, patched OCCT at `/root/occt`
-  (patches in `patches/occt/`). CI compiles the C++ with GCC 13 and MSVC: direct-initialise OCCT handle conversions,
-  no GCC-only headers, guard platform code with `_WIN32` / `_MSC_VER`.
+  (patches in `patches/occt/`). CI compiles the C++ with GCC 15 at baseline x86-64 (`.github/actions/setup-cxx`),
+  Apple clang and MSVC: direct-initialise OCCT handle conversions, no GCC-only headers, guard platform code with
+  `_WIN32` / `_MSC_VER`.
 
 ### Model
 - `crates/model-data`: the document data model (documents, tabs, feature lists, schemas, params, references,
@@ -102,8 +103,9 @@ Describe the work in the body only when needed, concisely, in simple language.
 
 ## Build, test, land
 
-- Env for every build: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-<yours> CC="ccache gcc-13"
-  CXX="ccache g++-13"`. Use your own target dir; never share one with another agent.
+- Env for every build: `OCCT_ROOT=/root/occt CARGO_TARGET_DIR=/root/target-<yours> CC="ccache gcc-15"
+  CXX="ccache g++-15" CFLAGS=-march=x86-64 CXXFLAGS=-march=x86-64` (as CI; the vibe hosts' GCC 15 defaults to
+  x86-64-v3, whose FMA changes results). Use your own target dir; never share one with another agent.
 - Incremental compilation is on (machine config); mold links. Test the crate you changed:
   `cargo test -p <crate> --test all <file>::<name>` or `--lib <module>::`. Build the app only to look at it.
 - Tiers (docs/TESTS.md): T0 `tools/tiers/t0.sh`, T1 `tools/tiers/t1.sh`, T2 `tools/tiers/t2.sh`.

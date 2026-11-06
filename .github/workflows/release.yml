@@ -75,6 +75,9 @@ jobs:
             if ($_ -match '^([^=]+)=(.*)$') { "$($matches[1])=$($matches[2])" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8 }
           }
 
+      - name: C and C++ compiler
+        uses: ./.github/actions/setup-cxx
+
       - name: OpenCascade
         uses: ./.github/actions/setup-occt
 
@@ -94,6 +97,23 @@ jobs:
         # The app (which is also the CLI and the MCP server: `noshape mcp`), the headless CLI for servers, and (Windows)
         # noshape.com, the console launcher terminals run for `noshape`.
         run: cargo build --release --locked -p noshape -p noshape-cli -p noshape-launcher
+
+      # setup-cxx's GCC is newer than 24.04's own: the binaries must not need a newer libstdc++ than a stock 24.04 has
+      # (its libstdc++6 is GCC 14's: GLIBCXX_3.4.33, CXXABI_1.3.15). The smoke job runs them on a fresh runner too.
+      - name: Runs on a stock 24.04 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          newest() { objdump -T "$1" | grep -oE "$2_[0-9.]+" | sort -uV | tail -1; }
+          for b in target/release/noshape target/release/noshape-cli; do
+            for want in GLIBCXX_3.4.33 CXXABI_1.3.15; do
+              got=$(newest "$b" "${want%%_*}")
+              echo "$b: ${got:-no ${want%%_*}} (24.04: $want)"
+              if [ -n "$got" ] && [ "$(printf '%s\n' "$got" "$want" | sort -V | tail -1)" != "$want" ]; then
+                echo "::error::$b needs $got, newer than a stock 24.04's $want"
+                exit 1
+              fi
+            done
+          done
 
       # Apple signing (macOS), when the secrets exist (else the ad-hoc signature): the Developer ID Application
       # certificate (APPLE_CERT_P12, base64; its password in APPLE_DEVID_CERT_PASSWORD, else APPLE_CERT_PASSWORD) in a
@@ -358,7 +378,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          sparse-checkout: .github/release
+          sparse-checkout: |
+            .github/release
+            tests/perf
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.asset }}
@@ -526,6 +548,19 @@ jobs:
           Expand-Archive (Get-ChildItem dl\noshape-cli-*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\cli"
           python $check (Get-ChildItem "$env:RUNNER_TEMP\cli\noshape-cli-*\noshape-cli.exe").FullName noshape-cli
           if ($LASTEXITCODE -ne 0) { throw "CLI check failed" }
+
+      # The release's speed on each platform, through its CLI-only download (qa's 1.5x between green and v0.4.32 on
+      # release-fillet-hang was green's x86-64-v3 OCCT, 11-06). Not a gate: a table in the job summary.
+      - name: Regeneration times
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then
+            cli=$(ls "$(cygpath -u "$RUNNER_TEMP")"/cli/noshape-cli-*/noshape-cli.exe); py=python
+          else
+            cli=$(ls "$RUNNER_TEMP"/noshape-cli-*/noshape-cli); py=python3
+          fi
+          $py .github/release/time_cli.py "$cli" tests/perf/release-fillet-hang.noshape tests/perf/live-30-features.noshape \
+            tests/perf/fins-400.noshape tests/perf/knurl-d25x25-45-45.noshape
 
   publish:
     needs: [bundle, sign, verify]

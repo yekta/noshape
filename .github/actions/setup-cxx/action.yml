@@ -1,0 +1,40 @@
+name: C and C++ compiler
+description: >
+  The compiler every C and C++ part of the build uses: OCCT and openNURBS
+  (their CMake builds) and the kernel's bridge (the cc crate), so they all
+  match. Linux: GCC `gcc` on ubuntu-24.04, installed and exported as CC / CXX,
+  at baseline x86-64 (GCC 15: ~4 % faster than 24.04's own GCC 13 on
+  release-fillet-hang, 11-06; the binary still runs on a stock 24.04: see the
+  check in release.yml).
+  macOS and Windows: the runner's clang and MSVC, as they are. setup-ccache
+  puts ccache in front of whatever this sets; setup-occt and setup-opennurbs
+  key their caches by its version.
+inputs:
+  gcc:
+    description: GCC major version for Linux (14 from noble's own archive, 15 and later from the ubuntu-toolchain-r PPA)
+    default: '15'
+runs:
+  using: composite
+  steps:
+    - name: GCC ${{ inputs.gcc }} (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        v=${{ inputs.gcc }}
+        if ! command -v "g++-$v" > /dev/null; then
+          # (noble ships GCC 14; newer ones come from the toolchain PPA.)
+          if [ "$v" -gt 14 ]; then sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test > /dev/null; fi
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends "gcc-$v" "g++-$v"
+        fi
+        # (Baseline x86-64, whatever the compiler's default: Ubuntu 26.04's GCC 14 and 15 default to x86-64-v3, whose
+        # FMA contraction rounds differently (michael's Fillet 2 failed so) and which older CPUs can't run.)
+        {
+          echo "CC=gcc-$v"
+          echo "CXX=g++-$v"
+          echo "NOSHAPE_CC=gcc-$v"
+          echo "NOSHAPE_CXX=g++-$v"
+          echo "CFLAGS=-march=x86-64"
+          echo "CXXFLAGS=-march=x86-64"
+        } >> "$GITHUB_ENV"
+        "g++-$v" --version | head -1

@@ -40,3 +40,8 @@ knurling" (`crates/model/tests/fs/knurl_b94.fs`), Diamond, outer face, circular 
 helix 45°, on a Ø25 × 25 mm cylinder (Top circle, Extrude 25), built through the CLI. Live: 16.8 s, 11597.649 mm³,
 4479 faces (behaviours request 1743). `crates/ops/tests/regen_profile.rs` `timed_knurl_d25` opens and regenerates it
 with its display meshes (perf.yml timed checks); it hung for minutes in the app while noshape's Boolean declined it.
+
+`release-fillet-hang.noshape`: qa's CLI fuzz document of seed 4539 (step 98, 74 features, the last Fillet 6): releases
+v0.4.26-v0.4.31 never opened it (BRepMesh's Delaunay walk on a degenerate face, OCCT patch 0022); v0.4.32 opened it
+1.5x slower than green builds, whose OCCT had x86-64-v3 code (fixed 11-06: dev builds at baseline, as releases).
+release.yml's check job times it through each platform's CLI (`.github/release/time_cli.py`).

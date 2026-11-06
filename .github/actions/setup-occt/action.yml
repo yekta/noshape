@@ -33,13 +33,22 @@ runs:
         echo "work=$tmp/ob" >> "$GITHUB_OUTPUT"
         echo "ccache=$tmp/occt-ccache" >> "$GITHUB_OUTPUT"
         echo "patches=${{ hashFiles('patches/occt/**') }}" >> "$GITHUB_OUTPUT"
+        # The C++ compiler's version line (setup-cxx's GCC, the runner's clang or MSVC), part of the keys: an install
+        # built by another compiler isn't this one's.
+        case "$RUNNER_OS" in
+          Windows) id=$(cl 2>&1 | head -1) ;;
+          *) id=$(${CXX:-c++} --version 2>&1 | head -1) ;;
+        esac
+        id="$id ${CXXFLAGS:-}"
+        echo "compiler: $id"
+        echo "cxx=$(printf %s "$id" | cksum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
 
     - name: Restore OCCT cache
       id: cache
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.paths.outputs.prefix }}
-        key: occt-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh', 'patches/occt/**') }}
+        key: occt-${{ runner.os }}-${{ runner.arch }}-cxx${{ steps.paths.outputs.cxx }}-${{ inputs.occt-tag }}-${{ hashFiles(runner.os == 'Windows' && 'scripts/build-occt.ps1' || 'scripts/build-occt.sh', 'patches/occt/**') }}
 
     # ----------------------------------------------- a build: through ccache
     - name: Install ccache (Linux)
@@ -70,8 +79,8 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.paths.outputs.ccache }}
-        key: occt-ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-${{ steps.paths.outputs.patches }}
-        restore-keys: occt-ccache-${{ runner.os }}-${{ runner.arch }}-${{ inputs.occt-tag }}-
+        key: occt-ccache-${{ runner.os }}-${{ runner.arch }}-cxx${{ steps.paths.outputs.cxx }}-${{ inputs.occt-tag }}-${{ steps.paths.outputs.patches }}
+        restore-keys: occt-ccache-${{ runner.os }}-${{ runner.arch }}-cxx${{ steps.paths.outputs.cxx }}-${{ inputs.occt-tag }}-
 
     - name: Build OCCT (Linux/macOS)
       if: steps.cache.outputs.cache-hit != 'true' && runner.os != 'Windows'

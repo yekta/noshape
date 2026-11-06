@@ -62,12 +62,12 @@ The lead integrates: it builds, tests and commits the whole tree to `main` whene
 - **Final message:** say what you finished, what's left, and anything the lead must do (cross-area changes,
   Cargo.lock changes, files that are half done).
 
-## C++ must build on GCC 13
-The release runners use Ubuntu 24.04 (GCC 13); this machine has GCC 15, which accepts things GCC 13 rejects
-(v0.4.1's release build failed on an implicit `handle<Derived>` -> `handle<Base>` return). Spell such
-conversions out (`occ::handle<Base>(x)`). Before you finish C++ kernel changes, syntax-check them with
-`g++-13 -std=c++17 -fsyntax-only -w -Icpp -I/root/occt/include/opencascade -I<out>/cxxbridge/include -I<out>/cxxbridge/crate <file>`
-(`<out>` = your target dir's `debug/build/noshape-kernel-*/out`).
+## C++ must build on GCC 15, Apple clang and MSVC
+The Linux release runners use Ubuntu 24.04 with GCC 15 from the toolchain PPA at baseline x86-64
+(`.github/actions/setup-cxx`, 11-06; GCC 13 before). Keep `-march=x86-64` in your own builds too: the vibe hosts'
+GCC 14 / 15 default to x86-64-v3, whose FMA contraction changes results (learning-center-michael's Fillet 2 failed
+on an OCCT built so). Compilers differ in what they accept (v0.4.1's release build failed on an implicit
+`handle<Derived>` -> `handle<Base>` return): spell such conversions out (`occ::handle<Base>(x)`).
 
 ## Resource limits (2026-10-20, after the server ran out of memory and rebooted)
 - Only the agents the lead lists as active may build or run the app. Paused agents run no cargo and no app at all.

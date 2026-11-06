@@ -51,7 +51,8 @@ runs:
         dir="$RUNNER_TEMP/cargo-ccache"
         if [ "$RUNNER_OS" = Windows ]; then dir="$(cygpath -m "$dir")"; fi
         case "$RUNNER_OS" in
-          Linux) cc=gcc; cxx=g++ ;;
+          # (setup-cxx's compiler where it ran.)
+          Linux) cc=${NOSHAPE_CC:-gcc}; cxx=${NOSHAPE_CXX:-g++} ;;
           macOS) cc=clang; cxx=clang++ ;;
           Windows) cc=cl.exe; cxx=cl.exe ;;
         esac
@@ -71,5 +72,5 @@ runs:
       uses: actions/cache/restore@v6
       with:
         path: ${{ steps.env.outputs.dir }}
-        key: cargo-ccache-${{ runner.os }}-${{ inputs.name }}-${{ hashFiles('crates/kernel/cpp/**', 'crates/kernel/build.rs') }}
-        restore-keys: cargo-ccache-${{ runner.os }}-${{ inputs.name }}-
+        key: cargo-ccache-${{ runner.os }}-${{ env.NOSHAPE_CXX || 'cc' }}-${{ inputs.name }}-${{ hashFiles('crates/kernel/cpp/**', 'crates/kernel/build.rs') }}
+        restore-keys: cargo-ccache-${{ runner.os }}-${{ env.NOSHAPE_CXX || 'cc' }}-${{ inputs.name }}-
