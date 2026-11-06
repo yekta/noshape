@@ -26,6 +26,8 @@
 # comparable with each other; compare settings for fps in separate jobs
 # (BENCH_ENV), GPU time (`w.gpu_wait`) within a job.
 # ONLY (`<label>:<kind>` separated by spaces) runs just those.
+# AB_BIN / AB_OUT: every run (but the pick bench) also with another build (the previous release, the same-job
+# baseline perf.yml compares with), alternating which goes first.
 set -u
 BIN=$1; DOC=$2; OUT=$3; shift 3
 MODES=("$@")
@@ -53,38 +55,50 @@ for v in ${VARIANTS:-}; do
   if [[ $name == *@* ]]; then vkind=${name#*@}; name=${name%%@*}; fi
   RUNS+=("texture+$name:$vkind:${v#*:}")
 done
+# One run of `bin` into `out` (`shots`: the correctness stills of the mode's orbit).
+one() {
+  local bin=$1 out=$2 shots=$3
+  mkdir -p "$out"
+  log="$out/$label-$kind.log"
+  work=$(mktemp -d)
+  cp "$DOC" "$work/bench.noshape"
+  echo "== $label $kind ${extra//,/ } ($bin)"
+  if [[ -n ${COLD:-} && "$(uname)" == Darwin ]]; then
+    cache=$(getconf DARWIN_USER_CACHE_DIR)
+    echo "cold start: clearing $(du -sk "$cache" 2>/dev/null | cut -f1) KB cache, Metal: $(find "$cache" -maxdepth 3 -type d -name com.apple.metal | tr '\n' ' ')"
+    find "$cache" -maxdepth 3 -type d -name com.apple.metal -prune -exec rm -rf {} +
+  fi
+  env NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT="$FRAMES" NOSHAPE_PERF_ORBIT_DELAY="$DELAY" \
+    NOSHAPE_PERF_BENCH="$kind" NOSHAPE_PRESENT="$mode" RUST_LOG=info ${BENCH_ENV//,/ } ${extra//,/ } \
+    "$bin" "$work/bench.noshape" > "$log" 2>&1 &
+  pid=$!
+  if [[ $shots == 1 && $kind == orbit && $label == "$mode" ]]; then
+    # The settled view (geometry refined, before the bench moves the camera).
+    wait_for 'regen\[refine\]' "$log" $((DELAY - 15)) || echo "no refine regen logged"
+    sleep 8
+    shot "$out/$mode-still.png"
+    if wait_for 'orbit bench: start' "$log" $((DELAY + 60)); then
+      sleep 1.5; shot "$out/$mode-orbit-1.png"
+      sleep 1.5; shot "$out/$mode-orbit-2.png"
+    fi
+  fi
+  wait_for 'BENCH SUMMARY' "$log" $((DELAY + 600)) || echo "::warning::no BENCH SUMMARY for $mode $kind"
+  kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
+  grep -a "viewport frames\|GPU:\|orbit bench\|BENCH FIRST\|BENCH SUMMARY\|regen\[\|panicked\|ERROR" "$log" | cut -c1-400
+  rm -rf "$work"
+}
+n=0
 for run in "${RUNS[@]}"; do
   label=${run%%:*}; rest=${run#*:}; kind=${rest%%:*}; extra=${rest#*:}
   # ONLY="<label>:<kind> ...": just those runs (perf.yml re-measures the rows a baseline comparison flagged).
   [[ -n ${ONLY:-} && " $ONLY " != *" $label:$kind "* ]] && continue
   mode=${label%%+*}
-  {
-    log="$OUT/$label-$kind.log"
-    work=$(mktemp -d)
-    cp "$DOC" "$work/bench.noshape"
-    echo "== $label $kind ${extra//,/ }"
-    if [[ -n ${COLD:-} && "$(uname)" == Darwin ]]; then
-      cache=$(getconf DARWIN_USER_CACHE_DIR)
-      echo "cold start: clearing $(du -sk "$cache" 2>/dev/null | cut -f1) KB cache, Metal: $(find "$cache" -maxdepth 3 -type d -name com.apple.metal | tr '\n' ' ')"
-      find "$cache" -maxdepth 3 -type d -name com.apple.metal -prune -exec rm -rf {} +
-    fi
-    env NOSHAPE_PERF=1 NOSHAPE_PERF_ORBIT="$FRAMES" NOSHAPE_PERF_ORBIT_DELAY="$DELAY" \
-      NOSHAPE_PERF_BENCH="$kind" NOSHAPE_PRESENT="$mode" RUST_LOG=info ${BENCH_ENV//,/ } ${extra//,/ } \
-      "$BIN" "$work/bench.noshape" > "$log" 2>&1 &
-    pid=$!
-    if [[ $kind == orbit && $label == "$mode" ]]; then
-      # The settled view (geometry refined, before the bench moves the camera).
-      wait_for 'regen\[refine\]' "$log" $((DELAY - 15)) || echo "no refine regen logged"
-      sleep 8
-      shot "$OUT/$mode-still.png"
-      if wait_for 'orbit bench: start' "$log" $((DELAY + 60)); then
-        sleep 1.5; shot "$OUT/$mode-orbit-1.png"
-        sleep 1.5; shot "$OUT/$mode-orbit-2.png"
-      fi
-    fi
-    wait_for 'BENCH SUMMARY' "$log" $((DELAY + 600)) || echo "::warning::no BENCH SUMMARY for $mode $kind"
-    kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
-    grep -a "viewport frames\|GPU:\|orbit bench\|BENCH FIRST\|BENCH SUMMARY\|regen\[\|panicked\|ERROR" "$log" | cut -c1-400
-    rm -rf "$work"
-  }
+  # AB_BIN: the same run of that build too, into AB_OUT, right before or after (alternately, so the runner slowing
+  # down through the job weighs on both alike); the pick bench only for the build measured.
+  if [[ -n ${AB_BIN:-} && $kind != pick ]]; then
+    n=$((n + 1))
+    if (( n % 2 )); then one "$BIN" "$OUT" 1; one "$AB_BIN" "$AB_OUT" 0; else one "$AB_BIN" "$AB_OUT" 0; one "$BIN" "$OUT" 1; fi
+  else
+    one "$BIN" "$OUT" 1
+  fi
 done

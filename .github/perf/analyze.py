@@ -26,6 +26,9 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
                      unlucky run doesn't set the bar. Every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
                      --max-regression worse than in DIR/summary.json, and worse by more
                      than the metric's noise floor (MIN_CHANGE);
+  --baseline DIR of logs: another build measured in this job, row by row (bench.sh AB_BIN / AB_OUT, perf.yml's
+                     macOS jobs: the previous release), so the runner's speed weighs on both alike;
+  --confirm-baseline DIR  with --confirm: the baseline build's rows measured again beside them;
   --confirm DIR      the flagged rows measured again (bench.sh ONLY=, perf.yml): a regression fails only when
                      the second measurement regresses too. One run against one baseline isn't enough on the macOS
                      runners: the same build's rows move 20-100 % between runs (macOS 15, 11-06: readback GPU p95
@@ -85,6 +88,9 @@ def load_baseline(path, fixture):
     one = os.path.join(path, "summary.json")
     if os.path.exists(one):
         return json.load(open(one, encoding="utf-8"))
+    # Logs: another build measured in this job (bench.sh AB_OUT).
+    if glob.glob(os.path.join(path, "*-*.log")):
+        return {"label": os.environ.get("AB_LABEL") or "another build measured in this job", "fixture": fixture, "runs": runs(path)}
     sums = [json.load(open(f, encoding="utf-8")) for f in sorted(glob.glob(os.path.join(path, "*", "summary.json")))]
     sums = [x for x in sums if x.get("fixture") == fixture]
     if not sums:
@@ -208,6 +214,7 @@ def main():
     ap.add_argument("--report-regressions", action="store_true")
     ap.add_argument("--gate-first-frames-gpu", type=float)
     ap.add_argument("--confirm")
+    ap.add_argument("--confirm-baseline")
     args = ap.parse_args()
     rows = runs(args.out)
     lines = [f"### Viewport benchmark: {args.label}", "",
@@ -327,6 +334,7 @@ def main():
     elif base is not None:
         lines += ["", f"Against the baseline ({base.get('label', '?')}), max {args.max_regression * 100:.0f}% worse:"]
         again = runs(args.confirm) if args.confirm else None
+        again_base = runs(args.confirm_baseline) if args.confirm_baseline and glob.glob(os.path.join(args.confirm_baseline, "*-*.log")) else None
 
         def regressed(metric, higher_better, now, was):
             worse = (was - now) / was if higher_better else (now - was) / was
@@ -352,15 +360,19 @@ def main():
                     flagged.add(f"{r['mode']}:{r['kind']}")
                     failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}")
                     continue
-                a = next((x for x in again if x["mode"] == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
+                same = lambda rows: next((x for x in rows or [] if x["mode"] == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
+                a = same(again)
+                # Measured again beside the baseline build too: the second comparison is with that.
+                ab = same(again_base)
+                was2 = ab[metric] if ab is not None and ab.get(metric) else was
                 if a is None or a.get(metric) is None:
                     notes[-1] += ", not measured again"
                     failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f} (not measured again)")
-                elif regressed(metric, higher_better, a[metric], was):
-                    notes[-1] += f", again {a[metric]:.2f}"
-                    failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}, again {a[metric]:.2f}")
+                elif regressed(metric, higher_better, a[metric], was2):
+                    notes[-1] += f", again {was2:.2f} → {a[metric]:.2f}"
+                    failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}, again {was2:.2f} → {a[metric]:.2f}")
                 else:
-                    notes[-1] += f", not repeated (again {a[metric]:.2f})"
+                    notes[-1] += f", not repeated (again {was2:.2f} → {a[metric]:.2f})"
             lines.append(f"- {r['mode']} {r['kind']}: " + "; ".join(notes))
     elif args.baseline:
         lines += ["", "No baseline (first run on main?)."]

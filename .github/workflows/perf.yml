@@ -296,6 +296,26 @@ jobs:
           "FRAMES=60" >> $env:GITHUB_ENV
           python -m pip install --quiet pillow
 
+      # The macOS jobs measure the release before this build beside it, row by row (bench.sh AB_BIN): on these
+      # runners one job's host and its slowing down through the job move a row 20-100 %, the same build failed
+      # against its own earlier runs (perf 42171045580), so regressions are judged within the job.
+      - name: The previous release (macOS, measured beside this build)
+        if: runner.os == 'macOS' && inputs.fixture == ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          tags=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 30 --json tagName,isPrerelease,isDraft \
+            --jq '.[] | select((.isPrerelease or .isDraft) | not) | .tagName')
+          if grep -qx "$BUILD" <<< "$tags"; then prev=$(grep -A1 -x "$BUILD" <<< "$tags" | sed -n 2p); else prev=$(head -1 <<< "$tags"); fi
+          [[ -n "$prev" ]] || { echo "no earlier release"; exit 0; }
+          gh release download "$prev" --repo "$GITHUB_REPOSITORY" --pattern "noshape-[0-9]*-${{ matrix.asset }}" --dir "$RUNNER_TEMP/prev"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/prev-dmg" "$RUNNER_TEMP"/prev/*.dmg
+          cp -R "$RUNNER_TEMP/prev-dmg/noshape.app" "$RUNNER_TEMP/prev/noshape.app"
+          hdiutil detach "$RUNNER_TEMP/prev-dmg"
+          echo "AB_BIN=$RUNNER_TEMP/prev/noshape.app/Contents/MacOS/noshape" >> "$GITHUB_ENV"
+          echo "AB_LABEL=${{ matrix.name }} ($prev, measured in this job)" >> "$GITHUB_ENV"
+          echo "beside: $prev"
+
       # --------------------------------------------------------------- the runs
       - name: Benchmarks
         if: runner.os != 'Windows'
@@ -303,7 +323,7 @@ jobs:
           VARIANTS: ${{ inputs.variants || matrix.variants || '' }}
           BENCH_ENV: ${{ inputs.env || '' }}
           COLD: ${{ inputs.cold || '' }}
-        run: .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
+        run: AB_OUT="$RUNNER_TEMP/perf/base" .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf" ${{ inputs.modes || matrix.modes }}
 
       # The 60 fps floor's other big models: their 2× orbit, pan and zoom only (the matrix's retina variants).
       - name: Benchmarks (big models)
@@ -312,6 +332,8 @@ jobs:
           BASE: '0'
           VARIANTS: ${{ matrix.variants }}
           BENCH_ENV: ${{ inputs.env || '' }}
+          AB_BIN: ''
+
         run: |
           for doc in parts-1000 pins-assembly-1000; do
             .github/perf/bench.sh "$BIN" "tests/perf/$doc.noshape" "$RUNNER_TEMP/perf/big-$doc" texture
@@ -364,16 +386,20 @@ jobs:
         run: |
           gates="${{ matrix.gates }}"
           gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//FLOOR/$FLOOR_GPU_P95_MS}"; gates="${gates//TARGET/$TARGET_GPU_MEAN_MS $TARGET_GATE}"
+          # The build measured beside this one in this job (macOS), else the last runs' median.
+          baseline="$RUNNER_TEMP/baseline"
+          [[ -n "${AB_BIN:-}" ]] && ls "$RUNNER_TEMP"/perf/base/*-*.log > /dev/null 2>&1 && baseline="$RUNNER_TEMP/perf/base"
           set +e
           python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD)" $gates \
-            --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION"
+            --baseline "$baseline" --max-regression "$MAX_REGRESSION"
           status=$?
           flagged=$(cat "$RUNNER_TEMP/perf/regressed.txt" 2>/dev/null)
           if [[ $status != 0 && -n "$flagged" && "$RUNNER_OS" != Windows ]]; then
             echo "measuring again: $flagged"
-            ONLY="$flagged" .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf/confirm" ${{ inputs.modes || matrix.modes }}
+            ONLY="$flagged" AB_OUT="$RUNNER_TEMP/perf/confirm/base" .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf/confirm" ${{ inputs.modes || matrix.modes }}
             python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD), flagged rows measured again" $gates \
-              --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION" --confirm "$RUNNER_TEMP/perf/confirm"
+              --baseline "$baseline" --max-regression "$MAX_REGRESSION" \
+              --confirm "$RUNNER_TEMP/perf/confirm" --confirm-baseline "$RUNNER_TEMP/perf/confirm/base"
             status=$?
           fi
           # The other big models: the floor only.

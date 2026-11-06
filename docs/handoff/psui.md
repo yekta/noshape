@@ -587,12 +587,16 @@ that touches the model: ~12 min.
 
 N00000000000. (11-06) **perf.yml's macOS gate (lead P1):** 42162655806 (v0.4.32) failed on macOS 15's baseline
     comparison only, no regression: the same build's rows move 20-100 % between runs there (readback GPU p95 7.2-15.5,
-    1x texture 6.6-9.6, 2x fps 65-82; readback UI CPU p95 2.9-5.9 over v0.4.23-v0.4.32 with no trend) and macOS 26
-    had every row at or under macOS 15's baseline. Two gate faults fixed: (1) the baseline was the last *passed* run,
-    so the luckiest run set the bar for the next: now each metric's median over the last five default-settings runs
-    on main, passed or failed; (2) one run decided: now a flagged row is measured again (bench.sh ONLY=, a fresh
-    launch) and fails only if it regresses again (analyze.py --confirm). Threshold unchanged (10 %, MIN_CHANGE).
-    On v0.4.32's data: no failure; a repeated slowdown still fails ("again 15.53").
+    1x texture 6.6-9.6, 2x fps 65-82; readback UI CPU p95 2.9-7.0 over v0.4.23-v0.4.32 with no trend) and macOS 26
+    had every row at or under macOS 15's baseline. Faults: (1) the baseline was the last *passed* run, so the luckiest
+    run set the bar (now each metric's median over the last five default-settings runs, passed or failed: Linux,
+    Windows, and macOS when no earlier release); (2) one run decided (now a flagged row is measured again, analyze.py
+    --confirm); (3) both still compared across jobs, and a job's host and its slowing down through the job decide
+    readback UI CPU and 1x fps: 42171045580 measured v0.4.32 against three runs of v0.4.32 and failed, again on
+    re-measuring (UI CPU p95 4.33 -> 6.57 -> 6.99; 1x zoom fps 26.3 -> 21.0 -> 19.5). So the macOS jobs measure the
+    previous release beside the build, row by row, alternating which goes first (bench.sh AB_BIN / AB_OUT), and judge
+    regressions against it, re-measuring both on a flag (--confirm-baseline). Thresholds unchanged (10 %, MIN_CHANGE).
+
 N0000000000. (11-06 05:42) **The first-frame stall on a real Mac (lead 11-06: the user's Mac mini runs these).** CI saw
     the bench's first frame after an idle cost 25-30 ms at 1x and 90-320 ms at 2x on the runners' virtual GPU (above).
     On a real Mac, from a checkout of the repo (Terminal; Python 3 with Pillow for the stills, `pip3 install pillow`):
