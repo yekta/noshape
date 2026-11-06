@@ -43,6 +43,20 @@ scratch /root/bool-scratch.
 - So: a few percent faster on the CLI documents (more with 3.6.1 than with the crate's 3.3.2), 10-20 % more peak
   memory every time. Not landed. The arm64 knurl gap is mostly the runners (3 cores; base 3.5-5.3 s between
   runners). tests/budget/draft-pool-hang.noshape didn't open within 30 min through the CLI on macOS, either build.
+- The harness (lead: mimalloc doesn't land on macOS, the branch deleted; kept in /root/bool-scratch/alloc-harness for
+  Windows or a later try): bool-alloc-ab.yml builds a (the commit before the change) and b (the change) in one job on
+  macos-latest (the five Cargo / main.rs files swapped with `git checkout HEAD~2 -- ...`, one target dir, so b only
+  rebuilds the app and CLI), bundles both apps like noshape-binary, and uploads them; 5 measure jobs (macos-15) each
+  run perf.yml's bench.sh with BIN = b and AB_BIN = a (row by row, alternating), analyze.py with --baseline the a
+  logs, then ab.py: app start to the first `regen[refine]` line with its peak RSS (/usr/bin/time -l; app_start.sh),
+  cli_doc.py (a fresh CLI's document_open + feature_list, peak RSS from RUSAGE_CHILDREN) on the knurl, the release
+  document and fins-400 three times and every repository document once, each pair alternating which goes first;
+  summary.py tabulates b / a as the median of the rounds' ratios. bool-alloc-ab2.yml reuses a run's builds
+  (download-artifact run-id) with B_ENV for b's runs (mimalloc's options, or DYLD_INSERT_LIBRARIES on a). Pitfalls:
+  the app has no --version (it opens a window); a document the CLI can't open in time (draft-pool-hang) holds a round
+  to cli_doc's timeout; the viewport bench's first pair puts b first (cold shader compile), so its first texture
+  orbit favours a. The change itself: 0001-*.patch there (Cargo.toml target macos `mimalloc = { features =
+  ["override"] }`, `#[global_allocator]` in both main.rs).
 
 ## macOS arm64 allocator measurement (11-06 08:16 UTC; run 42178325902, branch bool/arm-measure)
 - Runner: Apple M1 (Virtual), 3 cores (hw.ncpu 3). time_cli.py, two rounds each, seconds (knurl-d25x25-45-45 /
