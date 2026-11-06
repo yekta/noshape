@@ -3456,6 +3456,55 @@ pub(crate) fn par_map<T: Send>(n: usize, f: &(dyn Fn(usize) -> T + Sync)) -> R<V
     Ok(all.into_iter().map(|x| x.1).collect())
 }
 
+/// NOSHAPE_BOOL_PCB_PROBE (the partial common blocks' stage P0, bool.md): each two edge pieces of different arguments
+/// leaving one vertex within 25° and within their tolerances of each other for a stretch: how far, and where they part.
+fn pcb_probe(cx: &Ctx, sedges: &[SEdge]) {
+    let mut at: HashMap<u32, Vec<usize>> = HashMap::default();
+    for (i, s) in sedges.iter().enumerate() {
+        if s.origins.is_empty() || s.seg.v[0] == s.seg.v[1] || matches!(s.seg.g, Geo::Apex { .. }) {
+            continue;
+        }
+        for &w in &s.seg.v {
+            at.entry(w).or_default().push(i);
+        }
+    }
+    let mut ws: Vec<u32> = at.keys().copied().collect();
+    ws.sort_unstable();
+    for w in ws {
+        let list = &at[&w];
+        for (k, &a) in list.iter().enumerate() {
+            for &b in &list[k + 1..] {
+                let (sa, sb) = (&sedges[a], &sedges[b]);
+                if !sa.origins.iter().any(|&e| sb.origins.iter().any(|&g| cx.edges[g].arg != cx.edges[e].arg)) {
+                    continue;
+                }
+                let from = |s: &Seg, t: f64| if s.v[0] == w { cx.seg_at(s, t) } else { cx.seg_at(s, 1.0 - t) };
+                let (da, db) = ((from(&sa.seg, 1e-3) - cx.p(w)).normalize_or_zero(), (from(&sb.seg, 1e-3) - cx.p(w)).normalize_or_zero());
+                if da.dot(db) < 0.9063 {
+                    continue;
+                }
+                let reach = cx.pool.pair(sa.t, sb.t);
+                let la = cx.seg_length(&sa.seg);
+                let (mut along, mut part) = (0.0, None);
+                for k in 1..=32 {
+                    let t = k as f64 / 32.0;
+                    let (u, d) = cx.seg_param(&sb.seg, from(&sa.seg, t));
+                    if d <= reach && (-1e-9..=1.0 + 1e-9).contains(&u) {
+                        along = t * la;
+                    } else {
+                        part = Some((t * la, d));
+                        break;
+                    }
+                }
+                if along > cx.pool.floor {
+                    let args = |s: &SEdge| s.origins.iter().map(|&e| cx.edges[e].arg).collect::<Vec<_>>();
+                    eprintln!("PCB w {w} t {:.1e} pieces {a} {b} args {:?} {:?} ends {:?} {:?} len {la:.3e} {:.3e} along {along:.3e} part {part:?} reach {reach:.1e}", cx.pool.t[w as usize], args(sa), args(sb), sa.seg.v, sb.seg.v, cx.seg_length(&sb.seg));
+                }
+            }
+        }
+    }
+}
+
 /// The same; free-form (NURBS) faces taken where `src` gives their sections (else declined).
 pub fn boolean_with(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option<&dyn SectionSource>) -> R<Output> {
     // (Done again with the groups of vertices found on the way merged from the start, as OCCT merges them before
@@ -4892,6 +4941,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             pieces.push((si, rev));
         }
         edge_pieces.push(pieces);
+    }
+    if std::env::var_os("NOSHAPE_BOOL_PCB_PROBE").is_some() {
+        pcb_probe(&cx, &sedges);
     }
     // An input vertex inside edges of two other arguments (coincident there: a common block): OCCT
     // (non-destructive) replaces it for each edge, and again when the block's tolerance grows past the new

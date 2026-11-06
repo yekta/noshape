@@ -63,6 +63,13 @@ P3. The merge rounds in one pass: VV groups (and those P1 / P2 add) closed trans
 P4. Only if P1-P3 leave cases at "a piece's point near its face's boundary": a thin piece bounded by common-block
     edges classified by its loop, as OCCT's face builder does, not by a point within the edges' tolerance.
 Order P0, P1, P2, P3 (P2 may go before P1 if the parity share gains more there). Each stage's numbers in this file.
+P0 (11-06 12:36 UTC): the probe (boolean.rs pcb_probe, NOSHAPE_BOOL_PCB_PROBE=1, lines "PCB w <vertex> ... along
+<length together> part <(where, distance)>"). Gate unchanged (no behaviour change). Pairs: bool-corpus 58 lines,
+corpus2-6 47-49 each, parity56 7, shfall 650, direct-corpus / sh-new2 / knurls (k10-25, k25-15, k25-25) / gears
+(cf-spur-gear, gears) 0. As expected: 47587a8d's two edges from vertex 25 together 56 um then 0.2 um apart at 60 um;
+0acfd0a2's pieces of arguments 28/46 and 60/61 together 0.69 mm (of 2 mm) and 0.34 mm (of 1 mm). Also pairs between
+the same two vertices that bulge apart in the middle (together 11 um from each end, 0.57 um apart between): OCCT's EE
+gives those common parts at both ends too.
 
 ## mimalloc on macOS, measured to land (11-06 11:17 UTC; lead: land only if nothing gets worse beyond noise): not landed
 - The change (branch bool/macos-mimalloc, c9a9ea42): the mimalloc crate with `override` (malloc's default zone, so
