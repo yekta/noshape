@@ -6029,6 +6029,213 @@ fn linear_grid_pattern(data: &mut SketchData, seeds: &[EntityId], x: (DVec2, usi
     Ok(groups)
 }
 
+/// Points the links made so far relate (a link between two of one group would only repeat what the others imply:
+/// a pattern closing on its own seed, the solver's dependent equations).
+#[derive(Default)]
+struct Related(Vec<(EntityId, EntityId)>);
+
+impl Related {
+    fn root(&self, mut p: EntityId) -> EntityId {
+        while let Some((_, up)) = self.0.iter().find(|(x, _)| *x == p) {
+            p = *up;
+        }
+        p
+    }
+
+    /// Whether `a` and `b` were apart (then related from now on).
+    fn join(&mut self, a: EntityId, b: EntityId) -> bool {
+        let (ra, rb) = (self.root(a), self.root(b));
+        if ra == rb {
+            return false;
+        }
+        self.0.push((rb, ra));
+        true
+    }
+}
+
+/// The points of `instance`'s entities paired with the seeds' (entities in the seeds' order, as Onshape lists a
+/// pattern's instances): a point with its seed point, a curve's points with its seed's.
+/// `map` the instance's transform: a curve's points are paired by where they land (an arc drawn the other way round
+/// lists its ends the other way).
+fn instance_points(sk: &Sketch, seeds: &[EntityId], instance: &[EntityId], map: &dyn Fn(DVec2) -> DVec2, tol: f64) -> Option<Vec<(EntityId, EntityId)>> {
+    let mut out = Vec::new();
+    for (s, i) in seeds.iter().zip(instance) {
+        let (es, ei) = (sk.entity(*s)?, sk.entity(*i)?);
+        if es.kind() != ei.kind() {
+            return None;
+        }
+        let (ps, pi): (Vec<EntityId>, Vec<EntityId>) = if es.kind() == EntityKind::Point { (vec![*s], vec![*i]) } else { (es.point_refs().to_vec(), ei.point_refs().to_vec()) };
+        if ps.len() != pi.len() {
+            return None;
+        }
+        for p in ps {
+            let to = map(sk.point(p)?);
+            out.push((p, pi.iter().copied().find(|q| sk.point(*q).is_some_and(|x| (x - to).length() <= tol))?));
+        }
+    }
+    Some(out)
+}
+
+/// Entities already in the sketch linked as a circular pattern about point `center`, as the tool links the copies
+/// it makes (a translated sketch: Onshape stores the instances, ours makes them; linked, editing the pattern or a
+/// dimension carries them along). `instances[0]`: the seeds; each instance's entities in the seeds' order; `full`:
+/// spread over a turn. Nothing when they aren't rotated copies of the seeds. The pattern's id.
+pub fn link_circular_pattern(data: &mut SketchData, instances: &[Vec<EntityId>], center: EntityId, full: bool) -> Option<u32> {
+    let seeds = instances.first()?.clone();
+    if instances.len() < 2 || instances.iter().any(|g| g.len() != seeds.len()) {
+        return None;
+    }
+    let sk = &data.sketch;
+    let c = sk.point(center)?;
+    // The seeds' farthest point from the centre: each instance's angle from where its copy is (any of the first
+    // seed's points: the arcs' ends may be listed either way).
+    let far = seeds.iter().flat_map(|e| if sk.kind(*e) == Some(EntityKind::Point) { vec![*e] } else { sk.entity(*e).map(|x| x.point_refs().to_vec()).unwrap_or_default() }).filter_map(|p| Some((p, sk.point(p)?))).max_by(|x, y| (x.1 - c).length().total_cmp(&(y.1 - c).length()))?;
+    let r = (far.1 - c).length();
+    if r < 1e-12 {
+        return None;
+    }
+    let tol = r * 1e-7;
+    let mut related = Related::default();
+    let mut links: Vec<(EntityId, EntityId, f64)> = Vec::new();
+    let mut angles = Vec::new();
+    for g in &instances[1..] {
+        // Rotations taking the far point onto one of the instance's points; the one that maps every seed point.
+        let candidates: Vec<f64> = g.iter().flat_map(|e| if sk.kind(*e) == Some(EntityKind::Point) { vec![*e] } else { sk.entity(*e).map(|x| x.point_refs().to_vec()).unwrap_or_default() }).filter_map(|q| sk.point(q)).filter(|q| ((*q - c).length() - r).abs() <= tol).map(|q| (far.1 - c).angle_to(q - c)).collect();
+        // (Over a full turn, a whole step of it exactly: what the geometry measures is a hair off, and the sketch's
+        // perpendiculars and the like hold the exact angle.)
+        let n = instances.len() as f64;
+        let exact = |a: f64| {
+            let k = (a * n / TAU).round();
+            if full && (a - k * TAU / n).abs() < 1e-6 { k * TAU / n } else { a }
+        };
+        let candidates: Vec<f64> = candidates.into_iter().map(exact).collect();
+        let (angle, pairs) = candidates.into_iter().find_map(|angle| {
+            let t = Transform::Rotate { center: c, angle };
+            instance_points(sk, &seeds, g, &move |p| t.apply(p), tol).map(|p| (angle, p))
+        })?;
+        for (a, b) in pairs {
+            if related.join(a, b) {
+                links.push((a, b, angle));
+            }
+        }
+        angles.push(angle);
+    }
+    let sk = &mut data.sketch;
+    for (seed, inst, angle) in links {
+        let _ = sk.add_constraint(ConstraintKind::CircularPatternLink { seed, inst, center, angle });
+    }
+    for (g, angle) in instances[1..].iter().zip(&angles) {
+        for (seed, inst) in seeds.iter().zip(g) {
+            match sk.kind(*seed) {
+                Some(EntityKind::Circle) => {
+                    let _ = sk.add_constraint(ConstraintKind::Equal { a: *seed, b: *inst });
+                }
+                Some(EntityKind::Ellipse | EntityKind::EllipticalArc) => {
+                    let _ = sk.add_constraint(ConstraintKind::CircularPatternLink { seed: *seed, inst: *inst, center, angle: *angle });
+                }
+                _ => {}
+            }
+        }
+    }
+    let angle = if full { TAU } else { *angles.last()? };
+    let ids = |g: &[EntityId]| g.iter().map(|e| e.0).collect::<Vec<u32>>();
+    Some(record_pattern(data, noshape_model::sketch_feature::SketchPattern {
+        id: 0,
+        circular: true,
+        seeds: ids(&seeds),
+        instances: instances[1..].iter().map(|g| ids(g)).collect(),
+        count: instances.len(),
+        distance: 0.0,
+        angle,
+        center: [c.x, c.y],
+        second_count: 1,
+        second_distance: 0.0,
+        second_angle: 0.0,
+    }))
+}
+
+/// A linear pattern's step: its offset, and each seed point with its copy one step on.
+type Step = (DVec2, Vec<(EntityId, EntityId)>);
+
+/// Entities already in the sketch linked as a linear pattern (as [`link_circular_pattern`]): `grid[a][b]` the
+/// instance b along the first direction and a along the second, `grid[0][0]` the seeds, each in the seeds' order.
+pub fn link_linear_pattern_grid(data: &mut SketchData, grid: &[Vec<Vec<EntityId>>]) -> Option<u32> {
+    let seeds = grid.first()?.first()?.clone();
+    if grid.iter().flatten().any(|g| g.len() != seeds.len()) || grid.iter().any(|row| row.len() != grid[0].len()) || grid.len() * grid[0].len() < 2 {
+        return None;
+    }
+    let sk = &data.sketch;
+    let points = |g: &[EntityId]| g.iter().flat_map(|e| if sk.kind(*e) == Some(EntityKind::Point) { vec![*e] } else { sk.entity(*e).map(|x| x.point_refs().to_vec()).unwrap_or_default() }).collect::<Vec<_>>();
+    let s0 = *points(&seeds).first()?;
+    let p0 = sk.point(s0)?;
+    // The step along each direction: the one taking the seeds onto the next instance (none: one instance that way).
+    let step_to = |g: Option<&Vec<EntityId>>| -> Option<Option<Step>> {
+        let Some(g) = g else { return Some(None) };
+        points(g).into_iter().filter_map(|q| sk.point(q)).find_map(|q| {
+            let d = q - p0;
+            let tol = d.length().max(1e-9) * 1e-7;
+            instance_points(sk, &seeds, g, &move |p| p + d, tol).map(|pairs| (d, pairs))
+        }).map(Some)
+    };
+    let (first, second) = (step_to(grid[0].get(1))?, step_to(grid.get(1).and_then(|r| r.first()))?);
+    let (d1, d2) = (first.as_ref().map_or(DVec2::ZERO, |x| x.0), second.as_ref().map_or(DVec2::ZERO, |x| x.0));
+    let reference = |x: &Option<Step>| x.as_ref().and_then(|(_, pairs)| pairs.iter().find(|(a, _)| *a == s0).map(|p| p.1));
+    let (r1, r2) = (reference(&first), reference(&second));
+    let tol = d1.length().max(d2.length()).max(1e-9) * 1e-7;
+    let mut related = Related::default();
+    let mut links: Vec<ConstraintKind> = Vec::new();
+    let mut groups: Vec<Vec<EntityId>> = Vec::new();
+    // The reference copies relate to the seed point through their own step.
+    for r in [r1, r2].into_iter().flatten() {
+        related.join(s0, r);
+    }
+    for (a, row) in grid.iter().enumerate() {
+        for (b, g) in row.iter().enumerate() {
+            if a == 0 && b == 0 {
+                continue;
+            }
+            // Along the first direction from the seeds; a later row from its first row's instance.
+            let (base, k, r, d) = if a == 0 { (&seeds, b, r1?, d1) } else { (&grid[0][b], a, r2?, d2) };
+            let off = d * k as f64;
+            for (sp, ip) in instance_points(sk, base, g, &move |p| p + off, tol)? {
+                if related.join(sp, ip) {
+                    links.push(ConstraintKind::PatternLink { seed: sp, inst: ip, ref_seed: s0, ref_inst: r, k: k as f64 });
+                }
+            }
+            for (seed, inst) in base.iter().zip(g) {
+                if sk.kind(*seed) == Some(EntityKind::Circle) {
+                    links.push(ConstraintKind::Equal { a: *seed, b: *inst });
+                }
+            }
+            groups.push(g.clone());
+        }
+    }
+    for k in links {
+        let _ = data.sketch.add_constraint(k);
+    }
+    Some(record_pattern(data, noshape_model::sketch_feature::SketchPattern {
+        id: 0,
+        circular: false,
+        seeds: seeds.iter().map(|e| e.0).collect(),
+        instances: groups.iter().map(|g| g.iter().map(|e| e.0).collect()).collect(),
+        count: grid[0].len(),
+        distance: d1.length(),
+        angle: d1.y.atan2(d1.x),
+        center: [p0.x, p0.y],
+        second_count: grid.len(),
+        second_distance: d2.length(),
+        second_angle: d2.y.atan2(d2.x),
+    }))
+}
+
+/// A pattern's record (Edit pattern from its glyph), as the tool keeps it, under a new id.
+fn record_pattern(data: &mut SketchData, mut p: noshape_model::sketch_feature::SketchPattern) -> u32 {
+    p.id = data.patterns.iter().map(|p| p.id + 1).max().unwrap_or(1);
+    let id = p.id;
+    data.patterns.push(p);
+    id
+}
+
 fn link_linear_pattern(data: &mut SketchData, seeds: &[EntityId], groups: &[Vec<EntityId>], step: DVec2, wpp: f64) {
     let sk = &mut data.sketch;
     let seed_points: Vec<EntityId> = seeds

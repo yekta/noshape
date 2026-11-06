@@ -1432,6 +1432,8 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 Ok(lin.pld(k, [lc[0], lc[1]], ls))
             }
             (a, b) if a.is_circular() && b.is_circular() => Ok(lin.rad(k, &self.radius(master_copy)?).rad(-k, &self.radius(master_source)?)),
+            // A point's offset: an arc round it (live's slot: a centre line's end and its cap), the arc's radius.
+            (EntityKind::Point, b) if b.is_circular() => Ok(lin.rad(k, &self.radius(master_copy)?)),
             (a, b) => Err(format!("offset master not supported between {a:?} and {b:?}")),
         }
     }
@@ -1460,6 +1462,11 @@ impl<'a, L: Lookup> Builder<'a, L> {
             (a, b) if a.is_circular() && b.is_circular() => {
                 let lin = Lin::new().rad(1.0, &self.radius(copy)?).rad(-1.0, &self.radius(source)?);
                 let lin = self.offset_master(lin, -side, master_source, master_copy)?;
+                self.lin(lin);
+                Ok(())
+            }
+            (EntityKind::Point, b) if b.is_circular() => {
+                let lin = self.offset_master(Lin::new().rad(1.0, &self.radius(copy)?), -side, master_source, master_copy)?;
                 self.lin(lin);
                 Ok(())
             }

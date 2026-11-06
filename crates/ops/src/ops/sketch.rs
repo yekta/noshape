@@ -395,6 +395,48 @@ pub(crate) fn pin_to_missing_reference(ctx: &mut Ctx, args: &Value) -> Result<()
     commit(od, t)
 }
 
+/// The parity translator's sketch pattern (live's CIRCULAR_PATTERN / LINEAR_PATTERN): the instances it drew linked
+/// as our pattern tool links its copies, and recorded so Edit pattern finds them. Not an op: the app links only the
+/// copies its tool makes. `args`: `sketch`, the optional `tab`, and either `circular` (instances, the seeds' first,
+/// each a list of entity ids in the seeds' order), `center` (a point entity) and `full`, or `grid` (rows along the
+/// second direction of instances along the first, `grid[0][0]` the seeds).
+pub(crate) fn link_sketch_pattern(ctx: &mut Ctx, args: &Value) -> Result<(), OpError> {
+    let op = crate::registry::by_tool_name("sketch_constrain").ok_or_else(|| OpError::invalid("no sketch_constrain"))?;
+    let a = Args { op, value: args };
+    let (od, tab) = studio_target(ctx, &a)?;
+    let mut t = target(od, tab, &a)?;
+    let list = |v: &Value, t: &mut SketchTarget| -> Result<Vec<EntityId>, OpError> {
+        v.as_array().ok_or_else(|| OpError::param("instances", "lists of entity ids"))?.iter().map(|e| parse_entity(e, t, false, false)).collect()
+    };
+    let made = if let Some(instances) = args["circular"].as_array() {
+        let groups = instances.iter().map(|g| list(g, &mut t)).collect::<Result<Vec<_>, _>>()?;
+        let center = parse_entity(args.get("center").ok_or_else(|| OpError::param("center", "required"))?, &mut t, false, false)?;
+        sm::link_circular_pattern(&mut t.data, &groups, center, args["full"].as_bool().unwrap_or(true))
+    } else {
+        let rows = args["grid"].as_array().ok_or_else(|| OpError::param("grid", "required (or circular)"))?;
+        let grid = rows.iter().map(|r| r.as_array().ok_or_else(|| OpError::param("grid", "rows of instances"))?.iter().map(|g| list(g, &mut t)).collect::<Result<Vec<_>, _>>()).collect::<Result<Vec<_>, _>>()?;
+        sm::link_linear_pattern_grid(&mut t.data, &grid)
+    };
+    made.ok_or_else(|| OpError::invalid("the instances aren't copies of the seeds"))?;
+    t.data.sketch.solve();
+    commit(od, t)
+}
+
+/// The parity translator's OFFSET (live's: a copy and its source tied to the first pair's offset): the pair already
+/// drawn linked as our Offset tool links its copies. Not an op, as [`link_sketch_pattern`]. `args`: `sketch`, the
+/// optional `tab`, `source`, `copy`, `master_source`, `master_copy`.
+pub(crate) fn link_sketch_offset(ctx: &mut Ctx, args: &Value) -> Result<(), OpError> {
+    let op = crate::registry::by_tool_name("sketch_constrain").ok_or_else(|| OpError::invalid("no sketch_constrain"))?;
+    let a = Args { op, value: args };
+    let (od, tab) = studio_target(ctx, &a)?;
+    let mut t = target(od, tab, &a)?;
+    let id = |name: &str, t: &mut SketchTarget| parse_entity(args.get(name).ok_or_else(|| OpError::param(name, "required"))?, t, false, false);
+    let (source, copy, ms, mc) = (id("source", &mut t)?, id("copy", &mut t)?, id("master_source", &mut t)?, id("master_copy", &mut t)?);
+    t.data.sketch.link_offset_pair(source, copy, ms, mc).map_err(|e| OpError::invalid(e.to_string()))?;
+    t.data.sketch.solve();
+    commit(od, t)
+}
+
 /// Commit the edited sketch data ("Edit : Sketch 1").
 pub(super) fn commit(od: &mut OpenDoc, t: SketchTarget) -> Result<(), OpError> {
     let ps = doc::studio(od.doc(), t.tab)?;

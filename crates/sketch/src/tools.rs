@@ -1409,10 +1409,32 @@ impl Sketch {
         Ok(())
     }
 
+    /// An offset copy already in the sketch linked to its source as the Offset tool links its copies (a translated
+    /// sketch: live's OFFSET, its first pair `master_source` / `master_copy`), the pairs' sense as they lie.
+    pub fn link_offset_pair(&mut self, source: EntityId, copy: EntityId, master_source: EntityId, master_copy: EntityId) -> Result<ConstraintId> {
+        let side = if (source, copy) == (master_source, master_copy) {
+            1.0
+        } else {
+            let (sk, sm) = (self.signed_offset(source, copy), self.signed_offset(master_source, master_copy));
+            match (sk, sm) {
+                (Some(sk), Some(sm)) if sm.abs() > 1e-12 && sk.abs() > 1e-12 => (sk / sm).signum(),
+                _ => return Err(SketchError::InvalidGeometry("an offset pair: a line or an arc and its copy, apart".into())),
+            }
+        };
+        self.add_constraint(ConstraintKind::OffsetPair { source, copy, master_source, master_copy, side })
+    }
+
     /// A copy's signed offset from its source, as the solver's OffsetPair
     /// measures it: lines, the copy's start from the source line (left of
     /// its start → end positive); arcs, the radius difference.
     fn signed_offset(&self, source: EntityId, copy: EntityId) -> Option<f64> {
+        // A point's offset: the radius of the arc round it.
+        if self.kind(source) == Some(EntityKind::Point) {
+            return match self.curve(copy)? {
+                Curve2::Arc { radius, .. } | Curve2::Circle { radius, .. } => Some(radius),
+                _ => None,
+            };
+        }
         match (self.curve(source)?, self.curve(copy)?) {
             (Curve2::Line { .. }, Curve2::Line { .. }) => {
                 let (s0, s1) = self.endpoints(source)?;

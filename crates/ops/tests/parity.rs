@@ -1182,6 +1182,95 @@ fn lives_ellipse_mirror_and_handle_constraints_translate() {
     }
 }
 
+/// Live's sketch patterns (CIRCULAR_PATTERN about a pivot, a two-direction LINEAR_PATTERN): the instances drawn as
+/// live stores them come out linked as our pattern tool links its copies, so a seed's edit carries them.
+#[test]
+fn lives_sketch_patterns_are_linked() {
+    let circle = |id: &str, c: [f64; 2], r: f64| json!({ "btType": "BTMSketchCurve-4", "entityId": id, "centerId": format!("{id}.center"), "geometry": { "btType": "BTCurveGeometryCircle-115", "xCenter": c[0], "yCenter": c[1], "radius": r, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let point = |id: &str, x: f64, y: f64| json!({ "btType": "BTMSketchPoint-158", "entityId": id, "isConstruction": false, "x": x, "y": y });
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let b = |id: &str, v: bool| json!({ "btType": "BTMParameterBoolean-144", "parameterId": id, "value": v });
+    let c = |ty: &str, params: Vec<Value>| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "parameters": params });
+    let (r, n) = (0.02, 3);
+    let mut entities = vec![point("o", 0.0, 0.0)];
+    let mut circular = vec![s("localPivot", "o"), b("openPattern", false)];
+    for k in 0..n {
+        let a = std::f64::consts::TAU * k as f64 / n as f64;
+        let id = format!("c{k}");
+        entities.push(circle(&id, [r * a.cos(), r * a.sin()], 0.004));
+        circular.push(s(&format!("localInstance0,{k}"), &id));
+        circular.push(s(&format!("localInstance1,{k}"), &format!("{id}.center")));
+    }
+    let mut linear = Vec::new();
+    for a in 0..2 {
+        for bb in 0..3 {
+            let id = format!("p{a}{bb}");
+            entities.push(point(&id, 0.05 + 0.01 * bb as f64, 0.03 * a as f64));
+            linear.push(s(&format!("localInstance0,{a},{bb}"), &id));
+        }
+    }
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": entities,
+          "constraints": [c("CIRCULAR_PATTERN", circular), c("LINEAR_PATTERN", linear)] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("patterns.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let sketch = step.ours.unwrap();
+    let g = t.call("sketch_get", json!({ "sketch": sketch })).unwrap();
+    let count = |ty: &str| g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == ty).count();
+    // Each instance circle's centre to its seed's, its radius equal; each grid point but the two reference copies
+    // (one step along each direction, as our tool leaves them).
+    assert_eq!((count("Circular pattern"), count("Equal"), count("Linear pattern")), (2, 2, 3), "{g}");
+    // The seed circle dimensioned further out: its instances follow round the pivot.
+    let seed = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "circle" && e["center"] == json!([20.0, 0.0])).unwrap()["center_point"].clone();
+    let pivot = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "point" && e["at"] == json!([0.0, 0.0])).unwrap()["id"].clone();
+    t.call("sketch_dimension", json!({ "sketch": sketch, "entities": [pivot, seed], "kind": "distance", "value": "30 mm" })).unwrap();
+    let g = t.call("sketch_get", json!({ "sketch": sketch })).unwrap();
+    let radii: Vec<f64> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "circle").map(|e| (e["center"][0].as_f64().unwrap().hypot(e["center"][1].as_f64().unwrap()) * 1e6).round() / 1e6).collect();
+    assert_eq!(radii, vec![30.0; 3], "{g}");
+}
+
+/// Live's OFFSET as a slot keeps it (exercise-chino): the sides and end caps tied to the centre line by offset pairs,
+/// the first an end point and its cap. Linked as our Offset tool links its copies: a new cap radius moves the sides.
+#[test]
+fn lives_offsets_are_linked() {
+    let line = |id: &str, p: [f64; 2], d: [f64; 2], t: [f64; 2]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": t[0], "endParam": t[1], "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": p[0], "pntY": p[1], "dirX": d[0], "dirY": d[1] } });
+    let arc = |id: &str, c: [f64; 2], r: f64, t: [f64; 2]| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "centerId": format!("{id}.center"), "startParam": t[0], "endParam": t[1], "geometry": { "btType": "BTCurveGeometryCircle-115", "xCenter": c[0], "yCenter": c[1], "radius": r, "xDir": 1.0, "yDir": 0.0, "clockwise": false } });
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let c = |ty: &str, params: Vec<Value>| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "parameters": params });
+    let off = |second: &str, copy: &str| c("OFFSET", vec![s("localMaster", "m.end"), s("localOffset", "cap1"), s("localSecond", second), s("localSecondOffset", copy)]);
+    let pi = std::f64::consts::PI;
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [
+              { "btType": "BTMSketchCurveSegment-155", "entityId": "m", "isConstruction": true, "startPointId": "m.start", "endPointId": "m.end", "startParam": 0.0, "endParam": 0.03,
+                "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": 0.0, "pntY": 0.0, "dirX": 1.0, "dirY": 0.0 } },
+              line("top", [0.0, 0.005], [1.0, 0.0], [0.0, 0.03]),
+              line("bottom", [0.03, -0.005], [-1.0, 0.0], [0.0, 0.03]),
+              arc("cap1", [0.03, 0.0], 0.005, [-pi / 2.0, pi / 2.0]),
+              arc("cap0", [0.0, 0.0], 0.005, [pi / 2.0, 3.0 * pi / 2.0])
+          ],
+          "constraints": [off("m.end", "cap1"), off("m", "top"), off("m", "bottom"), off("m.start", "cap0")] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("offsets.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let sketch = step.ours.unwrap();
+    let g = t.call("sketch_get", json!({ "sketch": sketch })).unwrap();
+    assert_eq!(g["constraints"].as_array().unwrap().iter().filter(|c| c["type"] == "Offset").count(), 4, "{g}");
+    let cap = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "arc" && e["center"] == json!([30.0, 0.0])).unwrap()["id"].clone();
+    t.call("sketch_dimension", json!({ "sketch": sketch, "entities": [cap], "kind": "radius", "value": "6 mm" })).unwrap();
+    let g = t.call("sketch_get", json!({ "sketch": sketch })).unwrap();
+    let ys: Vec<f64> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "line" && e["construction"] != json!(true)).map(|e| (e["start"][1].as_f64().unwrap() * 1e6).round() / 1e6).collect();
+    assert_eq!(ys, vec![6.0, -6.0], "{g}");
+}
+
 /// Sketch text as live stores it (BTMSketchTextEntity: its first baseline's
 /// start and direction, the ascent, the font file): the Text tool's box at
 /// that corner and height, turned along the baseline (cf-fix-pcb's Sketch 4).

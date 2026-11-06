@@ -2624,6 +2624,70 @@ impl<'a> Translator<'a> {
         }
     }
 
+    /// Live's OFFSET (`localSecondOffset` the copy of `localSecond`, tied to the first pair `localMaster` /
+    /// `localOffset`): the pair already drawn linked as our Offset tool links its copies.
+    fn sketch_offset(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
+        let ours = |name: &str| -> Result<String, String> {
+            let v = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).and_then(|p| p["value"].as_str()).ok_or_else(|| format!("no {name}"))?;
+            self.sketch_entities.get(&(oid.to_string(), v.to_string())).cloned().ok_or_else(|| format!("{v} not translated"))
+        };
+        if c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == "externalMaster") {
+            return Err("to external geometry".into());
+        }
+        let (ms, mc) = (ours("localMaster")?, ours("localOffset")?);
+        // (A lone pair: its own master.)
+        let has = |name: &str| c["parameters"].as_array().into_iter().flatten().any(|p| p["parameterId"] == name);
+        let (source, copy) = if has("localSecond") { (ours("localSecond")?, ours("localSecondOffset")?) } else { (ms.clone(), mc.clone()) };
+        let mut args = json!({ "sketch": id, "source": source, "copy": copy, "master_source": ms, "master_copy": mc });
+        if let Some(tab) = &self.tab {
+            args["tab"] = json!(tab);
+        }
+        crate::ops::link_sketch_offset(self.ctx, &args).map_err(|e| e.message)?;
+        self.sketch_edits += 1;
+        Ok(())
+    }
+
+    /// A sketch pattern (live's CIRCULAR_PATTERN: `localInstance<j>,<k>` the instance k's entity j, the seeds k = 0,
+    /// about `localPivot`; LINEAR_PATTERN: `localInstance<j>,<a>,<b>` on a grid): the instances already drawn linked as
+    /// our pattern tool links its copies.
+    fn sketch_pattern(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
+        let params = c["parameters"].as_array().ok_or("no parameters")?;
+        let mut cells: Vec<(Vec<usize>, String)> = Vec::new();
+        for p in params {
+            let Some(at) = p["parameterId"].as_str().and_then(|n| n.strip_prefix("localInstance")) else { continue };
+            let idx: Vec<usize> = at.split(',').map(|x| x.parse::<usize>()).collect::<Result<_, _>>().map_err(|_| "an instance index")?;
+            let v = p["value"].as_str().ok_or("an instance entity")?;
+            // (An instance deleted in live: its entities' ids empty, the instance left out.)
+            if v.is_empty() {
+                continue;
+            }
+            let ours = self.sketch_entities.get(&(oid.to_string(), v.to_string())).ok_or_else(|| format!("{v} not translated"))?;
+            cells.push((idx, ours.clone()));
+        }
+        let size = |d: usize| cells.iter().map(|(i, _)| i.get(d).copied().unwrap_or(0) + 1).max().unwrap_or(0);
+        let (nj, linear) = (size(0), c["constraintType"] == "LINEAR_PATTERN");
+        let entity = |i: &[usize]| cells.iter().find(|(x, _)| x == i).map(|(_, e)| json!(e));
+        let mut args = json!({ "sketch": id });
+        if let Some(tab) = &self.tab {
+            args["tab"] = json!(tab);
+        }
+        if linear {
+            let grid: Vec<Vec<Vec<Value>>> = (0..size(1)).map(|a| (0..size(2)).map(|b| (0..nj).filter_map(|j| entity(&[j, a, b])).collect()).collect()).collect();
+            args["grid"] = json!(grid);
+        } else {
+            let instances: Vec<Vec<Value>> = (0..size(1)).map(|k| (0..nj).filter_map(|j| entity(&[j, k])).collect::<Vec<_>>()).filter(|g| g.len() == nj).collect();
+            let pivot = params.iter().find(|p| p["parameterId"] == "localPivot").and_then(|p| p["value"].as_str()).ok_or("its pivot is model geometry")?;
+            // (A circle as the pivot: its centre.)
+            let center = self.sketch_entities.get(&(oid.to_string(), format!("{pivot}.center"))).or_else(|| self.sketch_entities.get(&(oid.to_string(), pivot.to_string()))).ok_or("its pivot not translated")?;
+            args["circular"] = json!(instances);
+            args["center"] = json!(center);
+            args["full"] = json!(!params.iter().any(|p| p["parameterId"] == "openPattern" && p["value"] == true));
+        }
+        crate::ops::link_sketch_pattern(self.ctx, &args).map_err(|e| e.message)?;
+        self.sketch_edits += 1;
+        Ok(())
+    }
+
     /// A conic's RHO: our conic's Rho dimension (made with it) set to live's value.
     fn conic_rho(&mut self, oid: &str, id: &str, c: &Value) -> Result<(), String> {
         let par = |name: &str| c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == name).cloned().unwrap_or(Value::Null);
@@ -2663,6 +2727,18 @@ impl<'a> Translator<'a> {
                 "QUADRANT" => "quadrant",
                 // Dimensions: `dimensions`.
                 "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
+                "OFFSET" => {
+                    if let Err(e) = self.sketch_offset(oid, id, c) {
+                        *missed.entry(format!("{ty} ({e})")).or_default() += 1;
+                    }
+                    continue;
+                }
+                "CIRCULAR_PATTERN" | "LINEAR_PATTERN" => {
+                    if let Err(e) = self.sketch_pattern(oid, id, c) {
+                        *missed.entry(format!("{ty} ({e})")).or_default() += 1;
+                    }
+                    continue;
+                }
                 "RHO" => {
                     if let Err(e) = self.conic_rho(oid, id, c) {
                         problems.push(format!("RHO on {}: {e}", c["entityId"].as_str().unwrap_or("?")));
