@@ -140,6 +140,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   full round: cf-spur-gear's FULL root fillet, the fillet circle tangent to both involute flanks and the root
   circle) stay two faces here; live gives one. The double-helical 20-tooth gear: 226/612/388 faces/edges/vertices,
   live 186/512/328 (8 B-spline faces per gap, live 6). Repro: parity_models with NOSHAPE_PARITY_ONLY=cf-spur-gear.
+- [ ] P1 MESH-AVX2 (core, lead 11-06, queued after core's current items) BRepMesh (OCCT TKMesh) built for x86-64-v3
+  behind a runtime CPU check: green opened tests/perf/release-fillet-hang.noshape 1.5x faster than v0.4.32 only because
+  its TKMesh (and ten other OCCT libraries) had been built for x86-64-v3 by the vibe hosts' GCC 15 default (11-06, all
+  rebuilt at baseline). Users with AVX2 CPUs (most) should get that speed: a second TKMesh compiled with -march=x86-64-v3
+  and `-ffp-contract=off` (FMA contraction changed learning-center-michael's Fillet 2 when it reached
+  math_DirectPolynomialRoots; keep FMA out of anything whose results it could change), its symbols renamed apart and the
+  meshing entry points dispatched on `__builtin_cpu_supports("avx2")` / cpuid (Linux and Windows x86-64; arm64 has NEON
+  by default). Results identical on both paths: a T1 meshing the perf fixtures and qa's document both ways, comparing
+  nodes and triangles exactly. Measure release-fillet-hang and the corpus on both (release.yml's timing step).
 - [ ] P1 SPUR-GEAR-SPEED (skasm, from core (lead 11-05 03:03); dx 11-04 19:53) cf-spur-gear regenerates in 3.9 s, live 2.1 s; all of it in kernel
   operations (core.md 19:53: Boolean 2's unify 887 ms + kernel 698 ms; Boolean 1 500 ms vs live 34 ms; the gears'
   hobbing cuts 115–482 ms and double-helical fillet 277 ms); the FeatureScript side is ~3 ms per gear.
