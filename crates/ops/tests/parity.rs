@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, refs_from_bodies};
+use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, refs_from_bodies, splits_its_model};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -371,7 +371,19 @@ fn exchange_round_trip() {
                 (Err(e), _) => vec![e],
                 (Ok(_), None) => vec!["live-self.json has no import of it".into()],
                 (Ok(ours), Some(live)) if format == "STL" => differences(&live, &mesh_counts(ours)),
-                (Ok(ours), Some(live)) => differences(&live, &ours),
+                (Ok(ours), Some(live)) => {
+                    let diff = differences(&live, &ours);
+                    // Where live's import loses detail against its own model and ours keeps the model's: live's
+                    // shortcoming, not counted against ours.
+                    let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
+                    match (&xt, own) {
+                        (Some(x), Some(own)) if !diff.is_empty() && splits_its_model(&own, x) && differences(x, &ours).is_empty() => {
+                            println!("{name}: live's own {format} import splits its model's edges or faces: ours keeps the model's (live's shortcoming)");
+                            Vec::new()
+                        }
+                        _ => diff,
+                    }
+                }
             };
             imports_ok += usize::from(diff.is_empty());
             println!("{name}: ours imports live.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
@@ -434,6 +446,19 @@ fn exchange_round_trip() {
         }
     }
     println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}", exports - waiting);
+}
+
+/// Live's import that splits its own model's edges (the hose's STEP) is its shortcoming; one that merges them, or
+/// differs in volume, is not.
+#[test]
+fn an_import_splitting_lives_own_model_is_its_shortcoming() {
+    use noshape_ops::parity::PartState;
+    let part = |volume: f64, f: u64, e: u64, v: u64| PartState { name: "Part 1".into(), faces: f, edges: e, vertices: v, volume: Some(volume), ..Default::default() };
+    let model = [part(2.0e-6, 12, 12, 0), part(1.0e-6, 10, 20, 8)];
+    assert!(splits_its_model(&[part(1.0e-6, 10, 20, 8), part(2.0e-6, 12, 16, 8)], &model));
+    assert!(!splits_its_model(&model, &model), "the same");
+    assert!(!splits_its_model(&[part(2.0e-6, 9, 12, 0), part(1.0e-6, 10, 20, 8)], &model), "fewer faces: cleaner, a target");
+    assert!(!splits_its_model(&[part(2.1e-6, 12, 16, 8), part(1.0e-6, 10, 20, 8)], &model), "another volume");
 }
 
 /// The exchange suite reads live's import in mm (SI inside) and leaves a mesh's counts out.
