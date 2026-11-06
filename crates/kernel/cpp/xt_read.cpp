@@ -2009,9 +2009,9 @@ UnwrappedLoop rotated(const UnwrappedLoop& L, size_t k, const TopoDS_Face& F, do
 }
 
 // Shift a loop's pcurves by whole periods.
-void shift_loop(UnwrappedLoop& L, const TopoDS_Face& F, double du)
+void shift_loop(UnwrappedLoop& L, const TopoDS_Face& F, double du, double dv = 0)
 {
-  if (du == 0)
+  if (du == 0 && dv == 0)
     return;
   BRep_Builder B;
   for (size_t i = 0; i < L.edges.size(); ++i)
@@ -2019,11 +2019,11 @@ void shift_loop(UnwrappedLoop& L, const TopoDS_Face& F, double du)
     const TopoDS_Edge& E = L.edges[i];
     double             f, l;
     occ::handle<Geom2d_Curve> c = occ::down_cast<Geom2d_Curve>(BRep_Tool::CurveOnSurface(E, F, f, l)->Copy());
-    c->Translate(gp_Vec2d(du, 0));
+    c->Translate(gp_Vec2d(du, dv));
     B.UpdateEdge(E, c, F, BRep_Tool::Tolerance(E));
-    L.starts[i].SetX(L.starts[i].X() + du);
+    L.starts[i].Translate(gp_Vec2d(du, dv));
   }
-  L.end.SetX(L.end.X() + du);
+  L.end.Translate(gp_Vec2d(du, dv));
 }
 
 // A face's loops on a u-periodic surface: the two winding once round it
@@ -2101,6 +2101,16 @@ TopoDS_Face seam_ring(const TopoDS_Face& F, double tol)
     // After A the walk is a turn on: start B closest to there.
     const gp_Pnt2d a2 = a.end;
     shift_loop(b, F, std::round((a2.X() - b.starts.front().X()) / period) * period);
+    // Also periodic across the loops (a torus's fillet band): B on the face's side of A, within one turn (the band may
+    // cross the v seam; the other way round is the tube's rest: cf-o-ring-generator's fillets, 3x their area).
+    if (S->IsVPeriodic())
+    {
+      const double pv   = S->VPeriod();
+      const int    side = (a.turns > 0 ? 1 : -1) * (F.Orientation() == TopAbs_REVERSED ? -1 : 1);
+      const double dv   = b.starts.front().Y() - a2.Y();
+      const double want = side > 0 ? dv - std::ceil(dv / pv - 1) * pv : dv - std::floor(dv / pv + 1) * pv;
+      shift_loop(b, F, 0, want - dv);
+    }
     const gp_Pnt2d b2 = b.starts.front();
     // The seam: forward along a2 -> b2, reversed one turn back.
     occ::handle<Geom2d_Line> line = new Geom2d_Line(a2, gp_Dir2d(gp_Vec2d(a2, b2)));
