@@ -1,0 +1,95 @@
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_5.cxx
+@@ -259,6 +259,15 @@
+   return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
+ }
+ 
++// noshape: a pair with a free-form surface (B-spline, Bezier, revolution, extrusion, offset) costs a millisecond or
++// more where a pair of elementary ones costs microseconds: a few such pairs are worth the pool (c2-valve-config's
++// up-to extrude split its 26 free-form face pairs on one thread, 128 ms of 228).
++static bool noshapeFreeForm(const GeomAbs_SurfaceType theType)
++{
++  return theType == GeomAbs_BezierSurface || theType == GeomAbs_BSplineSurface || theType == GeomAbs_SurfaceOfRevolution
++         || theType == GeomAbs_SurfaceOfExtrusion || theType == GeomAbs_OffsetSurface || theType == GeomAbs_OtherSurface;
++}
++
+ // Off until noshape turns it on (kernel boolean(): its CPU budgets keep the pairs
+ // serial; a kernel without that must not get them).
+ static std::atomic<int> THE_NOSHAPE_PAIRS_PARALLEL{0};
+@@ -331,6 +340,7 @@
+   TopAbs_ShapeEnum                                         aType;
+   NCollection_List<occ::handle<BOPDS_PaveBlock>>::Iterator aIt;
+   BOPAlgo_VectorOfEdgeFace                                 aVEdgeFace;
++  int                                                      aNbFreeForm = 0;
+   // noshape: per pair, the earlier congruent pair it copies (-1: none).
+   std::vector<int>                     aCopyOf;
+   std::unordered_map<std::string, int> aRepOf;
+@@ -412,6 +422,8 @@
+       //
+       aEdgeFace.SetIndices(nE, nF);
+       aEdgeFace.SetPaveBlock(aPB);
++      if (noshapeFreeForm(myContext->SurfaceAdaptor(aF).GetType()))
++        ++aNbFreeForm;
+       //
+       aEdgeFace.SetEdge(aE);
+       aEdgeFace.SetFace(aF);
+@@ -455,7 +467,10 @@
+     aEdgeFace.SetProgressRange(aPS.Next());
+   }
+   //=================================================================
+-  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aNbEdgeFace), aVEdgeFace, myContext);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aNbEdgeFace)
++                               || (noshape_bop_pairs_parallel() != 0 && aNbFreeForm >= 8),
++                             aVEdgeFace,
++                             myContext);
+   //=================================================================
+   if (UserBreak(aPSOuter))
+   {
+diff -ru a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
+--- a/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
++++ b/src/ModelingAlgorithms/TKBO/BOPAlgo/BOPAlgo_PaveFiller_6.cxx
+@@ -369,6 +369,15 @@
+   return theRunParallel || (noshape_bop_pairs_parallel() != 0 && theNbPairs >= 64);
+ }
+ 
++// noshape: a pair with a free-form surface (B-spline, Bezier, revolution, extrusion, offset) costs a millisecond or
++// more where a pair of elementary ones costs microseconds: a few such pairs are worth the pool (c2-valve-config's
++// up-to extrude split its 26 free-form face pairs on one thread, 128 ms of 228).
++static bool noshapeFreeForm(const GeomAbs_SurfaceType theType)
++{
++  return theType == GeomAbs_BezierSurface || theType == GeomAbs_BSplineSurface || theType == GeomAbs_SurfaceOfRevolution
++         || theType == GeomAbs_SurfaceOfExtrusion || theType == GeomAbs_OffsetSurface || theType == GeomAbs_OtherSurface;
++}
++
+ void BOPAlgo_PaveFiller::PerformFF(const Message_ProgressRange& theRange)
+ {
+   // Update face info for all Face/Face intersection pairs
+@@ -448,6 +457,7 @@
+ 
+   // Prepare the pairs of faces for intersection
+   BOPAlgo_VectorOfFaceFace aVFaceFace;
++  int                      aNbFreeForm = 0;
+   // noshape: per pair, the earlier congruent pair it copies (-1: none).
+   std::vector<int>                     aCopyOf;
+   std::unordered_map<std::string, int> aRepOf;
+@@ -579,6 +589,8 @@
+       //
+       aFaceFace.SetRunParallel(myRunParallel);
+       aFaceFace.SetIndices(nF1, nF2);
++      if (noshapeFreeForm(aBAS1.GetType()) || noshapeFreeForm(aBAS2.GetType()))
++        ++aNbFreeForm;
+       aFaceFace.SetFaces(aFShifted1, aFShifted2);
+       aFaceFace.SetBoxes(myDS->ShapeInfo(nF1).Box(), myDS->ShapeInfo(nF2).Box());
+       // Note: in case of faces with closed edges it should not be less than value of the shift
+@@ -629,7 +641,9 @@
+   }
+   //======================================================
+   // Perform intersection
+-  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVFaceFace.Length()), aVFaceFace);
++  BOPTools_Parallel::Perform(noshapePairsInParallel(myRunParallel, aVFaceFace.Length())
++                               || (noshape_bop_pairs_parallel() != 0 && aNbFreeForm >= 4),
++                             aVFaceFace);
+   if (UserBreak(aPSOuter))
+   {
+     return;

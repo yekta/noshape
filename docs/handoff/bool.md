@@ -64,6 +64,23 @@ scratch /root/bool-scratch.
 - cf-fix-pcb: OCCT's Splitter of a solid by one planar face across it is now ours (0ac149fd: the common and the cut
   with the half-space, the halves sharing their cut faces as the Splitter's; the face matched by place, BRepTools_
   ReShape): its split 284 -> 160 ms, the document 573-698 ms against live's 618.
+- c2-valve-config's Extrude 3 (21:09 UTC): an up-to extrude, OCCT's Splitter of the 26-face prism (B-spline profile
+  extruded) by one face of revolution: its 26 face pairs (128 ms) and 50 edge / face pairs (47 ms) on one thread,
+  OCCT patch 0004 putting pairs on the pool only from 64. Patch 0026: from 4 pairs with a free-form surface (B-spline,
+  Bezier, revolution, extrusion, offset) or 8 edges on such a face (the same records, the same results): op_prism_until
+  224 -> 73 ms, Extrude 3 286 -> 142 ms; the kernel's OCCT settings (the pairs' switch) now set before a split and an
+  up-to extrude too (only boolean() did: a document's first OCCT op stayed serial). Parity suite 2x2 A/B, best of two
+  each: c2-valve-config 943 -> 778 ms (live 175), cf-setback-fillet 1167 -> 943, c2-housing-draft 412 -> 306,
+  c2-impeller-loft 9991 -> 9618, nothing slower beyond +3 %, every feature's result the same; replay gate identical.
+  The lib (gcc-15, x86-64, patches 0001-0026): /root/bool-scratch/occt/libTKBO.a.0026. A prism only as long as the
+  target needs changed nothing (tried). Left in the valve: Extrude 2 / Circular pattern 1's four cuts (tolerant
+  vertices off the cone, above), ours' Boolean after the split 52 ms.
+- cf-surface-pattern (lead 11-06, OPEN-SLOW-SURFACE-PATTERN): Surface Pattern 3's cut (1 lofted body less 85 copies of
+  one stamp) is OCCT's 7.7-8.7 s (8789 faces made, 112 513 classifications) with an invalid result (ours declines in
+  0.3 s: a section touching a face's boundary). Its inputs are wrong upstream: Fillet 1 fails ("Failed to fillet
+  selections.", one face's edges, 0.1 in) so the stamp (Part 5) has 7 faces, live 10; SP3 gives 11 parts, live 6.
+  With live's filleted stamp the cut is another one: to redo once Fillet 1 works (core). Recording: vibe5
+  ~/agents/bool-corpora/sp1.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change

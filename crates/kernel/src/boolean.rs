@@ -152,19 +152,11 @@ pub fn boolean(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolean
     r
 }
 
-fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
-    require_nonempty(objects, "boolean objects")?;
-    require_nonempty(tools, "boolean tools")?;
-    let code = match op {
-        BooleanOp::Fuse => 0,
-        BooleanOp::Cut => 1,
-        BooleanOp::Common => 2,
-    };
-    let a = vec_to_list(objects);
-    let t = vec_to_list(tools);
+/// OCCT's Boolean settings from the environment (read here, where the process environment is current on every
+/// platform), set before each OCCT Boolean, split or up-to extrude: the first of a session may be any of them.
+pub(crate) fn occt_bop_settings() {
     // The memory budget (NOSHAPE_BOOLEAN_MEMORY_MB, MB of growth; the kernel's
-    // default otherwise: half the machine's memory, 4 to 16 GB): read here, where the process environment is
-    // current on every platform.
+    // default otherwise: half the machine's memory, 4 to 16 GB).
     ffi::set_memory_budget_mb(std::env::var("NOSHAPE_BOOLEAN_MEMORY_MB").ok().and_then(|v| v.trim().parse().ok()).unwrap_or(0));
     // OCCT's booleans in parallel (NOSHAPE_BOP_PARALLEL; serial by default):
     // likewise.
@@ -184,6 +176,19 @@ fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolea
             ffi::set_occt_threads(n);
         }
     });
+}
+
+fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Result<OpResult> {
+    require_nonempty(objects, "boolean objects")?;
+    require_nonempty(tools, "boolean tools")?;
+    let code = match op {
+        BooleanOp::Fuse => 0,
+        BooleanOp::Cut => 1,
+        BooleanOp::Common => 2,
+    };
+    let a = vec_to_list(objects);
+    let t = vec_to_list(tools);
+    occt_bop_settings();
     let run = || Ok(OpResult::from_ffi(ck(ffi::op_boolean(code, &a, &t, &opts.ffi()))?));
     let res = match crate::bool_corpus::recording() {
         Some(dir) => crate::bool_corpus::record(&dir, op, objects, tools, opts, run),
@@ -383,6 +388,7 @@ pub fn split(objects: &[Shape], tools: &[Shape], opts: &BooleanOptions) -> Resul
     require_nonempty(tools, "split tools")?;
     let a = vec_to_list(objects);
     let t = vec_to_list(tools);
+    occt_bop_settings();
     Ok(OpResult::from_ffi(ck(ffi::op_split(&a, &t, &opts.ffi()))?))
 }
 

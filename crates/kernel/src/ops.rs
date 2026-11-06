@@ -58,6 +58,7 @@ pub fn extrude_symmetric(profile: &Shape, vector: DVec3) -> Result<OpResult> {
 /// History args: 0 = profile, 1 = target. The end cap faces (pieces of the
 /// target) are reported as `Last` of the profile.
 pub fn extrude_up_to(profile: &Shape, direction: DVec3, target: &Shape, start_offset: f64) -> Result<OpResult> {
+    crate::boolean::occt_bop_settings();
     op(ffi::op_prism_until(profile.raw(), p3(direction), target.raw(), start_offset))
 }
 
