@@ -3671,6 +3671,26 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
                 params.insert("startStyle".into(), json!(if v == true { "SKETCH" } else { "PART" }));
             }
         }
+        // Sweeps before Profile control: a flag (std sweep.fs derives it from profileControl today).
+        "sweep" => {
+            if let Some(v) = done("keepProfileOrientation", params) {
+                params.entry("profileControl").or_insert(json!(if v == true { "KEEP_ORIENTATION" } else { "NONE" }));
+            }
+        }
+        // Helices before the axis type: one helixType for both (std helix.fs getHelixType, inverted).
+        "helix" => {
+            if let Some(t) = done("helixType", params) {
+                let (axis, path) = match t.as_str().unwrap_or("TURNS") {
+                    "PITCH" => ("SURFACE", "PITCH"),
+                    "HEIGHT_TURNS" => ("CIRCLE", "TURNS"),
+                    "HEIGHT_PITCH" => ("CIRCLE", "PITCH"),
+                    "TURNS_PITCH" => ("CIRCLE", "TURNS_PITCH"),
+                    _ => ("SURFACE", "TURNS"),
+                };
+                params.entry("axisType").or_insert(json!(axis));
+                params.entry("pathType").or_insert(json!(path));
+            }
+        }
         "assignVariable" => {
             if let Some(v) = done("value", params) {
                 let key = match params.get("variableType").and_then(Value::as_str) {
