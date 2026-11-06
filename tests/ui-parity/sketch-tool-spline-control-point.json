@@ -1,0 +1,63 @@
+{
+ "name": "sketch-tool-spline-control-point",
+ "about": "in a sketch on Top: Spline › Spline control point, clicks (0, 0), (10, 10), (20, 0), Enter: the curve, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline",
+    "menu": "Spline control point"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

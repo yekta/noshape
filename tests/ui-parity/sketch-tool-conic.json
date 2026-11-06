@@ -1,0 +1,59 @@
+{
+ "name": "sketch-tool-conic",
+ "about": "in a sketch on Top: 3 point arc › Conic, clicks (0, 0), (20, 0), (10, 10): its state, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "3 point arc",
+    "menu": "Conic"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     20,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     10,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

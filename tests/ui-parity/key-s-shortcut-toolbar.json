@@ -1,0 +1,27 @@
+{
+ "name": "key-s-shortcut-toolbar",
+ "about": "block: the pointer on the top face (a click), s: the shortcut toolbar, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "s"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

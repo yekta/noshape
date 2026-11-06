@@ -1,0 +1,17 @@
+{
+ "name": "key-k-mate-connectors",
+ "about": "block: k (Hide/show mate connectors), k again",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "k"
+  },
+  {
+   "do": "key",
+   "key": "k"
+  }
+ ]
+}

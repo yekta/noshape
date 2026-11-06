@@ -1,0 +1,27 @@
+{
+ "name": "key-bracket-measure",
+ "about": "block: the top face, [ (measure details), [ again",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "["
+  },
+  {
+   "do": "key",
+   "key": "["
+  }
+ ]
+}

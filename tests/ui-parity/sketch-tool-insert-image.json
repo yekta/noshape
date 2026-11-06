@@ -1,0 +1,32 @@
+{
+ "name": "sketch-tool-insert-image",
+ "about": "in a sketch on Top: Insert DXF or DWG › Insert image: its dialog, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert DXF or DWG",
+    "menu": "Insert image"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

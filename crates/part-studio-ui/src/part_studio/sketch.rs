@@ -15,6 +15,7 @@ use glam::{DVec2, DVec3};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use crate::os_ui::OsDropdownExt as _;
 use gpui_kit::component::{Disableable as _, Icon, WindowExt as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -1810,10 +1811,13 @@ impl PartStudioView {
                 .border_color(pal.border_strong)
                 .selected(cm_open || pi_open)
                 .tooltip("Show sketch diagnostics tools")
-                .dropdown_menu(move |m, _, _| {
+                // (The parity suite clicks it by its tooltip.)
+                .map(|b| crate::ui_script::mark(b, || "button:Show sketch diagnostics tools".into()))
+                // An Onshape dropdown (os_ui), not the kit's.
+                .os_dropdown_menu("sk-diagnostics-menu", false, move |m, _, _| {
                     let (v1, v2) = (view.clone(), view.clone());
-                    m.item(PopupMenuItem::new(if pi_open { "Turn profile inspector off" } else { "Profile inspector…" }).on_click(move |_, _, cx| v1.update(cx, |this, cx| this.toggle_profile_inspector(cx))))
-                        .item(PopupMenuItem::new(if cm_open { "Turn constraint manager off" } else { "Constraint manager…" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.toggle_constraint_manager(cx))))
+                    m.item(crate::os_menu::OsMenuItem::new(if pi_open { "Turn profile inspector off" } else { "Profile inspector…" }).on_click(move |_, _, cx| v1.update(cx, |this, cx| this.toggle_profile_inspector(cx))))
+                        .item(crate::os_menu::OsMenuItem::new(if cm_open { "Turn constraint manager off" } else { "Constraint manager…" }).on_click(move |_, _, cx| v2.update(cx, |this, cx| this.toggle_constraint_manager(cx))))
                 })
                 .into_any_element();
             (rows, Some(diagnostics))

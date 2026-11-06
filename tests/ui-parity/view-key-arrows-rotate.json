@@ -1,0 +1,27 @@
+{
+ "name": "view-key-arrows-rotate",
+ "about": "block: the top face selected, ArrowLeft, ArrowUp (rotate steps)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "ArrowLeft"
+  },
+  {
+   "do": "key",
+   "key": "ArrowUp"
+  }
+ ]
+}

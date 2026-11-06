@@ -1,0 +1,27 @@
+{
+ "name": "key-backtick-select-other",
+ "about": "block: click the top face, ` (Select other at the pointer): its list, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "`"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

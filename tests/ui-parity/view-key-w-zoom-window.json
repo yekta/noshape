@@ -1,0 +1,17 @@
+{
+ "name": "view-key-w-zoom-window",
+ "about": "block: w (Zoom to window), then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "w"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

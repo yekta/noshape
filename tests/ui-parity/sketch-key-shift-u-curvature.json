@@ -1,0 +1,29 @@
+{
+ "name": "sketch-key-shift-u-curvature",
+ "about": "in a sketch on Top: shift+u (Curvature): the tool, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+u"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

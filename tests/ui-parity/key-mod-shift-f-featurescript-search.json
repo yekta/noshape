@@ -1,0 +1,17 @@
+{
+ "name": "key-mod-shift-f-featurescript-search",
+ "about": "block: mod+shift+f (FeatureScript search), Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "key",
+   "key": "mod+shift+f"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

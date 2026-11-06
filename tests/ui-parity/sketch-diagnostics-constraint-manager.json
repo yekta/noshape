@@ -1,0 +1,67 @@
+{
+ "name": "sketch-diagnostics-constraint-manager",
+ "about": "in a sketch on Top with a line: Show sketch diagnostics tools › Constraint manager…: its panel, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show sketch diagnostics tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Constraint manager…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

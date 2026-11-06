@@ -1,0 +1,27 @@
+{
+ "name": "view-key-shift-arrows-coarse",
+ "about": "block: the top face selected, shift+ArrowLeft, shift+ArrowUp (coarse rotate)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: shortcuts, sketch tools; batch 12)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+ArrowLeft"
+  },
+  {
+   "do": "key",
+   "key": "shift+ArrowUp"
+  }
+ ]
+}
