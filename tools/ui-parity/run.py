@@ -226,9 +226,37 @@ def cloud_menu(a, b):
         lb["highlighted"] = la.get("highlighted")
 
 
+# Rows that depend on what the clipboard held before the scenario (live's runner keeps one browser session, so a copy
+# from an earlier scenario shows Paste into sketch in a later one): compared only in scenarios that copy something.
+CLIPBOARD_ROWS = {"Paste into sketch", "Paste sketch", "Paste sketch entities"}
+
+
+def copies(live):
+    """Whether a scenario copies something itself (a Copy… menu row or Ctrl/Cmd+C)."""
+    for s in live.get("steps", []):
+        do = s.get("do") or {}
+        menu = str((do.get("on") or {}).get("menu") or "")
+        if menu.startswith("Copy") or str(do.get("key", "")).lower() in ("mod+c", "ctrl+c", "cmd+c", "secondary-c"):
+            return True
+    return False
+
+
+def drop_clipboard_rows(state):
+    lst = (state or {}).get("list")
+    if not isinstance(lst, dict) or lst.get("kind") != "context-menu":
+        return state
+    rows = lst.get("rows") or []
+    hl = lst.get("highlighted")
+    hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
+    lst["rows"] = [r for r in rows if r not in CLIPBOARD_ROWS]
+    lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
+    return state
+
+
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
     pairs = [("start", live.get("start"), ours.get("start"))]
+    clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
     for s in live.get("steps", []):
         o = ours_steps.get(s.get("step"), {})
@@ -241,6 +269,8 @@ def compare(live, ours):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
+        if clipboard_free:
+            a, b = drop_clipboard_rows(a), drop_clipboard_rows(b)
         # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
         for side in (a, b):
             d = side.get("dialog")

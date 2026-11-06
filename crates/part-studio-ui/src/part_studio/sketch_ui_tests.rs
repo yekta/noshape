@@ -1379,12 +1379,13 @@ fn p_toggles_every_plane(cx: &mut TestAppContext) {
     assert_eq!(shown(cx), 4, "p again showed them all");
 }
 
-/// core-workflow 8.1.15 / 8.6.4: one Esc cancels the appearance editor, its hex field focused (live request 1663 (a)).
+/// core-workflow 8.1.15 / 8.6.4: one Esc cancels the appearance editor, its hex field focused (a part's; live request
+/// 1663 (a)).
 #[gpui::test]
 fn escape_cancels_the_appearance_editor(cx: &mut TestAppContext) {
     let (window, view) = part_studio(cx, "appearance-esc");
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Faces(vec![], None), w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Parts(vec![]), w, cx))).unwrap();
     draw(cx, window);
     let hex_focused = cx.update_window(window, |_, w, cx| view.read(cx).ui.appearance_edit.as_ref().is_some_and(|e| e.hex.read(cx).focus_handle(cx).is_focused(w))).unwrap();
     assert!(hex_focused, "the editor opens with its hex field focused");
@@ -1398,7 +1399,7 @@ fn escape_cancels_the_appearance_editor(cx: &mut TestAppContext) {
 fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) {
     let (window, view) = part_studio(cx, "appearance-tab");
     cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Faces(vec![], None), w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(super::super::appearance::EditTarget::Parts(vec![]), w, cx))).unwrap();
     draw(cx, window);
     let focused = |cx: &mut TestAppContext| {
         cx.update_window(window, |_, w, cx| {
@@ -2974,4 +2975,32 @@ fn cancel_a_slow_preview_opened_before_the_last_edit_was_shown(cx: &mut TestAppC
     drop(release);
     frames_for(cx, window, 1000);
     assert_eq!(cx.update(|cx| state(view.read(cx))), (false, 0), "once its late result is in");
+}
+
+/// Live (ui-parity sketch-empty-rclick-menu): in a sketch on Top, a right-click where the Front plane is under the
+/// pointer gives the plane's rows; the sketch's own plane is empty space.
+#[gpui::test]
+fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
+    let (window, view) = sketch_with(cx, "sketch-plane-menu", Tool::Select);
+    let labels_over = |cx: &mut TestAppContext, plane: DatumPlane| {
+        cx.update_window(window, |_, w, cx| {
+            view.update(cx, |v, cx| {
+                v.hover = Some(Reference::Plane(plane));
+                v.open_sketch_context_menu(gpui_kit::point(px(600.), px(400.)), None, w, cx);
+            })
+        })
+        .unwrap();
+        draw(cx, window);
+        let labels = cx.update(|cx| view.read(cx).context_menu.as_ref().map(|(_, m, _)| m.read(cx).labels()).unwrap_or_default());
+        cx.update(|cx| view.update(cx, |v, cx| v.close_context_menu(cx)));
+        labels
+    };
+    let want = [
+        "Confirm Sketch 1", "———", "Hide Front plane", "Hide other planes", "Hide all planes", "Section view…", "———",
+        "Clear selection", "Select", "Select other…", "———", "Zoom to fit", "Zoom to selection", "View normal to",
+        "View normal to sketch plane",
+    ];
+    assert_eq!(labels_over(cx, DatumPlane::Front), want);
+    let own = labels_over(cx, DatumPlane::Top);
+    assert!(!own.iter().any(|l| l.starts_with("Hide ")), "{own:?}");
 }

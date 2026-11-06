@@ -4210,33 +4210,36 @@ impl PartStudioView {
         bar.child(crate::ui::tool_group(SharedString::from(format!("skg-c-{key}")), main, caret))
     }
 
-    /// Sketch row menu "Paste into sketch" (live ui-parity feature-row-rclick-sketch): the sketch opens and the
-    /// copied sketch entities (or a copied sketch's) are pasted into it.
-    pub(super) fn paste_into_sketch(&mut self, id: noshape_model::reference::FeatureId, window: &mut Window, cx: &mut Context<Self>) {
+    /// Sketch row menu "Paste into sketch": the copied sketch entities (or a copied sketch's) go into the sketch
+    /// where they were copied from, the sketch stays closed and the pasted curves are selected (live ui-parity
+    /// sketch-row-menu-paste-into-sketch; the `sketch_copy_entities` op's default offset).
+    pub(super) fn paste_into_sketch(&mut self, id: noshape_model::reference::FeatureId, cx: &mut Context<Self>) {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else { return };
-        // A copied sketch (Copy sketch) pastes as its entities.
-        let text = match serde_json::from_str::<serde_json::Value>(&text).ok().and_then(|v| v.get("noshape_features").cloned()) {
-            Some(features) => {
-                let sketch = serde_json::from_value::<Vec<noshape_model::partstudio::Feature>>(features).ok().and_then(|fs| {
-                    fs.into_iter().find_map(|f| match f.params.get("sketch") {
-                        Some(noshape_model::ParamValue::Sketch(d)) => Some(d.sketch.clone()),
-                        _ => None,
-                    })
-                });
-                match sketch {
-                    Some(sk) => serde_json::json!({ "noshape_sketch_entities": sk }).to_string(),
-                    None => return,
-                }
-            }
-            None => text,
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+        let clip = match v.get("noshape_features") {
+            // A copied sketch (Copy sketch) pastes as its entities.
+            Some(features) => serde_json::from_value::<Vec<noshape_model::partstudio::Feature>>(features.clone()).ok().and_then(|fs| {
+                fs.into_iter().find_map(|f| match f.params.get("sketch") {
+                    Some(noshape_model::ParamValue::Sketch(d)) => Some(d.sketch.clone()),
+                    _ => None,
+                })
+            }),
+            None => v.get("noshape_sketch_entities").and_then(|c| serde_json::from_value::<noshape_sketch::Sketch>(c.clone()).ok()),
         };
-        self.edit_feature(id, window, cx);
-        cx.defer_in(window, move |this, window, cx| {
-            if this.with_sketch(cx, |ed, data| ed.paste_clipboard(data, &text)) == Some(true) {
-                this.regen_sync(window, cx);
-            }
-            cx.notify();
+        let Some(clip) = clip else { return };
+        let tab = self.tab;
+        let created = self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Paste into sketch", cx, |ps| {
+                let Some(noshape_model::ParamValue::Sketch(d)) = ps.feature_mut(id).and_then(|f| f.params.0.get_mut("sketch")) else { return Vec::new() };
+                let created = d.sketch.paste(&clip, DVec2::ZERO);
+                d.sketch.solve();
+                created.into_iter().filter(|e| d.sketch.curve(*e).is_some()).collect::<Vec<_>>()
+            })
         });
+        let Some(created) = created.filter(|c| !c.is_empty()) else { return };
+        self.selection = created.into_iter().map(|e| Reference::SketchEntity { sketch: id, entity: e.0 }).collect();
+        self.selected_features.clear();
+        cx.notify();
     }
 
     fn paste_sketch_entities(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -4311,15 +4314,24 @@ impl PartStudioView {
         let model_ref = self.hover.clone().filter(|_| model_edge);
         let model_body = model_ref.as_ref().and_then(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r) || b.edge_refs.contains(r)).map(|b| (b.id.clone(), b.name.clone())));
         let linear_model_edge = model_ref.as_ref().filter(|r| self.linear_edge_direction(r).is_some()).cloned();
+        // A plane under the cursor (live ui-parity sketch-empty-rclick-menu: the Front plane behind the sketch).
+        // Not the sketch's own plane: right-clicking it is empty space.
+        let sketch_frame = self.sketch.as_ref().map(|e| e.frame);
+        let own_plane = |r: &Reference| {
+            let (Some(a), Some(b)) = (self.frame_of_ref(r), sketch_frame) else { return false };
+            a.normal.dot(b.normal).abs() > 1.0 - 1e-9 && (a.origin - b.origin).dot(b.normal).abs() < 1e-9
+        };
+        let plane_ref = self.hover.clone().filter(|r| hovered.is_none() && dim.is_none() && matches!(r, Reference::Plane(_) | Reference::FeaturePlane(_) | Reference::ConstructionPlane { .. }) && !own_plane(r));
+        let plane_name = plane_ref.as_ref().map(|r| self.labeler(cx)(r)).unwrap_or_default();
         let sketch_name = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone()).unwrap_or_else(|| "sketch".into());
         // Other sketches shown (live: Hide other sketches / Hide all sketches).
         let this_sketch = self.sketch.as_ref().map(|e| e.feature);
         let other_sketches = self.display.sketches.iter().any(|s| !s.hidden && Some(s.feature) != this_sketch);
         let Some(ed) = &mut self.sketch else { return };
-        // The entity under the cursor joins the selection the menu acts on.
-        if let Some(h) = hovered
-            && !ed.selection.contains(&h)
-        {
+        // The menu acts on the selection and the entity under the cursor, which joins the selection only when an item
+        // runs (live ui-parity sketch-entity-copy-paste: the right-click and Copy sketch entities select nothing).
+        let added = hovered.filter(|h| !ed.selection.contains(h));
+        if let Some(h) = added {
             ed.selection.push(h);
         }
         let n = ed.selection.len();
@@ -4339,7 +4351,20 @@ impl PartStudioView {
         // neither Copy nor Transform.
         let all_curves = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_some())));
         let only_endpoints = n > 0 && self.sketch_data(cx).is_some_and(|d| self.sketch.as_ref().is_some_and(|ed| ed.selection.iter().all(|e| d.sketch.curve(*e).is_none() && !d.sketch.users_of_point(*e).is_empty())));
-        let has_clip = cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("noshape_sketch_entities"));
+        let has_clip = Self::clipboard_has_sketch_entities(cx);
+        if let Some(h) = added
+            && let Some(ed) = &mut self.sketch
+        {
+            ed.selection.retain(|e| *e != h);
+        }
+        let take_added = move |this: &mut Self| {
+            if let Some(h) = added
+                && let Some(ed) = &mut this.sketch
+                && !ed.selection.contains(&h)
+            {
+                ed.selection.push(h);
+            }
+        };
         let view = cx.entity();
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, window, cx| {
             let v = view.clone();
@@ -4347,6 +4372,7 @@ impl PartStudioView {
                 let v = v.clone();
                 crate::os_menu::OsMenuItem::new(label.to_string()).on_click(move |_, window, cx| v.update(cx, |this, cx| {
                     this.close_context_menu(cx);
+                    take_added(this);
                     f(this, window, cx)
                 }))
             };
@@ -4466,15 +4492,75 @@ impl PartStudioView {
                 }
                 return m;
             }
+            if let Some(r) = plane_ref.clone().filter(|_| n == 0 && !tool_active) {
+                let (rh, ro, rs, rz, rn, rf) = (r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r);
+                if has_clip {
+                    m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
+                }
+                m = m
+                    .item(item(&format!("Hide {plane_name}"), Box::new(move |this, _, cx| {
+                        this.set_visibility(std::slice::from_ref(&rh), true, cx);
+                        this.hover = None;
+                    })).icon_name("eye-off"))
+                    .item(item("Hide other planes", Box::new(move |this, _, cx| this.hide_planes(Some(&ro), cx))))
+                    .item(item("Hide all planes", Box::new(|this, _, cx| this.hide_planes(None, cx))))
+                    .item(item("Section view…", Box::new(move |this, w, cx| this.section_through(rs.clone(), w, cx))).icon_name("menu-section-view"))
+                    .separator()
+                    .item(item("Clear selection", Box::new(|this, _, cx| {
+                        this.selection.clear();
+                        this.refresh_scene(false, cx);
+                        cx.notify();
+                    })));
+                let vs = v.clone();
+                m = m.submenu("Select", window, cx, move |mut sm, _, _| {
+                    for c in noshape_model::select::Criterion::FACE {
+                        let (v, r) = (vs.clone(), rf.clone());
+                        sm = sm.item(crate::os_menu::OsMenuItem::new(c.label()).on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                            this.close_context_menu(cx);
+                            this.select_related(&r, c, cx);
+                        })));
+                    }
+                    let v = vs.clone();
+                    sm.item(crate::os_menu::OsMenuItem::new("Create selection…").on_click(move |_, _, cx| v.update(cx, |this, cx| {
+                        this.close_context_menu(cx);
+                        this.open_create_selection_at(this.ui.menu_pos, cx);
+                    })))
+                });
+                return m
+                    .item(item("Select other…", Box::new(|this, window, cx| this.open_select_other(window, cx))))
+                    .separator()
+                    .item(item("Zoom to fit", Box::new(|_, window, cx| window.dispatch_action(Box::new(ZoomToFit), cx))))
+                    .item(item("Zoom to selection", Box::new(move |this, _, cx| {
+                        let previous = std::mem::replace(&mut this.selection, vec![rz.clone()]);
+                        this.zoom_to_selection(cx);
+                        this.selection = previous;
+                    })))
+                    .item(item("View normal to", Box::new(move |this, _, cx| {
+                        let previous = std::mem::replace(&mut this.selection, vec![rn.clone()]);
+                        this.view_normal(cx);
+                        this.selection = previous;
+                    })))
+                    .item(item("View normal to sketch plane", Box::new(|this, _, cx| {
+                        let prev = std::mem::take(&mut this.selection);
+                        this.view_normal(cx);
+                        this.selection = prev;
+                    })));
+            }
             if only_endpoints {
                 if has_clip {
                     m = m.item(item("Paste sketch entities", Box::new(|this, w, cx| this.paste_sketch_entities(w, cx))));
                 }
             } else if n > 0 {
-                m = m.item(item("Copy sketch entities", Box::new(|this, _, cx| {
+                m = m.item(item("Copy sketch entities", Box::new(move |this, _, cx| {
                     let text = this.sketch_data(cx).and_then(|d| this.sketch.as_ref()?.copy_selection(&d));
                     if let Some(text) = text {
                         cx.write_to_clipboard(ClipboardItem::new_string(text));
+                    }
+                    // (Copying selects nothing: live.)
+                    if let Some(h) = added
+                        && let Some(ed) = &mut this.sketch
+                    {
+                        ed.selection.retain(|e| *e != h);
                     }
                 })));
                 if has_clip {
@@ -4535,6 +4621,7 @@ impl PartStudioView {
                         let v = vs.clone();
                         sm = sm.item(crate::os_menu::OsMenuItem::new(how.label()).on_click(move |_, _, cx| v.update(cx, |this, cx| {
                             this.close_context_menu(cx);
+                            take_added(this);
                             if let Some(d) = this.sketch_data(cx)
                                 && let Some(ed) = &mut this.sketch
                             {

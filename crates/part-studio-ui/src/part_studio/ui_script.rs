@@ -42,6 +42,9 @@ impl PartStudioView {
             let mut f = crate::feature_dialog::field_focus("Filter by name or type", st);
             f["kind"] = "filter".into();
             f
+        } else if self.ui.appearance_edit.as_ref().is_some_and(|e| self.appearance_heading(&e.target, cx).1.is_some()) && self.focus.is_focused(window) {
+            // The appearance editor's "Faces or features" field has the keyboard (live face-menu-add-appearance-to-face).
+            json!({ "kind": "field", "label": "Faces or features", "text": null, "selection": null, "all": false })
         } else if crate::ui_script::open_dialog().is_some_and(|d| d["kind"] == "modal") {
             // A modal holds the keyboard (live part-menu-properties: "other").
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
@@ -105,8 +108,8 @@ impl PartStudioView {
                                 match status {
                                     Some(FeatureStatus::Error) => "error",
                                     Some(FeatureStatus::Warning) => "warning",
-                                    Some(FeatureStatus::Info) => "info",
                                     Some(FeatureStatus::Suppressed) => "suppressed",
+                                    // An info feature's row too is drawn as an ok one (live plane-line-angle: no ns-list-item-info).
                                     _ => "ok",
                                 }
                             };

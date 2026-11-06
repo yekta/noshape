@@ -1476,6 +1476,11 @@ impl PartStudioView {
         cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("\"noshape_features\"") && t.contains("\"type_id\":\"sketch\""))
     }
 
+    /// Whether the clipboard holds sketch entities ("Copy sketch entities", a sketch's Ctrl+C).
+    pub(super) fn clipboard_has_sketch_entities(cx: &App) -> bool {
+        cx.read_from_clipboard().and_then(|c| c.text()).is_some_and(|t| t.contains("noshape_sketch_entities"))
+    }
+
     /// Plane menus: "Hide other planes" (keep one) / "Hide all planes".
     pub(super) fn hide_planes(&mut self, keep: Option<&Reference>, cx: &mut Context<Self>) {
         let planes: Vec<Reference> = self.display.planes.iter().map(|p| p.reference.clone()).filter(|r| Some(r) != keep).collect();
@@ -1517,11 +1522,25 @@ impl PartStudioView {
             self.flash_info("Copy a sketch first (right-click a sketch > Copy sketch).".into(), cx);
             return;
         }
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Paste sketch", cx, |ps| {
-                noshape_ops::studio::paste_sketches_onto(ps, &sketches, plane);
-            });
+        let tab = self.tab;
+        let curves = self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(tab, "Paste sketch", cx, |ps| {
+                let ids = noshape_ops::studio::paste_sketches_onto(ps, &sketches, plane);
+                // The pasted sketches' curves end up selected (live ui-parity sketch-row-copy-paste-onto-front).
+                ids.into_iter()
+                    .filter_map(|id| match ps.feature(id)?.params.get("sketch") {
+                        Some(noshape_model::ParamValue::Sketch(d)) => Some((id, d.sketch.entities().filter(|e| d.sketch.curve(e.id).is_some()).map(|e| e.id.0).collect::<Vec<_>>())),
+                        _ => None,
+                    })
+                    .flat_map(|(id, es)| es.into_iter().map(move |entity| Reference::SketchEntity { sketch: id, entity }))
+                    .collect::<Vec<_>>()
+            })
         });
+        if let Some(curves) = curves.filter(|c| !c.is_empty()) {
+            self.selection = curves;
+            self.selected_features.clear();
+            cx.notify();
+        }
     }
 
     /// "Export as DXF/DWG" for a sketch (DXF, millimeters, sketch plane

@@ -3656,7 +3656,7 @@ impl PartStudioView {
                         let r = r.clone();
                         let is_plane = matches!(r, Reference::Plane(_));
                         // Live (behaviours "6.28 Default planes can't be deleted", PLANE-MENU-SELECTED): a selected
-                        // plane's menu adds Section view… and Clear selection.
+                        // plane's menu adds Clear selection.
                         let selected = view.read(cx).selection.contains(&r);
                         let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
                         let (r1, r2, r3, r4) = (r.clone(), r.clone(), r.clone(), r.clone());
@@ -3701,10 +3701,9 @@ impl PartStudioView {
                                 m.item(crate::os_menu::OsMenuItem::new("Hide other planes").on_click(move |_, _, cx| vo.update(cx, |this, cx| this.hide_planes(Some(&ro), cx))))
                                     .item(crate::os_menu::OsMenuItem::new("Hide all planes").on_click(move |_, _, cx| va.update(cx, |this, cx| this.hide_planes(None, cx))))
                             };
-                            if selected {
-                                let (vx, rx) = (view.clone(), r.clone());
-                                m = m.item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| vx.update(cx, |this, cx| this.section_through(rx.clone(), w, cx))));
-                            }
+                            // Live (ui-parity plane-row-rclick-menu): selected or not.
+                            let (vx, rx) = (view.clone(), r.clone());
+                            m = m.item(crate::os_menu::OsMenuItem::new("Section view…").icon_name("menu-section-view").on_click(move |_, w, cx| vx.update(cx, |this, cx| this.section_through(rx.clone(), w, cx))));
                             m = m
                                 .separator()
                                 .item(crate::os_menu::OsMenuItem::new("Zoom to selection").on_click(move |_, _, cx| {
@@ -5709,9 +5708,11 @@ impl PartStudioView {
                 m = m.item(item(&format!("Edit {shown}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))));
             }
             if is_sketch {
-                m = m
-                    .item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))))
-                    .item(item("Paste into sketch", Box::new(move |this, w, cx| this.paste_into_sketch(id, w, cx))));
+                m = m.item(item("Copy sketch", Box::new(move |this, _, cx| this.copy_sketch(id, cx))));
+                // Only with something to paste (live ui-parity sketch-row-menu-paste-into-sketch: after Copy sketch).
+                if PartStudioView::clipboard_has_sketch(cx) || PartStudioView::clipboard_has_sketch_entities(cx) {
+                    m = m.item(item("Paste into sketch", Box::new(move |this, _, cx| this.paste_into_sketch(id, cx))));
+                }
             }
             if is_sketch || source_sketch.is_some() {
                 m = m.item(item("Show dimensions", Box::new(move |this, w, cx| {
@@ -6600,7 +6601,13 @@ impl Render for PartStudioView {
                 }
                 // Live (behaviours request 1663 (a)): one Esc cancels every
                 // appearance editor, even typing in its hex field.
-                if this.ui.appearance_edit.take().is_some() {
+                if let Some(e) = this.ui.appearance_edit.take() {
+                    // (What it selected goes with it: live ui-parity face-menu-add-appearance-to-face.)
+                    if matches!(e.target, appearance::EditTarget::Faces(..) | appearance::EditTarget::Feature(..) | appearance::EditTarget::Features(_)) {
+                        this.selection.clear();
+                        this.selected_features.clear();
+                        this.refresh_scene(false, cx);
+                    }
                     window.focus(&this.focus, cx);
                     cx.notify();
                     return;

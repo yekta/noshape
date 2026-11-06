@@ -291,9 +291,26 @@ impl PartStudioView {
             }
             this.appearance_enter(ev, cx);
         }));
-        // Live 173: the hex field has the focus, its text selected; a
-        // feature's face appearance leaves it on the body (request 1663).
-        if matches!(&target, EditTarget::Feature(f, _) if studio.as_ref().and_then(|s| s.feature(*f)).is_some_and(|x| x.type_id != "sketch")) {
+        // Live (ui-parity face-menu-add-appearance-to-face, feature-menu-add-appearance, sketch-row-menu-edit-appearance):
+        // what the editor colours is selected while it is open.
+        match &target {
+            EditTarget::Faces(faces, _) => {
+                self.selection = faces.clone();
+                self.selected_features.clear();
+            }
+            EditTarget::Feature(f, _) => {
+                self.selection.clear();
+                self.selected_features = vec![*f];
+            }
+            EditTarget::Features(fs) => {
+                self.selection.clear();
+                self.selected_features = fs.clone();
+            }
+            _ => {}
+        }
+        // Live 173: the hex field has the focus, its text selected; faces and a feature's face appearance leave it
+        // on the body, in their "Faces or features" field (request 1663, ui-parity face-menu-add-appearance-to-face).
+        if matches!(&target, EditTarget::Faces(..)) || matches!(&target, EditTarget::Feature(f, _) if studio.as_ref().and_then(|s| s.feature(*f)).is_some_and(|x| x.type_id != "sketch")) {
             window.focus(&self.focus, cx);
         } else {
             hex.update(cx, |s, cx| {

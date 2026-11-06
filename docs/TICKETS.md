@@ -2689,6 +2689,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 EXPORT-DXF-DIALOG (psui) a sketch's (and a planar face's) "Export as DXF/DWG…" opens live's modal "Export as
+  DXF/DWG" (ui-parity sketch-row-menu-export-dxf): File name (with "View export rules"), Format DXF / DWG, Version
+  (Release 14 …), Units (Millimeter), Use workspace units ✓, Options (Download …), Export splines as polylines ☐, Set
+  z-height to zero and normals to positive ✓; Export / Cancel; the File name input focused, its text selected. Ours goes
+  straight to the OS save dialog (DXF only, mm). The drawing export's DXF / DWG writers and its modal
+  (drawing-ui/drawing_export.rs) are the parts to reuse; the `sketch_export` op (file, format today) gets the same options.
 - [ ] P2 SKETCH-MIRROR-LINE-SELECTED (psui) live shows the sketch Mirror's mirror line selected once picked (ui-parity
   sketch-mirror-tool step 14: selection 1); ours doesn't. Selecting it in `Tool::Mirror` (sketch_mode.rs) made the next click
   on the curve to mirror find no hover in the app (4 of 4 runs, vibe5; the editor's unit test, which sets the hover itself,
