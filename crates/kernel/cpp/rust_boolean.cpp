@@ -3025,7 +3025,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer     timer("boolean.rust.brep");
     const RustMemoryWatch watch;
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, touching_only, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, fuzzy, touching_only, r))
     {
       // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();

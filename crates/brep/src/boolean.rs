@@ -566,6 +566,11 @@ struct Pool {
     grid: HashMap<(i64, i64, i64), Vec<u32>>,
     cell: f64,
     tol: f64,
+    /// The Boolean's fuzzy value, added to each entity's tolerance in a pair test ([`Pool::pair`]).
+    fuzzy: f64,
+    /// The least tolerance an entity has in a pair test: OCCT's 1e-7 where the inputs carry their own, else half the
+    /// Boolean's (bodies made without tolerances: the Boolean's alone).
+    floor: f64,
     /// Per vertex its own tolerance (an input's, OCCT's; 0 for a new one: within the sum of the two's tolerances
     /// another is the same vertex, OCCT's rule).
     t: Vec<f64>,
@@ -590,7 +595,13 @@ struct Pool {
 impl Pool {
     fn new(tol: f64, groups: Vec<(DVec3, f64, u32)>, regroup: std::sync::Arc<std::sync::Mutex<Vec<(DVec3, f64)>>>) -> Pool {
         let (p, inputs, grid, coarse, t, huge) = Default::default();
-        Pool { p, inputs, grid, cell: GREY * tol * 1.01, tol, t, coarse, ccell: (64.0 * tol).max(5e-5), huge, tmax: 0.0, tall: 0.0, groups, regroup }
+        Pool { p, inputs, grid, cell: GREY * tol * 1.01, tol, fuzzy: crate::fuzzy(), floor: 0.5 * tol, t, coarse, ccell: (64.0 * tol).max(5e-5), huge, tmax: 0.0, tall: 0.0, groups, regroup }
+    }
+
+    /// Two entities of tolerances `a` and `b` are together within the sum of their own (each at least the floor,
+    /// plus the fuzzy value): OCCT's pair test (the per-entity tolerance plan, docs/handoff/bool.md).
+    fn pair(&self, a: f64, b: f64) -> f64 {
+        a.max(self.floor) + b.max(self.floor) + 2.0 * self.fuzzy
     }
 
     fn key(&self, p: DVec3) -> (i64, i64, i64) {
@@ -618,17 +629,16 @@ impl Pool {
         let mut near: Vec<(u32, f64, f64)> = Vec::new();
         let mut take = |i: u32| {
             let ti = self.t[i as usize];
-            let reach = self.tol.max(tp + ti);
+            let reach = self.pair(tp, ti);
             // (OCCT's rule: together within the sum of the two's tolerances, apart past it, nothing in between; a
             // sharp knurl tooth's sub-micrometre slivers kept as live keeps them.)
             let d = (self.p[i as usize] - p).length();
-            tol_flip("vertex-vertex", d, reach, tp + ti);
             if d <= reach && !near.iter().any(|x| x.0 == i) {
                 near.push((i, d, reach));
             }
         };
         // (The farthest a vertex but a huge one can be: within a cell of either grid, the 27 round it; else every one.)
-        let far = self.tol.max(tp + self.tmax);
+        let far = self.tol.max(self.pair(tp, self.tmax));
         let cells = |grid: &HashMap<(i64, i64, i64), Vec<u32>>, k: (i64, i64, i64), take: &mut dyn FnMut(u32)| {
             for dx in -1..=1 {
                 for dy in -1..=1 {
@@ -1001,8 +1011,7 @@ impl Ctx<'_> {
         // (On the plane within its own tolerance and the face's (OCCT's rule), apart past that: no grey band, as for
         // two vertices.)
         let tv = self.pool.t[v as usize];
-        let reach = self.tol.max(tv + self.faces[f].t.max(0.5 * self.tol));
-        tol_flip("vertex-plane", x.abs(), reach, tv + self.faces[f].t);
+        let reach = self.pool.pair(tv, self.faces[f].t);
         let s = if x.abs() <= reach {
             0
         } else if x > 0.0 {
@@ -3060,9 +3069,9 @@ impl Ctx<'_> {
     /// point of it).
     fn split_reach(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<Vec<u32>> {
         let tol = self.tol;
-        let reach = |w: u32| tol.max(te + self.pool.t[w as usize]);
-        let end_reach = |w: u32| if at_ends { reach(w) } else { tol.max(self.pool.t[w as usize]) };
-        let tol_far = tol.max(te + self.pool.tall);
+        let reach = |w: u32| self.pool.pair(te, self.pool.t[w as usize]);
+        let end_reach = |w: u32| if at_ends { reach(w) } else { self.pool.pair(0.0, self.pool.t[w as usize]) };
+        let tol_far = tol.max(self.pool.pair(te, self.pool.tall));
         let (lo, hi) = match s.g {
             Geo::Line => {
                 let (a, b) = (self.p(s.v[0]), self.p(s.v[1]));
@@ -3108,7 +3117,6 @@ impl Ctx<'_> {
             if t * len <= re || (1.0 - t) * len <= re {
                 continue;
             }
-            tol_flip("vertex-edge", off, r, te + self.pool.t[w as usize]);
             if off <= r {
                 on.push((t, w));
             }
@@ -3515,6 +3523,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         ncurves: Vec::new(),
         src,
     };
+    // (Inputs that carry their own tolerances (the kernel's): OCCT's least, 1e-7, in a pair test.)
+    if args.iter().any(|b| !b.vertex_tol.is_empty()) {
+        cx.pool.floor = 1e-7;
+    }
     for &(c, r) in groups {
         let w = cx.pool.push_tol(c, r);
         cx.pool.groups.push((c, r, w));

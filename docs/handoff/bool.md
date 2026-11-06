@@ -50,6 +50,13 @@ Stage 1 (11-06 02:30 UTC): NOSHAPE_BOOL_TOL_PROBE=1 prints each pair test the pa
 decide otherwise ("TOLPROBE <test> d had own"): vertex-vertex (Pool::find_tol), vertex-plane (side), vertex-edge
 (split_reach), line-cylinder (edge_on_surface). Counts over whole corpora: shfall 298 / 750 / 682 / 214, bool-corpus
 10 / 4 / 8 / 0, corpus5 6 / 12 / 43 / 0, kall 0. Next: stage 2 (the vertex tests), gated as above.
+Stage 2 (11-06 03:30 UTC): vertex with vertex (Pool::find_tol), vertex on a plane (side) and vertex on an edge
+(split_reach) by Pool::pair: each one's own tolerance (floor 1e-7 where the inputs carry theirs, else half the
+Boolean's) plus the fuzzy value, now passed to the Rust side (brep_boolean's fuzzy, noshape_brep::with_fuzzy). For
+ordinary inputs (all 1e-7) the same as before. Gate: corpora and parity56 identical, 0 differences; shfall 46/194 as
+before (5 declines one step later); knurls and gears the same results, idle vibe4 times within 2 %. Note: the gpf
+corpus has 2 differences on main (49eaef95, ba295710), not new. New points (sections' crossings) still get half the
+Boolean's tolerance (stage 4). Next: stage 3 (edge on face, edge with edge).
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 

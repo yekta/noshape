@@ -422,7 +422,7 @@ pub(crate) mod ffi {
         /// noshape's own Boolean (op 0 fuse, 1 cut, 2 common) of `args` (the object first): false when it
         /// declines (`last_rust_decline` says why).
         /// `touching_only`: declines unless the arguments only touch (a pattern's checked glue).
-        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, touching_only: bool, out: &mut BrepResult) -> bool;
+        fn brep_boolean(op: u8, args: &[BrepBody], tol: f64, fuzzy: f64, touching_only: bool, out: &mut BrepResult) -> bool;
         /// Notes why the C++ side declined (for `last_rust_decline`).
         fn brep_blend(body: &BrepBody, spec: &[f64], tol: f64, out: &mut BrepResult) -> bool;
         fn brep_blend_enabled() -> bool;

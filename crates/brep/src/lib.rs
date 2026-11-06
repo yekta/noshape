@@ -30,6 +30,21 @@ pub mod mesh;
 pub use boolean::{boolean, boolean_touching, boolean_with, Op};
 
 std::thread_local!(static CANCEL: std::cell::Cell<usize> = const { std::cell::Cell::new(0) });
+std::thread_local!(static FUZZY: std::cell::Cell<f64> = const { std::cell::Cell::new(0.0) });
+
+/// Runs `run` with the Boolean's fuzzy value `fuzzy` (OCCT's, added to each entity's tolerance in every pair test;
+/// the tolerance passed to the Boolean already holds it, for what isn't a pair test).
+pub fn with_fuzzy<T>(fuzzy: f64, run: impl FnOnce() -> T) -> T {
+    let before = FUZZY.with(|f| f.replace(fuzzy));
+    let r = run();
+    FUZZY.with(|f| f.set(before));
+    r
+}
+
+/// This thread's fuzzy value ([`with_fuzzy`]).
+pub(crate) fn fuzzy() -> f64 {
+    FUZZY.with(|f| f.get())
+}
 
 /// This thread's cancel flag (the address of an `AtomicBool`, 0 none; the kernel's `with_cancel` sets it): once
 /// set, a running Boolean stops at its next check and declines "cancelled" (a stale regeneration's worker is free
