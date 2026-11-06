@@ -25,6 +25,45 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## Plan: partial common blocks (11-06 12:13 UTC, agreed with the lead)
+Why: OCCT's pave filler makes edges one over the part of their length where they lie within their tolerances (a
+common block over a range, IntTools_EdgeEdge's common part), with paves at that range's ends on both, and puts a
+vertex on an edge or a section within the two's tolerances by growing the vertex. Ours splits an edge only at pool
+vertices already within reach (split_reach) and merges only whole pieces between the same two vertices (get_sedge;
+5c added OCCT's ForceInterfEE / IsExistingPaveBlock reach there). What that leaves (Shell, by OCCT time): 47587a8d
+19.6 s (two 1e-7 edges leaving one vertex 3 mrad apart: OCCT's common block up to ~66 um, ours a 0.3 um sliver); the
+slab cases 0acfd0a2, 80a5941f, 9aec1f4b, 4fca980b 62 s (two B-spline edges leaving one vertex together, parting at
+different vertices); a5f1e564 25.5 s and f82bed32 6.4 s (merge rounds that never settle); and the slot corners in the
+parity documents (17 "two edges" + 14 "a non-manifold result" in one document: OCCT's section ends 10.6 um short of a
+tool's corner, OCCT puts the corner on it as a new vertex whose tolerance covers the gap, the old one Deleted).
+
+Stages (each lands alone, gated: 0 differences on every corpus (bool-corpus, corpus2-6, direct-corpus, sh-new2),
+parity56 and shfall's known 2; knurl and gear results the same and their times level against main on the same host,
+kt.sh 5 rounds: a stage that makes them slower doesn't land; a bool_patterns test from the case it was for):
+P0. A probe (NOSHAPE_BOOL_PCB_PROBE=1), no behaviour change: every pair of edge pieces of different arguments leaving
+    one pool vertex within 25 deg and within te + tg + fuzzy of each other for a length past the floor, with that
+    length and where they part. Right when: the gate is unchanged and the cases above all show (a pair each where
+    expected), and the knurls / gears show none or few (their cost is bounded by these pairs).
+P1. Edge with edge over a range (OCCT's EE common part) for those pairs: the range from the shared vertex to where the
+    two part by more than te + tg + fuzzy; a pave at its end on both, the vertex there if one is within reach, else a
+    new one covering both edges' points there (BOPTools MakeVertex: tolerance the distance + its own); get_sedge then
+    makes the two pieces up to it one. Only pairs sharing a vertex (every case above; a general EE over all box pairs
+    only if a case needs it later). Right when: 47587a8d's sliver and the slab cases' overlaps are gone (each moves
+    past its decline, taken ones equal or equivalent to OCCT's), the gate holds.
+P2. A vertex onto a curve by growing it (OCCT's PutPavesOnCurve / VE with UpdateVertex): an input vertex within the
+    section's or edge's tolerance plus its own of the curve's end or of the curve is put on it, its tolerance grown to
+    cover; as OCCT's non-destructive mode, a grown input vertex is a new vertex in the result and the input one is
+    reported Deleted (history). Covers the slot corners (/root/bool-scratch/pave-wip-1106.patch has the snap; the
+    history and the unify's seam placement were what differed). Right when: the slot-corner cuts are taken with
+    OCCT's counts and history (equivalent at worst), parity56's share up, the gate holds.
+P3. The merge rounds in one pass: VV groups (and those P1 / P2 add) closed transitively before anything is built
+    (union of every pair within its tolerances, one bounding sphere a group, OCCT's order: VV first, then paves),
+    instead of up to 4 rebuilds that each find more. Right when: a5f1e564 and f82bed32 get past "a point near two
+    vertices", no case takes more rebuilds than now, and no corpus case changes.
+P4. Only if P1-P3 leave cases at "a piece's point near its face's boundary": a thin piece bounded by common-block
+    edges classified by its loop, as OCCT's face builder does, not by a point within the edges' tolerance.
+Order P0, P1, P2, P3 (P2 may go before P1 if the parity share gains more there). Each stage's numbers in this file.
+
 ## mimalloc on macOS, measured to land (11-06 11:17 UTC; lead: land only if nothing gets worse beyond noise): not landed
 - The change (branch bool/macos-mimalloc, c9a9ea42): the mimalloc crate with `override` (malloc's default zone, so
   OCCT's allocations too; the bundled mimalloc 3.3.2) and MiMalloc as the global allocator, app and CLI, macOS only.
