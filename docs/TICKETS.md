@@ -595,6 +595,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P2 WINDOWS-RUST-SLOW (skasm, lead 11-06 05:00) core's release timing step had Windows at ~2x Linux on fins-400 /
+  knurl (2.81 / 5.70 s against 1.36 / 2.60) but 1.2x on the OCCT-heavy release-fillet-hang. skasm 11-06 07:15:
+  **mostly runner hardware.** Hosted runners of one OS land on different CPUs (the timing table now names them,
+  a4433e68): in four dry runs Linux's fins-400 took 1.36-2.70 s and macOS's knurl 2.17-4.63 s for the same code. On
+  the same CPU (AMD EPYC 7763, 4 cores) Windows is 1.29x Linux on fins-400 (2.83 / 2.20 s), 1.17x on knurl (5.31 /
+  4.54) and 0.84x on release-fillet-hang (5.61 / 6.69); a Windows run on an EPYC 9V45 did 2.03 / 3.62 / 3.45.
+  **mimalloc as Rust's global allocator on Windows** (branch skasm/mimalloc-win, cfg(windows), app and CLI): against
+  the baseline on comparable runs, knurl -7 % (5.70 -> 5.31 / 5.25), fins-400 0 to -7 % (2.83 -> 2.83 / 2.62),
+  release-fillet-hang -1 to -3 %: real but small, not the gap. Why: Linux profiles (perf, release CLI) put fins-400
+  mostly in OCCT's topology code with ~10 % in malloc / free, which OCCT reaches through the C runtime (NATIVE
+  allocator), not Rust's; knurl is our NURBS evaluation (NurbsCurve::at 11 %, derivatives, atan2) with the
+  allocator ~3 %. Left on the same hardware, 1.2-1.3x on our Rust-heavy documents: candidates the MSVC CRT's math
+  (atan2 / sin / cos: glibc picks FMA versions), OCCT's allocations on the Windows heap (OCCT 8's build-time
+  allocator: OPT / TBB / JEMALLOC), thread pool / lock behaviour. Comparing them needs runs pinned to one CPU
+  (several dry runs, keep the 7763 pairs) or a Windows box to profile.
 - [x] (skasm 11-06 02:25: live's runner's, not ours: it mapped Front-sketch points as Top (live 2116); re-recorded, live's
   line now gets one COINCIDENT and VERTICAL as ours: revolve-dialog-axis / -thin / -type-list match, 33 / 33 states)
   P3 SKETCH-LINE-ON-PLANE-TRACE (skasm; psui's interaction run 11-05 20:22) ui-parity `revolve-dialog-axis` step 8:
