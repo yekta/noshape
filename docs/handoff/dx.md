@@ -29,6 +29,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   as many (`parts_by_count`).
 - 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
   profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+## 11-06 22:30 UTC: exchange, lead's rule (match live where it is cleaner; its import's losses are its shortcoming)
+- Ours imports live's files 44/48 at 22:00, hose IGES since (12/12/0 as its model). IGES: B-spline faces on analytic
+  surfaces rebuilt on them, a face's pieces on copies of one B-spline merged, a whole torus made with its seams (o-ring:
+  every ring one face, as its model); shown topology: a closed chain of edges between two faces, smooth at each joint,
+  one ring (motor-mount's slots, hose's tube ends; T1 seam::a_pockets_outline_across_the_seam_is_one_ring). Model
+  suite unchanged by it (59/86, 614/924).
+- Suite (crates/ops/tests/parity.rs): live's import that splits its model is held to the model's counts and the
+  import's volume (model_topology: hose STEP); a part live reads off its model by up to 1 % holds ours as close
+  (held_to_model: spur gear STEP volume). Left: spur gear STEP / IGES areas (its tooth chamfers' cones 0.6 % small
+  from the file's 4-pole curves, no pcurves: recomputing those edges as surface intersections would make them exact).
+- Waiting on live: the five multi-part x_t re-import (P0), drawing batches 4-5, batch 3's three questions.
 
 ## 11-06 20:57 UTC: drawing batch 3 and the exchange suite's P0
 - Drawings (70e75ac4): batch 3 30/35 scenarios (192 -> ~200/211 states). Left: drw-export-formats (live's runner
