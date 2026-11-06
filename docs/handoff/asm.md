@@ -22,7 +22,8 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
 
 ### ui-parity
 - Live recordings: 7 asm-* (all matched on skasm's last run, asm-fastened-undo-picks flaky 1 in 4).
-- Filed with live, not recorded yet: batch 1 (25, REQUESTS 2156), batch 2 (20 menus, 2158), batch 3 (40, below).
+- Filed with live, not recorded yet: batch 1 (25, REQUESTS 2156), batch 2 (20 menus, 2158), batch 3 (40, below;
+  filed 11-06 22:1x, land 056b6606 queued). On our side every batch 3 step runs (nothing "not shown").
   Waiting: whether live's recorder clicks the right-hand panels (exploded views, named positions, BOM).
 - Batch 3 (asm 11-06, 40 scenarios): the assembly row's menu (Unfix all, Collapse / Expand all, Check
   interference…, Rename), the graphics menus (a face: Section view… with Turn off / Edit section view…, Select
@@ -38,6 +39,8 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
     relations, Replace, folder name, Section view), as its ✓ (behaviours "Enter accepts the open dialog", line ~1200;
     skasm's open question). Binding `enter` → Accept in the Assembly context; T1 assembly-ui
     `enter_in_the_graphics_accepts_the_open_dialog`.
+  - Connector, relation and group rows are `mate:` targets; the Section view dialog's ✓ / ✕ are `button:ok` /
+    `button:cancel` (app-core section_dialog, the Part Studio's too). Live's first folder is "New folder" as ours.
   - `{"view_cube": …}` targets work in an assembly (app-core `view_cube::ui_cell_point`, shared with the Part Studio).
   - Not differences: a part instance's row menu has no Section view… / Check interference… (live 1259 / 1357: graphics
     menu and the assembly row only); mates start hidden in live too, so a mate row's menu offers Show / Show all mates
