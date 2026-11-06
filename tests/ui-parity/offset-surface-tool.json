@@ -1,0 +1,29 @@
+{
+ "name": "offset-surface-tool",
+ "about": "block: the top face, the Offset surface tool, Enter",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Offset surface"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

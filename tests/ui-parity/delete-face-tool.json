@@ -1,0 +1,29 @@
+{
+ "name": "delete-face-tool",
+ "about": "block: the front face, the Delete face tool: its state (heal), then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     0,
+     5
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Delete face"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

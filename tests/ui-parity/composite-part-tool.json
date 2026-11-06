@@ -1,0 +1,25 @@
+{
+ "name": "composite-part-tool",
+ "about": "block: Part 1, the Composite part tool, Enter",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Composite part"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

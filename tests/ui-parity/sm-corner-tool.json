@@ -1,0 +1,20 @@
+{
+ "name": "sm-corner-tool",
+ "about": "plate: Sheet metal model › Corner: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Corner"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

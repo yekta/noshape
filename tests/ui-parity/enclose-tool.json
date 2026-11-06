@@ -1,0 +1,20 @@
+{
+ "name": "enclose-tool",
+ "about": "block: Thicken › Enclose: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Thicken",
+    "menu": "Enclose"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

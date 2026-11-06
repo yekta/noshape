@@ -1,0 +1,20 @@
+{
+ "name": "fill-tool",
+ "about": "block: Offset surface › Fill: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Offset surface",
+    "menu": "Fill"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

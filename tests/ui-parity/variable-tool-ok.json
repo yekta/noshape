@@ -1,0 +1,19 @@
+{
+ "name": "variable-tool-ok",
+ "about": "block: the Variable tool: its dialog, then ✓ (Enter)",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Variable"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+ "name": "sm-bend-tool",
+ "about": "plate: Sheet metal model › Bend: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "plate",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sheet metal model",
+    "menu": "Bend"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "variable-tool-typed",
+ "about": "block: the Variable tool, type 25 into Value, Enter (the value), Enter (the dialog)",
+ "area": "psui",
+ "source": "coverage 11-06 (toolbar, batch 9)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Variable"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "25"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}
