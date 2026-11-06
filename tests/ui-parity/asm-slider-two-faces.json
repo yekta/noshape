@@ -1,0 +1,41 @@
+{
+ "name": "asm-slider-two-faces",
+ "about": "Slider between Part 2's top and Part 1's top, Enter: Part 2 moves onto Part 1, the mate's row.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Slider mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

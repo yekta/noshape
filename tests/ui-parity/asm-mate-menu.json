@@ -1,0 +1,19 @@
+{
+ "name": "asm-mate-menu",
+ "about": "Right-click Revolute 1's row: the mate menu's rows; Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

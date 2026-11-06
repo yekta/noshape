@@ -1,0 +1,17 @@
+{
+ "name": "asm-shift-s-snap-mode",
+ "about": "Shift+S toggles Snap mode on and off.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "key",
+   "key": "shift+s"
+  },
+  {
+   "do": "key",
+   "key": "shift+s"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "asm-mate-edit-escape",
+ "about": "Double-click Revolute 1's row: its dialog, Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

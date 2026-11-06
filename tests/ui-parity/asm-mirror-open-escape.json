@@ -1,0 +1,19 @@
+{
+ "name": "asm-mirror-open-escape",
+ "about": "The Assembly mirror dialog opens and closes (Esc).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly mirror"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "name": "asm-mate-connector-on-face",
+ "about": "Mate connector on Part 2's top face, Enter: the connector's row, its dialog's fields.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

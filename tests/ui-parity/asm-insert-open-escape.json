@@ -1,0 +1,19 @@
+{
+ "name": "asm-insert-open-escape",
+ "about": "The Insert tool opens the Insert dialog (its tabs and list), Esc closes it.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

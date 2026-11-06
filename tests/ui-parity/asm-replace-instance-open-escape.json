@@ -1,0 +1,25 @@
+{
+ "name": "asm-replace-instance-open-escape",
+ "about": "Part 2 selected, Replace instance: its dialog with the instance in, Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Replace instance"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

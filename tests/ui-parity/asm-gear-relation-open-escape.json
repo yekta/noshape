@@ -1,0 +1,19 @@
+{
+ "name": "asm-gear-relation-open-escape",
+ "about": "The Gear relation dialog opens and closes (Esc).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Gear relation"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

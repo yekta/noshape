@@ -1,0 +1,19 @@
+{
+ "name": "asm-replicate-open-escape",
+ "about": "The Replicate dialog opens and closes (Esc).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Replicate"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

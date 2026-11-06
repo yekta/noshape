@@ -1,0 +1,41 @@
+{
+ "name": "asm-cylindrical-pin-hole",
+ "about": "Cylindrical between the pin's side and the hole's, Enter (beside the Revolute).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Cylindrical mate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     65,
+     0,
+     15
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     5,
+     0,
+     10
+    ],
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

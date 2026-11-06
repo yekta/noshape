@@ -1,0 +1,31 @@
+{
+ "name": "asm-group-two-instances",
+ "about": "Group of both instances picked in the list, Enter: the group's row.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Group"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 1 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

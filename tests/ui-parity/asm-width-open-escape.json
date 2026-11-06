@@ -1,0 +1,19 @@
+{
+ "name": "asm-width-open-escape",
+ "about": "The Width mate dialog opens and closes (Esc).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Width mate"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

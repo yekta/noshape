@@ -1,0 +1,19 @@
+{
+ "name": "asm-circular-pattern-open-escape",
+ "about": "The Assembly circular pattern dialog opens and closes (Esc).",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Assembly circular pattern"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

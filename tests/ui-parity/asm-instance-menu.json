@@ -1,0 +1,19 @@
+{
+ "name": "asm-instance-menu",
+ "about": "Right-click Part 2's row: the instance menu's rows; Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 1",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
