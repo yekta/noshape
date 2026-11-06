@@ -1377,3 +1377,23 @@ fn a_plate_split_by_a_plane_as_occts_splitter() {
     };
     assert_eq!(rel(&ours), rel(&occt));
 }
+
+/// c2-sm-louver's Mirror 2 (from skasm): the mirrored half's bend-end cutter is inside out (its volume below zero, a
+/// mirror's image not turned back). Ours declines it first ("an inside-out tool", no section computed), not after
+/// 0.35 s of work ("no clean ray"); OCCT then cuts it as it is.
+#[test]
+fn an_inside_out_tool_declined_first() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let read = |n: &str| k::Shape::from_brep_bytes(&std::fs::read(dir.join(n)).unwrap()).unwrap();
+    let (bend, cutter) = (read("louver-mirror2-bend.brep"), read("louver-mirror2-cutter.brep"));
+    assert!(cutter.volume().unwrap() < 0.0);
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), std::slice::from_ref(&cutter), &k::BooleanOptions::default());
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    assert!(r.is_err());
+    assert_eq!(why, "an inside-out tool");
+    let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), std::slice::from_ref(&cutter), &k::BooleanOptions::default()).expect("OCCT's");
+    assert!(o.shape.is_valid());
+}

@@ -32,8 +32,9 @@ scratch /root/bool-scratch.
   a_cone_cut_in_two_merges_as_after_occts. Its time: Extrude 3 287 / 56 (an up-to extrude: OCCT's Splitter of a
   27-face prism by a surface of revolution, 222-308 ms), Circular pattern 1 274 / 67 and Extrude 2 111 / 10 (four cuts
   ours declined "a plane through a cone's apex", OCCT 105-264 ms each). That decline is a bug: a plane across a cone's
-  axis past its apex (a radius below zero: the other nappe) declined as through the apex; fixed in bool-b
-  (/root/bool-scratch/apex-split-dbg-1106.patch), to land with its gate. Past it the four stop at "a face lost" /
+  axis past its apex (a radius below zero: the other nappe) declined as through the apex; that fix landed
+  (d49d0f96) and was reverted (df3ab2a2): past it the four declined later, 690 -> 1104 ms. Back with it once the
+  tolerant vertices' places on a cone are right. Past it the four stop at "a face lost" /
   "an invalid result": the valve's tool has tolerant vertices (0.21 mm) where its arc and its B-spline edge meet off the
   cone; ours maps the arc at its circle's height and the vertex by projection, 0.1 mm apart in the face's parameters
   (OCCT uses the input edges' own curves on the face). 
@@ -45,10 +46,24 @@ scratch /root/bool-scratch.
   axis to revolve around.", Fillet 1 "Failed to fillet selections.", Extrude 1's centroid off), so Shell 1 gets a
   13-face part instead of live's 17-face ring and fails ("Could not shell part with selections."), its slab route
   spending 6.2 s before failing. To redo once the upstream features match (sketch / query side).
-- cf-fix-pcb 1031 ms / live 618: Fix PCB 2 762 / 276: OCCT's Splitter of a 328-face solid by one planar face 470 ms
-  (and a 33-face one, 24 ms), 1098 boxes 170 ms (two optimal boxes of its B-spline faces 96 ms). A split by one
-  planar face covering the solid's section is two of our Booleans (common and cut with the half-space): next.
+- cf-fix-pcb 1031 ms / live 618 (before the split below): Fix PCB 2 762 / 276: OCCT's Splitter of a 328-face solid
+  by one planar face 470 ms (and a 33-face one, 24 ms), 1098 boxes 170 ms (two optimal boxes of its B-spline faces
+  96 ms). A split by one planar face covering the solid's section is two of our Booleans (common and cut with the
+  half-space).
 - cf-planetary-gears 462 ms / live 542: faster than live now (BOOL-RUST-GEARS-SLOW's 2.07 s is from before).
+- c2-sm-louver's Mirror 2 (from skasm, lead): one cut of the mirrored half's skewed bend end; ours spent 0.35 s and
+  declined "no clean ray", then OCCT 0.4 s. Its cutter is inside out (volume -1.737e-6 m³: the mirror's image not
+  turned back). Ours now declines an inside-out tool first ("an inside-out tool": rust_boolean.cpp solid_inside_out,
+  once a shape, OcShape::myInsideOut: a planar face at the solid's extreme (its vertices and its box) pointing away
+  or in, ~20 us a tool; none such, its volume's sign, which alone made gears ~9 % slower; an inside-out object
+  stays taken: bool_patterns a_plane_a_few_degrees_off_a_cylinders_axis is one, a fuse, OCCT's result). Mirror 2
+  986 -> 680 ms (live 111), the document 4.1 s (live 5.0 s). But OCCT's cut by the inside-out cutter removes nothing (the part's volume
+  1.10974e-5 m³ unchanged, its faces split: 11), where the cutter turned back removes 0.039e-5 m³ (6 faces; ours 61
+  ms, OCCT 129): Mirror 2's result is likely wrong as well as slow; the mirror should turn its image back (skasm's
+  sheet metal mirror). T1 bool_patterns::an_inside_out_tool_declined_first.
+- cf-fix-pcb: OCCT's Splitter of a solid by one planar face across it is now ours (0ac149fd: the common and the cut
+  with the half-space, the halves sharing their cut faces as the Splitter's; the face matched by place, BRepTools_
+  ReShape): its split 284 -> 160 ms, the document 573-698 ms against live's 618.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change

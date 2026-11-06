@@ -689,6 +689,8 @@ public:
   mutable std::shared_ptr<const BrepBody> myBrep;
   mutable double                          myBrepTol = 0;
   mutable const char*                     myBrepWhy = nullptr;
+  // Whether a solid of it is inside out (its volume below zero), found once: -1 not yet (rust_boolean.cpp).
+  mutable std::atomic<int>                myInsideOut{-1};
   // A body still to remap onto this shape's maps (a result of that Boolean: rust_boolean.cpp), on first use.
   mutable std::function<std::shared_ptr<const BrepBody>(const OcShape&)> myBrepLazy;
 

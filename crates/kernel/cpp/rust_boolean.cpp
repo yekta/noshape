@@ -22,6 +22,8 @@
 #include <BRepTools_WireExplorer.hxx>
 #include <BRepLib.hxx>
 #include <BRepBndLib.hxx>
+#include <GProp_GProps.hxx>
+#include <BRepGProp.hxx>
 #include <ShapeAnalysis_Surface.hxx>
 #include <IntSurf_PntOn2S.hxx>
 #include <NCollection_List.hxx>
@@ -79,6 +81,7 @@
 #include <Geom_TrimmedCurve.hxx>
 #include <TopExp.hxx>
 #include <TopoDS.hxx>
+#include <Precision.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <TopoDS_Shell.hxx>
@@ -2852,6 +2855,69 @@ void brep_occt_ahead(rust::Slice<const uint32_t> pairs)
   }
 }
 
+// Whether a solid is inside out (its faces' normals pointing in): a planar face whose plane holds the solid's
+// vertices at one extreme says it cheaply, its normal pointing away from them, or at them with its box there too;
+// none such: its volume's sign.
+static bool solid_inside_out(const TopoDS_Shape& solid)
+{
+  ShapeIMap vertices;
+  TopExp::MapShapes(solid, TopAbs_VERTEX, vertices);
+  std::vector<gp_Pnt> points;
+  points.reserve(vertices.Extent());
+  double tol = Precision::Confusion();
+  for (int i = 1; i <= vertices.Extent(); ++i)
+  {
+    const TopoDS_Vertex& v = TopoDS::Vertex(vertices(i));
+    points.push_back(BRep_Tool::Pnt(v));
+    tol = std::max(tol, BRep_Tool::Tolerance(v));
+  }
+  Bnd_Box box;
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face&      f     = TopoDS::Face(e.Current());
+    occ::handle<Geom_Plane> plane = occ::down_cast<Geom_Plane>(BRep_Tool::Surface(f));
+    if (plane.IsNull())
+      continue;
+    const gp_Ax3& ax = plane->Position();
+    gp_Dir        n  = ax.XDirection().Crossed(ax.YDirection());
+    if (f.Orientation() == TopAbs_REVERSED)
+      n.Reverse();
+    const double d = gp_Vec(plane->Location().XYZ()).Dot(n);
+    double lo = d, hi = d;
+    for (const gp_Pnt& p : points)
+    {
+      const double x = gp_Vec(p.XYZ()).Dot(n);
+      lo = std::min(lo, x);
+      hi = std::max(hi, x);
+    }
+    if (hi - lo <= 2 * tol)
+      continue;
+    if (d >= hi - tol)
+      return false;
+    if (d > lo + tol)
+      continue;
+    // At the vertices' extreme, unless a curved face bulges past it (its box says).
+    if (box.IsVoid())
+    {
+      BRepBndLib::Add(solid, box, false);
+      for (TopExp_Explorer x(solid, TopAbs_EDGE); x.More(); x.Next())
+        tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
+      for (TopExp_Explorer x(solid, TopAbs_FACE); x.More(); x.Next())
+        tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Face(x.Current())));
+    }
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    double blo = d;
+    for (int c = 0; c < 8; ++c)
+      blo = std::min(blo, gp_Vec(c & 1 ? x1 : x0, c & 2 ? y1 : y0, c & 4 ? z1 : z0).Dot(n));
+    if (d <= blo + 3 * tol)
+      return true;
+  }
+  GProp_GProps g;
+  BRepGProp::VolumeProperties(solid, g, true);
+  return g.Mass() < 0;
+}
+
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy, bool touching_only)
@@ -2875,6 +2941,23 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
       own.push_back(std::make_unique<OcShape>(args[i]));
       srcs[i] = own.back().get();
     }
+  // A tool that's inside out (a mirror's image not turned back: c2-sm-louver's Mirror 2 cutter, its volume below
+  // zero): ours classifies every point against its faces' normals the wrong way round and declines late ("no clean
+  // ray", 0.35 s; OCCT takes it as it is). Declined first; found once a shape. (An object inside out is taken alike:
+  // a fuse of one, OCCT's result.)
+  for (size_t i = 1; i < args.size(); ++i)
+  {
+    int inside_out = srcs[i]->myInsideOut.load(std::memory_order_relaxed);
+    if (inside_out < 0)
+    {
+      inside_out = 0;
+      for (TopExp_Explorer e(args[i], TopAbs_SOLID); e.More() && inside_out == 0; e.Next())
+        inside_out = solid_inside_out(e.Current()) ? 1 : 0;
+      srcs[i]->myInsideOut.store(inside_out, std::memory_order_relaxed);
+    }
+    if (inside_out == 1)
+      return decline("an inside-out tool");
+  }
   std::vector<BrepBody> bodies(args.size());
   double                max_tol = 0;
   {
