@@ -25,6 +25,8 @@ pub enum Op {
     ControlPointMatrix,
     /// `vector(x, y)`, `vector(x, y, z)`: `[x, y] as Vector`.
     NewVector,
+    /// `size(container is array)`, `size(container is map)`: `@size(container)`.
+    Size,
     Units,
     Vectors,
 }
@@ -40,6 +42,7 @@ pub fn classify(decl: &FnDecl) -> Option<Op> {
         ("onshape/std/vector.fs", "isLengthVector") => Op::IsLengthVector,
         ("onshape/std/vector.fs", "is3dLengthVector") => Op::Is3dLengthVector,
         ("onshape/std/surfaceGeometry.fs", "canBeControlPointMatrix") => Op::ControlPointMatrix,
+        ("onshape/std/containers.fs", "size") if decl.arity() == 1 => Op::Size,
         ("onshape/std/vector.fs", "vector") if matches!(decl.arity(), 2 | 3) && decl.param_types.iter().all(Option::is_none) => Op::NewVector,
         ("onshape/std/units.fs", _) => Op::Units,
         ("onshape/std/vector.fs", _) => Op::Vectors,
@@ -59,6 +62,8 @@ pub fn apply(op: Op, decl: &FnDecl, args: &mut [Value]) -> Option<Value> {
         (Op::IsLengthVector, [v]) => Some(Value::bool(is_length_vector(v))),
         (Op::Is3dLengthVector, [v]) => Some(Value::bool(is_length_vector(v) && v.as_array().is_some_and(|a| a.len() == 3))),
         (Op::ControlPointMatrix, [v]) => Some(Value::bool(control_point_matrix(v))),
+        (Op::Size, [Value::Array(a, _)]) => Some(Value::num(a.len() as f64)),
+        (Op::Size, [Value::Map(m, _)]) => Some(Value::num(m.len() as f64)),
         (Op::NewVector, _) => {
             let tag = vector_tag()?;
             Some(Value::Array(Arc::new(args.iter_mut().map(std::mem::take).collect()), tag))

@@ -491,7 +491,7 @@ fn std_unit_and_vector_operators_answer_as_their_bodies() {
         "vector(1, 2, 3) * meter", "meter * vector(1, 2, 3)", "vector(1, 2) * meter + vector(3, 4) * meter",
         "vector(1, 2) * meter - vector(3, 4) * inch", "-(vector(1, 2) * meter)", "vector(1, 2) * meter / 2",
         "vector(1, 2) / 2", "2 * vector(1, 2)", "vector(1, 2) + vector(1, 2, 3)", "vector(1, 2) * meter + vector(1, 2)",
-        "vector(1, 2) * vector(3, 4)", "vector(1, 2) * meter * meter", "vector(1, meter)", "vector('a', 2, [3])", "vector([1, 2])", "vector(1, 2) * meter / meter", "meter ^ 2",
+        "vector(1, 2) * vector(3, 4)", "vector(1, 2) * meter * meter", "vector(1, meter)", "vector('a', 2, [3])", "vector([1, 2])", "size([1, 2, [3]])", "size({ 'a' : 1 })", "size([])", "size('ab')", "vector(1, 2) * meter / meter", "meter ^ 2",
         "squaredNorm(vector(3, 4) * meter)", "norm(vector(3, 4) * meter) == 5 * meter", "(vector(1, 2) as Vector) * (meter / second)",
         "isLength(meter)", "isLength(inch)", "isLength(1)", "isLength(meter * meter)", "isLength(degree)",
         "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } } as ValueWithUnits)", "isLength({ 'value' : 1, 'unit' : { 'meter' : 1 } })",
@@ -540,6 +540,7 @@ fn natively_answered_std_texts_are_3095s_from_since() {
         let heads: &[&str] = match file {
             "units.fs" => &["export operator", "export predicate isLength(val)", "export function reciprocal(", "export function unitProduct(", "export const LENGTH_UNITS"],
             "vector.fs" => &["export operator", "export predicate isLengthVector(", "export predicate is3dLengthVector(", "export function vector(x, y)", "export function vector(x, y, z)"],
+            "containers.fs" => &["export function size(container is array)", "export function size(container is map)"],
             _ => &["export predicate canBeControlPointMatrix("],
         };
         let mut out = Vec::new();
@@ -554,7 +555,7 @@ fn natively_answered_std_texts_are_3095s_from_since() {
         }
         out
     };
-    for file in ["units.fs", "vector.fs", "surfaceGeometry.fs"] {
+    for file in ["units.fs", "vector.fs", "surfaceGeometry.fs", "containers.fs"] {
         let now = ops(crate::std_source_at(crate::STD_VERSION, file).expect("3095"), file);
         for v in crate::std_versions().into_iter().filter(|v| *v >= crate::std_ops::SINCE) {
             let theirs = ops(crate::std_source_at(v, file).expect("shipped"), file);

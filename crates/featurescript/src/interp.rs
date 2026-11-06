@@ -1353,6 +1353,23 @@ impl Interp {
                 }
             }
             ExK::Index(b, i, safe) => {
+                // (A local array's element read in its slot: no copy of the array. No expression changes a local.)
+                if let ExK::Local(slot) = b.k
+                    && matches!(self.stack[self.base + slot as usize], Value::Array(..))
+                {
+                    let idx = self.eval(i)?;
+                    self.pos = e.pos;
+                    let at = self.base + slot as usize;
+                    if let (Value::Array(a, _), Value::Number(n, _)) = (&self.stack[at], &idx)
+                        && *n >= 0.0
+                        && n.fract() == 0.0
+                        && (*n as usize) < a.len()
+                    {
+                        return Ok(a[*n as usize].clone());
+                    }
+                    let base = self.stack[at].clone();
+                    return self.index(base, &idx);
+                }
                 let base = self.eval(b)?;
                 if *safe && base.is_undefined() {
                     return Ok(Value::Undefined);
@@ -1362,6 +1379,12 @@ impl Interp {
                 self.index(base, &idx)
             }
             ExK::Member(b, k, safe) => {
+                // (A local's member read in its slot: no copy of the map.)
+                if let ExK::Local(slot) = b.k
+                    && let Value::Map(m, _) = &self.stack[self.base + slot as usize]
+                {
+                    return Ok(m.get(k).cloned().unwrap_or_default());
+                }
                 let base = self.eval(b)?;
                 match base {
                     Value::Map(m, _) => Ok(m.get(k).cloned().unwrap_or_default()),

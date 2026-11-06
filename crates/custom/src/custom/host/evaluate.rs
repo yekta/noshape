@@ -246,15 +246,29 @@ fn ev_face_tangent_planes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         face_tangent_planes(&q.shape(e)?, &params)
     })?;
-    // (A displacement map's million: stopped by a cancel or the deadline part-way.)
+    // (A displacement map's million: made in slices on the machine's threads, stopped by a cancel or the deadline
+    // between slices.)
+    const SLICE: usize = 1 << 17;
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).clamp(1, 8);
     let mut planes = Vec::with_capacity(frames.len());
-    for chunk in frames.chunks(4096) {
+    for slice in frames.chunks(SLICE) {
         if let Err(e) = i.check_deadline() {
             // (Freed off this thread: 0.2-0.4 s for a million.)
             std::thread::spawn(move || drop(planes));
             return Err(e);
         }
-        planes.extend(chunk.iter().map(plane_value));
+        if threads == 1 || slice.len() < 4096 {
+            planes.extend(slice.iter().map(plane_value));
+            continue;
+        }
+        let parts: Vec<Vec<Value>> = std::thread::scope(|sc| {
+            let made: Vec<_> = slice.chunks(slice.len().div_ceil(threads)).map(|c| sc.spawn(move || c.iter().map(plane_value).collect::<Vec<_>>())).collect();
+            made.into_iter().map(|h| h.join().unwrap_or_default()).collect()
+        });
+        planes.extend(parts.into_iter().flatten());
+    }
+    if planes.len() != frames.len() {
+        return Err(i.error("@evFaceTangentPlanes: a plane could not be made"));
     }
     Ok(Value::array(planes))
 }
