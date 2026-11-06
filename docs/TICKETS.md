@@ -250,8 +250,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
-## Release blockers for the 2026-11-06 05:00 release (qa list 03:25, checked on green 2532af01; the latest release is v0.4.32)
-- **qa 03:25: no new blocker.** On green 2532af01 (vibe3), the full CLI smoke = v0.4.32's: round trip 67643.716875 / 18 in all
+## Release blockers for the 2026-11-06 05:00 release (qa list 03:20, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 03:20: no new blocker.** On green 2532af01 (vibe3), the full CLI smoke = v0.4.32's: round trip 67643.716875 / 18 in all
   six formats, volume sweep = v0.4.32, fixed tickets hold, and the user's cases pass (knurl, vase, split-and-chamfer, Y Ribs, the
   Gyro matrices: only the picked body changes). RELEASE-BUILD-FILLET-HANG opens in 7 s. The 44 ticket documents and dx's cf
   corpus are unchanged through the 13 greens since v0.4.32 (aa5ed3ea … 2532af01). Fuzz on vibe3 since v0.4.32: 241 CLI seeds
