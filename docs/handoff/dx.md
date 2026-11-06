@@ -217,6 +217,17 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   walk: ~30-60 ns a node, 75 ns a bare loop pass) and values without per-operation refcounting, plus a faster
   allocator (jemalloc / mimalloc: -10-30 % here; the lead's call). c2-sm-louver's 14 s is one coincident Boolean of
   Linear pattern 3 whose UI-fetched values are distance 0, count 0 (the REST refetch first).
+- 11-06 02:54: lead's decisions (00:2x). Drawings: the reverted hole-table commit re-landed (ops e2e on live's
+  behaviour: an extruded cut's hole table is its header only); the showcase's plate holes are Hole features
+  (demo::plate_studio_with_hole_features, demo_document_on). Live 2131 / 2133 / 2134 taken: a picked part's first view
+  by its Front width (under 80 mm, 80 only at 1:1 / 2:1, tight extent; the Part Studio keeps 1812's frame rule), a
+  pick after the Part Studio's sets the scale again, the broken-out depth on a quadrant within 8 px (no centre), the
+  hole table placed by a click after ✓ (Esc leaves it), views' brokenOut, no hole table in the state, a dimension's
+  lines EDGE once two are picked. All 16 drw-*: 14/16, 92/94 (left: two hovered frames). mimalloc (ALLOC-MIMALLOC):
+  measured, not adopted (FS steps +6-17 %, FS-heavy documents slower; peak memory and cold start equal). FS-COMPILED-
+  INTERP stage 1 queued: closures over the tree walker's helpers, identical on all 78 corpus documents (T2
+  parity::fs_closures_answer_as_the_tree_walker; NOSHAPE_FS_TREE=1 the reference); steps 15-40 % faster, the corpus'
+  CPU unchanged. Next: stage 2 (values without per-operation refcounting), then the c2 REST refetch after 06:00.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
