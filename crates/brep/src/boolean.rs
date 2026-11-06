@@ -1241,6 +1241,13 @@ impl Ctx<'_> {
         Ok(distance_with(q, b, self.bound_spans(f)?))
     }
 
+    /// Whether `q` is within an edge's own tolerance (with the face's) of that edge of face `f`'s boundary.
+    fn near_bound(&self, f: usize, q: DVec2) -> R<bool> {
+        let (b, spans) = (self.bound(f)?, self.bound_spans(f)?);
+        let ft = self.faces[f].t;
+        Ok(self.faces[f].edges.iter().enumerate().any(|(k, &(e, _))| distance_with(q, &b[k..=k], &spans[k..=k]) <= self.pool.pair(ft, self.edges[e].t)))
+    }
+
     /// Face `f`'s boundary curves' spans' boxes ([`distance_with`]).
     fn bound_spans(&self, f: usize) -> R<&[SpanBoxes]> {
         let b = self.bound(f)?;
@@ -1632,11 +1639,13 @@ impl Ctx<'_> {
         if let Path::Ellipse(e) = path
             && e.open()
         {
-            // (Not closed: its ends are where its range ends.)
+            // (Not closed: its ends are where its range ends. Cut where both parts are longer than a new point's
+            // tolerance: a 16 um hyperbola across a cone's seam, 8 um on each side, in Shell's 20 um Boolean.)
+            let short = self.pool.pair(0.0, 0.0);
             for f in [fs, ft] {
                 let Some(p) = self.seam_at(f, &path) else { continue };
                 let t = e.param(p);
-                if e.length(t0, t.max(t0)) > tol && e.length(t.min(t1), t1) > tol {
+                if e.length(t0, t.max(t0)) > short && e.length(t.min(t1), t1) > short {
                     cuts.push((t, End::Point(p)));
                 }
             }
@@ -1674,7 +1683,7 @@ impl Ctx<'_> {
         // Whether the length along it between two parameters is within the tolerance (a B-spline's, the length
         // either way: clearly not where the chord is longer, clearly so where its control polygon there is
         // shorter).
-        let near = |x: f64, y: f64| {
+        let near_by = |x: f64, y: f64, tol: f64| {
             if let Path::Nurbs { c, .. } = &path {
                 if x == y {
                     return true;
@@ -1688,10 +1697,15 @@ impl Ctx<'_> {
             }
             path.length(x, y) <= tol
         };
+        let near = |x: f64, y: f64| near_by(x, y, tol);
         // The end of a section: the tighter of the two faces' ends, made a vertex.
         let pick = |cx: &mut Ctx, x: (f64, End), y: (f64, End), lo: bool| -> R<Option<u32>> {
             let (later, earlier) = if x.0 > y.0 { (x, y) } else { (y, x) };
-            let end = if !near(earlier.0, later.0) {
+            // (One end where the two are within their own tolerances (a vertex's, a new point's the floor), as the
+            // pool merges them.)
+            let own = |e: End| if let End::Vertex(w) = e { cx.pool.t[w as usize] } else { 0.0 };
+            let one = near_by(earlier.0, later.0, cx.pool.pair(own(x.1), own(y.1)).max(stol));
+            let end = if !one {
                 if lo { later.1 } else { earlier.1 }
             } else if x.1.rank() >= y.1.rank() {
                 x.1
@@ -1714,14 +1728,14 @@ impl Ctx<'_> {
                     None => cx.pool.add(p)?,
                 },
             };
-            // Both faces end there: the same vertex.
-            if near(earlier.0, later.0) {
+            // Both faces end there: the same vertex (a point within the two's tolerances is that end).
+            if one {
                 for o in [x.1, y.1] {
                     let w = match o {
                         End::Vertex(w) => w,
                         End::Point(p) => match corner(cx, p) {
                             Some(w) => w,
-                            None => cx.pool.add(p)?,
+                            None => continue,
                         },
                         End::Open => continue,
                     };
@@ -1971,9 +1985,7 @@ impl Ctx<'_> {
 
     /// [`Self::edge_on_surface`] by points along the edge.
     fn on_free_surface(&self, e: usize, f: usize) -> R<bool> {
-        let tol = self.tol;
-        // (On within the Boolean's tolerance, or the edge's and the face's own where that's more, OCCT's rule; the
-        // grey band past that the Boolean's.)
+        // (On within the edge's and the face's own tolerances, OCCT's rule; the grey band past that by theirs too.)
         let on_tol = self.pool.pair(self.edges[e].t, self.faces[f].t);
         // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
         // without being clearly off, ambiguous.
@@ -1988,7 +2000,7 @@ impl Ctx<'_> {
             let d = free::surface_distance(&self.faces[f], p);
             if d <= on_tol {
                 on += 1;
-            } else if d <= GREY * tol {
+            } else if d <= GREY * on_tol {
                 near += 1;
             } else {
                 return Ok(false);
@@ -5097,7 +5109,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 r.inside = deeper(&lsegs, &r);
                 dist = cx.bound_distance(f, r.inside)?;
             }
-            if dist <= tol {
+            // (Near an edge within its and the face's own tolerances too: a 31 um sliver of a Shell slab's face bounded
+            // by 1e-7 edges, its middle 8 um in, is clearly in.)
+            if dist <= tol && cx.near_bound(f, r.inside)? {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
             if !inside2(r.inside, cx.bound(f)?) {

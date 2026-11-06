@@ -1097,6 +1097,14 @@ fn a_vertex_inside_a_face() {
     valid_as_occt("a7bdd15ba4f8613a", 1e-9);
 }
 
+/// A Shell slab's common (recorded) with a thin piece whose middle is within the Boolean's tolerance of its face's
+/// boundary but clear of the nearest edges' own: in, as OCCT's (it declined "a piece's point near its face's
+/// boundary"). Valid, OCCT's counts and volume.
+#[test]
+fn a_sliver_between_exact_edges_of_a_tolerant_slab() {
+    valid_as_occt("d0e9929845ef66b4", 1e-9);
+}
+
 /// Shell's slab common with a plane at an angle to a cone steeper than its rulings (recorded): a hyperbola, its axes
 /// from where the plane meets the two rulings in the plane of the axis and its normal, drawn on the cone point by
 /// point (it declined "a plane at an angle to a cone"); valid, OCCT's counts and volume.

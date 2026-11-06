@@ -108,6 +108,18 @@ tolerance (Pool::pair with the floor), not the Boolean's; a new point (Pool::fin
 Boolean's tolerance. Gate: corpora and parity56 identical, 0 differences; shfall 46 -> 50 of 194 taken (the 2 known
 differences, 18 equivalent); knurls and gears the same, times level. Next: stage 5 (the grey band by the local
 tolerance, then `tol` to the floor and the tolerant-input preflight).
+Stage 5a (11-06 08:14 UTC): four tests by the entities' own tolerances where they used the Boolean's: an edge on a
+free-form face's grey band (on_free_surface: GREY x the pair's, not GREY x tol); a section's two faces' ends one end
+only within their own tolerances (section_from's pick; a new point within them is that end, not a second vertex); an
+open conic cut at a seam where both parts pass a new point's tolerance (a 16 um hyperbola across a cone's seam); a
+piece's point near its face's boundary only within the nearest edge's own tolerance (and the Boolean's, so tolerant
+edges stay as they were). Gate: corpora and parity56 0 differences, corpus5 827 -> 828; shfall 50 -> 51 of 194 (the 2
+known differences); knurls and gears the same, times level. Shell's four 14-16 s slab cases (0acfd0a2, 80a5941f,
+4fca980b, 9aec1f4b) now stop at zero-width pieces: two B-spline edges between the same vertices 2-5 um apart (OCCT's
+ForceInterfEE: apart past te + tg + 2 max(tv)) that coincide in the face's parameter plane. Next (5b): new points by their
+curve's tolerance (OCCT's new vertex: the section's TolR3D; ours the floor since stage 4, so points 0.2-0.5 um apart
+stay apart and regroup 4 rounds: a5f1e564, 25 s), and OCCT's bound pave (a section curve ending inside both faces: a
+vertex there, not "a section without ends").
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 
