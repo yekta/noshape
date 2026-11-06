@@ -251,6 +251,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-06 05:00 release (qa list 03:20, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 05:58: no blocker on green a4433e68** (bool's tolerances, stage 4), one small change: slow1151-pre / -before-extrude's
+  parts are 40183.8115 mm³, not 40183.9505, because the Rust Boolean now takes Draft 4 (0.18 mm³ under OCCT's result; P2
+  BOOL-TOL4-DRAFT-VOLUME). Its full CLI smoke = b1fcb30d's results; the volume sweep and dx's cf corpus are unchanged; so are
+  fa886aef, 46f6caff and 6eb003c4.
 - **qa 04:43: still no blocker on green b1fcb30d** (bool's tolerances, stage 3a: an edge on a face): its full CLI smoke has
   ca1d1b37's results, and the volume sweep and dx's cf corpus = ca1d1b37. The ticket documents differ only in cli-draft-hang2, which
   gave the 37305.64 result (DRAFT-NONDETERMINISTIC, seen on greens too since 11-06). Knurl, five pairs back to back: medians
