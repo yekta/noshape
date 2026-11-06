@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Plan: per-entity tolerances (11-06 02:40 UTC, agreed with the lead)
+## Plan: per-entity tolerances (11-06 02:09 UTC, agreed with the lead)
 Why: the Boolean runs with one tolerance, `tol` = the largest ordinary tolerance among its inputs (rust_boolean.cpp
 `max_tol`: vertices, edges and faces up to kMaxTol 1e-5, tolerant ones handled apart), where OCCT's pave filler tests
 each pair of entities by their own tolerances (+ fuzzy). With a few 1e-5 entities in a Shell input every test in the
