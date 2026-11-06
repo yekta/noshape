@@ -3986,9 +3986,15 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         {
             out.push(format!("{who}: centroid {:?} mm, live {:?}", a.map(|c| c * 1e3), b.map(|c| c * 1e3)));
         }
-        let off = |a: [[f64; 3]; 2], b: [[f64; 3]; 2], j: usize| if l.bbox_outer { (b[0][j] - a[0][j]).max(a[1][j] - b[1][j]) } else { (a[0][j] - b[0][j]).abs().max((a[1][j] - b[1][j]).abs()) };
+        // A free-form part (B-spline faces, ours or live's): live's box is its poles' and display mesh's bounds
+        // (cf-surface-pattern's Thicken 1: its surface's poles 3.3 mm past its edge, the offset side 0.013-0.018 mm
+        // inside ours; volume and area within 0.02 %): ours inside it, within 2e-4 of its diagonal.
+        let freeform = [&o.face_types, &l.face_types].iter().any(|t| t.as_ref().is_some_and(|m| m.get("other").is_some_and(|&n| n > 0)));
+        let outer = l.bbox_outer || freeform;
+        let off = |a: [[f64; 3]; 2], b: [[f64; 3]; 2], j: usize| if outer { (b[0][j] - a[0][j]).max(a[1][j] - b[1][j]) } else { (a[0][j] - b[0][j]).abs().max((a[1][j] - b[1][j]).abs()) };
+        let slack = |b: [[f64; 3]; 2]| if freeform { (2e-4 * (0..3).map(|j| (b[1][j] - b[0][j]).powi(2)).sum::<f64>().sqrt()).max(1e-6) } else { 1e-6 };
         if let (Some(a), Some(b)) = (o.bbox, l.bbox)
-            && (0..3).any(|j| off(a, b, j) > 1e-6)
+            && (0..3).any(|j| off(a, b, j) > slack(b))
         {
             out.push(format!("{who}: box {:?} mm, live {:?}", a.map(|p| p.map(|c| c * 1e3)), b.map(|p| p.map(|c| c * 1e3))));
         }

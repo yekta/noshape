@@ -964,6 +964,12 @@ fn differences_use_lives_bands() {
     assert!(differences(std::slice::from_ref(&loose), &[round(-0.015, 0.015)]).is_empty());
     assert!(differences(&[loose], &[round(-0.016, 0.015)]).iter().any(|d| d.contains("box")));
     assert!(differences(&[round(-0.0154005, 0.0153382)], &[round(-0.015, 0.015)]).iter().any(|d| d.contains("box")));
+    // A free-form part (B-spline faces): live's box is its poles' and display mesh's bounds (cf-surface-pattern's
+    // Thicken 1): ours inside it within 2e-4 of its diagonal is no difference; past that, or a part without, is.
+    let free = |s: PartState| PartState { face_types: kinds(&[("plane", 5), ("other", 1)]), ..s };
+    assert!(differences(&[free(round(-0.015, 0.015))], &[free(round(-0.015, 0.0150025))]).is_empty());
+    assert!(differences(&[free(round(-0.015, 0.015))], &[free(round(-0.015, 0.0151))]).iter().any(|d| d.contains("box")));
+    assert!(differences(&[round(-0.015, 0.015)], &[round(-0.015, 0.0150025)]).iter().any(|d| d.contains("box")));
 }
 
 /// Variables from a Variable Studio (live's `variables` with a studio
