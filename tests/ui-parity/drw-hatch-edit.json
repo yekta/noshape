@@ -1,0 +1,73 @@
+{
+  "name": "drw-hatch-edit",
+  "about": "A hatch inside Front (Hatch region, a click, ✓), its menu: Edit hatch, then closed",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hatch region"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit hatch"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

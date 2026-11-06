@@ -1,0 +1,88 @@
+{
+  "name": "drw-ordinate-add-to-group",
+  "about": "An ordinate group's menu: Add to ordinate dimension group, then Top's far corner",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Ordinate dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            0,
+            -10,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            40,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "0.000 1.575"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Add to ordinate dimension group"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            40,
+            30,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
