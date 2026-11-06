@@ -250,6 +250,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-06 05:00 release (qa list 03:25, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 03:25: no new blocker.** On green 2532af01 (vibe3), the full CLI smoke = v0.4.32's: round trip 67643.716875 / 18 in all
+  six formats, volume sweep = v0.4.32, fixed tickets hold, and the user's cases pass (knurl, vase, split-and-chamfer, Y Ribs, the
+  Gyro matrices: only the picked body changes). RELEASE-BUILD-FILLET-HANG opens in 7 s. The 44 ticket documents and dx's cf
+  corpus are unchanged through the 13 greens since v0.4.32 (aa5ed3ea … 2532af01). Fuzz on vibe3 since v0.4.32: 241 CLI seeds
+  (v0.4.31, v0.4.32 and greens, half with the fallback off), 0 deaths; one 4000 s timeout on v0.4.31 (seed 4895, a Mirror) that
+  didn't reproduce; two new P2 BOOL-DECLINE reasons. **This is the first release CI builds with GCC 15 at baseline x86-64
+  (core 2532af01).** qa checks on the release itself: that it runs on a stock 24.04, that the hang document opens (the old
+  release-vs-green gap of 15 against 10 s is gone now that greens are built at baseline too, P1 MESH-AVX2), the Draft opens,
+  and the Release run's new timing table. Also open, not blockers: P1 DRAFT-NONDETERMINISTIC (now also on green 2532af01, 1 / 12
+  opens), P2 UPDATE-HELPER-LINUX-PARITY (unchanged 0.4.31 → 0.4.32), P2 SAVED-MIRROR-REF-CHANGE. P3 ABOUT-DISABLED is fixed in
+  this green (8c65ff6a).
+
 ## Release blockers for the 2026-11-05 17:00 release (qa list 16:14, checked on green 994114cc; the latest release is v0.4.31)
 - **qa 16:14: no new blocker.** On green 994114cc (vibe3): CLI round trip 67643.716875 / 18 in all six formats; volume sweep = v0.4.25;
   the 44 ticket documents and dx's cf corpus = the previous greens (8cc1b766's SAVED-MIRROR-REF-CHANGE included, P2); fixed
@@ -654,6 +667,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Runs in order: v32 ✓✓✗✓✗✓, green 6 × ✓, v32 ✗✗✗✓✓✓, green 6 × ✓ (✗ = 37305.64). So it seems to need load (core's runs
   were on idle machines) and to show more on the release build, which is slower (GCC 13 OCCT): something time-dependent
   decides Draft 4 / 6. Output: vibe3:~/qa/cli/dn-v32.out.
+  qa 11-06 03:20: **green 2532af01 flips too** (built at baseline like the release since 11-06): 1 / 12 opens gave 37305.64,
+  Draft 7 Ok in 2 / 12, load 3–5.7 (vibe3:~/qa/cli/dn-g2532af01.out). So it isn't release-only; it's rarer on a faster build.
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,
