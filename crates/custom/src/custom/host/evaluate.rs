@@ -1002,11 +1002,16 @@ fn face_pair(a: &k::Shape, b: &k::Shape) -> bool {
 /// std's boolean heuristics then pick Add, as live (qa5 EXT1).
 ///
 /// Only faces on one surface can lie on each other, so only those get the
-/// faces' common; the section runs under a short budget and one that takes
-/// longer counts as crossing (on a fuzz body's curved faces a pair's common
+/// faces' common; the section runs under a bound of work and one that takes
+/// more counts as crossing (on a fuzz body's curved faces a pair's common
 /// and section took up to 28 s, and a Part mirror's editing logic over 11
-/// such parts never finished: qa MIRROR-HANG-402).
+/// such parts never finished: qa MIRROR-HANG-402). Work, not time: the same
+/// answer on a fast or a busy machine (core's DRAFT-NONDETERMINISTIC sweep).
 fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
+    faces_cross_within(a, b, solids, SECTION_WORK)
+}
+
+fn faces_cross_within(a: &k::Shape, b: &k::Shape, solids: bool, work: u64) -> bool {
     if one_surface(a, b) && let Some(c) = k::common(a, b).ok().filter(|c| c.shape.area().is_ok_and(|x| x > 1e-12)) {
         let facing = || {
             let p = c.shape.faces().first()?.bounding_box(false).ok()?.center();
@@ -1014,9 +1019,9 @@ fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
         };
         return solids && facing() == Some(true);
     }
-    let sec = match k::with_call_budget(SECTION_BUDGET, || k::section(a, b)) {
+    let sec = match k::with_section_work(work, || k::section(a, b)) {
         Ok(sec) => sec,
-        Err(e) => return e.to_string().contains("took too long"),
+        Err(e) => return e.to_string().contains("took too much work"),
     };
     let interior = |f: &k::Shape, p: DVec3| {
         let Ok(v) = k::make_vertex(p) else { return false };
@@ -1029,9 +1034,11 @@ fn faces_cross(a: &k::Shape, b: &k::Shape, solids: bool) -> bool {
     })
 }
 
-/// The CPU seconds a section of two touching faces may take in
-/// [`faces_cross`].
-const SECTION_BUDGET: f64 = 0.5;
+/// The steps of work (OCCT's checks of its break hook and progress, run
+/// serially) a section of two touching faces may take in [`faces_cross`]:
+/// about 0.5 s of CPU on vibe5 (a section of a plate with 36 holes, 37k steps
+/// in 37 ms).
+const SECTION_WORK: u64 = 500_000;
 
 /// Whether two faces lie on one plane, cylinder, cone, sphere or torus.
 fn one_surface(a: &k::Shape, b: &k::Shape) -> bool {
@@ -1461,4 +1468,41 @@ fn ev_mesh_points(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         Ok(out)
     })?;
     Ok(Value::array(points))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// faces_cross gives up by work, not time: two faces meeting along a line inside both cross, and with too little
+    /// work for their section they still count as crossing; the same with every core busy (the CPU's speed decided
+    /// it before, core's DRAFT-NONDETERMINISTIC). Two faces meeting only at a boundary don't, unless the work runs out.
+    #[test]
+    fn faces_cross_gives_up_by_work_alike_at_any_load() {
+        let plane = |o: DVec3, n: DVec3, x: DVec3| k::Plane::new(o, n, x);
+        let square = |p: k::Plane| k::make_plane_face(&p, -5.0, 5.0, -5.0, 5.0).unwrap();
+        // Two squares crossing through each other's middles, and two meeting along an edge (an L).
+        let a = square(plane(DVec3::ZERO, DVec3::Z, DVec3::X));
+        let crossing = square(plane(DVec3::ZERO, DVec3::Y, DVec3::X));
+        let abutting = square(plane(DVec3::new(0.0, 5.0, 5.0), DVec3::Y, DVec3::X));
+        let answers = || [(faces_cross(&a, &crossing, false), faces_cross(&a, &abutting, false)), (faces_cross_within(&a, &crossing, false, 1), faces_cross_within(&a, &abutting, false, 1))];
+        let quiet = answers();
+        assert_eq!(quiet, [(true, false), (true, true)]);
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let spinners: Vec<_> = (0..std::thread::available_parallelism().map_or(4, |n| n.get()))
+            .map(|_| {
+                let stop = stop.clone();
+                std::thread::spawn(move || {
+                    let mut x = 0u64;
+                    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                        x = std::hint::black_box(x.wrapping_mul(6364136223846793005).wrapping_add(1));
+                    }
+                })
+            })
+            .collect();
+        let busy = answers();
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        spinners.into_iter().for_each(|t| t.join().unwrap());
+        assert_eq!(busy, quiet);
+    }
 }

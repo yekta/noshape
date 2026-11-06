@@ -206,6 +206,25 @@ fn boolean_once(op: BooleanOp, objects: &[Shape], tools: &[Shape], opts: &Boolea
     Ok(res)
 }
 
+/// Runs `f` with this thread's [`section`]s limited to `steps` of work each (OCCT's checks of its break hook and
+/// progress indicator, run serially: the same count on every machine and load); past it they fail with "section took
+/// too much work". For checks that must give up the same way everywhere (std's collision detection).
+pub fn with_section_work<T>(steps: u64, f: impl FnOnce() -> T) -> T {
+    struct Restore(u64);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ffi::set_section_work(self.0);
+        }
+    }
+    let _restore = Restore(ffi::set_section_work(steps));
+    f()
+}
+
+/// The steps of work the last [`section`] under [`with_section_work`] took on this thread.
+pub fn last_section_work() -> u64 {
+    ffi::last_section_work()
+}
+
 /// Runs `f` with this thread's [`section`]s limited to `seconds` of CPU
 /// each (they fail with "section took too long" past it): for checks that
 /// may give up (std's collision detection in editing logic).

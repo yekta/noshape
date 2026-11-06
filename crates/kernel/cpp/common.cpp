@@ -72,6 +72,7 @@ void fail_invalid(const std::string& msg) { throw std::runtime_error("invalid: "
 void fail_op(const std::string& msg) { throw std::runtime_error("failed: " + msg); }
 
 thread_local Deadline* t_deadline = nullptr;
+thread_local WorkBudget* t_work = nullptr;
 
 double steady_seconds()
 {

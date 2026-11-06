@@ -731,6 +731,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the FeatureScript host's faces_cross (custom/host/evaluate.rs, SECTION_BUDGET 0.5 s CPU) answers "they cross" when
   a section of two faces runs out of it, so a slow or busy machine can answer differently from a fast one on a
   pathological pair (sections take ms otherwise). Not changed: needs a deterministic bound (work, not time).
+  dx 11-06 10:26: faces_cross now bounds its section by work: kernel with_section_work counts OCCT's break-hook and
+  progress checks on the calling thread, the section run serially (500,000 steps, ~0.5 s on vibe5; "section took too
+  much work"). T1: kernel boolean_groups::a_sections_work_bound_answers_alike_at_any_speed (the same step count with
+  every core busy; one step fewer fails), custom host::evaluate::tests::faces_cross_gives_up_by_work_alike_at_any_load.
+  Corpus run 137 unchanged or better (521/753).
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,

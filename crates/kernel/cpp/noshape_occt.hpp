@@ -204,6 +204,25 @@ struct Deadline
 #endif
 };
 extern thread_local Deadline* t_deadline;
+// A bound by work, not time: the break hook's and the progress indicator's checks on this thread (a build run
+// serially makes as many on any machine, at any load). Past `limit` they say stop.
+struct WorkBudget
+{
+  uint64_t limit = 0;
+  uint64_t used  = 0;
+  bool     hit   = false;
+};
+extern thread_local WorkBudget* t_work;
+// One step of work: whether the thread's work budget is spent.
+inline bool work_step()
+{
+  WorkBudget* const w = t_work;
+  if (w == nullptr)
+    return false;
+  if (++w->used > w->limit)
+    w->hit = true;
+  return w->hit;
+}
 double                        steady_seconds();
 // The deadline's clock now.
 double deadline_now(const Deadline& d);
@@ -763,6 +782,8 @@ rust::Vec<double>        bounding_box(const OcShape& s, bool optimal);
 PlaneQ                   find_plane(const OcShape& s, double tolerance);
 PropsF                   props_volume(const OcShape& s);
 double                   set_call_budget(double seconds);
+uint64_t                 set_section_work(uint64_t steps);
+uint64_t                 last_section_work();
 double                   set_blend_budget(double seconds);
 PropsF                   props_volume_precise(const OcShape& s);
 PropsF                   props_surface(const OcShape& s);

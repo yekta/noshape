@@ -343,6 +343,49 @@ fn a_section_under_a_call_budget_gives_up() {
     assert!(s.count(ShapeType::Edge) > 400);
 }
 
+/// with_section_work: a section's bound is a count of work, not time: the same count on every run, also with every core
+/// busy, so a check that gives up answers alike on a fast and a busy machine (core's DRAFT-NONDETERMINISTIC sweep: the
+/// FeatureScript host's faces_cross answered by the CPU's speed). One step fewer than it takes fails, as many succeed.
+#[test]
+fn a_sections_work_bound_answers_alike_at_any_speed() {
+    let plate = make_box_corners(DVec3::ZERO, DVec3::new(50.0, 50.0, 10.0)).unwrap();
+    let mut tools = Vec::new();
+    for i in 0..6 {
+        for j in 0..6 {
+            tools.push(make_cylinder(&Plane::new(DVec3::new(4.0 + 8.0 * i as f64, 4.0 + 8.0 * j as f64, -1.0), DVec3::Z, DVec3::X), 2.0, 12.0, 2.0 * PI).unwrap());
+        }
+    }
+    let holes = boolean(BooleanOp::Cut, &[plate], &tools, &BooleanOptions::default()).unwrap().shape;
+    let tilted = make_box_corners(DVec3::new(-10.0, -10.0, 4.0), DVec3::new(60.0, 60.0, 6.0)).unwrap();
+    let tilted = tilted.transformed(&Transform::Rotate { origin: DVec3::new(25.0, 25.0, 5.0), axis: DVec3::new(1.0, 1.0, 0.0), angle: 0.05 }).unwrap();
+    let run = |steps: u64| {
+        let r = with_section_work(steps, || section(&holes, &tilted)).map(|r| r.shape.count(ShapeType::Edge)).map_err(|e| e.to_string());
+        (r, last_section_work())
+    };
+    let (edges, used) = run(u64::MAX);
+    assert!(edges.as_ref().is_ok_and(|n| *n > 40) && used > 0, "{edges:?} in {used} steps");
+    // Every core busy while it runs again: the same steps.
+    let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let spinners: Vec<_> = (0..std::thread::available_parallelism().map_or(4, |n| n.get()))
+        .map(|_| {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                let mut x = 0u64;
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    x = std::hint::black_box(x.wrapping_mul(6364136223846793005).wrapping_add(1));
+                }
+            })
+        })
+        .collect();
+    let busy = run(u64::MAX);
+    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    spinners.into_iter().for_each(|t| t.join().unwrap());
+    assert_eq!(busy, (edges.clone(), used));
+    let short = run(used - 1).0;
+    assert!(short.as_ref().is_err_and(|e| e.contains("took too much work")), "{short:?}");
+    assert_eq!(run(used), (edges, used));
+}
+
 /// with_blend_budget: a fillet longer than its budget fails with "fillet took
 /// too long" on every platform (off Linux the budget is a deadline OCCT patch
 /// 0007's hook stops the fillet builder at; BUDGET-OFF-LINUX), and without a

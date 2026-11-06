@@ -209,7 +209,7 @@ public:
   ~CancelIndicator() override { Show(nullptr); }
   bool UserBreak() override
   {
-    if (cancelled(myFlag) || myOver)
+    if (work_step() || cancelled(myFlag) || myOver)
       return true;
     const auto now = std::chrono::steady_clock::now();
     // (A CPU clock is a system call: every 5 ms.)
@@ -398,6 +398,8 @@ size_t RustMemoryWatch::budget_mb() { return memory_budget() >> 20; }
 
 extern "C" int noshape_should_break()
 {
+  if (work_step())
+    return 1;
   Deadline* const d = t_deadline;
   if (cancelled(t_cancel))
     return 1;
@@ -7924,6 +7926,9 @@ namespace
 {
 // set_call_budget's: the CPU seconds a section may take (0: no limit).
 thread_local double t_call_budget = 0;
+// set_section_work's: the steps of work a section may take (0: no limit), and the last such section's.
+thread_local uint64_t t_section_work = 0;
+thread_local uint64_t t_last_section_work = 0;
 } // namespace
 
 double set_call_budget(double seconds)
@@ -7933,7 +7938,16 @@ double set_call_budget(double seconds)
   return was;
 }
 
-static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b)
+uint64_t set_section_work(uint64_t steps)
+{
+  const uint64_t was = t_section_work;
+  t_section_work     = steps;
+  return was;
+}
+
+uint64_t last_section_work() { return t_last_section_work; }
+
+static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b, bool parallel = true)
 {
   require_non_null(a.shape, "first shape");
   require_non_null(b.shape, "second shape");
@@ -7941,7 +7955,7 @@ static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b)
   sec.Approximation(true);
   sec.ComputePCurveOn1(true);
   sec.ComputePCurveOn2(true);
-  sec.SetRunParallel(bop_parallel());
+  sec.SetRunParallel(parallel && bop_parallel());
   // Its inputs as they were if a budget stops it (see run_budgeted); stopped
   // through its progress indicator off Linux.
   sec.SetNonDestructive(true);
@@ -7958,6 +7972,37 @@ static OpOut op_section_unbudgeted(const OcShape& a, const OcShape& b)
 // up to 28 s, qa MIRROR-HANG-402).
 OpOut op_section(const OcShape& a, const OcShape& b)
 {
+  // Under set_section_work's bound: serial (every step on this thread, counted), stopped once past it. The same
+  // answer on a fast or a busy machine, unlike a CPU budget (core's DRAFT-NONDETERMINISTIC sweep).
+  if (t_section_work > 0)
+  {
+    WorkBudget        w;
+    WorkBudget* const outer = t_work;
+    w.limit                 = t_section_work;
+    t_work                  = &w;
+    const int pairs         = noshape_bop_set_pairs_parallel_here(0);
+    const auto restore      = [&] {
+      noshape_bop_set_pairs_parallel_here(pairs);
+      t_work              = outer;
+      t_last_section_work = w.used;
+    };
+    OpOut out;
+    try
+    {
+      out = op_section_unbudgeted(a, b, false);
+    }
+    catch (...)
+    {
+      restore();
+      if (w.hit)
+        fail_op("section took too much work");
+      throw;
+    }
+    restore();
+    if (w.hit)
+      fail_op("section took too much work");
+    return out;
+  }
   if (t_call_budget <= 0)
     return op_section_unbudgeted(a, b);
   OpOut     out;
