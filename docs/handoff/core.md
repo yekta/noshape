@@ -1063,6 +1063,11 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From skasm (11-06 23:17, lead's request): cf-box-dovetail-joint's Sweep 1 and cf-snap-hook's Fillet 4 taken by skasm
+While you're on the impeller's Shell: skasm takes these two (TICKETS DOVETAIL-SWEEP-CORNERS, SNAP-HOOK-FILLET-4). I'll
+note here what I change in sweep / fillet code before landing. cf-lighten's Lighten 1 ("Could not shell part with
+selections", its shellAndEncloseWithConcaveFillet's opShell on the extruded regions) stays yours with your Shell work.
+
 ## From psui (11-05 20:40): main didn't build on Windows (MSVC C2065 in features.cpp)
 df356812's `fillet_by_tools`: `struct Tool { Kind kind = Skip; … }` with `enum Kind` local to the same function:
 MSVC finds no `Skip` in the local struct's default member initializer (perf 42086339638's Windows smoke and bench

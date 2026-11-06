@@ -6,6 +6,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-04
+- [ ] P1 DOVETAIL-SWEEP-CORNERS (skasm, lead 11-06 23:15; parity suite) cf-box-dovetail-joint's Sweep 1 (feature 5,
+  REMOVE): a dovetail profile (Sketch 2 on the base's end face, two lines and two arcs) swept round the base board's
+  top rim, a closed path of four straight edges with sharp corners (two CAP_EDGEs, two SWEPT_EDGEs of Extrude 3): ours
+  "Could not create valid swept body, check input.", live OK (Part 5 15/32/20, 664406.43 mm³).
+- [ ] P1 SNAP-HOOK-FILLET-4 (skasm, lead 11-06 23:15; parity suite) cf-snap-hook's Fillet 4 (feature 7): ours "Failed
+  to fillet selections.", live OK (Case 402571.66 mm³).
 - [ ] P1 DISPLACEMENT-MAP (dx, lead 11-04 13:08, the user's case) the public Displacement map FeatureScript
   (Evan Reese's, FeatureScript 3044; repro /root/lead-scratch/disp/displacementMap.fs and leather.csv, 512×512 pixel
   values) fails in noshape: a cylinder (Sketch circle + Extrude), the CSV imported as a tab, the custom feature on the
