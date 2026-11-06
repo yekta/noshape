@@ -36,6 +36,20 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 00:30: v0.4.32 (published 23:33 after the lead re-ran publish; tag 2d7411b38) checked: good, no new blocker.** Linux
+files byte-identical to the smoked artifact, SHA256SUMS OK, 11 assets. CLI smoke = v0.4.31 (round trip, volume sweep, fixed
+tickets, the user's cases incl. the Gyro), faster rows (vase shells 3.9 → 3.0 s etc.); **RELEASE-BUILD-FILLET-HANG verified**
+(9 s on vibe3). GUI rows (vibe3 :63, qa-relgui432.sh) pixel-identical to v0.4.31. Title bar: all five menus open on the release
+app (tickets/titlebar-menus-linux-v0432.png; About still greyed out there, its fix 8c65ff6a is after the cut). Memory (qa-mem432.sh on
+vibe3): 508 peak 748 MB, 685 501 MB. Updater 0.4.31 → 0.4.32 (v0.4.31's helper, a fresh `noshape mcp` running): ends on 0.4.32,
+g34 reopened; the mcp copy left on the deleted binary and no helper log (UPDATE-HELPER-LINUX-PARITY, noted). The app also showed
+"Set up noshape" on that start (dismissed: Not now). Ticket documents on the release CLI = v0.4.31, except
+cli-suppress-stall (SAVED-MIRROR-REF-CHANGE, known) and **cli-draft-hang2: DRAFT-NONDETERMINISTIC reproduced** (5 / 12 opens
+on v0.4.32 on a loaded vibe3; exact recipe in the ticket for core). Fuzz: v0.4.31 seed 4895 timed out (4000 s) at step 100's
+Mirror; replays on v0.4.32 / e6600518 / v0.4.31 ran to the end but took other paths (the session isn't repeatable under load):
+not filed. Greens since: aa5ed3ea, 1a89a93a, 96880e21, e6600518: sweeps unchanged; 98d4e3e0 running. Loops: v3cf6.sh (v0.4.31,
+4881–4940), v3nf7.sh (aa5ed3ea fallback off, 4941–5000); the next cf batch goes on v0.4.32 (bin/w-v32.sh). Next: the 04:30 list.
+
 **11-05 23:30: v0.4.32 is not published. Its Release run 42118667359 (tag 2d7411b38) built, signed and checked on all three
 OSs, but `publish`'s `gh release create` got HTTP 500 from api.github.com twice (attempt 1 at 23:21, attempt 2 at 23:25). No
 draft or partial release was left; v0.4.31 is still Latest. GitHub status: all operational; the notes are 1.4 kB. The lead needs
