@@ -67,6 +67,11 @@ carries its edge's (GEdge::t, seg_edge_tol for edges lying on faces) or its sect
 larger. Gate: corpora and parity56 identical, 0 differences; shfall 46/194 (4 declines one step on); knurls and gears
 the same; cf-spur-gear against OCCT's time on the same run +3 % on average over 5 rounds on a loaded vibe4 (+5 %, +5 %,
 +4 %, +6 %, 0 %), the knurls level. Next: stage 4 (sections' placing and ends, new points by their section's tolerance).
+Stage 4 (11-06 05:32 UTC): a section's crossings and ends (intervals_on's tol / vtol) by the curve's own accuracy and
+tolerance (Pool::pair with the floor), not the Boolean's; a new point (Pool::find) by the floor (1e-7), not half the
+Boolean's tolerance. Gate: corpora and parity56 identical, 0 differences; shfall 46 -> 50 of 194 taken (the 2 known
+differences, 18 equivalent); knurls and gears the same, times level. Next: stage 5 (the grey band by the local
+tolerance, then `tol` to the floor and the tolerant-input preflight).
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 

@@ -616,7 +616,7 @@ impl Pool {
     /// Boolean's, OCCT's new vertex's: against a tolerant vertex the reach is the two's sum (two coplanar sheets' edges
     /// crossing 1e-4 from the other's vertex of tolerance 1e-4, which was on that edge by the sum with the edge's).)
     fn find(&self, p: DVec3) -> R<Option<u32>> {
-        self.find_tol(p, 0.5 * self.tol)
+        self.find_tol(p, self.floor)
     }
 
     /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
@@ -1321,9 +1321,9 @@ impl Ctx<'_> {
             Path::Nurbs { id, .. } => {
                 let nc = &self.ncurves[*id as usize];
                 let other = nc.sec.as_ref().and_then(|x| x.0.into_iter().find(|&g| g != f));
-                (self.tol.max(nc.acc), self.tol.max(nc.tol), other)
+                (self.pool.pair(nc.acc, 0.0), self.pool.pair(nc.tol, 0.0), other)
             }
-            _ => (self.tol, self.tol, None),
+            _ => (self.pool.pair(0.0, 0.0), self.pool.pair(0.0, 0.0), None),
         };
         let len = path.length(t0, t1);
         if len <= vtol {
