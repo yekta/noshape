@@ -153,22 +153,29 @@ impl AssemblyView {
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
             items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
         }
-        let dialog = self.mate.as_ref().map(|s| {
-            let d = s.dialog.read(cx);
-            let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
-            json!({
-                "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
-                "fields": d.ui_fields(),
-                "error": null, "ok": if complete { "enabled" } else { "disabled" }
+        let mut dialogs: Vec<Value> = self
+            .mate
+            .as_ref()
+            .map(|s| {
+                let d = s.dialog.read(cx);
+                let complete = d.a.is_some() && d.b.is_some() && !d.same_instance();
+                json!({
+                    "title": d.name, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [],
+                    "fields": d.ui_fields(),
+                    "error": null, "ok": if complete { "enabled" } else { "disabled" }
+                })
             })
-        });
+            .into_iter()
+            .collect();
+        dialogs.extend(self.other_dialogs(cx));
+        let dialog = dialogs.last().cloned();
         // The mate dialog's empty query box has the focus (live: field "Mate connectors").
         let focus = self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } })).unwrap_or_else(|| json!({ "kind": "none" }));
         let history = self.history_state(cx);
         json!({
             "focus": focus,
             "dialog": dialog,
-            "dialogs": dialog.iter().cloned().collect::<Vec<_>>(),
+            "dialogs": dialogs,
             // An open menu (a row's, the graphics area's): its rows, as the Part Studio's.
             "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))),
             "selection": { "count": items.len(), "items": items },
@@ -179,5 +186,160 @@ impl AssemblyView {
             "sketch": null,
             "assembly": { "instances": instances, "mates": mates }
         })
+    }
+}
+
+impl AssemblyView {
+    /// The assembly's other open dialogs as the suite records them, in live's field format (as the mate dialog's):
+    /// Mate connector, Group, the patterns / Mirror / Replicate, the relations, Replace instance, Insert.
+    fn other_dialogs(&self, cx: &App) -> Vec<Value> {
+        let mut out = Vec::new();
+        let labeler = self.labeler(cx);
+        let asm = self.assembly(cx);
+        let names: HashMap<InstanceId, String> = asm.map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
+        let mate_name = |id: MateId| asm.and_then(|a| a.mates.iter().find(|m| m.id == id).map(|m| m.name.clone())).unwrap_or_default();
+        let query = |label: &str, items: Vec<String>, active: bool, missing: bool| json!({ "label": label, "kind": "query", "items": items, "active": active, "state": if missing { "error" } else { "ok" } });
+        let number = |label: Value, text: String| json!({ "label": label, "kind": "number", "text": text, "state": "ok" });
+        let quantity = |st: &Entity<crate::quantity_field::QuantityInput>| st.read(cx).text().to_string();
+        let check = |label: &str, on: bool| json!({ "label": label, "kind": "boolean", "checked": on, "state": "ok" });
+        let toggle = |on: bool| json!({ "label": "toggle", "kind": "toggle", "checked": on, "state": "ok" });
+        let choice = |text: &str| json!({ "label": null, "kind": "enum", "text": text, "state": "ok" });
+        let other = |text: &str| json!({ "label": null, "kind": "other", "text": text, "state": "ok" });
+        let dialog = |title: String, complete: bool, ok: bool, fields: Vec<Value>| json!({ "title": title, "titleState": if complete { "ok" } else { "error" }, "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": if ok { "enabled" } else { "disabled" } });
+        // An entity as its field names it ("Face of Part 1 <3>"; the origin "Origin").
+        let entity = |r: &MateConnectorRef| -> String {
+            if r.instance == InstanceId::ORIGIN && r.connector.is_none() {
+                return "Origin".into();
+            }
+            let mut r = r.clone();
+            if let Reference::Implicit { on, .. } = &r.reference {
+                r.reference = (**on).clone();
+            }
+            labeler(&r)
+        };
+        if let Some(s) = &self.mc {
+            // Rows as the Part Studio's Mate connector (its rows read the same in live), less owner and attachment.
+            let slot = |k: usize| s.active && s.slot == k;
+            let picked = |k: usize| if k == 0 { s.on.as_ref() } else { s.extra[k - 1].as_ref() }.map(&entity).into_iter().collect::<Vec<_>>();
+            let mut fields = vec![choice(if s.between { "Between entities" } else { "On entity" }), query("Origin entity", picked(0), slot(0), false)];
+            if s.between {
+                fields.push(query("Between entity", picked(1), slot(1), false));
+            }
+            fields.push(check("Realign", s.realign));
+            if s.realign {
+                fields.push(query("Primary axis entity", picked(2), slot(2), false));
+                fields.push(query("Secondary axis entity", picked(3), slot(3), false));
+            }
+            fields.push(check("Move", s.moving));
+            if s.moving {
+                // X / Y / Z rows show an axis icon for their label (read "").
+                fields.extend(s.inputs[..3].iter().map(|st| number(json!(""), quantity(st))));
+                fields.push(choice(["Rotate about X", "Rotate about Y", "Rotate about Z"][usize::from(s.rot_axis.min(2))]));
+                fields.push(number(json!("Rotation angle"), quantity(&s.inputs[3])));
+            }
+            fields.push(toggle(s.flip));
+            fields.push(other(""));
+            let failed = self.result.connectors.iter().any(|c| c.id == s.id && c.message.is_some());
+            let title = if s.implicit { "Mate connector".to_string() } else { s.name.clone() };
+            out.push(dialog(title, s.on.is_some() && !failed, s.on.is_some(), fields));
+        }
+        if let Some(s) = &self.pattern {
+            let seeds: Vec<String> = s.seeds.iter().filter_map(|i| names.get(i).cloned()).collect();
+            let axis = |r: &Option<MateConnectorRef>, mirror: bool| -> Vec<String> {
+                r.iter()
+                    .map(|r| match (&r.reference, &r.connector) {
+                        (Reference::Implicit { .. }, None) if mirror => "Mate connector".to_string(),
+                        _ => entity(r),
+                    })
+                    .collect()
+            };
+            let mut fields = vec![query(if s.kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" }, seeds, s.active.is_none(), false)];
+            match s.kind {
+                PatternDialogKind::Linear | PatternDialogKind::Circular => {
+                    let circular = s.kind == PatternDialogKind::Circular;
+                    fields.push(query(if circular { "Axis of pattern" } else { "Direction" }, axis(&s.axis, false), s.active == Some(0), false));
+                    fields.push(number(json!(if circular { "Angle" } else { "Distance" }), quantity(&s.distance)));
+                    fields.push(number(json!("Instance count"), quantity(&s.count)));
+                    fields.push(toggle(s.opposite));
+                    fields.push(check("Equal spacing", s.equal));
+                    fields.push(check("Centered", s.centered));
+                    if !circular {
+                        fields.push(check("Second direction", s.second));
+                        if s.second {
+                            fields.push(query("Direction", axis(&s.axis2, false), s.active == Some(1), false));
+                            fields.push(number(json!("Distance"), quantity(&s.distance2)));
+                            fields.push(number(json!("Instance count"), quantity(&s.count2)));
+                            fields.push(toggle(s.opposite2));
+                        }
+                    }
+                }
+                PatternDialogKind::Mirror => {
+                    fields.push(query("Mirror plane", axis(&s.axis, true), s.active == Some(0), false));
+                    fields.push(other("Mirror strategy…"));
+                }
+                PatternDialogKind::PartPattern | PatternDialogKind::Replicate => {
+                    fields.push(query("Mate to be matched", s.mate.map(mate_name).into_iter().collect(), false, false));
+                    if s.kind == PatternDialogKind::Replicate {
+                        use noshape_model::assembly::ReplicateScope;
+                        let scope = self.replicate_scope(s, cx);
+                        fields.push(choice(scope.label()));
+                        let refs: Vec<String> = s
+                            .scope_refs
+                            .iter()
+                            .map(|r| {
+                                let part = names.get(&r.instance).cloned().unwrap_or_default();
+                                match &r.entity {
+                                    Some(Reference::Face(_)) => format!("Face of {part}"),
+                                    Some(Reference::Edge(_)) => format!("Edge of {part}"),
+                                    _ => part,
+                                }
+                            })
+                            .collect();
+                        let empty = refs.is_empty();
+                        fields.push(query(if scope == ReplicateScope::EdgesOnFace { "Faces to find match in" } else { "Parts to find match in" }, refs, s.active == Some(2), empty));
+                    }
+                }
+            }
+            let complete = !s.seeds.is_empty()
+                && match s.kind {
+                    PatternDialogKind::Linear | PatternDialogKind::Circular | PatternDialogKind::Mirror => s.axis.is_some(),
+                    PatternDialogKind::PartPattern => s.mate.is_some(),
+                    PatternDialogKind::Replicate => s.mate.is_some() && !s.scope_refs.is_empty(),
+                };
+            out.push(dialog(s.name.clone(), complete, complete, fields));
+        }
+        if let Some((editing, ids)) = &self.ui.group {
+            let title = match editing {
+                Some(g) => asm.and_then(|a| a.groups.iter().find(|x| x.id == *g).map(|x| x.name.clone())).unwrap_or_else(|| "Group".into()),
+                None => asm.map(|a| a.next_feature_name("Group")).unwrap_or_else(|| "Group 1".into()),
+            };
+            let complete = ids.len() >= 2 || !self.ui.group_patterns.is_empty();
+            out.push(dialog(title, complete, true, vec![query("Instances", ids.iter().filter_map(|i| names.get(i).cloned()).collect(), true, false)]));
+        }
+        if let Some(r) = &self.relation {
+            let mates: Vec<String> = [r.a, r.b].into_iter().flatten().map(mate_name).collect();
+            let complete = r.a.is_some() && r.b.is_some();
+            let fields = vec![
+                choice(noshape_ops::assembly::relation_name(r.kind)),
+                query("Mate(s)", mates, true, false),
+                number(json!(noshape_ops::assembly::relation_value_label(r.kind)), r.ratio.read(cx).value().to_string()),
+                check("Reverse direction", r.reverse),
+            ];
+            out.push(dialog(self.relation_name(cx), complete, complete, fields));
+        }
+        if let Some(s) = &self.replace_panel {
+            let fields = vec![
+                query("Instances to replace", s.instances.iter().filter_map(|i| names.get(i).cloned()).collect(), !s.picking, false),
+                check("Replace all instances", s.all),
+                other(s.replacement.as_ref().map_or("Select replacement component", |(_, n)| n.as_str())),
+            ];
+            let complete = s.replacement.is_some();
+            out.push(dialog("Replace instance".into(), complete, complete, fields));
+        }
+        if self.insert_open {
+            // A list panel, not a feature dialog: its title (its rows aren't fields).
+            out.push(json!({ "title": "Insert parts and assemblies", "titleState": "ok", "kind": "other", "tabs": [], "fields": [], "error": null, "ok": null }));
+        }
+        out
     }
 }
