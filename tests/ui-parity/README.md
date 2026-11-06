@@ -303,14 +303,16 @@ centermarks and centerlines, hole callout, datum, GD&T, surface finish, callout,
 dropdown's other kinds, ordinate dimension, revision table, table, export formats, a view's and a note's context
 menus, the tools' keys), batch 4 (8 sheet scenarios: the sheet_tab target, the sheet menu, Insert sheet, the sheet keys)
 and batch 5 (14: the remaining dimension, centerline, GD&T and table tools, a note's, a view's and a table's menu
-items) give (11-06 21:24; drw-revision-table dropped: live's free plan has no Revision table tool):
+items), batch 6 (16: the empty sheet's, a view's Show/hide, a note's order and the tables' properties menus) and
+batch 7 (12: a dimension's, a view's and a general table's cells' menus) give (11-06 22:46; drw-revision-table dropped:
+live's free plan has no Revision table tool):
 
-57 drw-* scenarios
+85 drw-* scenarios
 
 | kind | covered |
 |---|---|
 | tool | 42/58 |
-| menu | 14/119 |
+| menu | 32/119 |
 | shortcut | 10/14 |
 | export | 4/10 |
 
@@ -321,10 +323,10 @@ items) give (11-06 21:24; drw-revision-table dropped: live's free plan has no Re
 | export | 4/10 |
 | insert views | 4/5 |
 | notes | 12/16 |
-| other | 11/94 |
+| other | 23/94 |
 | section / detail / broken-out | 3/17 |
-| sheets | 10/13 |
-| tables | 5/16 |
+| sheets | 13/13 |
+| tables | 8/16 |
 
 ## Comparison
 

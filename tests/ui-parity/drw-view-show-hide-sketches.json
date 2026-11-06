@@ -1,0 +1,38 @@
+{
+  "name": "drw-view-show-hide-sketches",
+  "about": "Front's menu: Show/hide ▸ Show/hide sketches…, then closed",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, the biggest gap, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show/hide"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Show/hide sketches..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

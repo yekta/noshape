@@ -1,0 +1,34 @@
+{
+  "name": "drw-canvas-drawing-properties",
+  "about": "The empty sheet's menu: Drawing properties…, then closed",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, the biggest gap, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          150,
+          110
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Drawing properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

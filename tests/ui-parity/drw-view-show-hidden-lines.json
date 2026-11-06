@@ -1,0 +1,29 @@
+{
+  "name": "drw-view-show-hidden-lines",
+  "about": "Front's menu: Show/hide ▸ Show hidden lines (the hole's)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, the biggest gap, most-used first)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show/hide"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Show hidden lines"
+      }
+    }
+  ]
+}
