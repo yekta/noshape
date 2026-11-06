@@ -345,7 +345,20 @@ fn exchange_round_trip() {
             continue;
         }
         let (selfs, theirs) = (read_json(&dir.join("live-self.json")), read_json(&dir.join("live-ours.json")));
-        let expected = |format: &str| (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"));
+        // Live's own import of a format, unless it is off from its Parasolid import's volume by over 0.1 % (live read
+        // its own STEP of cf-wave-spring as 7559 mm³ for 916.5: Onshape's failure is no target): then the Parasolid's.
+        let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
+        let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
+        let expected = |format: &str| -> Option<Vec<PartState>> {
+            let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"))?;
+            match &xt {
+                Some(x) if format != "STL" && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
+                    println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
+                    Some(x.clone())
+                }
+                _ => Some(own),
+            }
+        };
         // Live's files in ours.
         for (format, ext) in FORMATS {
             let file = dir.join(format!("live.{ext}"));

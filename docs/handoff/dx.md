@@ -248,6 +248,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     73 ms: kernel), cf-sheet-metal-model-plus 1.4 s / 0.92 (Extrude 4, Up to Part, Flange 1: SM-BOOLEAN-SPEED).
   - 2132: rerun the corpus when live ticks it (quota back ~05:45 11-07); skasm and core get their first differences.
   - drw-dimension-radius / drw-hole-table: recorded before live's 2134 recorder fix; re-record asked (REQUESTS 09:13).
+- 11-06 13:05 (lead 11-06: drawing coverage, exchange suite): drw-* 16/16 (94/94). tools/ui-parity/coverage_drawing.py;
+  batch 3 (20 scenarios) asked of live (REQUESTS 11:01). Exchange suite (PARITY-SUITES §3, /root/parity/exchange, T2
+  parity::exchange_round_trip): batch 1's 12 documents in; landed: swept surfaces / G1 rings / PART_XMT_BLOCK in our
+  Parasolid, ring pieces counted as one vertexless edge, the reader of live's multi-part files (a regression of mine,
+  473fb899 → fixed a6b43aba within 10 min). live-ours.json is stale (REQUESTS 12:4x asks for a re-import of the 12:33
+  files). Next in exchange: IGES face splitting on import, cf-spur-gear STEP −0.3 %, cf-o-ring spun +0.06 %, sheet
+  metal STEP faces 54 vs 30, motor-mount STEP rings 28/8 vs 24/0, hose STEP edges.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
