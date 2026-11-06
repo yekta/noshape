@@ -46,6 +46,7 @@
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepGProp.hxx>
+#include <BRepPrimAPI_MakePrism.hxx>
 #include <OSD_Parallel.hxx>
 #include <BRep_Tool.hxx>
 #include <Geom2d_Curve.hxx>
@@ -7487,6 +7488,256 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   return make_result(inputs, res, hist.get(), &srcs);
 }
 
+namespace
+{
+// One solid split by one planar face covering its whole section (a convex polygon holding the projection of the
+// solid's box): the solid's common with the half-space on the face's side and its cut by it, by noshape's Boolean, with
+// OCCT's Splitter's history (the tool face Modified into the section faces). False where it doesn't apply or declines.
+bool split_by_plane_ours(const TopoDS_Shape& a, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
+{
+  if (!rust_boolean_on() || a.ShapeType() != TopAbs_SOLID || tool.ShapeType() != TopAbs_FACE)
+    return false;
+  const TopoDS_Face   f = TopoDS::Face(tool);
+  BRepAdaptor_Surface su(f, false);
+  if (su.GetType() != GeomAbs_Plane)
+    return false;
+  // A convex polygon: one wire of straight edges turning one way.
+  ShapeIMap wires;
+  TopExp::MapShapes(f, TopAbs_WIRE, wires);
+  if (wires.Extent() != 1)
+    return false;
+  const gp_Pln        pl = su.Plane();
+  const gp_Dir        n  = pl.Axis().Direction();
+  std::vector<gp_Pnt> poly;
+  for (BRepTools_WireExplorer w(TopoDS::Wire(wires(1)), f); w.More(); w.Next())
+  {
+    if (BRepAdaptor_Curve(w.Current()).GetType() != GeomAbs_Line)
+      return false;
+    poly.push_back(BRep_Tool::Pnt(w.CurrentVertex()));
+  }
+  if (poly.size() < 3)
+    return false;
+  int turn = 0;
+  for (size_t i = 0; i < poly.size(); ++i)
+  {
+    const gp_Vec u(poly[i], poly[(i + 1) % poly.size()]), v(poly[(i + 1) % poly.size()], poly[(i + 2) % poly.size()]);
+    const double c = u.Crossed(v).Dot(gp_Vec(n));
+    if (std::abs(c) <= 1e-18)
+      continue;
+    const int sg = c > 0 ? 1 : -1;
+    if (turn != 0 && sg != turn)
+      return false;
+    turn = sg;
+  }
+  // The solid's box, its corners on the plane inside the polygon.
+  Bnd_Box bb;
+  BRepBndLib::Add(a, bb, false);
+  if (bb.IsVoid())
+    return false;
+  double x0, y0, z0, x1, y1, z1;
+  bb.Get(x0, y0, z0, x1, y1, z1);
+  for (int k = 0; k < 8; ++k)
+  {
+    const gp_Pnt c((k & 1) ? x1 : x0, (k & 2) ? y1 : y0, (k & 4) ? z1 : z0);
+    const gp_Pnt q = c.Translated(gp_Vec(n) * -gp_Vec(pl.Location(), c).Dot(gp_Vec(n)));
+    BRepClass_FaceClassifier fc(f, q, Precision::Confusion());
+    if (fc.State() != TopAbs_IN && fc.State() != TopAbs_ON)
+      return false;
+  }
+  // The half-space: a square on the plane past the box, swept along the normal past it.
+  const double size = 2 * std::sqrt(bb.SquareExtent()) + 1;
+  const gp_Pnt mid  = gp_Pnt((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  const gp_Pnt o    = mid.Translated(gp_Vec(n) * -gp_Vec(pl.Location(), mid).Dot(gp_Vec(n)));
+  const gp_Pln sq(gp_Ax3(o, n, pl.Position().XDirection()));
+  const TopoDS_Face base = BRepBuilderAPI_MakeFace(sq, -size, size, -size, size).Face();
+  BRepPrimAPI_MakePrism hp(base, gp_Vec(n) * size, false, true);
+  if (!hp.IsDone())
+    return false;
+  const TopoDS_Shape h = hp.Shape();
+  TopoDS_Face        hbase;
+  for (TopExp_Explorer e(h, TopAbs_FACE); e.More(); e.Next())
+  {
+    BRepAdaptor_Surface hs(TopoDS::Face(e.Current()), false);
+    if (hs.GetType() == GeomAbs_Plane && std::abs(gp_Vec(hs.Plane().Location(), o).Dot(gp_Vec(n))) <= 1e-12 * size &&
+        hs.Plane().Axis().Direction().IsParallel(n, 1e-12))
+      hbase = TopoDS::Face(e.Current());
+  }
+  if (hbase.IsNull())
+    return false;
+  TopoDS_Shape                          parts[2];
+  HHist                                 hs[2];
+  for (int k = 0; k < 2; ++k)
+  {
+    std::vector<const OcShape*>           srcs;
+    std::vector<std::unique_ptr<OcShape>> own;
+    if (!rust_boolean(k == 0 ? 2 : 1, {a, h}, srcs, own, parts[k], hs[k], 0.0, false))
+      return false;
+    if (!TopExp_Explorer(parts[k], TopAbs_SOLID).More())
+      return false;
+  }
+  // The halves share their cut faces, edges and vertices, as OCCT's Splitter's (the display meshes faces shared between
+  // bodies once, and names go by them): the cut's replaced by the common's, matched by place.
+  occ::handle<BRepTools_History> moved;
+  {
+    if (hs[0].IsNull() || hs[1].IsNull())
+      return false;
+    std::vector<TopoDS_Face> cuts[2];
+    for (int k = 0; k < 2; ++k)
+      for (ShapeList::Iterator it(hs[k]->Modified(hbase)); it.More(); it.Next())
+        cuts[k].push_back(TopoDS::Face(it.Value()));
+    // (Each of the common's matched in the cut's; the cut's others are the solid's own faces on the plane (a board's top
+    // around the parts standing on it: cf-fix-pcb), not shared.)
+    if (cuts[0].empty() || cuts[0].size() > cuts[1].size())
+      return false;
+    auto props = [](const TopoDS_Face& x) {
+      GProp_GProps g;
+      BRepGProp::SurfaceProperties(x, g);
+      return std::make_pair(g.Mass(), g.CentreOfMass());
+    };
+    auto tol_of = [](const TopoDS_Shape& x, const TopoDS_Shape& y) { return 2 * (BRep_Tool::MaxTolerance(x, TopAbs_VERTEX) + BRep_Tool::MaxTolerance(y, TopAbs_VERTEX)) + 1e-9; };
+    occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape;
+    std::vector<std::pair<double, gp_Pnt>> p2;
+    for (const TopoDS_Face& x : cuts[1])
+      p2.push_back(props(x));
+    std::vector<char> used(cuts[1].size(), 0);
+    for (const TopoDS_Face& f1 : cuts[0])
+    {
+      const auto [a1, c1] = props(f1);
+      size_t     found = cuts[1].size();
+      for (size_t i = 0; i < cuts[1].size() && found == cuts[1].size(); ++i)
+        if (!used[i] && std::abs(p2[i].first - a1) <= 1e-9 * std::max(a1, p2[i].first) && p2[i].second.Distance(c1) <= tol_of(f1, cuts[1][i]))
+          found = i;
+      if (found == cuts[1].size())
+        return false;
+      used[found]           = 1;
+      const TopoDS_Face& f2 = cuts[1][found];
+      const double       tol = tol_of(f1, f2);
+      ShapeIMap          v1s, e1s;
+      TopExp::MapShapes(f1, TopAbs_VERTEX, v1s);
+      TopExp::MapShapes(f1, TopAbs_EDGE, e1s);
+      NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> vmap;
+      for (TopExp_Explorer x(f2, TopAbs_VERTEX); x.More(); x.Next())
+      {
+        if (vmap.IsBound(x.Current()))
+          continue;
+        const gp_Pnt p = BRep_Tool::Pnt(TopoDS::Vertex(x.Current()));
+        int          found = 0;
+        for (int i = 1; i <= v1s.Extent() && found == 0; ++i)
+          if (BRep_Tool::Pnt(TopoDS::Vertex(v1s(i))).Distance(p) <= tol)
+            found = i;
+        if (found == 0)
+          return false;
+        vmap.Bind(x.Current(), v1s(found));
+        rs->Replace(x.Current().Oriented(TopAbs_FORWARD), v1s(found).Oriented(TopAbs_FORWARD));
+      }
+      for (TopExp_Explorer x(f2, TopAbs_EDGE); x.More(); x.Next())
+      {
+        const TopoDS_Edge e2 = TopoDS::Edge(x.Current().Oriented(TopAbs_FORWARD));
+        if (rs->IsRecorded(e2))
+          continue;
+        TopoDS_Vertex a2v, b2v;
+        TopExp::Vertices(e2, a2v, b2v);
+        BRepAdaptor_Curve ca(e2);
+        const gp_Pnt      m2 = ca.Value(0.5 * (ca.FirstParameter() + ca.LastParameter()));
+        int               found = 0;
+        bool              same  = true;
+        for (int i = 1; i <= e1s.Extent() && found == 0; ++i)
+        {
+          const TopoDS_Edge e1 = TopoDS::Edge(e1s(i).Oriented(TopAbs_FORWARD));
+          TopoDS_Vertex     a1v, b1v;
+          TopExp::Vertices(e1, a1v, b1v);
+          BRepAdaptor_Curve cb(e1);
+          if (cb.Value(0.5 * (cb.FirstParameter() + cb.LastParameter())).Distance(m2) > tol)
+            continue;
+          if (a1v.IsSame(vmap.Find(a2v)) && b1v.IsSame(vmap.Find(b2v)))
+            found = i, same = true;
+          else if (a1v.IsSame(vmap.Find(b2v)) && b1v.IsSame(vmap.Find(a2v)))
+            found = i, same = false;
+        }
+        if (found == 0)
+          return false;
+        rs->Replace(e2, e1s(found).Oriented(same ? TopAbs_FORWARD : TopAbs_REVERSED));
+      }
+      // (Its normal the way the cut's own face's was.)
+      BRepAdaptor_Surface sa(f1, false), sb(f2, false);
+      const bool alike = sa.Plane().Axis().Direction().Dot(sb.Plane().Axis().Direction()) > 0;
+      rs->Replace(f2.Oriented(TopAbs_FORWARD), f1.Oriented(alike ? TopAbs_FORWARD : TopAbs_REVERSED));
+    }
+    parts[1] = rs->Apply(parts[1]);
+    moved    = rs->History();
+  }
+  // Where the cut's own history's images went in the sharing.
+  auto shared = [&](const TopoDS_Shape& x, const std::function<void(const TopoDS_Shape&)>& add) {
+    if (moved.IsNull() || !moved->IsSupportedType(x) || (moved->Modified(x).IsEmpty() && !moved->IsRemoved(x)))
+    {
+      add(x);
+      return;
+    }
+    for (ShapeList::Iterator it(moved->Modified(x)); it.More(); it.Next())
+      add(it.Value());
+  };
+  // The history: an argument's sub-shape kept where either kept it, its images in both, removed where both removed it;
+  // the tool face into the half-space's base face's images; its edges and vertices gone.
+  hist = new BRepTools_History();
+  for (TopAbs_ShapeEnum kind : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+  {
+    ShapeIMap m;
+    TopExp::MapShapes(a, kind, m);
+    for (int i = 1; i <= m.Extent(); ++i)
+    {
+      bool removed = true;
+      for (int k = 0; k < 2; ++k)
+      {
+        const HHist& x = hs[k];
+        if (x.IsNull())
+        {
+          removed = false;
+          continue;
+        }
+        if (!x->IsRemoved(m(i)))
+          removed = false;
+        for (ShapeList::Iterator it(x->Modified(m(i))); it.More(); it.Next())
+          shared(it.Value(), [&](const TopoDS_Shape& y) { hist->AddModified(m(i), y); });
+        for (ShapeList::Iterator it(x->Generated(m(i))); it.More(); it.Next())
+          shared(it.Value(), [&](const TopoDS_Shape& y) { hist->AddGenerated(m(i), y); });
+      }
+      // (Kept by the cut and rebuilt by the sharing: its new self.)
+      if (!hs[1]->IsRemoved(m(i)) && hs[1]->Modified(m(i)).IsEmpty() && !moved.IsNull() && moved->IsSupportedType(m(i)) && !moved->Modified(m(i)).IsEmpty())
+        for (ShapeList::Iterator it(moved->Modified(m(i))); it.More(); it.Next())
+          hist->AddModified(m(i), it.Value());
+      if (removed)
+        hist->Remove(m(i));
+    }
+  }
+  // (The shared cut faces once, the common's; the cut's own besides.)
+  for (ShapeList::Iterator it(hs[0]->Modified(hbase)); it.More(); it.Next())
+    hist->AddModified(f, it.Value());
+  for (ShapeList::Iterator it(hs[1]->Modified(hbase)); it.More(); it.Next())
+    if (moved.IsNull() || !moved->IsRemoved(it.Value()))
+      shared(it.Value(), [&](const TopoDS_Shape& y) {
+        bool dup = false;
+        for (ShapeList::Iterator jt(hist->Modified(f)); jt.More() && !dup; jt.Next())
+          dup = jt.Value().IsSame(y);
+        if (!dup)
+          hist->AddModified(f, y);
+      });
+  for (int k = 0; k < 2; ++k)
+    for (ShapeList::Iterator it(hs[k]->Generated(hbase)); it.More(); it.Next())
+      shared(it.Value(), [&](const TopoDS_Shape& y) { hist->AddGenerated(f, y); });
+  for (TopAbs_ShapeEnum kind : {TopAbs_EDGE, TopAbs_VERTEX})
+    for (TopExp_Explorer e(f, kind); e.More(); e.Next())
+      hist->Remove(e.Current());
+  BRep_Builder    b;
+  TopoDS_Compound c;
+  b.MakeCompound(c);
+  for (const TopoDS_Shape& p : parts)
+    for (TopExp_Explorer e(p, TopAbs_SOLID); e.More(); e.Next())
+      b.Add(c, e.Current());
+  out = c;
+  return true;
+}
+} // namespace
+
 OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
 {
   if (args.items.empty())
@@ -7501,6 +7752,27 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
     a.push_back(facet_mesh(x, facets));
   for (const TopoDS_Shape& x : tools.items)
     t.push_back(facet_mesh(x, facets));
+  // A solid split by one planar face across it: noshape's Boolean (cf-fix-pcb's 328-face board: OCCT's 470 ms).
+  if (a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && std::getenv("NOSHAPE_SPLIT_OCCT") == nullptr)
+  {
+    TopoDS_Shape out;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("split.ours");
+      done = split_by_plane_ours(a[0], t[0], out, h);
+    }
+    if (done)
+    {
+      if (opts.unify)
+      {
+        const KernelTimer timer("split.ours.unify");
+        out = unify(out, h);
+      }
+      const KernelTimer timer("split.ours.result");
+      return make_result(concat(args.items, tools.items), out, h.get());
+    }
+  }
   BRepAlgoAPI_Splitter sp;
   sp.SetArguments(to_list(a));
   sp.SetTools(to_list(t));

@@ -1335,3 +1335,45 @@ fn equal_results_unify_to_equal_volumes() {
     assert_eq!(unified_volume(&ours).to_bits(), vo.to_bits());
     assert_eq!(unified_volume(&occt).to_bits(), vc.to_bits());
 }
+
+/// A plate with two holes split by a planar face across it (Split part; cf-fix-pcb's Fix PCB splits its board so):
+/// noshape's Boolean (the plate's common and cut with the half-space) as OCCT's Splitter: two valid solids of its
+/// volumes, the plate's faces Modified, kept or gone alike, the plane face into the cut faces.
+#[test]
+fn a_plate_split_by_a_plane_as_occts_splitter() {
+    let _ = k::set_working_scale(1000.0);
+    let opts = k::BooleanOptions::default();
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.02, 0.006)).unwrap();
+    let hole = |x: f64| k::make_cylinder(&z_frame(DVec3::new(x, 0.01, -0.001)), 0.003, 0.008, TAU).unwrap();
+    let plate = k::boolean(k::BooleanOp::Cut, &[plate], &[hole(0.01), hole(0.03)], &opts).unwrap().shape;
+    let slab = k::make_box_corners(DVec3::new(-0.01, -0.01, 0.002), DVec3::new(0.05, 0.03, 0.003)).unwrap();
+    let tool = (0..slab.count(k::ShapeType::Face))
+        .map(|i| slab.sub_shape(k::ShapeType::Face, i).unwrap())
+        .find(|f| (f.centroid().unwrap().z - 0.002).abs() < 1e-9)
+        .expect("the slab's bottom face");
+    let ours = k::split(std::slice::from_ref(&plate), std::slice::from_ref(&tool), &opts).unwrap();
+    k::set_rust_boolean(Some(false));
+    let occt = k::split(std::slice::from_ref(&plate), std::slice::from_ref(&tool), &opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(ours.shape.is_valid());
+    let vols = |s: &k::Shape| {
+        let mut v: Vec<f64> = s.sub_shapes(k::ShapeType::Solid).iter().map(|x| x.volume().unwrap()).collect();
+        v.sort_by(f64::total_cmp);
+        v
+    };
+    let (a, b) = (vols(&ours.shape), vols(&occt.shape));
+    assert_eq!(a.len(), 2);
+    assert_eq!(a.len(), b.len());
+    for (x, y) in a.iter().zip(&b) {
+        assert!((x - y).abs() <= 1e-9 * y, "volume {x} against OCCT's {y}");
+    }
+    // (Which input faces each says Modified / Deleted; OCCT shares a cut face between the two solids, ours gives
+    // each its own, so the images' counts differ there.)
+    let rel = |r: &k::OpResult| {
+        let mut v: Vec<(u32, u32, String)> = r.history.records.iter().filter(|h| h.input_kind == k::ShapeType::Face).map(|h| (h.arg, h.input_index, format!("{:?}", h.relation))).collect();
+        v.sort();
+        v.dedup();
+        v
+    };
+    assert_eq!(rel(&ours), rel(&occt));
+}
