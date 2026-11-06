@@ -609,6 +609,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (time_cli.py --limit 180 on tests/budget/*.noshape, every platform, every release). T1
   `kernel_core::an_offset_face_far_outside_its_parameters_fails_at_once` (landed after the 11-06 /opt/occt sync).
   Still: any other OCCT loop that checks no deadline hangs off Linux only; the gate is how one shows.
+- [ ] P2 VFILLET-OVERFLOW (core 11-06, parity: c2-tpd-fillet-variable's Fillet 1) **a variable fillet whose radius
+  passes the next face**: a 140 × 80 × 25 block's top loop, radii 5-40 mm at its corners and ten sketch points along the
+  edges (live: Allow edge overflow, OK, 13/28/17, 247,046.6 mm³). The points were ignored before (vertex settings
+  inside an edge: now points on it, as live takes them); with them the first edge's law reaches 25 mm, the block's
+  height, and OCCT's variable fillet can't run over onto the bottom face: "Failed to fillet selections". Needs the
+  overflow (as the constant-radius rim overflow, FILLET-RIM-OVERFLOW) for variable radii.
 - [ ] P2 LOFT-VERTEX-MATCH (core 11-06, parity: c2-impeller-loft's Loft Gehäuse, its first difference) **how Parasolid
   splits a section with fewer vertices**: a D-shaped profile (lines 60, 72.42, 72.42, a 120.35 spline) lofted to a
   Ø65 circle: live splits the circle at (0, ±21.19, -9.35) and (0, ±23.55, -56.40), 40.7° and 133.6° from its top

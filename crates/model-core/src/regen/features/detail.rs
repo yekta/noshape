@@ -579,6 +579,21 @@ fn variable_law(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) ->
 
 
 
+/// The edge's normalized parameter (0 at its start) at `p` when `p` lies on it (within 1e-6 of its length).
+fn param_on_edge(edge: &k::Shape, info: &k::EdgeInfo, p: glam::DVec3) -> Option<f64> {
+    let (t0, t1) = (info.first_param, info.last_param);
+    let at = |f: f64| edge.point_at(t0 + (t1 - t0) * f).ok().map_or(f64::INFINITY, |q| (q - p).length());
+    let n = 256;
+    let k = (0..=n).min_by(|a, b| at(*a as f64 / n as f64).total_cmp(&at(*b as f64 / n as f64)))?;
+    let (mut lo, mut hi) = (((k as f64) - 1.0).max(0.0) / n as f64, ((k as f64) + 1.0).min(n as f64) / n as f64);
+    for _ in 0..80 {
+        let (a, b) = (lo + (hi - lo) / 3.0, hi - (hi - lo) / 3.0);
+        if at(a) < at(b) { hi = b } else { lo = a }
+    }
+    let f = 0.5 * (lo + hi);
+    (at(f) <= 1e-6 * info.length.max(1e-9)).then_some(f)
+}
+
 /// Variable fillet: Onshape's `vertexSettings` (vertex + radius) and
 /// `pointOnEdgeSettings` (edge, position, radius); a plain `vertices` query
 /// takes the main radius. Edges are filleted one at a time, found again by name.
@@ -625,6 +640,15 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
             let key = |p: glam::DVec3| (p.x, p.y, p.z);
             let flip = key(info.end).partial_cmp(&key(info.start)) == Some(std::cmp::Ordering::Less);
             let mut points: Vec<(f64, f64)> = on_edge.iter().filter(|(n, _, _)| *n == name).map(|(_, t, r)| (if flip { 1.0 - *t } else { *t }, *r)).collect();
+            // A vertex setting on a point inside the edge (a sketch point on it: c2-tpd-fillet-variable's ten) is a
+            // point on the edge there, as live takes it.
+            for (p, r) in &at_vertex {
+                if (*p - info.start).length() > 1e-9 && (*p - info.end).length() > 1e-9
+                    && let Some(t) = param_on_edge(&edge, &info, *p)
+                {
+                    points.push((t, *r));
+                }
+            }
             let law = variable_law((radius_at(info.start), radius_at(info.end)), &mut points, smooth);
             let res = k::fillet_variable_checked(&body.shape, &edge, &law).map_err(|e| blend_failed("Failed to fillet selections.", e))?;
             let names = body.shape_names();
