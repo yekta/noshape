@@ -634,6 +634,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and pinned to 2 cores (taskset -c 0,1), and on vibe3 as ngyekta (v0.4.30 CLI, alone and 4 loops at once). qa: the
   exact command, user / HOME and environment (any NOSHAPE_* set? a -wal / -shm beside the copy?) of a run that flips,
   and NSCLI_ERR=<file> for its stderr; copies in vibe3:~/agents/core-dn (opens.py takes a cli path).
+  **qa 11-06 00:08: flips on vibe3 with the v0.4.32 release CLI, 5 / 12 opens** (37305.64, D4 Ok D6 Error), while green
+  e6600518 gave 29954.56 in 12 / 12, though its Draft 7 was Ok in 2 / 12. Found by the 44-ticket-document run on v0.4.32. Exact
+  recipe: user ngyekta (uid 1001), HOME=/home/ngyekta, no NOSHAPE_* set, DISPLAY empty; `cd ~/qa; NSTAG=dn-v32 python3
+  tickets/draft-nondet/opens.py /home/ngyekta/qa/bin/w-v32.sh 6`. The wrapper is `ulimit -v 40000000; exec env DISPLAY=
+  ~/qa/rel/noshape-cli-0.4.32 "$@" 2>> cli/stderr-$NSTAG.log`, and stderr stayed empty. Each open is a fresh copy in /tmp: the
+  document only, no -wal / -shm. Load during the runs: 7–9.5 on 8 cores (qa's fuzz loops, sweeps and a GUI fuzz on :61).
+  Runs in order: v32 ✓✓✗✓✗✓, green 6 × ✓, v32 ✗✗✗✓✓✓, green 6 × ✓ (✗ = 37305.64). So it seems to need load (core's runs
+  were on idle machines) and to show more on the release build, which is slower (GCC 13 OCCT): something time-dependent
+  decides Draft 4 / 6. Output: vibe3:~/qa/cli/dn-v32.out.
 - [x] (core 11-05 12:18) P1 DISPLACEMENT-MAP-SCALE (lead 11-05, the user: 1024 × 1024, Replace face on, never finished;
   then its cancel did nothing) Live refuses 1024²: opCreateBSplineSurface fails above 500,000 control points in all
   ("The B-spline definition has too many control points.", live 2057, after 47 s); we now give the same error in 7.6 s,
