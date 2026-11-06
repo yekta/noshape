@@ -485,7 +485,12 @@ impl GFace {
                             q0.x = r * (th0 + TAU);
                         }
                         let Some(x1) = onto(q0.x + ds) else { return Err(Decline("an arc across a cylinder's seam")) };
-                        Ok(C2::Seg { a: q0, b: DVec2::new(x1, q0.y) })
+                        // (At its circle's own height, not its vertex's: two circles 0.1 mm apart between the same two
+                        // tolerant vertices of a Shell slab, two curves, not one.)
+                        let Surf::Cyl { flip, .. } = self.s else { unreachable!() };
+                        let hc = (k.c - *o).dot(*a);
+                        let y = if flip { -hc } else { hc };
+                        Ok(C2::Seg { a: DVec2::new(q0.x, y), b: DVec2::new(x1, y) })
                     }
                     Geo::Ell { e, t0, sweep, .. } if e.hyp => {
                         // Seen along the axis: from its foot on the plane (nearest the axis, at |dd|) along y,
@@ -1370,6 +1375,16 @@ impl Ctx<'_> {
                 let q = c2.at(u);
                 if ends[k] == End::Open && std::iter::once(q).chain(turns.iter().map(|&d| q + d)).any(|q| distance_with(q, &bound, spans) <= tol) {
                     cuts[k].1 = End::Point(path.at(cuts[k].0));
+                    continue;
+                }
+                // (Or within one of the face's vertices' own tolerance (a Shell slab's vertex of 0.21 mm, OCCT's curve
+                // ending 0.18 mm from it): that vertex, as OCCT's pave.)
+                if ends[k] == End::Open {
+                    let p = path.at(cuts[k].0);
+                    let near = self.faces[f].edges.iter().flat_map(|&(e, _)| self.edges[e].v).map(|w| (w, (self.p(w) - p).length())).filter(|&(w, d)| d <= self.tol.max(self.pool.t[w as usize] + self.tol)).min_by(|a, b| a.1.total_cmp(&b.1));
+                    if let Some((w, _)) = near {
+                        cuts[k].1 = End::Vertex(w);
+                    }
                 }
             }
         }
@@ -4733,10 +4748,53 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let ends: Vec<f64> = std::iter::once(from).chain(at).chain(std::iter::once(to)).collect();
         Ok(ends.windows(2).map(|x| Seg { v: s.v, g: Geo::Apex { a0: x[0], a1: x[1] } }).collect())
     };
-    let edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain)?;
+    let mut edge_chains = by_period(edge_solid.len(), &|e| cx.edge_seg(e), &edge_chain)?.into_iter().collect::<R<Vec<Vec<u32>>>>()?;
+    // (An input vertex splitting another argument's edge splits an edge of its own argument lying along that one too
+    // (OCCT's common block of the two: a Shell slab's vertex 8.7 um off the part's edge, splitting it, and the slab's
+    // own edge along it whole: two curves one way from a vertex).)
+    {
+        let mut at: HashMap<u32, Vec<usize>> = HashMap::default();
+        for (e, ed) in cx.edges.iter().enumerate() {
+            for w in ed.v {
+                at.entry(w).or_default().push(e);
+            }
+        }
+        let mut add: Vec<(usize, u32)> = Vec::new();
+        for (g, chain) in edge_chains.iter().enumerate() {
+            for &w in chain.iter().skip(1).take(chain.len().saturating_sub(2)) {
+                let own: Vec<u32> = cx.pool.inputs[w as usize].iter().map(|x| x.0).filter(|&a| a != cx.edges[g].arg).collect();
+                if own.is_empty() {
+                    continue;
+                }
+                for u in cx.edges[g].v {
+                    for &e in at.get(&u).into_iter().flatten() {
+                        if e == g || !own.contains(&cx.edges[e].arg) || cx.edges[e].micro || matches!(cx.edges[e].g, Geo::Apex { .. }) || edge_chains[e].contains(&w) {
+                            continue;
+                        }
+                        let s = cx.edge_seg(e);
+                        let (t, d) = cx.seg_param(&s, cx.p(w));
+                        let len = cx.seg_length(&s);
+                        let reach = tol.max(cx.edges[e].t + cx.pool.t[w as usize]).max(cx.edges[g].t + cx.pool.t[w as usize]);
+                        if t > 0.0 && t < 1.0 && t * len > reach && (1.0 - t) * len > reach && d <= reach.max(cx.seg_param(&cx.edge_seg(g), cx.p(w)).1 + tol) {
+                            add.push((e, w));
+                        }
+                    }
+                }
+            }
+        }
+        for (e, w) in add {
+            let s = cx.edge_seg(e);
+            let chain = &mut edge_chains[e];
+            if chain.contains(&w) {
+                continue;
+            }
+            let t = cx.seg_param(&s, cx.p(w)).0;
+            let k = chain[1..chain.len() - 1].iter().position(|&x| cx.seg_param(&s, cx.p(x)).0 > t).map_or(chain.len() - 1, |k| k + 1);
+            chain.insert(k, w);
+        }
+    }
     for (e, chain) in edge_chains.into_iter().enumerate() {
         let s = cx.edge_seg(e);
-        let chain = chain?;
         if cx.edges[e].micro {
             edge_inner.push(Vec::new());
             edge_pieces.push(Vec::new());
