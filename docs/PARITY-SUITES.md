@@ -51,6 +51,23 @@ it is fast and deterministic (docs/TESTS.md), T2 until then.
 fixed. qa writes scenarios from everyday sessions: sketch, dimension, extrude with variables, fillet, edit, rollback,
 undo, measure, the variable autocomplete, the feature list's keys. Target: 100 scenarios by 11-05, 300 by 11-09.
 
+## 3. Exchange suite: files between live and noshape (dx, lead 11-06)
+
+Per document under `/root/parity/exchange/<doc>/` (a corpus document's name, never in the repo):
+- live's exports of its Part Studio, all visible parts, mm, Onshape's export defaults otherwise: `live.step`,
+  `live.x_t`, `live.igs`, `live.stl` (binary);
+- `live-self.json`: live's own import of each of those files, `{"STEP": {"parts": [{"name", "bodyType", "faces",
+  "edges", "vertices", "volume" mm³, "volume_band" [lo, hi] mm³, "area" mm², "area_band"}]}, "PARASOLID": …,
+  "IGES": …, "STL": …}` (massproperties' bands when it gives them);
+- `ours.step` / `ours.x_t` / `ours.igs` / `ours.stl`: ours, written by the run (the corpus document rebuilt from
+  `/root/parity/models`); `live-ours.json`: live's import of each, in live-self.json's form.
+
+`cargo test -p noshape-ops --test all parity::exchange_round_trip -- --ignored --nocapture` (NOSHAPE_EXCHANGE,
+NOSHAPE_PARITY_MODELS, NOSHAPE_PARITY_ONLY as the model suite): ours imports each live file and its parts are compared
+with live-self.json's (counts exact, volume and area within live's band or 1e-6; an STL's mesh by its parts, volume
+and area only); then ours is exported, and live-ours.json, once given, is compared with live-self.json the same way.
+Its last line is the score: `exchange score: ours imports live's files m/n; live imports ours m/n`.
+
 ## Score (qa, daily, docs/parity/SCORE.md)
 One line per day: models matched / total, features matched / total, scenarios matched / total, and the five biggest
 causes of difference with their tickets.

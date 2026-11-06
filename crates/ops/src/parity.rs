@@ -3815,9 +3815,22 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
         out
     };
     let (faces, edges) = (types("faces", "surface"), types("edges", "curve"));
+    Ok(parts_from_query(&r)
+        .into_iter()
+        .zip(r["parts"].as_array().into_iter().flatten())
+        .map(|(mut s, p)| {
+            s.face_types = p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default());
+            s.edge_types = p["id"].as_str().map(|id| edges.get(id).cloned().unwrap_or_default());
+            s
+        })
+        .collect())
+}
+
+/// The parts of a `query_parts` answer, SI (faces and edges by geometry not known).
+pub fn parts_from_query(r: &Value) -> Vec<PartState> {
     let k = per_unit(&r["units"]);
     let at = |v: &Value| f3(v).map(|p| p.map(|c| c * k));
-    Ok(r["parts"]
+    r["parts"]
         .as_array()
         .into_iter()
         .flatten()
@@ -3842,10 +3855,41 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
             bbox_outer: false,
             centroid: at(&p["centroid"]),
             centroid_band: None,
-            face_types: p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default()),
-            edge_types: p["id"].as_str().map(|id| edges.get(id).cloned().unwrap_or_default()),
+            face_types: None,
+            edge_types: None,
         })
-        .collect())
+        .collect()
+}
+
+/// Parts as live reports an import (the exchange suite's live-self.json / live-ours.json, docs/PARITY-SUITES.md
+/// §3): `{"parts": [{"name", "bodyType", "faces", "edges", "vertices", "volume" mm³, "volume_band" [lo, hi] mm³,
+/// "area" mm², "area_band"}]}`, SI. `mesh`: a mesh body's counts aren't compared (zero).
+pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
+    let n = |x: &Value| if mesh { 0 } else { x.as_u64().unwrap_or(0) };
+    let band = |x: &Value, k: f64| x.as_array().and_then(|a| Some([a.first()?.as_f64()? * k, a.get(1)?.as_f64()? * k]));
+    v["parts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|p| PartState {
+            name: p["name"].as_str().unwrap_or("").to_string(),
+            body_type: if mesh { String::new() } else { p["bodyType"].as_str().unwrap_or("").to_lowercase() },
+            faces: n(&p["faces"]),
+            edges: n(&p["edges"]),
+            vertices: n(&p["vertices"]),
+            volume: p["volume"].as_f64().map(|x| x * 1e-9),
+            area: p["area"].as_f64().map(|x| x * 1e-6),
+            volume_band: band(&p["volume_band"], 1e-9),
+            volume_high: None,
+            area_band: band(&p["area_band"], 1e-6),
+            bbox: None,
+            bbox_outer: false,
+            centroid: None,
+            centroid_band: None,
+            face_types: None,
+            edge_types: None,
+        })
+        .collect()
 }
 
 /// How ours differs from live after a feature (empty: it matches). Parts

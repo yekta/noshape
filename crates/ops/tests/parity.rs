@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{Translator, differences, rebuild_assembly, live_parts, our_parts, parse_refs, refs_from_bodies};
+use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, refs_from_bodies};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -302,6 +302,114 @@ fn parity_feature_studios() {
 /// from their source.json. The models are on this machine only: run it here
 /// (NOSHAPE_RB_LOCAL=1 with tools/tiers/rb.sh), or copy them and point
 /// NOSHAPE_PARITY_MODELS at the copy.
+/// The data exchange suite (docs/PARITY-SUITES.md §3), per document under NOSHAPE_EXCHANGE (default
+/// /root/parity/exchange): live's exports of its Part Studio (live.step, live.x_t, live.igs, live.stl, mm) imported
+/// in ours, the parts compared with live's own import of the same file (live-self.json, by format); and ours (the
+/// corpus document rebuilt from NOSHAPE_PARITY_MODELS) exported as ours.<ext> for live to import, live's import of
+/// them (live-ours.json) compared with live-self.json once given. Counts exact, volume and area within live's band
+/// or 1e-6; an STL's mesh by its parts, volume and area only.
+#[test]
+#[ignore = "T2: live's exports from /root/parity/exchange (other people's work, never in the repo)"]
+fn exchange_round_trip() {
+    const FORMATS: [(&str, &str); 4] = [("STEP", "step"), ("PARASOLID", "x_t"), ("IGES", "igs"), ("STL", "stl")];
+    let root = PathBuf::from(std::env::var("NOSHAPE_EXCHANGE").unwrap_or_else(|_| "/root/parity/exchange".into()));
+    let models = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
+    let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
+    let read_json = |p: &Path| std::fs::read_to_string(p).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()).unwrap_or(Value::Null);
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(&root).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.is_dir()).collect()).unwrap_or_default();
+    dirs.sort();
+    let mesh_counts = |mut v: Vec<PartState>| {
+        for p in &mut v {
+            (p.faces, p.edges, p.vertices, p.body_type) = (0, 0, 0, String::new());
+        }
+        v
+    };
+    let (mut imports, mut imports_ok, mut exports, mut exports_ok, mut waiting) = (0, 0, 0, 0, 0);
+    for dir in dirs {
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) {
+            continue;
+        }
+        let (selfs, theirs) = (read_json(&dir.join("live-self.json")), read_json(&dir.join("live-ours.json")));
+        let expected = |format: &str| (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"));
+        // Live's files in ours.
+        for (format, ext) in FORMATS {
+            let file = dir.join(format!("live.{ext}"));
+            if !file.is_file() {
+                continue;
+            }
+            imports += 1;
+            let mut ctx = Ctx::new();
+            let doc = scratch(&format!("{name}-import-{ext}.noshape"));
+            let _ = std::fs::remove_file(&doc);
+            let mut op = |tool: &str, args: Value| -> Result<Value, String> {
+                let op = noshape_ops::registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
+                noshape_ops::registry::run(&mut ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
+            };
+            let ours = op("document_create", json!({ "path": doc, "length_unit": "mm" }))
+                .and_then(|_| op("import_files", json!({ "files": [file], "mesh_unit": "Millimeter" })))
+                .and_then(|_| op("query_parts", json!({})))
+                .map(|q| parts_from_query(&q));
+            let diff = match (ours, expected(format)) {
+                (Err(e), _) => vec![format!("import failed: {e}")],
+                (Ok(_), None) => vec!["live-self.json has no import of it".into()],
+                (Ok(ours), Some(live)) if format == "STL" => differences(&live, &mesh_counts(ours)),
+                (Ok(ours), Some(live)) => differences(&live, &ours),
+            };
+            imports_ok += usize::from(diff.is_empty());
+            println!("{name}: ours imports live.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
+        // Ours in live.
+        let Some((features, live, refs)) = read_model(&models.join(&name)) else { continue };
+        let mut ctx = Ctx::new();
+        let path = scratch(&format!("{name}-export.noshape"));
+        let mut all = refs_from_bodies(&live);
+        all.extend(parse_refs(&refs));
+        let mut t = match Translator::open(&mut ctx, &path, &features, all) {
+            Ok(t) => t,
+            Err(e) => {
+                println!("{name}: not rebuilt for export: {e}");
+                continue;
+            }
+        };
+        for k in 0..t.len() {
+            t.step(k);
+        }
+        for (format, ext) in FORMATS {
+            let file = dir.join(format!("ours.{ext}"));
+            let mut args = json!({ "format": format, "file": file });
+            if format == "STL" {
+                args["units"] = json!("Millimeter");
+            }
+            if let Err(e) = t.call("export_parts", args) {
+                println!("{name}: ours.{ext} not exported: {e}");
+                continue;
+            }
+            exports += 1;
+            let (Some(live), false) = (expected(format), theirs[format].is_null()) else {
+                waiting += 1;
+                continue;
+            };
+            let diff = differences(&live, &parts_from_live_import(&theirs[format], format == "STL"));
+            exports_ok += usize::from(diff.is_empty());
+            println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
+        }
+    }
+    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet)", exports - waiting);
+}
+
+/// The exchange suite reads live's import in mm (SI inside) and leaves a mesh's counts out.
+#[test]
+fn an_exchange_import_is_read_in_mm() {
+    let v = json!({ "parts": [{ "name": "Part 1", "bodyType": "SOLID", "faces": 7, "edges": 15, "vertices": 10, "volume": 12000.0, "volume_band": [11999.0, 12001.0], "area": 3400.0 }] });
+    let solid = parts_from_live_import(&v, false);
+    assert_eq!((solid[0].faces, solid[0].body_type.as_str()), (7, "solid"));
+    assert!((solid[0].volume.unwrap() - 12e-6).abs() < 1e-15 && (solid[0].area.unwrap() - 3.4e-3).abs() < 1e-12);
+    assert_eq!(solid[0].volume_band.map(|b| (b[0] * 1e9).round()), Some(11999.0));
+    let mesh = parts_from_live_import(&v, true);
+    assert_eq!((mesh[0].faces, mesh[0].edges, mesh[0].vertices, mesh[0].body_type.as_str()), (0, 0, 0, ""));
+}
+
 #[test]
 #[ignore = "T2: live's models from /root/parity/models (other people's work, never in the repo)"]
 fn parity_models() {
