@@ -15,6 +15,8 @@ use gpui_kit::*;
 use std::time::Instant;
 
 pub(super) enum Script {
+    /// `open`: waiting for the opened studio's first full display, then quitting once its frame is up.
+    OpenOnly,
     /// Waiting for the opened studio's first full display.
     Open,
     /// The last feature deleted then.
@@ -40,6 +42,7 @@ pub(super) enum Script {
 /// The script asked for in the environment, if any.
 pub(super) fn from_env() -> Option<Script> {
     match std::env::var("NOSHAPE_PERF_SCRIPT").ok()?.as_str() {
+        "open" => Some(Script::OpenOnly),
         "delete-undo-last" => Some(Script::Open),
         "edit-undo-redo" => Some(Script::EditOpen),
         "ui-latency" => Some(Script::LatencyOpen),
@@ -61,6 +64,23 @@ const PARTS: [&str; 15] = ["ps.apply_display", "ps.apply_display_end", "s.build"
 impl PartStudioView {
     /// A stage of the step in progress (the regeneration scheduled, its result in, its display applied), logged
     /// with the time since the step began: where an undo's time goes (COMMIT-LATENCY).
+    /// `NOSHAPE_PERF`: the opened studio's first preview / full display is about to be applied: its regeneration
+    /// time logged, the frame that first draws it armed (`perf::arm_frame_milestone`: document open → model on
+    /// screen, the `open` script and tools/perf/open-times.py).
+    pub(super) fn note_open_display(&mut self, full: bool, regen_ms: f32) {
+        if !noshape_render::perf::enabled() {
+            return;
+        }
+        let stage = if full { 2 } else { 1 };
+        if self.ui.open_frames >= stage {
+            return;
+        }
+        self.ui.open_frames = stage;
+        let what = if full { "full" } else { "preview" };
+        noshape_render::perf::milestone(&format!("open: {what} display in (regen {regen_ms:.1} ms)"));
+        noshape_render::perf::arm_frame_milestone(format!("open: {what} model frame presented"));
+    }
+
     pub(super) fn perf_script_note(&self, what: &str) {
         if let Some(Script::Edited(t) | Script::EditUndone(t) | Script::Redone(t) | Script::Deleted(t) | Script::Undone(t)) = &self.perf_script {
             log::info!(target: "perf", "perf script: {what} at {:.1} ms", t.elapsed().as_secs_f64() * 1e3);
@@ -75,6 +95,16 @@ impl PartStudioView {
         log::info!(target: "perf", "perf script: stages since the last step:");
         noshape_render::perf::flush();
         self.perf_script = Some(match step {
+            Script::OpenOnly => {
+                log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);
+                // Long enough for the armed frame to be presented and logged.
+                cx.spawn(async move |_, cx| {
+                    cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    cx.update(|cx| cx.quit());
+                })
+                .detach();
+                Script::Done
+            }
             Script::Open => {
                 log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);
                 let Some(last) = self.studio(cx).and_then(|s| s.features.last()).map(|f| f.id) else {

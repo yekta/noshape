@@ -32,6 +32,24 @@ pub fn milestone(what: &str) {
     }
 }
 
+fn armed() -> &'static Mutex<Vec<String>> {
+    static A: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
+    A.get_or_init(Default::default)
+}
+
+/// A milestone for the first frame that draws what was just applied: the viewport takes it with the next frame it
+/// submits ([`take_armed`]) and logs it when that frame is presented (document open → the model on screen).
+pub fn arm_frame_milestone(what: impl Into<String>) {
+    if enabled() {
+        armed().lock().push(what.into());
+    }
+}
+
+/// The milestones armed since the last frame was submitted.
+pub fn take_armed() -> Vec<String> {
+    std::mem::take(&mut *armed().lock())
+}
+
 #[derive(Default)]
 struct Stage {
     samples: Vec<f32>,

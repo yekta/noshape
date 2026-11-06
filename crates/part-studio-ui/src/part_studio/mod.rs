@@ -762,6 +762,11 @@ impl PartStudioView {
                     let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
                     // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
                     let started = asked.elapsed();
+                    // `NOSHAPE_PERF`: when the opened document's first regeneration starts (document open's split).
+                    if noshape_render::perf::enabled() {
+                        static FIRST: std::sync::Once = std::sync::Once::new();
+                        FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
+                    }
                     // Work no one wants any more (a cancelled preview in a kernel step that doesn't stop at once) may
                     // hold the Regenerator: past a short grace this run doesn't wait for it, it starts on a fresh one
                     // (user P1 11-05: the spinner went on after Esc until the cancelled preview's step ended).
@@ -814,6 +819,7 @@ impl PartStudioView {
                 this.perf_script_note(if refine { "preview result in" } else { "result in" });
                 this.context = Some(result.context.clone());
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
+                this.note_open_display(!refine, result.display.regen_ms);
                 let display = Arc::new(result.display);
                 if !refine {
                     let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
@@ -862,6 +868,7 @@ impl PartStudioView {
                     this.end_pending(seq, cx);
                     this.context = Some(fine.context.clone());
                     scene_builder::log_regen_perf("refine", &fine.display, &studio);
+                    this.note_open_display(true, fine.display.regen_ms);
                     let display = Arc::new(fine.display);
                     crate::start_thumbnail::regen_done(&path, this.tab, head.then(|| (studio.clone(), shown_vars, display.clone())), cx);
                     if this.edit.is_some() {

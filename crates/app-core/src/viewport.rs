@@ -423,6 +423,8 @@ pub struct Viewport {
     frames_failed: u64,
     /// `NOSHAPE_PERF`: when the last frame was presented (paint latency).
     presented_at: Option<Instant>,
+    /// `NOSHAPE_PERF`: each frame in flight's armed milestones, in submit order (`perf::arm_frame_milestone`).
+    frame_milestones: std::collections::VecDeque<(u64, Vec<String>)>,
     /// `NOSHAPE_PERF_ORBIT`: closed-loop orbit benchmark state.
     bench: Option<OrbitBench>,
 }
@@ -666,6 +668,7 @@ impl Viewport {
             frames_presented: 0,
             frames_failed: 0,
             presented_at: None,
+            frame_milestones: Default::default(),
             bench,
         }
     }
@@ -1162,6 +1165,13 @@ impl Viewport {
             self.schedule_hover_refresh(cx);
         }
         self.seq += 1;
+        // Milestones armed since the last frame ride with this one to its present.
+        if noshape_render::perf::enabled() {
+            let armed = noshape_render::perf::take_armed();
+            if !armed.is_empty() {
+                self.frame_milestones.push_back((self.seq, armed));
+            }
+        }
         if let Some(b) = &mut self.bench
             && let Some((t, Some(need))) = b.click
             && need == self.seq
@@ -1281,6 +1291,11 @@ impl Viewport {
                 if noshape_render::perf::enabled() {
                     static FIRST: std::sync::Once = std::sync::Once::new();
                     FIRST.call_once(|| noshape_render::perf::milestone("first viewport frame presented"));
+                    while self.frame_milestones.front().is_some_and(|(s, _)| *s <= seq) {
+                        for m in self.frame_milestones.pop_front().map(|f| f.1).unwrap_or_default() {
+                            noshape_render::perf::milestone(&m);
+                        }
+                    }
                     noshape_render::perf::record("v.frame_to_present", frame.rendered_at.elapsed());
                     self.presented_at = Some(Instant::now());
                 }
