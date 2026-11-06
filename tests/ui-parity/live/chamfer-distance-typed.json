@@ -4,7 +4,8 @@
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
-  "platform": "linux (Chrome over CDP, software GL)"
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.1 backfilled"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
