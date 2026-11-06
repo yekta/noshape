@@ -16,8 +16,16 @@ pub const NOTICES: &str = include_str!("../assets/THIRD-PARTY-NOTICES.txt");
 /// The notices written where the system can open them (the app's config folder), for the About dialog's link.
 pub fn notices_file() -> std::io::Result<std::path::PathBuf> {
     let path = noshape_scene::config_dir().join("THIRD-PARTY-NOTICES.txt");
-    if std::fs::read_to_string(&path).ok().as_deref() != Some(NOTICES) {
-        std::fs::write(&path, NOTICES)?;
+    if std::fs::read_to_string(&path).ok().as_deref() == Some(NOTICES) {
+        return Ok(path);
     }
+    // (Written aside and renamed in: another window or test reading it never sees half a file.)
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = path.with_extension(format!("{}-{n}.tmp", std::process::id()));
+    std::fs::write(&tmp, NOTICES)?;
+    std::fs::rename(&tmp, &path).inspect_err(|_| {
+        let _ = std::fs::remove_file(&tmp);
+    })?;
     Ok(path)
 }
