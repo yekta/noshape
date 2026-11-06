@@ -48,8 +48,27 @@ def once(cli, doc, tmp):
     return dt, n
 
 
+def cpu():
+    """The runner's processor and core count: hosted runners of one OS differ (Linux's fins-400 1.36 to 2.70 s
+    between runs of the same code, 11-06), so a table is read against its hardware."""
+    name = ""
+    try:
+        if sys.platform.startswith("linux"):
+            with open("/proc/cpuinfo", encoding="utf-8") as f:
+                name = next((l.split(":", 1)[1].strip() for l in f if l.startswith("model name")), "")
+        elif sys.platform == "darwin":
+            name = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True).stdout.strip()
+        elif sys.platform == "win32":
+            name = subprocess.run(["powershell", "-NoProfile", "-Command", "(Get-CimInstance Win32_Processor).Name"], capture_output=True, text=True).stdout.strip()
+    except (OSError, StopIteration):
+        pass
+    return f"{name or 'unknown processor'}, {os.cpu_count()} cores"
+
+
 def main():
     cli, docs = sys.argv[1], sys.argv[2:]
+    hw = cpu()
+    print(f"cpu: {hw}", flush=True)
     rows = []
     with tempfile.TemporaryDirectory() as tmp:
         for doc in docs:
@@ -60,7 +79,7 @@ def main():
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary:
         with open(summary, "a", encoding="utf-8") as f:
-            f.write(f"### Regeneration times ({os.environ.get('RUNNER_OS', '?')}, {os.path.basename(cli)})\n\n{table}\n")
+            f.write(f"### Regeneration times ({os.environ.get('RUNNER_OS', '?')}, {os.path.basename(cli)}; {hw})\n\n{table}\n")
 
 
 if __name__ == "__main__":
