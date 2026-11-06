@@ -3259,6 +3259,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Sketch + assembly (skasm)
+- [ ] P2 UIP-ASM-FASTENED-FLAKY (skasm) the ui-parity scenario asm-fastened-undo-picks differs 1 run in 4 (vibe5, release
+  build of main 08:30, run alone four times with `tools/ui-parity/run.py`): at step 4 the Fastened dialog's second query
+  field ("Mate connectors") holds one item ("Mate connector of Part 2 <1>") where live's has none, then the selection
+  count, the feature rows' `related` and Undo follow (6/9 states). The other three runs match 9/9. A pick or hover
+  landing some runs and not others; the suite counts it as a difference when it does. (psui 2026-11-06)
 - [x] verified d0526d18 (qa 11-03 17:06: sketch-slot-on-line matches, 11/11; sketch-extend-to-line still 13/14 against its one recording, which live's two re-runs (behaviours 09:20 addition) contradict: re-record asked) (skasm 11-03 16:30: Slot's picked curves stay selected while its preview is pending, cleared when it commits (Enter, the next click, Esc). Extend's JFF is that one recording's: live re-ran it twice (behaviours 1866 09:20 addition) and nothing was selected after Extend's click, as in ours.) P3 SKETCH-TOOL-PICK-SELECTION (skasm) a curve clicked with the Slot or Extend tool is selected in live, not in ours:
   live's ui-parity recordings sketch-slot-on-line (step 8: the line clicked with Slot → selection 1 SKETCH_ENTITY, the slot
   previews; Enter makes it) and sketch-extend-to-line (step 12: the line clicked with Extend → selection 1) vs ours on

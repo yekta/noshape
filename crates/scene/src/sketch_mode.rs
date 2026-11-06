@@ -3386,8 +3386,8 @@ impl SketchEditor {
         // later change of the workspace units keeps the geometry.
         let text = noshape_model::quantity_text::commit_text(text.trim().trim_start_matches('=').trim(), dim, units, vars);
         let q = noshape_units::evaluate_as(&text, dim, units, vars).map_err(|e| e.to_string())?;
-        let expr = is_expression(&text).then_some(text.as_str());
-        self.commit_otf_value(data, o, f, q.value, expr)
+        // Kept as typed, a plain value too (live: the box's "20" is the dimension's "20 mm", as a dimension's own box).
+        self.commit_otf_value(data, o, f, q.value, Some(text.as_str()))
     }
 
     /// Enter while a tool shows an on-the-fly box (live Onshape: Enter in a

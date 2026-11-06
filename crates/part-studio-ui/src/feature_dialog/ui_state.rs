@@ -231,11 +231,13 @@ impl FeatureDialog {
         // Errors show as the red title (its tooltip says why); the dialog has no message text of its own.
         let red = self.applied_value_error().is_some() || matches!(self.status.as_ref().map(|s| s.0), Some(FeatureStatus::Error | FeatureStatus::Warning));
         let kind = if self.feature.type_id == "sketch" { "sketch" } else { "feature" };
-        json!({ "title": self.title_text(), "titleState": if red { "error" } else { "ok" }, "kind": kind, "tabs": tabs, "fields": fields, "error": null })
+        // ✓ (none in configure mode or a nested dialog).
+        let ok = (!self.configure_mode && !self.nested).then(|| if self.ok_blocked() { "disabled" } else { "enabled" });
+        json!({ "title": self.title_text(), "titleState": if red { "error" } else { "ok" }, "kind": kind, "tabs": tabs, "fields": fields, "error": null, "ok": ok })
     }
 
     /// `state.list` for the open autofill list.
     pub fn ui_list(&self) -> Option<Value> {
-        self.completion.as_ref().map(|c| c.ui_state())
+        self.completion.as_ref().map(|c| c.ui_state(Some((&self.variables, &self.units))))
     }
 }

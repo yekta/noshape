@@ -183,6 +183,21 @@ Two keys added 11-03 (skasm, for the sketch scenarios; the runner compares each 
   distance, mm), `RADIUS` / `DIAMETER` (mm), `ANGLE` (degrees), values rounded to 6 decimals, sorted by kind then
   value.
 
+Keys live's recorder added later (psui records them since 11-06; before, the runner skipped them, so they were never
+compared):
+- `dialog.ok`: the dialog's ✓, `"enabled"` / `"disabled"` (`null`: a dialog without one); `dialog.titleState`:
+  `"ok"` / `"error"` (the red title).
+- `dialogs`: every open dialog's state, the last one being `dialog`.
+- `focus.dialog`: the title of the dialog the focused field is in (`null` outside dialogs); the Create variable popup
+  is its own (`"Create variable"`).
+- `partsHeading`: the parts list's heading as shown (`"Parts (2)"`).
+- `list.detail`: each autocomplete row's whole text, its texts joined by single spaces (`"#width 30 mm"`,
+  `"max( x , y )"`, `"New variable…"`).
+- `sketch.dimensions[].expression`: the dimension's stored expression, `null` when its value was never typed; a typed
+  plain number with the document unit (`"25 mm"`), a unitless expression wrapped (`"(2*15) mm"`). Before a plane is
+  picked live's recorder can't read the sketch (`"error": "sketch model not reached"`, its lists `null`): not compared.
+- Not compared: `focus.tag` and `features.rows[].cls` (live's DOM), `selection.items[].id` (live's entity ids).
+
 ## Comparison
 
 `tools/ui-parity/run.py` compares the keys both sides record. A size that comes from where a click landed (a drawn
@@ -203,6 +218,8 @@ window, targets found by name), writes the recording and exits. The runner compa
 `live/<name>.json` step by step and names the first step and key that differ; with no argument it runs every
 scenario that has a live recording and prints the score (matched / total).
 
+The whole suite in parallel shards (one Xvfb display each, ~4 minutes for 310 scenarios on a 16-core host):
+`tools/ui-parity/shards.sh <noshape binary> <out dir> [shards] [first display]` (qa's daily score).
 Run: `tools/ui-parity/run.py --app $CARGO_TARGET_DIR/debug/noshape --display :102 [names…]` (`--all` records every
 scenario, `--compare-only` compares recordings already made). Named controls record their bounds through
 app-core `ui_script::mark` (`tool:`, `field:`, `feature:`, `part:`, `tab:`, `checkbox:`, `dropdown:`, `list_row:`,

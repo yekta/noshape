@@ -70,6 +70,9 @@ def first_difference(a, b, path=""):
         for k in a:
             if k not in b:
                 continue
+            # Live's recorder couldn't read the sketch (`"error": "sketch model not reached"`, before a plane is picked).
+            if path == ".sketch" and a.get("error") and k in ("entities", "constraints", "dimensions"):
+                continue
             if path == ".selection" and k == "items" and not all("owner" in i and i.get("kind") for i in (a[k] or [])):
                 continue
             # A flip button has no label of its own (live records its icon's name).

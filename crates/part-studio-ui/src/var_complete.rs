@@ -165,9 +165,45 @@ impl VarCompletion {
         Some(Self { key: key.to_string(), range, entries, selected: 0, new_variable: None })
     }
 
-    /// `state.list` of the interaction parity suite: each row's first text, the highlighted one.
-    pub fn ui_state(&self) -> serde_json::Value {
-        serde_json::json!({ "kind": "autocomplete", "rows": self.row_names(), "highlighted": self.selected, "disabled": [] })
+    /// `state.list` of the interaction parity suite: each row's first text, the highlighted one, and with the
+    /// variables and units the list shows, each row's whole text (`detail`: "#width 30 mm", "max( x , y )").
+    pub fn ui_state(&self, shown: Option<(&BTreeMap<String, noshape_units::Quantity>, &noshape_units::UnitPrefs)>) -> serde_json::Value {
+        let mut v = serde_json::json!({ "kind": "autocomplete", "rows": self.row_names(), "highlighted": self.selected, "disabled": [] });
+        if let Some((variables, units)) = shown {
+            v["detail"] = self.row_texts(variables, units).into();
+        }
+        v
+    }
+
+    /// Each row's texts as [`Self::render`] draws them, joined by single spaces.
+    fn row_texts(&self, variables: &BTreeMap<String, noshape_units::Quantity>, units: &noshape_units::UnitPrefs) -> Vec<String> {
+        let mut rows: Vec<String> = self
+            .entries
+            .iter()
+            .take(MAX_ROWS)
+            .map(|e| match e {
+                Entry::Variable(name) => match variables.get(name).map(|q| noshape_units::format_quantity(*q, units)) {
+                    Some(value) if !value.is_empty() => format!("#{name} {value}"),
+                    _ => format!("#{name}"),
+                },
+                Entry::Function(name, args) => {
+                    let mut parts = vec![format!("{name}(")];
+                    for (k, a) in args.iter().enumerate() {
+                        if k > 0 {
+                            parts.push(",".into());
+                        }
+                        parts.push(a.to_string());
+                    }
+                    parts.push(")".into());
+                    parts.join(" ")
+                }
+                Entry::Unit(n) | Entry::Constant(n) => n.to_string(),
+            })
+            .collect();
+        if self.new_variable.is_some() {
+            rows.push("New variable…".into());
+        }
+        rows
     }
 
     /// Each row's first text, as shown.

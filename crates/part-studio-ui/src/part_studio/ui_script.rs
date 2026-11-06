@@ -14,7 +14,8 @@ impl PartStudioView {
         let dialog = self.edit.as_ref().map(|e| e.dialog.read(cx));
         let filter_focused = self.ui.filter.as_ref().is_some_and(|f| f.0.read(cx).focus_handle(cx).is_focused(window));
         let dim_box = self.dim_input.as_ref().map(|d| d.1.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window)).or_else(|| self.focused_value_box(window, cx));
-        let focus = if let Some(f) = dialog.and_then(|d| d.ui_focus(window, cx)) {
+        let in_dialog = dialog.and_then(|d| d.ui_focus(window, cx));
+        let focus = if let Some(f) = in_dialog.clone() {
             f
         } else if let Some(st) = dim_box {
             // Live: an input outside the dialogs.
@@ -47,8 +48,8 @@ impl PartStudioView {
         let list = crate::os_menu::ui_state(cx)
             .or_else(|| self.context_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx)))
             .or_else(|| dialog.and_then(|d| d.ui_list()))
-            .or_else(|| self.dim_completion_state())
-            .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state()))
+            .or_else(|| self.dim_completion_state(cx))
+            .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state(None)))
             .or_else(crate::ui_script::open_list);
         let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id).map(|f| f.name.clone())).unwrap_or_default();
         // In a sketch the selection is its own, with what the Dimension tool picked (drawn selected); in a feature
@@ -139,9 +140,19 @@ impl PartStudioView {
         let message = message.or_else(|| self.sketch.as_ref().and_then(|ed| ed.message.clone()));
         // The canceled-sketch toast's Restore link is part of its text in live.
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
+        // The parts list's heading, as drawn (render_parts_list).
+        let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
+        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
+        // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
+        let mut focus = focus;
+        if in_dialog.is_some() {
+            focus["dialog"] = dialog_state.as_ref().map(|d| d["title"].clone()).unwrap_or(Value::Null);
+        }
         json!({
             "focus": focus,
-            "dialog": dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog),
+            "dialogs": dialog_state.iter().cloned().collect::<Vec<_>>(),
+            "dialog": dialog_state,
+            "partsHeading": parts_heading,
             "list": list,
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": rollback_after },
@@ -171,7 +182,7 @@ impl PartStudioView {
         use noshape_sketch::{ConstraintKind as K, EntityKind};
         let Some(data) = self.sketch_data(cx) else { return Value::Null };
         // The Sketch dialog before its plane is picked: no sketch model yet.
-        let Some(ed) = self.sketch.as_ref() else { return json!({ "tool": null }) };
+        let Some(ed) = self.sketch.as_ref() else { return json!({ "tool": null, "entities": null, "constraints": null, "dimensions": null }) };
         let sk = &data.sketch;
         // The first active toolbar button (live): Construction while it shows active, unless a drawing tool (left of it) is on.
         use crate::sketch_mode::Tool as T;
@@ -214,21 +225,24 @@ impl PartStudioView {
             }
         }
         let mut constraints: Vec<String> = users.values().filter(|n| **n > 1).flat_map(|n| std::iter::repeat_n("COINCIDENT".to_string(), n - 1)).collect();
-        let mut dimensions: Vec<(String, f64)> = Vec::new();
+        let mut dimensions: Vec<(String, f64, Option<String>)> = Vec::new();
+        let units = self.doc.read(cx).session.doc.settings.units;
         for c in sk.constraints().filter(|c| c.driving) {
             let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
+            let typed = |unit: &str| data.dimension_exprs.get(&c.id.0).map(|e| onshape_dimension_expression(&e.text, unit));
+            let length = typed(units.length.symbol());
             match &c.kind {
-                K::Length { value, .. } | K::Distance { value, .. } | K::HorizontalDistance { value, .. } | K::VerticalDistance { value, .. } => dimensions.push(("LINEAR".into(), mm(*value))),
-                K::Radius { value, .. } => dimensions.push(("RADIUS".into(), mm(*value))),
-                K::Diameter { value, .. } => dimensions.push(("DIAMETER".into(), mm(*value))),
-                K::Angle { value, .. } | K::ArcAngle { value, .. } => dimensions.push(("ANGLE".into(), (value.to_degrees() * 1e6).round() / 1e6)),
-                k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0))),
+                K::Length { value, .. } | K::Distance { value, .. } | K::HorizontalDistance { value, .. } | K::VerticalDistance { value, .. } => dimensions.push(("LINEAR".into(), mm(*value), length)),
+                K::Radius { value, .. } => dimensions.push(("RADIUS".into(), mm(*value), length)),
+                K::Diameter { value, .. } => dimensions.push(("DIAMETER".into(), mm(*value), length)),
+                K::Angle { value, .. } | K::ArcAngle { value, .. } => dimensions.push(("ANGLE".into(), (value.to_degrees() * 1e6).round() / 1e6, typed(units.angle.symbol()))),
+                k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0), length)),
                 k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
             }
         }
         constraints.sort();
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
-        let dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value)| json!({ "kind": kind, "value": value })).collect();
+        let dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
         json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions })
     }
 
@@ -442,4 +456,18 @@ impl PartStudioView {
         }
         cx.notify();
     }
+}
+
+/// A typed sketch dimension as Onshape stores it (live `sketch.dimensions[].expression`): a plain number with the
+/// document unit ("25" → "25 mm"), a unitless expression wrapped ("2*15" → "(2*15) mm"), anything with a unit or a
+/// variable as typed.
+fn onshape_dimension_expression(text: &str, unit: &str) -> String {
+    let t = text.trim();
+    if t.parse::<f64>().is_ok() {
+        return format!("{t} {unit}");
+    }
+    if t.chars().all(|c| c.is_ascii_digit() || " .+-*/()^".contains(c)) {
+        return format!("({t}) {unit}");
+    }
+    t.to_string()
 }

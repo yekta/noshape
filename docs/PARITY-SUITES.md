@@ -55,6 +55,13 @@ undo, measure, the variable autocomplete, the feature list's keys. Target: 100 s
 One line per day: models matched / total, features matched / total, scenarios matched / total, and the five biggest
 causes of difference with their tickets.
 
+qa's daily routine for the scenarios column (lead 11-06): on the morning's green, from a checkout at that commit on an
+idle 16-core host (vibe5), `tools/ui-parity/shards.sh /root/green/noshape /tmp/uip-$(date -u +%m%d)` (all scenarios
+with a live recording, 6 shards, ~4 minutes; the binary copied over if it runs elsewhere). Its last lines are the
+scenarios that differ, `score: m/n scenarios, s/t states` and the differences by key: write m/n (s/t states) in the
+day's line, each differing scenario's cause with its owner's ticket in the causes column. A scenario that differs only
+now and then is flaky: run it alone 4 times (`tools/ui-parity/run.py --app … --display … <name>`) and ticket it.
+
 ## First milestones (check 11-03 evening)
 - live: 10 P1 documents fetched with live.jsonl; 20 scenarios recorded in live.
 - dx: the translator takes the first documents end to end; `parity_models` runs and gives a first score.

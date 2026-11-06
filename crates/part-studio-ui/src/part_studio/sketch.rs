@@ -355,8 +355,9 @@ impl PartStudioView {
     }
 
     /// The dimension box's open autofill list (`state.list` of the parity suite).
-    pub(super) fn dim_completion_state(&self) -> Option<serde_json::Value> {
-        self.ui_ref()?.dim_completion.as_ref().map(|c| c.ui_state())
+    pub(super) fn dim_completion_state(&self, cx: &App) -> Option<serde_json::Value> {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        self.ui_ref()?.dim_completion.as_ref().map(|c| c.ui_state(Some((&self.sketch_variables(cx), &units))))
     }
 
     /// The sketch's value box (a tool's on-the-fly box, the offset's distance) holding the keyboard.

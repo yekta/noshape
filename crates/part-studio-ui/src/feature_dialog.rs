@@ -2142,6 +2142,12 @@ impl FeatureDialog {
         self.applied_value_error().is_some()
     }
 
+    /// Whether ✓ is disabled (live `canSubmit`): until the dialog is dirty (an edit, or a regeneration without an
+    /// error), and while an applied value doesn't evaluate.
+    pub(crate) fn ok_blocked(&self) -> bool {
+        self.applied_value_error().is_some() || !self.dirty
+    }
+
     fn applied_value_error(&self) -> Option<(&'static str, String)> {
         self.eval_errors(|id, typed| self.applied_text(id, typed)).next()
     }
@@ -4063,7 +4069,7 @@ impl Render for FeatureDialog {
         // applied value to be valid; regeneration errors and empty
         // selections don't disable it (a new Loft with no profiles isn't
         // dirty yet, icons2; an Add with no merge scope is, qa5 BOOL4b).
-        let blocked = value_invalid || !self.dirty;
+        let blocked = self.ok_blocked();
         // What the ✓ shows disabled (`ui::disabled_accept`: the pale green, or the accent at 20 % in a hex theme).
         let disabled_ok: Hsla = if gpui_kit::hex_theme_active() { pal.accept.into() } else { gpui_kit::rgb(0xcce9cc).into() };
         let title_color = if invalid { pal.text_invalid } else { pal.text };
