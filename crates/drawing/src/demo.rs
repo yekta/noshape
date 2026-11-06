@@ -8,10 +8,18 @@ use noshape_model_core::document::{Document, TabContent};
 /// isometric views, a section and a detail view, associative dimensions,
 /// centermarks, a note, a callout and a filled-in title block.
 pub fn demo_document_with_drawing() -> Document {
+    with_drawing(demo_document())
+}
+
+/// [`demo_document_with_drawing`] whose plate's holes are Hole features (the showcase: its hole table lists them).
+pub fn hole_feature_demo_document_with_drawing() -> Document {
+    with_drawing(demo_document_on(plate_studio_with_hole_features()))
+}
+
+fn with_drawing(mut d: Document) -> Document {
     use crate::drawing::views::{circle_ref_near, regenerate_sources, vertex_ref_near};
     use crate::drawing::*;
     use glam::DVec3;
-    let mut d = demo_document();
     let studio = d.tabs[0].id;
     let mut drawing = Drawing::default();
     let view = |id: u64, kind: ViewKind, position: [f64; 2]| DrawingView {

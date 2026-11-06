@@ -246,7 +246,8 @@ impl DrawingEditor {
         if let TableKind::Hole { view, origin, exclude, x_dir, .. } = &t.kind {
             let tag = self.cell_text(*id, r, 0);
             let Some(g) = self.geoms.get(view) else { return none() };
-            let Some(row) = noshape_model::drawing::tables::hole_rows(g, *origin, exclude, *x_dir).into_iter().find(|h| h.tag == tag) else { return none() };
+            let ctx = noshape_model::drawing::views::table_source(self.current_sheet(), t).and_then(|k| self.sources.get(&k)).map(|s| &*s.context);
+            let Some(row) = noshape_model::drawing::tables::hole_rows(g, ctx, *origin, exclude, *x_dir).into_iter().find(|h| h.tag == tag) else { return none() };
             let c = row.center;
             return (Vec::new(), edge_picks(*view, &|me| matches!(me.geom, noshape_model::drawing::views::EdgeGeom::Circle { center, .. } if (center[0] - c[0]).hypot(center[1] - c[1]) < 1e-7)));
         }

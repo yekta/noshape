@@ -277,12 +277,12 @@ impl DrawingEditor {
         match self.tool.clone() {
             Tool::BrokenOut { parent: Some(view), points, done: false } if points.len() >= 3 => {
                 self.tool = Tool::BrokenOut { parent: Some(view), points: points.clone(), done: true };
-                // Blind, 25 mm (1 in) as live.
+                // Up to entity (live 2131's panel), Blind's 25 mm (1 in) ready.
                 let u = format::length_units(&self.drawing, &DimFormat::default());
                 let d = noshape_scene::drawing_tools::broken_out_blind_default(u);
                 let depth = self.input(&format::format_number(d / u.meters(), None, 3), window, cx);
-                Self::focus_input(&depth, window, cx);
-                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: false, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false, add_point: false });
+                let _ = window;
+                self.panel = Some(Panel::BrokenOut { view, edit: None, profile: points, spline: true, up_to: true, depth, depth_ref: None, offset: None, exclude: Vec::new(), picking: false, add_point: false });
                 self.update_preview(cx);
                 true
             }
@@ -595,16 +595,104 @@ impl DrawingEditor {
             .border_1()
             .border_color(if closed { gpui_kit::rgb(0xd3d7d9) } else { pal.accent })
             .when(!closed, |d| d.bg(gpui_kit::rgb(0xdbf1fa)).child("Create closed profile"))
-            .when(closed, |d| d.child(div().text_color(pal.text_faint).child("Edit closed profile")).child(div().px(px(4.)).bg(gpui_kit::rgb(0xe4e4e4)).child("Profile")));
+            .when(closed, |d| {
+                d.child(div().text_color(pal.text_faint).child("Edit closed profile")).child(
+                    h_flex()
+                        .px(px(4.))
+                        .gap(px(4.))
+                        .bg(gpui_kit::rgb(0xe4e4e4))
+                        .child("Profile")
+                        // × drops the profile: drawn again from the start.
+                        .child(div().id("dr-bo-profile-x").cursor_pointer().child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(Panel::BrokenOut { view, .. }) = this.panel.take() {
+                                this.tool = Tool::BrokenOut { parent: Some(view), points: Vec::new(), done: false };
+                            }
+                            this.update_preview(cx);
+                            cx.notify();
+                        }))),
+                )
+            });
         vec![tool.into_any_element(), field.into_any_element()]
     }
 
-    /// Broken-out section before its profile closes (live 12604: the panel
-    /// is up from the start, ✓ greyed, Blind with its 25 mm depth).
+    /// The [Up to entity | Blind] select (live 2131: a dropdown, Up to entity first and the default).
+    fn broken_out_mode(up: bool, cx: &mut Context<Self>) -> AnyElement {
+        let ed = cx.entity();
+        Button::new("dr-bo-mode")
+            .label(if up { "Up to entity" } else { "Blind" })
+            .xsmall()
+            .ghost()
+            .w_full()
+            .dropdown_caret(true)
+            .border_b_1()
+            .border_color(gpui_kit::rgb(0xdddddd))
+            .os_dropdown_menu("dr-bo-mode-dd", true, move |mut m, _, _| {
+                for (label, v) in [("Up to entity", true), ("Blind", false)] {
+                    let e = ed.clone();
+                    m = m.item(crate::os_menu::OsMenuItem::new(label).checked(up == v).on_click(move |_, _, cx| {
+                        e.update(cx, |this, cx| {
+                            if let Some(Panel::BrokenOut { up_to, .. }) = &mut this.panel {
+                                *up_to = v;
+                            }
+                            this.update_preview(cx);
+                            cx.notify();
+                        })
+                    }));
+                }
+                m
+            })
+            .into_any_element()
+    }
+
+    /// The "Depth of section cut" box: its placeholder, or the picked point's chip.
+    fn broken_out_depth_field(picked: bool, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        h_flex()
+            .h(px(24.))
+            .px(px(6.))
+            .gap(px(4.))
+            .text_xs()
+            .border_1()
+            .border_color(gpui_kit::rgb(0xd3d7d9))
+            .when(!picked, |d| d.text_color(pal.text_faint).child("Depth of section cut"))
+            .when(picked, |d| {
+                d.child(
+                    h_flex().px(px(4.)).gap(px(4.)).bg(gpui_kit::rgb(0xe4e4e4)).child("Point").child(div().id("dr-bo-depth-x").cursor_pointer().child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        if let Some(Panel::BrokenOut { depth_ref, .. }) = &mut this.panel {
+                            *depth_ref = None;
+                        }
+                        this.update_preview(cx);
+                        cx.notify();
+                    }))),
+                )
+            })
+            .into_any_element()
+    }
+
+    /// The panel's texts for the ui-parity state (README "### Drawings"; live 2131).
+    fn note_broken_out(closed: bool, up: bool, picked: bool) {
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Broken-out section"];
+            text.extend(if closed { &["Edit closed profile", "Profile", "×"][..] } else { &["Create closed profile"][..] });
+            text.extend(["Up to entity", "Blind"]);
+            if up {
+                text.push("Depth of section cut");
+                if picked {
+                    text.extend(["Point", "×"]);
+                }
+                text.push("Offset");
+            } else {
+                text.push("Depth");
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Broken-out section", "text": text })
+        });
+    }
+
+    /// Broken-out section before its profile closes (live 2131: the panel
+    /// is up from the start, ✓ greyed, Up to entity with its empty depth box and ☐ Offset).
     pub fn render_broken_out_start(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let u = format::length_units(&self.drawing, &DimFormat::default());
-        let depth = format::format_number(noshape_scene::drawing_tools::broken_out_blind_default(u) / u.meters(), None, 3);
+        Self::note_broken_out(false, true, false);
         v_flex()
             .id("dr-bo-start")
             .absolute()
@@ -629,8 +717,9 @@ impl DrawingEditor {
                     .child(div().id("dr-bo-start-x").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.set_tool(Tool::Select, cx)))),
             )
             .children(self.broken_out_profile_rows(false, cx))
-            .child(h_flex().gap_1().child(Button::new("dr-bo-start-upto").label("Up to entity").xsmall().outline()).child(Button::new("dr-bo-start-blind").label("Blind").xsmall().primary()))
-            .child(Self::label_row("Depth", h_flex().gap_2().child(div().text_xs().child(depth)).child(div().text_xs().text_color(pal.text_faint).child(u.symbol())).into_any_element()))
+            .child(Button::new("dr-bo-start-mode").label("Up to entity").xsmall().ghost().w_full().dropdown_caret(true).border_b_1().border_color(gpui_kit::rgb(0xdddddd)))
+            .child(Self::broken_out_depth_field(false, cx))
+            .child(crate::drawing_chrome::DrCheckbox::new("dr-bo-start-offset").label("Offset").checked(false))
             .into_any_element()
     }
 
@@ -645,21 +734,11 @@ impl DrawingEditor {
                 // Exclude from cut: assembly views only (as Section view's).
                 let assembly = views::view_source(self.current_sheet(), *view).and_then(|(k, _)| self.sources.get(&k)).is_some_and(|s| s.assembly);
                 let (n, on) = (exclude.len(), *picking);
-                // [Up to entity | Blind] (live).
-                let mode = |id: &'static str, label: &'static str, v: bool, cx: &mut Context<Self>| {
-                    Button::new(id).label(label).xsmall().when(v == up, |b| b.primary()).when(v != up, |b| b.outline()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if let Some(Panel::BrokenOut { up_to, .. }) = &mut this.panel {
-                            *up_to = v;
-                        }
-                        this.update_preview(cx);
-                        cx.notify();
-                    }))
-                };
+                Self::note_broken_out(true, up, depth_ref.is_some());
                 let mut rows = self.broken_out_profile_rows(true, cx);
-                rows.push(h_flex().gap_1().child(mode("dr-bo-upto", "Up to entity", true, cx)).child(mode("dr-bo-blind", "Blind", false, cx)).into_any_element());
+                rows.push(Self::broken_out_mode(up, cx));
                 if up {
-                    let what = if depth_ref.is_some() { "1 entity" } else { "Select a vertex" };
-                    rows.push(Self::label_row("Depth of section cut", div().text_xs().text_color(if depth_ref.is_some() { pal.text } else { pal.text_faint }).child(what).into_any_element()));
+                    rows.push(Self::broken_out_depth_field(depth_ref.is_some(), cx));
                     rows.push(
                         crate::drawing_chrome::DrCheckbox::new("dr-bo-offset")
                             .label("Offset")

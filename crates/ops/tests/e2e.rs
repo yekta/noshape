@@ -2269,15 +2269,15 @@ fn drawing_callouts_ordinates_and_datums() {
     assert_eq!(kind_of(&mut ctx, h["annotation"].as_u64().unwrap()), "HoleCallout");
     let e = try_call(&mut ctx, "drawing_hole_callout", json!({ "drawing": tab, "hole": [5, 5], "position": [20, 20] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("hole"), "{e:?}");
-    // A hole table of that view (live 1983): TAG, X / Y LOC, SIZE (the
-    // diameter: an extrude cut has no hole feature), QTY.
+    // A hole table of that view (live 1983): TAG, X / Y LOC, SIZE, QTY; an
+    // extruded cut is no Hole feature's hole, so live lists none (behaviours
+    // "no Hole features": the header only).
     let ht = call(&mut ctx, "drawing_view_table", json!({ "drawing": tab, "kind": "hole", "view": top["id"], "origin": p(&lines[0], "a"), "position": [20, 120] }));
     let hid = ht["table"].clone();
     let tables = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["tables"].clone();
     let t = tables.as_array().unwrap().iter().find(|t| t["id"] == hid).cloned().unwrap();
     assert_eq!(t["header"], json!(["TAG", "X LOC", "Y LOC", "SIZE", "QTY"]), "{t}");
-    assert_eq!(t["rows"][0][3], "Ø10", "{t}");
-    assert_eq!(t["rows"][0][4], "1", "{t}");
+    assert_eq!(t["rows"], json!([]), "{t}");
 
     let c = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(&lines[0]), "position": [40, 250], "text": "7", "border": "hexagon" }));
     assert_eq!(kind_of(&mut ctx, c["annotation"].as_u64().unwrap()), "Balloon");

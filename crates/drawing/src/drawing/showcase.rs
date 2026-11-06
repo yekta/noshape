@@ -20,7 +20,7 @@ fn studio_and_assembly(doc: &Document) -> Option<(TabId, TabId)> {
 
 /// The demo drawing document extended with every drawing feature.
 pub fn showcase_document() -> Document {
-    let mut doc = crate::demo::demo_document_with_drawing();
+    let mut doc = crate::demo::hole_feature_demo_document_with_drawing();
     let Some((studio, asm)) = studio_and_assembly(&doc) else { return doc };
     // An exploded view in the assembly.
     {

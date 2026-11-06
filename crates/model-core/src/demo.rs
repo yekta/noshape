@@ -49,6 +49,57 @@ pub fn plate_studio() -> PartStudio {
     ps
 }
 
+/// The demo plate with its three holes (Ø24 in the middle, two Ø9.6 at opposite corners) made by Hole features,
+/// through from below: a drawing's hole table lists them (live lists only Hole features' holes).
+pub fn plate_studio_with_hole_features() -> PartStudio {
+    let units = UnitPrefs::default();
+    let (w, h, r) = (0.1, 0.06, 0.012);
+    let mut ps = PartStudio::new();
+    let mut outline = noshape_sketch::Sketch::new();
+    let p = [DVec2::new(-w / 2.0, -h / 2.0), DVec2::new(w / 2.0, -h / 2.0), DVec2::new(w / 2.0, h / 2.0), DVec2::new(-w / 2.0, h / 2.0)];
+    let pts: Vec<_> = p.iter().map(|q| outline.add_point(*q)).collect();
+    for i in 0..4 {
+        let _ = outline.add_line_between(pts[i], pts[(i + 1) % 4]);
+    }
+    let mut sketch = ps.new_feature("sketch", &units).unwrap();
+    sketch.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    sketch.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: outline, ..Default::default() })));
+    let sid = sketch.id;
+    ps.features.push(sketch);
+    let mut centers = noshape_sketch::Sketch::new();
+    let middle = centers.add_point(DVec2::ZERO);
+    let corners = [centers.add_point(DVec2::new(-w / 2.0 + 0.012, -h / 2.0 + 0.012)), centers.add_point(DVec2::new(w / 2.0 - 0.012, h / 2.0 - 0.012))];
+    let mut points = ps.new_feature("sketch", &units).unwrap();
+    points.params.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+    points.params.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: centers, ..Default::default() })));
+    let pid = points.id;
+    ps.features.push(points);
+    let mut reg = Regenerator::new();
+    let r0 = reg.regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let region = r0.display.sketches[0].regions.iter().max_by(|a, b| a.area.partial_cmp(&b.area).unwrap()).unwrap().key.clone();
+    let mut ex = ps.new_feature("extrude", &units).unwrap();
+    ex.params.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch: sid, key: region }]));
+    ex.params.set("depth", ParamValue::Expr(ExprValue::new("12 mm")));
+    ps.features.push(ex);
+    let r1 = reg.regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let plate = Reference::Body(r1.context.bodies[0].id.clone());
+    let top: Vec<Reference> = r1.context.bodies[0].edges.iter().filter(|e| format!("{e:?}").contains("CapEnd")).map(|e| Reference::Edge((**e).clone())).collect();
+    let mut f = ps.new_feature("fillet", &units).unwrap();
+    f.params.set("entities", ParamValue::Query(top));
+    f.params.set("radius", ParamValue::Expr(ExprValue::new("2 mm")));
+    ps.features.push(f);
+    for (at, d) in [(vec![middle], r * 2.0), (corners.to_vec(), r * 0.8)] {
+        let mut hole = ps.new_feature("hole", &units).unwrap();
+        hole.params.set("locations", ParamValue::Query(at.iter().map(|e| Reference::SketchEntity { sketch: pid, entity: e.0 }).collect()));
+        hole.params.set("holeDiameterV3", ParamValue::Expr(ExprValue::new(format!("{} mm", d * 1000.0))));
+        hole.params.set("endStyleV2", ParamValue::Enum("THROUGH".into()));
+        hole.params.set("oppositeDirection", ParamValue::Bool(true));
+        hole.params.set("scope", ParamValue::Query(vec![plate.clone()]));
+        ps.features.push(hole);
+    }
+    ps
+}
+
 /// A new document whose Part Studio holds the demo plate (`demo_document` in noshape-assembly adds the demo assembly
 /// and Feature Studio).
 pub fn plate_document() -> Document {
@@ -221,3 +272,26 @@ pub fn configure_pin_length(ps: &mut PartStudio) {
 }
 
 
+
+#[cfg(test)]
+mod hole_plate_tests {
+    use super::*;
+
+    /// The Hole-feature plate regenerates every feature (its holes noting their diameters off the standard's table, as
+    /// live), its three holes recorded (Ø24, two Ø9.6), the cut plate's volume within 0.2 cm³ (its hole rims square).
+    #[test]
+    fn the_hole_feature_plate_has_its_three_holes() {
+        let units = UnitPrefs::default();
+        let mut reg = Regenerator::new();
+        let r = reg.regenerate(&plate_studio_with_hole_features(), &ConfigValues::default(), &units, &RegenOptions::default());
+        let failed: Vec<_> = r.display.features.iter().filter(|s| s.status == crate::display::FeatureStatus::Error).map(|s| (s.id, s.message.clone())).collect();
+        assert!(failed.is_empty(), "{failed:?}");
+        let mut d: Vec<f64> = r.context.holes.iter().map(|h| (h.diameter * 1e4).round() / 10.0).collect();
+        d.sort_by(f64::total_cmp);
+        assert_eq!(d, [9.6, 9.6, 24.0]);
+        let cut = Regenerator::new().regenerate(&plate_studio(), &ConfigValues::default(), &units, &RegenOptions::default());
+        let vol = |r: &crate::regen::RegenResult| r.context.bodies.iter().filter_map(|b| b.shape.volume().ok()).sum::<f64>();
+        assert_eq!(r.context.bodies.len(), 1);
+        assert!(vol(&r) > 0.0 && (vol(&r) - vol(&cut)).abs() < 2e-7, "{} vs {}", vol(&r), vol(&cut));
+    }
+}

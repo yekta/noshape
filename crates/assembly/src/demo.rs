@@ -7,7 +7,15 @@ use noshape_model_core::document::{Document, TabContent};
 use noshape_model_core::reference::Reference;
 
 pub fn demo_document() -> Document {
+    demo_document_on(plate_studio())
+}
+
+/// [`demo_document`] on another plate (the showcase's, its holes Hole features).
+pub fn demo_document_on(plate: noshape_model_core::partstudio::PartStudio) -> Document {
     let mut d = plate_document();
+    if let TabContent::PartStudio(ps) = &mut d.tabs[0].content {
+        *ps = plate;
+    }
     add_demo_assembly(&mut d);
     add_demo_feature_studio(&mut d);
     d
