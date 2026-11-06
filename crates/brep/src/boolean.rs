@@ -622,7 +622,6 @@ impl Pool {
             // (OCCT's rule: together within the sum of the two's tolerances, apart past it, nothing in between; a
             // sharp knurl tooth's sub-micrometre slivers kept as live keeps them.)
             let d = (self.p[i as usize] - p).length();
-            tol_flip("vertex-vertex", d, reach, tp + ti);
             if d <= reach && !near.iter().any(|x| x.0 == i) {
                 near.push((i, d, reach));
             }
@@ -745,20 +744,6 @@ impl Pool {
             return Ok(i);
         }
         Ok(self.push(p))
-    }
-}
-
-/// NOSHAPE_BOOL_TOL_PROBE: report each pair test whose outcome the pair's own tolerances (floor 1e-7) would change
-/// (the per-entity tolerance plan's stage 1, docs/handoff/bool.md).
-fn tol_probe() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("NOSHAPE_BOOL_TOL_PROBE").is_some())
-}
-
-/// [`tol_probe`]'s report of one test: `what`, the distance, the reach it had and the pair's own.
-fn tol_flip(what: &str, d: f64, had: f64, own: f64) {
-    if tol_probe() && (d <= had) != (d <= own.max(1e-7)) {
-        eprintln!("TOLPROBE {what} d {d:.3e} had {had:.3e} own {:.3e}", own.max(1e-7));
     }
 }
 
@@ -1002,7 +987,6 @@ impl Ctx<'_> {
         // two vertices.)
         let tv = self.pool.t[v as usize];
         let reach = self.tol.max(tv + self.faces[f].t.max(0.5 * self.tol));
-        tol_flip("vertex-plane", x.abs(), reach, tv + self.faces[f].t);
         let s = if x.abs() <= reach {
             0
         } else if x > 0.0 {
@@ -1951,8 +1935,6 @@ impl Ctx<'_> {
                     ((w - *ax * h).length() - (r0 + k * h)).abs()
                 };
                 let (pa, pb) = (self.p(a), self.p(b));
-                let worst = off(pa).max(off(pb)).max(off((pa + pb) * 0.5));
-                tol_flip("line-cylinder", worst, tol, self.edges[e].t + self.faces[f].t);
                 Ok(off(pa) <= tol && off(pb) <= tol && off((pa + pb) * 0.5) <= tol)
             }
             (Surf::Cyl { o, a: ax, r0, k: slope, .. }, Geo::Arc { k, .. }) => {
@@ -3108,7 +3090,6 @@ impl Ctx<'_> {
             if t * len <= re || (1.0 - t) * len <= re {
                 continue;
             }
-            tol_flip("vertex-edge", off, r, te + self.pool.t[w as usize]);
             if off <= r {
                 on.push((t, w));
             }

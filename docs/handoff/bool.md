@@ -46,12 +46,6 @@ gears, gpf; bool_patterns' gear tests); timing of the knurls and gears no worse 
    rust_boolean.cpp where stage 2-4 cover it (fewer "a tolerant input" declines).
 Expected: Shell's slab Booleans (shfall) stop borrowing 20 um everywhere; the risk is the knurls (sub-micrometre
 slivers tested at today's tol) and the gears (many near-tangent sections): they gate every stage.
-Stage 1 (11-06 02:30 UTC): NOSHAPE_BOOL_TOL_PROBE=1 prints each pair test the pair's own tolerances (floor 1e-7) would
-decide otherwise ("TOLPROBE <test> d had own"): vertex-vertex (Pool::find_tol), vertex-plane (side), vertex-edge
-(split_reach), line-cylinder (edge_on_surface). Counts over whole corpora: shfall 298 / 750 / 682 / 214, bool-corpus
-10 / 4 / 8 / 0, corpus5 6 / 12 / 43 / 0, kall 0. Next: stage 2 (the vertex tests), gated as above.
-- c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
-  its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 
 ## Shell's "a section without ends"; the slot corners' vertex (11-06 02:05 UTC)
 - Landed 018a8298 (no case taken yet, gate unchanged): a section's end within a face vertex's own tolerance ends at
