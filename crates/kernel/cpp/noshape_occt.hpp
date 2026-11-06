@@ -98,6 +98,9 @@ public:
 private:
   size_t myPrevious;
 };
+// OCCT patch 0004 (every platform): this thread's override of the pairs' mode (-1 none, 0 serial); returns the one
+// before.
+extern "C" int noshape_bop_set_pairs_parallel_here(int on);
 // Budget of a blend (qa FILLET-HANG: OCCT's blend approximation never
 // returned): `f` runs with a CPU-time timer on this thread (Linux) that
 // ticks every 100 ms; once `cpu_seconds` are used or the regeneration is
@@ -112,8 +115,6 @@ extern thread_local const std::atomic<bool>* budget_cancel;
 // yet): the jump waits a grace for the cooperative stop as for the deadline.
 extern thread_local double                  budget_cancel_seen;
 extern thread_local int                     budget_hold;
-// OCCT patch 0004: this thread's override of the pairs' mode (-1 none, 0 serial); returns the one before.
-extern "C" int noshape_bop_set_pairs_parallel_here(int on);
 // The running budget's timer (run_budgeted's), for the crash guard to stop
 // when it recovers past that budget's frame.
 extern thread_local void*                   budget_timer_live;
