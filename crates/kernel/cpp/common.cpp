@@ -956,6 +956,33 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       f.erase(std::unique(f.begin(), f.end()), f.end());
       return f;
     };
+    // Whether, walking from vertex `v` along edge `j` and on through each vertex with exactly two shown edges, both
+    // between faces `pair`, the walk comes back to `v`.
+    auto closes_loop = [&](int v, int j, const std::vector<uint32_t>& pair) {
+      int at = v, edge = j;
+      for (int steps = 0; steps < em.Extent(); ++steps)
+      {
+        TopoDS_Vertex x, y;
+        TopExp::Vertices(TopoDS::Edge(em(edge)), x, y);
+        const int next = vm.FindIndex(x) == at ? vm.FindIndex(y) : vm.FindIndex(x);
+        if (next == v)
+          return true;
+        int other = 0, shown = 0;
+        for (uint32_t k = ve.first[(size_t)next - 1]; k < ve.first[(size_t)next]; ++k)
+        {
+          const int e = (int)ve.second[k] + 1;
+          if (out[(size_t)e - 1] == 0 || e == edge)
+            continue;
+          ++shown;
+          other = e;
+        }
+        if (shown != 1 || !open[other] || faces_of(other) != pair)
+          return false;
+        at   = next;
+        edge = other;
+      }
+      return false;
+    };
     for (int i = 1; i <= vm.Extent(); ++i)
     {
       const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
@@ -976,16 +1003,13 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       }
       if (other || two.size() != 2 || !open[two[0]] || !open[two[1]])
         continue;
-      // Two edges that close a loop between the same two faces (both their ends shared): one ring, seam or not (an
-      // IGES writer's halves of a slot's outline, live's motor-mount: its model has rings).
-      TopoDS_Vertex a0, a1, b0, b1;
-      TopExp::Vertices(TopoDS::Edge(em(two[0])), a0, a1);
-      TopExp::Vertices(TopoDS::Edge(em(two[1])), b0, b1);
-      const bool loop = (a0.IsSame(b0) && a1.IsSame(b1)) || (a0.IsSame(b1) && a1.IsSame(b0));
-      if (seams == 0 && !loop)
-        continue;
+      // Edges that close a loop between the same two faces, each vertex on it theirs alone: one ring, seam or not (an
+      // IGES writer's pieces of a slot's outline or a tube's end, live's motor-mount and hose: their models have rings).
       const std::vector<uint32_t> fa = faces_of(two[0]), fb = faces_of(two[1]);
       if (fa.size() != 2 || fa != fb)
+        continue;
+      const bool loop = closes_loop(i, two[0], fa);
+      if (seams == 0 && !loop)
         continue;
       // Going on from each other: their directions away from the vertex opposite.
       const TopoDS_Vertex& v = TopoDS::Vertex(vm(i));
