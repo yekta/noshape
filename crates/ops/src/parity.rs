@@ -1699,6 +1699,38 @@ impl<'a> Translator<'a> {
                 return Ok(only["id"].as_str().map(whole));
             }
         }
+        // One circle named, whole, and the face's side of it (`…}),-1.0]])]`, the query's last orientation): -1 the
+        // region it is a hole of, +1 the one inside it (cf-lighten's rings around its holes).
+        if bounded.len() > 1 && !derived && let [circle] = named.as_slice()
+            && g["entities"].as_array().into_iter().flatten().any(|e| e["id"] == circle.as_str() && e["type"] == "circle")
+            && let Some(side) = text.rfind("]])]").and_then(|end| text[..end].rsplit_once(',')).and_then(|(_, n)| n.trim().parse::<f64>().ok())
+        {
+            let inside = |r: &Value| r["outer"].as_array().is_some_and(|o| o.iter().any(|x| x == circle.as_str()));
+            if let [only] = bounded.iter().filter(|r| inside(r) == (side > 0.0)).collect::<Vec<_>>().as_slice() {
+                return Ok(only["id"].as_str().map(whole));
+            }
+        }
+        // One line named and no region bounded by it: it lies along another curve that bounds the region instead
+        // (two rectangles' sides on one line, cf-box-dovetail-joint's corners). The region beside it, where only one
+        // side has one.
+        if bounded.is_empty() && !derived && let [line] = named.as_slice() {
+            let entity = g["entities"].as_array().into_iter().flatten().find(|e| e["id"] == line.as_str() && e["type"] == "line");
+            let end = |e: &Value, k: &str| Some(glam::DVec2::new(e[k][0].as_f64()?, e[k][1].as_f64()?));
+            if let Some((a, b)) = entity.and_then(|e| Some((end(e, "start")?, end(e, "end")?))) {
+                let (mid, side) = ((a + b) * 0.5, (b - a).perp().normalize_or_zero() * (1e-3 * a.distance(b)).min(0.01));
+                let k = per_unit(&g["units"]);
+                let mut beside: Vec<String> = Vec::new();
+                for q in [mid + side, mid - side] {
+                    let at: [f64; 3] = std::array::from_fn(|i| (o[i] + q.x * x[i] + q.y * y[i]) * k);
+                    let found = self.call("sketch_get", json!({ "sketch": ours, "at": mm(at) }))?;
+                    beside.extend(found["regions"].as_array().into_iter().flatten().filter(|r| r["imprinted"] != true).filter_map(|r| r["id"].as_str().map(str::to_string)));
+                }
+                beside.dedup();
+                if let [only] = beside.as_slice() {
+                    return Ok(Some(whole(only)));
+                }
+            }
+        }
         // A piece of the face (named by face edges too): the pieces whose own
         // curves are exactly the named ones, the one nearest those face edges
         // (each side of a symmetric part names its own edges).
@@ -1755,6 +1787,7 @@ impl<'a> Translator<'a> {
             segments.extend(siblings.flat_map(|(_, poly)| poly.windows(2).flat_map(|w| [w[0], w[1]])));
         }
         // Else (several share them, or none known): the one inside those curves.
+        let several = bounded.len() > 1;
         let regions = if bounded.is_empty() { all } else { bounded };
         let mut best: Option<(f64, String)> = None;
         for r in &regions {
@@ -1774,6 +1807,14 @@ impl<'a> Translator<'a> {
             {
                 best = Some((area, id.to_string()));
             }
+        }
+        // (None inside them, several bounded by them: queries naming the same curves from either side of their
+        // meeting take one each (cf-lighten's ring, split in two by a tangent line and an arc).)
+        if best.is_none() && several && !derived
+            && let Some(id) = regions.iter().filter_map(|r| r["id"].as_str()).find(|id| !self.picked.contains(*id)).map(str::to_string)
+        {
+            self.picked.insert(id.clone());
+            return Ok(Some(whole(&id)));
         }
         best.map(|b| Some(whole(&b.1))).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
     }
