@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Parity fuses unlike OCCT's; slot corners (11-06 02:30 UTC)
+## Parity fuses unlike OCCT's; slot corners (11-06 01:25 UTC)
 - Landed 0797fb5b: OCCT's route groups 8+ tools it takes as apart (group_disjoint, a mesh check) and never intersects
   one group's tools; the check missed flat sheets sharing an edge, so OCCT's fuse left them apart (ac1b1ab0: 47 edges
   after merging faces) where ours, one fuse of them all, joined them (16). Sheets aren't grouped now: OCCT's alike,
