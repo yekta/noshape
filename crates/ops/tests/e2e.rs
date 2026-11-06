@@ -2203,6 +2203,32 @@ fn sketch_draw_makes_a_stored_b_spline() {
     assert_eq!(e.param.as_deref(), Some("knots"), "{e:?}");
 }
 
+/// Vertical takes an elliptical arc's major axis, and Coincident makes two elliptical arcs one ellipse (Onshape: a
+/// trimmed ellipse's pieces; c2-rings-loft).
+#[test]
+fn elliptical_arcs_take_vertical_and_coincident() {
+    let mut ctx = Ctx::new();
+    let s = new_sketch(&mut ctx, "elliptical.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": s, "shapes": [
+        { "tool": "elliptical_arc", "points": [[0, 0], [2, 10], [8, 0], [0, -10.2]] },
+        { "tool": "elliptical_arc", "points": [[30, 0], [30, 12], [36, 0], [30, -12]] }
+    ] }));
+    let arcs: Vec<String> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "elliptical_arc").map(|e| e["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(arcs.len(), 2, "{r}");
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": s, "constraint": "vertical", "entities": [arcs[0]] }));
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": s, "constraint": "coincident", "entities": [arcs[0], arcs[1]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": s }));
+    let e: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "elliptical_arc").collect();
+    let num = |v: &Value| v.as_f64().unwrap();
+    assert!(num(&e[0]["major"][0]).abs() < 1e-6, "vertical: {}", e[0]);
+    for k in ["center", "major"] {
+        for i in 0..2 {
+            assert!((num(&e[0][k][i]) - num(&e[1][k][i])).abs() < 1e-6, "one ellipse: {} / {}", e[0], e[1]);
+        }
+    }
+    assert!((num(&e[0]["minor_radius"]) - num(&e[1]["minor_radius"])).abs() < 1e-6, "{} / {}", e[0], e[1]);
+}
+
 #[test]
 fn sketch_draw_many_shapes_in_one_edit() {
     let mut ctx = Ctx::new();

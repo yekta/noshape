@@ -83,6 +83,9 @@ pub struct Translator<'a> {
     config_defaults: HashMap<String, String>,
     /// Edits the current sketch's constraints and dimensions made (to undo).
     sketch_edits: usize,
+    /// A spline's end handle (Onshape's `<spline>.startHandle` / `.endHandle` construction lines): our spline's end point
+    /// and handle tip.
+    handle_lines: HashMap<(String, String), [String; 2]>,
     /// The sketch before its constraints, and the first that moved it.
     sketch_before: Value,
     /// The open sketch's Onshape (x, y) → ours.
@@ -277,7 +280,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -2353,7 +2356,17 @@ impl<'a> Translator<'a> {
                     match (e["startParam"].as_f64(), e["endParam"].as_f64()) {
                         (Some(t0), Some(t1)) if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchCurveSegment")) => {
                             let (t0, t1) = if sense < 0.0 { (t1, t0) } else { (t0, t1) };
-                            Some(json!({ "tool": "elliptical_arc", "points": [at(cx, cy), pt(0.0), pt(t0), pt(t1)], "construction": construction }))
+                            // The tool's third click sets the minor radius by its distance across the major axis and the
+                            // start by its angle: the click with both, live's b and its start's angle (on the axis: the
+                            // start itself).
+                            let (c0, s0) = (t0.cos(), sense * t0.sin());
+                            let third = if s0.abs() > 1e-6 {
+                                let (k, m) = (a * c0 / s0.abs(), b * s0.signum());
+                                json!(at(cx + k * xd - m * yd, cy + k * yd + m * xd))
+                            } else {
+                                pt(t0)
+                            };
+                            Some(json!({ "tool": "elliptical_arc", "points": [at(cx, cy), pt(0.0), third, pt(t1)], "construction": construction }))
                         }
                         _ => Some(json!({ "tool": "ellipse", "points": [at(cx, cy), pt(0.0), pt(std::f64::consts::FRAC_PI_2)], "construction": construction })),
                     }
@@ -2466,6 +2479,15 @@ impl<'a> Translator<'a> {
                         }
                         _ => false,
                     };
+                    // A spline's handles: their tips, and the lines from its ends.
+                    if let (Some([h0, h1]), Some(pts)) = (c["handles"].as_array().and_then(|h| Some([h.first()?.as_str()?.to_string(), h.get(1)?.as_str()?.to_string()])), c["point_ids"].as_array()) {
+                        let (first, last) = (pts.first().and_then(Value::as_str).unwrap_or_default().to_string(), pts.last().and_then(Value::as_str).unwrap_or_default().to_string());
+                        for (end, tip, at) in [("startHandle", h0, first), ("endHandle", h1, last)] {
+                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.start")), at.clone());
+                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.end")), tip.clone());
+                            self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
+                        }
+                    }
                     let keys = if reversed { [("start", "end_point"), ("end", "start_point"), ("center", "center_point")] } else { [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] };
                     for (end, key) in keys {
                         if let Some(pid) = c[key].as_str() {
@@ -2637,6 +2659,8 @@ impl<'a> Translator<'a> {
                 "FIX" => "fix",
                 "NORMAL" => "normal",
                 "CURVATURE" => "curvature",
+                // A point at an ellipse's axis end: inferred when ours was drawn there (kept), else on the ellipse.
+                "QUADRANT" => "quadrant",
                 // Dimensions: `dimensions`.
                 "DISTANCE" | "LENGTH" | "DIAMETER" | "RADIUS" | "ANGLE" | "CENTERLINE_DIMENSION" | "MAJOR_DIAMETER" | "MINOR_DIAMETER" => continue,
                 "RHO" => {
@@ -2698,6 +2722,18 @@ impl<'a> Translator<'a> {
             if ours == "coincident" && entities.len() == 2 && entities[0] == entities[1] {
                 continue;
             }
+            if ours == "quadrant" {
+                let have = entities.len() == 2
+                    && self.call("sketch_get", json!({ "sketch": id })).is_ok_and(|g| {
+                        g["constraints"].as_array().into_iter().flatten().any(|q| q["type"] == "Quadrant" && entities.iter().all(|e| q["entities"].as_array().is_some_and(|l| l.iter().any(|x| x == e.as_str()))))
+                    });
+                if have {
+                    continue;
+                }
+            }
+            let ours = if ours == "quadrant" { "coincident" } else { ours };
+            // A point mirrored onto itself (ours merged the pair: a point on the mirror line) lies on the line.
+            let (ours, entities) = if ours == "symmetric" && entities.len() == 3 && entities[0] == entities[1] { ("coincident", vec![entities[0].clone(), entities[2].clone()]) } else { (ours, entities) };
             let made = !entities.is_empty() && self.call("sketch_constrain", json!({ "sketch": id, "constraint": ours, "entities": entities })).is_ok();
             self.sketch_edits += usize::from(made);
             if made {
@@ -2925,6 +2961,7 @@ impl<'a> Translator<'a> {
             let value = ["length", "angle"].iter().find_map(|n| par(n)).and_then(|p| p["expression"].as_str().map(str::to_string));
             let mut entities = Vec::new();
             let mut missing = false;
+            let mut handle: Option<[String; 2]> = None;
             for n in ["localFirst", "externalFirst", "localSecond", "externalSecond", "localEntity1", "localEntity2"] {
                 if n.starts_with("external") {
                     let Some(ext) = par(n) else { continue };
@@ -2937,13 +2974,27 @@ impl<'a> Translator<'a> {
                 if let Some(v) = par(n).and_then(|p| p["value"].as_str().map(str::to_string)).filter(|v| !v.is_empty()) {
                     match self.sketch_entities.get(&(oid.to_string(), v.clone())) {
                         Some(e) => entities.push(e.clone()),
-                        None => problems.push(format!("{ty} dimension: sketch entity {v} not translated")),
+                        None => match self.handle_lines.get(&(oid.to_string(), v.clone())) {
+                            Some(line) => handle = Some(line.clone()),
+                            None => problems.push(format!("{ty} dimension: sketch entity {v} not translated")),
+                        },
                     }
                 }
             }
+            // On a spline's handle line: its length the distance from the spline's end to the tip; an angle to it
+            // has no counterpart (ours has no handle line).
+            let mut kind = kind;
+            if let Some([at, tip]) = handle {
+                if kind != "length" || !entities.is_empty() {
+                    *external.entry(format!("{ty} on a spline handle (no counterpart)")).or_default() += 1;
+                    continue;
+                }
+                entities = vec![at, tip];
+                kind = "distance";
+            }
             // To model geometry: left to the solved geometry, as constraints are.
             if missing {
-                *external.entry(ty.to_string()).or_default() += 1;
+                *external.entry(format!("{ty} to external geometry")).or_default() += 1;
                 continue;
             }
             if entities.is_empty() {
@@ -2998,7 +3049,7 @@ impl<'a> Translator<'a> {
             }
         }
         if !external.is_empty() {
-            problems.push(format!("dimensions left to the solved geometry: {}", external.iter().map(|(k, n)| format!("{n} {k} to external geometry")).collect::<Vec<_>>().join(", ")));
+            problems.push(format!("dimensions left to the solved geometry: {}", external.iter().map(|(k, n)| format!("{n} {k}")).collect::<Vec<_>>().join(", ")));
         }
     }
 }

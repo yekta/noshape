@@ -424,7 +424,14 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
         Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k) }),
         Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::BSpline { control, degree, knots, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) }),
-        Geometry::FitSpline { points, .. } => json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() }),
+        Geometry::FitSpline { points, handles } => {
+            let mut v = json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() });
+            // Its end handles' tips (Onshape's white handles), start's then end's.
+            if let Some((h0, h1)) = handles {
+                v["handles"] = json!([eid(*h0), eid(*h1)]);
+            }
+            v
+        }
         Geometry::Conic { start, control, end, rho } => json!({ "type": "conic", "start": p(*start), "control": p(*control), "end": p(*end), "rho": rho, "start_point": eid(*start), "control_point": eid(*control), "end_point": eid(*end) }),
     };
     v["id"] = json!(entity_id(sketch, e.id));
@@ -828,9 +835,9 @@ fn dimension_kind(kind: &str, ids: &[EntityId], mode: DistanceMode, data: &Sketc
         [a, b] => Ok((*a, *b)),
         _ => Err(OpError::param("entities", "two entities")),
     };
-    // An ellipse's radius / diameter is the axis the Dimension tool picks
+    // An ellipse's (or elliptical arc's) radius / diameter is the axis the Dimension tool picks
     // (Ø of the major or minor axis, as live's ellipse dimension).
-    let ellipse = matches!(ids, [e] if matches!(data.sketch.entity(*e).map(|x| &x.geometry), Some(noshape_sketch::Geometry::Ellipse { .. })));
+    let ellipse = matches!(ids, [e] if matches!(data.sketch.entity(*e).map(|x| &x.geometry), Some(noshape_sketch::Geometry::Ellipse { .. } | noshape_sketch::Geometry::EllipticalArc { .. })));
     let kind = if ellipse && matches!(kind, "radius" | "diameter") { "auto" } else { kind };
     Ok(match kind {
         "auto" => {

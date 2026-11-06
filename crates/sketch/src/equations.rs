@@ -1281,6 +1281,16 @@ impl<'a, L: Lookup> Builder<'a, L> {
                 self.lin(Lin::new().rad(1.0, &r1).rad(-1.0, &r2));
                 Ok(())
             }
+            // One ellipse (Onshape's pieces of a trimmed one): the centre, the major axis and the minor radius.
+            (x, y) if x.is_elliptical() && y.is_elliptical() => {
+                let (e1, e2) = (self.ell(p)?, self.ell(q)?);
+                for (i, j) in e1.into_iter().zip(e2) {
+                    if i != j {
+                        self.lin(Lin::new().p(1.0, i).p(-1.0, j));
+                    }
+                }
+                Ok(())
+            }
             _ => Err(format!("coincident not supported between {kp:?} and {kq:?}")),
         }
     }

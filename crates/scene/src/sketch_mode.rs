@@ -6905,11 +6905,11 @@ pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -
     let round = |k: EntityKind| k.is_circular() || k.is_elliptical();
     let curve = |k: EntityKind| k != EntityKind::Point;
     match c {
-        ConstraintTool::Coincident => n >= 2 && (count(&point) >= 1 && (count(&point) == n || count(&point) == 1 || n == 2) || all(&line) || all(&|k| k.is_circular())),
+        ConstraintTool::Coincident => n >= 2 && (count(&point) >= 1 && (count(&point) == n || count(&point) == 1 || n == 2) || all(&line) || all(&|k| k.is_circular()) || all(&|k| k.is_elliptical())),
         ConstraintTool::Concentric => n >= 2 && all(&|k| round(k) || point(k)) && count(&round) >= 1,
         ConstraintTool::Parallel => n >= 2 && all(&line),
         ConstraintTool::Tangent => n >= 2 && all(&curve) && !all(&line),
-        ConstraintTool::Horizontal | ConstraintTool::Vertical => all(&|k| line(k) || k == EntityKind::Ellipse) || (n >= 2 && all(&point)),
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => all(&|k| line(k) || k.is_elliptical()) || (n >= 2 && all(&point)),
         ConstraintTool::Perpendicular => n == 2 && all(&line),
         ConstraintTool::Equal => n >= 2 && (all(&line) || all(&|k| k.is_circular())),
         ConstraintTool::Midpoint => (n == 2 && count(&point) == 1 && kinds.iter().any(|k| matches!(k, EntityKind::Line | EntityKind::Arc))) || (n == 3 && all(&point)),

@@ -1127,6 +1127,61 @@ fn a_conic_is_translated_with_its_rho() {
     assert_eq!(g["regions"].as_array().map(Vec::len), Some(1), "{g}");
 }
 
+/// Live's constraints that had no counterpart in the translator (c2 corpus): an elliptical arc's QUADRANT point,
+/// VERTICAL major axis and MINOR_DIAMETER, two pieces of one trimmed ellipse COINCIDENT, a point MIRRORed onto itself
+/// (on the mirror line), a spline handle's LENGTH. All taken, nothing moved.
+#[test]
+fn lives_ellipse_mirror_and_handle_constraints_translate() {
+    let seg = |id: &str, t: [f64; 2], g: Value| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "centerId": format!("{id}.center"), "startParam": t[0], "endParam": t[1], "geometry": g });
+    let ellipse = json!({ "btType": "BTCurveGeometryEllipse-1189", "radius": 0.01275, "minorRadius": 0.012, "xCenter": 0.0, "yCenter": 0.0015, "xDir": 0.0, "yDir": 1.0, "clockwise": false });
+    let line = |id: &str, p: [f64; 2], d: [f64; 2], t: [f64; 2], construction: bool| {
+        let mut l = seg(id, t, json!({ "btType": "BTCurveGeometryLine-117", "pntX": p[0], "pntY": p[1], "dirX": d[0], "dirY": d[1] }));
+        l["isConstruction"] = json!(construction);
+        l
+    };
+    let s = |id: &str, v: &str| json!({ "btType": "BTMParameterString-149", "parameterId": id, "value": v });
+    let q = |id: &str, e: &str| json!({ "btType": "BTMParameterQuantity-147", "parameterId": id, "expression": e });
+    let c = |ty: &str, params: Vec<Value>| json!({ "btType": "BTMSketchConstraint-2", "constraintType": ty, "parameters": params });
+    let tau = std::f64::consts::TAU;
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [
+              seg("e1", [0.6828, 5.6004], ellipse.clone()),
+              seg("e2", [5.9, 0.4 + tau], ellipse),
+              line("q", [0.0, -0.01125], [0.0, 1.0], [0.0, 0.001], true),
+              line("m", [0.03, 0.0], [0.0, 1.0], [-0.01, 0.01], true),
+              { "btType": "BTMSketchPoint-158", "entityId": "p1", "isConstruction": false, "x": 0.03, "y": 0.005 },
+              { "btType": "BTMSketchPoint-158", "entityId": "p2", "isConstruction": false, "x": 0.03, "y": 0.005 },
+              { "btType": "BTMSketchCurveSegment-155", "entityId": "sp", "startPointId": "sp.start", "endPointId": "sp.end", "startParam": 0.0, "endParam": 1.0,
+                "geometry": { "btType": "BTCurveGeometryInterpolatedSpline-116", "isPeriodic": false, "interpolationPoints": [0.05, 0.0, 0.07, 0.01, 0.09, 0.0],
+                              "startDerivativeX": 0.03, "startDerivativeY": 0.03, "endDerivativeX": 0.03, "endDerivativeY": -0.03 } }
+          ],
+          "constraints": [
+              c("QUADRANT", vec![s("localFirst", "q.start"), s("localSecond", "e1")]),
+              c("VERTICAL", vec![s("localFirst", "e1")]),
+              c("COINCIDENT", vec![s("localFirst", "e1"), s("localSecond", "e2")]),
+              c("MINOR_DIAMETER", vec![s("localFirst", "e1"), q("length", "24 mm")]),
+              c("MIRROR", vec![s("localFirst", "p1"), s("localSecond", "p2"), s("localMirror", "m")]),
+              c("LENGTH", vec![s("localFirst", "sp.startHandle"), q("length", "7.0710678 mm")])
+          ] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("untranslated-constraints.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let arcs: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "elliptical_arc").collect();
+    assert_eq!(arcs.len(), 2, "{g}");
+    for a in &arcs {
+        assert_eq!((a["center"].clone(), a["major"].clone(), a["minor_radius"].clone()), (json!([0.0, 1.5]), json!([0.0, 12.75]), json!(12.0)), "{a}");
+    }
+    let types: Vec<&str> = g["constraints"].as_array().unwrap().iter().filter_map(|c| c["type"].as_str()).collect();
+    for want in ["Quadrant", "Vertical", "Coincident"] {
+        assert!(types.contains(&want), "{want}: {types:?}");
+    }
+}
+
 /// Sketch text as live stores it (BTMSketchTextEntity: its first baseline's
 /// start and direction, the ascent, the font file): the Text tool's box at
 /// that corner and height, turned along the baseline (cf-fix-pcb's Sketch 4).
