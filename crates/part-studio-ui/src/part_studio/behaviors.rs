@@ -318,6 +318,8 @@ pub struct UiState {
     pub cache_task: Option<Task<()>>,
     pub cache_save_task: Option<Task<()>>,
     pub cache_key: Option<String>,
+    /// The regeneration's coarse (preview) display and its sequence number, cached with its full one.
+    pub preview_for_cache: Option<(u64, std::sync::Arc<noshape_model::display::StudioDisplay>)>,
     pub after_regen: Option<super::cached_open::Deferred>,
     /// The open "Export as DXF/DWG" modal's File name (the suite reads its focus).
     pub cad_export_file: Option<WeakEntity<gpui_kit::component::input::InputState>>,
@@ -700,6 +702,7 @@ impl UiState {
             cache_task: None,
             cache_save_task: None,
             cache_key: None,
+            preview_for_cache: None,
             after_regen: None,
             cad_export_file: None,
             appearance_hover: Vec::new(),

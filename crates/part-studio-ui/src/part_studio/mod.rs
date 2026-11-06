@@ -825,6 +825,8 @@ impl PartStudioView {
                 scene_builder::log_regen_perf(if refine { "preview" } else { "full" }, &result.display, &studio);
                 this.note_open_display(!refine, result.display.regen_ms);
                 let display = Arc::new(result.display);
+                // The coarse display the cache keeps beside the full one (cached_open.rs: shown first on a reopen).
+                this.ui.preview_for_cache = refine.then(|| (seq, display.clone()));
                 if !refine {
                     let made = head.then(|| (studio.clone(), shown_vars.clone(), display.clone()));
                     crate::start_thumbnail::regen_done(&path, this.tab, made, cx);

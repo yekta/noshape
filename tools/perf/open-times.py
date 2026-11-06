@@ -86,9 +86,10 @@ def reopen_summary(runs):
     """The reopens' median to the first frame with a model: the cached one, else the regenerated one."""
     vals = []
     for r in runs:
-        at = r.get("cached_frame", r.get("preview_frame", r.get("full_frame")))
-        if at is not None and "open" in r:
-            vals.append(at - r["open"])
+        # Whichever model frame came first: the cached display's, or a regeneration that beat it.
+        frames = [r[k] for k in ("cached_frame", "preview_frame", "full_frame") if k in r]
+        if frames and "open" in r:
+            vals.append(min(frames) - r["open"])
     return {"reopen_ms": round(statistics.median(vals)) if vals else None, "reopen_cached": sum(1 for r in runs if "cached_frame" in r)}
 
 

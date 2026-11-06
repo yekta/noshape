@@ -31,6 +31,11 @@ pub(super) const WAITING: &str = "Regenerating the model: this opens as soon as 
 /// How long after a full display the cache is written (edits in a row write once).
 const SAVE_AFTER: Duration = Duration::from_secs(2);
 
+/// The key of a display's coarse (preview) level.
+fn coarse_key(key: &str) -> String {
+    format!("{key}-coarse")
+}
+
 impl PartStudioView {
     fn cache_key_inputs(&self, cx: &App) -> (noshape_model::Document, noshape_model::document::TabId, noshape_model::configuration::ConfigValues, bool) {
         (self.doc.read(cx).session.doc.clone(), self.tab, self.config_values.clone(), self.ui.high_quality_seen)
@@ -42,16 +47,27 @@ impl PartStudioView {
             return;
         }
         let (doc, tab, config, fine) = self.cache_key_inputs(cx);
-        let found = cx.background_spawn(async move {
+        // The coarse display first (a fraction of the refined one's triangles: drawn at once), then the refined one.
+        let first = cx.background_spawn(async move {
             let key = display_cache::key(&doc, tab, &config, fine)?;
-            let display = display_cache::load(&display_cache::default_dir(), &key)?;
-            Some((key, display))
+            let dir = display_cache::default_dir();
+            let coarse = display_cache::load(&dir, &coarse_key(&key));
+            Some((key, coarse))
         });
         self.ui.cache_task = Some(cx.spawn_in(window, async move |this, cx| {
-            let Some((key, display)) = found.await else { return };
+            let Some((key, coarse)) = first.await else { return };
+            let had_coarse = coarse.is_some();
+            if let Some(display) = coarse {
+                let key = key.clone();
+                let _ = this.update_in(cx, |this: &mut Self, window, cx| this.show_cached_display(key, display, window, cx));
+            }
+            let full = cx.background_spawn(async move { display_cache::load(&display_cache::default_dir(), &key).map(|d| (key, d)) }).await;
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.cache_task = None;
-                this.show_cached_display(key, display, window, cx);
+                // Over the coarse cached one, or alone when there was none; never over the real model.
+                if let Some((key, display)) = full.filter(|_| this.ui.cached_view || !had_coarse) {
+                    this.show_cached_display(key, display, window, cx);
+                }
             });
         }));
     }
@@ -112,16 +128,21 @@ impl PartStudioView {
                 if this.regen_seq != seq || this.edit.is_some() || this.pending.is_some() {
                     return None;
                 }
-                Some((this.cache_key_inputs(cx), this.display.clone(), this.ui.cache_key.clone()))
+                let coarse = this.ui.preview_for_cache.as_ref().filter(|(s, _)| *s == seq).map(|(_, d)| d.clone());
+                Some((this.cache_key_inputs(cx), this.display.clone(), coarse, this.ui.cache_key.clone()))
             });
-            let Ok(Some(((doc, tab, config, fine), display, known))) = job else { return };
+            let Ok(Some(((doc, tab, config, fine), display, coarse, known))) = job else { return };
             let saved = cx
                 .background_spawn(async move {
                     let key = display_cache::key(&doc, tab, &config, fine)?;
                     if known.as_ref() == Some(&key) {
                         return Some(key);
                     }
-                    display_cache::store(&display_cache::default_dir(), &key, &display).ok()?;
+                    let dir = display_cache::default_dir();
+                    if let Some(coarse) = &coarse {
+                        display_cache::store(&dir, &coarse_key(&key), coarse).ok()?;
+                    }
+                    display_cache::store(&dir, &key, &display).ok()?;
                     Some(key)
                 })
                 .await;
