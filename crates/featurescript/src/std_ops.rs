@@ -131,8 +131,11 @@ fn vwu(v: &Value) -> Option<Vwu<'_>> {
     if Some(*tag) != vwu_tag() {
         return None;
     }
-    let Some(Value::Number(value, Tag::NONE)) = map.get(&VALUE_KEY) else { return None };
-    let unit = map.get(&UNIT_KEY)?;
+    let (unit, value) = match map.unit_value() {
+        Some(uv) => uv,
+        None => (map.get(&UNIT_KEY)?, map.get(&VALUE_KEY)?),
+    };
+    let Value::Number(value, Tag::NONE) = value else { return None };
     Some(Vwu { map, tag: *tag, value: *value, unit })
 }
 
@@ -222,10 +225,7 @@ fn product(tag: Tag, u1: &Value, u2: &Value, x: f64) -> Option<Value> {
     if unit.is_empty() {
         return Some(Value::num(x));
     }
-    let mut m = Map::new();
-    m.insert(UNIT_KEY.clone(), Value::Map(Arc::new(unit), t1));
-    m.insert(VALUE_KEY.clone(), Value::num(x));
-    Some(Value::Map(Arc::new(m), tag))
+    Some(Value::Map(Arc::new(Map::with_unit_value(Value::Map(Arc::new(unit), t1), Value::num(x))), tag))
 }
 
 /// `reciprocal`: every exponent negated, the value inverted.

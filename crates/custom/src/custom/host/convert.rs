@@ -6,7 +6,7 @@ use super::std_tag;
 use crate::display::PlaneFrame;
 use glam::{DMat3, DMat4, DVec2, DVec3};
 use noshape_featurescript::interp::{Interp, R};
-use noshape_featurescript::value::{Map, Tag, UNIT_KEY, VALUE_KEY, Value};
+use noshape_featurescript::value::{Map, Tag, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
@@ -59,9 +59,7 @@ fn unit_map(entries: &[(&str, f64)]) -> Value {
 }
 
 fn with_units(x: f64, unit: &[(&str, f64)]) -> Value {
-    let mut m = Map::new();
-    m.insert(UNIT_KEY.clone(), unit_spec(unit));
-    m.insert(VALUE_KEY.clone(), Value::num(x));
+    let m = Map::with_unit_value(unit_spec(unit), Value::num(x));
     static TAG: OnceLock<Tag> = OnceLock::new();
     Value::Map(Arc::new(m), kept_tag(&TAG, "units.fs", "ValueWithUnits"))
 }

@@ -1,105 +1,43 @@
-//! FeatureScript's map: entries sorted by key, in place while two or fewer (a ValueWithUnits: the map's only
-//! allocation is its value's `Arc`), then a short vector (a plane's three; a B-tree's node held eleven, a 512 × 512
-//! Displacement map's values took 1.5 GB), a B-tree past that. Iteration, comparison and lookup as a `BTreeMap` (by
-//! `Value`'s order).
+//! FeatureScript's map: entries sorted by key, as a short vector while small (a plane's three: one allocation of
+//! their size, where a B-tree's node held eleven; a 512 × 512 Displacement map's values took 1.5 GB), a B-tree past
+//! that. A map of exactly "unit" and "value" (every ValueWithUnits) holds only its two values: a length is its `Arc`'s
+//! one allocation, read without a lookup. Iteration, comparison and lookup as a `BTreeMap` (by `Value`'s order).
 
-use crate::value::Value;
+use crate::value::{Tag, UNIT_KEY, VALUE_KEY, Value};
 use std::collections::BTreeMap;
 use std::collections::btree_map;
 
 /// Entries kept in a vector up to this many.
 const SMALL: usize = 16;
-/// Entries kept in place up to this many (a ValueWithUnits' two: a million points' lengths are each one allocation
-/// of their size).
-const INLINE: usize = 2;
-const EMPTY: (Value, Value) = (Value::Undefined, Value::Undefined);
 
 #[derive(Clone, Debug)]
 pub struct Map(Repr);
 
 #[derive(Clone, Debug)]
 enum Repr {
-    Small(Small),
+    Small(Vec<(Value, Value)>),
     Big(BTreeMap<Value, Value>),
+    /// `{ "unit" : u, "value" : v }`: [u, v].
+    UnitValue([Value; 2]),
 }
 
-/// A small map's sorted entries: the first `INLINE` in place (the slots past the count hold undefined), more in a
-/// vector.
-#[derive(Clone, Debug)]
-enum Small {
-    Inline(u8, [(Value, Value); INLINE]),
-    Heap(Vec<(Value, Value)>),
+/// A key's place in a [`Repr::UnitValue`]: "unit" 0, "value" 1.
+fn unit_value_slot(key: &Value) -> Option<usize> {
+    if key.same_str(&UNIT_KEY) {
+        return Some(0);
+    }
+    if key.same_str(&VALUE_KEY) {
+        return Some(1);
+    }
+    match key {
+        Value::Str(s, Tag::NONE) if &**s == "unit" => Some(0),
+        Value::Str(s, Tag::NONE) if &**s == "value" => Some(1),
+        _ => None,
+    }
 }
 
-impl Small {
-    fn as_slice(&self) -> &[(Value, Value)] {
-        match self {
-            Small::Inline(n, a) => &a[..*n as usize],
-            Small::Heap(v) => v,
-        }
-    }
-
-    fn as_mut_slice(&mut self) -> &mut [(Value, Value)] {
-        match self {
-            Small::Inline(n, a) => &mut a[..*n as usize],
-            Small::Heap(v) => v,
-        }
-    }
-
-    fn insert(&mut self, i: usize, e: (Value, Value)) {
-        match self {
-            Small::Inline(n, a) if (*n as usize) < INLINE => {
-                let end = *n as usize;
-                a[end] = e;
-                a[i..=end].rotate_right(1);
-                *n += 1;
-            }
-            Small::Inline(..) => {
-                let mut v = self.take_all();
-                v.insert(i, e);
-                *self = Small::Heap(v);
-            }
-            Small::Heap(v) => v.insert(i, e),
-        }
-    }
-
-    fn remove(&mut self, i: usize) -> (Value, Value) {
-        match self {
-            Small::Inline(n, a) => {
-                let end = *n as usize;
-                a[i..end].rotate_left(1);
-                *n -= 1;
-                std::mem::take(&mut a[end - 1])
-            }
-            Small::Heap(v) => v.remove(i),
-        }
-    }
-
-    fn retain(&mut self, mut f: impl FnMut(&mut (Value, Value)) -> bool) {
-        match self {
-            Small::Inline(n, a) => {
-                let mut kept = 0;
-                for i in 0..*n as usize {
-                    if f(&mut a[i]) {
-                        a.swap(kept, i);
-                        kept += 1;
-                    }
-                }
-                for x in &mut a[kept..] {
-                    *x = EMPTY;
-                }
-                *n = kept as u8;
-            }
-            Small::Heap(v) => v.retain_mut(f),
-        }
-    }
-
-    fn take_all(&mut self) -> Vec<(Value, Value)> {
-        match std::mem::replace(self, Small::Inline(0, [EMPTY; INLINE])) {
-            Small::Inline(n, a) => a.into_iter().take(n as usize).collect(),
-            Small::Heap(v) => v,
-        }
-    }
+fn unit_value_keys() -> [&'static Value; 2] {
+    [&UNIT_KEY, &VALUE_KEY]
 }
 
 impl Default for Map {
@@ -110,13 +48,14 @@ impl Default for Map {
 
 impl Map {
     pub const fn new() -> Self {
-        Map(Repr::Small(Small::Inline(0, [EMPTY; INLINE])))
+        Map(Repr::Small(Vec::new()))
     }
 
     pub fn len(&self) -> usize {
         match &self.0 {
-            Repr::Small(v) => v.as_slice().len(),
+            Repr::Small(v) => v.len(),
             Repr::Big(m) => m.len(),
+            Repr::UnitValue(_) => 2,
         }
     }
 
@@ -124,21 +63,47 @@ impl Map {
         self.len() == 0
     }
 
+    /// `{ "unit" : unit, "value" : value }`.
+    pub fn with_unit_value(unit: Value, value: Value) -> Map {
+        Map(Repr::UnitValue([unit, value]))
+    }
+
+    /// A ValueWithUnits' unit and value, when this map is exactly those two.
+    pub fn unit_value(&self) -> Option<(&Value, &Value)> {
+        match &self.0 {
+            Repr::UnitValue([u, v]) => Some((u, v)),
+            _ => None,
+        }
+    }
+
     fn find(v: &[(Value, Value)], key: &Value) -> Result<usize, usize> {
         v.binary_search_by(|(k, _)| k.cmp(key))
+    }
+
+    /// The entries as a vector (a unit-and-value map's keys made).
+    fn small(&mut self) -> &mut Vec<(Value, Value)> {
+        if let Repr::UnitValue([u, v]) = &mut self.0 {
+            let (u, v) = (std::mem::take(u), std::mem::take(v));
+            self.0 = Repr::Small(vec![(UNIT_KEY.clone(), u), (VALUE_KEY.clone(), v)]);
+        }
+        match &mut self.0 {
+            Repr::Small(v) => v,
+            // (Not reached: a big map is no vector.)
+            Repr::Big(_) | Repr::UnitValue(_) => unreachable_small(),
+        }
     }
 
     pub fn get(&self, key: &Value) -> Option<&Value> {
         match &self.0 {
             Repr::Small(v) => {
-                let v = v.as_slice();
-                // (A key by address first: a ValueWithUnits' "value", a plane's "origin".)
+                // (A key by address first: a plane's "origin".)
                 if let Some((_, x)) = v.iter().find(|(k, _)| k.same_str(key)) {
                     return Some(x);
                 }
                 Self::find(v, key).ok().map(|i| &v[i].1)
             }
             Repr::Big(m) => m.get(key),
+            Repr::UnitValue(a) => unit_value_slot(key).map(|i| &a[i]),
         }
     }
 
@@ -146,7 +111,6 @@ impl Map {
     pub fn get_str(&self, key: &str) -> Option<&Value> {
         match &self.0 {
             Repr::Small(v) => {
-                let v = v.as_slice();
                 // (Where the key sorts in Value's order: untagged values by standard type, strings by their text.)
                 let at = |k: &Value| match k {
                     Value::Str(a, t) if t.is_none() => (**a).cmp(key),
@@ -156,17 +120,22 @@ impl Map {
                 v.binary_search_by(|(k, _)| at(k)).ok().map(|i| &v[i].1)
             }
             Repr::Big(m) => m.get(&Value::str(key)),
+            Repr::UnitValue(a) => match key {
+                "unit" => Some(&a[0]),
+                "value" => Some(&a[1]),
+                _ => None,
+            },
         }
     }
 
     pub fn get_mut(&mut self, key: &Value) -> Option<&mut Value> {
         match &mut self.0 {
             Repr::Small(v) => {
-                let v = v.as_mut_slice();
                 let i = v.iter().position(|(k, _)| k.same_str(key)).map_or_else(|| Self::find(v, key), Ok);
                 i.ok().map(|i| &mut v[i].1)
             }
             Repr::Big(m) => m.get_mut(key),
+            Repr::UnitValue(a) => unit_value_slot(key).map(|i| &mut a[i]),
         }
     }
 
@@ -175,16 +144,25 @@ impl Map {
     }
 
     pub fn insert(&mut self, key: Value, value: Value) -> Option<Value> {
-        let v = match &mut self.0 {
+        match &mut self.0 {
             Repr::Big(m) => return m.insert(key, value),
-            Repr::Small(v) => v,
-        };
-        match Self::find(v.as_slice(), &key) {
-            Ok(i) => Some(std::mem::replace(&mut v.as_mut_slice()[i].1, value)),
+            Repr::UnitValue(a) => {
+                if let Some(i) = unit_value_slot(&key) {
+                    return Some(std::mem::replace(&mut a[i], value));
+                }
+            }
+            Repr::Small(_) => {}
+        }
+        let v = self.small();
+        match Self::find(v, &key) {
+            Ok(i) => Some(std::mem::replace(&mut v[i].1, value)),
             Err(i) => {
                 v.insert(i, (key, value));
-                if v.as_slice().len() > SMALL {
-                    self.0 = Repr::Big(v.take_all().into_iter().collect());
+                if v.len() > SMALL {
+                    self.0 = Repr::Big(std::mem::take(v).into_iter().collect());
+                } else if v.len() == 2 && unit_value_slot(&v[0].0) == Some(0) && unit_value_slot(&v[1].0) == Some(1) {
+                    let (u, x) = (std::mem::take(&mut v[0].1), std::mem::take(&mut v[1].1));
+                    self.0 = Repr::UnitValue([u, x]);
                 }
                 None
             }
@@ -193,29 +171,35 @@ impl Map {
 
     pub fn remove(&mut self, key: &Value) -> Option<Value> {
         match &mut self.0 {
-            Repr::Small(v) => Self::find(v.as_slice(), key).ok().map(|i| v.remove(i).1),
             Repr::Big(m) => m.remove(key),
+            Repr::UnitValue(_) if unit_value_slot(key).is_none() => None,
+            _ => {
+                let v = self.small();
+                Self::find(v, key).ok().map(|i| v.remove(i).1)
+            }
         }
     }
 
     pub fn retain(&mut self, mut f: impl FnMut(&Value, &mut Value) -> bool) {
         match &mut self.0 {
-            Repr::Small(v) => v.retain(|(k, x)| f(k, x)),
             Repr::Big(m) => m.retain(|k, x| f(k, x)),
+            _ => self.small().retain_mut(|(k, x)| f(k, x)),
         }
     }
 
     pub fn iter(&self) -> Iter<'_> {
         match &self.0 {
-            Repr::Small(v) => Iter::Small(v.as_slice().iter()),
+            Repr::Small(v) => Iter::Small(v.iter()),
             Repr::Big(m) => Iter::Big(m.iter()),
+            Repr::UnitValue(a) => Iter::UnitValue(unit_value_keys().into_iter().zip(a.iter())),
         }
     }
 
     pub fn iter_mut(&mut self) -> IterMut<'_> {
         match &mut self.0 {
-            Repr::Small(v) => IterMut::Small(v.as_mut_slice().iter_mut()),
+            Repr::Small(v) => IterMut::Small(v.iter_mut()),
             Repr::Big(m) => IterMut::Big(m.iter_mut()),
+            Repr::UnitValue(a) => IterMut::UnitValue(unit_value_keys().into_iter().zip(a.iter_mut())),
         }
     }
 
@@ -226,6 +210,12 @@ impl Map {
     pub fn values(&self) -> impl DoubleEndedIterator<Item = &Value> + ExactSizeIterator {
         self.iter().map(|(_, v)| v)
     }
+}
+
+#[cold]
+fn unreachable_small() -> &'static mut Vec<(Value, Value)> {
+    // (Map::small is only called on a vector or a unit-and-value map; a leaked empty vector keeps it panic-free.)
+    Box::leak(Box::default())
 }
 
 impl PartialEq for Map {
@@ -258,9 +248,12 @@ impl<const N: usize> From<[(Value, Value); N]> for Map {
     }
 }
 
+type UnitValueIter<'a> = std::iter::Zip<std::array::IntoIter<&'static Value, 2>, std::slice::Iter<'a, Value>>;
+
 pub enum Iter<'a> {
     Small(std::slice::Iter<'a, (Value, Value)>),
     Big(btree_map::Iter<'a, Value, Value>),
+    UnitValue(UnitValueIter<'a>),
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -269,12 +262,14 @@ impl<'a> Iterator for Iter<'a> {
         match self {
             Iter::Small(i) => i.next().map(|(k, v)| (k, v)),
             Iter::Big(i) => i.next(),
+            Iter::UnitValue(i) => i.next(),
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self {
             Iter::Small(i) => i.size_hint(),
             Iter::Big(i) => i.size_hint(),
+            Iter::UnitValue(i) => i.size_hint(),
         }
     }
 }
@@ -284,6 +279,7 @@ impl DoubleEndedIterator for Iter<'_> {
         match self {
             Iter::Small(i) => i.next_back().map(|(k, v)| (k, v)),
             Iter::Big(i) => i.next_back(),
+            Iter::UnitValue(i) => i.next_back(),
         }
     }
 }
@@ -293,6 +289,7 @@ impl ExactSizeIterator for Iter<'_> {}
 pub enum IterMut<'a> {
     Small(std::slice::IterMut<'a, (Value, Value)>),
     Big(btree_map::IterMut<'a, Value, Value>),
+    UnitValue(std::iter::Zip<std::array::IntoIter<&'static Value, 2>, std::slice::IterMut<'a, Value>>),
 }
 
 impl<'a> Iterator for IterMut<'a> {
@@ -301,30 +298,31 @@ impl<'a> Iterator for IterMut<'a> {
         match self {
             IterMut::Small(i) => i.next().map(|(k, v)| (&*k, v)),
             IterMut::Big(i) => i.next(),
+            IterMut::UnitValue(i) => i.next(),
         }
     }
 }
 
 pub enum IntoIter {
-    Inline(std::iter::Take<std::array::IntoIter<(Value, Value), INLINE>>),
     Small(std::vec::IntoIter<(Value, Value)>),
     Big(btree_map::IntoIter<Value, Value>),
+    UnitValue(std::iter::Zip<std::array::IntoIter<Value, 2>, std::array::IntoIter<Value, 2>>),
 }
 
 impl Iterator for IntoIter {
     type Item = (Value, Value);
     fn next(&mut self) -> Option<Self::Item> {
         match self {
-            IntoIter::Inline(i) => i.next(),
             IntoIter::Small(i) => i.next(),
             IntoIter::Big(i) => i.next(),
+            IntoIter::UnitValue(i) => i.next(),
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         match self {
-            IntoIter::Inline(i) => i.size_hint(),
             IntoIter::Small(i) => i.size_hint(),
             IntoIter::Big(i) => i.size_hint(),
+            IntoIter::UnitValue(i) => i.size_hint(),
         }
     }
 }
@@ -332,9 +330,9 @@ impl Iterator for IntoIter {
 impl DoubleEndedIterator for IntoIter {
     fn next_back(&mut self) -> Option<Self::Item> {
         match self {
-            IntoIter::Inline(i) => i.next_back(),
             IntoIter::Small(i) => i.next_back(),
             IntoIter::Big(i) => i.next_back(),
+            IntoIter::UnitValue(i) => i.next_back(),
         }
     }
 }
@@ -346,9 +344,9 @@ impl IntoIterator for Map {
     type IntoIter = IntoIter;
     fn into_iter(self) -> IntoIter {
         match self.0 {
-            Repr::Small(Small::Inline(n, a)) => IntoIter::Inline(a.into_iter().take(n as usize)),
-            Repr::Small(Small::Heap(v)) => IntoIter::Small(v.into_iter()),
+            Repr::Small(v) => IntoIter::Small(v.into_iter()),
             Repr::Big(m) => IntoIter::Big(m.into_iter()),
+            Repr::UnitValue(a) => IntoIter::UnitValue([UNIT_KEY.clone(), VALUE_KEY.clone()].into_iter().zip(a)),
         }
     }
 }
@@ -401,21 +399,37 @@ mod tests {
         }
     }
 
-    /// A map of two or fewer entries (held in place) and one that grew past them, every operation on each size.
+    /// A unit-and-value map (keys "unit" and "value", however made) and the maps it turns into, every operation on
+    /// each: as a BTreeMap.
     #[test]
-    fn a_small_map_answers_as_a_btree_map() {
-        for keys in [&[2][..], &[2, 1], &[3, 1, 2], &[3, 1, 2, 0], &[4, 0, 2, 1, 3]] {
+    fn a_unit_and_value_map_answers_as_a_btree_map() {
+        let key = |k: &usize| match k {
+            1 => Value::key("unit"),
+            2 => Value::str("value"),
+            3 => Value::str("unit").with_tag(crate::value::Tag(1)),
+            k => Value::num(*k as f64),
+        };
+        for keys in [&[2][..], &[2, 1], &[1, 2], &[3, 1, 2], &[1, 2, 0], &[4, 0, 2, 1, 3]] {
             for gone in keys.iter().copied().chain([9]) {
                 let (mut m, mut b) = (Map::new(), BTreeMap::new());
                 for k in keys {
-                    let (key, v) = (Value::num(*k as f64), Value::str(format!("v{k}")));
+                    let (key, v) = (key(k), Value::str(format!("v{k}")));
                     assert_eq!(m.insert(key.clone(), v.clone()), b.insert(key, v));
                 }
-                let key = Value::num(gone as f64);
-                assert_eq!(m.remove(&key), b.remove(&key));
+                assert!(keys.iter().chain(&[9]).all(|k| m.get(&key(k)) == b.get(&key(k))));
+                assert!(["unit", "value", "x"].iter().all(|s| m.get_str(s) == m.get(&Value::str(*s))));
+                assert_eq!(m.unit_value().is_some(), m.len() == 2 && keys.contains(&1) && keys.contains(&2));
+                for k in keys {
+                    if let (Some(x), Some(y)) = (m.get_mut(&key(k)), b.get_mut(&key(k))) {
+                        (*x, *y) = (Value::num(0.5), Value::num(0.5));
+                    }
+                }
+                let gone = key(&gone);
+                assert_eq!(m.remove(&gone), b.remove(&gone));
                 assert!(m.iter().eq(b.iter()) && m.iter().rev().eq(b.iter().rev()) && m.len() == b.len());
-                m.retain(|k, _| k.as_number().is_some_and(|x| x != 1.0));
-                b.retain(|k, _| k.as_number().is_some_and(|x| x != 1.0));
+                assert!(m.clone().iter_mut().map(|(k, v)| (k.clone(), v.clone())).eq(b.clone().into_iter()));
+                m.retain(|k, _| *k != Value::str("value"));
+                b.retain(|k, _| *k != Value::str("value"));
                 assert_eq!(m.insert(Value::num(7.0), Value::Undefined), b.insert(Value::num(7.0), Value::Undefined));
                 assert!(m.clone().into_iter().rev().eq(b.clone().into_iter().rev()) && m.into_iter().eq(b.into_iter()));
             }

@@ -580,6 +580,38 @@ impl Interp {
             Extend,
             Resize(usize),
         }
+        // `x = append(x, v)`, `x = concatenateArrays(x, y)`: the two arguments without a vector of them.
+        if let ([y], Callee::Overloads(set)) = (rest, callee) {
+            self.pos = pos;
+            let y = self.eval(y)?;
+            self.pos = pos;
+            let idx = self.base + slot as usize;
+            let pair = [self.stack[idx].clone(), y];
+            let (d, _) = self.resolve_cached(set, &pair)?;
+            if matches!(pair[0], Value::Array(..)) && &*d.module == "onshape/std/containers.fs" {
+                let [x, y] = pair;
+                // (x's copy gone first: the local's array is then the only one, grown in place.)
+                drop(x);
+                if let Value::Array(arr, tag) = &mut self.stack[idx] {
+                    let v = Arc::make_mut(arr);
+                    if &*d.name == "append" {
+                        v.push(y);
+                    } else {
+                        if let Value::Array(b, _) = y {
+                            v.extend(Arc::unwrap_or_clone(b));
+                        }
+                        // @concatenateArrays answers an untagged array.
+                        *tag = Tag::NONE;
+                    }
+                }
+                return Ok(Flow::Normal);
+            }
+            let Some(c) = d.compiled.get() else {
+                return Err(self.error(format!("Function {} is not compiled", d.name)));
+            };
+            self.stack[idx] = self.invoke(c, pair.into(), &[], false)?;
+            return Ok(Flow::Normal);
+        }
         self.pos = pos;
         let mut a = Vec::with_capacity(rest.len() + 1);
         a.push(Value::Undefined);
