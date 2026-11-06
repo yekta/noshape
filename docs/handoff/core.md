@@ -16,21 +16,27 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-06 12:05 UTC.**
-- P0 DRAFT-POOL-HANG-MACOS (lead 11-06, from bool): landed e7f452f5 (OCCT patch 0023 + release.yml's "Budgeted
-  documents" gate, time_cli.py --limit). Cause and numbers in TICKETS. /root/occt/lib/libTKG3d.a is patch 0023's since
-  12:03 (g15 build + the three patched objects; the old one in /root/core-scratch/p0023); lead's /opt/occt sync asked,
-  then the T1 (in the worktree, uncommitted; also /root/core-scratch/p0-t1.diff + p0-data/budget) lands. Repro on runners: branch core/budget-repro, run
-  42214143546 (macos-15 / windows, base vs fix).
-- How the budget works off Linux (asked): a Deadline on the steady clock (wall, not CPU), polled by OCCT's progress
-  indicator (CancelIndicator, Booleans' Build(range)) and patches 0007-0013 / 0016's noshape_should_break; pool workers
-  get the launcher's deadline through patch 0010. No timer, no jump: a loop that polls neither runs forever there.
-  Linux adds the per-thread CPU timer that siglongjmps (not inside multi-thread pool jobs, patch 0005).
-- Parked for the P0, in this order: (1) the Defeaturing speed: two result-identical OCCT patches, 4.6 -> 3.56 -> 2.93 s
-  on vibe5 (grid caches kept per span across rows; the polar projection's points memoized: 39 % of 84,044 asked
-  again), byte-identical result, kernel suite green; in /root/core-scratch/defeat-patches, to renumber 0024 / 0025;
-  the fit log shows 40 fits for one edge (next: why). (2) Lead's new item: c2-helical-sweep's Sweep 1
-  (keepProfileOrientation, helixType; 28.7 s and 14 faces vs live 40 ms / 6). (3) determinism sweep. (4) mesher share.
+**State 11-06 13:06 UTC.**
+- P0 DRAFT-POOL-HANG-MACOS: landed e7f452f5 (OCCT patch 0023 + release.yml's "Budgeted documents" gate). Cause in
+  TICKETS. /root/occt/lib/libTKG3d.a is patch 0023's since 12:03 (g15 build + three patched objects; the old one in
+  /root/core-scratch/p0023); **lead's /opt/occt sync asked**, then the T1 (in the worktree, uncommitted;
+  /root/core-scratch/p0-t1.diff + p0-data/budget) lands. Runner repro: branch core/budget-repro, run 42222728542
+  (macos-15 / windows, base vs fix; the first run, 42214143546, didn't compile: see next).
+- macOS / Windows didn't compile since dx's ee41a720 (10:26): its section work bound calls the pairs-mode override,
+  declared only in the Linux budget block. Fixed in b6f9e959 (queued 13:04). The lead's watcher tests Linux only.
+- How the budget works off Linux: a Deadline on the steady clock (wall), polled by OCCT's progress indicator and
+  patches 0007-0013 / 0016's noshape_should_break; pool workers get the launcher's deadline (patch 0010). No timer, no
+  jump: a loop that polls neither runs forever there. Linux adds the per-thread CPU timer's siglongjmp.
+- Item 1 done: Draft's face deletion 4.6 -> 2.93 s, landed 2c3f9461 (OCCT patches 0024 / 0025, results
+  byte-identical). Their libs (TKG3d with 0023+0024, TKGeomBase with 0025): vibe5 /tmp/core-ar/all, for the next sync.
+- Lead's helical sweep: Sweep 1 7.0 s -> 0.16 s (queued 689c77ad: the self-intersection check only where the profile
+  can reach itself; along a helix exactly by its screw motion), keepProfileOrientation / helixType mapped in the parity
+  translator (they're std-1511 parameters; today's std derives them internally, live's dialogs don't show them). Faces
+  14 vs live 6: the cylinder wall between the thread's turns is one face in Parasolid, 9 in OCCT (cut at the seam each
+  turn). One OCCT face over several turns with the top ring's seam fails BRepCheck (UnorientableShape / NotClosed;
+  attempt in /root/core-scratch/strip-merge-attempt.diff). The way to live's count is the shown topology (as 2e0ec154
+  did for seam-split edges) for faces: asked the lead before starting.
+- Next: determinism sweep (item 2), then the mesher share (item 3).
 
 **State 11-05 18:10 UTC.**
 - Landed: face pattern stitched (ae47fdff, motor-mount-jack's Circular pattern 1 158 -> 8 ms), seam-split edges one
