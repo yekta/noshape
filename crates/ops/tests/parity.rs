@@ -324,7 +324,21 @@ fn exchange_round_trip() {
         }
         v
     };
-    let (mut imports, mut imports_ok, mut exports, mut exports_ok, mut waiting) = (0, 0, 0, 0, 0);
+    // A file imported into a new mm document: its parts.
+    let import = |doc: &Path, file: &Path| -> Result<Vec<PartState>, String> {
+        let _ = std::fs::remove_file(doc);
+        let mut ctx = Ctx::new();
+        let mut op = |tool: &str, args: Value| -> Result<Value, String> {
+            let op = noshape_ops::registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
+            noshape_ops::registry::run(&mut ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
+        };
+        op("document_create", json!({ "path": doc, "length_unit": "mm" }))
+            .and_then(|_| op("import_files", json!({ "files": [file], "mesh_unit": "Millimeter" })))
+            .and_then(|_| op("query_parts", json!({})))
+            .map(|q| parts_from_query(&q))
+            .map_err(|e| format!("import failed: {e}"))
+    };
+    let (mut imports, mut imports_ok, mut exports, mut exports_ok, mut waiting, mut selfs_ok) = (0, 0, 0, 0, 0, 0);
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
         if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) {
@@ -339,19 +353,9 @@ fn exchange_round_trip() {
                 continue;
             }
             imports += 1;
-            let mut ctx = Ctx::new();
-            let doc = scratch(&format!("{name}-import-{ext}.noshape"));
-            let _ = std::fs::remove_file(&doc);
-            let mut op = |tool: &str, args: Value| -> Result<Value, String> {
-                let op = noshape_ops::registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
-                noshape_ops::registry::run(&mut ctx, op, &args).map(|o| o.value).map_err(|e| e.to_json().to_string())
-            };
-            let ours = op("document_create", json!({ "path": doc, "length_unit": "mm" }))
-                .and_then(|_| op("import_files", json!({ "files": [file], "mesh_unit": "Millimeter" })))
-                .and_then(|_| op("query_parts", json!({})))
-                .map(|q| parts_from_query(&q));
+            let ours = import(&scratch(&format!("{name}-import-{ext}.noshape")), &file);
             let diff = match (ours, expected(format)) {
-                (Err(e), _) => vec![format!("import failed: {e}")],
+                (Err(e), _) => vec![e],
                 (Ok(_), None) => vec!["live-self.json has no import of it".into()],
                 (Ok(ours), Some(live)) if format == "STL" => differences(&live, &mesh_counts(ours)),
                 (Ok(ours), Some(live)) => differences(&live, &ours),
@@ -375,6 +379,7 @@ fn exchange_round_trip() {
         for k in 0..t.len() {
             t.step(k);
         }
+        let native = t.call("query_parts", json!({})).map(|q| parts_from_query(&q)).unwrap_or_default();
         for (format, ext) in FORMATS {
             let file = dir.join(format!("ours.{ext}"));
             let mut args = json!({ "format": format, "file": file });
@@ -386,6 +391,21 @@ fn exchange_round_trip() {
                 continue;
             }
             exports += 1;
+            // Ours read back: the same parts as the model's (an STL's mesh by volume and area).
+            let back = import(&scratch(&format!("{name}-back-{ext}.noshape")), &file);
+            // (An STL is one mesh of all the parts, its facets within the export's chordal tolerance: its volume
+            // within 1 % of theirs.)
+            let total = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
+            let diff = match back {
+                Ok(b) if format == "STL" => {
+                    let (a, n) = (total(&b), total(&native));
+                    if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, the parts' {:.3}", a * 1e9, n * 1e9)] }
+                }
+                Ok(b) => differences(&native, &b),
+                Err(e) => vec![e],
+            };
+            selfs_ok += usize::from(diff.is_empty());
+            println!("{name}: ours reads ours.{ext} back: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
             let (Some(live), false) = (expected(format), theirs[format].is_null()) else {
                 waiting += 1;
                 continue;
@@ -395,7 +415,7 @@ fn exchange_round_trip() {
             println!("{name}: live imports ours.{ext}: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
         }
     }
-    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet)", exports - waiting);
+    println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}", exports - waiting);
 }
 
 /// The exchange suite reads live's import in mm (SI inside) and leaves a mesh's counts out.

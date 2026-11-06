@@ -9,7 +9,8 @@
 // shell. Surfaces and curves are written as planes, cylinders, cones,
 // spheres, tori, lines, circles and ellipses where they are, otherwise as
 // non-periodic B-splines; surfaces of revolution are spun surfaces (periodic
-// like Parasolid's own: a revolved spline is one face, Onshape G21), surfaces
+// like Parasolid's own: a revolved spline is one face, Onshape G21), extruded
+// ellipses and splines are swept surfaces (Parasolid's own), other surfaces
 // of extrusion and offset are converted first (same parameterisation), a
 // face going round a B-spline surface that is periodic (or closed with a
 // tangent seam) has it periodic (live's smooth loft), and other faces closed
@@ -54,6 +55,7 @@
 #include <Geom_Line.hxx>
 #include <Geom_Plane.hxx>
 #include <Geom_BezierCurve.hxx>
+#include <Geom_SurfaceOfLinearExtrusion.hxx>
 #include <Precision.hxx>
 #include <GeomAPI_Interpolate.hxx>
 #include <math_Gauss.hxx>
@@ -663,10 +665,36 @@ bool spun(const occ::handle<Geom_Surface>& s)
          !occ::down_cast<Geom_BSplineCurve>(c).IsNull() || !occ::down_cast<Geom_BezierCurve>(c).IsNull();
 }
 
+occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve, double f, double l);
+
+// A swept surface's section as a periodic curve when it closes with a tangent seam (live's closed sketch spline
+// extruded, request 1836: one face, ring edges), else as it is.
+occ::handle<Geom_Curve> swept_section(const occ::handle<Geom_SurfaceOfLinearExtrusion>& e)
+{
+  const occ::handle<Geom_Curve> c = basis_curve(e->BasisCurve());
+  if (c->IsPeriodic())
+    return c;
+  occ::handle<Geom_BSplineCurve> p = ring_bspline(c, c->FirstParameter(), c->LastParameter());
+  return p.IsNull() ? c : p;
+}
+
+// A surface of linear extrusion written as an XT swept surface (Parasolid's own for an extruded ellipse or spline:
+// live samples dx-nist-assembly, closed-spline-live): its section a curve the writer keeps with its parameterisation.
+bool swept(const occ::handle<Geom_Surface>& s)
+{
+  auto e = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s);
+  if (e.IsNull())
+    return false;
+  const occ::handle<Geom_Curve> c = basis_curve(e->BasisCurve());
+  return !occ::down_cast<Geom_Ellipse>(c).IsNull() || !occ::down_cast<Geom_BSplineCurve>(c).IsNull() || !occ::down_cast<Geom_BezierCurve>(c).IsNull();
+}
+
 bool periodic_analytic(const occ::handle<Geom_Surface>& s)
 {
   return !occ::down_cast<Geom_CylindricalSurface>(s).IsNull() || !occ::down_cast<Geom_ConicalSurface>(s).IsNull() ||
-         !occ::down_cast<Geom_SphericalSurface>(s).IsNull() || !occ::down_cast<Geom_ToroidalSurface>(s).IsNull() || spun(s);
+         !occ::down_cast<Geom_SphericalSurface>(s).IsNull() || !occ::down_cast<Geom_ToroidalSurface>(s).IsNull() || spun(s) ||
+         // (Swept round a periodic section: an extruded ellipse's face goes round without a seam.)
+         (swept(s) && swept_section(occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s))->IsPeriodic());
 }
 
 constexpr double kPrecision = 1e-8; // Parasolid linear precision (metres)
@@ -733,7 +761,7 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
 
 // A closed edge's B-spline as a ring edge's curve (Parasolid writes a closed
 // spline edge whole, without a vertex: live 1836): periodic already, or closed
-// with a tangent seam and made so. Null for anything else (it is split).
+// with a tangent seam (G1) and made so. Null for anything else (it is split).
 occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve, double f, double l)
 {
   occ::handle<Geom_BSplineCurve> b = occ::down_cast<Geom_BSplineCurve>(basis_curve(curve));
@@ -748,7 +776,9 @@ occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve
   gp_Vec d0, d1;
   b->D1(u0, p0, d0);
   b->D1(u1, p1, d1);
-  if ((d0 - d1).Magnitude() > 1e-6 * std::max(1.0, d0.Magnitude()))
+  // Tangent at the seam: the same direction (G1; an approximated fillet's edge round an ellipse runs on at another
+  // speed there, motor-mount-jack: 1e-4 apart, angle 0).
+  if (d0.Magnitude() < 1e-12 || d1.Magnitude() < 1e-12 || d0.Angle(d1) > 1e-6)
     return nullptr;
   occ::handle<Geom_BSplineCurve> p = occ::down_cast<Geom_BSplineCurve>(b->Copy());
   try
@@ -939,6 +969,28 @@ struct BodyWriter
         gp_Vec du, dv;
         r->D1(u, v, q, du, dv);
         return dv.Crossed(du);
+      };
+      return xs;
+    }
+    if (swept(s))
+    {
+      // R(u, v) = C(u) + v D: OCCT's linear extrusion, the same parameters (scale null, as Parasolid writes it).
+      auto                          e = occ::down_cast<Geom_SurfaceOfLinearExtrusion>(s);
+      const occ::handle<Geom_Curve> c = swept_section(e);
+      double                        u0, u1, v0, v1;
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      const double cf = c->IsPeriodic() || Precision::IsInfinite(c->FirstParameter()) ? u0 : c->FirstParameter();
+      const double cl = c->IsPeriodic() || Precision::IsInfinite(c->LastParameter()) ? u1 : c->LastParameter();
+      bool         closed = false;
+      const int    sec    = curve_node(body, c, cf, cl, closed);
+      Node&        nd     = head(67);
+      nd.fields.insert(nd.fields.end(), {fp(sec), fv(e->Direction().XYZ()), ff_null()});
+      depend(sec, idx);
+      xs.natural = [e](const gp_Pnt&, double u, double v) {
+        gp_Pnt q;
+        gp_Vec du, dv;
+        e->D1(u, v, q, du, dv);
+        return du.Crossed(dv);
       };
       return xs;
     }
@@ -1786,7 +1838,8 @@ TopoDS_Shape prepared(const TopoDS_Shape& s, bool keep_spun, bool periodic_splin
     for (TopExp_Explorer ee(ef.Current(), TopAbs_EDGE); ee.More() && keep_spun && !occ::down_cast<Geom_SurfaceOfRevolution>(fs).IsNull(); ee.Next())
       keep_spun = !BRep_Tool::Degenerated(TopoDS::Edge(ee.Current()));
   }
-  r = ShapeCustom::ConvertToBSpline(r, true, !keep_spun, true, false);
+  // (Extrusions of ellipses and splines stay: XT swept surfaces, exact. The others are written as B-surfaces.)
+  r = ShapeCustom::ConvertToBSpline(r, false, !keep_spun, true, false);
   bool split     = false;
   for (TopExp_Explorer ef(r, TopAbs_FACE); ef.More() && !split; ef.Next())
   {

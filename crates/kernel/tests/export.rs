@@ -105,6 +105,31 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// An extruded ellipse through Parasolid (the exchange suite, motor-mount-jack): its two ellipses stay whole ring
+/// edges (live writes them without a vertex), the side one face; the volume as it was.
+#[test]
+fn an_extruded_ellipse_keeps_its_ring_edges_through_parasolid() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-ellipse-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mm = 1e-3;
+    let plane = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let face = make_face_2d(&plane, &[Segment2d::Ellipse { center: glam::DVec2::ZERO, major_radius: 22.5 * mm, minor_radius: 7.5 * mm, rotation: 0.3 }], &[]).unwrap();
+    let solid = extrude(&face, DVec3::new(0.0, 0.0, 10.0 * mm)).unwrap().shape;
+    let want = volume_properties(&solid).unwrap().mass;
+    for binary in [false, true] {
+        let path = dir.join(if binary { "ellipse.x_b" } else { "ellipse.x_t" });
+        write_parasolid(&path, std::slice::from_ref(&solid), LengthUnit::Meter, binary).unwrap();
+        let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+        // (The ellipses as ellipses: exact, as live writes them.)
+        let ellipses = back.edges().iter().filter(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, Curve::Ellipse { .. }))).count();
+        assert_eq!(ellipses, 2, "binary={binary}");
+        assert_eq!((back.count(ShapeType::Face), back.count(ShapeType::Edge)), (solid.count(ShapeType::Face), solid.count(ShapeType::Edge)), "binary={binary}");
+        let v = volume_properties(&back).unwrap().mass;
+        assert!((v - want).abs() < 1e-9 * want, "binary={binary}: {v} vs {want}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// An assembly as Parasolid (qa ASM-PARASOLID-FLAT): in every version each
 /// part once with its instances, read back as the same assembly.
 #[test]
