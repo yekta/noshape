@@ -211,7 +211,7 @@ fn set_property(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             continue;
         }
         let key = Value::map_from([("property", Value::str(kind.clone())), ("custom", def.get("customPropertyId").clone())]);
-        st.attributes_mut().retain(|(e, v)| !(*e == r && *v.get("name") == key));
+        st.retain_attributes(|(e, v)| !(*e == r && *v.get("name") == key));
         st.push_attribute(r, Value::map_from([("name", key), ("attribute", value.clone())]));
     }
     Ok(Value::Undefined)
@@ -716,7 +716,7 @@ fn set_attribute(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let mut st = cx.state.lock();
     for r in refs {
         if !name.is_undefined() {
-            st.attributes_mut().retain(|(e, v)| !(*e == r && *v.get("name") == name));
+            st.retain_attributes(|(e, v)| !(*e == r && *v.get("name") == name));
         }
         st.push_attribute(r, Value::map_from([("name", name.clone()), ("attribute", attribute.clone())]));
     }
@@ -798,7 +798,7 @@ fn remove_attributes(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let pattern = def.get("attributePattern").clone();
     let name = def.get("name").clone();
     let mut st = cx.state.lock();
-    st.attributes_mut().retain(|(e, v)| {
+    st.retain_attributes(|(e, v)| {
         let hit = refs.as_ref().is_none_or(|r| r.contains(e)) && (name.is_undefined() || *v.get("name") == name) && matches_pattern(v.get("attribute"), &pattern);
         !hit
     });

@@ -172,8 +172,9 @@ pub struct CtxState {
     attrs: Vec<(Reference, Value)>,
     /// `attrs`' positions by entity, built when first asked after a change ([`Self::attributes_of`]).
     attr_index: Mutex<Option<HashMap<Reference, Vec<usize>>>>,
-    /// `attrs`' positions an attribute filter matches, by the filter ([`Self::attributes_matching`]).
-    attr_filters: Mutex<HashMap<String, Arc<Vec<usize>>>>,
+    /// `attrs`' positions an attribute filter matches, by the filter, and how many of `attrs` it has looked at
+    /// (appended ones are looked at when next asked: [`Self::attributes_matching`]).
+    attr_filters: Mutex<HashMap<String, (usize, Arc<Vec<usize>>)>>,
     /// `debug()` entities as they were when debugged (std debugs points,
     /// lines and arrows of sub-features it then aborts) and their colours
     /// (sRGB), shown while the feature is edited.
@@ -397,15 +398,28 @@ impl CtxState {
         &mut self.attrs
     }
 
-    /// The positions of the attributes a filter `key` matches, kept until the attributes change (std's
-    /// qAttributeFilter: c2-sm-louver's 839 filters each went through its 7586 attributes).
+    /// The positions of the attributes a filter `key` matches, kept while attributes are only added (std's
+    /// qAttributeFilter: c2-sm-louver's 839 filters each went through its 7586 attributes, and std sets thousands).
     pub fn attributes_matching(&self, key: String, matches: impl Fn(&Value) -> bool) -> Arc<Vec<usize>> {
-        if let Some(found) = self.attr_filters.lock().get(&key) {
-            return found.clone();
+        let mut filters = self.attr_filters.lock();
+        let (seen, found) = filters.entry(key).or_insert_with(|| (0, Arc::new(Vec::new())));
+        if *seen < self.attrs.len() {
+            let more = self.attrs[*seen..].iter().enumerate().filter(|(_, (_, v))| matches(v)).map(|(k, _)| *seen + k);
+            Arc::make_mut(found).extend(more);
+            *seen = self.attrs.len();
         }
-        let found: Arc<Vec<usize>> = Arc::new(self.attrs.iter().enumerate().filter(|(_, (_, v))| matches(v)).map(|(k, _)| k).collect());
-        self.attr_filters.lock().insert(key, found.clone());
-        found
+        found.clone()
+    }
+
+    /// Keep the attributes `keep` says to; the indexes only when one goes (setAttribute's replace of an
+    /// entity's same-named one, which there usually isn't).
+    pub fn retain_attributes(&mut self, keep: impl FnMut(&(Reference, Value)) -> bool) {
+        let before = self.attrs.len();
+        self.attrs.retain(keep);
+        if self.attrs.len() != before {
+            *self.attr_index.get_mut() = None;
+            self.attr_filters.get_mut().clear();
+        }
     }
 
     /// The attributes of entity `r` (`{ name, attribute }`), in order: from an index of them all (std asks this of
@@ -429,7 +443,12 @@ impl CtxState {
         {
             self.attr_snapshots.insert(r.clone(), s);
         }
-        self.attributes_mut().push((r, v));
+        // Appended: the indexes stay (the by-entity one takes it; the filters look at it when next asked).
+        let k = self.attrs.len();
+        if let Some(index) = self.attr_index.get_mut().as_mut() {
+            index.entry(r.clone()).or_default().push(k);
+        }
+        self.attrs.push((r, v));
     }
 
     /// Attributes whose entity an operation renamed follow it (a sheet

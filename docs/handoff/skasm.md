@@ -1685,8 +1685,8 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
 - **Coplanar walls unified apart from the rest** (host/sheetmetal.rs build_part): a whole-part unify merged each end
   cap into one face whenever two collinear lines made one wall; now the walls of a rip are unified alone, and the ends
   stay in wall / bend pieces (Louver: live's 22/44/24). Test `sheetmetal_std::collinear_walls_keep_the_ends_in_pieces`.
-  Left: live's 1.6° and 2.9° bends there are PLANE faces (chords); ours cylinders, same volume. Live request filed
-  (skasm 09:37) for where live switches.
+  Live's 1.6° and 2.9° bends there read as PLANE faces: an artefact of the UI-method fetch (live 2143: a bend is a
+  cylinder at every angle, 0.57-10.2°), so ours is right and the REST refetch corrects the reference.
 - **Translator**: live's solved line ends by its `.start` / `.end` point records (a segment record can run the other
   way: the Louver sketch's 0.9 µm line, endParam < startParam); a solved text box from `sketchText`; a text converted
   to an expression stays one (sketch_text `expression`), `toString(x)` evaluates, and the box is sized to the
@@ -1720,7 +1720,9 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
     the few attributed entities found by their references, and the filter's matches cached until the attributes
     change (CtxState::attributes_matching), 16.5 -> 13.6 s.
   - A bend's square end cut by a plane, not a 35-section loft, -> 12.3 s.
-  - Left: Mirror 2's one bend cut (bool.md 14:36, repro there); Linear patterns 1-2 ~1.1-1.4 s each.
+  - Attribute indexes kept across appends (setAttribute's retain mostly removes nothing; std adds 7652 in this
+    regen): ~12.3 -> 10.4-11.2 s (Linear pattern 2 1.4 -> 0.8 s).
+  - Left: Mirror 2's one bend cut (bool.md 14:36, repro there); Extrude 3 / 4 ~1.0-1.5 s.
 - SKETCH-SCREEN-SPACE-REACH: the editor's `screen_metric()` (from `screen_map`), sketch::ScreenMetric, used by
   inference (point snaps, midpoints, on-curve, alignments, a line's H / V) and the picks (`pick_on_screen`, the
   hover's near-check). An alignment's reach is the snap's own move on screen, (dx, 0) for a vertical, which is what
