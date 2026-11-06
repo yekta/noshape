@@ -1,0 +1,48 @@
+{
+ "name": "mirror-feature-mirror-right-plane",
+ "about": "block: Mirror, type Feature mirror, Extrude 1, Mirror plane: Right, ✓",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: most-used tools, batch 5)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part mirror",
+    "pick": "Feature mirror"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mirror plane"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Right"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
