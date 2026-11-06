@@ -1711,3 +1711,25 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
 - Not mine / waiting: sm-corner-break's Corner break 1 (queries without live geometry: dx / the refetch);
   duct-multipart's Extrude 3 needs Sketch 5's regions split by the edges of Extrude 2's body on its plane (our imprint
   takes only the sketch's own face's edges): to check on live before building.
+
+## 11-06 afternoon: louver speed (lead 11-06), SKETCH-SCREEN-SPACE-REACH (P1)
+- c2-sm-louver 22.5 -> ~12 s (release; live 5.0 s):
+  - Kernel guards: sigsetjmp without saving the signal mask (a syscall on every kernel call, 13 %), 22.5 -> 16.5 s.
+    The lead keeps the save on macOS (NOSHAPE_GUARD_SAVES_MASK: macOS CI's budget-fault test failed without it).
+  - std's attribute filters (query.rs ATTRIBUTE_FILTER, 839 in this regen, ~7 matches among ~9000 entities):
+    the few attributed entities found by their references, and the filter's matches cached until the attributes
+    change (CtxState::attributes_matching), 16.5 -> 13.6 s.
+  - A bend's square end cut by a plane, not a 35-section loft, -> 12.3 s.
+  - Left: Mirror 2's one bend cut (bool.md 14:36, repro there); Linear patterns 1-2 ~1.1-1.4 s each.
+- SKETCH-SCREEN-SPACE-REACH: the editor's `screen_metric()` (from `screen_map`), sketch::ScreenMetric, used by
+  inference (point snaps, midpoints, on-curve, alignments, a line's H / V) and the picks (`pick_on_screen`, the
+  hover's near-check). An alignment's reach is the snap's own move on screen, (dx, 0) for a vertical, which is what
+  fits live's two recordings at live's zoom. Also: a constraint key on a selection that already has that constraint
+  adds nothing and counts as applied (selection cleared, as live's).
+- Not landed (branch skasm/screen-reach, local): on the runner (window 1200 x 780, our default 0.275 mm per px)
+  sketch-offset and -horizontal-key now match, but -vertical-key, -offset-key and -midpoint-key fail: each sits
+  0.1-1.6 % inside the 10 px edge at our zoom (3 mm in x = 9.84 px; 5 mm off the bottom line = 10.07 px measured
+  from the projected line, which pixel rounding pulls in). All five pass if live's view is >= 1.6 % more zoomed in
+  than ours (behaviours: live's default ~4 px / mm, ours 3.63). Sketch scenarios: green 106/125, this 105/125.
+  Live request 15:39 for the recorder's exact plane-to-screen map; then ours set by it (default view extent /
+  canvas size: our default shows a fixed 134 mm of height).

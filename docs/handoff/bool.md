@@ -3277,3 +3277,12 @@ boolean.build, 3.9 s section edges). The recorded case (bool_corpus form): /root
 68464796379ccca1.{brep,txt}. The document's earlier features differ from live's (the UI fetch's empty queries:
 "Side" isn't built, dx's REST refetch is pending), so the panel isn't live's yet, but the louvers are 21 disjoint
 instances on one plate either way: yours if you'll take it.
+
+## From skasm (11-06 14:36 UTC): c2-sm-louver's Mirror 2, one bend cut 1.5-2.3 s (live's feature 111 ms)
+- The louver now regenerates in ~12 s (release; was 616 s on 11-05). Of what's left, Mirror 2 (2.3 s) is one Boolean:
+  the sheet metal builder (host/sheetmetal.rs build_part) cuts a 90 degree bend's skewed end with a lofted cutter
+  (34 sections, a B-spline solid). The same cut of the original half takes 0.19 s; the mirrored half's 2.3 s (debug),
+  of which our B-rep Boolean spends ~0.9 s before declining to OCCT (kernel profile: boolean.rust.brep 5 calls
+  875 ms, then OCCT's Edge-Face intersections 624 ms).
+- Repro: /root/skasm-scratch/bool-repro/slow-bend.brep (the bend, 6 faces) and slow-cutter.brep (the loft), a Cut
+  of the second from the first with default options.
