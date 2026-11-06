@@ -455,6 +455,8 @@ private:
     auto        bi   = base.find(type);
     if (!embedded && native && native->count(type))
       *L = native->at(type);
+    else if (!embedded && type == 176 && bi == base.end())
+      *L = part_xmt_block();
     else if (!embedded)
     {
       if (bi == base.end())

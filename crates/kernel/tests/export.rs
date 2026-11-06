@@ -105,6 +105,14 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Onshape's file of three parts (qa4 round 4 s5's Part Studio, live's export: a PART_XMT_BLOCK root in its embedded
+/// schema) reads as its three parts (the block's type described there as a new one, not a change to a known one).
+#[test]
+fn an_onshape_file_of_three_parts_reads_as_them() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/xt-parts/onshape-three-parts.x_t");
+    assert_eq!(read_parasolid(&p, LengthUnit::Millimeter).unwrap().count(ShapeType::Solid), 3);
+}
+
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
 /// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
 /// both read back as the parts.
