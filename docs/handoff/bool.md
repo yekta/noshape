@@ -175,6 +175,23 @@ tolerance": its OCCT sections of ~1e-6 more tolerant than its Boolean) and a sec
 slivers_between_two_caps; OCCT gives a section's end on a face's boundary the edge's pave, not the curve's
 tolerance. Next in a5f1e564: a vertex 36 mm on along a B-spline face's edge lands 1.2 mm back in the face's
 parameters (the surface's parameter mapping folding near its seam), "two edges leave a vertex in one direction".
+Stage 5c (11-06 12:08 UTC; lead: Shell's cases by OCCT time): two pieces between the same two vertices are one common
+block by OCCT's rules with the vertices' tolerances: two input edges of different arguments nearly parallel (cos >=
+0.9063) within te + tg + 2 max(tv) (BOPAlgo_PaveFiller::ForceInterfEE); an OCCT section and an edge within max(TolR3D,
+tv) where the edge is a common block, else nearly parallel within 2 min(10 TolR3D, 1 mm, max(TolR3D, tv))
+(IsExistingPaveBlock). A Shell slab's ruling and three parts' line fanning 71 um apart into a vertex of 0.32 mm are
+now one. Gate: corpora and parity56 0 differences, shfall 51 of 194 as before, knurls and gears the same, ratios to
+OCCT level. Shell's biggest declines (by OCCT time) and what they need:
+  a5f1e564 25.5 s, f82bed32 6.4 s: "a point near two vertices" (the regroup rounds never settle, even at 10; then a
+  B-spline face's parameters fold near its seam).
+  47587a8d 19.6 s: two 1e-7 edges of different arguments leave one vertex 3 mrad apart (0.3 um at 100 um): OCCT
+  keeps a common block over the part within their tolerances; ours leaves a 0.3 um sliver ("a piece's point near
+  its face's boundary").
+  0acfd0a2, 80a5941f, 9aec1f4b, 4fca980b 14-16 s each (62 s): after 5c, two B-spline edges leave one vertex together
+  and part at different vertices (a partial overlap whose split vertices aren't put on each other).
+  All three are OCCT's pave blocks over part of an edge (partial common blocks, a vertex of one put on the other within
+  the two's tolerances plus the vertices'): a design change to the edge splitting (split_reach / get_sedge), not a
+  per-case rule.
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 

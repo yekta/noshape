@@ -931,9 +931,9 @@ struct Ctx<'a> {
     face_segs: Vec<Vec<Seg>>,
     /// For each of a face's curves, the section it is (its index in `sections`), or `usize::MAX`.
     seg_section: Vec<Vec<usize>>,
-    /// For each of a face's curves, the tolerance of the input edge it is a piece of (another argument's lying in
-    /// the face), or 0.
-    seg_edge_tol: Vec<Vec<f64>>,
+    /// For each of a face's curves, the tolerance and argument of the input edge it is a piece of (another
+    /// argument's lying in the face), or (0, None).
+    seg_edge_tol: Vec<Vec<(f64, Option<u32>)>>,
     coplanar: Vec<(usize, usize)>,
     /// Where two faces cross (the curve, the faces).
     sections: Vec<(Seg, usize, usize)>,
@@ -1790,8 +1790,8 @@ impl Ctx<'_> {
                 self.face_segs[ft].push(seg);
                 self.seg_section[fs].push(self.sections.len());
                 self.seg_section[ft].push(self.sections.len());
-                self.seg_edge_tol[fs].push(0.0);
-                self.seg_edge_tol[ft].push(0.0);
+                self.seg_edge_tol[fs].push((0.0, None));
+                self.seg_edge_tol[ft].push((0.0, None));
                 self.sections.push((seg, fs, ft));
             }
         }
@@ -1867,7 +1867,7 @@ impl Ctx<'_> {
     }
 
     /// An edge's pieces in face `f` (where `path` lies inside it; the edge's tolerance `te`): its edges there.
-    fn in_face_from(&mut self, f: usize, path: &Path, ivs: Vec<Ival>, te: f64) -> R<()> {
+    fn in_face_from(&mut self, f: usize, path: &Path, ivs: Vec<Ival>, te: f64, arg: u32) -> R<()> {
         // (A point on it has its tolerance, and where it leaves the face, the tolerance of the face's edge it is on
         // too, OCCT's: an edge leaving a slab's face across its edge of 0.1 mm, 0.1 mm from another's vertex, is at
         // that vertex (OCCT's corner one vertex of 0.21 mm); up to half a millimetre.)
@@ -1889,7 +1889,7 @@ impl Ctx<'_> {
             }
             self.face_segs[f].push(Seg { v: [a, b], g });
             self.seg_section[f].push(usize::MAX);
-            self.seg_edge_tol[f].push(te);
+            self.seg_edge_tol[f].push((te, Some(arg)));
         }
         Ok(())
     }
@@ -4310,8 +4310,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             Pending::Section(fs, ft, path, ..) if !ia.is_empty() => cx.section_from(fs, ft, path, ia, ib)?,
             Pending::Section(..) => {}
             Pending::InFace(f, path, _, _, e) => {
-                let te = cx.edges[e].t;
-                cx.in_face_from(f, &path, ia, te)?
+                let (te, arg) = (cx.edges[e].t, cx.edges[e].arg);
+                cx.in_face_from(f, &path, ia, te, arg)?
             }
         }
     }
@@ -4576,7 +4576,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if grazing {
                 continue;
             }
-            let reach = cx.seg_edge_tol[f][i].max(cx.seg_edge_tol[f][j]);
+            let reach = cx.seg_edge_tol[f][i].0.max(cx.seg_edge_tol[f][j].0);
             if reach > tol {
                 cx.pool.add_tol(p, reach)?;
             } else {
@@ -4612,7 +4612,9 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     let mut sedge_of: HashMap<(u32, u32), Vec<usize>> = HashMap::default();
     // The split edge of `s` (made if new), and whether it runs the other way.
     // (`te`: the piece's edge's own tolerance, 0 for a section's: its curve's.)
-    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg, te: f64| -> (usize, bool) {
+    // (`arg`: the piece's edge's argument, for OCCT's rule for two edges of different arguments between the same two
+    // vertices.)
+    let mut get_sedge = |cx: &Ctx, sedges: &mut Vec<SEdge>, s: Seg, te: f64, arg: Option<u32>| -> (usize, bool) {
         let key = (s.v[0].min(s.v[1]), s.v[0].max(s.v[1]));
         let mid = cx.seg_at(&s, 0.5);
         let list = sedge_of.entry(key).or_default();
@@ -4630,7 +4632,30 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             };
             // (Within the two's own tolerances (OCCT's common block of two edges, or of a section and an edge).)
             let ts = te.max(stol(&s.g));
-            let reach = cx.pool.pair(sedges[i].t, ts);
+            let mut reach = cx.pool.pair(sedges[i].t, ts);
+            // (Two input edges of different arguments between the same two vertices, nearly parallel (within 25°): one
+            // within their tolerances and twice their vertices' larger, OCCT's ForceInterfEE (a Shell slab's ruling and
+            // another part's line fanning 71 um apart into a vertex of 0.32 mm).)
+            // (An OCCT section between an edge's two vertices: one with it within the larger of its tolerance and theirs
+            // where the edge is a common block, else nearly parallel within twice that, at most ten times its own and
+            // 1 mm, OCCT's IsExistingPaveBlock.)
+            if s.v[0] != s.v[1] && !sedges[i].origins.is_empty() {
+                let tv = cx.pool.t[key.0 as usize].max(cx.pool.t[key.1 as usize]);
+                let dir = |g: &Seg, t: f64| (cx.seg_at(g, (t + 1e-3).min(1.0)) - cx.seg_at(g, (t - 1e-3).max(0.0))).normalize_or_zero();
+                let parallel = || dir(&s, 0.5).dot(dir(o, cx.seg_param(o, mid).0)).abs() >= 0.9063;
+                match arg {
+                    Some(a) if sedges[i].origins.iter().any(|&e| cx.edges[e].arg != a) && parallel() => reach += 2.0 * tv,
+                    None if stol(&s.g) > 0.0 => {
+                        let tc = stol(&s.g) + cx.pool.fuzzy;
+                        if sedges[i].origins.len() > 1 {
+                            reach = reach.max(tc.max(tv));
+                        } else if parallel() {
+                            reach = reach.max(2.0 * (10.0 * tc).min(1e-3).min(tc.max(tv)));
+                        }
+                    }
+                    _ => {}
+                }
+            }
             let alike = std::mem::discriminant(&o.g) == std::mem::discriminant(&s.g)
                 || (s.v[0] != s.v[1]
                     && !matches!(o.g, Geo::Apex { .. })
@@ -4860,7 +4885,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         let mut pieces = Vec::with_capacity(chain.len() - 1);
         let parts = if matches!(s.g, Geo::Apex { .. }) { apex_parts(&cx, e)? } else { cx.pieces_of(&s, &chain) };
         for piece in parts {
-            let (si, rev) = get_sedge(&cx, &mut sedges, piece, cx.edges[e].t);
+            let (si, rev) = get_sedge(&cx, &mut sedges, piece, cx.edges[e].t, Some(cx.edges[e].arg));
             if !sedges[si].origins.contains(&e) {
                 sedges[si].origins.push(e);
             }
@@ -4905,8 +4930,8 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     // (Where the curves added to faces and the sections are split, on all threads; taken in order.)
     // (A section's split once, for both faces' curves it is.)
     let extra_segs: Vec<(usize, Seg)> = (0..cx.faces.len()).flat_map(|f| cx.face_segs[f].iter().map(move |&s| (f, s))).collect();
-    // (Each one's edge's own tolerance, 0 for a section's.)
-    let extra_te: Vec<f64> = (0..cx.faces.len()).flat_map(|f| cx.seg_edge_tol[f].iter().copied()).collect();
+    // (Each one's edge's own tolerance and argument, (0, None) for a section's.)
+    let extra_te: Vec<(f64, Option<u32>)> = (0..cx.faces.len()).flat_map(|f| cx.seg_edge_tol[f].iter().copied()).collect();
     let extra_of: Vec<usize> = (0..cx.faces.len()).flat_map(|f| cx.seg_section[f].iter().copied()).collect();
     // (A section at a vertex within its own error too (OCCT's approximation's): two sections crossing in a face's
     // plane are that far apart in space there (a knurl groove's flank's section with the cylinder and with another
@@ -4933,7 +4958,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
-            face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te).0);
+            face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te.0, te.1).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
@@ -4943,7 +4968,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         crate::check_cancel()?;
         let chain = chain?;
         for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
-            let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0);
+            let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0, None);
             section_faces.push((si, fs));
             section_faces.push((si, ft));
         }
