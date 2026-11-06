@@ -98,11 +98,14 @@ pub fn ops() -> Vec<Op> {
                 req("sketch", s(), "Sketch feature id or name."),
                 opt("tool", json!({ "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }), "Drawing tool (required without `shapes`)."),
                 opt("points", json!({ "type": "array", "items": click_point.clone() }), "The clicks, in order: [[x, y], ...] in sketch coordinates, or [[x, y, z], ...] model positions (required without `shapes`)."),
-                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone() }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
+                opt("shapes", json!({ "type": "array", "items": { "type": "object", "properties": { "tool": { "type": "string", "enum": DRAW_TOOLS.iter().map(|t| t.0).collect::<Vec<_>>() }, "points": { "type": "array", "items": click_point.clone() }, "sides": { "type": "integer", "minimum": 3, "maximum": 1000 }, "construction": { "type": "boolean" }, "tangent_arc_switch": { "type": "array", "items": { "type": "integer" } }, "start_derivative": click_point.clone(), "end_derivative": click_point.clone(), "degree": { "type": "integer", "minimum": 1 }, "knots": { "type": "array", "items": { "type": "number" } }, "weights": { "type": "array", "items": { "type": "number" } } }, "required": ["tool", "points"] } }), "Many shapes in one edit, each drawn exactly as its own call would (instead of tool / points / sides / construction). Much faster for many shapes."),
                 opt("construction", json!({ "type": "boolean" }), "Make the new geometry construction geometry."),
                 opt("sides", json!({ "type": "integer", "minimum": 3, "maximum": 1000 }), "Polygon sides."),
                 opt("start_derivative", click_point.clone(), "spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`."),
                 opt("end_derivative", click_point.clone(), "spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`."),
+                opt("degree", json!({ "type": "integer", "minimum": 1 }), "bezier: a B-spline of this degree on those control points (any number of them; Onshape's stored B-splines, a Use's or an offset's) instead of the tool's one span. With `knots`."),
+                opt("knots", json!({ "type": "array", "items": { "type": "number" } }), "bezier: its knot vector, clamped (control points + degree + 1 values, as Onshape stores a B-spline's)."),
+                opt("weights", json!({ "type": "array", "items": { "type": "number" } }), "bezier: a rational B-spline's weights, one per control point."),
                 opt("tangent_arc_switch", json!({ "type": "array", "items": { "type": "integer", "minimum": 1 } }), "line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape)."),
             ],
             mutates: true,
@@ -420,7 +423,7 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
         Geometry::Arc { center, start, end } => json!({ "type": "arc", "center": p(*center), "start": p(*start), "end": p(*end), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k) }),
         Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "start_point": eid(*start), "end_point": eid(*end) }),
-        Geometry::BSpline { control, degree, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>() }),
+        Geometry::BSpline { control, degree, knots, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) }),
         Geometry::FitSpline { points, .. } => json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() }),
         Geometry::Conic { start, control, end, rho } => json!({ "type": "conic", "start": p(*start), "control": p(*control), "end": p(*end), "rho": rho, "start_point": eid(*start), "control_point": eid(*control), "end_point": eid(*end) }),
     };
@@ -629,19 +632,40 @@ fn draw(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 let construction = obj.get("construction").map(|v| v.as_bool().ok_or_else(|| OpError::param(&format!("{p}construction"), "true or false"))).transpose()?.unwrap_or(false);
                 let switches = switch_list(obj.get("tangent_arc_switch"), &format!("{p}tangent_arc_switch"))?;
                 let ends = end_derivatives(obj.get("start_derivative"), obj.get("end_derivative"), &units, &p)?;
-                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends)?;
+                let knots = knot_args(obj.get("degree"), obj.get("knots"), obj.get("weights"), &p)?;
+                draw_shape(&mut t, &units, &p, tool, points, sides, construction, &switches, ends, knots)?;
             }
         }
         None => {
             let (tool, points) = (a.opt_str("tool")?.ok_or_else(|| OpError::param("tool", "required (or `shapes`)"))?, a.opt_array("points")?.ok_or_else(|| OpError::param("points", "required (or `shapes`)"))?);
             let switches = switch_list(a.get("tangent_arc_switch"), "tangent_arc_switch")?;
             let ends = end_derivatives(a.get("start_derivative"), a.get("end_derivative"), &units, "")?;
-            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends)?;
+            let knots = knot_args(a.get("degree"), a.get("knots"), a.get("weights"), "")?;
+            draw_shape(&mut t, &units, "", tool, points, a.opt_u64("sides")?, a.bool_or("construction", false)?, &switches, ends, knots)?;
         }
     }
     let (id, tab) = (t.id, t.tab);
     commit(od, t)?;
     Ok(sketch_state(od, tab, id, Some(&before))?.into())
+}
+
+/// A B-spline's `degree` and `knots` (both or neither) and its `weights`.
+type Knots = (usize, Vec<f64>, Option<Vec<f64>>);
+fn knot_args(degree: Option<&Value>, knots: Option<&Value>, weights: Option<&Value>, p: &str) -> Result<Option<Knots>, OpError> {
+    let numbers = |v: &Value, name: &str| -> Result<Vec<f64>, OpError> {
+        v.as_array().and_then(|l| l.iter().map(Value::as_f64).collect::<Option<Vec<f64>>>()).ok_or_else(|| OpError::param(&format!("{p}{name}"), "a list of numbers"))
+    };
+    let (degree, knots, weights) = (degree.filter(|v| !v.is_null()), knots.filter(|v| !v.is_null()), weights.filter(|v| !v.is_null()));
+    match (degree, knots) {
+        (Some(d), Some(k)) => {
+            let d = d.as_u64().filter(|d| *d >= 1).ok_or_else(|| OpError::param(&format!("{p}degree"), "a whole number, 1 or more"))? as usize;
+            Ok(Some((d, numbers(k, "knots")?, weights.map(|w| numbers(w, "weights")).transpose()?)))
+        }
+        (None, None) if weights.is_none() => Ok(None),
+        (None, None) => Err(OpError::param(&format!("{p}weights"), "needs `degree` and `knots`")),
+        (Some(_), None) => Err(OpError::param(&format!("{p}knots"), "required with degree")),
+        (None, Some(_)) => Err(OpError::param(&format!("{p}degree"), "required with knots")),
+    }
 }
 
 /// `start_derivative` / `end_derivative`: both or neither.
@@ -668,7 +692,7 @@ fn switch_list(v: Option<&Value>, param: &str) -> Result<Vec<usize>, OpError> {
 /// `sketch_draw` call does (`p`: the parameter prefix for errors).
 /// `switches`: the line tool's Shift+A before those clicks.
 #[allow(clippy::too_many_arguments)]
-fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>) -> Result<(), OpError> {
+fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, points: &[Value], sides: Option<u64>, construction: bool, switches: &[usize], ends: Option<(DVec2, DVec2)>, knots: Option<Knots>) -> Result<(), OpError> {
     let tool = DRAW_TOOLS.iter().find(|x| x.0 == name).map(|x| x.1).ok_or_else(|| {
         let names: Vec<&str> = DRAW_TOOLS.iter().map(|t| t.0).collect();
         OpError::param(&format!("{p}tool"), &format!("`{name}` is not a drawing tool{}; tools: {}", crate::error::did_you_mean(name, names.iter().copied()), names.join(", ")))
@@ -677,6 +701,23 @@ fn draw_shape(t: &mut SketchTarget, units: &UnitPrefs, p: &str, name: &str, poin
     let points = points.iter().enumerate().map(|(i, v)| click_value(v, units, &frame).map_err(|e| e.with_param(format!("{p}points[{i}]")))).collect::<Result<Vec<_>, _>>()?;
     if points.is_empty() {
         return Err(OpError::param(&format!("{p}points"), "at least one click"));
+    }
+    // A stored B-spline (Onshape's from a Use or an offset, any number of poles): made from its poles, not by the
+    // Bezier tool's clicks (at most 16, as live's).
+    if let Some((degree, knots, weights)) = knots {
+        if name != "bezier" {
+            return Err(OpError::param(&format!("{p}knots"), "the bezier tool's"));
+        }
+        let id = t.data.sketch.add_bspline(&points, degree.min(points.len().saturating_sub(1)).max(1)).map_err(|e| OpError::param(&format!("{p}points"), &e.to_string()))?;
+        if let Err(e) = t.data.sketch.set_bspline_knots(id, degree, knots, weights) {
+            let _ = t.data.sketch.remove_entity(id);
+            return Err(OpError::param(&format!("{p}knots"), &e.to_string()));
+        }
+        if construction {
+            let _ = t.data.sketch.set_construction(id, true);
+        }
+        t.data.sketch.solve();
+        return Ok(());
     }
     let before: Vec<EntityId> = t.data.sketch.entities().map(|e| e.id).collect();
     let mut ed = editor(t);

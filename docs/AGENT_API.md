@@ -1157,6 +1157,9 @@ Examples:
 | `sides` | integer |  | Polygon sides. |
 | `start_derivative` | array of number or string |  | spline: the open spline's derivative at its start, [x, y] (per unit of its 0–1 parameter, as Onshape stores `startDerivative`; its end handle placed for it). With `end_derivative`. |
 | `end_derivative` | array of number or string |  | spline: the derivative at its end (Onshape's `endDerivative`). With `start_derivative`. |
+| `degree` | integer |  | bezier: a B-spline of this degree on those control points (any number of them; Onshape's stored B-splines, a Use's or an offset's) instead of the tool's one span. With `knots`. |
+| `knots` | array of number |  | bezier: its knot vector, clamped (control points + degree + 1 values, as Onshape stores a B-spline's). |
+| `weights` | array of number |  | bezier: a rational B-spline's weights, one per control point. |
 | `tangent_arc_switch` | array of integer |  | line: press the Line/tangent arc switch (Shift+A) before these clicks (0-based): that click draws a tangent arc, then the chain goes on with lines (as in Onshape). |
 
 #### sketch_constrain

@@ -2381,11 +2381,27 @@ impl<'a> Translator<'a> {
                         s
                     })
                 }
-                "BTCurveGeometryControlPointSpline" => {
+                // A stored B-spline (a Use's, an offset's: BTCurveGeometrySpline; a control-point spline): its poles,
+                // degree, knots and weights.
+                "BTCurveGeometryControlPointSpline" | "BTCurveGeometrySpline" => {
                     let flat: Vec<f64> = g["controlPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
                     let n = flat.len() / 2;
-                    let bezier = g["degree"].as_u64() == Some(n.saturating_sub(1) as u64) && g["isRational"].as_bool() != Some(true);
-                    if bezier { Some(json!({ "tool": "bezier", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction })) } else { None }
+                    let nums = |k: &str| g[k].as_array().map(|l| l.iter().filter_map(Value::as_f64).collect::<Vec<f64>>());
+                    let mut shape = json!({ "tool": "bezier", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction });
+                    let degree = g["degree"].as_u64().unwrap_or(0) as usize;
+                    let knots = nums("knots").filter(|k| k.len() == n + degree + 1);
+                    if g["isPeriodic"].as_bool() == Some(true) || n < 2 || degree == 0 {
+                        None
+                    } else if let Some(knots) = knots {
+                        shape["degree"] = json!(degree);
+                        shape["knots"] = json!(knots);
+                        if g["isRational"].as_bool() == Some(true) {
+                            shape["weights"] = json!(nums("weights").unwrap_or_default());
+                        }
+                        Some(shape)
+                    } else {
+                        (degree == n - 1 && g["isRational"].as_bool() != Some(true)).then_some(shape)
+                    }
                 }
                 _ if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchPoint")) => Some(json!({ "tool": "point", "points": [at(e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0))], "construction": construction })),
                 _ => None,
@@ -3192,7 +3208,7 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
         }
         // Splines through their fit or control points: enough to tell which
         // side of them a region lies.
-        "BTCurveGeometryInterpolatedSpline" | "BTCurveGeometryControlPointSpline" => {
+        "BTCurveGeometryInterpolatedSpline" | "BTCurveGeometryControlPointSpline" | "BTCurveGeometrySpline" => {
             let key = if g["interpolationPoints"].is_array() { "interpolationPoints" } else { "controlPoints" };
             let flat: Vec<f64> = g[key].as_array()?.iter().filter_map(Value::as_f64).collect();
             (flat.len() >= 4).then(|| flat.chunks(2).map(|c| [c[0], c[1]]).collect())

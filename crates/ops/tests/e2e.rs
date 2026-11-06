@@ -2181,6 +2181,28 @@ fn sketch_draw_keeps_a_nearly_horizontal_line_as_drawn() {
     assert_eq!(horizontal[0]["entities"], json!([lines[1]["id"]]), "{g}");
 }
 
+/// sketch_draw's bezier with `degree` / `knots`: a stored B-spline (Onshape's from a Use or an offset) on any number of
+/// control points, past the tool's 16 clicks; knots that don't fit are named.
+#[test]
+fn sketch_draw_makes_a_stored_b_spline() {
+    let mut ctx = Ctx::new();
+    let s = new_sketch(&mut ctx, "bspline.noshape", "plane:top");
+    let poles: Vec<Value> = (0..20).map(|i| json!([i as f64 * 5.0, if i % 2 == 0 { 0.0 } else { 4.0 }])).collect();
+    // Clamped cubic, 20 poles: 24 knots, 17 spans.
+    let mut knots = vec![0.0; 4];
+    knots.extend((1..17).map(|i| i as f64 / 17.0));
+    knots.extend([1.0; 4]);
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": s, "tool": "bezier", "points": poles, "degree": 3, "knots": knots }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": r["sketch"] }));
+    let b = g["entities"].as_array().unwrap().iter().find(|e| e["type"] == "bspline").unwrap_or_else(|| panic!("{g}"));
+    assert_eq!((b["degree"].clone(), b["control_points"].as_array().map(Vec::len), b["knots"].as_array().map(Vec::len)), (json!(3), Some(20), Some(24)), "{b}");
+    assert_eq!(b["start_point"], b["point_ids"][0], "{b}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": s, "tool": "bezier", "points": [[0, 10], [5, 14], [10, 10], [15, 14]], "degree": 3, "knots": [0, 0, 0, 1, 1, 1] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("knots"), "{e:?}");
+    let e = try_call(&mut ctx, "sketch_draw", json!({ "sketch": s, "tool": "line", "points": [[0, 20], [5, 20]], "degree": 1, "knots": [0, 0, 1, 1] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("knots"), "{e:?}");
+}
+
 #[test]
 fn sketch_draw_many_shapes_in_one_edit() {
     let mut ctx = Ctx::new();

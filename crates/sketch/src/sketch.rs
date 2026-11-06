@@ -479,6 +479,38 @@ impl Sketch {
         Ok(())
     }
 
+    /// A control-point B-spline's degree, knots and weights set (Onshape's stored B-splines: a Use's, an offset's;
+    /// the Bezier tool makes its poles' one span): clamped, as many knots as poles + degree + 1, never falling,
+    /// a positive weight a pole.
+    pub fn set_bspline_knots(&mut self, id: EntityId, degree: usize, knots: Vec<f64>, weights: Option<Vec<f64>>) -> Result<()> {
+        let Some(Geometry::BSpline { control, .. }) = self.entity(id).map(|e| e.geometry.clone()) else {
+            return Err(SketchError::InvalidGeometry("knots need a control-point spline".into()));
+        };
+        let n = control.len();
+        if degree == 0 || degree >= n {
+            return Err(SketchError::InvalidGeometry(format!("degree {degree} for {n} control points: 1 to {}", n - 1)));
+        }
+        if knots.len() != n + degree + 1 {
+            return Err(SketchError::InvalidGeometry(format!("{} knots for {n} control points of degree {degree}: {} wanted", knots.len(), n + degree + 1)));
+        }
+        if knots.windows(2).any(|w| w[1] < w[0]) || knots[degree] >= knots[n] {
+            return Err(SketchError::InvalidGeometry("knots must not fall, and span a range".into()));
+        }
+        if knots[..=degree].iter().any(|k| *k != knots[0]) || knots[n..].iter().any(|k| *k != knots[n + degree]) {
+            return Err(SketchError::InvalidGeometry("knots must be clamped (the first and last degree + 1 equal)".into()));
+        }
+        if let Some(w) = &weights
+            && (w.len() != n || w.iter().any(|x| x.is_nan() || *x <= 0.0))
+        {
+            return Err(SketchError::InvalidGeometry(format!("{} weights for {n} control points: one positive weight each", w.len())));
+        }
+        if let Some(e) = self.entity_mut_silent(id) {
+            e.geometry = Geometry::BSpline { control, degree, knots, weights };
+        }
+        self.touch();
+        Ok(())
+    }
+
     /// Interpolating spline through `points` whose last point repeats the
     /// first, once: periodic (see [`Nurbs::interpolate`]).
     pub fn add_closed_fit_spline(&mut self, points: &[DVec2]) -> Result<EntityId> {
