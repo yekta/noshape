@@ -157,12 +157,21 @@ impl DrawingEditor {
                 }))
         };
         let picked = matches!(self.tool, Tool::Auxiliary { parent: Some(_) });
-        let field_text = match (picked, mode) {
-            (true, _) => "1 entity",
-            (false, 1) => "Select a sketch line or centerline",
-            (false, 2) => "Select a hole axis",
+        let field_text = match mode {
+            1 => "Select a sketch line or centerline",
+            2 => "Select a hole axis",
             _ => "Select a linear edge",
         };
+        // (The panel's texts for the ui-parity runner, as live's recorder reads them: the prompt stays, the pick a chip
+        // "Edge ×", live 2146.)
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Auxiliary view", "Normal", "In line", "Axis", field_text];
+            if picked {
+                text.extend(["Edge", "×"]);
+            }
+            text.push("Show view reference indicator");
+            serde_json::json!({ "kind": "drawing-panel", "title": "Auxiliary view", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-aux-dlg")
@@ -239,6 +248,26 @@ impl DrawingEditor {
                                         })),
                                 ),
                         )
+                        // The picked edge as a chip under the prompt (live 2146: "Edge ×").
+                        .when(picked, |b| {
+                            b.child(
+                                h_flex()
+                                    .mt(px(2.))
+                                    .h(px(22.))
+                                    .px(px(6.))
+                                    .gap(px(6.))
+                                    .text_size(px(12.))
+                                    .bg(gpui_kit::rgb(0xe8f1fb))
+                                    .child("Edge")
+                                    .child(
+                                        div().id("aux-edge-x").cursor_pointer().child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            this.tool = Tool::Auxiliary { parent: None };
+                                            this.update_preview(cx);
+                                            cx.notify();
+                                        })),
+                                    ),
+                            )
+                        })
                         .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("aux-show-ref").label("Show view reference indicator").checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some(d) = &mut this.aux_dlg {
                                 d.show_ref = *v;

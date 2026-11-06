@@ -202,6 +202,8 @@ impl DrawingEditor {
     pub fn render_callout_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.refresh_callout_values(cx);
         let d = self.callout_dlg.as_ref()?;
+        // (The panel's texts in reading order for the ui-parity runner, as live's recorder reads them: live 2146.)
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Callout", "text": ["Callout", "None", "Circle", "Diamond", "Double Circle", "Flag", "Hexagon", "Octagon", "Rectangle", "Split Circle", "Square Circle", "Triangle", "Underline", "Tight Fit", "1 Character", "2 Characters", "3 Characters", "4 Characters", "5 Characters"] }));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let inputs = d.inputs.clone();

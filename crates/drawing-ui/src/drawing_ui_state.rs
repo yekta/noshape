@@ -70,6 +70,7 @@ impl DrawingEditor {
             // Live's export names it "Section", its "SECTION A - A" a note (2063).
             ViewKind::Section { .. } => "Section".to_string(),
             ViewKind::Detail { .. } => "Detail".to_string(),
+            ViewKind::Auxiliary { .. } => "Auxiliary".to_string(),
             _ => v.label.clone().unwrap_or_else(|| self.ui_view_kind(id).to_string()),
         }
     }
@@ -98,24 +99,40 @@ impl DrawingEditor {
             let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.as_str()).collect();
             parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")
         };
+        // The ordinate group being placed is listed once the tool ends (live drw-ordinate-dimension).
+        let placing = match self.tool {
+            Tool::Ordinate { group, .. } => group,
+            _ => None,
+        };
         sheet
             .annotations
             .iter()
+            .filter(|a| Some(a.id) != placing)
             .map(|a| {
                 let kind = format!("{:?}", a.kind);
                 let variant = kind.split([' ', '(', '{']).next().unwrap_or("");
+                // (Live's recorder's kinds from DRAWING_JSON's types, live 2146: Onshape::Callout "callout",
+                // Onshape::Dimension::Ordinate "ordinate", Onshape::SurfaceFinishSymbol "surfacefinishsymbol".)
                 let k = match variant {
+                    "OrdinateDimension" | "OrdinateGroup" => "ordinate",
                     v if v.ends_with("Dimension") => "dimension",
                     "Note" => "note",
                     "Centermark" => "centermark",
                     v if v.contains("Centerline") => "centerline",
-                    "Callout" | "HoleCallout" => "callout",
+                    "Callout" | "HoleCallout" | "Balloon" => "callout",
                     "Datum" => "datum",
                     "Gdt" => "gdt",
+                    "SurfaceFinish" => "surfacefinishsymbol",
                     _ => "other",
                 };
                 let t = text(a.id);
-                (a.id, k, if k == "dimension" { dimension_value(&t) } else { t })
+                let t = match k {
+                    "dimension" => dimension_value(&t),
+                    // Each member's value: "0.000 1.575" (live).
+                    "ordinate" => t.split_whitespace().map(dimension_value).collect::<Vec<_>>().join(" "),
+                    _ => t,
+                };
+                (a.id, k, t)
             })
             .collect()
     }
@@ -175,15 +192,29 @@ impl DrawingEditor {
         // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
         // drw-broken-out-section).
         match &self.tool {
-            // (Live: a picked circle shows at once, lines once there are two: drw-dimension-edge, -angular.)
+            // (Live: a picked circle shows at once, a line once it is the second pick: drw-dimension-edge, -angular,
+            // -point-to-line.)
             Tool::Dimension { picks, .. } => {
                 let lines = picks.iter().filter(|p| matches!(p, Pick::Line { .. })).count();
                 for p in picks {
                     match p {
-                        Pick::Line { a: PickedPoint { view, .. }, .. } if lines >= 2 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        Pick::Line { a: PickedPoint { view, .. }, .. } if lines >= 2 || picks.len() >= 2 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
                         _ => {}
                     }
+                }
+            }
+            // A datum's edge until it is placed (drw-datum).
+            Tool::Datum { anchor: Some(_) } if let Some((v, _)) = self.datum_at => selection.push(("EDGE".into(), self.ui_view_name(v))),
+            // The edge the last symbol was placed on (drw-surface-finish).
+            Tool::SurfaceFinish => {
+                let last = match &self.panel { Some(Panel::SurfaceFinish { placed, .. }) => placed.last().copied(), _ => None };
+                let on = last.and_then(|id| self.current_sheet().annotations.iter().find(|a| a.id == id)).and_then(|a| match &a.kind {
+                    AnnotationKind::SurfaceFinish { on: Some((v, ..)), .. } => Some(*v),
+                    _ => None,
+                });
+                if let Some(v) = on {
+                    selection.push(("EDGE".into(), self.ui_view_name(v)));
                 }
             }
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
@@ -199,7 +230,8 @@ impl DrawingEditor {
             // (The Insert view panel before a part is chosen is the Insert view tool's, as live's toolbar shows it.)
             "tool": ui_tool_name(&self.tool).or_else(|| (matches!(self.tool, Tool::Select) && (self.insert.panel || self.insert.chooser.is_some())).then_some("Insert view")),
             "views": views,
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": t })).collect::<Vec<_>>(),
+            // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
+            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol")).then_some(t) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }
@@ -208,7 +240,7 @@ impl DrawingEditor {
     /// "other"; the Insert view chooser's search box and list a panel "field"; a menu of the window's (a document
     /// tab's) takes it off the drawing.
     fn ui_focus(&self, cx: &App) -> Value {
-        if ui_list(cx).is_some() {
+        if self.ui_list(cx).is_some() {
             return json!({ "kind": "none" });
         }
         if self.insert.chooser.is_some() {
@@ -225,7 +257,7 @@ impl DrawingEditor {
         json!({
             "focus": self.ui_focus(cx),
             "dialog": noshape_app_core::ui_script::open_dialog(),
-            "list": ui_list(cx),
+            "list": self.ui_list(cx),
             "selection": { "count": self.selection.len(), "items": [] },
             "features": { "rows": [], "rollbackAfter": null },
             "parts": [],
@@ -236,11 +268,16 @@ impl DrawingEditor {
             "drawing": self.ui_drawing_state(cx),
         })
     }
-}
 
-/// The open menu or list: a menu of the window's (a document tab's), else a list a control noted.
-fn ui_list(cx: &App) -> Option<Value> {
-    noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)
+    /// The open menu or list: a menu of the window's (a document tab's), else a list a control noted; not the
+    /// canvas' context menu, which is in live's drawing iframe where its recorder can't read it (live drw-note-delete,
+    /// drw-view-properties: list null, focus other).
+    fn ui_list(&self, cx: &App) -> Option<Value> {
+        if self.canvas_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
+            return None;
+        }
+        noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)
+    }
 }
 
 /// The active drawing tool's tooltip name (the toolbar's, without its shortcut); `None` for Select.

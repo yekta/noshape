@@ -396,6 +396,8 @@ impl DrawingEditor {
 
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
+        // (The panel's texts for the ui-parity runner, as live's recorder reads them, the label's value not: live 2146.)
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "text": ["Datum", "Datum", "Datum target", "Label"] }));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();

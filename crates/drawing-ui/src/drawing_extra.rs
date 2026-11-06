@@ -908,8 +908,11 @@ impl DrawingEditor {
         why.is_some()
     }
 
+    /// The next free datum letter on the sheet as it is, not counting the tool's own preview datum (it took "A": the
+    /// first datum came out "B", live 2146).
     pub fn next_datum_label(&self) -> String {
-        self.pk().next_datum_label()
+        let used: Vec<&str> = self.drawing_sheet().annotations.iter().filter_map(|a| if let AnnotationKind::Datum { label, .. } = &a.kind { Some(label.as_str()) } else { None }).collect();
+        "ABCDEFGHJKLMNPRTUVWY".chars().map(|c| c.to_string()).find(|l| !used.contains(&l.as_str())).unwrap_or_else(|| "A".into())
     }
 
     pub fn extra_overlay(&self, overlay: &mut Overlay) {
@@ -2301,7 +2304,11 @@ impl DrawingEditor {
                         .into_any_element(),
                 ],
             ),
-            Panel::SurfaceFinish { .. } => ("Surface finish", self.sf_panel_rows(cx)),
+            Panel::SurfaceFinish { .. } => {
+                // (Its texts for the ui-parity runner, as live's recorder reads them: live 2146.)
+                crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Surface finish", "text": ["Surface finish", "Type", "All around", "( )", "+"] }));
+                ("Surface finish", self.sf_panel_rows(cx))
+            }
             Panel::Datum { input, anchor, .. } => (if anchor[0].is_nan() { "Callout text (empty = BOM item)" } else { "Datum" }, vec![Self::label_row("Label", Input::new(input).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).small().w(px(120.)).into_any_element())]),
             _ => return None,
         })

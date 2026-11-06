@@ -111,9 +111,11 @@ impl DrawingEditor {
             cx.notify();
             return;
         }
-        // View properties: one Esc closes it as a cancel (live request 1566).
+        // View properties: one Esc closes it as a cancel (live request 1566), the view no longer selected (live
+        // drw-view-properties).
         if self.view_props.take().is_some() {
-            cx.notify();
+            self.selection.clear();
+            self.redraw(cx);
             return;
         }
         // The Table dialog: closed without placing.
@@ -122,6 +124,14 @@ impl DrawingEditor {
             return;
         }
         if self.insert.chooser.take().is_some() | std::mem::take(&mut self.insert.panel) {
+            cx.notify();
+            return;
+        }
+        // The Surface finish tool: Esc ends it, the symbols placed stay (live drw-surface-finish).
+        if matches!(self.tool, Tool::SurfaceFinish) && matches!(self.panel, Some(Panel::SurfaceFinish { edit: None, .. })) {
+            self.panel = None;
+            self.note_leader = None;
+            self.tool = Tool::Select;
             cx.notify();
             return;
         }
@@ -140,6 +150,9 @@ impl DrawingEditor {
         }
         if self.gdt_dlg.is_some() {
             self.close_gdt_dlg(false, cx);
+            return;
+        }
+        if self.close_centermark_on_escape(cx) {
             return;
         }
         if self.custom_tables.dlg.as_ref().is_some_and(|d| d.picker.is_some()) {
@@ -965,7 +978,8 @@ impl DrawingEditor {
                 }
             }
             Tool::CircleCenterline { three, mut points } => {
-                if let Some(p) = self.snap_at(c).filter(|p| points.first().is_none_or(|f| f.view == p.view)) {
+                // A snap point, else the point on the edge under the pointer (live drw-centerline-circle-3-point).
+                if let Some(p) = self.pk().snap_or_edge_point(c).filter(|p| points.first().is_none_or(|f| f.view == p.view)) {
                     points.push(p);
                 }
                 let need = if three { 3 } else { 2 };
@@ -1991,6 +2005,7 @@ impl DrawingEditor {
         // Onshape's right-click menu (os_menu: 12 px, 22 px rows).
         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
         if !menu.read(cx).is_empty() {
+            self.canvas_menu = Some(menu.downgrade());
             crate::os_menu::open(position, menu, window, cx);
         }
         cx.notify();

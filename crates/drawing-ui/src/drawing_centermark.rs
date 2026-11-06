@@ -45,14 +45,11 @@ impl DrawingEditor {
 
     /// Click with the Centermark tool. True when the click was used.
     pub fn centermark_click(&mut self, cx: &mut Context<Self>) -> bool {
-        let Some(mode) = self.centermark_dlg.as_ref().map(|d| d.mode) else { return false };
-        let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return true };
-        if mode == 0 {
-            let id = self.current_sheet().next_annotation_id();
-            let (c, mark) = (self.cursor, CmCircle { view, center, radius, r });
-            self.edit_sheet("Centermark", cx, |s| s.annotations.push(noshape_scene::drawing_tools::centermark(id, &mark, c)));
-            return true;
+        if self.centermark_dlg.is_none() {
+            return false;
         }
+        let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(self.cursor) else { return true };
+        // (Single too: the circles listed under Entities to include, marked on ✓ or Esc: live 2146.)
         if let Some(d) = &mut self.centermark_dlg {
             // Click again to drop a circle; all circles come from one view.
             if let Some(i) = d.picks.iter().position(|p| p.view == view && (p.center[0] - center[0]).abs() < 1e-9 && (p.center[1] - center[1]).abs() < 1e-9) {
@@ -73,12 +70,37 @@ impl DrawingEditor {
     }
 
     /// ✓: create the circular / linear centermark.
+    /// Esc with circles listed: they are marked as on ✓ (live 2146), and the tool ends.
+    pub fn close_centermark_on_escape(&mut self, cx: &mut Context<Self>) -> bool {
+        if !self.centermark_dlg.as_ref().is_some_and(|d| !d.picks.is_empty()) {
+            return false;
+        }
+        self.accept_centermark(cx);
+        self.tool = Tool::Select;
+        self.centermark_dlg = None;
+        cx.notify();
+        true
+    }
+
     fn accept_centermark(&mut self, cx: &mut Context<Self>) {
         let Some(d) = self.centermark_dlg.clone() else { return };
         if d.picks.is_empty() {
             return;
         }
         let pos = self.cursor;
+        if d.mode == 0 {
+            self.edit_sheet("Centermark", cx, |s| {
+                for mark in &d.picks {
+                    let id = s.next_annotation_id();
+                    s.annotations.push(noshape_scene::drawing_tools::centermark(id, mark, pos));
+                }
+            });
+            if let Some(d) = &mut self.centermark_dlg {
+                d.picks.clear();
+            }
+            cx.notify();
+            return;
+        }
         let opts = noshape_scene::drawing_tools::CentermarkOpts { mode: d.mode, reference_center: d.reference_center, bolt_circle: d.bolt_circle, radial_lines: d.radial_lines, pattern: d.pattern, connecting: d.connecting };
         let (new, name) = noshape_scene::drawing_tools::centermark_set(&d.picks, &opts);
         self.edit_sheet(name, cx, |s| {
@@ -126,7 +148,16 @@ impl DrawingEditor {
                 cx.notify();
             })))
         };
-        let can_accept = d.mode != 0 && !d.picks.is_empty();
+        let can_accept = !d.picks.is_empty();
+        // (The panel's texts for the ui-parity runner, as live's recorder reads them: live 2146.)
+        let picked = d.picks.len();
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = ["Centermark", "Single", "Circular", "Linear", "Entities to include"].map(String::from).to_vec();
+            for i in 0..picked {
+                text.extend([format!("Circle/ellipse/arc {}", i + 1), "×".to_string()]);
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Centermark", "text": text })
+        });
         let mut body = v_flex().p(px(3.)).child(h_flex().child(tab("cm-single", "Single", 0, cx)).child(tab("cm-circ", "Circular", 1, cx)).child(tab("cm-lin", "Linear", 2, cx)));
         match d.mode {
             1 => {
@@ -139,9 +170,20 @@ impl DrawingEditor {
             2 => body = body.child(check("cm-connect", "Connecting lines", d.connecting, |d, v| d.connecting = v, cx)),
             _ => {}
         }
-        if d.mode != 0 {
-            body = body.child(div().px(px(4.)).py(px(3.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("{} circle(s) selected", d.picks.len())));
+        // Entities to include: a chip per circle (live 2146).
+        let mut field = v_flex().mx(px(4.)).my(px(3.)).p(px(3.)).border_1().border_color(pal.accent).bg(gpui_kit::rgb(0xe8f1fb)).text_size(px(12.)).child("Entities to include");
+        for i in 0..d.picks.len() {
+            field = field.child(h_flex().h(px(22.)).gap(px(6.)).child(format!("Circle/ellipse/arc {}", i + 1)).child(div().id(("cm-x", i)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                if let Some(d) = &mut this.centermark_dlg
+                    && i < d.picks.len()
+                {
+                    d.picks.remove(i);
+                }
+                this.update_preview(cx);
+                cx.notify();
+            }))));
         }
+        body = body.child(field);
         Some(
             v_flex()
                 .id("dr-centermark-dlg")

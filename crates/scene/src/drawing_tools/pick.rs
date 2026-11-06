@@ -66,7 +66,7 @@ impl<'a> SheetPick<'a> {
         let hover = match self.tool {
             Tool::Dimension { kind: DimTool::Point2, .. } => hover,
             Tool::Dimension { kind: DimTool::Linear, .. } | Tool::Sketch { .. } | Tool::Constrain { .. } => edges_only(true).or(hover),
-            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
+            Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note => edges_only(false).or(hover),
             // A surface finish symbol stands on the edge under it (live A45);
             // both it and a geometric tolerance also take a dimension (live
             // request 1624), under whatever else is on top.
@@ -97,7 +97,7 @@ impl<'a> SheetPick<'a> {
             // Dimension-like tools (and the surface finish symbol) only care
             // about view edges.
             // A note's leader attaches to a view edge too.
-            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
+            (Tool::Dimension { .. } | Tool::Auxiliary { .. } | Tool::Centermark | Tool::Centerline { .. } | Tool::CircleCenterline { .. } | Tool::EdgeCenterline { .. } | Tool::VirtualSharp { .. } | Tool::Balloon { .. } | Tool::Ordinate { .. } | Tool::Note, Some(h)) => match self.built.and_then(|b| b.picks.get(h as usize)) {
                 Some(PickTarget::Edge { .. }) => Some(h),
                 _ => None,
             },

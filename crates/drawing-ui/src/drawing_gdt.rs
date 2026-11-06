@@ -202,7 +202,9 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::Gdt) {
             return false;
         }
-        let Some((frame, extra)) = self.gdt_values(cx) else { return true };
+        // Nothing entered: the default frame, the position symbol (live 2146: each click placed one, "⌖"; ✓ waits for
+        // an entry).
+        let (frame, extra) = self.gdt_values(cx).unwrap_or_else(|| (vec![noshape_scene::drawing_tools::GDT_TYPES[0].0.to_string(), String::new()], Default::default()));
         let c = self.cursor;
         let id = self.current_sheet().next_annotation_id();
         // The second click of a leader placement.
@@ -310,6 +312,8 @@ impl DrawingEditor {
     pub fn render_gdt_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let entered = self.gdt_values(cx).is_some();
         let d = self.gdt_dlg.as_ref()?;
+        // (The panel's texts in reading order for the ui-parity runner, as live's recorder reads them: live 2146.)
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Geometric tolerance", "text": ["Geometric tolerance", "Prefix", "Type", "Tolerance", "Datums", "Suffix", "+"] }));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();

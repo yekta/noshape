@@ -817,22 +817,24 @@ impl DrawingEditor {
         let reference = h_flex()
             .gap(px(3.))
             .child(crate::assets::icon(if is_asm { "assembly" } else { "part" }, 20., cx))
-            .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab containing {source_name}"))).child(source_name).on_click(move |_, w, cx| {
+            .child(div().id("vp-ref-link").text_color(gpui_kit::rgb(0x0088cc)).cursor_pointer().tooltip(crate::ui::tooltip(format!("Switch to the tab containing {source_name}"))).child(source_name.clone()).on_click(move |_, w, cx| {
                 if let Some(tab) = source_tab {
                     crate::actions::request_activate_tab(tab, w, cx);
                 }
             }))
             .into_any_element();
         // The reference's state: "In progress" for the workspace, else the version.
-        let badge = div().ml(px(82.)).mt(px(4.)).mb(px(2.)).px(px(3.)).py(px(1.)).rounded(px(3.)).bg(gpui_kit::rgb(0x90cef1)).text_size(px(12.)).text_color(gpui_kit::rgb(0x000000)).child(pinned.map(|p| p.name).unwrap_or_else(|| "In progress".into()));
+        let badge_text = pinned.map(|p| p.name).unwrap_or_else(|| "In progress".to_string());
+        let workspace = if self.out_of_date && self.doc.read(cx).session.viewing.is_some() { "Main (Drawing needed update when version was created)" } else { "Main" };
+        let badge = div().ml(px(82.)).mt(px(4.)).mb(px(2.)).px(px(3.)).py(px(1.)).rounded(px(3.)).bg(gpui_kit::rgb(0x90cef1)).text_size(px(12.)).text_color(gpui_kit::rgb(0x000000)).child(badge_text.clone());
         let mut rows: Vec<AnyElement> = if multi.is_some() {
             vec![div().pl(px(5.)).pt(px(6.)).pb(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x777777)).child("Multiple views selected.").into_any_element()]
         } else {
             vec![
-                info_row("Document", text(doc_name)),
+                info_row("Document", text(doc_name.clone())),
                 // Live (dom asb-d-view-properties): a version of a drawing that
                 // was out of date when the version was made says so.
-                info_row("Workspace", text(if self.out_of_date && self.doc.read(cx).session.viewing.is_some() { "Main (Drawing needed update when version was created)".into() } else { "Main".into() })),
+                info_row("Workspace", text(workspace.into())),
                 info_row("Type", text(if is_asm { "Assembly".into() } else { "Part".into() })),
                 info_row("Reference", reference),
                 h_flex().child(badge).into_any_element(),
@@ -1048,9 +1050,9 @@ impl DrawingEditor {
             _ => props.tangent.label().to_string(),
         };
         rows.push(row("Tangent edges", select("vp-tangent", tangent_label, tangent_items, true)));
-        // View render mode (live drawing/1104): Best quality / Best performance (default).
+        // View render mode (live drawing/1104, dom asbv-view-properties-projected): Best performance (default) / Best quality.
         let bq = props.best_quality;
-        let mode_items: Vec<(String, bool, PropsAct)> = [("Best quality", true), ("Best performance", false)]
+        let mode_items: Vec<(String, bool, PropsAct)> = [("Best performance", false), ("Best quality", true)]
             .into_iter()
             .map(|(n, q)| {
                 let f: PropsAct = std::rc::Rc::new(move |p| p.best_quality = q);
@@ -1079,6 +1081,32 @@ impl DrawingEditor {
         if !crate::drawing_insert::simplification_text(eff, true).is_empty() && props.simplification.is_some() {
             // Live (dom asb-d-view-properties): "Threshold" and its tooltip.
             rows.push(row("Threshold", div().id("vp-simp-threshold").tooltip(crate::ui::tooltip("Simplification threshold: Features below this value will be simplified")).child(field(&props.simp_value)).into_any_element()));
+        }
+        // The panel's texts as live's recorder reads them (dom asbv-view-properties-right-projected: labels and each
+        // list's options, at most 30).
+        if multi.is_none() {
+            crate::ui_script::note_dialog(|| {
+                let mut t: Vec<String> = ["View properties", "Document", doc_name.as_str(), "Workspace", workspace, "Type", if is_asm { "Assembly" } else { "Part" }, "Reference", source_name.as_str(), badge_text.as_str()].map(String::from).to_vec();
+                if let Some(n) = &v.named_view {
+                    t.extend(["Named view".to_string(), n.clone()]);
+                }
+                t.push("View orientation".into());
+                match props.orientation {
+                    Some(_) => t.extend(ORIENTATIONS.iter().map(|(_, n)| n.to_string())),
+                    None => t.push(default_view_name(&self.drawing, sheet, &v)),
+                }
+                t.push("Scale".into());
+                if has_parent {
+                    t.extend(["Suppress alignment with parent", "Synchronize breaks from parent"].map(String::from));
+                }
+                t.extend(["Rotation angle", "Tangent edges", "Hidden", "Solid", "Phantom", "View render mode", "Best performance", "Best quality", "View simplification"].map(String::from));
+                t.extend(crate::drawing_insert::simplification_choices(eff).into_iter().map(|c| c.name().to_string()));
+                t.push("Sheet".into());
+                t.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
+                t.push("Name".into());
+                t.truncate(30);
+                serde_json::json!({ "kind": "drawing-panel", "title": "View properties", "text": t })
+            });
         }
         // Sheet: the sheet's name; with several sheets a list that moves the view.
         let sheet_name = self.drawing.sheets.get(props.sheet).map(|s| s.name.clone()).unwrap_or_default();
