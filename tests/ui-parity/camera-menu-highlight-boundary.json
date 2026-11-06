@@ -1,0 +1,31 @@
+{
+ "name": "camera-menu-highlight-boundary",
+ "about": "block: the Camera and render options button (the ▾ under the view cube), Highlight boundary edges; the menu again: its ✓, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Highlight boundary edges"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,96 @@
+{
+ "name": "sketch-dim-menu-driven",
+ "about": "in a sketch on Top, a line (0, 0) → (30, 0), Dimension (d) on it placed at (15, -8), Enter, Escape (the tool); right-click it, Change to driven dimension",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     15,
+     -8
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Change to driven dimension"
+   }
+  }
+ ]
+}

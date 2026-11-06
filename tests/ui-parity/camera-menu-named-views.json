@@ -1,0 +1,25 @@
+{
+ "name": "camera-menu-named-views",
+ "about": "block: the Camera and render options button (the ▾ under the view cube), Named views…: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Named views…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -84,6 +84,10 @@ def main():
     for area, label in coverage_rs({"partStudio", "view"}, "MENUS"):
         items[("menu", label)] = set()
         menu_of[label.lower()] = ("menu", label)
+    # A sketch dimension's menu: coverage.rs lists its rows by id.
+    for row, item in (("change to driven dimension", "sk-dim-driving"), ("change to driving dimension", "sk-dim-driving"), ("delete dimension", "sk-dim-delete"), ("unconfigure dimension", "sk-dim-unconf")):
+        if ("menu", item) in items:
+            menu_of[row] = ("menu", item)
     key_of = defaultdict(list)
     for tab in shortcuts:
         if tab["tab"] not in ("General", "Part Studio", "3D view", "Sketch"):

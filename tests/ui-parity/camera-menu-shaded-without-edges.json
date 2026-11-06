@@ -1,0 +1,38 @@
+{
+ "name": "camera-menu-shaded-without-edges",
+ "about": "block: the Camera and render options button (the ▾ under the view cube), hover Shaded with edges, Shaded without edges; the menu again: its rows, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Shaded with edges"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Shaded without edges"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

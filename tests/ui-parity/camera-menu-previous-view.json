@@ -1,0 +1,27 @@
+{
+ "name": "camera-menu-previous-view",
+ "about": "block: the view cube's Top, then the camera menu's Previous view",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "view_cube": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Previous view"
+   }
+  }
+ ]
+}

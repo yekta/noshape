@@ -1,0 +1,25 @@
+{
+ "name": "camera-menu-graphics-preferences",
+ "about": "block: the Camera and render options button (the ▾ under the view cube), Graphics preferences…: its panel, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: camera menu, sketch dimension menu; batch 10)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Camera and render options"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Graphics preferences…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
