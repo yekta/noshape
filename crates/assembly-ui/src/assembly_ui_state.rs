@@ -117,6 +117,9 @@ impl AssemblyView {
             }
             let selected = self.selected.contains(&i.id);
             rows.push(row(&i.name, if i.suppressed { "suppressed" } else { "ok" }, selected, false, selected || related.contains(&i.id), i.hidden));
+            if let Some(n) = self.result.node(&[i.id]) {
+                self.nested_state_rows(n, &mut rows, cx);
+            }
         }
         let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
         let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, "ok", mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
@@ -193,6 +196,39 @@ impl AssemblyView {
 }
 
 impl AssemblyView {
+    /// An expanded subassembly's rows as the list draws them (`push_children`): its instances, its patterns (their
+    /// copies when open) and its own "Mate features (n)" with its mates (when open).
+    fn nested_state_rows(&self, node: &InstanceNode, rows: &mut Vec<Value>, cx: &App) {
+        if !self.expanded.contains(&node.path) {
+            return;
+        }
+        let row = |name: &str, state: &str, hidden: bool| json!({ "name": name, "state": state, "selected": false, "editing": false, "related": false, "hidden": hidden });
+        let sub = if node.kind == NodeKind::Assembly { self.node_assembly(&node.path, cx) } else { None };
+        let generated = |c: &InstanceNode| sub.as_ref().is_some_and(|a| c.path.last().is_some_and(|id| a.generated_by(*id).is_some()));
+        for c in node.children.iter().filter(|c| !generated(c)) {
+            rows.push(row(&c.name, if c.suppressed { "suppressed" } else { "ok" }, c.hidden));
+            self.nested_state_rows(c, rows, cx);
+        }
+        let Some(sub) = sub else { return };
+        for pat in &sub.patterns {
+            rows.push(row(&pat.name, "ok", false));
+            let mut key = node.path.clone();
+            key.push(InstanceId(NESTED_PATTERN_BIT | pat.id.0));
+            if self.expanded.contains(&key) {
+                for c in node.children.iter().filter(|c| c.path.last().is_some_and(|id| pat.generated.iter().any(|g| g.instance == *id))) {
+                    rows.push(row(&c.name, if c.suppressed { "suppressed" } else { "ok" }, c.hidden));
+                    self.nested_state_rows(c, rows, cx);
+                }
+            }
+        }
+        rows.push(row(&format!("Mate features ({})", sub.listed_mate_count()), "ok", false));
+        let mut key = node.path.clone();
+        key.push(NESTED_MATES_COLLAPSED);
+        if !self.expanded.contains(&key) {
+            rows.extend(sub.mates.iter().filter(|m| sub.mate_generated_by(m.id).is_none()).map(|m| row(&m.name, "ok", false)));
+        }
+    }
+
     /// The assembly's other open dialogs as the suite records them, in live's field format (as the mate dialog's):
     /// Mate connector, Group, the patterns / Mirror / Replicate, the relations, Replace instance, Insert.
     fn other_dialogs(&self, cx: &App) -> Vec<Value> {

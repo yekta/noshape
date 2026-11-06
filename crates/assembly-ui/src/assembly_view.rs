@@ -3321,7 +3321,8 @@ impl AssemblyView {
                         )
                         .into_any_element()
                     }
-                    "tb-insert" => rich("tb-insert", "Insert parts and assemblies (i)", "insert", lit(crate::ui::text_tool_button("tb-insert", "insert", "Insert", self.insert_open, cx), "insert").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_insert(w, cx)))).into_any_element(),
+                    // Also `tool:Insert`, by its label (live's runner takes a tool's title or text).
+                    "tb-insert" => crate::ui_script::wrap(rich("tb-insert", "Insert parts and assemblies (i)", "insert", lit(crate::ui::text_tool_button("tb-insert", "insert", "Insert", self.insert_open, cx), "insert").on_click(cx.listener(|this, _: &ClickEvent, w, cx| this.toggle_insert(w, cx)))), || "tool:Insert".into()),
                     "tb-mc" => tool(self, "tb-mc", "mate-connector-assembly", "Mate connector (ctrl+m)", self.mc.is_some(), cx, |this, w, cx| this.open_mc(None, w, cx)).into_any_element(),
                     "tb-fastened" => mate(self, "tb-fastened", MateType::Fastened, "Fastened mate (m)", cx).into_any_element(),
                     "tb-revolute" => mate(self, "tb-revolute", MateType::Revolute, "Revolute mate (m)", cx).into_any_element(),

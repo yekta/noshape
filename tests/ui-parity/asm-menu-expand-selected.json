@@ -1,0 +1,40 @@
+{
+ "name": "asm-menu-expand-selected",
+ "about": "Part 2 moved to a new subassembly, then that row's menu: Expand ▸ Expand selected.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 4",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to new subassembly"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly 1 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Expand"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Expand selected"
+   }
+  }
+ ]
+}

@@ -1,0 +1,59 @@
+{
+ "name": "asm-menu-collapse-selected",
+ "about": "Part 2 in a new subassembly, its row expanded (Expand selected), then Collapse ▸ Collapse selected.",
+ "area": "asm",
+ "source": "lead 11-06: assembly coverage, batch 4",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to new subassembly"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly 1 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Expand"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Expand selected"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Assembly 1 <1>"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Collapse"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Collapse selected"
+   }
+  }
+ ]
+}
