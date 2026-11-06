@@ -36,6 +36,14 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 09:13:** still no 05:00 Release run (none cut by 09:13); the list in TICKETS stands. Greens since: fa886aef, a4433e68 (bool's
+tolerances stage 4: **P2 BOOL-TOL4-DRAFT-VOLUME**, slow1151's Draft 4 now taken by the Rust Boolean, 0.18 mm³ under OCCT), 9d64259f,
+3ea570b7, 5b14f339 (also GUI rows: identical to v0.4.32), efd5533d, 3be27d0f, 9cb2159f, de022225 (stage 5a; full smoke = a4433e68),
+13c7a972, 3e68c50e: no other change. e0bacc7e touches no crate (tools only): not swept. Full smokes run alongside a sweep slow
+down by up to 50 % (the hang document 8 → 12 s, the knurl 6 → 8 s); back to back the greens are equal. Fuzz: 5121–5240 clean, one
+new P2 BOOL-DECLINE ("a face's curves over more than a turn"); running v3cf9.sh (v0.4.32, 5241–5300), v3nf10.sh (9cb2159f
+fallback off, 5301–5360).
+
 **11-06 05:32:** the 05:00 list is in TICKETS (no new blocker; last checked on green 46f6caff). No 05:00 Release run yet. The
 **next release is the first CI builds with GCC 15 at baseline x86-64** (core 2532af01). On it, check: the Linux binary on a stock 24.04
 (release.yml checks GLIBCXX ≤ 3.4.33 too), the hang document's open time against a green's (both baseline now: P1 MESH-AVX2), the
