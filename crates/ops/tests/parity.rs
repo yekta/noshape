@@ -407,15 +407,17 @@ fn exchange_round_trip() {
             // Ours read back: the same parts as the model's (an STL's mesh by volume and area).
             let back = import(&scratch(&format!("{name}-back-{ext}.noshape")), &file);
             // (An STL is one mesh of all the parts, its facets within the export's chordal tolerance: its volume
-            // within 1 % of theirs.)
+            // within 1 % of theirs; of live's import of it once given, where a part inside another is that one's
+            // hollow, cf-sheet-metal-model-plus.)
             let total = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
             // (STEP, IGES: as Onshape's import, faces on one surface merged: a sheet metal model's coplanar walls one
             // face; by volume and area.)
             let diff = match back {
                 Ok(b) if format == "IGES" || format == "STEP" => differences(&mesh_counts(native.clone()), &mesh_counts(b)),
                 Ok(b) if format == "STL" => {
-                    let (a, n) = (total(&b), total(&native));
-                    if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, the parts' {:.3}", a * 1e9, n * 1e9)] }
+                    let read_by_live = (!theirs[format].is_null()).then(|| parts_from_live_import(&theirs[format], true));
+                    let (a, n) = (total(&b), read_by_live.as_deref().map_or_else(|| total(&native), total));
+                    if (a - n).abs() <= 1e-2 * n.abs() { Vec::new() } else { vec![format!("mesh volume {:.3} mm³, expected {:.3}", a * 1e9, n * 1e9)] }
                 }
                 Ok(b) => differences(&native, &b),
                 Err(e) => vec![e],

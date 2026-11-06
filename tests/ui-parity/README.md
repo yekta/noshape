@@ -268,28 +268,30 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 covered 12/58 tools, 2/119 menu items, 0/14 shortcuts, 0/10 formats; batch 3 (20 scenarios, the most-used gaps:
 centermarks and centerlines, hole callout, datum, GD&T, surface finish, callout, auxiliary view, the Dimension
 dropdown's other kinds, ordinate dimension, revision table, table, export formats, a view's and a note's context
-menus, the tools' keys) gives:
+menus, the tools' keys), batch 4 (8 sheet scenarios: the sheet_tab target, the sheet menu, Insert sheet, the sheet keys)
+and batch 5 (14: the remaining dimension, centerline, GD&T and table tools, a note's, a view's and a table's menu
+items) give (11-06 21:24; drw-revision-table dropped: live's free plan has no Revision table tool):
 
-36 drw-* scenarios
+57 drw-* scenarios
 
 | kind | covered |
 |---|---|
-| tool | 30/58 |
-| menu | 4/119 |
-| shortcut | 5/14 |
+| tool | 42/58 |
+| menu | 14/119 |
+| shortcut | 10/14 |
 | export | 4/10 |
 
 | area | covered |
 |---|---|
-| GD&T | 3/10 |
-| dimensions | 14/20 |
+| GD&T | 5/10 |
+| dimensions | 16/20 |
 | export | 4/10 |
 | insert views | 4/5 |
-| notes | 8/16 |
-| other | 3/94 |
+| notes | 12/16 |
+| other | 11/94 |
 | section / detail / broken-out | 3/17 |
-| sheets | 0/13 |
-| tables | 4/16 |
+| sheets | 10/13 |
+| tables | 5/16 |
 
 ## Comparison
 
