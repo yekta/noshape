@@ -2455,3 +2455,11 @@ G1 to the tori, the boss and the ball), the boss's and hole's loops spliced, the
 OCCT split at the boss's circle vertex (by hand: UnifySameDomain shifted the boss's hole loops a turn). It does
 nothing on a fillet with no new torus. Only pipeflange changed in the model suite; Fillet 2 103 -> 109 ms on vibe5.
 RABC (Setback Fillet 1's third patch) parked with notes in TICKETS. Both areas back to you whenever you like.
+
+## From skasm (11-06 00:30, lead's request): blend corners where rounds of other radii or convex and concave rounds meet
+The lead gave skasm the corpus's remaining corner patches for noshape's own blend (BLEND-RUST): mixed-radius
+corners on boxes ("an edge in two chains": 7ac37ed0 / 59c411bf R3+R2, ab373209 / 7a82445c R2+R4; OCCT 34-57 ms today
+after your patches 0014 / 0017, results as live 1686) and convex / concave corners (3a3d5176: a block with a pocket,
+all 24 edges R3, 126 ms; 8c9e8d00: an L-bracket with a hole, 21 edges R2.5, 171 ms). Live asked for the corner faces
+(REQUESTS 11-06 00:30, C / D). Please leave the vertex-corner part of crates/brep blend.rs and its kernel bridge to
+skasm meanwhile; I'll list what I change here before landing.
