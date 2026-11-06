@@ -682,6 +682,22 @@ fn a_deadline_stops_a_long_operation() {
     assert!(!late && r.is_ok());
 }
 
+/// bool / lead P0 (11-06): an offset face (tests/data/budget, from draft-pool-hang.noshape's Shell 20) evaluated at a
+/// singular point far outside its parameters, where Shell's Boolean asked for it (PointNearEdge). OCCT's retry,
+/// stepping towards the surface's centre, moved by less than the numbers' spacing at 1.4e9 and never ended: only
+/// Linux's CPU timer stopped it, and the document never opened on macOS. Patch 0023: the evaluation fails at once.
+#[test]
+fn an_offset_face_far_outside_its_parameters_fails_at_once() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/budget/offset-face-far-singular-point.brep");
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let face = read_brep(&path).unwrap();
+        let _ = tx.send(face.point_at_uv(-1433470578.9116597, 90_437_419.388_804_3).is_err());
+    });
+    let failed = rx.recv_timeout(std::time::Duration::from_secs(20)).expect("the evaluation never ended");
+    assert!(failed, "a point at a singular parameter far outside the face");
+}
+
 /// A face's template as a displacement map makes it: the face's points at its normalized parameters (an n × n grid,
 /// std evFaceTangentPlanes) moved `d` along its normals, as a degree-3 B-spline's poles.
 fn moved_face(face: &Shape, n: usize, d: f64) -> Shape {

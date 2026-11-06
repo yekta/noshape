@@ -591,8 +591,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   -DNOSHAPE_PORTABLE_BUDGET (endless). **OCCT patch 0023**: a shift that doesn't move the point fails at once; the
   document opens in 4 s on both paths (Shell 20 fails in 8 s, as before). Gate: release.yml "Budgeted documents"
   (time_cli.py --limit 180 on tests/budget/*.noshape, every platform, every release). T1
-  `kernel_core::an_offset_face_far_outside_its_parameters_fails_at_once` lands after the /opt/occt sync. Still: any
-  other OCCT loop that checks no deadline hangs off Linux only; the gate is how one shows.
+  `kernel_core::an_offset_face_far_outside_its_parameters_fails_at_once` (landed after the 11-06 /opt/occt sync).
+  Still: any other OCCT loop that checks no deadline hangs off Linux only; the gate is how one shows.
+- [ ] P2 SEAM-SPLIT-FACE-GROUP (core, lead 11-06: take it if more documents show it) **a cylinder wall between a
+  thread's turns is one face in live, one per turn here**: c2-helical-sweep's Sweep 1 (a V profile cut along an 8-turn
+  helix round a Ø50.8 cylinder) gives 14/25/21 faces / edges / vertices, live 6/10/6: OCCT cuts the wall at the
+  cylinder's seam on every turn (9 strips, joined across 8 seam-line pieces). One OCCT face over the turns (each
+  edge's curve moved by whole turns so the loop runs on in u; the top ring above the groove's end keeps a seam) fails
+  BRepCheck: UnorientableShape on the face, NotClosed on its wire (OCCT reads a periodic face's u modulo the period
+  round its seam); attempt in /root/core-scratch/strip-merge-attempt.diff. The way to live's count is the shown
+  topology, as 2e0ec154 did for seam-split edges: faces on one surface parted only by seam pieces shown, picked,
+  named, measured and counted as one, the pieces between them hidden. (Its speed, 7.0 -> 0.16 s, landed 689c77ad.)
   qa 11-06 12:24: on Linux (vibe3, load 7–9) the document opens in 47–48 s on v0.4.32 and 20–21 s on green e7f452f5 (2 / 2 each),
   so patch 0023 is in the green. macOS / Windows, where it hung, can't be run here: qa reads the next release's "Budgeted
   documents" table on all three platforms and verifies from it. Until then v0.4.32 hangs on this document on macOS / Windows.
