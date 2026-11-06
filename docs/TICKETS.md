@@ -996,6 +996,23 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   flange's 0.02 mm clearance pieces at its ends); those in line with the bend now go with its pull-back: Flange 1 as
   live (182/428/248), c2-sm-corner-break 6/11 (run 131: nothing else changed); next there Corner break 1's vertex
   (the UI fetch's, REQUESTS). No T1/T2 repro yet: a plate, or a converted tray with every edge a rip, doesn't overlap. Sheet metal model 1 before it as live since run 127 (edge-joint rips, material inward).
+- [ ] P1 FS-COMPILED-INTERP (dx 11-06 01:21, lead 11-06's decision: FeatureScript speed reaches every custom feature and std's
+  sheet metal). Stage 1: the IR tree compiled to closures (or bytecode), values unchanged; the tree walker kept as the
+  reference and a T2 differential test running both over the FS corpus (std tests, custom_features, the parity models'
+  custom features) with identical results required. Stage 2: values without per-operation refcounting. Each stage
+  lands only with before / after numbers (T2 featurescript interpreter_step_costs, displacement_map_loops_timing,
+  custom_features displacement_map_profile_probe, the corpus' regeneration) and identical corpus results. Today (dev,
+  vibe5): a bare loop pass 75 ns, a call 138, length * number 175, the Displacement map's loops at 1024² 2.7 s,
+  the feature 4.4 s (lead's target: the script's own part under 1 s).
+- [ ] P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
+  measure app-wide with and without (the corpus' regeneration, the interpreter benchmarks, cold start, peak memory on
+  the big documents). First pass with the system libmimalloc 3.2 preloaded (also OCCT's heap): corpus regen 30.1 ->
+  33.2 s (cf-spur-gear +59 %, cf-fix-pcb +61 %), peak RSS 2.6 -> 1.5 GB. 01:43: the crate (mimalloc 0.1, Rust's heap
+  only) against the same build without it: corpus regen +2.1 % (vibe5 at load 7, noisy: model-plus +13 %,
+  shaped-flange +21 %, wave-spring +27 %, planetary-gears +34 %), peak RSS 2.5-2.7 -> 2.45 GB; FS benches on vibe4
+  pinned to 4 cores: the Displacement map's loops 4.15 -> 3.6 s, but a call 345 -> 365 ns, length * number 340 ->
+  400 ns; cold start (window shown, :104) 524-701 vs 523-600 ms, the app's peak RSS on model-plus 815 vs 820 MB. Not
+  adopted (small FS steps and FS-heavy documents regress); to measure again after FS-COMPILED-INTERP's stage 2.
 - [ ] P1 SM-BOOLEAN-SPEED (dx 11-05 09:35, speed; 15:58: run 125 model-plus 870 ms, live 917 (Up to Part 197 ms / live 160, Flange 1 221 / 224, Extrude 4 489 / 339): face point queries by the classifier, a cap's foot, cached split-piece tests; left in Extrude 4: its Booleans ~146 ms, evCollisionDetection's distances ~26, inner points computed twice in keep_names / part_sources ~10; 10:23: model-plus 2.5 -> 1.12 s, live 0.92: landed 2134f521 tracking
   on-face tests by the face classifier and cached inner points, then tracking's split-piece search by box and plane
   with cached boxes, then the curved outline from the tool's cap on the face (opCreateOutline 158 -> 60 ms). Left
