@@ -2283,7 +2283,7 @@ impl PartStudioView {
         // Also for every open feature: bodies the feature creates are drawn
         // as Onshape's see-through preview (display_for_scene).
         if self.edit.is_none() {
-            self.ui.preview_before = None;
+            super::drop_off_thread(self.ui.preview_before.take(), cx);
             return;
         }
         let Some((studio, _)) = self.effective_studio(cx) else { return };
@@ -2309,8 +2309,7 @@ impl PartStudioView {
             let Some((display, context)) = display else { return };
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
                 this.ui.preview_task = None;
-                this.ui.before_context = Some(context);
-                this.ui.preview_before = Some(Arc::new(display));
+                super::drop_off_thread((this.ui.before_context.replace(context), this.ui.preview_before.replace(Arc::new(display))), cx);
                 // Changes made before the model was ready get std's editing logic now.
                 if let Some(dialog) = this.edit.as_ref().map(|e| e.dialog.clone())
                     && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)
@@ -2341,7 +2340,7 @@ impl PartStudioView {
             matches!(f.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft") && matches!(f.params.enum_("operationType"), "ADD" | "REMOVE" | "INTERSECT")
         });
         if !tool_op {
-            self.ui.preview_tool = None;
+            super::drop_off_thread(self.ui.preview_tool.take(), cx);
             self.ui.preview_tool_task = None;
             self.show_tool_miss(false, cx);
             return;
@@ -2373,7 +2372,7 @@ impl PartStudioView {
                 .await;
             let Some(display) = display else { return };
             let _ = this.update_in(cx, |this: &mut Self, window, cx| {
-                this.ui.preview_tool = Some((Arc::new(display), fid));
+                super::drop_off_thread(this.ui.preview_tool.replace((Arc::new(display), fid)), cx);
                 this.ui.preview_tool_adds = adds;
                 // "Selected tools and targets do not intersect." is a Remove /
                 // Intersect note; a failing Add only shows its tool red (BOOL4b).

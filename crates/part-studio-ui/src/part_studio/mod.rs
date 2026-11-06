@@ -1022,7 +1022,7 @@ impl PartStudioView {
         // The cached workspace kept painting the old parts list and strip
         // ("Parts (0)") although this view was notified.
         let parts_changed = self.display.bodies.len() != display.bodies.len() || self.display.bodies.iter().zip(&display.bodies).any(|(a, b)| a.id != b.id || a.name != b.name);
-        self.display = display;
+        drop_off_thread(std::mem::replace(&mut self.display, display), cx);
         if parts_changed {
             window.refresh();
         }
@@ -1054,8 +1054,7 @@ impl PartStudioView {
     /// a dialog's open and close there, cf-straight-spline).
     fn set_built(&mut self, built: BuiltScene, base: Option<BuiltScene>, cx: &mut Context<Self>) {
         self.built_seq += 1;
-        let old = (self.built.replace(built), std::mem::replace(&mut self.built_base, base));
-        cx.background_spawn(async move { drop(old) }).detach();
+        drop_off_thread((self.built.replace(built), std::mem::replace(&mut self.built_base, base)), cx);
     }
 
     /// What [`Self::apply_display`] does once the scene is built (`None`: a newer build replaced it meanwhile).
@@ -1081,12 +1080,14 @@ impl PartStudioView {
         let pivot: Arc<dyn Fn(glam::DVec3, glam::DVec3) -> Option<glam::DVec3> + Send + Sync> = Arc::new(move |o, d| {
             noshape_model::interaction::entities_along_ray(&disp, o, d, 0.0, &|_| false, 1).first().map(|h| o + d.normalize() * h.depth)
         });
-        self.viewport.update(cx, |vp, _| {
+        let old_pivot = self.viewport.update(cx, |vp, _| {
             if let Some(prio) = prio {
                 vp.pick_priority = prio;
             }
-            vp.orbit_pivot_fn = Some(pivot);
+            vp.orbit_pivot_fn.replace(pivot)
         });
+        // (It holds the replaced display: often its last reference.)
+        drop_off_thread(old_pivot, cx);
         // The notices panel lists the open dialog's feature too (a new one isn't in the document yet).
         noshape_model::custom::run::set_draft(self.tab, self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()));
         // Update dialog status from the edited feature's state.
@@ -2554,8 +2555,7 @@ impl PartStudioView {
         self.ui.preview_opacity = crate::feature_dialog::PREVIEW_REST;
         // Paused regeneration previews nothing (live 10-27).
         self.ui.preview_tone = self.ui.regen_paused.is_none() && matches!(dialog.read(cx).feature.type_id.as_str(), "extrude" | "revolve" | "sweep" | "loft");
-        self.ui.preview_before = None;
-        self.ui.before_context = None;
+        drop_off_thread((self.ui.preview_before.take(), self.ui.before_context.take()), cx);
         // A new feature's first change runs std's editing logic with an
         // empty old definition; an edited one starts from its values.
         self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
@@ -2669,7 +2669,7 @@ impl PartStudioView {
             self.ui.preview_cancel.abort();
             self.ui.preview_tool_task = None;
             self.ui.preview_tool_cancel.abort();
-            self.ui.preview_tool = None;
+            drop_off_thread(self.ui.preview_tool.take(), cx);
             self.sync_manipulator(cx);
             window.focus(&self.focus, cx);
             if !self.restore_last_done(window, cx) {
@@ -7179,3 +7179,8 @@ fn later_reference(ps: &noshape_model::partstudio::PartStudio, at: usize) -> imp
     }
 }
 
+/// Frees `x` off the UI thread: a replaced model display drops its names there for 1-5 ms (cf-straight-spline, ~8 % of
+/// the UI thread while dialogs open and close).
+pub(super) fn drop_off_thread<T: Send + 'static>(x: T, cx: &App) {
+    cx.background_spawn(async move { drop(x) }).detach();
+}
