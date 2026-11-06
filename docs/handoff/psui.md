@@ -271,7 +271,118 @@ document's display mesh is under 0.5 s.
 | hover, pick (pointer / click to the frame showing it) | within a frame | 11-04: viewport benches `NOSHAPE_PERF_BENCH=hover` (new) / `pick`; their summary splits the UI thread's part (to the frame's submission) from the GPU's. cf-straight-spline (3662 faces, 230k triangles, model suite, local Xvfb): hover's pick 1.5 ms p50, scene refresh 1.4 ms; the GPU part is lavapipe's here (~1.1 s), only perf.yml's runners say |
 | dialog open, list row click (action to the end of the paint of its first frame, UI thread) | within a frame | **Met. 11-06 on an idle host (vibe5, load 1-8, xvfb-run, release main 3be27d0f): cf-straight-spline dialog open UI-thread CPU (action + its frame) p50 4.9-5.0 ms, p95 5.2-6.1 (action 0.8, frame ~5: prepaint 2-5.5); the first open of each feature type is no outlier (sample 0: frame 4.9 ms); live-30-features p50 4.0-4.5, p95 5.4-5.7, row click p95 1.9. The ~35 ms until the frame starts there is llvmpipe drawing and presenting GPUI's window (frames ~30 fps); a real GPU starts it within a refresh. Gated now: perf.yml's macOS jobs run ui-latency on live-30-features (bench.sh LATENCY_DOC), `--gate-latency-cpu-p95 16.7` and the same-job comparison with the previous release. The numbers below (13-22 ms) were the loaded local machine (load 10-29).** 11-06 (main 5b14f339, cf-straight-spline, :102 release, interleaved A/B, load 10-29): dialog open UI-thread CPU (action + its frame) p50 12.6-13.2 ms (was 14.1-14.6 before 5b14f339; 26-27 on 11-04), p95 15-22 (the first open of a feature type and the machine's load); its frame's layout+prepaint+paint p50 ~10 ms (prepaint 4.3-9 ms, was ~13); row click CPU p50 6.4 ms. Met at p50; p95 over by up to ~5 ms. Per sample: `BENCH SAMPLE` lines. Left on the UI thread around an open: the preview's `ps.apply_display_end` 3.5-12 ms before its first frame (refresh_scene: `with_highlights` and the consumed picks' edges, the pick priority built twice), GPUI's layout/prepaint/paint of the window. Waiting for the frame (~30 ms here) is this machine's (lavapipe draws on the same CPUs). 5b14f339: a replaced display is freed off the UI thread (it was 8 % of the UI thread while dialogs opened and closed).** Earlier 11-04 21:00 (ef6fbdfb): CPU p50 26-27 ms (was 43-46). |
 | pins-assembly-1000 on perf.yml's macOS runners (real GPU) | 120 fps / a frame | 11-04 run 41840797973 (main 60f4813f, fixture pins-assembly-1000, variant `hov@hover:`): GPU 8.7 ms a frame mean, 13 ms p95 (over 8.3 ms: the renderer's next item); presented 33 fps (the runners cap a 1x window near 30); hover p50 23-32 ms (UI 10-15 ms), pick p50 106-113 ms (UI 11-15 ms; the rest the runner's pacing) |
-| open a document | ≤ 0.5 s | **11-06 20:44 (vibe5 idle, release, Xvfb + llvmpipe, median of 3; table below): 73/95 show their model within 0.5 s of opening (parity corpus 87 + tests/perf 8; pins-assembly-1000 is an assembly, not measured by the Part Studio script). Every slow one is regeneration (OCCT Shell / Fillet, Booleans of many tools, FeatureScript custom features), not scene build or upload. Floor ~170-200 ms (window + GPU init to the first frame ~120-165 ms).** Earlier: v0.4.11 warm: opening → first viewport frame 130–200 ms (an empty viewport, before the model) ✓; first launch 800 ms |
+| open a document | ≤ 0.5 s | **11-06 23:19, with the display cache (vibe5, release, Xvfb + llvmpipe, median of 3; table "Document open with the display cache" below): a reopen shows the model within 0.5 s for 94/94 Part Studio documents (slowest 377 ms, c2-housing-draft; c2-rings-loft 5178 → 218 ms, cf-surface-pattern 10083 → 261 ms); a first open (no cache) 72/95, unchanged: regeneration-bound (OPEN-SLOW-SURFACE-PATTERN, OPEN-SLOW-SHELL-FILLET).** 11-06 20:44 (vibe5 idle, release, Xvfb + llvmpipe, median of 3; table below): 73/95 show their model within 0.5 s of opening (parity corpus 87 + tests/perf 8; pins-assembly-1000 is an assembly, not measured by the Part Studio script). Every slow one is regeneration (OCCT Shell / Fillet, Booleans of many tools, FeatureScript custom features), not scene build or upload. Floor ~170-200 ms (window + GPU init to the first frame ~120-165 ms).** Earlier: v0.4.11 warm: opening → first viewport frame 130–200 ms (an empty viewport, before the model) ✓; first launch 800 ms |
+
+### Document open with the display cache (11-06 23:19)
+
+Before / after (lead 11-06): `tools/perf/open-times.py --runs 3 --reopen 3` (release 5bb968de, vibe5 idle): each
+document opened 3 times on an empty display cache ("open → model": before the cache, what a first open still is), then
+3 times on the cache the last open wrote ("reopen → model": the first frame drawing a model, the cached one's or a
+regeneration's that came first). "regen starts": opening to the background regeneration's start. The regenerated
+display replaces the cached one once its scene is built off the UI thread (`apply_display_async`: the old scene stays
+drawn until then). GPUI test `a_cached_display_stands_in_until_the_identical_real_one_lands`: the cached display's
+meshes equal the regenerated one's, the view is view-only with "Regenerating…" until it lands, a feature dialog asked
+for meanwhile says WAITING at once and opens when it lands. Live's page load: REQUESTS 20:20, not recorded yet.
+
+| document | open → model (ms) | reopen → model | open → full | regen starts | regen (preview) | regen (full) | display → frame | live regen |
+|---|---|---|---|---|---|---|---|---|
+| pins-assembly-1000 (timeout) | – | – (no cache) | – | – | – | – | – | – |
+| cf-surface-pattern | 10083 | 261 | 10400 | 115 | 9880 | 52 | 92 | 4178 |
+| c2-impeller-loft | 9810 | 322 | 9999 | 117 | 9620 | 205 | 82 | 2773 |
+| c2-rings-loft | 5178 | 218 | 5200 | 103 | 5010 | 6 | 50 | 1557 |
+| release-fillet-hang | 5066 | 183 | 7145 | 96 | 4931 | 2096 | 39 | – |
+| c2-sm-louver | 3556 | 227 | 3829 | 99 | 3384 | 61 | 76 | 4987 |
+| cf-fill-pattern | 3198 | 219 | 3659 | 141 | 2728 | 292 | 327 | 4711 |
+| knurl-d25x25-45-45 | 1993 | 369 | 2058 | 168 | 1746 | 74 | 78 | – |
+| c2-sm-corner-break | 1760 | 223 | 1874 | 109 | 1590 | 15 | 62 | 1972 |
+| cf-drive-train-generator | 1759 | 313 | 2155 | 146 | 1480 | 40 | 126 | 4156 |
+| cf-setback-fillet | 1285 | 217 | 1422 | 118 | 1112 | 30 | 49 | 1089 |
+| c2-valve-config | 1261 | 370 | 1298 | 157 | 1018 | 54 | 90 | 175 |
+| cf-spur-gear | 1244 | 297 | 2174 | 122 | 995 | 136 | 127 | 2112 |
+| fins-400 | 1187 | 257 | 1187 | 93 | 1034 | 1034 | 60 | – |
+| cf-sheet-metal-shaped-flange | 1076 | 263 | 1079 | 166 | 837 | 3 | 69 | 1026 |
+| cf-sheet-metal-model-plus | 1056 | 227 | 1111 | 127 | 877 | 70 | 55 | 917 |
+| learning-center-michael | 811 | 214 | 905 | 95 | 661 | 67 | 58 | 96 |
+| cf-part-draft | 756 | 214 | 814 | 107 | 589 | 11 | 60 | 1241 |
+| cf-fix-pcb | 642 | 265 | 662 | 163 | 434 | 2 | 45 | 618 |
+| c2-housing-draft | 590 | 377 | 634 | 151 | 368 | 9 | 69 | 105 |
+| c2-hunting-knife | 561 | 328 | 621 | 163 | 318 | 13 | 77 | 408 |
+| nist-mtc-crada-assembly | 535 | 208 | 1233 | 126 | 161 | 160 | 247 | – |
+| cf-planetary-gears | 517 | 244 | 565 | 129 | 333 | 6 | 53 | 542 |
+| cf-sheet-metal-overcut-dogbone | 476 | 290 | 497 | 196 | 244 | 1 | 38 | 270 |
+| cf-wave-spring | 457 | 201 | 508 | 103 | 299 | 35 | 52 | 740 |
+| cf-hose-routing | 454 | 246 | 638 | 131 | 241 | 42 | 73 | 491 |
+| cf-belt | 438 | 356 | 490 | 195 | 150 | 3 | 72 | 35 |
+| c2-extension-spring | 434 | 342 | 473 | 162 | 197 | 2 | 69 | 183 |
+| cf-circular-pattern | 412 | 222 | 460 | 107 | 257 | 2 | 49 | 237 |
+| cf-sheet-metal-hem | 399 | 254 | 421 | 160 | 196 | 1 | 41 | 95 |
+| c2-hex-bookcase-derived | 396 | 322 | 417 | 97 | 254 | 12 | 43 | 290 |
+| c2-bottle-split | 384 | 361 | 580 | 151 | 144 | 5 | 87 | 40 |
+| cf-3d-spline | 364 | 328 | 364 | 170 | 149 | 149 | 44 | 43 |
+| c2-helical-sweep | 338 | 209 | 363 | 95 | 199 | 7 | 50 | 40 |
+| cf-sheet-metal-flange-plus | 338 | 224 | 357 | 133 | 160 | 0 | 40 | 208 |
+| bushing2-0-joshua | 332 | 328 | 384 | 157 | 88 | 16 | 78 | 46 |
+| cf-transform-pattern | 330 | 234 | 347 | 134 | 133 | 2 | 65 | 206 |
+| pipeflange-steven | 329 | 200 | 366 | 96 | 176 | 29 | 54 | 212 |
+| cf-linear-pattern-with-seed-location | 322 | 208 | 363 | 107 | 168 | 2 | 46 | 132 |
+| cf-o-ring-generator | 307 | 231 | 805 | 108 | 119 | 288 | 80 | 65 |
+| cf-point-pattern | 295 | 238 | 322 | 140 | 103 | 1 | 52 | 53 |
+| c2-variable-fillet-faceblend | 294 | 310 | 294 | 156 | 26 | 1 | 113 | 58 |
+| bracket120-datenkrake | 293 | 310 | 293 | 154 | 16 | 1 | 123 | 40 |
+| c2-sm-exhaust-clamp | 285 | 188 | 303 | 96 | 142 | 1 | 46 | 71 |
+| c2-duct-multipart | 278 | 307 | 278 | 157 | 29 | 29 | 89 | 107 |
+| big-plate | 278 | 248 | 465 | 93 | 70 | 49 | 104 | – |
+| c2-fan-blade-sweep | 275 | 213 | 302 | 103 | 116 | 7 | 53 | 1418 |
+| cf-parameter-pattern | 272 | 216 | 272 | 128 | 111 | 111 | 31 | 75 |
+| cf-butt-joint-with-pin | 271 | 217 | 271 | 155 | 89 | 89 | 28 | 191 |
+| cf-pocket-holes | 271 | 206 | 294 | 106 | 122 | 8 | 42 | 55 |
+| cf-parametric-curve | 270 | 231 | 270 | 148 | 95 | 95 | 25 | 315 |
+| clamp-hms | 270 | 196 | 296 | 99 | 116 | 2 | 50 | 146 |
+| motor-mount-jack | 268 | 192 | 322 | 93 | 123 | 25 | 52 | 53 |
+| cf-extrude-vertex | 266 | 214 | 266 | 129 | 98 | 98 | 33 | 27 |
+| parts-1000 | 262 | 361 | 696 | 92 | 44 | 13 | 120 | – |
+| cf-box-dovetail-joint | 255 | 232 | 281 | 112 | 94 | 1 | 52 | 360 |
+| cf-syncro-rotator | 249 | 204 | 268 | 108 | 99 | 1 | 42 | 38 |
+| cf-metric-keys | 245 | 201 | 245 | 106 | 95 | 0 | 42 | 25 |
+| cf-lighten | 244 | 219 | 244 | 126 | 72 | 0 | 44 | 114 |
+| cf-multi-plane | 241 | 197 | 241 | 105 | 93 | 0 | 42 | 102 |
+| cf-mortise-and-tenon | 240 | 196 | 254 | 105 | 94 | 0 | 40 | 43 |
+| bracket03-mattie | 230 | 201 | 246 | 96 | 92 | 4 | 43 | 67 |
+| stef-radijator-nlukic | 230 | 193 | 257 | 92 | 90 | 10 | 47 | 74 |
+| cf-snap-hook | 225 | 187 | 225 | 107 | 89 | 89 | 28 | 274 |
+| exercise-jan | 216 | 190 | 241 | 93 | 70 | 1 | 48 | 98 |
+| knob-jason | 216 | 196 | 299 | 95 | 67 | 5 | 53 | 125 |
+| prize-wheel-tim | 216 | 192 | 245 | 95 | 76 | 3 | 42 | 61 |
+| clamp-guillem | 209 | 193 | 233 | 95 | 71 | 3 | 43 | 189 |
+| exercise-martinl | 209 | 187 | 231 | 93 | 75 | 1 | 42 | 76 |
+| c2-tpd-fillet-variable | 199 | 309 | 360 | 95 | 50 | 172 | 47 | 44 |
+| live-30-features | 199 | 190 | 246 | 96 | 48 | 2 | 52 | – |
+| cf-t-slot-joint | 198 | 218 | 198 | 129 | 12 | 12 | 57 | 222 |
+| clamp-abhil | 193 | 188 | 195 | 96 | 32 | 2 | 53 | 89 |
+| c2-lofted-basic | 192 | 201 | 192 | 103 | 5 | 0 | 85 | 22 |
+| exercise-chino | 188 | 186 | 208 | 93 | 45 | 2 | 47 | 88 |
+| cf-wiring | 187 | 184 | 187 | 121 | 0 | 0 | 65 | 11 |
+| bearing-block-takumi | 184 | 193 | 184 | 94 | 10 | 1 | 79 | 27 |
+| knob-tim | 184 | 183 | 184 | 92 | 11 | 1 | 80 | 41 |
+| cf-torus-dome-and-sphere | 181 | 195 | 181 | 105 | 3 | 0 | 73 | 60 |
+| flange-walter | 181 | 186 | 181 | 94 | 6 | 3 | 82 | 16 |
+| knob-kraut | 180 | 186 | 209 | 93 | 18 | 10 | 70 | 55 |
+| learning-center-frank | 179 | 189 | 179 | 92 | 6 | 1 | 80 | 20 |
+| learning-center-ivan | 179 | 180 | 203 | 95 | 19 | 9 | 59 | 25 |
+| c2-steak-mold-draft | 178 | 187 | 178 | 96 | 10 | 1 | 71 | 30 |
+| flange-josh | 178 | 184 | 178 | 92 | 11 | 1 | 73 | 20 |
+| exercise-anthony | 175 | 190 | 175 | 92 | 6 | 1 | 77 | 17 |
+| learning-center-devon | 175 | 186 | 175 | 92 | 6 | 1 | 77 | 28 |
+| cf-curved-text | 174 | 179 | 174 | 108 | 3 | 3 | 64 | 506 |
+| pulley02-maxwell | 173 | 184 | 200 | 92 | 19 | 12 | 62 | 34 |
+| exercise-evana | 172 | 179 | 172 | 92 | 7 | 1 | 73 | 34 |
+| mounting-plate-giana | 170 | 185 | 170 | 95 | 9 | 1 | 67 | 51 |
+| pillow-block-maysa | 170 | 181 | 170 | 91 | 5 | 1 | 74 | 13 |
+| train-joe | 170 | 182 | 170 | 93 | 14 | 1 | 62 | 100 |
+| untitled-document-chris | 170 | 183 | 170 | 92 | 10 | 1 | 68 | 39 |
+| exercise-jonathan | 168 | 180 | 168 | 93 | 4 | 0 | 71 | 17 |
+
+72/95 documents show their model within 0.5 s of opening, 94/95 of reopening
 
 ### Document open, per document (11-06 20:44)
 
@@ -738,7 +849,8 @@ N000000000000000. (11-06 21:49) **Display cache (lead 11-06: open like Onshape, 
     regeneration; shown with `show_cached_display` unless the real one came first; `cached_view` until the first real
     display: "Regenerating…" with the spinner at the top of the feature list, `start_feature` / `edit_feature` deferred
     with the message WAITING and run when it lands; the first full display after opening saved at once, later ones 2 s
-    after the last full regeneration with no dialog). Enabled by the app only (`cached_open::enable`, never under the
+    after the last full regeneration with no dialog; the coarse (preview) display kept beside it as `<key>-coarse` and
+    shown first, the refined one over it when read: a refined cf-fill-pattern took 2.5 s to read and draw). Enabled by the app only (`cached_open::enable`, never under the
     ui-parity driver or in tests; NOSHAPE_CACHE_DIR moves it). GPUI test
     `a_cached_display_stands_in_until_the_identical_real_one_lands`. The opened studio's displays build their scenes off
     the UI thread until its first full one (`first_full_shown`). bench.sh OPEN_DOCS on the macOS perf jobs.
