@@ -1,6 +1,6 @@
 {
  "scenario": "drw-hole-table",
- "recorded": "2026-11-05T23:05:01.799Z",
+ "recorded": "2026-11-06T09:53:56.672Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -9,7 +9,7 @@
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "47a39dce2574580aaa19592a",
+  "element": "0b0454b743c1b20ff4fa3293",
   "start": "hole-plate-drawing",
   "startElement": "164441c15ca44d6dfc6c413e"
  },
@@ -180,7 +180,7 @@
      "selection": []
     }
    },
-   "t": 224150
+   "t": 244302
   },
   {
    "step": 2,
@@ -291,7 +291,7 @@
      "selection": []
     }
    },
-   "t": 239923
+   "t": 261219
   },
   {
    "step": 3,
@@ -408,15 +408,10 @@
       }
      ],
      "annotations": [],
-     "selection": [
-      {
-       "kind": "VIEW",
-       "owner": "Top"
-      }
-     ]
+     "selection": []
     }
    },
-   "t": 254236
+   "t": 278070
   },
   {
    "step": 4,
@@ -496,7 +491,7 @@
      "selection": []
     }
    },
-   "t": 269957
+   "t": 294602
   },
   {
    "step": 5,
@@ -579,7 +574,7 @@
      "selection": []
     }
    },
-   "t": 285337
+   "t": 310178
   },
   {
    "step": 6,
@@ -653,7 +648,7 @@
      "selection": []
     }
    },
-   "t": 301740
+   "t": 327158
   }
  ]
 }
