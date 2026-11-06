@@ -22,7 +22,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
 - cf-surface-pattern 6 -> 9: live's box of a free-form part is its poles' / display mesh's (harness, landed); Split 1
   now targets the Thicken's cap (translator: live's part decides among faces with live's display-mesh area). Its next
   difference is the sketch's: Sketch 4's spline is periodic (live's `isPeriodic`), our fit spline has no closed form
-  (crates/sketch FitSpline): for the sketch's owner.
+  (crates/sketch FitSpline): for the sketch's owner (lead: skasm, P1).
+- c2-hunting-knife 9 -> 10: Delete face 1 as live's. Our Split 2 wedge is exact (31.892 mm², integrated); live's
+  32.868 is its display mesh's; the translator now takes the face nearest in measure within 5 % before the nearest in
+  space. Next: Bridging curve 1's vertices JLM / JPI have no live geometry (its fetch: 28 lines unfetched): the
+  refetch's.
 
 **State 11-06 14:26 UTC.**
 - P0 DRAFT-POOL-HANG-MACOS confirmed on runners (run 42222728542): without 0023 not open after 900 s on macos-15 and

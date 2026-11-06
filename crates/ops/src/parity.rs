@@ -2333,9 +2333,20 @@ impl<'a> Translator<'a> {
         }
         if r.measure.is_some() && found.len() >= 8 {
             a["limit"] = json!(64);
-            let more = self.call("query_entities", a).ok()?;
+            let more = self.call("query_entities", a.clone()).ok()?;
             if let Some(e) = best(more[kind].as_array().map(Vec::as_slice).unwrap_or(&[])) {
                 return Some(e);
+            }
+        }
+        // Live's areas are its display mesh's: a sliver's 3 % off (c2-hunting-knife's spine wedge, exactly 31.892 mm²
+        // here and by integration, live 32.868): within 5 %, the nearest in measure (live's part first), before the
+        // nearest in space (that wedge's point lies on the curve between it and its 197 mm² neighbour).
+        if let Some(m) = r.measure.filter(|m| *m > 0.0) {
+            let rel = |e: &&Value| e[key].as_f64().map_or(f64::INFINITY, |ours| (ours * scale - m).abs() / m);
+            let close: Vec<&Value> = found.iter().filter(|e| rel(e) <= 5e-2).collect();
+            let theirs: Vec<&Value> = close.iter().copied().filter(on_part).collect();
+            if let Some(e) = if theirs.is_empty() { close } else { theirs }.into_iter().min_by(|x, y| rel(x).total_cmp(&rel(y))) {
+                return id(e);
             }
         }
         found.first().and_then(id)
