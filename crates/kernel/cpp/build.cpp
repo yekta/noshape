@@ -1149,6 +1149,7 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
     B.Add(ne, v1.Oriented(TopAbs_FORWARD));
     B.Add(ne, v0.Oriented(TopAbs_REVERSED));
     B.Range(ne, rf, rl);
+    bool same_range = true;
     for (ShapeList::Iterator fi(ef.FindFromKey(e)); fi.More(); fi.Next())
     {
       const TopoDS_Face&              F = TopoDS::Face(fi.Value());
@@ -1158,11 +1159,29 @@ std::unique_ptr<OcShape> reverse_edge_curves(const OcShape& in, const OcShapeLis
         continue;
       TopLoc_Location                 sl;
       const occ::handle<Geom_Surface> su = BRep_Tool::Surface(F, sl);
-      B.UpdateEdge(ne, pc->Reversed(), su, sl, tol);
-      B.Range(ne, su, sl, pc->ReversedParameter(pl), pc->ReversedParameter(pf));
+      occ::handle<Geom2d_Curve>       rpc = pc->Reversed();
+      double                          a = pc->ReversedParameter(pl), b = pc->ReversedParameter(pf);
+      // A circle's line on a cylinder reverses as -u, the circle as 2pi - u: the line moved along itself by the
+      // difference keeps the ranges the same.
+      const double shift = a - rf;
+      if (std::abs(shift) > 1e-12 && std::abs((b - a) - (rl - rf)) < 1e-12 * std::max(1.0, rl - rf))
+        if (const occ::handle<Geom2d_Line> ln = occ::down_cast<Geom2d_Line>(rpc))
+        {
+          rpc = new Geom2d_Line(ln->Value(shift), ln->Direction());
+          a   = rf;
+          b   = rl;
+        }
+      same_range = same_range && std::abs(a - rf) <= 1e-12 * std::max(1.0, std::abs(rf)) && std::abs(b - rl) <= 1e-12 * std::max(1.0, std::abs(rl));
+      B.UpdateEdge(ne, rpc, su, sl, tol);
+      B.Range(ne, su, sl, a, b);
     }
-    B.SameRange(ne, BRep_Tool::SameRange(e));
-    B.SameParameter(ne, BRep_Tool::SameParameter(e));
+    B.SameRange(ne, same_range && BRep_Tool::SameRange(e));
+    B.SameParameter(ne, same_range && BRep_Tool::SameParameter(e));
+    if (!same_range)
+    {
+      BRepLib::SameRange(ne, Precision::PConfusion());
+      BRepLib::SameParameter(ne, tol);
+    }
     rs->Replace(e, ne.Reversed());
     any = true;
   }

@@ -224,6 +224,46 @@ fn mid_plane_of_two_intersecting_planes() {
     assert!(near3(f.origin, DVec3::new(0.0, 0.0, mm(20.0))) && near3(f.normal, DVec3::Z), "{f:?}");
 }
 
+/// A Mid plane of one edge is normal to the edge as it runs: an extrude's cap edge runs as its sketch line was drawn,
+/// whichever way the profile's loop goes, also where the extrude fuses its regions (live cf-surface-pattern's Plane 4
+/// on its Sketch 10, a clockwise loop and a circle across its top, all regions picked: -x, its bottom line drawn right to
+/// left).
+#[test]
+fn mid_plane_of_a_cap_edge_follows_the_sketch_line() {
+    for all in [false, true] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = [(-109.4, -105.6), (-100.5, -89.7), (-85.3, -89.7), (-76.4, -105.6)].map(|(x, y)| sk.add_point(DVec2::new(mm(x), mm(y))));
+        for (a, b) in [(0, 1), (1, 2), (2, 3), (3, 0)] {
+            sk.add_line_between(p[a], p[b]).unwrap();
+        }
+        sk.add_circle(DVec2::new(mm(-92.9), mm(-94.0)), mm(8.7));
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let r = s.regen();
+        let regions = &r.display.sketches.iter().find(|x| x.feature == sid).unwrap().regions;
+        assert_eq!(regions.len(), 3);
+        // Without the circle: the region under the line.
+        let picked: Vec<Reference> = regions.iter().filter(|g| all || g.key.len() > 4).map(|g| Reference::SketchRegion { sketch: sid, key: g.key.clone() }).collect();
+        assert_eq!(picked.len(), if all { 3 } else { 1 }, "{:?}", regions.iter().map(|g| g.key.len()).collect::<Vec<_>>());
+        s.add("extrude", move |p| {
+            p.set("entities", qs(picked));
+            p.set("depth", expr("5 mm"));
+        });
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let mid = DVec3::new(mm(-92.9), mm(-105.6), 0.0);
+        let i = b.shape.edges().iter().position(|e| e.endpoints().is_ok_and(|(p, q)| ((p + q) * 0.5 - mid).length() < 1e-6)).expect("edge");
+        let e = Reference::Edge((*b.edges[i]).clone());
+        let id = s.plane(move |p| {
+            p.set("cplaneType", en("MID_PLANE"));
+            p.set("entities", qs(vec![e]));
+        });
+        let r = s.ok();
+        let (f, ..) = Studio::frame(&r, id);
+        assert!(near3(f.normal, -DVec3::X), "all regions {all}: {f:?}");
+    }
+}
+
 #[test]
 fn tangent_plane_through_an_outside_point() {
     let mut s = Studio::new();

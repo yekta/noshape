@@ -16,6 +16,22 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-06 19:46 UTC (parity, the lead's order).**
+- cf-surface-pattern's Plane 4 (Mid plane of Extrude 5's start cap edge, live normal -x): the extrude already turns
+  cap edges to run as their sketch lines were drawn (`drawn_edge_directions`; edges are handed out FORWARD, so
+  `endpoints()` is the curve's way), but `reverse_edge_curves` returned the shape unchanged whenever its result failed
+  BRepCheck, and reversing a circle whose pcurve on the side cylinder is a line broke SameRange (the circle reverses as
+  2pi - u, the line as -u): every flip of such a profile was lost. The reversed line is now moved along itself by the
+  difference (BRepLib::SameRange otherwise). T1 cplane::mid_plane_of_a_cap_edge_follows_the_sketch_line.
+- Building profile edges along their entities instead (tried first) is wrong: pulley02's full-round fillet then leaves
+  zero-width faces (the comment on `drawn_edge_directions` says why). A checked blend's zero-width faces as a failed
+  blend (falls back to the 1e-7-smaller blend and drops slivers): /root/core-scratch/blend-vanished-face.diff, not
+  landed (no case left that needs it; it costs a face-properties pass per blend).
+- c2-valve-config's Extrude 3 (edge kinds): two 0.039 mm edges where a text cut's flat face (z 4.38 mm, normal -z)
+  meets the body's revolved face about z: live circles, ours B-splines. A plane normal to a revolution's axis cuts it in
+  circles: the Boolean's intersection curves (bool's).
+- cf-lighten's Extrude 1: written region queries (the translator's region resolution), not a feature's.
+
 **State 11-06 17:20 UTC (parity, the lead's order).**
 - c2-impeller-loft: the loft's rims keep the sections' curves (landed); its -1.1 % is Parasolid's vertex matching
   (P2 LOFT-VERTEX-MATCH, numbers there).
