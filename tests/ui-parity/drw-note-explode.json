@@ -1,0 +1,54 @@
+{
+  "name": "drw-note-explode",
+  "about": "A note's Explode note from its menu",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing tools and menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "type",
+      "text": "TEMP"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          240,
+          190
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Explode note"
+      }
+    }
+  ]
+}

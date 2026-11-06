@@ -1,0 +1,41 @@
+{
+  "name": "drw-view-copy-paste",
+  "about": "Front copied from its menu and pasted at an empty point of the sheet",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing tools and menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Copy"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          230,
+          40
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Paste"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

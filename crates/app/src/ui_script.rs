@@ -398,8 +398,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                         }
                     }
                     // A tool not on the toolbar (inside a dropdown): Search
-                    // tools, its name and Enter, as live's runner does.
-                    Err(_) if what == "click" && target.get("menu").is_none() && target.get("tool").and_then(Value::as_str).is_some() => {
+                    // tools, its name and Enter, as live's runner does (a drawing has no tool search).
+                    Err(_) if what == "click" && drw.is_none() && target.get("menu").is_none() && target.get("tool").and_then(Value::as_str).is_some() => {
                         let name = target["tool"].as_str().unwrap_or("");
                         for key in std::iter::once("alt+c".to_string()).chain(name.chars().map(|c| if c == ' ' { "Space".into() } else { c.to_string() })).chain(std::iter::once("Enter".to_string())) {
                             if let Some(ks) = keystroke(&key) {

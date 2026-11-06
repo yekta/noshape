@@ -1,0 +1,51 @@
+{
+  "name": "drw-edge-condition",
+  "about": "Edge condition symbol on Front's top edge, placed above it",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing tools and menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Edge condition symbol"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            30,
+            0,
+            22
+          ]
+        }
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
