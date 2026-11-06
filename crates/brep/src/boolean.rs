@@ -758,20 +758,6 @@ impl Pool {
     }
 }
 
-/// NOSHAPE_BOOL_TOL_PROBE: report each pair test whose outcome the pair's own tolerances (floor 1e-7) would change
-/// (the per-entity tolerance plan's stage 1, docs/handoff/bool.md).
-fn tol_probe() -> bool {
-    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("NOSHAPE_BOOL_TOL_PROBE").is_some())
-}
-
-/// [`tol_probe`]'s report of one test: `what`, the distance, the reach it had and the pair's own.
-fn tol_flip(what: &str, d: f64, had: f64, own: f64) {
-    if tol_probe() && (d <= had) != (d <= own.max(1e-7)) {
-        eprintln!("TOLPROBE {what} d {d:.3e} had {had:.3e} own {:.3e}", own.max(1e-7));
-    }
-}
-
 /// The sphere bounding spheres `m` (OCCT's merged vertex, BRepLib::BoundingVertex): one of them where it holds the
 /// rest; else for two the least, for more about their points' centroid.
 fn bounding_sphere(m: &[(DVec3, f64)]) -> (DVec3, f64) {
@@ -1945,12 +1931,13 @@ impl Ctx<'_> {
     /// Whether edge `e` lies on face `f`'s surface.
     fn edge_on_surface(&mut self, e: usize, f: usize) -> R<bool> {
         let [a, b] = self.edges[e].v;
-        let tol = self.tol;
+        // (Within the edge's and the face's own tolerances, OCCT's rule.)
+        let on = self.pool.pair(self.edges[e].t, self.faces[f].t);
         match (&self.faces[f].s, self.edges[e].g) {
             (Surf::Plane { .. }, Geo::Line) => Ok(self.side(a, f)? == 0 && self.side(b, f)? == 0),
             (Surf::Plane { n, d, .. }, Geo::Arc { k, .. }) => {
                 let off = n.dot(k.c) - d;
-                Ok(k.n.cross(*n).length() <= 1e-9 && off.abs() <= tol)
+                Ok(k.n.cross(*n).length() <= 1e-9 && off.abs() <= on)
             }
             (Surf::Cyl { o, a: ax, r0, k, .. }, Geo::Line) => {
                 // Both ends and the middle on it: a line meets a cylinder or cone in two points at most.
@@ -1960,14 +1947,12 @@ impl Ctx<'_> {
                     ((w - *ax * h).length() - (r0 + k * h)).abs()
                 };
                 let (pa, pb) = (self.p(a), self.p(b));
-                let worst = off(pa).max(off(pb)).max(off((pa + pb) * 0.5));
-                tol_flip("line-cylinder", worst, tol, self.edges[e].t + self.faces[f].t);
-                Ok(off(pa) <= tol && off(pb) <= tol && off((pa + pb) * 0.5) <= tol)
+                Ok(off(pa) <= on && off(pb) <= on && off((pa + pb) * 0.5) <= on)
             }
             (Surf::Cyl { o, a: ax, r0, k: slope, .. }, Geo::Arc { k, .. }) => {
                 let w = k.c - *o;
                 let h = w.dot(*ax);
-                Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= tol && (k.r - (r0 + slope * h)).abs() <= tol)
+                Ok(k.n.cross(*ax).length() <= 1e-9 && (w - *ax * h).length() <= on && (k.r - (r0 + slope * h)).abs() <= on)
             }
             (_, Geo::Apex { .. }) => Ok(false),
             (Surf::Nurbs { .. }, _) | (_, Geo::Nurbs { .. } | Geo::Ell { .. }) => match self.on_surface.get(&(e, f)) {
@@ -1987,7 +1972,7 @@ impl Ctx<'_> {
         let tol = self.tol;
         // (On within the Boolean's tolerance, or the edge's and the face's own where that's more, OCCT's rule; the
         // grey band past that the Boolean's.)
-        let on_tol = tol.max(self.edges[e].t + self.faces[f].t);
+        let on_tol = self.pool.pair(self.edges[e].t, self.faces[f].t);
         // Points along it: all on the surface, it lies on it (not yet taken); within the grey band
         // without being clearly off, ambiguous.
         let s = self.edge_seg(e);

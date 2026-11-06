@@ -57,6 +57,11 @@ ordinary inputs (all 1e-7) the same as before. Gate: corpora and parity56 identi
 before (5 declines one step later); knurls and gears the same results, idle vibe4 times within 2 %. Note: the gpf
 corpus has 2 differences on main (49eaef95, ba295710), not new. New points (sections' crossings) still get half the
 Boolean's tolerance (stage 4). Next: stage 3 (edge on face, edge with edge).
+Stage 3a (11-06 04:08 UTC): an edge on a face (edge_on_surface's planes and cylinders, on_free_surface) by the edge's
+and the face's own tolerances (Pool::pair); the stage 1 probe removed (its tests all moved). Gate: corpora and
+parity56 identical, 0 differences; shfall 46/194 as before (5 slab cases now decline earlier, "an edge nearly on
+another argument's face": between the pair's tolerance and the old grey band, stage 5's); knurls and gears the same,
+times within 1 %. Next: 3b, edge with edge (get_sedge's common blocks need each piece's edge tolerance).
 - c2-sm-louver's 46 s fuse (from skasm): not before the REST refetch after ~06:00 UTC (dx: its Linear pattern 3 lost
   its values in the UI fetch, 21 instances overlapping exactly, a data artefact); re-check it after.
 
