@@ -134,6 +134,7 @@
 #include <TopoDS_Wire.hxx>
 #include <NCollection_IndexedDataMap.hxx>
 #include <functional>
+#include <numeric>
 #include <map>
 #include <TopoDS_Shell.hxx>
 #include <TopoDS_Solid.hxx>
@@ -7928,8 +7929,125 @@ TopoDS_Shape bspline_faces_analytic(const TopoDS_Shape& shape, double tol, const
 }
 
 // Whether two faces lie on one plane, or (`periodic`) one cylinder, cone, sphere or torus (the cheap test before a merge).
+// Two copies of one B-spline surface (an IGES writer's pieces of a periodic one, each its own entity).
+bool same_bspline_surface(const occ::handle<Geom_Surface>& a, const occ::handle<Geom_Surface>& b, double tol)
+{
+  const auto p = occ::down_cast<Geom_BSplineSurface>(a), q = occ::down_cast<Geom_BSplineSurface>(b);
+  if (p.IsNull() || q.IsNull() || p->UDegree() != q->UDegree() || p->VDegree() != q->VDegree() || p->NbUPoles() != q->NbUPoles() || p->NbVPoles() != q->NbVPoles() ||
+      p->NbUKnots() != q->NbUKnots() || p->NbVKnots() != q->NbVKnots())
+    return false;
+  for (int i = 1; i <= p->NbUKnots(); ++i)
+    if (std::abs(p->UKnot(i) - q->UKnot(i)) > 1e-12 || p->UMultiplicity(i) != q->UMultiplicity(i))
+      return false;
+  for (int i = 1; i <= p->NbVKnots(); ++i)
+    if (std::abs(p->VKnot(i) - q->VKnot(i)) > 1e-12 || p->VMultiplicity(i) != q->VMultiplicity(i))
+      return false;
+  for (int i = 1; i <= p->NbUPoles(); ++i)
+    for (int j = 1; j <= p->NbVPoles(); ++j)
+      if (p->Pole(i, j).Distance(q->Pole(i, j)) > tol || std::abs(p->Weight(i, j) - q->Weight(i, j)) > 1e-12)
+        return false;
+  return true;
+}
+
+// Adjacent faces on copies of one B-spline surface put on one of them (UnifySameDomain merges B-spline faces only on
+// one surface): each face's pcurves registered on it, an edge where two pieces meet across the surface's period a
+// seam with both. In place: `shape` is a copy of the part's.
+bool share_bspline_surfaces(const TopoDS_Shape& shape)
+{
+  ShapeIMap fmap;
+  TopExp::MapShapes(shape, TopAbs_FACE, fmap);
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  std::vector<int> parent(fmap.Extent() + 1);
+  std::iota(parent.begin(), parent.end(), 0);
+  std::function<int(int)> root = [&](int x) { return parent[x] == x ? x : parent[x] = root(parent[x]); };
+  auto surface = [](const TopoDS_Shape& f, TopLoc_Location& l) { return BRep_Tool::Surface(TopoDS::Face(f), l); };
+  bool any = false;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const auto& fs = ef(i);
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()))
+      continue;
+    TopLoc_Location la, lb;
+    const auto      ga = surface(fs.First(), la), gb = surface(fs.Last(), lb);
+    if (ga == gb || !la.IsEqual(lb) || !same_bspline_surface(ga, gb, 1e-9))
+      continue;
+    parent[root(fmap.FindIndex(fs.Last()))] = root(fmap.FindIndex(fs.First()));
+    any = true;
+  }
+  if (!any)
+    return false;
+  BRep_Builder b;
+  // Per edge, the pcurve already on the group's surface and the edge's orientation in that face.
+  std::map<std::pair<const TopoDS_TShape*, const Geom_Surface*>, std::pair<occ::handle<Geom2d_Curve>, TopAbs_Orientation>> on;
+  std::vector<int> size(parent.size(), 0), order;
+  for (int i = 1; i <= fmap.Extent(); ++i)
+    ++size[(size_t)root(i)];
+  // Each group's own face first (its pcurves are on the surface already).
+  for (int pass = 0; pass < 2; ++pass)
+    for (int i = 1; i <= fmap.Extent(); ++i)
+      if (size[(size_t)root(i)] > 1 && (root(i) == i) == (pass == 0))
+        order.push_back(i);
+  for (const int i : order)
+  {
+    const int r = root(i);
+    TopLoc_Location                 lr, lf;
+    const occ::handle<Geom_Surface> rep = surface(fmap(r), lr);
+    const TopoDS_Face               f   = TopoDS::Face(fmap(i));
+    const occ::handle<Geom_Surface> own = surface(f, lf);
+    // This face's pcurves on its own surface, read before it changes.
+    std::vector<std::tuple<TopoDS_Edge, occ::handle<Geom2d_Curve>, occ::handle<Geom2d_Curve>, double, double>> curves;
+    for (TopExp_Explorer e(f.Oriented(TopAbs_FORWARD), TopAbs_EDGE); e.More(); e.Next())
+    {
+      const TopoDS_Edge ed = TopoDS::Edge(e.Current());
+      double            f0, f1;
+      const auto        c  = BRep_Tool::CurveOnSurface(ed, f, f0, f1);
+      const auto        c2 = BRep_Tool::IsClosed(ed, f) ? BRep_Tool::CurveOnSurface(TopoDS::Edge(ed.Reversed()), f, f0, f1) : occ::handle<Geom2d_Curve>();
+      if (c.IsNull())
+        return false;
+      curves.emplace_back(ed, c, c2, f0, f1);
+    }
+    if (own != rep)
+      b.UpdateFace(f, rep, lr, BRep_Tool::Tolerance(f));
+    for (const auto& [ed, c, c2, f0, f1] : curves)
+    {
+      const double tol = BRep_Tool::Tolerance(ed);
+      if (!c2.IsNull())
+      {
+        // A seam of this face already: both on the group's surface.
+        b.UpdateEdge(ed, ed.Orientation() == TopAbs_FORWARD ? c : c2, ed.Orientation() == TopAbs_FORWARD ? c2 : c, rep, lr, tol);
+        continue;
+      }
+      const auto key = std::make_pair(ed.TShape().get(), rep.get());
+      auto       it  = on.find(key);
+      if (it == on.end())
+      {
+        b.UpdateEdge(ed, c, rep, lr, tol);
+        on[key] = {c, ed.Orientation()};
+        continue;
+      }
+      // Met before from another piece: the same place in (u, v), or across the period (a seam of the merged face).
+      const auto& [other, oo] = it->second;
+      const double m          = (f0 + f1) / 2;
+      if (other->Value(m).Distance(c->Value(m)) <= 1e-9)
+        continue;
+      const bool first = oo == TopAbs_FORWARD;
+      b.UpdateEdge(ed, first ? other : c, first ? c : other, rep, lr, tol);
+    }
+  }
+  return true;
+}
+
 bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
 {
+  if (periodic)
+  {
+    // One surface (pieces of one B-spline put on it: share_bspline_surfaces).
+    TopLoc_Location la, lb;
+    const auto      ga = BRep_Tool::Surface(a, la), gb = BRep_Tool::Surface(b, lb);
+    if (!ga.IsNull() && ga == gb && la.IsEqual(lb))
+      return true;
+  }
   const BRepAdaptor_Surface sa(a, false), sb(b, false);
   if (sa.GetType() != sb.GetType() || (!periodic && sa.GetType() != GeomAbs_Plane))
     return false;
@@ -8009,9 +8127,21 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
       rebuilt = true;
     }
   }
+  // Pieces of one B-spline surface on one (on a copy: the part as read stays as it is).
+  std::unique_ptr<BRepBuilderAPI_Copy> copy;
+  if (periodic)
+  {
+    auto c = std::make_unique<BRepBuilderAPI_Copy>(shape, false);
+    if (share_bspline_surfaces(c->Shape()) && BRepCheck_Analyzer(c->Shape()).IsValid())
+    {
+      shape = c->Shape();
+      copy  = std::move(c);
+    }
+  }
   auto converted_face = [&](const TopoDS_Shape& f) {
-    const TopoDS_Shape g = converted ? mod.ModifiedShape(f) : f;
-    return rebuilt ? reshape->Value(g) : g;
+    TopoDS_Shape g = converted ? mod.ModifiedShape(f) : f;
+    g              = rebuilt ? reshape->Value(g) : g;
+    return copy ? copy->Modified(g).First() : g;
   };
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
@@ -8027,7 +8157,7 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     if (!merge)
       keep.Add(ef.FindKey(i));
   }
-  if (!any && !converted && !rebuilt)
+  if (!any && !converted && !rebuilt && !copy)
     return as_is();
   ShapeUpgrade_UnifySameDomain u(shape, true, true, false);
   u.KeepShapes(keep);

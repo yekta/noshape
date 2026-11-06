@@ -67,3 +67,18 @@ fn a_face_pattern_round_a_tube_is_stitched_as_the_cut() {
     // (Live's: each rim one closed edge; the plain cut leaves rims split at the seams, 8 / 14 / 4.)
     assert_eq!(counts(&stitched), (8, 12, 0));
 }
+
+/// An elliptic pocket cut into a cylinder across its seam: the pocket's outline on the side is one ring (Parasolid has
+/// no seam to split it), not two halves and two vertices.
+#[test]
+fn a_pockets_outline_across_the_seam_is_one_ring() {
+    let mm = 1e-3;
+    let cylinder = make_cylinder(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 10.0 * mm, 40.0 * mm, 2.0 * PI).unwrap();
+    // Through the +x wall, where the cylinder's seam runs.
+    let plane = Plane::new(DVec3::new(5.0 * mm, 0.0, 20.0 * mm), DVec3::X, DVec3::Y);
+    let slot = make_face_2d(&plane, &[Segment2d::Ellipse { center: glam::DVec2::ZERO, major_radius: 12.0 * mm, minor_radius: 4.0 * mm, rotation: PI / 2.0 }], &[]).unwrap();
+    let cutter = extrude(&slot, DVec3::new(10.0 * mm, 0.0, 0.0)).unwrap().shape;
+    let part = cut(&cylinder, &cutter).unwrap().shape;
+    // The side, the two ends, the pocket's wall and floor; the end circles, the outline on the side and the floor's ellipse.
+    assert_eq!(counts(&part), (5, 4, 0));
+}

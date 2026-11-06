@@ -153,6 +153,27 @@ fn an_iges_bspline_sphere_reads_as_a_sphere() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A B-spline sheet in two pieces, each written as its own copy of the surface (an IGES writer's pieces of a face:
+/// live's hose and motor-mount), reads as one face, as Onshape's import.
+#[test]
+fn an_iges_bspline_face_in_pieces_reads_as_one() {
+    let dir = std::env::temp_dir().join(format!("noshape-iges-pieces-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let n = 6;
+    let heights: Vec<f64> = (0..n * n).map(|k| ((k / n) as f64 * 0.7).sin() + ((k % n) as f64 * 0.5).cos()).collect();
+    let sheet = bspline_surface_from_grid(&Plane::xy(), 0.0, 2.0, 0.0, 2.0, &heights, n, n, 3, 1e-6).unwrap();
+    let pieces = split_by_plane(&sheet, &Plane::new(DVec3::new(5.0, 0.0, 0.0), DVec3::X, DVec3::Y)).unwrap().shape;
+    assert_eq!(pieces.count(ShapeType::Face), 2, "written in two");
+    let path = dir.join("sheet.igs");
+    write_iges(&path, std::slice::from_ref(&pieces), LengthUnit::Millimeter).unwrap();
+    let parts = read_iges_parts(&path, LengthUnit::Millimeter).unwrap();
+    assert_eq!(parts.iter().map(|p| p.shape.count(ShapeType::Face)).sum::<usize>(), 1);
+    let want = surface_properties(&sheet).unwrap().mass;
+    let a: f64 = parts.iter().map(|p| surface_properties(&p.shape).unwrap().mass).sum();
+    assert!((a - want).abs() < 1e-6 * want, "{a} vs {want}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
 /// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
 /// both read back as the parts.

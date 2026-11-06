@@ -974,7 +974,15 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         else
           ++seams;
       }
-      if (other || seams == 0 || two.size() != 2 || !open[two[0]] || !open[two[1]])
+      if (other || two.size() != 2 || !open[two[0]] || !open[two[1]])
+        continue;
+      // Two edges that close a loop between the same two faces (both their ends shared): one ring, seam or not (an
+      // IGES writer's halves of a slot's outline, live's motor-mount: its model has rings).
+      TopoDS_Vertex a0, a1, b0, b1;
+      TopExp::Vertices(TopoDS::Edge(em(two[0])), a0, a1);
+      TopExp::Vertices(TopoDS::Edge(em(two[1])), b0, b1);
+      const bool loop = (a0.IsSame(b0) && a1.IsSame(b1)) || (a0.IsSame(b1) && a1.IsSame(b0));
+      if (seams == 0 && !loop)
         continue;
       const std::vector<uint32_t> fa = faces_of(two[0]), fb = faces_of(two[1]);
       if (fa.size() != 2 || fa != fb)
@@ -1000,7 +1008,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         double                          f, l;
         const occ::handle<Geom_Curve>   ca = BRep_Tool::Curve(TopoDS::Edge(em(two[0])), la, f, l);
         const occ::handle<Geom_Curve>   cb = BRep_Tool::Curve(TopoDS::Edge(em(two[1])), lb, f, l);
-        bool                            one = !ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9));
+        bool                            one = loop || (!ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9)));
         if (!one)
         {
           BRepAdaptor_Curve xa(TopoDS::Edge(em(two[0]))), xb(TopoDS::Edge(em(two[1])));
