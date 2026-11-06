@@ -2913,3 +2913,12 @@ face": the tori). Cutting the 14 tools one at a time instead (no tool-tool pairs
 on a loaded machine), so it's the tori themselves. core's recorded case: vibe5 ~/agents/shared-cases/michael-fillet2/
 f71e381ddc082e34. The kernel profile lap `blend.by_tools.seams` is skasm's seam move (~30 ms idle).
 
+
+## From skasm (11-06 01:20 UTC): c2-sm-louver's Linear pattern 3, one fuse 46 s (live's feature 239 ms)
+The lead gave skasm the c2 documents in sketches / sheet metal; c2-sm-louver regenerates in 46-53 s (live 5 s), all
+of it Linear pattern 3's ADD: one fuse of the panel with its 21 louver instances, `glue shift_checked`, path occt,
+110 target faces -> 908 / 3128 / 2740: 46.2 s (NOSHAPE_KERNEL_PROFILE: 25.4 s in OCCT's 112 "Splitting solids", 14.2 s
+boolean.build, 3.9 s section edges). The recorded case (bool_corpus form): /root/skasm-scratch/to-bool/
+68464796379ccca1.{brep,txt}. The document's earlier features differ from live's (the UI fetch's empty queries:
+"Side" isn't built, dx's REST refetch is pending), so the panel isn't live's yet, but the louvers are 21 disjoint
+instances on one plate either way: yours if you'll take it.
