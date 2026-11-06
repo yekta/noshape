@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-06 17:20 UTC (parity, the lead's order).**
+- c2-impeller-loft: the loft's rims keep the sections' curves (landed); its -1.1 % is Parasolid's vertex matching
+  (P2 LOFT-VERTEX-MATCH, numbers there).
+- cf-surface-pattern 6 -> 9: live's box of a free-form part is its poles' / display mesh's (harness, landed); Split 1
+  now targets the Thicken's cap (translator: live's part decides among faces with live's display-mesh area). Its next
+  difference is the sketch's: Sketch 4's spline is periodic (live's `isPeriodic`), our fit spline has no closed form
+  (crates/sketch FitSpline): for the sketch's owner.
+
 **State 11-06 14:26 UTC.**
 - P0 DRAFT-POOL-HANG-MACOS confirmed on runners (run 42222728542): without 0023 not open after 900 s on macos-15 and
   windows; with it 8.75 s (M1, 3 cores) and 8.03 s (EPYC, 4 cores). Kernel CI (kernel-os.yml) on main: warm 2-3 min.

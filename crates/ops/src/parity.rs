@@ -2319,15 +2319,23 @@ impl<'a> Translator<'a> {
         // (a disc and a cylinder can have one area); none of the nearest (a
         // point on an axis is nearer the end faces than a wide cylinder): more
         // of them.
+        // (On live's part first: a Thicken's cap and the surface it kept are one face apart, one centroid, and
+        // live's display-mesh area, 1.6e-4 off, is exact for neither: cf-surface-pattern's Split 1.)
         let off = |e: &&Value| f3(&e["centroid"]).map_or(f64::INFINITY, |c| (0..3).map(|i| (c[i] * k - p[i]).powi(2)).sum::<f64>());
-        if let Some(e) = found.iter().filter(within(2e-3)).min_by(|x, y| off(x).total_cmp(&off(y))) {
-            return id(e);
+        let on_part = |e: &&Value| part.is_some_and(|q| e["part"] == q);
+        let best = |list: &[Value]| -> Option<String> {
+            let near: Vec<&Value> = list.iter().filter(within(2e-3)).collect();
+            let theirs: Vec<&Value> = near.iter().copied().filter(on_part).collect();
+            if theirs.is_empty() { near } else { theirs }.into_iter().min_by(|x, y| off(x).total_cmp(&off(y))).and_then(id)
+        };
+        if let Some(e) = best(&found) {
+            return Some(e);
         }
         if r.measure.is_some() && found.len() >= 8 {
             a["limit"] = json!(64);
             let more = self.call("query_entities", a).ok()?;
-            if let Some(e) = more[kind].as_array().into_iter().flatten().filter(within(2e-3)).min_by(|x, y| off(x).total_cmp(&off(y))) {
-                return id(e);
+            if let Some(e) = best(more[kind].as_array().map(Vec::as_slice).unwrap_or(&[])) {
+                return Some(e);
             }
         }
         found.first().and_then(id)
