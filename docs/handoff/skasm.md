@@ -1779,3 +1779,22 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
 - **Coverage**: `tools/ui-parity/coverage_assembly.py [--uncovered]` (toolbar 23/31, menu items 18/86 with batches 1-2;
   `MOST_USED` orders the gaps). parity_assemblies data: vibe5:~/agents/skasm/parity-asm (10/10 documents, 13/13 mates
   at 11-04).
+
+## 11-06 night: parity correctness in sketches / sheet metal (lead 21:05)
+- Suite (local, all 86): 593 -> 622/924 features, 58 -> 59/86 documents, no regressions (each step diffed against the
+  last run's report.json: /root/skasm-scratch/report-all*.json). Landed / queued: qSketchRegion without spaces
+  (cf-multi-plane 14/14, cf-mortise-and-tenon 5/6, cf-snap-hook 7/18, cf-3d-spline 2/7); a region's straight edge that
+  one sketch line covers is one edge (region_profile `one_line`, cf-box-dovetail-joint's base board); the translator's
+  text region queries by their face edge, its vertex and side (`edge_side_query` / `edge_side_probe`: a point a hair
+  along the piece from the vertex, -1 the piece starting there, +1 ending there, then a hair to the face's side,
+  +1 left / a circle's inside; the side offset is half the other curve's distance, so a tangent cusp works), a lone
+  line no region is bounded by (the region beside it), several regions named alike taking one each; evCollision's
+  entities as transient queries (std 2241's evCollision wraps raw ids).
+- Next differences, not mine: cf-box-dovetail-joint Sweep 1 (a dovetail profile swept REMOVE round the base's sharp
+  rectangular rim: "Could not create valid swept body") and cf-lighten's Lighten 1 opShell ("Could not shell part with
+  selections"): core. cf-snap-hook Fillet 4, cf-mortise-and-tenon's custom feature (4 parts, live 2).
+- Blocked on dx's REST refetch (REQUESTS 2132, after the 05:45 unlock): c2-sm-louver (Louver's bends are the UI fetch's
+  planes, live 2143; Sheet metal model 1's regions name Sketch 5 entities the fetched sketch lacks, and some values are
+  0), c2-rings-loft, c2-duct-multipart (PROJECTED geometry not found), c2-sm-corner-break (queries without live geometry).
+- Tried and dropped: a region's interior point by clearance (it moved the translator's inside test: exercise-jan and
+  knob-tim 8 -> 4 / 3).
