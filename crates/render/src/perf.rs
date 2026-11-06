@@ -188,6 +188,22 @@ pub fn thread_cpu_time() -> Option<Duration> {
     }
 }
 
+/// The process's page faults so far: (reclaims, faults that read a page in), where the OS counts them.
+pub fn page_faults() -> Option<(u64, u64)> {
+    #[cfg(unix)]
+    {
+        // SAFETY: an all-zero rusage is valid; getrusage writes it.
+        let mut ru: libc::rusage = unsafe { std::mem::zeroed() };
+        // SAFETY: `ru` is a valid, writable rusage.
+        let r = unsafe { libc::getrusage(libc::RUSAGE_SELF, &mut ru) };
+        (r == 0).then_some((ru.ru_minflt as u64, ru.ru_majflt as u64))
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
 /// Scoped timer: records on drop (no-op when disabled).
 pub struct Scope {
     stage: &'static str,

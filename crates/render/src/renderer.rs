@@ -1830,8 +1830,9 @@ impl PipelineMaker {
         if self.early {
             crate::worker::low_priority_compile();
         }
+        let t = perf::enabled().then(std::time::Instant::now);
         let sh = &self.shader;
-        self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let pipeline = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some(p.label),
             layout: Some(match layout {
                 LayoutKind::Main => &self.main,
@@ -1874,7 +1875,11 @@ impl PipelineMaker {
             multisample: wgpu::MultisampleState { count: p.samples, mask: !0, alpha_to_coverage_enabled: false },
             multiview_mask: None,
             cache: None,
-        })
+        });
+        if let Some(t) = t {
+            log::info!(target: "perf", "pipeline {} built in {:.1} ms", p.label, t.elapsed().as_secs_f64() * 1000.0);
+        }
+        pipeline
     }
 }
 
@@ -2859,6 +2864,9 @@ impl Renderer {
         let ts = self.targets.entry(target).or_default();
         ts.stamp = self.stamp;
         if !ts.tex.as_ref().is_some_and(|t| t.width == width && t.height == height && t.msaa == msaa) {
+            if perf::enabled() {
+                log::info!(target: "perf", "target {target} textures created ({width}x{height}, {msaa}x MSAA)");
+            }
             ts.tex = Some(create_textures(device, width, height, msaa));
             ts.spare.clear();
             ts.pick_valid = false;
@@ -3077,11 +3085,17 @@ impl Renderer {
             None => {
                 let t = Arc::new(create_present_texture(device, width, height));
                 ts.ring.push(t.clone());
+                if perf::enabled() {
+                    log::info!(target: "perf", "present texture {} of target {target} created ({width}x{height})", ts.ring.len());
+                }
                 t
             }
         });
         let readback = present_texture.is_none().then(|| {
             ts.spare.pop().unwrap_or_else(|| {
+                if perf::enabled() {
+                    log::info!(target: "perf", "readback buffer of target {target} created ({width}x{height})");
+                }
                 device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("color-readback"),
                     size: tex.readback_size(),

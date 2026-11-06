@@ -461,6 +461,9 @@ struct OrbitBench {
     window_draw: Vec<f32>,
     drawable_wait: Vec<f32>,
     draw_at_present: Option<(Duration, Duration)>,
+    /// The process's page faults between presented frames (reclaims, reads), for the first frames' report.
+    faults: Vec<(f32, f32)>,
+    faults_at_present: Option<(u64, u64)>,
     /// The camera was fitted to the model before the run.
     fitted: bool,
     /// When the last tick ran (`v.bench_tick`: the timer's real period).
@@ -504,7 +507,7 @@ fn orbit_bench_from_env() -> Option<OrbitBench> {
         Ok("hover") => BenchKind::Hover,
         _ => BenchKind::Orbit,
     };
-    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, fitted: false, last_tick: None, click: None, click_ms: Vec::new(), click_submit_ms: Vec::new() })
+    Some(OrbitBench { frames, started: None, frames_at_start: 0, last_present: None, kind, grab: None, hover_wait: 0, ticks: 0, renders: 0, intervals: Vec::new(), ui_cpu: Vec::new(), cpu_at_present: None, window_draw: Vec::new(), drawable_wait: Vec::new(), draw_at_present: None, faults: Vec::new(), faults_at_present: None, fitted: false, last_tick: None, click: None, click_ms: Vec::new(), click_submit_ms: Vec::new() })
 }
 
 impl EventEmitter<ViewportEvent> for Viewport {}
@@ -1478,6 +1481,11 @@ impl Viewport {
         {
             b.ui_cpu.push(cpu.saturating_sub(prev).as_secs_f32() * 1000.0);
         }
+        if let Some(f) = noshape_render::perf::page_faults()
+            && let Some(prev) = b.faults_at_present.replace(f)
+        {
+            b.faults.push((f.0.saturating_sub(prev.0) as f32, f.1.saturating_sub(prev.1) as f32));
+        }
         let draw = gpui::window_draw_time();
         if let Some(prev) = b.draw_at_present.replace(draw) {
             b.window_draw.push(draw.0.saturating_sub(prev.0).as_secs_f32() * 1000.0);
@@ -1530,6 +1538,8 @@ impl Viewport {
             }
             b.started = Some(Instant::now());
             b.frames_at_start = self.frames_presented;
+            // (From the start: the first frame's faults count.)
+            b.faults_at_present = noshape_render::perf::page_faults();
             match b.kind {
                 BenchKind::Zoom | BenchKind::Pick | BenchKind::Hover => {}
                 BenchKind::Drag => self.drag = Drag::Tool,
@@ -1554,7 +1564,12 @@ impl Viewport {
                 BenchKind::Hover => "hover",
             };
             let mut series: Vec<(&str, Vec<f32>)> = BENCH_SERIES.iter().map(|&k| (k, noshape_render::perf::series_take(k))).collect();
-            series.extend([("v.frame_interval", b.intervals.clone()), ("ui_cpu", b.ui_cpu.clone())]);
+            series.extend([
+                ("v.frame_interval", b.intervals.clone()),
+                ("ui_cpu", b.ui_cpu.clone()),
+                ("page_reclaims", b.faults.iter().map(|f| f.0).collect()),
+                ("page_reads", b.faults.iter().map(|f| f.1).collect()),
+            ]);
             // Each frame of the warm-up (a hitch the user sees when the camera starts moving), then left out of the
             // steady-state statistics below.
             let firsts: Vec<String> = series.iter().filter(|(_, v)| !v.is_empty()).map(|(k, v)| format!("{k} {}", v.iter().take(BENCH_WARMUP).map(|x| format!("{x:.1}")).collect::<Vec<_>>().join(" "))).collect();
