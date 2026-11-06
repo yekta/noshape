@@ -1648,3 +1648,27 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
 - pins-assembly-1000 on perf.yml's macOS runners (run 41840797973, main 60f4813f): GPU 8.7 ms a frame (p95 13 ms,
   1194x794 device px); hover to the highlighted frame p50 23-32 ms (UI part 10-15 ms); pick p50 106-113 ms, of which
   the UI part is 11-15 ms and `a.list_render` 20 ms; the rest is the runner's frame pacing.
+
+## From dx (2026-11-06 07:23 UTC): c2 on live's REST features.json (2132 partly in), run 136
+- Live's REST refetch hit Onshape's quota: features.json (with queryStrings) is in for all 20 c2 documents, live.jsonl
+  and the SKETCH bodies only for valve-config / lofted-basic / impeller-loft / bottle-split; the rest of the sketch
+  bodies come after the unlock (~05:45 UTC 11-07). So sketch-line / region ids (JFB, JGC...) still lack geometry on
+  the other 16. Run 136 (/root/parity/models as synced 06:31): 56/72 to the end, 519/753 features (run 135: 493).
+- Moved on: bottle-split 1 -> 7/9, duct-multipart 7 -> 10/19, extension-spring 7 -> 9/16, helical-sweep 1 -> 4/5,
+  hunting-knife 1 -> 8/24, lofted-basic 5 -> 6/6 (to the end), sm-louver 1 -> 4/36, valve-config 1 -> 5/10.
+- First differences now (yours: sketch, sheet metal, assembly; the "query not mapped" kind is still mine):
+  - c2-sm-louver feature 4 "Linear pattern 1": Part 1 274/816/544 faces/edges/vertices, live 278/820/544; and
+    **Linear pattern 3 takes 197.8 s** (live 5.0 s for the whole studio): a P0 speed case (bool.md's fuse?).
+  - c2-sm-exhaust-clamp feature 2 "Sheet metal model 1": 5 parts, live 1 (a 0.09 mm³ "Part 2" solid besides).
+  - c2-sm-corner-break feature 6 "Corner break 1": "Selected entities should be from active sheet metal models."
+  - c2-hunting-knife feature 8 "Split 3": "curves do not project onto the target" (live OK).
+  - c2-helical-sweep feature 4 "Sweep 1": "Select entities for sweep path." (helix path; its sketch body may be the gap).
+  - c2-valve-config feature 5 "Extrude 3": "Select face or sketch region to extrude." (its sketch bodies are in).
+  - c2-bottle-split feature 7 "Revolve 2": 1 part, live 2 (sketch bodies in).
+  - c2-duct-multipart feature 10 "Extrude 3": Part 2 volume 49125000 mm³, live 92868196.
+  - c2-extension-spring feature 9 "Fillet 1": 15/39/26, live 11/27/18 (my Spring y offset is gone).
+  - c2-rings-loft feature 2 "Extrude 1": centroid y -0.00014 mm in live (0 here); Shell 1 7.9 s (live 1.6 s whole).
+  - c2-impeller-loft feature 10 "Loft Gehäuse": edges 10 other, live 4 circle / 3 line / 3 other.
+  - unchanged: fan-blade-sweep / hex-bookcase-derived (Derived NOT BUILT), housing-draft "Bohrung 1" (Cannot
+    resolve entities), tpd-fillet-variable / variable-fillet-faceblend (core).
+- Full lines: /root/dx-scratch/walk/run136.log. I'll rerun when live ticks 2132.
