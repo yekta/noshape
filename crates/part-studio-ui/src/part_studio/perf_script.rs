@@ -214,6 +214,8 @@ impl PartStudioView {
                     }
                     for _ in 0..1000 {
                         if let Some(([h, w, f, hc, fc], ps)) = *shown.lock().unwrap_or_else(|e| e.into_inner()) {
+                            let each: Vec<String> = PARTS.iter().zip(ps).filter(|(_, x)| *x >= 0.5).map(|(p, x)| format!("{p} {x:.1}")).collect();
+                            log::info!(target: "perf", "BENCH SAMPLE {kind} {k}: action {h:.1} wait {w:.1} frame {f:.1} ms, CPU {:.1} ms | {}", hc + fc, each.join(", "));
                             parts.iter_mut().zip(ps).for_each(|(v, x)| v.push(x));
                             ms.push(h + w + f);
                             cpu.push(hc + fc);
