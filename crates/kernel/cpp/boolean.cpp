@@ -94,6 +94,11 @@
 #include <BRepTools_Modifier.hxx>
 #include <Geom_SurfaceOfRevolution.hxx>
 #include <ShapeCustom_SweptToElementary.hxx>
+#include <GeomConvert_SurfToAnaSurf.hxx>
+#include <ShapeAnalysis_Surface.hxx>
+#include <ShapeFix_Face.hxx>
+#include <Geom_BSplineSurface.hxx>
+#include <Geom_BezierSurface.hxx>
 #include <BRepTools.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBuilderAPI_MakeVertex.hxx>
@@ -7875,6 +7880,53 @@ public:
   }
 };
 
+// B-spline faces that are a plane, cylinder, cone, sphere or torus within `tol` (an IGES writer's rational torus
+// quarters, live's o-ring), rebuilt on that surface: their edges kept, pcurves projected. `reshape` maps them.
+TopoDS_Shape bspline_faces_analytic(const TopoDS_Shape& shape, double tol, const occ::handle<BRepTools_ReShape>& reshape)
+{
+  bool any = false;
+  for (TopExp_Explorer e(shape, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face&              f = TopoDS::Face(e.Current());
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> s = BRep_Tool::Surface(f, loc);
+    if (s.IsNull() || reshape->IsRecorded(f) || !(s->IsKind(STANDARD_TYPE(Geom_BSplineSurface)) || s->IsKind(STANDARD_TYPE(Geom_BezierSurface))))
+      continue;
+    GeomConvert_SurfToAnaSurf       conv(s);
+    const occ::handle<Geom_Surface> a = conv.ConvertToAnalytical(tol);
+    if (a.IsNull() || conv.Gap() > tol)
+      continue;
+    // The same side out: the new surface's normal against the old one's at the face's middle.
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    gp_Pnt p;
+    gp_Vec du, dv;
+    s->D1((u0 + u1) / 2, (v0 + v1) / 2, p, du, dv);
+    const occ::handle<ShapeAnalysis_Surface> sa = new ShapeAnalysis_Surface(a);
+    const gp_Pnt2d                           uv = sa->ValueOfUV(p, tol);
+    gp_Pnt                                   q;
+    gp_Vec                                   au, av;
+    a->D1(uv.X(), uv.Y(), q, au, av);
+    const bool   flip = du.Crossed(dv).Dot(au.Crossed(av)) < 0;
+    BRep_Builder b;
+    TopoDS_Face  nf;
+    b.MakeFace(nf, a, loc, std::max(BRep_Tool::Tolerance(f), conv.Gap()));
+    for (TopoDS_Iterator w(f.Oriented(TopAbs_FORWARD)); w.More(); w.Next())
+      b.Add(nf, flip ? w.Value().Reversed() : w.Value());
+    ShapeFix_Face fix(nf);
+    fix.FixOrientationMode() = 0;
+    fix.Perform();
+    TopoDS_Face out = fix.Face();
+    if (flip)
+      out.Reverse();
+    if (f.Orientation() == TopAbs_REVERSED)
+      out.Reverse();
+    reshape->Replace(f, out);
+    any = true;
+  }
+  return any ? reshape->Apply(shape) : shape;
+}
+
 // Whether two faces lie on one plane, or (`periodic`) one cylinder, cone, sphere or torus (the cheap test before a merge).
 bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
 {
@@ -7945,7 +7997,22 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
       }
     }
   }
-  auto converted_face = [&](const TopoDS_Shape& f) { return converted ? mod.ModifiedShape(f) : f; };
+  // B-spline faces on analytic surfaces (IGES too).
+  const occ::handle<BRepTools_ReShape> reshape = new BRepTools_ReShape;
+  bool                                 rebuilt = false;
+  if (periodic)
+  {
+    const TopoDS_Shape r = bspline_faces_analytic(shape, 1e-7, reshape);
+    if (!r.IsSame(shape) && BRepCheck_Analyzer(r).IsValid())
+    {
+      shape   = r;
+      rebuilt = true;
+    }
+  }
+  auto converted_face = [&](const TopoDS_Shape& f) {
+    const TopoDS_Shape g = converted ? mod.ModifiedShape(f) : f;
+    return rebuilt ? reshape->Value(g) : g;
+  };
   ShapeAncMap ef;
   TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, ef);
   // Only across edges between faces on one analytic surface: the others kept (a healed thread's B-spline faces merged
@@ -7960,24 +8027,59 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     if (!merge)
       keep.Add(ef.FindKey(i));
   }
-  if (!any)
+  if (!any && !converted && !rebuilt)
     return as_is();
   ShapeUpgrade_UnifySameDomain u(shape, true, true, false);
   u.KeepShapes(keep);
-  u.Build();
+  if (any)
+    u.Build();
   // (A merge that leaves a face it can't close: the part as read.)
-  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+  const TopoDS_Shape merged = any ? u.Shape() : shape;
+  if (!BRepCheck_Analyzer(merged).IsValid())
     return as_is();
+  // A whole torus or sphere merged into a face with no boundary at all: made again with its seams (the volume reads
+  // nothing without them), the solid turned outward.
+  const occ::handle<BRepTools_ReShape> whole  = new BRepTools_ReShape;
+  bool                                 remade = false;
+  for (TopExp_Explorer e(merged, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face& f = TopoDS::Face(e.Current());
+    if (TopoDS_Iterator(f).More() || whole->IsRecorded(f))
+      continue;
+    TopLoc_Location                 loc;
+    const occ::handle<Geom_Surface> g = BRep_Tool::Surface(f, loc);
+    BRepBuilderAPI_MakeFace         mf(g, BRep_Tool::Tolerance(f));
+    if (!mf.IsDone())
+      return as_is();
+    TopoDS_Face nf = mf.Face();
+    nf.Location(loc);
+    nf.Orientation(f.Orientation());
+    whole->Replace(f, nf);
+    remade = true;
+  }
+  TopoDS_Shape result = merged;
+  if (remade)
+  {
+    result = whole->Apply(result);
+    for (TopExp_Explorer e(result, TopAbs_SOLID); e.More(); e.Next())
+    {
+      TopoDS_Solid so = TopoDS::Solid(e.Current());
+      BRepLib::OrientClosedSolid(so);
+    }
+    if (!BRepCheck_Analyzer(result).IsValid())
+      return as_is();
+  }
   MergedFaces out;
-  out.shape = wrap(u.Shape());
+  out.shape = wrap(result);
   ShapeIMap nm;
-  TopExp::MapShapes(u.Shape(), TopAbs_FACE, nm);
-  const occ::handle<BRepTools_History> h = u.History();
+  TopExp::MapShapes(result, TopAbs_FACE, nm);
+  const occ::handle<BRepTools_History> h = any ? u.History() : occ::handle<BRepTools_History>();
   for (int i = 1; i <= fm.Extent(); ++i)
   {
-    const TopoDS_Shape                    f     = converted_face(fm(i));
-    const NCollection_List<TopoDS_Shape>& after = h->Modified(f);
-    const int                             k     = nm.FindIndex(after.IsEmpty() ? f : after.First());
+    TopoDS_Shape f = converted_face(fm(i));
+    if (!h.IsNull() && !h->Modified(f).IsEmpty())
+      f = h->Modified(f).First();
+    const int k = nm.FindIndex(whole->Value(f));
     out.face_map.push_back(k > 0 ? (uint32_t)(k - 1) : UINT32_MAX);
   }
   return out;

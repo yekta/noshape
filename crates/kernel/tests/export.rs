@@ -131,6 +131,28 @@ fn an_iges_parts_faces_on_one_surface_read_merged() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A sphere written as a B-spline surface (an IGES writer's rational surfaces: live's o-ring) reads as a sphere, as
+/// Onshape's import.
+#[test]
+fn an_iges_bspline_sphere_reads_as_a_sphere() {
+    let dir = std::env::temp_dir().join(format!("noshape-iges-sphere-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let ball = make_sphere(&Plane::from_normal(DVec3::ZERO, DVec3::Z), 10.0, std::f64::consts::TAU).unwrap();
+    let data = ball.faces()[0].face_bspline().unwrap();
+    let spline = make_bspline_surface(&data, &[], true).unwrap();
+    assert!(matches!(spline.faces()[0].face_surface(), Ok(Surface::BSpline { .. })));
+    let path = dir.join("ball.igs");
+    write_iges(&path, std::slice::from_ref(&spline), LengthUnit::Millimeter).unwrap();
+    let parts = read_iges_parts(&path, LengthUnit::Millimeter).unwrap();
+    let faces: Vec<Shape> = parts.iter().flat_map(|p| p.shape.faces()).collect();
+    assert_eq!(faces.len(), 1);
+    assert!(matches!(faces[0].face_surface(), Ok(Surface::Sphere { .. })), "{:?}", faces[0].face_surface());
+    let want = 4.0 / 3.0 * std::f64::consts::PI * 1000.0;
+    let v: f64 = parts.iter().map(|p| volume_properties(&p.shape).unwrap().mass).sum();
+    assert!((v - want).abs() < 1e-6 * want, "{v} vs {want}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
 /// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
 /// both read back as the parts.
