@@ -407,7 +407,7 @@ fn wall_holes(face: &Shape, topo: &Topo) -> FResult<Vec<(Shape, Vec<usize>)>> {
     let Some(outer) = outer_wire(face) else { return Ok(Vec::new()) };
     let mut out = Vec::new();
     for w in face.wires().into_iter().filter(|w| !w.is_same(&outer)) {
-        let edges = w.edges().iter().filter_map(|e| topo.edges.iter().position(|x| x.is_same(e))).collect();
+        let edges = w.edges().iter().filter_map(|e| topo.edge_of(e)).collect();
         out.push((k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?, edges));
     }
     Ok(out)
@@ -420,6 +420,8 @@ struct Topo {
     edge_faces: Vec<Vec<u32>>,
     edge_ends: Vec<(DVec3, DVec3)>,
     vertices: Vec<DVec3>,
+    /// Edge indices by [`Shape::hash_code`] (a sheet of a thousand holes: no search of every edge per edge).
+    edge_index: HashMap<u64, Vec<usize>>,
 }
 
 impl Topo {
@@ -429,7 +431,16 @@ impl Topo {
         let edge_faces = shape.edge_faces().map_err(|e| fe(e.to_string()))?;
         let edge_ends = edges.iter().map(|e| e.endpoints().unwrap_or_default()).collect();
         let vertices = shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).collect();
-        Ok(Topo { faces, edges, edge_faces, edge_ends, vertices })
+        let mut edge_index: HashMap<u64, Vec<usize>> = HashMap::new();
+        for (x, e) in edges.iter().enumerate() {
+            edge_index.entry(e.hash_code()).or_default().push(x);
+        }
+        Ok(Topo { faces, edges, edge_faces, edge_ends, vertices, edge_index })
+    }
+
+    /// The definition edge that is `e` (OCCT IsSame).
+    fn edge_of(&self, e: &Shape) -> Option<usize> {
+        self.edge_index.get(&e.hash_code())?.iter().copied().find(|x| self.edges[*x].is_same(e))
     }
 
     fn nearest_vertex(&self, p: DVec3) -> usize {
@@ -450,7 +461,7 @@ fn wall_loop(face: &Shape, topo: &Topo) -> FResult<Loop> {
     let mut segs: Vec<(DVec3, DVec3, usize, bool)> = Vec::new();
     for e in wire.edges() {
         let info = e.edge_info().map_err(|x| fe(x.to_string()))?;
-        let idx = topo.edges.iter().position(|x| x.is_same(&e)).ok_or_else(|| fe("Sheet metal wall edge not found"))?;
+        let idx = topo.edge_of(&e).ok_or_else(|| fe("Sheet metal wall edge not found"))?;
         if matches!(info.curve, k::Curve::Line { .. }) {
             segs.push((info.start, info.end, idx, false));
         } else {
