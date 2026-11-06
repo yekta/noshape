@@ -1029,6 +1029,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   custom_features displacement_map_profile_probe, the corpus' regeneration) and identical corpus results. Today (dev,
   vibe5): a bare loop pass 75 ns, a call 138, length * number 175, the Displacement map's loops at 1024² 2.7 s,
   the feature 4.4 s (lead's target: the script's own part under 1 s).
+  11-06 04:41: stage 1 landed (db694046; steps 15-40 % faster, the corpus' CPU unchanged: it is the kernel's). Stage 2
+  queued: compact lengths / Vectors in Value (32 bytes), identical on all 78 corpus documents against the tree
+  walker on maps and arrays; release: the loops 2.13 -> 1.53 s, the feature 3.57 -> 3.03 s; dev 2.49 -> 1.83 /
+  4.13 -> 3.45 s; the corpus' CPU and peak memory unchanged. Left for 1 s (release, the script's part ~2 s): std
+  operators' resolution per operation (~100-200 ns each, five per sample), host-made points and planes as maps and
+  arrays (evFaceTangentPlanes' million; next: the host making compact points), the precondition loop.
 - [ ] P2 ALLOC-MIMALLOC (dx 11-06 01:21, lead 11-06: mimalloc, not jemalloc (MSVC); adopt only if nothing regresses):
   measure app-wide with and without (the corpus' regeneration, the interpreter benchmarks, cold start, peak memory on
   the big documents). First pass with the system libmimalloc 3.2 preloaded (also OCCT's heap): corpus regen 30.1 ->

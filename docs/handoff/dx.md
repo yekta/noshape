@@ -228,6 +228,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   INTERP stage 1 queued: closures over the tree walker's helpers, identical on all 78 corpus documents (T2
   parity::fs_closures_answer_as_the_tree_walker; NOSHAPE_FS_TREE=1 the reference); steps 15-40 % faster, the corpus'
   CPU unchanged. Next: stage 2 (values without per-operation refcounting), then the c2 REST refetch after 06:00.
+- 11-06 04:41: FS-COMPILED-INTERP stage 2 queued (compact values; TICKETS): release loops 2.13 -> 1.53 s, feature 3.57 ->
+  3.03 s; the differential (T2 parity::fs_closures_answer_as_the_tree_walker) now runs the reference as the tree walker
+  on maps and arrays (NOSHAPE_FS_TREE=1 NOSHAPE_FS_PLAIN=1). Run 135-on-main scores 493 features: skasm's translator
+  (c2-hunting-knife's Sketch 12), not this.
 - Left in the corpus (SCORE.md run 105): bushing2 Extrude 4 and pipeflange Fillet 2 (core: CUT-CLOSED-EDGES-SPLIT),
   cf-straight-spline (core: live's 11 µm flank edges, our seam split; TICKETS), cf-setback-fillet (corner fill
   patches' areas, kernel), cf-drive-train-generator (gear volumes +0.02 %, skFitSpline as skasm's), cf-sheet-metal-hem
