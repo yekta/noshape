@@ -637,6 +637,20 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   documents" table on all three platforms and verifies from it. Until then v0.4.32 hangs on this document on macOS / Windows.
 
 ## Rust Boolean (bool)
+- [ ] P0 SECTIONS-AHEAD-HANG (bool + core) **a Shell's regeneration never ends, in v0.4.33 too: the CPU budget can't stop
+  OCCT's face/face sections made ahead on the thread pool.** CLI fuzz seed 5786, step 30 (a Shell, 0.5 mm, with or without
+  NOSHAPE_BOOL_FALLBACK=0): on vibe3 it never finishes on v0.4.33's release CLI and on greens 91035029 / a70b2698 (4 / 4, the
+  loop's run hit its 4000 s timeout; with or without `ulimit -v`). Here (16 cores) it ends after 31.8 s with "Could not shell
+  part with selections." as it should, but hangs the same way under `ulimit -v 40000000`, so it depends on the machine.
+  gdb on green 409110dd (tickets/hang5786/bt.txt): the main thread waits in `OSD_ThreadPool::Launcher::wait` under
+  `noshape::occt_ahead` ← `brep_occt_ahead` ← brep `ahead` ← `boolean_in` (rust_boolean.cpp 2593, since 5af3c48d4, v0.4.17); two pool
+  workers spin in `IntTools_FaceFace::Perform` → `IntWalk_PWalking::Perform` / `ExtendLineInCommonZone`, ~190 % CPU. The
+  workers check no break hook, and the waiting caller uses no CPU, so its budget (held while pool jobs run, OCCT patch
+  0005) never runs out. The app's Cancel probably can't stop it either (not checked). Repro: on vibe3, `NSCLI=<cli>
+  python3 bin/clifuzz_time.py 5786 31` reaches step 30 in about a minute; the document just before step 30 and the
+  session log are in /root/qa-scratch/tickets/hang5786/ (step29.noshape + -wal, clifuzz-5786.log: step 30's
+  shell-args are the faces). live: a Shell answers within seconds. Fix: the ahead jobs under the caller's budget or
+  their own (break hook in the pool workers, or a wall-clock limit per pair). (qa 2026-11-06 23:17, v0.4.33 / a70b2698 / 409110dd)
 - [ ] P2 OPEN-SLOW-SURFACE-PATTERN (bool; psui's open-speed table, lead 11-06: document open is the number users feel
   first) **cf-surface-pattern opens in 10.3 s, live regenerates it in 4.2 s**: 7.4 s of it is one `opBoolean` in its
   custom Surface Pattern 3 (Feature Studio line 172: SUBTRACTION of the `opPattern`-ed stamp bodies from the lofted,
