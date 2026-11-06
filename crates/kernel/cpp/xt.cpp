@@ -1988,7 +1988,6 @@ struct AttrWriter
 {
   Writer&            w;
   int                name_def = 0, colour_def = 0, last_def = 0;
-  std::map<int, int> last_of_type; // definition -> its latest attribute
 
   int definition(const std::string& id, int type_id, const std::vector<int>& actions, const std::vector<bool>& owners, int field)
   {
@@ -2038,7 +2037,10 @@ struct AttrWriter
   // node ids from `id` on.
   void attach(int owner, const std::string& name, const double* rgb, int& id)
   {
-    std::vector<int> attrs;
+    // An owner's attributes of a type are chained among themselves only: a chain into another part is a pointer out
+    // of the part (Onshape's multi-part files have none; Onshape reads ours as "Invalid or corrupt input file").
+    std::vector<int>   attrs;
+    std::map<int, int> last_of_type; // definition -> its latest attribute
     auto             attr = [&](int def, int value) {
       const int a         = w.alloc();
       const int prev_type = last_of_type.count(def) ? last_of_type[def] : 0;

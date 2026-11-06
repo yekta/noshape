@@ -154,6 +154,47 @@ fn several_parasolid_parts_are_listed_by_a_part_block() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Named, coloured parts in one Parasolid file: each part's attributes are chained only among its own (Onshape's
+/// multi-part files; ours chained a type's attributes across parts, a pointer out of each part).
+#[test]
+fn several_parasolid_parts_keep_their_attributes_to_themselves() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-attrs-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let part = |at: f64, name: &str| ExportShape { shape: make_box_corners(DVec3::new(at, 0.0, 0.0), DVec3::new(at + 0.01, 0.01, 0.01)).unwrap(), name: Some(name.into()), color: Some([0.2, 0.4, 0.6]) };
+    let path = dir.join("three.x_t");
+    write_parasolid_parts(&path, &[part(0.0, "A"), part(0.02, "B"), part(0.04, "C")], LengthUnit::Meter, false, "38.1").unwrap();
+    let text = std::fs::read_to_string(&path).unwrap();
+    let joined: String = text[text.find("**END_OF_HEADER").unwrap()..].lines().skip(1).collect();
+    // (A name's characters run straight into the next record: "A81 1 …".)
+    let mut spaced = String::new();
+    for c in joined.chars() {
+        if c.is_ascii_digit() && spaced.ends_with(|p: char| p.is_ascii_uppercase()) {
+            spaced.push(' ');
+        }
+        spaced.push(c);
+    }
+    let t: Vec<i64> = spaced.split_whitespace().skip_while(|t| !t.contains("SCH_")).skip(1).map(|t| t.parse().unwrap_or(-1)).collect();
+    // The part block (176, entry count, index 1, n_entries, offset, 3 pointers, entries) gives the bodies.
+    let n = t[1] as usize;
+    let bodies = &t[8..8 + n];
+    // An ATTRIBUTE: 81, field count 1, index, node id, definition, owner, next, previous, next / previous of its type.
+    let mut owner_of = std::collections::HashMap::new();
+    let mut chains = Vec::new();
+    for w in t.windows(10) {
+        if w[0] == 81 && w[1] == 1 && bodies.contains(&w[5]) {
+            owner_of.insert(w[2], w[5]);
+            chains.push((w[5], w[8], w[9]));
+        }
+    }
+    assert_eq!(chains.len(), 2 * n, "a name and a colour per part");
+    for (owner, next, prev) in chains {
+        for x in [next, prev].into_iter().filter(|&x| x != 0) {
+            assert_eq!(owner_of.get(&x), Some(&owner), "an attribute of part {owner} chained to {x}");
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// An extruded ellipse through Parasolid (the exchange suite, motor-mount-jack): its two ellipses stay whole ring
 /// edges (live writes them without a vertex), the side one face; the volume as it was.
 #[test]
