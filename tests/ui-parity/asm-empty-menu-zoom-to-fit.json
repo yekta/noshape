@@ -1,0 +1,21 @@
+{
+ "name": "asm-empty-menu-zoom-to-fit",
+ "about": "Empty space menu: Zoom to fit.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Zoom to fit"
+   }
+  }
+ ]
+}

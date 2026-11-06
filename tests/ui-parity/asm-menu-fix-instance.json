@@ -1,0 +1,25 @@
+{
+ "name": "asm-menu-fix-instance",
+ "about": "Part 2's row menu: Fix (its row's state), then Ctrl+Z.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Fix"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

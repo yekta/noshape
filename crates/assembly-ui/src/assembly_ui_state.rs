@@ -29,6 +29,31 @@ impl AssemblyView {
             let a = v.as_array()?;
             Some(DVec3::new(a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?) * 1e-3)
         };
+        if t.get("empty").is_some() {
+            // From the middle outwards, off every part's box on screen and the open dialog (as the Part Studio's).
+            let size = vp.size();
+            let boxes: Vec<(glam::DVec2, glam::DVec2)> = self
+                .result
+                .occurrences
+                .iter()
+                .filter(|o| !o.hidden)
+                .filter_map(|o| {
+                    let (lo, hi) = o.local_bounds?;
+                    let corners: Vec<glam::DVec2> = (0..8).filter_map(|i| vp.project(o.transform.transform_point3(DVec3::new(if i & 1 == 0 { lo.x } else { hi.x }, if i & 2 == 0 { lo.y } else { hi.y }, if i & 4 == 0 { lo.z } else { hi.z })))).collect();
+                    Some(corners.iter().fold((glam::DVec2::splat(f64::INFINITY), glam::DVec2::splat(f64::NEG_INFINITY)), |(a, b), c| (a.min(*c), b.max(*c))))
+                })
+                .collect();
+            let dialog = crate::ui_script::bounds_of("dialog");
+            let mut grid: Vec<glam::DVec2> = (1..8).flat_map(|i| (1..8).map(move |j| glam::DVec2::new(size.x * i as f64 / 8.0, size.y * j as f64 / 8.0))).collect();
+            grid.sort_by(|a, b| (*a - size * 0.5).length().total_cmp(&(*b - size * 0.5).length()));
+            let free = grid.into_iter().find(|at| {
+                let win = vp.origin() + point(px(at.x as f32), px(at.y as f32));
+                let on_part = boxes.iter().any(|(min, max)| at.cmpge(*min - glam::DVec2::splat(10.0)).all() && at.cmple(*max + glam::DVec2::splat(10.0)).all());
+                !on_part && !dialog.is_some_and(|b| b.dilate(px(10.)).contains(&win))
+            });
+            let at = free.ok_or("no empty spot in the graphics area")?;
+            return Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)));
+        }
         let world = if t.get("origin").is_some() {
             DVec3::ZERO
         } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
@@ -144,7 +169,8 @@ impl AssemblyView {
             "focus": focus,
             "dialog": dialog,
             "dialogs": dialog.iter().cloned().collect::<Vec<_>>(),
-            "list": null,
+            // An open menu (a row's, the graphics area's): its rows, as the Part Studio's.
+            "list": crate::os_menu::ui_state(cx).or_else(|| self.ui.ctx_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx))),
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],

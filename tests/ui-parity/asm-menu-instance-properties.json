@@ -1,0 +1,25 @@
+{
+ "name": "asm-menu-instance-properties",
+ "about": "Part 2's row menu: Instance properties\u2026, then Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Instance properties\u2026"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

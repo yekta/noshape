@@ -1,0 +1,21 @@
+{
+ "name": "asm-menu-hide-other-instances",
+ "about": "Part 2's row menu: Hide other instances.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide other instances"
+   }
+  }
+ ]
+}

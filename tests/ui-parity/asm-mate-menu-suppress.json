@@ -1,0 +1,33 @@
+{
+ "name": "asm-mate-menu-suppress",
+ "about": "Revolute 1's row menu: Suppress, then Unsuppress.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unsuppress"
+   }
+  }
+ ]
+}

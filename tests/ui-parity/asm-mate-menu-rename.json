@@ -1,0 +1,29 @@
+{
+ "name": "asm-mate-menu-rename",
+ "about": "Revolute 1's row menu: Rename, type Axle, Enter.",
+ "area": "skasm",
+ "source": "lead 11-06: assembly coverage, batch 2",
+ "start": "pin-block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "mate": "Revolute 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Axle"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}
