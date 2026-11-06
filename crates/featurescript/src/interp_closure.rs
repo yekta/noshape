@@ -36,6 +36,24 @@ pub fn set_tree_walker_default(tree: bool) {
     MODE.store(if tree { 2 } else { 1 }, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// New interpreters' compact values: 0 from NOSHAPE_FS_PLAIN, 1 on, 2 off ([`set_compact_default`]).
+static COMPACT: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(0);
+
+/// Whether std's operators answer compact values in new interpreters (not with NOSHAPE_FS_PLAIN, or as set).
+pub fn compact_default() -> bool {
+    static ENV: LazyLock<bool> = LazyLock::new(|| std::env::var_os("NOSHAPE_FS_PLAIN").is_none());
+    match COMPACT.load(std::sync::atomic::Ordering::Relaxed) {
+        1 => true,
+        2 => false,
+        _ => *ENV,
+    }
+}
+
+/// New interpreters answer compact values (`true`) or maps and arrays (the differential test's reference).
+pub fn set_compact_default(on: bool) {
+    COMPACT.store(if on { 1 } else { 2 }, std::sync::atomic::Ordering::Relaxed);
+}
+
 pub(crate) fn compile_fn(f: &CompiledFn) -> Body {
     Body {
         precondition: f.precondition.as_ref().map(statement),
@@ -66,7 +84,7 @@ fn walked_statement(s: &St) -> CSt {
 /// The tree walker on a copy of `e`.
 fn walked(e: &Ex) -> CEx {
     let e = e.clone();
-    Box::new(move |i| i.eval(&e))
+    Box::new(move |i| i.eval_in(&e))
 }
 
 /// A loop body's flow: Some to leave the loop with (`Break`: normally).
@@ -136,7 +154,7 @@ pub(crate) fn statement(s: &St) -> CSt {
                     None => rhs,
                     Some((o, ov)) => {
                         let old = std::mem::take(&mut i.stack[at]);
-                        i.binop(*o, old, rhs, ov.as_ref())?
+                        i.binop_in(*o, old, rhs, ov.as_ref())?
                     }
                 };
                 Ok(Flow::Normal)
@@ -216,6 +234,7 @@ pub(crate) fn statement(s: &St) -> CSt {
             Box::new(move |i| {
                 i.tick()?;
                 let container = iter(i)?;
+                let container = if container.is_compact() { container.shallow().into_owned() } else { container };
                 let b = i.base;
                 match container {
                     Value::Array(a, _) => {
@@ -311,7 +330,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
             let c = c.clone();
             Box::new(move |i| {
                 i.pos = pos;
-                i.global(&c)
+                i.global_in(&c)
             })
         }
         ExK::Array(items) => {
@@ -370,7 +389,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                     let (va, vb) = (i.stack[i.base + sa].clone(), i.stack[i.base + sb].clone());
                     i.pos = pos;
-                    i.binop(op, va, vb, ov.as_ref())
+                    i.binop_in(op, va, vb, ov.as_ref())
                 });
             }
             if let (Some(sa), Some(y)) = (local(a), number(b)) {
@@ -382,7 +401,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     }
                     let va = i.stack[i.base + sa].clone();
                     i.pos = pos;
-                    i.binop(op, va, Value::num(y), ov.as_ref())
+                    i.binop_in(op, va, Value::num(y), ov.as_ref())
                 });
             }
             let (a, b) = (expression(a), expression(b));
@@ -393,7 +412,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&va, &vb) {
                     return i.num_op(op, *x, *y);
                 }
-                i.binop(op, va, vb, ov.as_ref())
+                i.binop_in(op, va, vb, ov.as_ref())
             })
         }
         ExK::And(a, b) => {
@@ -447,7 +466,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
             Box::new(move |i| {
                 let v = x(i)?;
                 i.pos = pos;
-                i.as_type(v, t)
+                i.as_type_in(v, t)
             })
         }
         // A function's arguments onto the stack, where its frame starts.
@@ -479,13 +498,16 @@ pub(crate) fn expression(e: &Ex) -> CEx {
             };
             let b = expression(b);
             Box::new(move |i| {
-                if let Some(s) = slot
-                    && let Value::Map(m, _) = &i.stack[i.base + s]
-                {
-                    return Ok(m.get(&k).cloned().unwrap_or_default());
+                if let Some(s) = slot {
+                    match &i.stack[i.base + s] {
+                        Value::Map(m, _) => return Ok(m.get(&k).cloned().unwrap_or_default()),
+                        Value::Quantity(x, u) => return Ok(quantity_member(*x, *u, &k)),
+                        _ => {}
+                    }
                 }
                 match b(i)? {
                     Value::Map(m, _) => Ok(m.get(&k).cloned().unwrap_or_default()),
+                    Value::Quantity(x, u) => Ok(quantity_member(x, u, &k)),
                     Value::Undefined if safe => Ok(Value::Undefined),
                     other => {
                         i.pos = pos;
@@ -504,7 +526,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
             Box::new(move |i| {
                 // (A local array's element read in its slot: no copy of the array. No expression changes a local.)
                 if let Some(s) = slot
-                    && matches!(i.stack[i.base + s], Value::Array(..))
+                    && matches!(i.stack[i.base + s], Value::Array(..) | Value::Vector(..))
                 {
                     let idx = x(i)?;
                     i.pos = pos;
@@ -517,7 +539,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                         return Ok(a[*n as usize].clone());
                     }
                     let base = i.stack[at].clone();
-                    return i.index(base, &idx);
+                    return i.index_in(base, &idx);
                 }
                 let base = b(i)?;
                 if safe && base.is_undefined() {
@@ -525,7 +547,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                 }
                 let idx = x(i)?;
                 i.pos = pos;
-                i.index(base, &idx)
+                i.index_in(base, &idx)
             })
         }
         ExK::Neg(x, _) => {
@@ -560,7 +582,7 @@ pub(crate) fn expression(e: &Ex) -> CEx {
                     a.push(x(i)?);
                 }
                 i.pos = pos;
-                i.call_value(&f, a)
+                i.call_value_in(&f, a)
             })
         }
         // Missing functions, function values, boxes, lambdas, try, switch: the tree walker.

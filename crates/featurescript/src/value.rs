@@ -340,6 +340,114 @@ pub enum Value {
     Box(Shared<BoxCell>, Tag),
     Builtin(Arc<dyn Builtin>, Tag),
     Function(Shared<Func>),
+    /// A ValueWithUnits held in the value: `{ "unit" : unit(id), "value" : x } as ValueWithUnits` without its map
+    /// (FS-COMPILED-INTERP stage 2; std's operators make them). Alike in every respect but its form.
+    Quantity(f64, UnitId),
+    /// A Vector of two or three numbers, or lengths of one unit, held in the value: `[…] as Vector` without its
+    /// array.
+    Vector(Compact),
+}
+
+/// A unit map of [`UNITS`] (0: none, a Vector's plain numbers).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnitId(pub u32);
+
+/// A [`Value::Vector`]'s elements: `len` of `v`, plain numbers or quantities of `unit`.
+#[derive(Clone, Copy, Debug)]
+pub struct Compact {
+    pub v: [f64; 3],
+    pub unit: UnitId,
+    pub len: VecLen,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VecLen {
+    Two = 2,
+    Three = 3,
+}
+
+impl Compact {
+    pub fn len(&self) -> usize {
+        self.len as usize
+    }
+    pub fn is_empty(&self) -> bool {
+        false
+    }
+    /// Element `i` as a value (a number or a quantity).
+    pub fn at(&self, i: usize) -> Value {
+        if self.unit.0 == 0 { Value::num(self.v[i]) } else { Value::Quantity(self.v[i], self.unit) }
+    }
+    pub fn elements(&self) -> impl ExactSizeIterator<Item = Value> + DoubleEndedIterator + '_ {
+        (0..self.len()).map(|i| self.at(i))
+    }
+}
+
+/// The unit maps quantities name: kept for good (a few per run: meter, radian, their powers).
+static UNITS: LazyLock<RwLock<Vec<&'static Value>>> = LazyLock::new(Default::default);
+
+/// The unit map `id` names (from this thread's copy of the table, which only grows: no lock per operation).
+pub fn unit_value(id: UnitId) -> &'static Value {
+    static NONE: Value = Value::Undefined;
+    thread_local! {
+        static SEEN: std::cell::RefCell<Vec<&'static Value>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    let i = (id.0 as usize).wrapping_sub(1);
+    SEEN.with(|seen| {
+        if let Some(v) = seen.borrow().get(i) {
+            return *v;
+        }
+        let all = UNITS.read();
+        *seen.borrow_mut() = all.clone();
+        all.get(i).copied().unwrap_or(&NONE)
+    })
+}
+
+/// The id of unit map `unit` (made on first sight); `None` for anything but a map.
+pub fn unit_id(unit: &Value) -> Option<UnitId> {
+    let Value::Map(m, _) = unit else { return None };
+    thread_local! {
+        /// The last map asked (held: its address can't name another map meanwhile) and its id.
+        static LAST: std::cell::RefCell<Option<(Arc<Map>, u32)>> = const { std::cell::RefCell::new(None) };
+    }
+    if let Some(id) = LAST.with(|l| l.borrow().as_ref().filter(|(a, _)| Arc::ptr_eq(a, m)).map(|(_, id)| *id)) {
+        return Some(UnitId(id));
+    }
+    let found = UNITS.read().iter().position(|x| *x == unit);
+    let id = match found {
+        Some(i) => i as u32 + 1,
+        None => {
+            let mut u = UNITS.write();
+            match u.iter().position(|x| *x == unit) {
+                Some(i) => i as u32 + 1,
+                None => {
+                    u.push(Box::leak(Box::new(unit.clone())));
+                    u.len() as u32
+                }
+            }
+        }
+    };
+    LAST.with(|l| *l.borrow_mut() = Some((m.clone(), id)));
+    Some(UnitId(id))
+}
+
+fn std_tag_of(key: &'static str, cell: &'static std::sync::OnceLock<Tag>) -> Option<Tag> {
+    if let Some(t) = cell.get() {
+        return Some(*t);
+    }
+    let t = tag_of_key(key)?;
+    Some(*cell.get_or_init(|| t))
+}
+
+/// std's ValueWithUnits tag, once units.fs is loaded.
+pub fn vwu_tag() -> Option<Tag> {
+    static TAG: std::sync::OnceLock<Tag> = std::sync::OnceLock::new();
+    std_tag_of("onshape/std/units.fs#ValueWithUnits", &TAG)
+}
+
+/// std's Vector tag, once vector.fs is loaded.
+pub fn vector_tag() -> Option<Tag> {
+    static TAG: std::sync::OnceLock<Tag> = std::sync::OnceLock::new();
+    std_tag_of("onshape/std/vector.fs#Vector", &TAG)
 }
 
 /// Standard types, in sort order.
@@ -431,8 +539,8 @@ impl Value {
             Value::Bool(..) => StdType::Boolean,
             Value::Number(..) => StdType::Number,
             Value::Str(..) | Value::Enum(..) => StdType::String,
-            Value::Array(..) => StdType::Array,
-            Value::Map(..) => StdType::Map,
+            Value::Array(..) | Value::Vector(..) => StdType::Array,
+            Value::Map(..) | Value::Quantity(..) => StdType::Map,
             Value::Box(..) => StdType::Box,
             Value::Builtin(..) => StdType::Builtin,
             Value::Function(..) => StdType::Function,
@@ -442,7 +550,60 @@ impl Value {
     pub fn tag(&self) -> Tag {
         match self {
             Value::Bool(_, t) | Value::Number(_, t) | Value::Str(_, t) | Value::Array(_, t) | Value::Map(_, t) | Value::Box(_, t) | Value::Builtin(_, t) | Value::Enum(t, _) | Value::TaggedUndefined(t) => *t,
+            Value::Quantity(..) => vwu_tag().unwrap_or(Tag::NONE),
+            Value::Vector(..) => vector_tag().unwrap_or(Tag::NONE),
             _ => Tag::NONE,
+        }
+    }
+
+    /// A [`Value::Quantity`] or [`Value::Vector`]: a map or an array held in the value.
+    pub fn is_compact(&self) -> bool {
+        matches!(self, Value::Quantity(..) | Value::Vector(..))
+    }
+
+    /// The map or array a compact value stands for (one level: a Vector's elements stay quantities); others as they
+    /// are.
+    pub fn shallow(&self) -> std::borrow::Cow<'_, Value> {
+        use std::borrow::Cow;
+        match self {
+            Value::Quantity(x, u) => Cow::Owned(Value::Map(Arc::new(Map::with_unit_value(unit_value(*u).clone(), Value::num(*x))), self.tag())),
+            Value::Vector(c) => Cow::Owned(Value::Array(Arc::new(c.elements().collect()), self.tag())),
+            _ => Cow::Borrowed(self),
+        }
+    }
+
+    /// Whether this value holds a compact value anywhere (in its arrays, maps and boxes).
+    pub fn has_compact(&self) -> bool {
+        match self {
+            Value::Quantity(..) | Value::Vector(..) => true,
+            Value::Array(a, _) => a.iter().any(Value::has_compact),
+            Value::Map(m, _) => m.iter().any(|(k, v)| k.has_compact() || v.has_compact()),
+            Value::Box(b, _) => b.value.lock().has_compact(),
+            _ => false,
+        }
+    }
+
+    /// This value with every compact value made the map or array it stands for, all the way down (what the host
+    /// sees: natives' arguments, results the host asks for). Unchanged, without a copy, when it holds none.
+    pub fn materialized(self) -> Value {
+        if !self.has_compact() {
+            return self;
+        }
+        self.materialize()
+    }
+
+    fn materialize(self) -> Value {
+        match self {
+            Value::Quantity(..) | Value::Vector(..) => self.shallow().into_owned().materialize(),
+            Value::Array(a, t) => Value::Array(Arc::new(Arc::unwrap_or_clone(a).into_iter().map(Value::materialized).collect()), t),
+            Value::Map(m, t) => Value::Map(Arc::new(Arc::unwrap_or_clone(m).into_iter().map(|(k, v)| (k.materialized(), v.materialized())).collect()), t),
+            Value::Box(b, t) => {
+                // (Its holders all see the same contents, in their usual form.)
+                let inner = std::mem::take(&mut *b.value.lock());
+                *b.value.lock() = inner.materialized();
+                Value::Box(b, t)
+            }
+            other => other,
         }
     }
 
@@ -458,6 +619,9 @@ impl Value {
             Value::Map(m, _) => Value::Map(m, tag),
             Value::Builtin(b, _) => Value::Builtin(b, tag),
             Value::Box(b, _) => Value::Box(b, tag),
+            // (Its own tag keeps it compact; another makes it the map or array it stands for.)
+            v @ (Value::Quantity(..) | Value::Vector(..)) if v.tag() == tag => v,
+            v @ (Value::Quantity(..) | Value::Vector(..)) => v.shallow().into_owned().with_tag(tag),
             Value::Undefined | Value::TaggedUndefined(_) => {
                 if tag.is_none() { Value::Undefined } else { Value::TaggedUndefined(tag) }
             }
@@ -576,6 +740,13 @@ impl Ord for Value {
                 // As arrays of [key, value] arrays sorted by key: by size first.
                 a.len().cmp(&b.len()).then_with(|| a.iter().cmp(b.iter()))
             }
+            (Value::Quantity(a, ua), Value::Quantity(b, ub)) => {
+                // As maps: the unit first ("unit" < "value"), then the number.
+                let units = if ua == ub { Ordering::Equal } else { unit_value(*ua).cmp(unit_value(*ub)) };
+                units.then_with(|| a.partial_cmp(b).unwrap_or(Ordering::Equal))
+            }
+            (Value::Vector(a), Value::Vector(b)) => a.len.cmp(&b.len).then_with(|| a.elements().cmp(b.elements())),
+            (a, b) if a.is_compact() || b.is_compact() => a.shallow().cmp(&b.shallow()),
             (Value::Box(a, _), Value::Box(b, _)) => a.serial.cmp(&b.serial),
             (Value::Builtin(a, _), Value::Builtin(b, _)) => a.serial().cmp(&b.serial()),
             (Value::Function(a), Value::Function(b)) => {
@@ -650,6 +821,7 @@ pub fn to_display(v: &Value) -> String {
 
 fn write_display(out: &mut String, v: &Value, top: bool) {
     match v {
+        Value::Quantity(..) | Value::Vector(..) => write_display(out, &v.shallow(), top),
         Value::Undefined => out.push_str("undefined"),
         Value::TaggedUndefined(t) => {
             let _ = write!(out, "{} : undefined", tag_name(*t));

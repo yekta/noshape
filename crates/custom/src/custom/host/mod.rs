@@ -810,6 +810,9 @@ pub fn register() {
         all.extend_from_slice(builtin::NATIVES);
         all.extend_from_slice(super::reference::NATIVES);
         noshape_featurescript::interp::register_natives(&all);
+        // The fields these read with compact-aware helpers (vec2_of, vec3_of): passed as they are, not as maps and
+        // arrays (a Displacement map's million parameters and control points).
+        noshape_featurescript::interp::register_compact_fields(&[("evFaceTangentPlanes", &["parameters"]), ("opCreateBSplineSurface", &["bSplineSurface"])]);
         legacy::register();
 
     });

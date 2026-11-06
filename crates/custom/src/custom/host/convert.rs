@@ -82,7 +82,11 @@ pub fn mass_value(x: f64) -> Value {
 
 /// The unit map of a ValueWithUnits (`{"meter": 1}`), `None` for numbers.
 fn units_of(v: &Value) -> Option<Vec<(Arc<str>, f64)>> {
-    let u = v.get("unit").as_map()?;
+    // (A compact ValueWithUnits names its unit map.)
+    let u = match v {
+        Value::Quantity(_, id) => noshape_featurescript::value::unit_value(*id).as_map()?,
+        _ => v.get("unit").as_map()?,
+    };
     Some(u.iter().filter_map(|(k, x)| Some((k.as_str()?, x.as_number()?))).collect())
 }
 
@@ -95,6 +99,7 @@ fn is_unit(v: &Value, name: &str, power: f64) -> bool {
 pub fn length_of(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n, _) => Some(*n),
+        Value::Quantity(x, _) if is_unit(v, "meter", 1.0) => Some(*x),
         Value::Map(..) if is_unit(v, "meter", 1.0) => v.get("value").as_number(),
         _ => None,
     }
@@ -104,6 +109,7 @@ pub fn length_of(v: &Value) -> Option<f64> {
 pub fn angle_of(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n, _) => Some(*n),
+        Value::Quantity(x, _) if is_unit(v, "radian", 1.0) => Some(*x),
         Value::Map(..) if is_unit(v, "radian", 1.0) => v.get("value").as_number(),
         _ => None,
     }
@@ -113,6 +119,7 @@ pub fn angle_of(v: &Value) -> Option<f64> {
 pub fn magnitude_of(v: &Value) -> Option<f64> {
     match v {
         Value::Number(n, _) => Some(*n),
+        Value::Quantity(x, _) => Some(*x),
         Value::Map(..) => v.get("value").as_number(),
         _ => None,
     }
@@ -120,6 +127,9 @@ pub fn magnitude_of(v: &Value) -> Option<f64> {
 
 /// A 3D point or direction: an array of 3 lengths or numbers.
 pub fn vec3_of(v: &Value) -> Option<DVec3> {
+    if let Value::Vector(c) = v {
+        return (c.len() == 3).then(|| DVec3::from_array(c.v));
+    }
     let a = v.as_array()?;
     if a.len() != 3 {
         return None;
@@ -128,6 +138,9 @@ pub fn vec3_of(v: &Value) -> Option<DVec3> {
 }
 
 pub fn vec2_of(v: &Value) -> Option<DVec2> {
+    if let Value::Vector(c) = v {
+        return (c.len() == 2).then(|| DVec2::new(c.v[0], c.v[1]));
+    }
     let a = v.as_array()?;
     if a.len() != 2 {
         return None;

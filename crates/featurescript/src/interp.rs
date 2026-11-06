@@ -17,7 +17,7 @@ use std::time::Instant;
 
 #[path = "interp_closure.rs"]
 pub(crate) mod closure;
-pub use closure::set_tree_walker_default;
+pub use closure::{set_compact_default, set_tree_walker_default};
 
 /// A runtime builtin (`@name`).
 pub type NativeFn = fn(&mut Interp, Vec<Value>) -> R<Value>;
@@ -81,6 +81,36 @@ pub struct Notice {
 // ---------------------------------------------------------------- natives
 
 static HOST_NATIVES: LazyLock<RwLock<HashMap<&'static str, NativeFn>>> = LazyLock::new(Default::default);
+
+/// Host natives' fields read with compact-aware helpers ([`register_compact_fields`]).
+static COMPACT_FIELDS: LazyLock<RwLock<HashMap<&'static str, &'static [&'static str]>>> = LazyLock::new(Default::default);
+
+/// Host natives whose definition's `fields` (their map argument's) take compact values as they are: the native
+/// reads them with compact-aware helpers. Their other arguments and fields are maps and arrays as ever.
+pub fn register_compact_fields(list: &[(&'static str, &'static [&'static str])]) {
+    let mut m = COMPACT_FIELDS.write();
+    for (n, f) in list {
+        m.insert(n, f);
+    }
+}
+
+/// `v` without compact values but in `keep`'s fields (a map's).
+fn materialized_but(v: Value, keep: &[&str]) -> Value {
+    match v {
+        Value::Map(m, t) if m.iter().any(|(k, x)| !k.as_str().is_some_and(|k| keep.contains(&&*k)) && x.has_compact()) => {
+            let m = Arc::unwrap_or_clone(m).into_iter().map(|(k, x)| if k.as_str().is_some_and(|s| keep.contains(&&*s)) { (k, x) } else { (k, x.materialized()) }).collect();
+            Value::Map(Arc::new(m), t)
+        }
+        Value::Map(..) => v,
+        other => other.materialized(),
+    }
+}
+
+/// This crate's natives that move elements without reading them (the host's own of these names excepted).
+fn structural_native(name: &str) -> bool {
+    const MOVERS: [&str; 11] = ["size", "resize", "subArray", "concatenateArrays", "indexOf", "keys", "values", "mergeMaps", "intersectMaps", "reverse", "range"];
+    MOVERS.contains(&name) && !HOST_NATIVES.read().contains_key(name)
+}
 
 /// Values the host substitutes for top-level constants, by (module path,
 /// name): std features the host evaluates itself.
@@ -200,6 +230,9 @@ pub struct Interp {
     /// Run function bodies with the tree walker, not their closures ([`closure`]; NOSHAPE_FS_TREE=1: the reference
     /// of the differential test).
     pub tree_walker: bool,
+    /// std's operators answer compact values (`Value::Quantity`, `Value::Vector`; NOSHAPE_FS_PLAIN=1: never, the
+    /// reference of the differential test).
+    pub compact: bool,
 }
 
 /// Time spent running each source line (module, 1-based line), including
@@ -282,6 +315,7 @@ impl Interp {
             profile: None,
             stopped: None,
             tree_walker: closure::tree_walker_default(),
+            compact: closure::compact_default(),
         }
     }
 
@@ -362,6 +396,8 @@ impl Interp {
 
     /// Raise `value` at the current position.
     pub fn raise(&mut self, value: Value) -> Box<Exception> {
+        // (A thrown value reaches the host: in its usual form.)
+        let value = value.materialized();
         let e = Box::new(Exception { value, module: self.module.clone(), pos: self.pos, trace: self.frames.clone(), internal: false });
         self.note_exception(&e);
         e
@@ -369,6 +405,7 @@ impl Interp {
 
     /// Raise `value` with `notice` as the notice text.
     pub fn raise_noted(&mut self, value: Value, notice: String) -> Box<Exception> {
+        let value = value.materialized();
         let e = Box::new(Exception { value, module: self.module.clone(), pos: self.pos, trace: self.frames.clone(), internal: false });
         if self.silent == 0 && self.notices.len() < MAX_NOTICES {
             self.notices.push(Notice { kind: NoticeKind::Error, message: notice, module: e.module.clone(), pos: e.pos, trace: e.trace.clone() });
@@ -379,6 +416,7 @@ impl Interp {
     /// `throw v`: the notice reads "throw custom", "throw my message"
     /// (a regenError's custom message), "throw { "a" : 1 }" (live).
     pub fn throw(&mut self, value: Value) -> Box<Exception> {
+        let value = value.materialized();
         let text = match &value {
             Value::Str(s, _) => s.to_string(),
             Value::Map(..) if !value.get("customMessage").is_undefined() => error_text(value.get("customMessage")),
@@ -442,7 +480,7 @@ impl Interp {
     // ------------------------------------------------------------ globals
 
     /// Value of a top-level constant (initialized on first use).
-    pub fn global(&mut self, cell: &Arc<GlobalCell>) -> R<Value> {
+    pub(crate) fn global_in(&mut self, cell: &Arc<GlobalCell>) -> R<Value> {
         if let Some(v) = cell.value.get() {
             return v.clone().map_err(|e| self.raise(e));
         }
@@ -469,7 +507,7 @@ impl Interp {
         let base = self.stack.len();
         self.stack.resize(base + *frame as usize, Value::Undefined);
         self.base = base;
-        let mut r = self.eval(ex);
+        let mut r = self.eval_in(ex);
         if let (Ok(v), Some(Some(t))) = (&r, cell.ty.get())
             && !t.matches(v)
         {
@@ -489,25 +527,21 @@ impl Interp {
     // ------------------------------------------------------------ calls
 
     /// Call a function value with arguments.
-    pub fn call_value(&mut self, f: &Value, args: Vec<Value>) -> R<Value> {
+    pub(crate) fn call_value_in(&mut self, f: &Value, args: Vec<Value>) -> R<Value> {
         match f {
             Value::Function(func) => match &**func {
                 Func::Closure { def, captures } => {
                     let (def, captures) = (def.clone(), captures.clone());
-                    self.invoke(&def, args, &captures, true)
+                    self.invoke_in(&def, args, &captures, true)
                 }
                 Func::Overloads(set) => {
                     let set = set.clone();
-                    self.call_set(&set, args)
+                    self.call_set_in(&set, args)
                 }
                 Func::Native { name, f, bound } => {
-                    let (f, mut all) = (*f, bound.clone());
+                    let (f, mut all, name) = (*f, bound.clone(), name.clone());
                     all.extend(args);
-                    let saved = std::mem::replace(&mut self.native_name, name.clone());
-                    let r = f(self, all);
-                    self.native_name = saved;
-                    self.native_stopped(&r);
-                    r
+                    self.call_native(f, &name, all)
                 }
             },
             other => Err(self.error(format!("Called value must be function, value is {}", other.error_type()))),
@@ -515,17 +549,17 @@ impl Interp {
     }
 
     /// Call the best overload of `set` for `args`.
-    pub fn call_set(&mut self, set: &Arc<OverloadSet>, mut args: Vec<Value>) -> R<Value> {
+    pub(crate) fn call_set_in(&mut self, set: &Arc<OverloadSet>, mut args: Vec<Value>) -> R<Value> {
         let (decl, op) = self.resolve_cached(set, &args)?;
         if let Some(op) = op
-            && let Some(v) = crate::std_ops::apply(op, &decl, &mut args)
+            && let Some(v) = crate::std_ops::apply(op, &decl, &mut args, self.compact)
         {
             return Ok(v);
         }
         let Some(c) = decl.compiled.get() else {
             return Err(self.error(format!("Function {} is not compiled", set.name)));
         };
-        self.invoke(c, args, &[], false)
+        self.invoke_in(c, args, &[], false)
     }
 
     /// Call the best overload of `set` for the arguments on the stack from `base`.
@@ -538,7 +572,7 @@ impl Interp {
             }
         };
         if let Some(op) = op
-            && let Some(v) = crate::std_ops::apply(op, &decl, &mut self.stack[base..])
+            && let Some(v) = crate::std_ops::apply(op, &decl, &mut self.stack[base..], self.compact)
         {
             self.stack.truncate(base);
             return Ok(v);
@@ -586,6 +620,9 @@ impl Interp {
     /// walker's and the closures' alike).
     fn grow_one(&mut self, slot: u32, set: &Arc<OverloadSet>, y: Value) -> R<Flow> {
         let idx = self.base + slot as usize;
+        if self.stack[idx].is_compact() {
+            self.stack[idx] = self.stack[idx].shallow().into_owned();
+        }
         let pair = [self.stack[idx].clone(), y];
         let (d, _) = self.resolve_cached(set, &pair)?;
         if matches!(pair[0], Value::Array(..)) && &*d.module == "onshape/std/containers.fs" {
@@ -597,7 +634,7 @@ impl Interp {
                 if &*d.name == "append" {
                     v.push(y);
                 } else {
-                    if let Value::Array(b, _) = y {
+                    if let Value::Array(b, _) = y.shallow().into_owned() {
                         v.extend(Arc::unwrap_or_clone(b));
                     }
                     // @concatenateArrays answers an untagged array.
@@ -609,7 +646,7 @@ impl Interp {
         let Some(c) = d.compiled.get() else {
             return Err(self.error(format!("Function {} is not compiled", d.name)));
         };
-        self.stack[idx] = self.invoke(c, pair.into(), &[], false)?;
+        self.stack[idx] = self.invoke_in(c, pair.into(), &[], false)?;
         Ok(Flow::Normal)
     }
 
@@ -622,7 +659,7 @@ impl Interp {
         // `x = append(x, v)`, `x = concatenateArrays(x, y)`: the two arguments without a vector of them.
         if let ([y], Callee::Overloads(set)) = (rest, callee) {
             self.pos = pos;
-            let y = self.eval(y)?;
+            let y = self.eval_in(y)?;
             self.pos = pos;
             return self.grow_one(slot, set, y);
         }
@@ -630,10 +667,13 @@ impl Interp {
         let mut a = Vec::with_capacity(rest.len() + 1);
         a.push(Value::Undefined);
         for x in rest {
-            a.push(self.eval(x)?);
+            a.push(self.eval_in(x)?);
         }
         self.pos = pos;
         let idx = self.base + slot as usize;
+        if self.stack[idx].is_compact() {
+            self.stack[idx] = self.stack[idx].shallow().into_owned();
+        }
         a[0] = self.stack[idx].clone();
         let decl = match callee {
             Callee::Overloads(set) => Some(self.resolve_cached(set, &a)?.0),
@@ -658,7 +698,7 @@ impl Interp {
                 match grow {
                     Grow::Push => v.push(a.pop().unwrap_or_default()),
                     Grow::Extend => {
-                        if let Some(Value::Array(b, _)) = a.pop() {
+                        if let Some(Value::Array(b, _)) = a.pop().map(|y| y.shallow().into_owned()) {
                             v.extend(Arc::unwrap_or_clone(b));
                         }
                         // @concatenateArrays answers an untagged array.
@@ -674,15 +714,9 @@ impl Interp {
                 let Some(c) = d.compiled.get() else {
                     return Err(self.error(format!("Function {} is not compiled", d.name)));
                 };
-                self.invoke(c, a, &[], false)?
+                self.invoke_in(c, a, &[], false)?
             }
-            (None, Callee::Native(n, name)) => {
-                let saved = std::mem::replace(&mut self.native_name, name.clone());
-                let r = n(self, a);
-                self.native_name = saved;
-                self.native_stopped(&r);
-                r?
-            }
+            (None, Callee::Native(n, name)) => self.call_native(*n, name, a)?,
             (None, _) => return Err(self.error("Not a call that grows an array")),
         };
         self.stack[idx] = r;
@@ -801,7 +835,7 @@ impl Interp {
     }
 
     /// Run a compiled function.
-    pub fn invoke(&mut self, f: &CompiledFn, args: Vec<Value>, captures: &[Value], check_types: bool) -> R<Value> {
+    pub(crate) fn invoke_in(&mut self, f: &CompiledFn, args: Vec<Value>, captures: &[Value], check_types: bool) -> R<Value> {
         if self.frames.len() >= MAX_DEPTH {
             return Err(self.error("Maximum call stack depth exceeded."));
         }
@@ -904,7 +938,7 @@ impl Interp {
                 closure::CBody::Expr(e) => Flow::Return(e(self)?),
                 closure::CBody::Block(stmts) => closure::run_block(self, stmts)?,
             },
-            (None, FnBody::Expr(e)) => Flow::Return(self.eval(e)?),
+            (None, FnBody::Expr(e)) => Flow::Return(self.eval_in(e)?),
             (None, FnBody::Block(stmts)) => self.exec_block(stmts)?,
         };
         let v = match flow {
@@ -935,7 +969,7 @@ impl Interp {
 
     /// A condition; `at` locates its error (Onshape: the statement).
     fn cond(&mut self, e: &Ex, what: &str, at: Pos) -> R<bool> {
-        let v = self.eval(e)?;
+        let v = self.eval_in(e)?;
         self.cond_value(v, what, at)
     }
 
@@ -973,7 +1007,7 @@ impl Interp {
         match &s.k {
             StK::Let { slot, ty, init } => {
                 let v = match init {
-                    Some(e) => self.eval(e)?,
+                    Some(e) => self.eval_in(e)?,
                     None => Value::Undefined,
                 };
                 if let Some(t) = ty
@@ -996,14 +1030,14 @@ impl Interp {
                 }
                 // A local itself (`x = v`, `x += v`): its slot directly.
                 if path.is_empty() {
-                    let rhs = self.eval(value)?;
+                    let rhs = self.eval_in(value)?;
                     self.pos = s.pos;
                     let idx = self.base + *slot as usize;
                     self.stack[idx] = match op {
                         None => rhs,
                         Some((o, ov)) => {
                             let old = std::mem::take(&mut self.stack[idx]);
-                            self.binop(*o, old, rhs, ov.as_ref())?
+                            self.binop_in(*o, old, rhs, ov.as_ref())?
                         }
                     };
                     return Ok(Flow::Normal);
@@ -1012,11 +1046,11 @@ impl Interp {
                 for a in path {
                     keys.push(match a {
                         Acc::Member(k) => AccVal::Key(k.clone()),
-                        Acc::Index(e) => AccVal::Key(self.eval(e)?),
+                        Acc::Index(e) => AccVal::Key(self.eval_in(e)?),
                         Acc::Box => AccVal::Box,
                     });
                 }
-                let rhs = self.eval(value)?;
+                let rhs = self.eval_in(value)?;
                 self.pos = s.pos;
                 let idx = self.base + *slot as usize;
                 let mut root = std::mem::take(&mut self.stack[idx]);
@@ -1027,7 +1061,7 @@ impl Interp {
                         None => rhs,
                         Some((o, ov)) => {
                             let old = std::mem::take(target);
-                            me.binop(*o, old, rhs, ov.as_ref())?
+                            me.binop_in(*o, old, rhs, ov.as_ref())?
                         }
                     };
                     Ok(())
@@ -1036,10 +1070,10 @@ impl Interp {
                 r.map(|_| Flow::Normal)
             }
             StK::Expr(e) => {
-                self.eval(e)?;
+                self.eval_in(e)?;
                 Ok(Flow::Normal)
             }
-            StK::Check(e, text) => match self.eval(e)? {
+            StK::Check(e, text) => match self.eval_in(e)? {
                 Value::Bool(true, _) => Ok(Flow::Normal),
                 Value::Bool(false, _) => {
                     self.failed_check = Some((s.pos, text.clone()));
@@ -1092,7 +1126,8 @@ impl Interp {
                 Ok(Flow::Normal)
             }
             StK::ForIn { key, val, iter, body } => {
-                let container = self.eval(iter)?;
+                let container = self.eval_in(iter)?;
+                let container = if container.is_compact() { container.shallow().into_owned() } else { container };
                 let b = self.base;
                 match container {
                     Value::Array(a, _) => {
@@ -1138,7 +1173,7 @@ impl Interp {
             }
             StK::Return(e) => {
                 let v = match e {
-                    Some(e) => self.eval(e)?,
+                    Some(e) => self.eval_in(e)?,
                     None => Value::Undefined,
                 };
                 // A wrong return type is reported at the return statement.
@@ -1149,7 +1184,7 @@ impl Interp {
             StK::Continue => Ok(Flow::Continue),
             StK::Throw(e) => {
                 let v = match e {
-                    Some(e) => self.eval(e)?,
+                    Some(e) => self.eval_in(e)?,
                     None => Value::Undefined,
                 };
                 self.pos = s.pos;
@@ -1197,6 +1232,10 @@ impl Interp {
         let Some((first, rest)) = path.split_first() else {
             return leaf(self, target);
         };
+        // (Into a compact value: as the map or array it stands for.)
+        if target.is_compact() {
+            *target = target.shallow().into_owned();
+        }
         match first {
             AccVal::Key(k) => match target {
                 Value::Map(m, _) => {
@@ -1243,27 +1282,27 @@ impl Interp {
 
     // ------------------------------------------------------------ expressions
 
-    pub fn eval(&mut self, e: &Ex) -> R<Value> {
+    pub(crate) fn eval_in(&mut self, e: &Ex) -> R<Value> {
         match &e.k {
             ExK::Lit(v) => Ok(v.clone()),
             ExK::Local(s) => Ok(self.stack[self.base + *s as usize].clone()),
             ExK::Global(c) => {
                 self.pos = e.pos;
-                self.global(c)
+                self.global_in(c)
             }
             ExK::FnValue(set) => Ok(Value::Function(Shared::new(Func::Overloads(set.clone())))),
             ExK::Array(items) => {
                 let mut v = Vec::with_capacity(items.len());
                 for x in items {
-                    v.push(self.eval(x)?);
+                    v.push(self.eval_in(x)?);
                 }
                 Ok(Value::array(v))
             }
             ExK::Map(entries) => {
                 let mut m = Map::new();
                 for (k, x) in entries {
-                    let k = self.eval(k)?;
-                    let x = self.eval(x)?;
+                    let k = self.eval_in(k)?;
+                    let x = self.eval_in(x)?;
                     if x.is_undefined() {
                         m.remove(&k);
                     } else {
@@ -1273,11 +1312,11 @@ impl Interp {
                 Ok(Value::map(m))
             }
             ExK::Neg(x, _) => {
-                let v = self.eval(x)?;
+                let v = self.eval_in(x)?;
                 self.pos = e.pos;
                 self.negated(v)
             }
-            ExK::Not(x) => match self.eval(x)? {
+            ExK::Not(x) => match self.eval_in(x)? {
                 Value::Bool(b, _) => Ok(Value::bool(!b)),
                 _ => {
                     self.pos = e.pos;
@@ -1285,10 +1324,10 @@ impl Interp {
                 }
             },
             ExK::Bin(op, a, b, ov) => {
-                let va = self.eval(a)?;
-                let vb = self.eval(b)?;
+                let va = self.eval_in(a)?;
+                let vb = self.eval_in(b)?;
                 self.pos = e.pos;
-                self.binop(*op, va, vb, ov.as_ref())
+                self.binop_in(*op, va, vb, ov.as_ref())
             }
             ExK::And(a, b) => {
                 if !self.cond(a, "Operand of &&", a.pos)? {
@@ -1303,24 +1342,24 @@ impl Interp {
                 Ok(Value::bool(self.cond(b, "Operand of ||", b.pos)?))
             }
             ExK::Coalesce(a, b) => {
-                let v = self.eval(a)?;
-                if v.is_undefined() { self.eval(b) } else { Ok(v) }
+                let v = self.eval_in(a)?;
+                if v.is_undefined() { self.eval_in(b) } else { Ok(v) }
             }
             ExK::Cond(c, a, b) => {
                 if self.cond(c, "First operand of logical or conditional operator", c.pos)? {
-                    self.eval(a)
+                    self.eval_in(a)
                 } else {
-                    self.eval(b)
+                    self.eval_in(b)
                 }
             }
             ExK::Is(x, t) => {
-                let v = self.eval(x)?;
+                let v = self.eval_in(x)?;
                 Ok(Value::bool(t.matches(&v)))
             }
             ExK::As(x, t) => {
-                let v = self.eval(x)?;
+                let v = self.eval_in(x)?;
                 self.pos = e.pos;
-                self.as_type(v, *t)
+                self.as_type_in(v, *t)
             }
             ExK::Call(callee, args) => {
                 // Onshape locates errors in a call's arguments that have no
@@ -1332,7 +1371,7 @@ impl Interp {
                 if let Callee::Overloads(set) = callee {
                     let base = self.stack.len();
                     for x in args {
-                        match self.eval(x) {
+                        match self.eval_in(x) {
                             Ok(v) => self.stack.push(v),
                             Err(err) => {
                                 self.discard_from(base);
@@ -1344,19 +1383,19 @@ impl Interp {
                     return self.call_set_at(set, base);
                 }
                 let f = match callee {
-                    Callee::Value(fx) => Some(self.eval(fx)?),
+                    Callee::Value(fx) => Some(self.eval_in(fx)?),
                     _ => None,
                 };
                 let mut a = Vec::with_capacity(args.len());
                 for x in args {
-                    a.push(self.eval(x)?);
+                    a.push(self.eval_in(x)?);
                 }
                 if !matches!(callee, Callee::Missing(..)) {
                     self.pos = e.pos;
                 }
                 match callee {
-                    Callee::Overloads(set) => self.call_set(set, a),
-                    Callee::Value(_) => self.call_value(&f.unwrap_or_default(), a),
+                    Callee::Overloads(set) => self.call_set_in(set, a),
+                    Callee::Value(_) => self.call_value_in(&f.unwrap_or_default(), a),
                     Callee::Native(n, name) => self.call_native(*n, name, a),
                     Callee::MissingNative(name) => Err(self.error(format!("@{name} is not supported"))),
                     Callee::Missing(name, n) => Err(self.error(format!("Function {name} with {n} argument(s) not found"))),
@@ -1365,9 +1404,9 @@ impl Interp {
             ExK::Index(b, i, safe) => {
                 // (A local array's element read in its slot: no copy of the array. No expression changes a local.)
                 if let ExK::Local(slot) = b.k
-                    && matches!(self.stack[self.base + slot as usize], Value::Array(..))
+                    && matches!(self.stack[self.base + slot as usize], Value::Array(..) | Value::Vector(..))
                 {
-                    let idx = self.eval(i)?;
+                    let idx = self.eval_in(i)?;
                     self.pos = e.pos;
                     let at = self.base + slot as usize;
                     if let (Value::Array(a, _), Value::Number(n, _)) = (&self.stack[at], &idx)
@@ -1378,26 +1417,29 @@ impl Interp {
                         return Ok(a[*n as usize].clone());
                     }
                     let base = self.stack[at].clone();
-                    return self.index(base, &idx);
+                    return self.index_in(base, &idx);
                 }
-                let base = self.eval(b)?;
+                let base = self.eval_in(b)?;
                 if *safe && base.is_undefined() {
                     return Ok(Value::Undefined);
                 }
-                let idx = self.eval(i)?;
+                let idx = self.eval_in(i)?;
                 self.pos = e.pos;
-                self.index(base, &idx)
+                self.index_in(base, &idx)
             }
             ExK::Member(b, k, safe) => {
                 // (A local's member read in its slot: no copy of the map.)
-                if let ExK::Local(slot) = b.k
-                    && let Value::Map(m, _) = &self.stack[self.base + slot as usize]
-                {
-                    return Ok(m.get(k).cloned().unwrap_or_default());
+                if let ExK::Local(slot) = b.k {
+                    match &self.stack[self.base + slot as usize] {
+                        Value::Map(m, _) => return Ok(m.get(k).cloned().unwrap_or_default()),
+                        Value::Quantity(x, u) => return Ok(quantity_member(*x, *u, k)),
+                        _ => {}
+                    }
                 }
-                let base = self.eval(b)?;
+                let base = self.eval_in(b)?;
                 match base {
                     Value::Map(m, _) => Ok(m.get(k).cloned().unwrap_or_default()),
+                    Value::Quantity(x, u) => Ok(quantity_member(x, u, k)),
                     Value::Undefined if *safe => Ok(Value::Undefined),
                     other => {
                         self.pos = e.pos;
@@ -1405,7 +1447,7 @@ impl Interp {
                     }
                 }
             }
-            ExK::BoxGet(b, safe) => match self.eval(b)? {
+            ExK::BoxGet(b, safe) => match self.eval_in(b)? {
                 Value::Box(bx, _) => Ok(bx.value.lock().clone()),
                 Value::Undefined if *safe => Ok(Value::Undefined),
                 other => {
@@ -1418,7 +1460,7 @@ impl Interp {
                 Ok(Value::Function(Shared::new(Func::Closure { def: def.clone(), captures })))
             }
             ExK::NewBox(x) => {
-                let v = self.eval(x)?;
+                let v = self.eval_in(x)?;
                 Ok(Value::new_box(v))
             }
             ExK::Try(silent, x) => {
@@ -1427,7 +1469,7 @@ impl Interp {
                 }
                 let depth = self.frames.len();
                 let (base, module, version) = (self.base, self.module.clone(), self.module_version);
-                let r = self.eval(x);
+                let r = self.eval_in(x);
                 if *silent {
                     self.silent -= 1;
                 }
@@ -1444,10 +1486,10 @@ impl Interp {
                 }
             }
             ExK::Switch(subject, entries) => {
-                let s = self.eval(subject)?;
+                let s = self.eval_in(subject)?;
                 for (k, v) in entries {
-                    if self.eval(k)? == s {
-                        return self.eval(v);
+                    if self.eval_in(k)? == s {
+                        return self.eval_in(v);
                     }
                 }
                 Ok(Value::Undefined)
@@ -1475,7 +1517,38 @@ impl Interp {
     }
 
     /// A native's call with its arguments (its errors read "@name: …").
-    fn call_native(&mut self, n: NativeFn, name: &Name, a: Vec<Value>) -> R<Value> {
+    fn call_native(&mut self, n: NativeFn, name: &Name, mut a: Vec<Value>) -> R<Value> {
+        // The host reads maps and arrays: its natives' arguments without compact values all the way down; this
+        // crate's natives that only move elements need their top level so (no scan of a big array per call).
+        // (@size of a compact value: its length, without making its array; std's preconditions ask per element.)
+        if &**name == "size"
+            && let [v @ (Value::Vector(..) | Value::Quantity(..))] = a.as_slice()
+            && !HOST_NATIVES.read().contains_key("size")
+        {
+            return Ok(Value::num(match v {
+                Value::Vector(c) => c.len(),
+                _ => 2,
+            } as f64));
+        }
+        let keep = COMPACT_FIELDS.read().get(&**name).copied();
+        if let Some(keep) = keep {
+            a = a.into_iter().map(|v| materialized_but(v, keep)).collect();
+        } else if structural_native(name) {
+            for v in a.iter_mut().filter(|v| v.is_compact()) {
+                *v = v.shallow().into_owned();
+            }
+            // (@concatenateArrays takes an array of arrays: its compact Vectors too.)
+            if &**name == "concatenateArrays"
+                && let Some(Value::Array(arrays, _)) = a.first_mut()
+                && arrays.iter().any(Value::is_compact)
+            {
+                for v in Arc::make_mut(arrays).iter_mut().filter(|v| v.is_compact()) {
+                    *v = v.shallow().into_owned();
+                }
+            }
+        } else if a.iter().any(Value::has_compact) {
+            a = a.into_iter().map(Value::materialized).collect();
+        }
         let saved = std::mem::replace(&mut self.native_name, name.clone());
         let r = n(self, a);
         self.native_name = saved;
@@ -1483,7 +1556,12 @@ impl Interp {
         r
     }
 
-    pub fn index(&mut self, base: Value, idx: &Value) -> R<Value> {
+    pub(crate) fn index_in(&mut self, base: Value, idx: &Value) -> R<Value> {
+        if let Value::Vector(c) = &base {
+            let i = self.array_index(idx, c.len())?;
+            return Ok(c.at(i));
+        }
+        let base = if base.is_compact() { base.shallow().into_owned() } else { base };
         match base {
             Value::Array(a, _) => {
                 let i = self.array_index(idx, a.len())?;
@@ -1495,7 +1573,7 @@ impl Interp {
     }
 
     /// `v as t`.
-    pub fn as_type(&mut self, v: Value, t: TypeRef) -> R<Value> {
+    pub(crate) fn as_type_in(&mut self, v: Value, t: TypeRef) -> R<Value> {
         match t {
             TypeRef::Std(st) => {
                 if v.std_type() != st {
@@ -1549,7 +1627,7 @@ impl Interp {
         };
         let Some((decl, op)) = found else { return Ok(None) };
         if let Some(op) = op
-            && let Some(v) = crate::std_ops::apply(op, &decl, args)
+            && let Some(v) = crate::std_ops::apply(op, &decl, args, self.compact)
         {
             return Ok(Some(v));
         }
@@ -1557,11 +1635,11 @@ impl Interp {
             return Err(self.error(format!("Function {} is not compiled", set.name)));
         };
         let args = args.iter_mut().map(std::mem::take).collect();
-        self.invoke(c, args, &[], false).map(Some)
+        self.invoke_in(c, args, &[], false).map(Some)
     }
 
     /// A binary operator, with operator overloads for tagged operands.
-    pub fn binop(&mut self, op: BinOp, a: Value, b: Value, _ov: Option<&Arc<OverloadSet>>) -> R<Value> {
+    pub(crate) fn binop_in(&mut self, op: BinOp, a: Value, b: Value, _ov: Option<&Arc<OverloadSet>>) -> R<Value> {
         if let (Value::Number(x, Tag::NONE), Value::Number(y, Tag::NONE)) = (&a, &b) {
             return self.num_op(op, *x, *y);
         }
@@ -1620,6 +1698,34 @@ impl Interp {
         }
     }
 
+    // ------------------------------------------------------------ the host's entry points
+    // What these answer holds no compact values (`Value::materialized`): the host reads maps and arrays.
+
+    pub fn eval(&mut self, e: &Ex) -> R<Value> {
+        self.eval_in(e).map(Value::materialized)
+    }
+    pub fn call_set(&mut self, set: &Arc<OverloadSet>, args: Vec<Value>) -> R<Value> {
+        self.call_set_in(set, args).map(Value::materialized)
+    }
+    pub fn call_value(&mut self, f: &Value, args: Vec<Value>) -> R<Value> {
+        self.call_value_in(f, args).map(Value::materialized)
+    }
+    pub fn invoke(&mut self, f: &CompiledFn, args: Vec<Value>, captures: &[Value], check_types: bool) -> R<Value> {
+        self.invoke_in(f, args, captures, check_types).map(Value::materialized)
+    }
+    pub fn global(&mut self, cell: &Arc<GlobalCell>) -> R<Value> {
+        self.global_in(cell).map(Value::materialized)
+    }
+    pub fn index(&mut self, base: Value, idx: &Value) -> R<Value> {
+        self.index_in(base, idx).map(Value::materialized)
+    }
+    pub fn as_type(&mut self, v: Value, t: TypeRef) -> R<Value> {
+        self.as_type_in(v, t).map(Value::materialized)
+    }
+    pub fn binop(&mut self, op: BinOp, a: Value, b: Value, ov: Option<&Arc<OverloadSet>>) -> R<Value> {
+        self.binop_in(op, a, b, ov).map(Value::materialized)
+    }
+
     fn num_op(&mut self, op: BinOp, x: f64, y: f64) -> R<Value> {
         let r = match op {
             BinOp::Add => x + y,
@@ -1645,6 +1751,15 @@ impl Interp {
             return Err(self.error("Invalid number (NaN)"));
         }
         Ok(Value::num(r))
+    }
+}
+
+/// `q.key` of a compact ValueWithUnits: its value, its unit, else undefined (a map's member).
+pub(crate) fn quantity_member(x: f64, u: crate::value::UnitId, key: &Value) -> Value {
+    match key {
+        Value::Str(s, Tag::NONE) if &**s == "value" => Value::num(x),
+        Value::Str(s, Tag::NONE) if &**s == "unit" => crate::value::unit_value(u).clone(),
+        _ => Value::Undefined,
     }
 }
 

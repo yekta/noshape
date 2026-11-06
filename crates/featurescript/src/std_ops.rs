@@ -1,10 +1,11 @@
 //! std's ValueWithUnits and Vector operators (units.fs, vector.fs) run here: the values their FeatureScript bodies
 //! give, without a FeatureScript call per operation (a Displacement map's 262,144 points made millions, ~5 µs each).
 //! `None` wherever a body could answer otherwise (units that differ: its precondition's error; a NaN; a tagged
-//! number; a std before 2506, whose texts differ): the body runs as written.
+//! number; a std before 2506, whose texts differ): the body runs as written. With `compact`, the answers are
+//! compact values (`Value::Quantity`, `Value::Vector`: no map, no array) where they can be.
 
 use crate::ir::FnDecl;
-use crate::value::{Map, Tag, UNIT_KEY, VALUE_KEY, Value};
+use crate::value::{Compact, Map, Tag, UNIT_KEY, UnitId, VALUE_KEY, Value, VecLen, unit_id, unit_value, vector_tag, vwu_tag};
 use std::sync::{Arc, OnceLock};
 
 /// The first shipped std whose operators read as these (units.fs from 1024, vector.fs from 2506).
@@ -50,9 +51,9 @@ pub fn classify(decl: &FnDecl) -> Option<Op> {
     })
 }
 
-/// The value std's operator `decl` (classified `op`) answers for `args`, when it is one of these.
-/// `args` are taken only when answered (an operand's map or array then reused when nothing else holds it).
-pub fn apply(op: Op, decl: &FnDecl, args: &mut [Value]) -> Option<Value> {
+/// The value std's operator `decl` (classified `op`) answers for `args`, when it is one of these; compact values
+/// where they can be with `compact`. `args` are taken only when answered.
+pub fn apply(op: Op, decl: &FnDecl, args: &mut [Value], compact: bool) -> Option<Value> {
     #[cfg(test)]
     if OFF.with(|o| o.get()) {
         return None;
@@ -60,18 +61,59 @@ pub fn apply(op: Op, decl: &FnDecl, args: &mut [Value]) -> Option<Value> {
     match (op, &*args) {
         (Op::IsLength, [v]) => Some(Value::bool(is_length(v))),
         (Op::IsLengthVector, [v]) => Some(Value::bool(is_length_vector(v))),
-        (Op::Is3dLengthVector, [v]) => Some(Value::bool(is_length_vector(v) && v.as_array().is_some_and(|a| a.len() == 3))),
+        (Op::Is3dLengthVector, [v]) => Some(Value::bool(is_length_vector(v) && array_len(v) == Some(3))),
         (Op::ControlPointMatrix, [v]) => Some(Value::bool(control_point_matrix(v))),
-        (Op::Size, [Value::Array(a, _)]) => Some(Value::num(a.len() as f64)),
-        (Op::Size, [Value::Map(m, _)]) => Some(Value::num(m.len() as f64)),
+        (Op::Size, [v]) => array_len(v).or_else(|| map_len(v)).map(|n| Value::num(n as f64)),
         (Op::NewVector, _) => {
             let tag = vector_tag()?;
+            if compact && let Some(c) = compact_of(args) {
+                return Some(Value::Vector(c));
+            }
             Some(Value::Array(Arc::new(args.iter_mut().map(std::mem::take).collect()), tag))
         }
-        (Op::Units, _) => units(&decl.name, args),
-        (Op::Vectors, _) => vectors(decl, args),
+        (Op::Units, _) => units(&decl.name, args, compact),
+        (Op::Vectors, _) => vectors(decl, args, compact),
         _ => None,
     }
+}
+
+fn array_len(v: &Value) -> Option<usize> {
+    match v {
+        Value::Array(a, _) => Some(a.len()),
+        Value::Vector(c) => Some(c.len()),
+        _ => None,
+    }
+}
+
+fn map_len(v: &Value) -> Option<usize> {
+    match v {
+        Value::Map(m, _) => Some(m.len()),
+        Value::Quantity(..) => Some(2),
+        _ => None,
+    }
+}
+
+/// Two or three plain numbers, or quantities of one unit, as a compact Vector's elements.
+fn compact_of(items: &[Value]) -> Option<Compact> {
+    let len = match items.len() {
+        2 => VecLen::Two,
+        3 => VecLen::Three,
+        _ => return None,
+    };
+    let mut v = [0.0; 3];
+    let mut unit = None;
+    for (i, x) in items.iter().enumerate() {
+        let (n, u) = match x {
+            Value::Number(n, Tag::NONE) => (*n, UnitId(0)),
+            Value::Quantity(n, u) => (*n, *u),
+            _ => return None,
+        };
+        if *unit.get_or_insert(u) != u {
+            return None;
+        }
+        v[i] = n;
+    }
+    Some(Compact { v, unit: unit?, len })
 }
 
 fn tag(key: &'static str, cell: &'static OnceLock<Tag>) -> Option<Tag> {
@@ -82,56 +124,57 @@ fn tag(key: &'static str, cell: &'static OnceLock<Tag>) -> Option<Tag> {
     Some(*cell.get_or_init(|| t))
 }
 
-/// `isLength`: a ValueWithUnits whose unit is LENGTH_UNITS (`{ "meter" : 1 } as UnitSpec`).
-fn is_length(v: &Value) -> bool {
+/// LENGTH_UNITS: `{ "meter" : 1 } as UnitSpec`.
+fn is_length_unit(unit: &Value) -> bool {
     static SPEC: OnceLock<Tag> = OnceLock::new();
     static METER: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| Value::str("meter"));
-    let Value::Map(m, t) = v else { return false };
-    if Some(*t) != vwu_tag() {
-        return false;
-    }
-    let Some(Value::Map(unit, t)) = m.get(&UNIT_KEY) else { return false };
+    let Value::Map(unit, t) = unit else { return false };
     Some(*t) == tag("onshape/std/units.fs#UnitSpec", &SPEC) && unit.len() == 1 && unit.get(&METER) == Some(&Value::num(1.0))
 }
 
-fn vector_tag() -> Option<Tag> {
-    static VECTOR: OnceLock<Tag> = OnceLock::new();
-    tag("onshape/std/vector.fs#Vector", &VECTOR)
+/// `isLength`: a ValueWithUnits whose unit is LENGTH_UNITS.
+fn is_length(v: &Value) -> bool {
+    match v {
+        Value::Quantity(_, u) => is_length_unit(unit_value(*u)),
+        Value::Map(m, t) if Some(*t) == vwu_tag() => m.get(&UNIT_KEY).is_some_and(is_length_unit),
+        _ => false,
+    }
 }
 
 /// `isLengthVector`: a Vector of lengths.
 fn is_length_vector(v: &Value) -> bool {
-    let Value::Array(a, t) = v else { return false };
-    Some(*t) == vector_tag() && a.iter().all(is_length)
+    match v {
+        Value::Vector(c) => c.unit.0 != 0 && is_length_unit(unit_value(c.unit)),
+        Value::Array(a, t) => Some(*t) == vector_tag() && a.iter().all(is_length),
+        _ => false,
+    }
 }
 
 /// `canBeControlPointMatrix`: rows (arrays) as long as the first, of 3D length vectors.
 fn control_point_matrix(v: &Value) -> bool {
     let Value::Array(rows, _) = v else { return false };
-    let width = rows.first().map(|r| r.as_array().map(|a| a.len()));
+    let width = rows.first().map(array_len);
     for row in rows.iter() {
-        let Some(r) = row.as_array() else { return false };
-        if Some(Some(r.len())) != width || !r.iter().all(|x| is_length_vector(x) && x.as_array().is_some_and(|a| a.len() == 3)) {
+        let Value::Array(r, _) = row else { return false };
+        if Some(Some(r.len())) != width || !r.iter().all(|x| is_length_vector(x) && array_len(x) == Some(3)) {
             return false;
         }
     }
     true
 }
 
-fn vwu_tag() -> Option<Tag> {
-    static TAG: OnceLock<Tag> = OnceLock::new();
-    tag("onshape/std/units.fs#ValueWithUnits", &TAG)
-}
-
-/// A ValueWithUnits: its map, tag, value and unit.
+/// A ValueWithUnits: its map (none: compact), tag, value and unit.
 struct Vwu<'a> {
-    map: &'a Arc<Map>,
+    map: Option<&'a Arc<Map>>,
     tag: Tag,
     value: f64,
     unit: &'a Value,
 }
 
 fn vwu(v: &Value) -> Option<Vwu<'_>> {
+    if let Value::Quantity(x, u) = v {
+        return Some(Vwu { map: None, tag: vwu_tag()?, value: *x, unit: unit_value(*u) });
+    }
     let Value::Map(map, tag) = v else { return None };
     if Some(*tag) != vwu_tag() {
         return None;
@@ -141,7 +184,7 @@ fn vwu(v: &Value) -> Option<Vwu<'_>> {
         None => (map.get(&UNIT_KEY)?, map.get(&VALUE_KEY)?),
     };
     let Value::Number(value, Tag::NONE) = value else { return None };
-    Some(Vwu { map, tag: *tag, value: *value, unit })
+    Some(Vwu { map: Some(map), tag: *tag, value: *value, unit })
 }
 
 fn number(v: &Value) -> Option<f64> {
@@ -164,18 +207,28 @@ enum Out {
     New(Value),
 }
 
-/// Only these two entries: another map's value, with its own unit, is the same answer.
+/// Only these two entries (or compact): another map's value, with its own unit, is the same answer.
 fn plain(v: &Vwu) -> bool {
-    v.map.len() == 2
+    v.map.is_none_or(|m| m.len() == 2)
 }
 
 fn unique(v: &Vwu) -> bool {
-    Arc::strong_count(v.map) == 1 && Arc::weak_count(v.map) == 0
+    v.map.is_none_or(|m| Arc::strong_count(m) == 1 && Arc::weak_count(m) == 0)
 }
 
-/// `v` (a ValueWithUnits) with value `x`: its map changed in place when nothing else holds it, else a copy.
-fn put_value(v: Value, x: f64) -> Value {
+/// `v` (a ValueWithUnits) with value `x`: compact when it is or (with `compact`) when its map is only its unit and
+/// value; else its map changed in place when nothing else holds it, else a copy.
+fn put_value(v: Value, x: f64, compact: bool) -> Value {
+    if let Value::Quantity(_, u) = v {
+        return Value::Quantity(x, u);
+    }
     let Value::Map(mut m, t) = v else { return v };
+    if compact
+        && let Some((unit, Value::Number(_, Tag::NONE))) = m.unit_value()
+        && let Some(id) = unit_id(unit)
+    {
+        return Value::Quantity(x, id);
+    }
     let num = Value::num(x);
     match Arc::get_mut(&mut m) {
         Some(mm) => {
@@ -192,11 +245,22 @@ fn put_value(v: Value, x: f64) -> Value {
     Value::Map(m, t)
 }
 
-/// The value of `out`, taking operand `i` from `take` (owned: changed in place when nothing else holds it).
-fn finish(out: Out, take: impl FnOnce(usize) -> Value) -> Value {
+/// A ValueWithUnits of `unit` and `x`: compact with `compact`.
+fn quantity(tag: Tag, unit: Value, x: f64, compact: bool) -> Value {
+    if compact
+        && Some(tag) == vwu_tag()
+        && let Some(id) = unit_id(&unit)
+    {
+        return Value::Quantity(x, id);
+    }
+    Value::Map(Arc::new(Map::with_unit_value(unit, Value::num(x))), tag)
+}
+
+/// The value of `out`, taking operand `i` from `take`.
+fn finish(out: Out, take: impl FnOnce(usize) -> Value, compact: bool) -> Value {
     match out {
         Out::Num(x) => Value::num(x),
-        Out::Set(i, x) => put_value(take(i), x),
+        Out::Set(i, x) => put_value(take(i), x, compact),
         Out::New(v) => v,
     }
 }
@@ -208,7 +272,7 @@ fn exponents(u: &Value) -> Option<(&Arc<Map>, Tag)> {
 }
 
 /// `unitProduct` and operator*(ValueWithUnits, ValueWithUnits): a number when the units cancel.
-fn product(tag: Tag, u1: &Value, u2: &Value, x: f64) -> Option<Value> {
+fn product(tag: Tag, u1: &Value, u2: &Value, x: f64, compact: bool) -> Option<Value> {
     let ((m1, t1), (m2, _)) = (exponents(u1)?, exponents(u2)?);
     let mut unit = (**m1).clone();
     for (k, e) in m2.iter() {
@@ -230,7 +294,7 @@ fn product(tag: Tag, u1: &Value, u2: &Value, x: f64) -> Option<Value> {
     if unit.is_empty() {
         return Some(Value::num(x));
     }
-    Some(Value::Map(Arc::new(Map::with_unit_value(Value::Map(Arc::new(unit), t1), Value::num(x))), tag))
+    Some(quantity(tag, Value::Map(Arc::new(unit), t1), x, compact))
 }
 
 /// `reciprocal`: every exponent negated, the value inverted.
@@ -240,17 +304,17 @@ fn reciprocal(v: &Vwu) -> Option<(Value, f64)> {
     Some((Value::Map(Arc::new(unit), t), 1.0 / v.value))
 }
 
-fn units(name: &str, args: &mut [Value]) -> Option<Value> {
+fn units(name: &str, args: &mut [Value], compact: bool) -> Option<Value> {
     let out = match args {
-        [a] => plan_units(name, a, None)?,
-        [a, b] => plan_units(name, a, Some(b))?,
+        [a] => plan_units(name, a, None, compact)?,
+        [a, b] => plan_units(name, a, Some(b), compact)?,
         _ => return None,
     };
-    Some(finish(out, |i| std::mem::take(&mut args[i])))
+    Some(finish(out, |i| std::mem::take(&mut args[i]), compact))
 }
 
 /// A units.fs operator on `a` and `b` (none: unary), as an [`Out`].
-fn plan_units(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
+fn plan_units(name: &str, a: &Value, b: Option<&Value>, compact: bool) -> Option<Out> {
     let set = |i: usize, x: f64| finite(x).map(|x| Out::Set(i, x));
     let Some(b) = b else {
         return match name {
@@ -269,7 +333,7 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
             set(if !unique(&a) && unique(&b) && plain(&a) && plain(&b) { 1 } else { 0 }, x)
         }
         "operator*" => match (vwu(a), vwu(b)) {
-            (Some(a), Some(b)) => product(a.tag, a.unit, b.unit, a.value * b.value).map(Out::New),
+            (Some(a), Some(b)) => product(a.tag, a.unit, b.unit, a.value * b.value, compact).map(Out::New),
             (Some(a), None) => set(0, a.value * number(b)?),
             (None, Some(b)) => set(1, b.value * number(a)?),
             (None, None) => None,
@@ -279,15 +343,22 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
             (Some(a), Some(b)) if a.unit == b.unit && exponents(a.unit).is_some() => finite(a.value * (1.0 / b.value)).map(Out::Num),
             (Some(a), Some(b)) => {
                 let (unit, r) = reciprocal(&b)?;
-                product(a.tag, a.unit, &unit, a.value * r).map(Out::New)
+                product(a.tag, a.unit, &unit, a.value * r, compact).map(Out::New)
             }
             (Some(a), None) => set(0, a.value / number(b)?),
             (None, Some(b)) => {
                 let (unit, r) = reciprocal(&b)?;
-                let mut m = (**b.map).clone();
-                m.insert(UNIT_KEY.clone(), unit);
-                m.insert(VALUE_KEY.clone(), Value::num(finite(r * number(a)?)?));
-                Some(Out::New(Value::Map(Arc::new(m), b.tag)))
+                let x = finite(r * number(a)?)?;
+                Some(Out::New(match b.map {
+                    // (Its own other entries kept, as std's `rhs.unit = …; rhs.value = …`.)
+                    Some(m) if m.len() != 2 => {
+                        let mut m = (**m).clone();
+                        m.insert(UNIT_KEY.clone(), unit);
+                        m.insert(VALUE_KEY.clone(), Value::num(x));
+                        Value::Map(Arc::new(m), b.tag)
+                    }
+                    _ => quantity(b.tag, unit, x, compact),
+                }))
             }
             (None, None) => None,
         },
@@ -303,11 +374,11 @@ fn plan_units(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
 
 /// An element's operation inside a vector operator (`b` none: unary minus): plain numbers, or what units.fs answers
 /// (`Out::Set` naming `a` 0, `b` 1).
-fn plan_element(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
+fn plan_element(name: &str, a: &Value, b: Option<&Value>, compact: bool) -> Option<Out> {
     let Some(b) = b else {
         return match number(a) {
             Some(n) => Some(Out::Num(-n)),
-            None => plan_units(name, a, None),
+            None => plan_units(name, a, None, compact),
         };
     };
     if let (Some(x), Some(y)) = (number(a), number(b)) {
@@ -323,114 +394,93 @@ fn plan_element(name: &str, a: &Value, b: Option<&Value>) -> Option<Out> {
     if vwu(a).is_none() && vwu(b).is_none() {
         return None;
     }
-    plan_units(name, a, Some(b))
+    plan_units(name, a, Some(b), compact)
 }
 
-fn unique_array(v: &Value) -> bool {
-    matches!(v, Value::Array(a, _) if Arc::strong_count(a) == 1 && Arc::weak_count(a) == 0)
+/// A vector operand's elements: borrowed from its array, or made from a compact Vector.
+enum Elems<'a> {
+    Slice(&'a [Value]),
+    Made([Value; 3], usize),
 }
 
-/// Element `i` of an array operand: taken when nothing else holds the array (then changed in place when nothing
-/// holds it either), else a copy.
-fn take_at(a: &mut Arc<Vec<Value>>, i: usize) -> Value {
-    match Arc::get_mut(a) {
-        Some(v) => std::mem::take(&mut v[i]),
-        None => a[i].clone(),
+impl Elems<'_> {
+    fn get(&self) -> &[Value] {
+        match self {
+            Elems::Slice(s) => s,
+            Elems::Made(a, n) => &a[..*n],
+        }
     }
 }
 
-/// std's vector operators, element by element: the answer in an operand's own array when nothing else holds it (every
-/// element planned first, [`Out`]: std's body runs on untouched operands when one has no answer here), else in a new
-/// one.
-fn vectors(decl: &FnDecl, args: &mut [Value]) -> Option<Value> {
+fn elems(v: &Value) -> Option<Elems<'_>> {
+    match v {
+        Value::Array(a, _) => Some(Elems::Slice(a)),
+        Value::Vector(c) => Some(Elems::Made([c.at(0), c.at(1), if c.len() == 3 { c.at(2) } else { Value::Undefined }], c.len())),
+        _ => None,
+    }
+}
+
+/// std's vector operators, element by element: every element planned and made from copies of the operands (nothing
+/// of them changed: std's body runs on them when one has no answer here); the answer a compact Vector where it can
+/// be, else an array with its vector's tag (std returns vector1, or the vector; both vectors are Vectors).
+fn vectors(decl: &FnDecl, args: &mut [Value], compact: bool) -> Option<Value> {
     let name = &*decl.name;
-    // The vector whose array may become the answer, and the other operand: a vector, a scalar or none.
-    #[derive(PartialEq)]
-    enum Other {
-        Vector,
-        Scalar,
+    // The vector operand, the other (a vector, a scalar, none) and their elements' operation.
+    enum Other<'a> {
+        Vector(Elems<'a>),
+        Scalar(&'a Value),
         None,
     }
-    let (out_side, other) = match (name, args.len()) {
-        ("operator+" | "operator-", 2) => {
-            let (a, b) = (args[0].as_array()?, args[1].as_array()?);
-            if a.len() != b.len() {
-                return None;
-            }
-            (if unique_array(&args[0]) || !unique_array(&args[1]) { 0 } else { 1 }, Other::Vector)
-        }
-        ("operator-", 1) => {
-            args[0].as_array()?;
-            (0, Other::None)
-        }
+    let (v, other) = match (name, args.len()) {
+        ("operator+" | "operator-", 2) => (0, Other::Vector(elems(&args[1])?)),
+        ("operator-", 1) => (0, Other::None),
         ("operator*" | "operator/", 2) => {
             // (vector, scalar) or (scalar, vector); not two vectors, nor a matrix.
-            let v = match (decl.param_types[0].is_some(), decl.param_types[1].is_some()) {
-                (true, false) => 0,
-                (false, true) if name == "operator*" => 1,
+            match (decl.param_types[0].is_some(), decl.param_types[1].is_some()) {
+                (true, false) => (0, Other::Scalar(&args[1])),
+                (false, true) if name == "operator*" => (1, Other::Scalar(&args[0])),
                 _ => return None,
-            };
-            args[v].as_array()?;
-            (v, Other::Scalar)
+            }
         }
         _ => return None,
     };
-    let o = 1 - out_side;
-    // Element i's operation, operands in std's order.
-    let plan = |elements: &[Value], rest: &Value, i: usize| -> Option<Out> {
-        let x = &elements[i];
-        let y = match (&other, rest) {
-            (Other::Vector, Value::Array(r, _)) => Some(&r[i]),
-            (Other::Scalar, scalar) => Some(scalar),
-            _ => None,
-        };
-        match y {
-            None => plan_element(name, x, None),
-            Some(y) if out_side == 0 => plan_element(name, x, Some(y)),
-            Some(y) => plan_element(name, y, Some(x)),
-        }
-    };
-    // The answer has its vector's tag (std returns vector1, or the vector; both vectors are Vectors).
-    let tag = args[out_side].tag();
-    let undefined = Value::Undefined;
-    if !unique_array(&args[out_side]) {
-        // Nothing of the operands changes: each element's answer made anew, none when one has no answer.
-        let elements = args[out_side].as_array()?;
-        let rest = if other == Other::None { &undefined } else { &args[o] };
-        let mut out = Vec::with_capacity(elements.len());
-        for i in 0..elements.len() {
-            let p = plan(elements, rest, i)?;
-            out.push(finish(p, |k| match (&other, rest) {
-                (Other::None, _) => elements[i].clone(),
-                _ if k == out_side => elements[i].clone(),
-                (Other::Vector, Value::Array(r, _)) => r[i].clone(),
-                (_, scalar) => scalar.clone(),
-            }));
-        }
-        return Some(Value::Array(Arc::new(out), tag));
-    }
+    let a = elems(&args[v])?;
+    let a = a.get();
+    if let Other::Vector(b) = &other
+        && b.get().len() != a.len()
     {
-        let elements = args[out_side].as_array()?;
-        let rest = if other == Other::None { &undefined } else { &args[o] };
-        if !(0..elements.len()).all(|i| plan(elements, rest, i).is_some()) {
-            return None;
+        return None;
+    }
+    let element = |i: usize| -> Option<Value> {
+        let x = &a[i];
+        match &other {
+            Other::Vector(b) => {
+                let y = &b.get()[i];
+                let p = plan_element(name, x, Some(y), compact)?;
+                Some(finish(p, |k| if k == 0 { x.clone() } else { y.clone() }, compact))
+            }
+            Other::Scalar(s) => {
+                let p = if v == 0 { plan_element(name, x, Some(s), compact) } else { plan_element(name, s, Some(x), compact) }?;
+                Some(finish(p, |k| if k == v { x.clone() } else { (*s).clone() }, compact))
+            }
+            Other::None => {
+                let p = plan_element(name, x, None, compact)?;
+                Some(finish(p, |_| x.clone(), compact))
+            }
         }
-    }
-    let Value::Array(mut out, _) = std::mem::take(&mut args[out_side]) else { return None };
-    let mut rest = match other {
-        Other::None => Value::Undefined,
-        _ => std::mem::take(&mut args[o]),
     };
-    let elements = Arc::make_mut(&mut out);
-    for i in 0..elements.len() {
-        let p = plan(elements, &rest, i)?;
-        let v = finish(p, |k| match (&other, &mut rest) {
-            (Other::None, _) => std::mem::take(&mut elements[i]),
-            _ if k == out_side => std::mem::take(&mut elements[i]),
-            (Other::Vector, Value::Array(r, _)) => take_at(r, i),
-            (_, scalar) => scalar.clone(),
-        });
-        elements[i] = v;
+    let tag = args[v].tag();
+    // (Two or three: in a buffer, a compact Vector without an array made.)
+    if compact && (2..=3).contains(&a.len()) && Some(tag) == vector_tag() {
+        let mut buf = [Value::Undefined, Value::Undefined, Value::Undefined];
+        for (i, slot) in buf.iter_mut().enumerate().take(a.len()) {
+            *slot = element(i)?;
+        }
+        if let Some(c) = compact_of(&buf[..a.len()]) {
+            return Some(Value::Vector(c));
+        }
+        return Some(Value::Array(Arc::new(buf.into_iter().take(a.len()).collect()), tag));
     }
-    Some(Value::Array(out, tag))
+    let out = (0..a.len()).map(element).collect::<Option<Vec<_>>>()?;
+    Some(Value::Array(Arc::new(out), tag))
 }

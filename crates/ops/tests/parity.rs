@@ -433,7 +433,8 @@ fn parity_models() {
 /// matched, the scenarios column left to psui's runner, the five biggest
 /// causes (qa adds their tickets).
 /// FS-COMPILED-INTERP: every corpus document (live's models, as parity_models translates them) reopened with its
-/// FeatureScript run by the tree walker, then by closures, then by the tree walker again: its feature list (statuses,
+/// FeatureScript run by the tree walker on maps and arrays, then by closures on compact values, then by the tree
+/// walker again: its feature list (statuses,
 /// messages, notices, without times) and its parts' measures alike in all three. A document whose two tree-walker
 /// runs differ from each other is reported apart (a difference of its own, not the closures').
 #[test]
@@ -461,8 +462,10 @@ fn fs_closures_answer_as_the_tree_walker() {
             _ => {}
         }
     }
+    // The reference: the tree walker on maps and arrays; against it closures on compact values (stages 1 and 2).
     let state = |path: &Path, tree: bool| -> String {
         noshape_featurescript::interp::set_tree_walker_default(tree);
+        noshape_featurescript::interp::set_compact_default(!tree);
         let mut ctx = Ctx::new();
         let mut out = Vec::new();
         for (tool, args) in [("document_open", json!({ "path": path.to_str().unwrap_or_default() })), ("feature_list", json!({})), ("query_parts", json!({}))] {
@@ -505,6 +508,7 @@ fn fs_closures_answer_as_the_tree_walker() {
         }
     }
     noshape_featurescript::interp::set_tree_walker_default(false);
+    noshape_featurescript::interp::set_compact_default(true);
     println!("fs closures: {same} documents as the tree walker, {} differ {differ:?}; {} differ between two tree-walker runs {unsteady:?}", differ.len(), unsteady.len());
     assert!(differ.is_empty(), "closures differ from the tree walker: {differ:?}");
 }

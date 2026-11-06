@@ -655,7 +655,8 @@ function points(table is array, planes is array)
     let mut step = |name: &str, args: Vec<Value>| -> Value {
         let f = m.functions(name).expect(name);
         let t = std::time::Instant::now();
-        let r = interp.call_set(&f, args).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
+        // (The interpreter's own call: a points table returned to a host would be converted back for it.)
+        let r = interp.call_set_in(&f, args).unwrap_or_else(|e| panic!("{name}: {}", e.message()));
         println!("{name}: {:.0} ms", t.elapsed().as_secs_f64() * 1e3);
         r
     };
@@ -706,5 +707,63 @@ fn interpreter_step_costs() {
             base = ns;
         }
         println!("{name}: {ns:.0} ns ({:.0} over the loop)", ns - base);
+    }
+}
+
+/// A value (compact Vectors held in it) stays 32 bytes: arrays of numbers grow by a third at most.
+#[test]
+fn a_value_is_32_bytes() {
+    assert_eq!(std::mem::size_of::<Value>(), 32);
+}
+
+/// Compact lengths and Vectors (FS-COMPILED-INTERP stage 2) answer as the maps and arrays they stand for, whatever a
+/// script does with them: the same output with them as with maps and arrays only.
+#[test]
+fn compact_values_answer_as_maps_and_arrays() {
+    let bodies = [
+        "const a = 2 * meter; return [a, a.value, a.unit, a == { 'value' : 2, 'unit' : meter.unit } as ValueWithUnits, a is map, a is ValueWithUnits, size(a), a['value'], keys(a)];",
+        "const v = vector(1, 2, 3) * meter; return [v, v[0], v[2].value, size(v), v is array, v is Vector, v == [meter, 2 * meter, 3 * meter] as Vector, @size(v), v as array];",
+        "var v = vector(1, 2) * inch; v[1] = 5 * inch; return [v, v[1] + v[0], -v, v * 2, v / 2, 2 * v];",
+        "var q = 3 * meter; q.value = 4; return [q, q * q, q / q, q / (2 * second), 1 / q, sqrt(q * q)];",
+        "var out = []; for (var x in vector(1, 2, 3) * meter) { out = append(out, x); } for (var k, x in 2 * meter) { out = append(out, k); } return out;",
+        "const m = { (vector(1, 2) * meter) : 'a', (2 * meter) : 'b' }; return [m[vector(1, 2) * meter], m[[meter, 2 * meter] as Vector], m[2 * meter], m];",
+        "const v = vector(3, 1, 2); var w = concatenateArrays(v, [4]); w = append(w, vector(1, 1)); return [w, v ~ '', toString(v), sort([vector(2, 1), vector(1, 2)], function(a, b) { return a[0] - b[0]; })];",
+        "const p = vector(1, 2, 3) * meter; return [p + vector(1, 1, 1) * inch, cross(vector(1, 0, 0), vector(0, 1, 0)), dot(p, p), norm(p), normalize(vector(3, 4, 0)), squaredNorm(p)];",
+        "const a = [vector(1, 2, 3) * meter, vector(4, 5, 6) * meter]; return [a, isLengthVector(a[0]), is3dLengthVector(a[1]), canBeControlPointMatrix([a]), a[1] - a[0], (a[1] - a[0]) / 3];",
+        "return [vector(1, meter), vector(meter, inch), vector(1, 2, 3, 4), vector('a', 1), [vector(1, 2)] as Vector, (vector(1, 2) * meter) as Vector];",
+        "const b = new box(vector(1, 2) * meter); b[] = b[] * 2; return [b[], b[][0], b[] is Vector];",
+    ];
+    for b in bodies {
+        let src = format!("function f() {{ {b} }}");
+        let run_mode = |compact: bool| -> String {
+            let full = format!("FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n{src}");
+            let m = match compile_module(&unique_path(), &full, &NoImports) {
+                Ok(m) => m,
+                Err(e) => return format!("COMPILE: {}", e.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")),
+            };
+            let Some(f) = m.functions("f") else { return "no f".into() };
+            let mut i = Interp::new();
+            i.compact = compact;
+            match i.call_set(&f, vec![]) {
+                Ok(v) => to_display(&v),
+                Err(e) => format!("ERROR: {} at {}:{}", e.message(), e.module, e.pos),
+            }
+        };
+        let (compact, plain) = (run_mode(true), run_mode(false));
+        let message = |r: &str| r.split(" at test").next().unwrap_or_default().to_string();
+        assert_eq!(message(&compact), message(&plain), "{b}");
+        assert!(!compact.starts_with("COMPILE"), "{b}: {compact}");
+    }
+    // (They are compact inside: a length, a Vector of lengths, of numbers; maps and arrays without compact.)
+    let inside = |expr: &str, compact: bool| -> Value {
+        let full = format!("FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\nfunction f() {{ return {expr}; }}");
+        let m = compile_module(&unique_path(), &full, &NoImports).unwrap_or_else(|_| panic!("{expr}"));
+        let mut i = Interp::new();
+        i.compact = compact;
+        i.call_set_in(&m.functions("f").expect("f"), vec![]).unwrap_or_else(|e| panic!("{expr}: {}", e.message()))
+    };
+    for expr in ["2 * meter", "vector(1, 2, 3) * meter", "vector(1, 2)", "vector(1, 2) * meter + vector(3, 4) * meter"] {
+        assert!(inside(expr, true).is_compact(), "{expr} compact");
+        assert!(!inside(expr, false).has_compact(), "{expr} plain");
     }
 }
