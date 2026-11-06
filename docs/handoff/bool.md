@@ -3,6 +3,15 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## c2-sm-louver after the REST refetch (11-06 07:05 UTC)
+- Refetched (features.json 06:18): Linear pattern 3 has its values (3.318 in, 11 instances); the document now differs
+  from live first at feature 4 (Linear pattern 1: 274/816/544 against 278/820/544) and regenerates in 177 s (live 5 s),
+  Linear pattern 3 173.8 s of it (live 239 ms). Its Booleans recorded: vibe4 ~/agents/bool-corpora/louver2 (exact
+  inputs). The cost: one fuse, d47ac786287761ba, the panel with 23 louver tools, glue shift_checked (26.6 s for the
+  recorded call; the checked glue runs OCCT again when the volumes don't add up), path occt. Ours declines it in
+  rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
+  ours merges them: their history would be Modified, not Kept).
+
 ## The knurl on macOS arm64 (11-06 06:38 UTC; lead: release timing 4.63 s against Linux's 2.60)
 - Allocator contention, by every measure on Linux: with glibc on one heap (MALLOC_ARENA_MAX=1, every thread on one
   lock: what a malloc that scales worse across threads does) the knurl replay k25-15 goes 1.24 -> 2.4 s (OCCT's own
