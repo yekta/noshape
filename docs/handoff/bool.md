@@ -81,6 +81,10 @@ scratch /root/bool-scratch.
   selections.", one face's edges, 0.1 in) so the stamp (Part 5) has 7 faces, live 10; SP3 gives 11 parts, live 6.
   With live's filleted stamp the cut is another one: to redo once Fillet 1 works (core). Recording: vibe5
   ~/agents/bool-corpora/sp1.
+- (22:36 UTC) skasm's 4a88d8d9 (cf-spur-gear: rotated cutters found as copies by their extruded faces) also took tori
+  and spheres as copies: parity56's cuts by copies of filleted tools went to ours and 9 differed from OCCT (1abdab7d:
+  123 edges, OCCT 117), shfall one more. Tori and spheres out of copy_of again (extrusions and revolutions stay); T1
+  bool_patterns::copies_of_a_filleted_tool_cut_as_occt. A change in crates/brep goes through the gate (bool.md top).
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change
