@@ -1735,3 +1735,17 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   than ours (behaviours: live's default ~4 px / mm, ours 3.63). Sketch scenarios: green 106/125, this 105/125.
   Live request 15:39 for the recorder's exact plane-to-screen map; then ours set by it (default view extent /
   canvas size: our default shows a fixed 134 mm of height).
+
+## 11-06 evening: closed fit spline (lead: P1), assembly coverage
+- Closed (periodic) fit spline: the Spline tool and solver already had it (a click on the first point; points first =
+  last, periodic). Missing was the translator (live's `isPeriodic` interpolated spline, `BTMSketchCurve`, the first
+  point not repeated): now drawn as the tool closes one; sketch_get / sketch_draw say `closed`; e2e
+  a_spline_closes_on_its_first_point. With core's eb9e9a684 (live's part first among faces of one place and
+  area: the Thicken cap and the Loft sheet), cf-surface-pattern 6 -> 33/39; the suite 565 -> 592, nothing worse. Next difference there: Sketch 11 on Plane 4 (Mid plane of an extrude's cap edge) has its normal +x, live -x:
+  the edge's direction (core's edge orientation). Live request (closure's constraints, handles, tool end) and
+  scenario sketch-spline-closed filed.
+- Assembly coverage (tools/ui-parity/coverage_assembly.py): toolbar 4 -> 23/31, menu items 4 -> 18/86; batches 1
+  (25) and 2 (20) filed with live. Ours already shows: Mate connector, Group and pattern / mirror / Replicate /
+  Replace / relation / Insert dialogs aren't in the recorded state (only the mate dialog is): to write from live's
+  recordings. Enter in the graphics doesn't accept the connector / Group dialogs (only their OK / a field's Enter):
+  live's batch 1 will say.

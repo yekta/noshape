@@ -2524,12 +2524,11 @@ impl<'a> Translator<'a> {
                 "BTCurveGeometryInterpolatedSpline" => {
                     let flat: Vec<f64> = g["interpolationPoints"].as_array().into_iter().flatten().filter_map(Value::as_f64).collect();
                     let derivs = ["startDerivativeX", "startDerivativeY", "endDerivativeX", "endDerivativeY"].iter().any(|k| num(k).abs() > 1e-12);
+                    // Periodic (closed): drawn as the Spline tool closes one, its first point clicked again.
                     let periodic = g["isPeriodic"].as_bool() == Some(true);
-                    if periodic {
-                        problems.push(format!("sketch entity {eid}: periodic spline not translated (fit points only)"));
-                    }
+                    let closing = if periodic { flat.get(..2).unwrap_or_default().to_vec() } else { Vec::new() };
                     (flat.len() >= 4).then(|| {
-                        let mut s = json!({ "tool": "spline", "points": flat.chunks(2).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction });
+                        let mut s = json!({ "tool": "spline", "points": flat.chunks(2).chain(closing.chunks(2)).map(|c| at(c[0], c[1])).collect::<Vec<_>>(), "construction": construction });
                         // Onshape's end derivatives (its handles).
                         if derivs && !periodic {
                             s["start_derivative"] = along(num("startDerivativeX"), num("startDerivativeY"));
@@ -3523,7 +3522,14 @@ fn sampled(e: &Value) -> Option<Vec<[f64; 2]>> {
         "BTCurveGeometryInterpolatedSpline" | "BTCurveGeometryControlPointSpline" | "BTCurveGeometrySpline" => {
             let key = if g["interpolationPoints"].is_array() { "interpolationPoints" } else { "controlPoints" };
             let flat: Vec<f64> = g[key].as_array()?.iter().filter_map(Value::as_f64).collect();
-            (flat.len() >= 4).then(|| flat.chunks(2).map(|c| [c[0], c[1]]).collect())
+            let mut poly: Vec<[f64; 2]> = flat.chunks(2).map(|c| [c[0], c[1]]).collect();
+            // A periodic one closes.
+            if g["isPeriodic"].as_bool() == Some(true)
+                && let Some(&first) = poly.first()
+            {
+                poly.push(first);
+            }
+            (flat.len() >= 4).then_some(poly)
         }
         _ => None,
     }

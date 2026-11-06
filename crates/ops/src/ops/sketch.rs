@@ -468,6 +468,10 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
         Geometry::BSpline { control, degree, knots, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) }),
         Geometry::FitSpline { points, handles } => {
             let mut v = json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() });
+            // Closed on its first point: periodic (its last point is its first).
+            if points.len() > 3 && points.first() == points.last() {
+                v["closed"] = json!(true);
+            }
             // Its end handles' tips (Onshape's white handles), start's then end's.
             if let Some((h0, h1)) = handles {
                 v["handles"] = json!([eid(*h0), eid(*h1)]);

@@ -1262,6 +1262,26 @@ fn a_spline_takes_end_derivatives() {
     assert_eq!(e.param.as_deref(), Some("end_derivative"), "{e:?}");
 }
 
+/// A Spline whose last click lands on its first point closes into a periodic spline (live: "clicking the first point
+/// closes the spline"; cf-surface-pattern's Split 1 tool): `closed`, one curve, one region inside it.
+#[test]
+fn a_spline_closes_on_its_first_point() {
+    let mut ctx = Ctx::new();
+    let path = scratch("spline-closed.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "spline", "points": [[14, 33], [-58, 18], [-52, -26], [70, -32], [14, 33]] }));
+    let splines = created(&r, "spline");
+    assert_eq!(splines.len(), 1, "{r}");
+    assert_eq!(splines[0]["closed"], true, "{r}");
+    assert_eq!(splines[0]["point_ids"].as_array().map(Vec::len), Some(5), "the first point last too: {r}");
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    assert_eq!(g["regions"].as_array().map(Vec::len), Some(1), "{g}");
+    // An open one (its last click elsewhere) isn't.
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "spline", "points": [[100, 0], [120, 20], [140, 0]] }));
+    assert!(created(&r, "spline")[0].get("closed").is_none(), "{r}");
+}
+
 /// Live's template documents: ANSI A–D (no E), ISO A0–A4 and A4 Portrait,
 /// JIS the same sizes; a JIS drawing's title block in Japanese, third angle,
 /// its texts in Onshape-Standard-JapaneseFields (live tpl-JIS_A3.dxf).
