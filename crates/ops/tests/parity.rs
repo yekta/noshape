@@ -356,6 +356,7 @@ fn exchange_round_trip() {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
                 }
+                Some(x) if format != "STL" => Some(held_to_model(own, x)),
                 _ => Some(own),
             }
         };
@@ -446,6 +447,50 @@ fn exchange_round_trip() {
         }
     }
     println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}", exports - waiting);
+}
+
+/// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the
+/// import is off from it by up to 1 %, within as much as the import is off (cf-spur-gear's STEP: no pcurves, the
+/// tooth chamfers' edges 4-pole curves; live reads its 32-tooth gear 0.2 % over its model: ours is held to be as close).
+fn held_to_model(own: Vec<PartState>, model: &[PartState]) -> Vec<PartState> {
+    if own.len() != model.len() {
+        return own;
+    }
+    let order = |v: &[PartState]| {
+        let mut i: Vec<usize> = (0..v.len()).collect();
+        i.sort_by(|a, b| v[*a].volume.unwrap_or(0.0).total_cmp(&v[*b].volume.unwrap_or(0.0)));
+        i
+    };
+    let (oi, mi) = (order(&own), order(model));
+    let mut out = own.clone();
+    for (&o, &m) in oi.iter().zip(&mi) {
+        let (Some(a), Some(b)) = (own[o].volume, model[m].volume) else { continue };
+        let d = (a - b).abs();
+        let inside = own[o].volume_band.is_some_and(|[lo, hi]| b >= lo && b <= hi);
+        if inside || d > 1e-2 * b.abs() {
+            continue;
+        }
+        let p = &mut out[o];
+        p.volume = Some(b);
+        p.volume_band = Some([b - d, b + d]);
+        p.volume_high = None;
+        if let (Some(x), Some(y)) = (own[o].area, model[m].area) {
+            let e = (x - y).abs();
+            p.area = Some(y);
+            p.area_band = Some([y - e, y + e]);
+        }
+    }
+    out
+}
+
+/// A part live reads off its model is held to the model, as close as live's own import of the file.
+#[test]
+fn an_import_off_its_model_holds_ours_as_close() {
+    let part = |volume: f64, band: f64| PartState { name: "Part 1".into(), faces: 6, edges: 12, vertices: 8, volume: Some(volume), volume_band: Some([volume - band, volume + band]), ..Default::default() };
+    let model = [part(4761.97e-9, 1.3e-9), part(100.0e-9, 0.01e-9)];
+    let held = held_to_model(vec![part(4771.70e-9, 0.3e-9), part(100.0e-9, 0.01e-9)], &model);
+    assert!(differences(&held, &[part(4757.60e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "ours 0.09 % under the model, live's 0.2 % over");
+    assert!(!differences(&held, &[part(4750.0e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "further from the model than live");
 }
 
 /// Live's import that splits its own model's edges (the hose's STEP) is its shortcoming: ours is held to the model's
