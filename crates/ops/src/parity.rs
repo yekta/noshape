@@ -19,6 +19,16 @@ use std::path::Path;
 /// How a translated selection names an in-feature mate connector until its feature is added.
 const SUB_FEATURE: &str = "subfeature:";
 
+/// A sketch entity live made with Use (PROJECTED): our model reference for it, the shape to draw instead, live's
+/// ends (a curve) or place (a point).
+struct Use {
+    eid: String,
+    reference: String,
+    shape: Value,
+    ends: Option<[[f64; 2]; 2]>,
+    point: Option<[f64; 2]>,
+}
+
 /// One referenced entity as live evaluated it (`refs.jsonl`), SI units.
 #[derive(Clone, Debug, Default)]
 pub struct LiveRef {
@@ -117,6 +127,8 @@ pub struct Translator<'a> {
     /// Live's solved sketch geometry (`sketches` geomEntities) by (sketch
     /// feature id, entity id).
     solved: HashMap<(String, String), Value>,
+    /// Sketch entities (sketch, live id) ours made with Use: their PROJECTED constraint is that.
+    used: std::collections::HashSet<(String, String)>,
     /// The image tab standing in for icons live hasn't fetched.
     placeholder: Option<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
@@ -280,7 +292,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -943,6 +955,78 @@ impl<'a> Translator<'a> {
             _ => return None,
         }
         Some(out)
+    }
+
+    /// Live's Use of model geometry (a PROJECTED entity) as Use makes it, when ours lands where live's is; else
+    /// drawn as the other entities.
+    fn use_projected(&mut self, oid: &str, id: &str, u: Use, problems: &mut Vec<String>) {
+        let map = self.sketch_map;
+        let top = |t: &mut Self| t.ctx.doc(None).ok().and_then(|od| od.session.undo_tops().0);
+        let mark = top(self);
+        let point = u.shape["tool"] == "point";
+        let made = self.call("sketch_use", json!({ "sketch": id, "references": [u.reference] })).ok();
+        let ours = made.as_ref().and_then(|r| r["created"].as_array()?.iter().find(|c| (c["type"] == "point") == point).cloned());
+        let near = |c: &Value, key: &str, q: [f64; 2]| {
+            let q = map.local(q);
+            c[key][0].as_f64().zip(c[key][1].as_f64()).is_some_and(|(x, y)| (x * map.k - q[0]).hypot(y * map.k - q[1]) < 1e-7)
+        };
+        let lands = ours.as_ref().is_some_and(|c| match (u.point, u.ends) {
+            (Some(p), _) => near(c, "at", p),
+            (None, Some([a, b])) => (near(c, "start", a) && near(c, "end", b)) || (near(c, "start", b) && near(c, "end", a)),
+            (None, None) => true,
+        });
+        if let (true, Some(c)) = (lands, ours) {
+            self.map_drawn(oid, &u.eid, &c, point, u.ends);
+            self.used.insert((oid.to_string(), u.eid));
+            return;
+        }
+        if made.is_some() && top(self) != mark {
+            let _ = self.call("history_undo", json!({}));
+        }
+        match self.call("sketch_draw", json!({ "sketch": id, "shapes": [u.shape] })) {
+            Ok(r) => {
+                if let Some(c) = r["created"].as_array().and_then(|l| l.iter().find(|c| (c["type"] == "point") == point)) {
+                    self.map_drawn(oid, &u.eid, c, point, u.ends);
+                }
+            }
+            Err(e) => problems.push(format!("sketch entity {}: not drawn ({e})", u.eid)),
+        }
+    }
+
+    /// Sketch `oid`'s entity `eid` is our `c` (a sketch_draw or sketch_use reply's entity): its id, its ends (ours
+    /// may run the other way: its start nearer Onshape's `ends` end), centre and a spline's handles.
+    fn map_drawn(&mut self, oid: &str, eid: &str, c: &Value, point: bool, ends: Option<[[f64; 2]; 2]>) {
+        let map = self.sketch_map;
+        let oid = oid.to_string();
+        if let Some(cid) = c["id"].as_str() {
+            self.sketch_entities.insert((oid.clone(), eid.to_string()), cid.to_string());
+            if point {
+                self.sketch_points.push((oid.clone(), cid.to_string()));
+            }
+        }
+        let at = |key: &str| Some([c[key][0].as_f64()? * map.k, c[key][1].as_f64()? * map.k]);
+        let reversed = match (ends, at("start")) {
+            (Some([s, e]), Some(p)) => {
+                let d = |q: [f64; 2]| (q[0] - p[0]).hypot(q[1] - p[1]);
+                d(map.local(e)) < d(map.local(s)) - 1e-9
+            }
+            _ => false,
+        };
+        // A spline's handles: their tips, and the lines from its ends.
+        if let (Some([h0, h1]), Some(pts)) = (c["handles"].as_array().and_then(|h| Some([h.first()?.as_str()?.to_string(), h.get(1)?.as_str()?.to_string()])), c["point_ids"].as_array()) {
+            let (first, last) = (pts.first().and_then(Value::as_str).unwrap_or_default().to_string(), pts.last().and_then(Value::as_str).unwrap_or_default().to_string());
+            for (end, tip, at) in [("startHandle", h0, first), ("endHandle", h1, last)] {
+                self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.start")), at.clone());
+                self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.end")), tip.clone());
+                self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
+            }
+        }
+        let keys = if reversed { [("start", "end_point"), ("end", "start_point"), ("center", "center_point")] } else { [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] };
+        for (end, key) in keys {
+            if let Some(pid) = c[key].as_str() {
+                self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
+            }
+        }
     }
 
     /// Our plane (a default plane, a Plane feature's or a planar face) where
@@ -2327,6 +2411,19 @@ impl<'a> Translator<'a> {
         // run the other way (an arc is counter-clockwise).
         let mut ends: Vec<Option<[[f64; 2]; 2]>> = Vec::new();
         let mut texts: Vec<Value> = Vec::new();
+        // Live's Use (PROJECTED): the entity's model geometry, used after the drawing as live's sketch uses it.
+        let projected: HashMap<String, Value> = f["constraints"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c["constraintType"] == "PROJECTED")
+            .filter_map(|c| {
+                let params = c["parameters"].as_array()?;
+                let local = params.iter().find(|p| p["parameterId"] == "localFirst")?["value"].as_str()?.to_string();
+                Some((local, params.iter().find(|p| p["parameterId"] == "externalSecond")?.clone()))
+            })
+            .collect();
+        let mut uses: Vec<Use> = Vec::new();
         for e in f["entities"].as_array().into_iter().flatten() {
             // Where live's solve put it (`sketches` geomEntities): stored
             // geometry can lag its variables (cf-parameter-pattern).
@@ -2452,7 +2549,12 @@ impl<'a> Translator<'a> {
             if let Some(poly) = poly {
                 self.curves.insert((oid.clone(), eid.clone()), poly);
             }
+            let used = shape.as_ref().and_then(|_| projected.get(&eid)).and_then(|p| self.external_ref(k, p));
             match shape {
+                Some(s) if used.is_some() => {
+                    let point = (s["tool"] == "point").then(|| [e["x"].as_f64().unwrap_or(0.0), e["y"].as_f64().unwrap_or(0.0)]);
+                    uses.push(Use { eid, reference: used.unwrap_or_default(), shape: s, ends: end_points, point });
+                }
                 Some(s) => {
                     shapes.push(s);
                     local.push(eid);
@@ -2492,38 +2594,12 @@ impl<'a> Translator<'a> {
             for (ids, r) in &replies {
                 let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points).collect();
                 for (eid, c) in ids.iter().zip(made) {
-                    if let Some(cid) = c["id"].as_str() {
-                        self.sketch_entities.insert((oid.clone(), eid.clone()), cid.to_string());
-                        if points {
-                            self.sketch_points.push((oid.clone(), cid.to_string()));
-                        }
-                    }
-                    // Ours reversed: its start nearer Onshape's end.
-                    let at = |key: &str| Some([c[key][0].as_f64()? * map.k, c[key][1].as_f64()? * map.k]);
-                    let reversed = match (ends_of.get(eid), at("start")) {
-                        (Some([s, e]), Some(p)) => {
-                            let d = |q: [f64; 2]| (q[0] - p[0]).hypot(q[1] - p[1]);
-                            d(map.local(*e)) < d(map.local(*s)) - 1e-9
-                        }
-                        _ => false,
-                    };
-                    // A spline's handles: their tips, and the lines from its ends.
-                    if let (Some([h0, h1]), Some(pts)) = (c["handles"].as_array().and_then(|h| Some([h.first()?.as_str()?.to_string(), h.get(1)?.as_str()?.to_string()])), c["point_ids"].as_array()) {
-                        let (first, last) = (pts.first().and_then(Value::as_str).unwrap_or_default().to_string(), pts.last().and_then(Value::as_str).unwrap_or_default().to_string());
-                        for (end, tip, at) in [("startHandle", h0, first), ("endHandle", h1, last)] {
-                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.start")), at.clone());
-                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.end")), tip.clone());
-                            self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
-                        }
-                    }
-                    let keys = if reversed { [("start", "end_point"), ("end", "start_point"), ("center", "center_point")] } else { [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] };
-                    for (end, key) in keys {
-                        if let Some(pid) = c[key].as_str() {
-                            self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), pid.to_string());
-                        }
-                    }
+                    self.map_drawn(&oid, eid, c, points, ends_of.get(eid).copied());
                 }
             }
+        }
+        for u in uses {
+            self.use_projected(&oid, &id, u, problems);
         }
         for t in &texts {
             if let Err(e) = self.sketch_text(&id, t, map) {
@@ -2771,6 +2847,14 @@ impl<'a> Translator<'a> {
                 "CIRCULAR_PATTERN" | "LINEAR_PATTERN" => {
                     if let Err(e) = self.sketch_pattern(oid, id, c) {
                         *missed.entry(format!("{ty} ({e})")).or_default() += 1;
+                    }
+                    continue;
+                }
+                // Ours made with Use (`use_projected`), else drawn where live's solve put it.
+                "PROJECTED" => {
+                    let local = c["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "localFirst").and_then(|p| p["value"].as_str());
+                    if !local.is_some_and(|l| self.used.contains(&(oid.to_string(), l.to_string()))) {
+                        *missed.entry(format!("{ty} (not used: its model geometry not found)")).or_default() += 1;
                     }
                     continue;
                 }

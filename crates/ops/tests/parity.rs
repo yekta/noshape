@@ -315,7 +315,7 @@ fn parity_models() {
     let unscored: Vec<Value> = std::fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity-models/unscored.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
-        if only.as_ref().is_some_and(|o| *o != name) {
+        if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) {
             continue;
         }
         if let Ok(s) = std::fs::read_to_string(dir.join("source.json")).map(|t| serde_json::from_str::<Value>(&t).unwrap_or(Value::Null)) {
@@ -438,7 +438,7 @@ fn parity_models() {
 /// messages, notices, without times) and its parts' measures alike in all three. A document whose two tree-walker
 /// runs differ from each other is reported apart (a difference of its own, not the closures').
 #[test]
-#[ignore = "T2: live's models from /root/parity/models; NOSHAPE_PARITY_ONLY=<doc> for one"]
+#[ignore = "T2: live's models from /root/parity/models; NOSHAPE_PARITY_ONLY=<doc>[,<doc>…] for some"]
 fn fs_closures_answer_as_the_tree_walker() {
     let root = PathBuf::from(std::env::var("NOSHAPE_PARITY_MODELS").unwrap_or_else(|_| "/root/parity/models".into()));
     let only = std::env::var("NOSHAPE_PARITY_ONLY").ok();
@@ -483,7 +483,7 @@ fn fs_closures_answer_as_the_tree_walker() {
     let (mut same, mut differ, mut unsteady) = (0, Vec::new(), Vec::new());
     for dir in dirs {
         let name = dir.file_name().unwrap().to_string_lossy().to_string();
-        if only.as_ref().is_some_and(|o| *o != name) || !dir.join("live.jsonl").is_file() {
+        if only.as_ref().is_some_and(|o| !o.split(',').any(|x| x == name)) || !dir.join("live.jsonl").is_file() {
             continue;
         }
         let Some((features, live, refs)) = read_model(&dir) else { continue };
@@ -1129,6 +1129,35 @@ fn a_conic_is_translated_with_its_rho() {
     assert_eq!((k["start"].clone(), k["control"].clone(), k["end"].clone()), (json!([46.0, 1.0]), json!([46.0, 8.5]), json!([55.0, 8.5])), "{k}");
     assert!((k["rho"].as_f64().unwrap() - 0.6).abs() < 1e-12, "{k}");
     assert_eq!(g["regions"].as_array().map(Vec::len), Some(1), "{g}");
+}
+
+/// Live's Use (a PROJECTED constraint on a sketch entity): ours Uses the same geometry (an external, linked entity),
+/// not a free copy of it, so it follows the geometry it was made from. Sketch 2's line uses Sketch 1's.
+#[test]
+fn a_used_entity_is_used() {
+    let top = json!([{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }]);
+    let line = |id: &str| json!({ "btType": "BTMSketchCurveSegment-155", "entityId": id, "startPointId": format!("{id}.start"), "endPointId": format!("{id}.end"), "startParam": 0.0, "endParam": 0.02,
+        "geometry": { "btType": "BTCurveGeometryLine-117", "pntX": 0.01, "pntY": 0.005, "dirX": 1.0, "dirY": 0.0 } });
+    let edge = r#"query=qCompressed(1.0,"%B5$QueryM5Sa$entityTypeBa$EntityTypeS4$EDGESb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.6$FXu6qWaggV6KMhx_1wireOpS9$queryTypeSd$SKETCH_ENTITYSe$sketchEntityIdSc$PPC1NZux0mWW",id);"#;
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FXu6qWaggV6KMhx_1", "name": "Sketch 1", "parameters": top, "entities": [line("PPC1NZux0mWW")], "constraints": [] },
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS2", "name": "Sketch 2", "parameters": top, "entities": [line("u")],
+          "constraints": [{ "btType": "BTMSketchConstraint-2", "constraintType": "PROJECTED", "parameters": [
+              { "btType": "BTMParameterEnum-145", "parameterId": "projectionType", "value": "USE" },
+              { "btType": "BTMParameterString-149", "parameterId": "localFirst", "value": "u" },
+              { "btType": "BTMParameterQueryList-148", "parameterId": "externalSecond", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": edge, "deterministicIds": ["JNB"] }] }
+          ] }] }
+    ] });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("use.noshape"), &features, Default::default()).unwrap();
+    assert!(t.step(0).problems.is_empty());
+    let step = t.step(1);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    let lines: Vec<&Value> = g["entities"].as_array().unwrap().iter().filter(|e| e["type"] == "line").collect();
+    assert_eq!(lines.len(), 1, "{g}");
+    assert_eq!(lines[0]["external"], true, "{g}");
+    assert_eq!((lines[0]["start"].clone(), lines[0]["end"].clone()), (json!([10.0, 5.0]), json!([30.0, 5.0])), "{g}");
 }
 
 /// A text converted to an expression (c2-valve-config's Sketch 3: `toString(roundToPrecision(#espesor_material/mm, 0))`,

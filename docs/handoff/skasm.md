@@ -1704,6 +1704,10 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   helix (a wire in the same box as the part it winds round), not Part 1. The sweep now runs, and is **core's** next:
   Sweep 1 (Remove, a profile along the 8-turn helix, keepProfileOrientation false, which our sweep lacks, as our helix
   lacks helixType) takes 28.7 s (live 40 ms) and leaves 14/25/21 faces / edges / vertices, live 6/10/6.
+- **Translator: live's Use (PROJECTED) is a Use**: the entity's model reference mapped, ours Uses it (an external,
+  linked entity) when it lands where live's is, else drawn as before. Of the corpus's 183 PROJECTED, ~30 are Used
+  now; the rest name geometry live gave no position for (ids only: the refetch). NOSHAPE_PARITY_ONLY takes a list
+  (a,b,c). Test `parity::a_used_entity_is_used`.
 - Not mine / waiting: sm-corner-break's Corner break 1 (queries without live geometry: dx / the refetch);
   duct-multipart's Extrude 3 needs Sketch 5's regions split by the edges of Extrude 2's body on its plane (our imprint
   takes only the sketch's own face's edges): to check on live before building.
