@@ -986,6 +986,20 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
     }
     for (uint32_t& j : joins)
       j = root(j);
+    // Where a curve's pieces, joined through the seam, meet again: a ring, no vertex (a STEP ring circle read as two
+    // pieces, live's clamp-hms: live shows none).
+    for (int i = 1; i <= vm.Extent(); ++i)
+    {
+      std::vector<int> shown_edges;
+      for (uint32_t k = ve.first[(size_t)i - 1]; k < ve.first[(size_t)i]; ++k)
+      {
+        const int j = (int)ve.second[k] + 1;
+        if (out[(size_t)j - 1] != 0 && std::find(shown_edges.begin(), shown_edges.end(), j) == shown_edges.end())
+          shown_edges.push_back(j);
+      }
+      if (!joint[(size_t)i] && shown_edges.size() == 2 && joins[(size_t)shown_edges[0] - 1] == joins[(size_t)shown_edges[1] - 1])
+        joint[(size_t)i] = true;
+    }
     for (int i = 1; i <= vm.Extent(); ++i)
     {
       const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];

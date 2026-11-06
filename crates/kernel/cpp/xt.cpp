@@ -35,6 +35,8 @@
 
 #include "internal.hpp"
 
+#include <algorithm>
+
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepTools_Modifier.hxx>
 #include <ShapeCustom_SweptToElementary.hxx>
@@ -2163,12 +2165,17 @@ void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> 
   }
   if (list)
   {
-    Node& n     = w.add(74, root);
-    n.variable  = true;
-    n.var_count = (int)bodies.size();
-    n.fields    = {fd((long long)bodies.size()), fp(0)};
+    // Several parts: the file's root (node 1, first) lists them. Onshape's (Parasolid's) files have a PART_XMT_BLOCK
+    // (live exchange suite: Onshape reported our POINTER_LIS_BLOCK root "Invalid or corrupt input file" for every
+    // file of more than one part); the 12.0 schema the XT reference documents has the pointer list.
+    const bool old = std::string(ver.name) == "12.0";
+    Node&      n   = w.add(old ? 74 : 176, root);
+    n.variable     = true;
+    n.var_count    = (int)bodies.size();
+    n.fields       = old ? std::vector<Field>{fd((long long)bodies.size()), fp(0)} : std::vector<Field>{fd((long long)bodies.size()), fd(0), fp(0), fp(0), fp(0)};
     for (int b : bodies)
       n.fields.push_back(fp(b));
+    std::rotate(w.nodes.begin(), w.nodes.end() - 1, w.nodes.end());
   }
   write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application));
 }

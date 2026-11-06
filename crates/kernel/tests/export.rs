@@ -105,6 +105,29 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Several parts in one Parasolid file (the exchange suite: Onshape rejected our pointer-list root, "Invalid or corrupt
+/// input file"): node 1, first, is a PART_XMT_BLOCK listing the bodies, as Onshape's own; 12.0 keeps the pointer list;
+/// both read back as the parts.
+#[test]
+fn several_parasolid_parts_are_listed_by_a_part_block() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-block-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = make_box_corners(DVec3::ZERO, DVec3::splat(0.01)).unwrap();
+    let b = make_box_corners(DVec3::new(0.02, 0.0, 0.0), DVec3::new(0.03, 0.01, 0.01)).unwrap();
+    for (version, root) in [("38.1", "176"), ("30.0", "176"), ("12.0", "74")] {
+        let path = dir.join(format!("two-{version}.x_t"));
+        write_parasolid_version(&path, &[a.clone(), b.clone()], LengthUnit::Meter, false, version).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let body = &text[text.find("**END_OF_HEADER").unwrap()..];
+        let joined: String = body.lines().skip(1).collect();
+        let tokens: Vec<&str> = joined.split_whitespace().skip_while(|t| !t.contains("SCH_")).skip(1).collect();
+        // (The user field size follows the schema's name unspaced.) The first node: its type, entry count and index 1.
+        assert_eq!(&tokens[..3], [root, "2", "1"], "{version}");
+        assert_eq!(read_parasolid(&path, LengthUnit::Meter).unwrap().count(ShapeType::Solid), 2, "{version}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// An extruded ellipse through Parasolid (the exchange suite, motor-mount-jack): its two ellipses stay whole ring
 /// edges (live writes them without a vertex), the side one face; the volume as it was.
 #[test]
