@@ -4,7 +4,7 @@
     analyze.py <output dir> <label> [--stills] [--gate-ui-cpu-p95 MS] [--gate-gpu-p95 MS]
                [--gate-floor-gpu-p95 MS] [--target-gpu-mean MS [--gate-target]]
                [--gate-p95 MS] [--gate-mode MODE] [--baseline DIR --max-regression FRACTION]
-               [--gate-first-frames-gpu MS] [--report-regressions]
+               [--gate-first-frames-gpu MS] [--report-regressions] [--confirm DIR]
 
 Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
 <output dir>/summary.json (the next runs' baseline). Gates, on the orbit run of
@@ -21,9 +21,16 @@ Writes a Markdown table to $GITHUB_STEP_SUMMARY (and stdout) and
   out and reports their maxima apart, in "First frames";
   --gate-first-frames-gpu  every run's first frames: our GPU time per frame at most MS (the hitch as the camera
                      starts moving);
-  --baseline         every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
+  --baseline         DIR/summary.json, or DIR/<run>/summary.json of several runs (perf.yml: the last five
+                     default-settings runs on main, passed or not): each metric's median over them, so one lucky or
+                     unlucky run doesn't set the bar. Every run: fps, frame-interval p95, UI CPU p95 and GPU p95 at most
                      --max-regression worse than in DIR/summary.json, and worse by more
                      than the metric's noise floor (MIN_CHANGE);
+  --confirm DIR      the flagged rows measured again (bench.sh ONLY=, perf.yml): a regression fails only when
+                     the second measurement regresses too. One run against one baseline isn't enough on the macOS
+                     runners: the same build's rows move 20-100 % between runs (macOS 15, 11-06: readback GPU p95
+                     7.2-15.5 ms, 1x texture 6.6-9.6 ms, 2x presented fps 65-82), a real slowdown repeats.
+                     Without it, the flagged rows are listed in <output dir>/regressed.txt;
   --report-regressions  compare with the baseline but don't fail on it (software renderers:
                      WARP / lavapipe draw on the runner's shared CPU at 1-2 fps and swing
                      10-50% between runs of the same build).
@@ -69,6 +76,30 @@ STARTUP = {
 TARGET_FPS = 120.0
 TARGET_FIRST_FRAME_MS = 1000.0
 TARGET_OPEN_MS = 500.0
+
+
+def load_baseline(path, fixture):
+    """The baseline summary: DIR/summary.json, or each metric's median over DIR/*/summary.json of this document."""
+    if not path:
+        return None
+    one = os.path.join(path, "summary.json")
+    if os.path.exists(one):
+        return json.load(open(one, encoding="utf-8"))
+    sums = [json.load(open(f, encoding="utf-8")) for f in sorted(glob.glob(os.path.join(path, "*", "summary.json")))]
+    sums = [x for x in sums if x.get("fixture") == fixture]
+    if not sums:
+        return None
+    keys = {(r["mode"], r.get("kind")) for x in sums for r in x.get("runs", []) if not r.get("missing")}
+    rows = []
+    for mode, kind in sorted(keys, key=str):
+        row = {"mode": mode, "kind": kind}
+        for metric, _, _ in COMPARED:
+            vals = sorted(r[metric] for x in sums for r in x.get("runs", [])
+                          if r.get("mode") == mode and r.get("kind") == kind and not r.get("missing") and r.get(metric) is not None)
+            if vals:
+                row[metric] = vals[len(vals) // 2] if len(vals) % 2 else (vals[len(vals) // 2 - 1] + vals[len(vals) // 2]) / 2
+        rows.append(row)
+    return {"label": f"median of {len(sums)} runs: " + ", ".join(x.get("label", "?") for x in sums), "fixture": fixture, "runs": rows}
 
 
 def runs(out):
@@ -176,6 +207,7 @@ def main():
     ap.add_argument("--max-regression", type=float, default=0.10)
     ap.add_argument("--report-regressions", action="store_true")
     ap.add_argument("--gate-first-frames-gpu", type=float)
+    ap.add_argument("--confirm")
     args = ap.parse_args()
     rows = runs(args.out)
     lines = [f"### Viewport benchmark: {args.label}", "",
@@ -284,16 +316,22 @@ def main():
             lines.append(f"Gate first frames ({r['mode']} {r['kind']}) GPU max {r['firstgpu']:.2f} <= {args.gate_first_frames_gpu} ms: {'OK' if ok else 'FAILED'}")
             if not ok:
                 failures.append(f"first frames: {r['mode']} {r['kind']} GPU max {r['firstgpu']:.2f} ms > {args.gate_first_frames_gpu} ms")
-    base_path = os.path.join(args.baseline, "summary.json") if args.baseline else None
+    flagged = set()
     # The benchmark document (perf.yml FIXTURE): a baseline of another one
     # (a run dispatched with `fixture`, e.g. live-30's 24 instances against
     # the NIST assembly's 406) compares nothing.
     fixture = os.environ.get("FIXTURE", "")
-    base = json.load(open(base_path, encoding="utf-8")) if base_path and os.path.exists(base_path) else None
+    base = load_baseline(args.baseline, fixture)
     if base is not None and base.get("fixture") != fixture:
         lines += ["", f"Baseline ({base.get('label', '?')}) measured {base.get('fixture') or 'an unrecorded document'}, not {fixture or '?'}: not compared."]
     elif base is not None:
         lines += ["", f"Against the baseline ({base.get('label', '?')}), max {args.max_regression * 100:.0f}% worse:"]
+        again = runs(args.confirm) if args.confirm else None
+
+        def regressed(metric, higher_better, now, was):
+            worse = (was - now) / was if higher_better else (now - was) / was
+            return worse > args.max_regression and abs(now - was) > MIN_CHANGE[metric]
+
         for r in measured:
             b = next((x for x in base.get("runs", []) if x.get("mode") == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
             if not b:
@@ -304,14 +342,25 @@ def main():
                 if now is None or was is None or was == 0:
                     continue
                 change = (now - was) / was
-                worse = -change if higher_better else change
                 notes.append(f"{label} {was:.2f} → {now:.2f} ({change * 100:+.0f}%)")
-                if worse <= args.max_regression or abs(now - was) <= MIN_CHANGE[metric]:
+                if not regressed(metric, higher_better, now, was):
                     continue
                 if args.report_regressions:
                     notes[-1] += " over, not gated"
-                else:
+                    continue
+                if again is None:
+                    flagged.add(f"{r['mode']}:{r['kind']}")
                     failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}")
+                    continue
+                a = next((x for x in again if x["mode"] == r["mode"] and x.get("kind") == r.get("kind") and not x.get("missing")), None)
+                if a is None or a.get(metric) is None:
+                    notes[-1] += ", not measured again"
+                    failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f} (not measured again)")
+                elif regressed(metric, higher_better, a[metric], was):
+                    notes[-1] += f", again {a[metric]:.2f}"
+                    failures.append(f"regression: {r['mode']} {r['kind']} {label} {was:.2f} → {now:.2f}, again {a[metric]:.2f}")
+                else:
+                    notes[-1] += f", not repeated (again {a[metric]:.2f})"
             lines.append(f"- {r['mode']} {r['kind']}: " + "; ".join(notes))
     elif args.baseline:
         lines += ["", "No baseline (first run on main?)."]
@@ -320,6 +369,8 @@ def main():
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
             f.write(text)
+    with open(os.path.join(args.out, "regressed.txt"), "w", encoding="utf-8") as f:
+        f.write(" ".join(sorted(flagged)))
     with open(os.path.join(args.out, "summary.json"), "w", encoding="utf-8") as f:
         json.dump({"label": args.label, "fixture": fixture, "runs": rows, "failures": failures}, f, indent=1)
     for f in failures:

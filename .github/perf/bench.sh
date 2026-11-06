@@ -25,6 +25,7 @@
 # build: v0.4.7 and v0.4.8 alike), so later runs and variants are only
 # comparable with each other; compare settings for fps in separate jobs
 # (BENCH_ENV), GPU time (`w.gpu_wait`) within a job.
+# ONLY (`<label>:<kind>` separated by spaces) runs just those.
 set -u
 BIN=$1; DOC=$2; OUT=$3; shift 3
 MODES=("$@")
@@ -54,6 +55,8 @@ for v in ${VARIANTS:-}; do
 done
 for run in "${RUNS[@]}"; do
   label=${run%%:*}; rest=${run#*:}; kind=${rest%%:*}; extra=${rest#*:}
+  # ONLY="<label>:<kind> ...": just those runs (perf.yml re-measures the rows a baseline comparison flagged).
+  [[ -n ${ONLY:-} && " $ONLY " != *" $label:$kind "* ]] && continue
   mode=${label%%+*}
   {
     log="$OUT/$label-$kind.log"

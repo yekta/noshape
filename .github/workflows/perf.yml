@@ -329,28 +329,38 @@ jobs:
         shell: bash
         run: mkdir -p "$RUNNER_TEMP/perf" && echo "${{ github.run_id }}" > "$RUNNER_TEMP/perf/default-settings"
 
-      - name: Baseline (last successful run on main with the default settings)
+      # The last five runs on main measured with the default settings, passed or failed: analyze.py compares with
+      # each metric's median over them. (Only passed runs as the baseline kept the luckiest one: on these runners one
+      # run's rows move 20-100 %, and whichever happened to pass then set the bar for the next.)
+      - name: Baseline (the last five default-settings runs on main)
         if: inputs.fixture == ''
         continue-on-error: true
         shell: bash
         run: |
-          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow perf.yml --branch main --status success --limit 20 --json databaseId --jq '.[].databaseId'); do
+          n=0
+          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow perf.yml --branch main --limit 40 --json databaseId,conclusion \
+              --jq '.[] | select(.conclusion == "success" or .conclusion == "failure") | .databaseId'); do
             [[ "$id" == "${{ github.run_id }}" ]] && continue
-            rm -rf "$RUNNER_TEMP/baseline"
-            if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "perf-${{ matrix.os }}" --dir "$RUNNER_TEMP/baseline" 2>/dev/null \
-                && [[ -f "$RUNNER_TEMP/baseline/default-settings" ]]; then
-              echo "baseline: run $id"
-              exit 0
+            d="$RUNNER_TEMP/baseline/$id"
+            if gh run download "$id" --repo "$GITHUB_REPOSITORY" --name "perf-${{ matrix.os }}" --dir "$d" 2>/dev/null \
+                && [[ -f "$d/default-settings" && -f "$d/summary.json" ]]; then
+              n=$((n + 1))
+              [[ $n -ge 5 ]] && break
+            else
+              rm -rf "$d"
             fi
           done
-          rm -rf "$RUNNER_TEMP/baseline"
-          echo "no baseline yet (no successful run with the default settings)"
+          echo "baseline: $n runs ($(ls "$RUNNER_TEMP/baseline" 2>/dev/null | tr '\n' ' '))"
 
+      # A row worse than the baseline is measured again (a fresh launch) and fails only if it is worse again: on the
+      # macOS runners one run's rows move 20-100 % with the same build (analyze.py --confirm).
       - name: Summary and gates
         id: analyze
         shell: bash
         env:
           COLD: ${{ inputs.cold || '' }}
+          VARIANTS: ${{ inputs.variants || matrix.variants || '' }}
+          BENCH_ENV: ${{ inputs.env || '' }}
         run: |
           gates="${{ matrix.gates }}"
           gates="${gates//UI/$UI_CPU_P95_MS}"; gates="${gates//FLOOR/$FLOOR_GPU_P95_MS}"; gates="${gates//TARGET/$TARGET_GPU_MEAN_MS $TARGET_GATE}"
@@ -358,6 +368,14 @@ jobs:
           python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD)" $gates \
             --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION"
           status=$?
+          flagged=$(cat "$RUNNER_TEMP/perf/regressed.txt" 2>/dev/null)
+          if [[ $status != 0 && -n "$flagged" && "$RUNNER_OS" != Windows ]]; then
+            echo "measuring again: $flagged"
+            ONLY="$flagged" .github/perf/bench.sh "$BIN" "$FIXTURE" "$RUNNER_TEMP/perf/confirm" ${{ inputs.modes || matrix.modes }}
+            python3 .github/perf/analyze.py "$RUNNER_TEMP/perf" "${{ matrix.name }} ($BUILD), flagged rows measured again" $gates \
+              --baseline "$RUNNER_TEMP/baseline" --max-regression "$MAX_REGRESSION" --confirm "$RUNNER_TEMP/perf/confirm"
+            status=$?
+          fi
           # The other big models: the floor only.
           for dir in "$RUNNER_TEMP"/perf/big-*; do
             [[ -d "$dir" ]] || continue

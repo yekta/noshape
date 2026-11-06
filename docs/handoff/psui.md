@@ -585,6 +585,30 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N00000000000. (11-06) **perf.yml's macOS gate (lead P1):** 42162655806 (v0.4.32) failed on macOS 15's baseline
+    comparison only, no regression: the same build's rows move 20-100 % between runs there (readback GPU p95 7.2-15.5,
+    1x texture 6.6-9.6, 2x fps 65-82; readback UI CPU p95 2.9-5.9 over v0.4.23-v0.4.32 with no trend) and macOS 26
+    had every row at or under macOS 15's baseline. Two gate faults fixed: (1) the baseline was the last *passed* run,
+    so the luckiest run set the bar for the next: now each metric's median over the last five default-settings runs
+    on main, passed or failed; (2) one run decided: now a flagged row is measured again (bench.sh ONLY=, a fresh
+    launch) and fails only if it regresses again (analyze.py --confirm). Threshold unchanged (10 %, MIN_CHANGE).
+    On v0.4.32's data: no failure; a repeated slowdown still fails ("again 15.53").
+N0000000000. (11-06 05:42) **The first-frame stall on a real Mac (lead 11-06: the user's Mac mini runs these).** CI saw
+    the bench's first frame after an idle cost 25-30 ms at 1x and 90-320 ms at 2x on the runners' virtual GPU (above).
+    On a real Mac, from a checkout of the repo (Terminal; Python 3 with Pillow for the stills, `pip3 install pillow`):
+    1. Install noshape v0.4.33 or later (the first with the first-frames report: the release's macOS .dmg into
+       /Applications), or build main (`cargo build --release -p
+       noshape`, with OCCT as in docs). `BIN=/Applications/noshape.app/Contents/MacOS/noshape` (or target/release/noshape).
+    2. Keep the Mac awake and leave it alone during the runs (each launch waits 60 s, then measures 300 frames; the
+       whole set takes about 15 minutes; screencapture may ask for Screen Recording permission once: allow it):
+       `caffeinate -d -i -- env DELAY=60 VARIANTS="retina@orbit:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames
+       retina@pan:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames retina@zoom:NOSHAPE_PERF_SCALE=2,NOSHAPE_PERF_BENCH_DRIVE=frames"
+       .github/perf/bench.sh "$BIN" tests/perf/nist-mtc-crada-assembly.noshape ~/noshape-perf texture readback`
+    3. `python3 .github/perf/analyze.py ~/noshape-perf "Mac mini" --stills > ~/noshape-perf/report.md`, then send
+       report.md and the ~/noshape-perf folder (its logs have each first frame: `grep "BENCH FIRST" ~/noshape-perf/*.log`).
+    Reading it: the "First frames" table's GPU column against the rows' GPU mean. About a steady frame (under ~16 ms
+    at 2x): the stall is the runners' and nothing is to fix; 50 ms or more: it's real, and `BENCH FIRST FRAMES` shows
+    which pass pays it (r.pass.color / sil-cull / overlay, r.prep, r.encode_submit).
 N000000000. (11-06 05:25) **First-frames hitch (lead 11-06): not ours, found on the runners' GPU.** The bench gates the
     steady state (first 30 frames left out); their max per frame is its own row ("First frames", analyze.py;
     `--gate-first-frames-gpu MS` ready, not on). Four diagnosis runs (perf/psui-firstframes: 42137141138, 42145731291,
