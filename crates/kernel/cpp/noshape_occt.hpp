@@ -762,6 +762,7 @@ std::mutex& mesh_mutex();
 struct P3;
 struct HistRec;
 struct OpOut;
+struct MergedFaces;
 struct SurfaceInfo;
 struct CurveInfo;
 struct BSplineF;
@@ -976,6 +977,9 @@ OpOut op_split(const OcShapeList& args, const OcShapeList& tools, const BoolOpts
 // Cancel flag of this thread's booleans (address of a Rust AtomicBool, 0 = none).
 void set_thread_cancel(size_t flag);
 OpOut op_unify(const OcShape& s);
+// An imported part's faces on one plane (and with `periodic` one cylinder, cone, sphere or torus) merged, no history; the
+// part as it is when no two neighbours share one.
+MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic);
 OpOut op_join_edges(const OcShape& s);
 OpOut op_unify_edges(const OcShape& s);
 OpOut op_join_target_seam_splits(const OcShape& sheet, const OcShape& target);

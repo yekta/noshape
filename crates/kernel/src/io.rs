@@ -78,7 +78,7 @@ fn face_colors_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, [f32; 3])> {
 /// available (STEPCAFControl / XCAF). Shapes are converted to `unit`.
 pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let r = ck(ffi::read_step(path_str(path)?))?;
-    step_shapes(&r, 1.0 / unit.mm_per_unit())
+    step_shapes(&r, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, false)).collect()
 }
 
 /// A STEP reader's shapes (OCCT millimetres) in `unit`, with names and colours.
@@ -147,7 +147,7 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
     };
     // OCCT reads STEP in millimetres.
     let t0 = std::time::Instant::now();
-    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?;
+    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, false)).collect::<Result<Vec<_>>>()?;
     if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
         eprintln!("  step tree scale: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
     }
@@ -160,18 +160,23 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
 pub fn read_iges_parts(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let t = ck(ffi::read_iges_tree(path_str(path)?))?;
     if t.instances.is_empty() && !t.parts.names.is_empty() {
-        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(iges_whole).collect();
+        return step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect();
     }
-    Ok(vec![iges_whole(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() })?])
+    Ok(vec![merged_faces(ImportedShape { shape: read_iges(path, unit)?, name: None, color: None, opacity: None, face_colors: Vec::new() }, true)?])
 }
 
-/// An IGES part's faces on one surface merged, as Onshape imports them: IGES writers split a periodic face (Onshape's
-/// own: a cylinder in halves, a torus in quarters; the exchange suite's pulley read 16 faces for live's 9). Its face
+/// A STEP or IGES part's faces on one plane merged, as Onshape imports them (its Parasolid import doesn't: a sheet metal
+/// model's coplanar walls, cf-sheet-metal-model-plus: 54 faces, live's import 30), with `periodic` (IGES, whose writers
+/// split a periodic face: live's pulley read 16 faces for 9) also those on one cylinder, cone, sphere or torus. Its face
 /// colours follow their faces.
-fn iges_whole(mut p: ImportedShape) -> Result<ImportedShape> {
-    let r = crate::unify_same_domain(&p.shape)?;
-    p.face_colors = p.face_colors.iter().filter_map(|(f, c)| Some((*r.history.modified(0, crate::ShapeType::Face, *f as u32).first()? as usize, *c))).collect();
-    p.shape = r.shape;
+fn merged_faces(mut p: ImportedShape, periodic: bool) -> Result<ImportedShape> {
+    let t0 = std::time::Instant::now();
+    let m = ck(ffi::merge_same_surface_faces(p.shape.raw(), periodic))?;
+    p.face_colors = p.face_colors.iter().filter_map(|(f, c)| m.face_map.get(*f).filter(|&&k| k != u32::MAX).map(|&k| (k as usize, *c))).collect();
+    p.shape = Shape::from_ptr(m.shape);
+    if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
+        eprintln!("  faces on one surface merged: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
+    }
     Ok(p)
 }
 
@@ -184,7 +189,7 @@ pub fn read_iges_assembly(path: &Path, unit: LengthUnit) -> Result<Option<StepAs
     if t.instances.is_empty() {
         return Ok(None);
     }
-    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(iges_whole).collect::<Result<Vec<_>>>()?;
+    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect::<Result<Vec<_>>>()?;
     Ok(Some((t.root.clone(), parts, pvz_instances_of(&t.instances))))
 }
 

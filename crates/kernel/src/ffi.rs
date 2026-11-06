@@ -47,6 +47,12 @@ pub(crate) mod ffi {
         history: Vec<HistRec>,
     }
 
+    /// A part with faces merged: each of its faces' index after (the input's face order).
+    struct MergedFaces {
+        shape: UniquePtr<OcShape>,
+        face_map: Vec<u32>,
+    }
+
     /// Surface description. kind: 0 plane, 1 cylinder, 2 cone, 3 sphere,
     /// 4 torus, 5 bezier, 6 bspline, 7 revolution, 8 extrusion, 9 offset, 10 other.
     #[derive(Debug, Clone, Copy)]
@@ -737,6 +743,9 @@ pub(crate) mod ffi {
         /// Cancel flag of this thread's booleans (an `AtomicBool` address, 0 = none).
         fn set_thread_cancel(flag: usize);
         fn op_unify(s: &OcShape) -> Result<OpOut>;
+        /// An imported part's faces on one plane (with `periodic` also one cylinder, cone, sphere or torus) merged, no
+        /// history; the part itself when no neighbours share one.
+        fn merge_same_surface_faces(s: &OcShape, periodic: bool) -> Result<MergedFaces>;
         fn op_join_edges(s: &OcShape) -> Result<OpOut>;
         fn op_unify_edges(s: &OcShape) -> Result<OpOut>;
         fn op_join_target_seam_splits(sheet: &OcShape, target: &OcShape) -> Result<OpOut>;

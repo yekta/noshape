@@ -7839,6 +7839,94 @@ OpOut op_unify_edges(const OcShape& s)
   return make_result({s.shape}, u.Shape(), hist.get());
 }
 
+namespace
+{
+// Whether two faces lie on one plane, or (`periodic`) one cylinder, cone, sphere or torus (the cheap test before a merge).
+bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
+{
+  const BRepAdaptor_Surface sa(a, false), sb(b, false);
+  if (sa.GetType() != sb.GetType() || (!periodic && sa.GetType() != GeomAbs_Plane))
+    return false;
+  constexpr double tol = 1e-7, ang = 1e-9;
+  switch (sa.GetType())
+  {
+    case GeomAbs_Plane:
+    {
+      const gp_Pln p = sa.Plane(), q = sb.Plane();
+      return p.Axis().Direction().IsParallel(q.Axis().Direction(), ang) && p.Distance(q.Location()) < tol;
+    }
+    case GeomAbs_Cylinder:
+    {
+      const gp_Cylinder p = sa.Cylinder(), q = sb.Cylinder();
+      return std::abs(p.Radius() - q.Radius()) < tol && p.Axis().IsCoaxial(q.Axis(), ang, tol);
+    }
+    case GeomAbs_Cone:
+    {
+      const gp_Cone p = sa.Cone(), q = sb.Cone();
+      return p.Apex().Distance(q.Apex()) < tol && std::abs(p.SemiAngle() - q.SemiAngle()) < ang && p.Axis().Direction().IsParallel(q.Axis().Direction(), ang);
+    }
+    case GeomAbs_Sphere:
+      return sa.Sphere().Location().Distance(sb.Sphere().Location()) < tol && std::abs(sa.Sphere().Radius() - sb.Sphere().Radius()) < tol;
+    case GeomAbs_Torus:
+    {
+      const gp_Torus p = sa.Torus(), q = sb.Torus();
+      return p.Axis().IsCoaxial(q.Axis(), ang, tol) && p.Location().Distance(q.Location()) < tol && std::abs(p.MajorRadius() - q.MajorRadius()) < tol &&
+             std::abs(p.MinorRadius() - q.MinorRadius()) < tol;
+    }
+    default:
+      return false;
+  }
+}
+} // namespace
+
+MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
+{
+  require_non_null(s.shape, "shape");
+  const ShapeIMap& fm = s.map(TopAbs_FACE);
+  auto             as_is = [&] {
+    MergedFaces out;
+    out.shape = wrap(s.shape);
+    for (int i = 0; i < fm.Extent(); ++i)
+      out.face_map.push_back((uint32_t)i);
+    return out;
+  };
+  ShapeAncMap ef;
+  TopExp::MapShapesAndAncestors(s.shape, TopAbs_EDGE, TopAbs_FACE, ef);
+  // Only across edges between faces on one analytic surface: the others kept (a healed thread's B-spline faces merged
+  // into one whose boundary doesn't close).
+  bool                                                   any = false;
+  NCollection_Map<TopoDS_Shape, TopTools_ShapeMapHasher> keep;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const auto& faces = ef(i);
+    const bool  merge = faces.Extent() == 2 && !faces.First().IsSame(faces.Last()) && same_surface(TopoDS::Face(faces.First()), TopoDS::Face(faces.Last()), periodic);
+    any               = any || merge;
+    if (!merge)
+      keep.Add(ef.FindKey(i));
+  }
+  if (!any)
+    return as_is();
+  ShapeUpgrade_UnifySameDomain u(s.shape, true, true, false);
+  u.KeepShapes(keep);
+  u.Build();
+  // (A merge that leaves a face it can't close: the part as read.)
+  if (!BRepCheck_Analyzer(u.Shape()).IsValid())
+    return as_is();
+  MergedFaces out;
+  out.shape = wrap(u.Shape());
+  ShapeIMap nm;
+  TopExp::MapShapes(u.Shape(), TopAbs_FACE, nm);
+  const occ::handle<BRepTools_History> h = u.History();
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const TopoDS_Shape&               f   = fm(i);
+    const NCollection_List<TopoDS_Shape>& mod = h->Modified(f);
+    const int                         k   = nm.FindIndex(mod.IsEmpty() ? f : mod.First());
+    out.face_map.push_back(k > 0 ? (uint32_t)(k - 1) : UINT32_MAX);
+  }
+  return out;
+}
+
 OpOut op_unify(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
