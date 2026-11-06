@@ -87,6 +87,15 @@ prefix, 3; a new sketch's owner, 1), the server round trip after Suppress, Mirro
 number field's right-click focus (psui handoff), "Unknown of" chips, skasm's three sketch ones, the mirror line
 (SKETCH-MIRROR-LINE-SELECTED), the flaky asm-fastened-undo-picks (UIP-ASM-FASTENED-FLAKY); the rest are drw-* (dx).
 
+psui 11-06 19:58: the whole suite with live's batches 5-9 (487 recordings) on ffe5d877: **451/487 scenarios, 2946/3027
+states** (432 before today's fixes from them); since, abe55ca3 makes fill-tool, boundary-surface-tool,
+part-menu-copy-here and the two folder submenu scenarios match too (5 more, checked alone). Left in the Part Studio:
+account memory (Form's Circle emboss, External thread's 13/16), the free plan (Thickness analysis, Release's upsell),
+questions with live (Surfaces collapsed?, Bend's title, Face mirror focus, a checkbox's right-press focus), the number
+field's right-click focus, the server round trip after Suppress, "Unknown of" chips, a new sketch's owner, skasm's
+three sketch scenarios, SKETCH-MIRROR-LINE-SELECTED. Coverage: toolbar 76/76, sketch tools 55/55, menus 92/117,
+shortcuts 78/89 (batches 10-14 with live).
+
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
 Of the recorded Booleans (each distinct call once), the share noshape's own Boolean takes instead of OCCT, by count and

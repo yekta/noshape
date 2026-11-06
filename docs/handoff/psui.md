@@ -609,6 +609,14 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N00000000000000. (11-06 19:58) **Coverage complete for the toolbar and sketch tools; live's batches 5-9 in.** Batches 13
+    (the toolbar's last 29) and 14 (15 menu items) filed with live. Menus left (25/117): assembly in-context (Go to
+    assembly, Current assembly position…), releases, MBD annotations, the appearance panel's rows, a configured
+    dimension's Unconfigure, Paste inputs. From live's recordings today: see SCORE 11-06 evening; open questions in
+    REQUESTS 19:27. New: GROUP_OPEN hint (std "Collapsed By Default": false), `selection_feature_menu` (the
+    multi-selection feature menu, also a fresh folder's), recorder entries for the Section view panel / appearance
+    editor / parts list headings / open submenus.
+
 N0000000000000. (11-06 18:06) **Remembered feature values and batches 10-12 (lead 11-06).** Hole memory is ours as live
     found it (1987: on ✓, per account and type, every document, lengths per document unit; `feature_settings`). The
     suite's two Hole differences were live's account state: a scenario's `"remembered"` (README) seeds the run's config
