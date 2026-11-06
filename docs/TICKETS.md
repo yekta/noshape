@@ -251,6 +251,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-06 05:00 release (qa list 03:20, checked on green 2532af01; the latest release is v0.4.32)
+- **qa 04:43: still no blocker on green b1fcb30d** (bool's tolerances, stage 3a: an edge on a face): its full CLI smoke has
+  ca1d1b37's results, and the volume sweep and dx's cf corpus = ca1d1b37. The ticket documents differ only in cli-draft-hang2, which
+  gave the 37305.64 result (DRAFT-NONDETERMINISTIC, seen on greens too since 11-06). Knurl, five pairs back to back: medians
+  6.1 s (ca1d1b37) and 6.3 s, within the run-to-run noise (5.7–7.2 s); the vase is the same. Green 6eb003c4 (04:42) is sweeping.
 - **qa 04:10: still no blocker on green ca1d1b37** (bool's per-entity tolerances, stage 2): the full CLI smoke has 2532af01's
   results, and the volume sweep, dx's cf corpus and the 44 ticket documents = 9521ecf1. Timings are the same as 2532af01's when
   run back to back (vase shells ~2.0 / 2.1 / 1.5 s on both).
