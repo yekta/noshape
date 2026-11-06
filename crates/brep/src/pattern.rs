@@ -210,12 +210,6 @@ pub fn copy_of(a: &Body, b: &Body, tol: f64) -> Option<Rigid> {
             (Surface::Revolution { curve: c1, origin: o1, axis: a1 }, Surface::Revolution { curve: c2, origin: o2, axis: a2 }) => {
                 c1 == c2 && pt(o1, o2) && (r.dir(a1) * s - a2).length() <= 1e-9
             }
-            (Surface::Torus { origin: o1, xdir: x1, ydir: y1, zdir: z1, major: m1, minor: n1 }, Surface::Torus { origin: o2, xdir: x2, ydir: y2, zdir: z2, major: m2, minor: n2 }) => {
-                pt(o1, o2) && dir(x1, x2) && dir(y1, y2) && dir(z1, z2) && num(m1, m2) && num(n1, n2)
-            }
-            (Surface::Sphere { origin: o1, xdir: x1, ydir: y1, zdir: z1, radius: r1 }, Surface::Sphere { origin: o2, xdir: x2, ydir: y2, zdir: z2, radius: r2 }) => {
-                pt(o1, o2) && dir(x1, x2) && dir(y1, y2) && dir(z1, z2) && num(r1, r2)
-            }
             _ => false,
         };
         if !ok {

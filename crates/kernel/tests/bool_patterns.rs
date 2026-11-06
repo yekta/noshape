@@ -1397,3 +1397,21 @@ fn an_inside_out_tool_declined_first() {
     let o = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&bend), std::slice::from_ref(&cutter), &k::BooleanOptions::default()).expect("OCCT's");
     assert!(o.shape.is_valid());
 }
+
+/// A part cut by 12 copies of a filleted tool (parity56 1abdab7d, recorded): its tools' tori and spheres taken as
+/// copies of one another made ours give 123 edges where OCCT gives 117; found as copies only by their cylinders,
+/// cones, extrusions and revolutions, the result is OCCT's (ours declines it).
+#[test]
+fn copies_of_a_filleted_tool_cut_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "1abdab7d91d58819").expect("the recorded case");
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the cut");
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r.shape), counts(&o.shape));
+    let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against OCCT's {w}");
+}
