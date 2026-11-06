@@ -1,0 +1,123 @@
+{
+  "name": "drw-table-cells-unmerge",
+  "about": "Two cells merged, then their menu: Unmerge",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          148,
+          148
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          148,
+          148
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          110,
+          148
+        ]
+      },
+      "mods": "shift"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          148,
+          148
+        ]
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Merge"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          130,
+          148
+        ]
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          130,
+          148
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Unmerge"
+      }
+    }
+  ]
+}

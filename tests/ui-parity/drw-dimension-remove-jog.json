@@ -1,0 +1,84 @@
+{
+  "name": "drw-dimension-remove-jog",
+  "about": "A jog added on a dimension's extension line, then removed from the same menu",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: drawing menus, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            18
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            15
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Add jog"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            15
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Remove jog"
+      }
+    }
+  ]
+}
