@@ -4406,9 +4406,12 @@ namespace {
 // Two faces still meeting across an edge (not a seam) on one cylinder: USD's result depends on the faces' order.
 bool cylinder_faces_apart(const TopoDS_Shape& s)
 {
+  // (Cones too: a valve's conical seat cut in two by a tool, its pieces left apart by OCCT's unify in our faces'
+  // order where OCCT's own result's merged.)
   ShapeIMap faces;
   TopExp::MapShapes(s, TopAbs_FACE, faces);
   std::vector<std::optional<gp_Cylinder>> cyl(faces.Extent() + 1);
+  std::vector<std::optional<gp_Cone>>     cone(faces.Extent() + 1);
   bool                                    any = false;
   for (int i = 1; i <= faces.Extent(); ++i)
   {
@@ -4417,6 +4420,11 @@ bool cylinder_faces_apart(const TopoDS_Shape& s)
     {
       cyl[i] = a.Cylinder();
       any    = true;
+    }
+    else if (a.GetType() == GeomAbs_Cone)
+    {
+      cone[i] = a.Cone();
+      any     = true;
     }
   }
   if (!any)
@@ -4428,13 +4436,21 @@ bool cylinder_faces_apart(const TopoDS_Shape& s)
     const auto& fs = ef(i);
     if (fs.Extent() != 2)
       continue;
-    const std::optional<gp_Cylinder>&ca = cyl[faces.FindIndex(fs.First())], &cb = cyl[faces.FindIndex(fs.Last())];
-    if (!ca || !cb)
-      continue;
-    const gp_Lin la(ca->Axis()), lb(cb->Axis());
-    const double tol = 1e-9 * std::max(1.0, ca->Radius());
-    if (std::abs(ca->Radius() - cb->Radius()) <= tol && la.Direction().IsParallel(lb.Direction(), 1e-9) && la.Distance(lb.Location()) <= tol)
-      return true;
+    const int  a = faces.FindIndex(fs.First()), b = faces.FindIndex(fs.Last());
+    if (cyl[a] && cyl[b])
+    {
+      const gp_Lin la(cyl[a]->Axis()), lb(cyl[b]->Axis());
+      const double tol = 1e-9 * std::max(1.0, cyl[a]->Radius());
+      if (std::abs(cyl[a]->Radius() - cyl[b]->Radius()) <= tol && la.Direction().IsParallel(lb.Direction(), 1e-9) && la.Distance(lb.Location()) <= tol)
+        return true;
+    }
+    if (cone[a] && cone[b])
+    {
+      const double tol = 1e-9 * std::max(1.0, cone[a]->RefRadius());
+      if (std::abs(cone[a]->SemiAngle() - cone[b]->SemiAngle()) <= 1e-12 && cone[a]->Apex().Distance(cone[b]->Apex()) <= tol &&
+          cone[a]->Axis().Direction().IsParallel(cone[b]->Axis().Direction(), 1e-9))
+        return true;
+    }
   }
   return false;
 }

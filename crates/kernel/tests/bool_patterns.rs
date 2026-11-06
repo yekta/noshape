@@ -706,6 +706,30 @@ fn valid_as_occt(name: &str, rel: f64) {
     assert!((v - w).abs() <= rel * w.abs(), "volume {v} against OCCT's {w}");
 }
 
+/// A valve body's conical seat cut in two by a tool (c2-valve-config, recorded): merging faces after ours leaves the
+/// two cone pieces one face as after OCCT's (its unify depends on the faces' order; the cone's pieces are tried in
+/// others, as a cylinder's), 37 faces.
+#[test]
+fn a_cone_cut_in_two_merges_as_after_occts() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "378e9493f981dca8").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's");
+    k::set_rust_boolean(None);
+    let merged = |s: &k::Shape| {
+        let u = k::unify_same_domain(s).expect("merged").shape;
+        (u.count(k::ShapeType::Face), u.count(k::ShapeType::Edge))
+    };
+    assert_eq!(merged(&r.shape), merged(&o.shape));
+    assert_eq!(merged(&r.shape).0, 37);
+}
+
 /// Two knurl grooves of opposite hands crossing 44 µm above the cylinder's end face, where both tools' caps lie (the
 /// user's Ø25 × 25 B94.6 knurl at 45° / 45°, its tools 28 and 61; recorded): their flanks meet in 94 µm curves from
 /// the ridges' crossing to the bottom edges', which OCCT's face/face misses; asked again from between where the

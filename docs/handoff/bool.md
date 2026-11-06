@@ -25,6 +25,27 @@ scratch /root/bool-scratch.
   rust_boolean.cpp's preflight: "arguments share vertices" (OCCT keeps sub-shapes shared between arguments as they are;
   ours merges them: their history would be Modified, not Kept).
 
+## Real documents slower than live (11-06 15:13 UTC; vibe4 release, parity harness, live's times from live.jsonl)
+- c2-valve-config 690 ms / live 175: two of its cuts ours takes (path rust) merged to 38 faces where OCCT's merge to
+  37 (a conical seat cut in two: the merge leaves the cone's two pieces apart in our faces' order; unify_in retried
+  other orders for cylinders only): cones too now (boolean.cpp cylinder_faces_apart), both as OCCT's, T1 bool_patterns::
+  a_cone_cut_in_two_merges_as_after_occts. Its time: Extrude 3 287 / 56 (an up-to extrude: OCCT's Splitter of a
+  27-face prism by a surface of revolution, 222-308 ms), Circular pattern 1 274 / 67 and Extrude 2 111 / 10 (four cuts
+  ours declined "a plane through a cone's apex", OCCT 105-264 ms each). That decline is a bug: a plane across a cone's
+  axis past its apex (a radius below zero: the other nappe) declined as through the apex; fixed in bool-b
+  (/root/bool-scratch/apex-split-dbg-1106.patch), to land with its gate. Past it the four stop at "a face lost" /
+  "an invalid result": the valve's tool has tolerant vertices (0.21 mm) where its arc and its B-spline edge meet off the
+  cone; ours maps the arc at its circle's height and the vertex by projection, 0.1 mm apart in the face's parameters
+  (OCCT uses the input edges' own curves on the face). 
+- c2-rings-loft 6.8 s here / live 1.6 s (Shell 1 6.5 s / 235 ms): the model is wrong upstream (Revolve 1 "Select the
+  axis to revolve around.", Fillet 1 "Failed to fillet selections.", Extrude 1's centroid off), so Shell 1 gets a
+  13-face part instead of live's 17-face ring and fails ("Could not shell part with selections."), its slab route
+  spending 6.2 s before failing. To redo once the upstream features match (sketch / query side).
+- cf-fix-pcb 1031 ms / live 618: Fix PCB 2 762 / 276: OCCT's Splitter of a 328-face solid by one planar face 470 ms
+  (and a 33-face one, 24 ms), 1098 boxes 170 ms (two optimal boxes of its B-spline faces 96 ms). A split by one
+  planar face covering the solid's section is two of our Booleans (common and cut with the half-space): next.
+- cf-planetary-gears 462 ms / live 542: faster than live now (BOOL-RUST-GEARS-SLOW's 2.07 s is from before).
+
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change
 for coincident curves are parked with their scope notes below: each Shell stage moved shfall's cases one step without

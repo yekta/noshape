@@ -4830,7 +4830,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (Sketch 1 F36340493b76e, Extrude 1 F584b01ddf68e: listed order = id order) → live's 4 parts, Part 2 2250. So the
   picked features re-run in id order, the Extrude before its sketch is solved again for the instance; std runs them
   in the order of the FeatureList (the feature list's order).
-- [ ] P0 BOOL-RUST-GEARS-SLOW (bool; core 11-03 20:07, from PARITY-SPEED) cf-planetary-gears regenerates in 12.8 s with
+- [x] (bool 11-06 15:13: 462 ms on vibe4 in the parity harness, live 542 ms) P0 BOOL-RUST-GEARS-SLOW (bool; core 11-03 20:07, from PARITY-SPEED) cf-planetary-gears regenerates in 12.8 s with
   the Rust Boolean and 1.35 s without it (NOSHAPE_BOOL_RUST=0; both match live, live 0.54 s): its 4 subtractions a
   regeneration take ~2.5 s each in boolean.rust.brep. Data and rerun in docs/handoff/bool.md (core 11-03).
   core 11-03 21:34: the same on cf-straight-spline (54 SAE spline features): 44.2 s with the Rust Boolean, 15.3 s
