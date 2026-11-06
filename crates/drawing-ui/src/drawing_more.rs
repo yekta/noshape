@@ -202,13 +202,16 @@ impl DrawingEditor {
                     cx.notify();
                     return true;
                 }
-                // Up to entity: a snap point (in any view of the same model) sets the depth.
-                if let Some(p) = self.snap_at(c)
-                    && let Some(r) = p.r.clone()
-                    && let Some(Panel::BrokenOut { depth_ref, up_to: true, .. }) = &mut self.panel
-                {
-                    *depth_ref = Some(r);
-                    self.status = Some("Depth: up to the selected point".into());
+                // Up to entity (live 2134): a point in any view of the same model sets the depth: a circle's
+                // quadrant within 8 px (no Shift+Q), else a snap point, never a centre.
+                if matches!(self.panel, Some(Panel::BrokenOut { up_to: true, .. })) {
+                    let r = self.quadrant_near(c, 8.0).or_else(|| self.snap_at(c).and_then(|p| p.r).filter(|r| !matches!(r, PointRef::Center { .. })));
+                    if let Some(r) = r
+                        && let Some(Panel::BrokenOut { depth_ref, .. }) = &mut self.panel
+                    {
+                        *depth_ref = Some(r);
+                        self.status = Some("Depth: up to the selected point".into());
+                    }
                 }
             }
             Tool::CropPoly { parent, mut points, spline } => {
@@ -616,6 +619,28 @@ impl DrawingEditor {
     }
 
     /// The [Up to entity | Blind] select (live 2131: a dropdown, Up to entity first and the default).
+    /// The quadrant of a face-on circular edge within `px` screen pixels of `c` (sheet mm), in any view: the nearest.
+    fn quadrant_near(&self, c: [f64; 2], px: f64) -> Option<PointRef> {
+        let b = self.built.as_ref()?;
+        let tol = self.pk().tol_mm(px);
+        let mut best: Option<(f64, PointRef)> = None;
+        for pl in &b.placements {
+            let Some(g) = self.geoms.get(&pl.id) else { continue };
+            let at = pl.to_view(c);
+            for me in &g.model_edges {
+                let views::EdgeGeom::Circle { center, radius, face_on: true, .. } = me.geom else { continue };
+                for k in 0..4u8 {
+                    let a = f64::from(k) * std::f64::consts::FRAC_PI_2;
+                    let d = (center[0] + radius * a.cos() - at[0]).hypot(center[1] + radius * a.sin() - at[1]) * pl.scale * 1000.0;
+                    if d <= tol && best.as_ref().is_none_or(|(bd, _)| d < *bd) {
+                        best = Some((d, PointRef::Quadrant { body: me.body.clone(), name: (*me.name).clone(), k }));
+                    }
+                }
+            }
+        }
+        best.map(|(_, r)| r)
+    }
+
     fn broken_out_mode(up: bool, cx: &mut Context<Self>) -> AnyElement {
         let ed = cx.entity();
         Button::new("dr-bo-mode")
@@ -879,7 +904,8 @@ impl DrawingEditor {
                 b.exclude = exclude;
                 self.edit_view("Broken-out section", view, cx, |v| noshape_scene::drawing_tools::set_broken_out(v, edit, b));
                 self.tool = Tool::Select;
-                self.selection = vec![Sel::View(view)];
+                // (Live 2131: nothing selected after ✓.)
+                self.selection.clear();
             }
             Panel::CutAngle { view, input } => match num(val(&input, cx).trim_end_matches('°').to_string()) {
                 Some(deg) => {

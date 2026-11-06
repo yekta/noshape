@@ -1059,8 +1059,9 @@ pub fn view_scale_text(sheet: &Sheet, id: ViewId) -> String {
 pub fn front_extent(sources: &Sources, tab: TabId, part: Option<&BodyId>) -> Option<[f64; 2]> {
     let (_, src) = sources.iter().filter(|(k, _)| k.tab == tab).min_by_key(|(k, _)| (k.version.is_some(), k.explode.is_some(), k.position.is_some(), k.display.is_some()))?;
     let (mut lo, mut hi) = (DVec3::splat(f64::INFINITY), DVec3::splat(f64::NEG_INFINITY));
+    // (Tight: a 40 mm block is 40 wide, not 40 plus its tolerance: live's 2:1 for it.)
     for b in view_bodies(&src.context, part) {
-        if let Ok(bb) = b.shape.bounding_box(false) {
+        if let Ok(bb) = b.shape.bounding_box(true) {
             lo = lo.min(bb.min);
             hi = hi.max(bb.max);
         }

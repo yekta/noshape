@@ -86,6 +86,11 @@ impl DrawingEditor {
 
     pub fn cancel(&mut self, cx: &mut Context<Self>) {
         self.projection_parent_lit = false;
+        // A hole table following the pointer after ✓: Esc leaves it there (live 2131).
+        if self.hole_table_placing() {
+            self.place_hole_table(cx);
+            return;
+        }
         // Edit detail (not redrawing its profile): Esc discards it.
         if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_some()) && !matches!(self.tool, Tool::Detail { .. }) {
             self.close_detail_edit(false, cx);
@@ -757,6 +762,7 @@ impl DrawingEditor {
                     // views default to it.
                     if self.drawing_sheet().views.is_empty() {
                         self.insert.scale = None;
+                        self.insert_scale_was_auto = false;
                     }
                     self.edit_sheet("Insert view", cx, |s| noshape_model::drawing::create::push_inserted_view(s, v));
                     // Placing a view on an out-of-date drawing updates it.

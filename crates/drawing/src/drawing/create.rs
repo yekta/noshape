@@ -45,6 +45,22 @@ pub fn first_view_scale(size: super::SheetSize, extent: [f64; 2]) -> f64 {
     SCALES.iter().copied().find(|s| extent[0] * s <= w + 1e-9 && extent[1] * s <= h + 1e-9).unwrap_or(*SCALES.last().expect("scales"))
 }
 
+/// The scale of the first view of one part inserted into an empty sheet (live 2133, Part 1 picked): the largest list
+/// scale at which the Front view's width (mm at 1:1) is under 80 mm, 80 itself only at 1:1 and 2:1 (160 wide 1:3,
+/// 20 wide 3:1, 40 wide 2:1); its height within 30 % of the frame. On other sheets than ANSI A the 80 mm in
+/// proportion to the frame's width.
+pub fn first_part_view_scale(size: super::SheetSize, extent: [f64; 2]) -> f64 {
+    let f = size.frame_rect();
+    let ansi = super::SheetSize::AnsiA.frame_rect();
+    let limit = 80.0 * (f[2] - f[0]) / (ansi[2] - ansi[0]);
+    let h = 0.3 * (f[3] - f[1]);
+    let fits = |s: f64| {
+        let w = extent[0] * s;
+        (w < limit - 1e-6 || (w <= limit + 1e-6 && (s == 1.0 || s == 2.0))) && extent[1] * s <= h + 1e-6
+    };
+    SCALES.iter().copied().find(|s| fits(*s)).unwrap_or(*SCALES.last().expect("scales"))
+}
+
 /// A sheet's first inserted view gives the sheet its scale (live 1812: the
 /// title block shows it, later views default to it); others keep theirs.
 pub fn push_inserted_view(sheet: &mut super::Sheet, mut v: DrawingView) {
@@ -214,6 +230,17 @@ mod tests {
     use super::*;
     use crate::document::TabContent;
     use crate::drawing::templates::template_by_name;
+
+    /// Live 2133 (and 2067 / 2130): a picked part's first view, by its Front view's width alone (block L x W x H: the
+    /// view is L x H).
+    #[test]
+    fn first_part_view_scale_keeps_the_width_under_80_mm() {
+        use crate::drawing::SheetSize::AnsiA;
+        for (l, h, want) in [(160.0, 10.0, 1.0 / 3.0), (240.0, 10.0, 0.25), (320.0, 10.0, 0.2), (20.0, 10.0, 3.0), (16.0, 5.0, 4.0), (10.0, 5.0, 6.0), (20.0, 5.0, 3.0), (40.0, 10.0, 2.0), (40.0, 20.0, 2.0), (80.0, 10.0, 1.0), (60.0, 10.0, 1.0), (100.0, 10.0, 0.5), (400.0, 10.0, 1.0 / 6.0), (90.0, 10.0, 0.5), (45.0, 10.0, 1.0)] {
+            let got = first_part_view_scale(AnsiA, [l, h]);
+            assert!((got - want).abs() < 1e-12, "{l} x {h}: {got} (live {want})");
+        }
+    }
 
     /// Live 1812: the first inserted view's scale per Front view extent
     /// (block L × W × H: the view is L × H) and template.

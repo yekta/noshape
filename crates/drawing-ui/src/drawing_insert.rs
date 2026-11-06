@@ -171,6 +171,9 @@ impl DrawingEditor {
         self.insert.sketch = None;
         self.insert.flat = false;
         self.set_tool(Tool::InsertView { source, orientation, part }, cx);
+        if std::mem::take(&mut self.insert_scale_was_auto) {
+            self.insert.scale = None;
+        }
         self.insert_auto_scale = self.insert.scale.is_none();
         self.first_view_scale(cx);
     }
@@ -189,8 +192,11 @@ impl DrawingEditor {
             return;
         }
         let Some(e) = views::front_extent(&self.sources, *source, part.as_ref()) else { return };
-        self.insert.scale = Some(noshape_model::drawing::create::first_view_scale(sheet.size, e));
+        // (A picked part by its width, live 2133; a Part Studio's fitting the frame, live 1812.)
+        let scale = if part.is_some() { noshape_model::drawing::create::first_part_view_scale } else { noshape_model::drawing::create::first_view_scale };
+        self.insert.scale = Some(scale(sheet.size, e));
         self.insert_auto_scale = false;
+        self.insert_scale_was_auto = true;
         self.update_preview(cx);
         cx.notify();
     }
@@ -294,6 +300,7 @@ impl DrawingEditor {
                 cur_scale.is_none(),
                 std::rc::Rc::new(move |t: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| {
                     t.insert.scale = None;
+                    t.insert_scale_was_auto = false;
                     t.update_preview(cx);
                     cx.notify();
                 }) as Act,
@@ -311,6 +318,7 @@ impl DrawingEditor {
                         // "follow the sheet"; after, "(Sheet)" does.
                         t.insert.scale = (t.current_sheet().scale_shown || s != t.current_sheet().scale).then_some(s);
                         t.insert_auto_scale = false;
+                        t.insert_scale_was_auto = false;
                         t.update_preview(cx);
                         cx.notify();
                     }) as Act,

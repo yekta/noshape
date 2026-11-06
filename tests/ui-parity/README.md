@@ -103,7 +103,8 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   or cut from; `scale` as the view's properties show it. `annotations`: the sheet's, sorted by kind then text, `kind`
   one of `dimension`, `note`, `centermark`, `centerline`, `callout`, `datum`, `gdt`, `table`; automatic centermarks
   are left out; a dimension's text is its value as live's recorder reads it (no Ø / R, a leading zero: "0.394" for
-  "Ø.394"); a table's is `null` on live's side (it can't read cells), so the runner compares tables by kind there.
+  "Ø.394"); a table's is `null` on live's side (it can't read cells), so the runner compares tables by kind there;
+  a hole table isn't listed (live's exports have no entry for it, live 2134).
   `selection`: `VIEW` / `EDGE` / `ANNOTATION` items with the view or the annotation's text as `owner`.
 - A drawing's dialogs and panels are the top-level `dialog`, in live's recorder's forms (live 2063): a modal (Create
   Drawing, Export Drawing) is `{"kind": "modal", "title", "fields": [{"label", "kind": "input" | "select" |
@@ -111,8 +112,9 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   (Insert view, Note, Section view) is `{"kind": "drawing-panel", "title", "text": [...]}`, every text it shows in
   reading order (a list's options too, at most 30).
 - `selection` is what is drawn in selection colours: `VIEW` for a framed view (selected or hovered), `EDGE` for a view
-  whose edges are drawn picked (a dimension tool's picked edges, a closed broken-out profile, the projection's
-  parent). In a drawing the focus is `other` (live's drawing is an iframe), `field` in a panel's text box.
+  whose edges are drawn picked (a dimension tool's picked circle, or its lines once two are picked; a closed
+  broken-out profile; the projection's parent). In a drawing the focus is `other` (live's drawing is an iframe),
+  `field` in a panel's text box.
 - Compared in a drawing state: `drawing` and the keys above but `selection`, `undo` and `assembly` (live's recorder
   reads the main page's, which a drawing's iframe doesn't change: 0 and false throughout). The start's assembly is
   "start asm" in tab names and panel texts on both sides ("start pin-block asm Copy 2" / "start

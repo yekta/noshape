@@ -200,6 +200,9 @@ pub struct DrawingEditor {
     /// Insert view on an empty sheet: its scale is set to fit once the
     /// picked source is regenerated (live 1812).
     pub insert_auto_scale: bool,
+    /// The insert scale was set that way (not by the user): another pick sets it again (live 2133: Part 1 after its
+    /// Part Studio takes the part's scale).
+    pub insert_scale_was_auto: bool,
     assemblies: Arc<Mutex<AssemblyEvaluator>>,
     regenerating: HashSet<SourceKey>,
     /// Sources that couldn't be resolved (a deleted display state): retried
@@ -544,6 +547,7 @@ impl DrawingEditor {
             sources: Sources::new(),
             regens: HashMap::new(),
             insert_auto_scale: false,
+            insert_scale_was_auto: false,
             assemblies: Arc::new(Mutex::new(crate::derived::assembly_evaluator(studio_cache))),
             regenerating: HashSet::new(),
             failed_sources: HashSet::new(),

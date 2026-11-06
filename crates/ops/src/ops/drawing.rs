@@ -869,7 +869,9 @@ fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, mut opts: ViewOptions, ext
         && !opts.insert.flat
         && let Some(e) = noshape_model::drawing::views::front_extent(&m.sources, *source, part.as_ref())
     {
-        opts.insert.scale = Some(noshape_model::drawing::create::first_view_scale(d.sheets[sheet].size, e));
+        // (A picked part by its width, live 2133; a Part Studio's fitting the frame, live 1812.)
+        let scale = if part.is_some() { noshape_model::drawing::create::first_part_view_scale } else { noshape_model::drawing::create::first_view_scale };
+        opts.insert.scale = Some(scale(d.sheets[sheet].size, e));
     }
     let v = m.pick(&tool, &[], pos).pending_view(&opts).ok_or_else(|| OpError::param("position", "the view can't be placed there (a projected view goes at least 15 mm from its parent)"))?;
     let id = v.id;

@@ -136,14 +136,15 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let scale = self.placement(v.id).map(|p| noshape_model::drawing::sheet::format_scale(p.scale));
-                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale })
+                json!({ "name": self.ui_view_name(v.id), "kind": self.ui_view_kind(v.id), "parent": parent, "scale": scale, "brokenOut": v.broken_out.len() })
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().map(|(_, k, t)| (k, t)).collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
-            for t in &sheet.tables {
+            // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. })) {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
                 annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
             }
@@ -174,10 +175,14 @@ impl DrawingEditor {
         // A dimension's picked edges and a closed broken-out profile are drawn picked (live: drw-dimension-*,
         // drw-broken-out-section).
         match &self.tool {
+            // (Live: a picked circle shows at once, lines once there are two: drw-dimension-edge, -angular.)
             Tool::Dimension { picks, .. } => {
+                let lines = picks.iter().filter(|p| matches!(p, Pick::Line { .. })).count();
                 for p in picks {
-                    if let Pick::Line { a: PickedPoint { view, .. }, .. } | Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } = p {
-                        selection.push(("EDGE".into(), self.ui_view_name(*view)));
+                    match p {
+                        Pick::Line { a: PickedPoint { view, .. }, .. } if lines >= 2 => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        Pick::Circle { view, .. } | Pick::Arc { view, .. } | Pick::CircleAt { view, .. } => selection.push(("EDGE".into(), self.ui_view_name(*view))),
+                        _ => {}
                     }
                 }
             }

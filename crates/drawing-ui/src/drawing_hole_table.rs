@@ -49,11 +49,13 @@ pub struct HoleTableDlg {
     /// the next click picks one.
     pub more: Vec<(ViewId, Option<noshape_scene::drawing_tools::PickedPoint>)>,
     pub adding_view: bool,
+    /// ✓ pressed: the panel closed, the table follows the pointer until a click (or Esc) places it (live 2131).
+    pub placing: bool,
 }
 
 impl Default for HoleTableDlg {
     fn default() -> Self {
-        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false }
+        Self { show_location: true, precision: None, bottom_to_top: false, corner: TableCorner::TopRight, table: None, flip_x: false, flip_y: false, exclude: Vec::new(), picking: false, x_dir: None, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false }
     }
 }
 
@@ -77,7 +79,7 @@ impl DrawingEditor {
     pub fn open_hole_table_props(&mut self, id: u64, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(id) else { return };
         let TableKind::Hole { show_location, precision, bottom_to_top, flip_x, flip_y, ref exclude, x_dir, .. } = t.kind else { return };
-        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false });
+        self.hole_dlg = Some(HoleTableDlg { show_location, precision, bottom_to_top, corner: t.corner, table: Some(id), flip_x, flip_y, exclude: exclude.clone(), picking: false, x_dir, x_picking: false, y_picking: false, y_set: false, more: Vec::new(), adding_view: false, placing: false });
         cx.notify();
     }
 
@@ -153,8 +155,21 @@ impl DrawingEditor {
         false
     }
 
+    /// ✓ while inserting: the panel closes, the table follows the pointer (live 2131).
+    pub fn start_hole_table_placing(&mut self, cx: &mut Context<Self>) {
+        if let Some(d) = &mut self.hole_dlg {
+            d.placing = true;
+        }
+        cx.notify();
+    }
+
+    /// The table following the pointer after ✓ (an Esc places it there, live 2131).
+    pub fn hole_table_placing(&self) -> bool {
+        self.hole_dlg.as_ref().is_some_and(|d| d.placing && d.table.is_none()) && matches!(self.tool, Tool::Table { kind: TableTool::Hole, .. })
+    }
+
     /// Place the hole table being inserted at the pointer's last spot (a
-    /// click on the sheet, or ✓).
+    /// click on the sheet, or Esc after ✓).
     pub fn place_hole_table(&mut self, cx: &mut Context<Self>) {
         let Tool::Table { kind: TableTool::Hole, view: Some(v), origin: Some(o) } = self.tool.clone() else { return };
         if !self.hole_origins_done() {
@@ -252,7 +267,7 @@ impl DrawingEditor {
     }
 
     pub fn render_hole_table_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let d = self.hole_dlg.as_ref()?;
+        let d = self.hole_dlg.as_ref().filter(|d| !d.placing)?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
@@ -399,9 +414,9 @@ impl DrawingEditor {
                                 .when(!origin, |d| d.opacity(0.3))
                                 .child(crate::drawing_chrome::ok_check(16.))
                                 .when(editing.is_some(), |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_hole_table_props(true, cx))))
-                                // Inserting (live request 1682): ✓ places the table with its
-                                // fixed corner at the pointer's last spot on the sheet.
-                                .when(editing.is_none() && origin, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.place_hole_table(cx)))),
+                                // Inserting (live 2131): ✓ closes the panel; the table follows the
+                                // pointer until a click places it.
+                                .when(editing.is_none() && origin, |d| d.cursor_pointer().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.start_hole_table_placing(cx)))),
                         )
                         .child(div().id("hole-table-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::drawing_chrome::cancel_x(cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if editing.is_some() {
