@@ -3065,18 +3065,18 @@ impl PartStudioView {
         let mut lines = LineData::default();
         for (refs, color) in [(&acc, crate::theme::viewport::PREHIGHLIGHT), (&sel, crate::theme::viewport::SELECTION), (&hov, 0xf2ff80)] {
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 255];
-            for r in refs.iter() {
-                let edges = match r {
-                    Reference::Face(_) => crate::scene_builder::face_edges(&before, r),
-                    r => vec![r.clone()],
-                };
-                for e in &edges {
-                    for b in before.bodies.iter().filter(|b| !b.hidden) {
-                        if let Some(i) = b.edge_refs.iter().position(|x| x == e)
-                            && let Some(pl) = b.mesh.edges.get(i)
-                        {
-                            lines.push_polyline(pl, rgba, 0, 3.0, 0);
-                        }
+            // The faces' edges in one pass over the bodies, then each body's edges looked up once.
+            let faces: Vec<Reference> = refs.iter().filter(|r| matches!(r, Reference::Face(_))).cloned().collect();
+            let face_edges = crate::scene_builder::faces_edges(&before, &faces);
+            let mut wanted: std::collections::HashSet<&Reference> = refs.iter().filter(|r| !matches!(r, Reference::Face(_))).collect();
+            wanted.extend(face_edges.iter().flatten().flatten());
+            if wanted.is_empty() {
+                continue;
+            }
+            for b in before.bodies.iter().filter(|b| !b.hidden) {
+                for (e, pl) in b.edge_refs.iter().zip(&b.mesh.edges) {
+                    if wanted.contains(e) {
+                        lines.push_polyline(pl, rgba, 0, 3.0, 0);
                     }
                 }
             }
