@@ -1498,11 +1498,13 @@ impl<'a> Translator<'a> {
     /// TOPOLOGY is the sketch entities bounding it): our region whose
     /// interior point lies inside those curves. `None`: not a region query.
     fn region_from_query(&mut self, text: &str) -> Result<Option<String>, String> {
+        let mut own_edges: Vec<String> = Vec::new();
         let (sk, strings) = match text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next()) {
             Some(packed) => {
                 let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return Ok(None) };
                 let mut strings = Vec::new();
                 packed_strings(&tree, &mut strings);
+                own_edges = packed_face_edges(&tree);
                 // The sketch whose imprint the face is (the query's own
                 // operation), else the first sketch named.
                 let sk = root_operation(&tree).and_then(|o| o.strip_suffix(".imprint").map(str::to_string)).or_else(|| strings.iter().find_map(|s| s.strip_suffix(".wireOp")).map(str::to_string));
@@ -1563,6 +1565,15 @@ impl<'a> Translator<'a> {
         // it apart (TOPOLOGY): ours whose boundary has them all.
         let named: Vec<String> = strings.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();
         let all: Vec<Value> = g["regions"].as_array().cloned().unwrap_or_default();
+        // The region bounded by exactly the face's own edges (the curves its vertices meet are named too, one level
+        // down: c2-sm-exhaust-clamp's small circles touching a line and a ring, their disks, not the slivers beside).
+        let own: std::collections::BTreeSet<String> = own_edges.iter().filter_map(|e| self.sketch_entities.get(&(sk.clone(), e.clone())).cloned()).collect();
+        if !own.is_empty() && own.len() == own_edges.iter().collect::<std::collections::BTreeSet<_>>().len() && !derived {
+            let exact: Vec<&Value> = all.iter().filter(|r| r["boundary"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect::<std::collections::BTreeSet<_>>() == own).collect();
+            if let [only] = exact.as_slice() {
+                return Ok(only["id"].as_str().map(whole));
+            }
+        }
         let bounded: Vec<Value> = all.iter().filter(|r| !named.is_empty() && named.iter().all(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e)))).cloned().collect();
         if let [only] = bounded.as_slice() {
             return Ok(only["id"].as_str().map(whole));
@@ -3254,6 +3265,43 @@ fn root_operation(p: &noshape_model::custom::host::packed::Packed) -> Option<Str
 }
 
 /// Every string in a packed query.
+/// A packed face query's own edges (its TOPOLOGY's entities, not the curves those are told apart by in turn): their
+/// sketch entity ids.
+fn packed_face_edges(p: &noshape_model::custom::host::packed::Packed) -> Vec<String> {
+    use noshape_model::custom::host::packed::Packed;
+    fn field<'a>(p: &'a Packed, key: &str) -> Option<&'a Packed> {
+        let Packed::Map(kv) = (match p {
+            Packed::Tagged(_, inner) => inner.as_ref(),
+            other => other,
+        }) else {
+            return None;
+        };
+        kv.iter().find(|(k, _)| matches!(k, Packed::Str(s) if s == key)).map(|(_, v)| v)
+    }
+    fn entity_id(q: &Packed) -> Option<String> {
+        match field(q, "sketchEntityId") {
+            Some(Packed::Str(s)) => Some(s.clone()),
+            _ => field(q, "derivedFrom").and_then(entity_id),
+        }
+    }
+    let mut out = Vec::new();
+    let Some(Packed::Array(data)) = field(p, "disambiguationData") else { return out };
+    for d in data {
+        if !matches!(field(d, "disambiguationType"), Some(Packed::Str(t)) if t == "TOPOLOGY") {
+            continue;
+        }
+        let Some(Packed::Array(groups)) = field(d, "entities") else { continue };
+        for g in groups {
+            let items: Vec<&Packed> = match g {
+                Packed::Array(a) => a.iter().collect(),
+                other => vec![other],
+            };
+            out.extend(items.into_iter().filter_map(entity_id));
+        }
+    }
+    out
+}
+
 fn packed_strings(p: &noshape_model::custom::host::packed::Packed, out: &mut Vec<String>) {
     use noshape_model::custom::host::packed::Packed;
     match p {
@@ -4141,6 +4189,22 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    /// A packed face query's own edges, not the curves its vertices meet (named one level down): live's query for one
+    /// of c2-sm-exhaust-clamp's small disks, a circle touching a line and a ring, names all three, its own edges only
+    /// the circle (split in two at the tangent points).
+    #[test]
+    fn a_packed_faces_own_edges_are_its_topology_not_its_neighbours() {
+        let tree = noshape_model::custom::host::packed::unpack("&242$eJyNUUtTwjAQ/jPxCNOUPuBY2hQy2hY3EemJCU2EKM8+dPDXmxbGUbx42s3u99hvcjd20WOjynPiMmwjqSuxW+l1I2p92EeiFgFO7L8bfj4qNkQ8m2UP2SQ3rdrXutaqCuzADq3EYyskVanflYzLw85MXCYuoHNLHgtEvh/MQSSaEEPZ6Ko+lOerfAgk4DRLzeJwVGXnTOXYRlQGmGHc91DMnreT02JgEyqnllhaH7pU2ZGN0KlN1QlJxO4JD6dLknLKc6ZQ9abqYnM5gEpWoLzxYjpP4sWiLsBqMwMGGwbXNC441+qCBz4MYQQrKECCMmTSnIo0dNV+LQRgC9zQZx6aE+BkcQGHhbm3J/s+0rtjqfc1FOZCmnICjIQ8wv9weeWZ0p9P2zyLqs4FsHMFYc+gsB/18A9mO2Q+oskMjBHg0eVfwGnJNxEBDwG/tFUZ4I0I2E43NKkcFAch+b37AjUdsPk=").unwrap();
+        let own = super::packed_face_edges(&tree);
+        assert_eq!(own, vec!["Yu6FIVMFXXtc".to_string(); 2]);
+        let mut all = Vec::new();
+        super::packed_strings(&tree, &mut all);
+        for neighbour in ["EuqcNC5engaa", "jTOeizUlYODs"] {
+            assert!(all.iter().any(|s| s == neighbour), "{all:?}");
+        }
+    }
+
     /// stef-radijator's Fillet 1 names `TNHaprdwY81W.1.18.0` of an 18-instance circular pattern listing the seed
     /// `aszIiqlQyJeU` at 0 and `TNHaprdwY81W.0.1.0` … `.1.17.0`: the seed (live rounds the edge at its crossing).
     #[test]
