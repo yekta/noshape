@@ -1,5 +1,8 @@
 // Shapes, lists, topology exploration, validation and history building.
 #include "internal.hpp"
+
+#include <Geom_BSplineCurve.hxx>
+#include <Geom_TrimmedCurve.hxx>
 #include <mutex>
 #include <map>
 #include <fstream>
@@ -885,6 +888,28 @@ bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces)
 // Made once per shape from its cached ancestor maps (the naming made the
 // edge / vertex -> face ones): the display asked twice a regeneration, each
 // time mapping the 1600-face fin plate's ancestors three times (~70 ms).
+namespace {
+// Two copies of one B-spline curve (an import's closed curve split at a seam into pieces each holding the whole curve).
+bool same_bspline(const occ::handle<Geom_Curve>& a, const occ::handle<Geom_Curve>& b, double tol)
+{
+  auto basis = [](occ::handle<Geom_Curve> c) {
+    while (const auto t = occ::down_cast<Geom_TrimmedCurve>(c))
+      c = t->BasisCurve();
+    return occ::down_cast<Geom_BSplineCurve>(c);
+  };
+  const occ::handle<Geom_BSplineCurve> p = basis(a), q = basis(b);
+  if (p.IsNull() || q.IsNull() || p->Degree() != q->Degree() || p->NbPoles() != q->NbPoles() || p->NbKnots() != q->NbKnots() || p->IsRational() != q->IsRational())
+    return false;
+  for (int i = 1; i <= p->NbKnots(); ++i)
+    if (std::abs(p->Knot(i) - q->Knot(i)) > 1e-12 || p->Multiplicity(i) != q->Multiplicity(i))
+      return false;
+  for (int i = 1; i <= p->NbPoles(); ++i)
+    if (p->Pole(i).Distance(q->Pole(i)) > tol || std::abs(p->Weight(i) - q->Weight(i)) > 1e-12)
+      return false;
+  return true;
+}
+} // namespace
+
 rust::Vec<uint8_t> shown_topology(const OcShape& s)
 {
   const LockedSection locked_section_811;
@@ -975,7 +1000,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         double                          f, l;
         const occ::handle<Geom_Curve>   ca = BRep_Tool::Curve(TopoDS::Edge(em(two[0])), la, f, l);
         const occ::handle<Geom_Curve>   cb = BRep_Tool::Curve(TopoDS::Edge(em(two[1])), lb, f, l);
-        bool                            one = !ca.IsNull() && ca == cb && la.IsEqual(lb);
+        bool                            one = !ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9));
         if (!one)
         {
           BRepAdaptor_Curve xa(TopoDS::Edge(em(two[0]))), xb(TopoDS::Edge(em(two[1])));
