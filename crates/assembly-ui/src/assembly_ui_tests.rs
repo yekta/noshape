@@ -350,7 +350,7 @@ fn a_nested_rows_menu_is_lives(cx: &mut TestAppContext) {
 fn enter_in_the_graphics_accepts_the_open_dialog(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "enter-accepts");
     cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
-    cx.update_window(window, |_, w, cx| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
     let enter = |cx: &mut TestAppContext| {
         cx.update_window(window, |_, w, cx| {
             let focus = view.read(cx).focus.clone();
