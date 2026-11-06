@@ -36,6 +36,16 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-06 05:32:** the 05:00 list is in TICKETS (no new blocker; last checked on green 46f6caff). No 05:00 Release run yet. The
+**next release is the first CI builds with GCC 15 at baseline x86-64** (core 2532af01). On it, check: the Linux binary on a stock 24.04
+(release.yml checks GLIBCXX ≤ 3.4.33 too), the hang document's open time against a green's (both baseline now: P1 MESH-AVX2), the
+Draft opens (tickets/draft-nondet/opens.py on vibe3), and the Release run's new CLI timing table in its job summary. Greens since
+v0.4.32 (17 so far, through 46f6caff, incl. dx's compiled FeatureScript and bool's tolerance stages 2 / 3a / 3b): no change except
+cli-draft-hang2 flipping (DRAFT-NONDETERMINISTIC now also on greens, 1 / 12 on 2532af01). Full CLI smoke on 2532af01, ca1d1b37 and
+b1fcb30d = v0.4.32. Run timings back to back before calling one slower: vibe3 under the sweep plus the smoke moved the vase by 40 %
+and the knurl by 2 s. New P2s: BOOL-DECLINE "a seam off a ruling", "a piece shorter than its vertices' distance". vibe3 loops:
+v3cf8.sh (v0.4.32, 5121–5180), v3nf9.sh (2532af01 fallback off, 5181–5240).
+
 **11-06 00:30: v0.4.32 (published 23:33 after the lead re-ran publish; tag 2d7411b38) checked: good, no new blocker.** Linux
 files byte-identical to the smoked artifact, SHA256SUMS OK, 11 assets. CLI smoke = v0.4.31 (round trip, volume sweep, fixed
 tickets, the user's cases incl. the Gyro), faster rows (vase shells 3.9 → 3.0 s etc.); **RELEASE-BUILD-FILLET-HANG verified**
