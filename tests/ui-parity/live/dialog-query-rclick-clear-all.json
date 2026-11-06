@@ -1,0 +1,923 @@
+{
+ "scenario": "dialog-query-rclick-clear-all",
+ "recorded": "2026-11-06T13:33:18.260Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.3 3b32b16a"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "eee51c42995b3e0d3cc809aa",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "edge": [
+      10,
+      0,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "JHV"
+   ],
+   "at": [
+    1112,
+    498
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 29670
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "key",
+    "key": "shift+f"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 1"
+    },
+    "dialog": {
+     "title": "Fillet 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 33378
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "field": "Entities to fillet"
+    }
+   },
+   "ok": true,
+   "at": [
+    356,
+    162
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to fillet",
+     "dialog": "Fillet 1"
+    },
+    "dialog": {
+     "title": "Fillet 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Clear all"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Fillet 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 35879
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Clear all"
+    }
+   },
+   "ok": true,
+   "at": [
+    416,
+    177
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Fillet 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Edge",
+       "selected": true
+      },
+      {
+       "label": "Full round",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Entities to fillet",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Tangent propagation",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Measurement",
+       "kind": "enum",
+       "text": "Radius",
+       "state": "ok"
+      },
+      {
+       "label": "Control",
+       "kind": "enum",
+       "text": "Distance",
+       "state": "ok"
+      },
+      {
+       "label": "Radius",
+       "kind": "number",
+       "text": "5 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Asymmetric",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Partial fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Variable fillet",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Allow edge overflow",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Smooth fillet corners",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Fillet 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Edge",
+        "selected": true
+       },
+       {
+        "label": "Full round",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Entities to fillet",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Tangent propagation",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Measurement",
+        "kind": "enum",
+        "text": "Radius",
+        "state": "ok"
+       },
+       {
+        "label": "Control",
+        "kind": "enum",
+        "text": "Distance",
+        "state": "ok"
+       },
+       {
+        "label": "Radius",
+        "kind": "number",
+        "text": "5 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Asymmetric",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Partial fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Variable fillet",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Allow edge overflow",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Smooth fillet corners",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Fillet 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Fillet 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 38746
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 42039
+  }
+ ]
+}

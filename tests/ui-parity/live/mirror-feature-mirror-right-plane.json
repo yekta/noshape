@@ -1,0 +1,983 @@
+{
+ "scenario": "mirror-feature-mirror-right-plane",
+ "recorded": "2026-11-06T13:09:03.435Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.2 7539bca4"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "7991e2a711b347c1b8ba15e8",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Mirror"
+    }
+   },
+   "ok": true,
+   "at": [
+    741,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to mirror",
+     "dialog": "Mirror 1"
+    },
+    "dialog": {
+     "title": "Mirror 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part mirror",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to mirror",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Mirror plane",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mirror 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part mirror",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to mirror",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Mirror plane",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 25666
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Part mirror",
+     "pick": "Feature mirror"
+    }
+   },
+   "ok": true,
+   "at": [
+    343,
+    121
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "Mirror 1"
+    },
+    "dialog": {
+     "title": "Mirror 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Feature mirror",
+       "state": "ok"
+      },
+      {
+       "label": "Features to mirror",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Mirror plane",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Reapply features",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mirror 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Feature mirror",
+        "state": "ok"
+       },
+       {
+        "label": "Features to mirror",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Mirror plane",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Reapply features",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 30268
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "feature": "Extrude 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    70,
+    313
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Features to mirror",
+     "dialog": "Mirror 1"
+    },
+    "dialog": {
+     "title": "Mirror 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Feature mirror",
+       "state": "ok"
+      },
+      {
+       "label": "Features to mirror",
+       "kind": "query",
+       "items": [
+        "Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Mirror plane",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "error"
+      },
+      {
+       "label": "Reapply features",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mirror 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Feature mirror",
+        "state": "ok"
+       },
+       {
+        "label": "Features to mirror",
+        "kind": "query",
+        "items": [
+         "Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Mirror plane",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "error"
+       },
+       {
+        "label": "Reapply features",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "FEATURE",
+       "owner": "Extrude 1",
+       "id": "FOH5BjIXS9aThFr_0"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Mirror 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 33994
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Mirror plane"
+    }
+   },
+   "ok": true,
+   "at": [
+    343,
+    201
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Mirror plane",
+     "dialog": "Mirror 1"
+    },
+    "dialog": {
+     "title": "Mirror 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Feature mirror",
+       "state": "ok"
+      },
+      {
+       "label": "Features to mirror",
+       "kind": "query",
+       "items": [
+        "Extrude 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mirror plane",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Reapply features",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mirror 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Feature mirror",
+        "state": "ok"
+       },
+       {
+        "label": "Features to mirror",
+        "kind": "query",
+        "items": [
+         "Extrude 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mirror plane",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Reapply features",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 36895
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "plane": "Right"
+    }
+   },
+   "ok": true,
+   "at": [
+    1222,
+    568
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Mirror 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Feature mirror",
+       "state": "ok"
+      },
+      {
+       "label": "Features to mirror",
+       "kind": "query",
+       "items": [
+        "Extrude 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Mirror plane",
+       "kind": "query",
+       "items": [
+        "Right plane"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Reapply features",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Mirror 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Feature mirror",
+        "state": "ok"
+       },
+       {
+        "label": "Features to mirror",
+        "kind": "query",
+        "items": [
+         "Extrude 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Mirror plane",
+        "kind": "query",
+        "items": [
+         "Right plane"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Reapply features",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "PLANE",
+       "owner": "Right",
+       "id": "JEC"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 45262
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 47692
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Mirror 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Mirror 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 51863
+  }
+ ]
+}

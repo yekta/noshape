@@ -1,0 +1,1369 @@
+{
+ "scenario": "plane-line-angle",
+ "recorded": "2026-11-06T13:11:01.093Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.2 7539bca4"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "03c0928e5410f03b3af7176d",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Plane"
+    }
+   },
+   "ok": true,
+   "at": [
+    1077,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities",
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Offset",
+       "state": "ok"
+      },
+      {
+       "label": "Offset distance",
+       "kind": "number",
+       "text": "25 mm",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Offset",
+        "state": "ok"
+       },
+       {
+        "label": "Offset distance",
+        "kind": "number",
+        "text": "25 mm",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Plane 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 28037
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "dropdown": "Offset",
+     "pick": "Line angle"
+    }
+   },
+   "ok": true,
+   "at": [
+    343,
+    157
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Plane 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 33100
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "edge": [
+      10,
+      0,
+      10
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "JHV"
+   ],
+   "at": [
+    1112,
+    498
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Select an additional point, plane, or axis to specify where the angle is measured from. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 42542
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Angle"
+    }
+   },
+   "ok": true,
+   "at": [
+    363,
+    201
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Angle",
+     "text": "0 deg",
+     "selection": [
+      0,
+      5
+     ],
+     "all": true,
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "0 deg",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "0 deg",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Select an additional point, plane, or axis to specify where the angle is measured from. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 45497
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "type",
+    "text": "30"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Angle",
+     "text": "30",
+     "selection": [
+      2,
+      2
+     ],
+     "all": false,
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "30",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "30",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Select an additional point, plane, or axis to specify where the angle is measured from. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 47452
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Angle",
+     "text": "30 deg",
+     "selection": [
+      0,
+      6
+     ],
+     "all": true,
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "30 deg",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "30 deg",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Select an additional point, plane, or axis to specify where the angle is measured from. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 50317
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Angle",
+     "text": "30 deg",
+     "selection": [
+      0,
+      6
+     ],
+     "all": true,
+     "dialog": "Plane 1"
+    },
+    "dialog": {
+     "title": "Plane 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Entities",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Line angle",
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "30 deg",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-direction-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Flip normal",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Plane 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Entities",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Line angle",
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "30 deg",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-direction-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Flip normal",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHV"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Select an additional point, plane, or axis to specify where the angle is measured from. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 54501
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 56934
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Plane 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Plane 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 61102
+  }
+ ]
+}

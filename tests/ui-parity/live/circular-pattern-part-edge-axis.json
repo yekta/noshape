@@ -1,0 +1,2260 @@
+{
+ "scenario": "circular-pattern-part-edge-axis",
+ "recorded": "2026-11-06T11:22:17.006Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.2 backfilled"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "65f09f8856ffbff9b634d6a5",
+  "start": "block",
+  "startElement": "23614b0537e04a173a620e75"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Linear pattern",
+     "menu": "Circular pattern"
+    }
+   },
+   "ok": true,
+   "at": [
+    711,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to pattern",
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "4",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "4",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 44665
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "part": "Part 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    112,
+    690
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Entities to pattern",
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "4",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "4",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "BODY",
+       "owner": "Part 1",
+       "id": "JHD"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 48826
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Axis of pattern"
+    }
+   },
+   "ok": true,
+   "at": [
+    343,
+    228
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Axis of pattern",
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "error"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "4",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "error"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "4",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 51683
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "edge": [
+      40,
+      0,
+      5
+     ]
+    }
+   },
+   "ok": true,
+   "hover": [
+    "JHF"
+   ],
+   "at": [
+    1201,
+    537
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "4",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "4",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHF"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3",
+     "Part 4"
+    ],
+    "partsHeading": "Parts (4)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 61507
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Instance count"
+    }
+   },
+   "ok": true,
+   "at": [
+    387,
+    302
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "4",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "4",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "4",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHF"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3",
+     "Part 4"
+    ],
+    "partsHeading": "Parts (4)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 63623
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "type",
+    "text": "3"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      1,
+      1
+     ],
+     "all": false,
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHF"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3",
+     "Part 4"
+    ],
+    "partsHeading": "Parts (4)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 65524
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHF"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 69126
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Instance count",
+     "text": "3",
+     "selection": [
+      0,
+      1
+     ],
+     "all": true,
+     "dialog": "Circular pattern 1"
+    },
+    "dialog": {
+     "title": "Circular pattern 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "New",
+       "selected": true
+      },
+      {
+       "label": "Add",
+       "selected": false
+      },
+      {
+       "label": "Remove",
+       "selected": false
+      },
+      {
+       "label": "Intersect",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Part pattern",
+       "state": "ok"
+      },
+      {
+       "label": "Entities to pattern",
+       "kind": "query",
+       "items": [
+        "Part 1"
+       ],
+       "active": false,
+       "state": "ok"
+      },
+      {
+       "label": "Axis of pattern",
+       "kind": "query",
+       "items": [
+        "Edge of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Angle",
+       "kind": "number",
+       "text": "360 deg",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Instance count",
+       "kind": "number",
+       "text": "3",
+       "focused": true,
+       "state": "ok"
+      },
+      {
+       "label": "icon:svg-icon-flip-rotation-opposite",
+       "kind": "toggle",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Equal spacing",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      },
+      {
+       "label": "Centered",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      },
+      {
+       "label": "Skip instances",
+       "kind": "boolean",
+       "checked": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Circular pattern 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "New",
+        "selected": true
+       },
+       {
+        "label": "Add",
+        "selected": false
+       },
+       {
+        "label": "Remove",
+        "selected": false
+       },
+       {
+        "label": "Intersect",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Part pattern",
+        "state": "ok"
+       },
+       {
+        "label": "Entities to pattern",
+        "kind": "query",
+        "items": [
+         "Part 1"
+        ],
+        "active": false,
+        "state": "ok"
+       },
+       {
+        "label": "Axis of pattern",
+        "kind": "query",
+        "items": [
+         "Edge of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Angle",
+        "kind": "number",
+        "text": "360 deg",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Instance count",
+        "kind": "number",
+        "text": "3",
+        "focused": true,
+        "state": "ok"
+       },
+       {
+        "label": "icon:svg-icon-flip-rotation-opposite",
+        "kind": "toggle",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Equal spacing",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       },
+       {
+        "label": "Centered",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       },
+       {
+        "label": "Skip instances",
+        "kind": "boolean",
+        "checked": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 1,
+     "items": [
+      {
+       "kind": "EDGE",
+       "owner": "Part 1",
+       "id": "JHF"
+      }
+     ]
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": true,
+       "hidden": false,
+       "cls": "related-highlight"
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected"
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 73345
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Enter"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 75974
+  },
+  {
+   "step": 10,
+   "do": {
+    "do": "wait",
+    "until": "regenerated"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Circular pattern 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Circular pattern 1"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2",
+     "Part 3"
+    ],
+    "partsHeading": "Parts (3)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 80195
+  }
+ ]
+}
