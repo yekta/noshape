@@ -2488,6 +2488,21 @@ impl DrawingEditor {
                 }));
             }
             Some(Sel::Break(view, index)) => out.extend(self.break_entries(view, index)),
+            // The empty sheet with something selected (live behaviours "Replicate annotations" set-up): Paste · Copy ·
+            // Paste as table | Clear selection · Zoom to fit (Add comment is a cloud feature).
+            None if !self.selection.is_empty() => {
+                out.push(crate::drawing_props::paste_always());
+                out.push(MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)));
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                    t.paste_as_table(cx);
+                }));
+                out.push(MenuEntry::Separator);
+                out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+                    t.selection.clear();
+                    t.redraw(cx);
+                }));
+                out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
+            }
             None => {
                 // Onshape's empty-sheet menu (live drawing/290): [Paste,]
                 // Paste as table | Sheet properties…, Drawing properties… |
