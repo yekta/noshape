@@ -1,0 +1,41 @@
+{
+ "name": "analysis-thickness-edit",
+ "about": "block: Show analysis tools › Thickness analysis…, Enter; the menu again: its rows, Edit thickness analysis, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Thickness analysis…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit thickness analysis"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

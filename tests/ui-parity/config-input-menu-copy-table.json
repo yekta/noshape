@@ -1,0 +1,33 @@
+{
+ "name": "config-input-menu-copy-table",
+ "about": "block: the Configuration panel, Configure Part Studio; the input's ⋯, Copy table (live: a toast)",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": "Configuration"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy table"
+   }
+  }
+ ]
+}

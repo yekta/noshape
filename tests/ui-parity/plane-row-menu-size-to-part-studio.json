@@ -1,0 +1,21 @@
+{
+ "name": "plane-row-menu-size-to-part-studio",
+ "about": "block: right-click the Top plane's row, Size to Part Studio",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Size to Part Studio"
+   }
+  }
+ ]
+}

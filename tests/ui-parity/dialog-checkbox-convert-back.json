@@ -1,0 +1,51 @@
+{
+ "name": "dialog-checkbox-convert-back",
+ "about": "block: the top face, Shift+E, right-click Symmetric › Convert to expression, right-click it again › Convert to checkbox, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "checkbox": "Symmetric"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Convert to expression"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "field": "Symmetric"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Convert to checkbox"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

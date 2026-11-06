@@ -1,0 +1,36 @@
+{
+ "name": "face-menu-select-create-selection",
+ "about": "block: right-click the top face, hover Select, Create selection…: its dialog, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Select"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create selection…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+ "name": "feature-menu-dynamic-suppression-add",
+ "about": "block: right-click Extrude 1, hover Dynamic suppression, Add expression…: its box, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: the remaining menu items; batch 14)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Dynamic suppression"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add expression…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
