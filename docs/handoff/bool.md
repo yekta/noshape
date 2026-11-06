@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## The knurl on macOS arm64 (11-06 06:45 UTC; lead: release timing 4.63 s against Linux's 2.60)
+## The knurl on macOS arm64 (11-06 06:38 UTC; lead: release timing 4.63 s against Linux's 2.60)
 - Allocator contention, by every measure on Linux: with glibc on one heap (MALLOC_ARENA_MAX=1, every thread on one
   lock: what a malloc that scales worse across threads does) the knurl replay k25-15 goes 1.24 -> 2.4 s (OCCT's own
   14 -> 21.6 s) and the release document tests/perf/knurl-d25x25-45-45.noshape through the CLI 7.2-8.2 -> 11.5-11.8 s
