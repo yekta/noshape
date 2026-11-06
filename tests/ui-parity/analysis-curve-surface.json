@@ -1,0 +1,35 @@
+{
+ "name": "analysis-curve-surface",
+ "about": "block: the top face, the analysis tools button, Curve/surface analysis…: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Curve/surface analysis…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

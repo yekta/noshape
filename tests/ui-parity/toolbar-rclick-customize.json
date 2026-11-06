@@ -1,0 +1,25 @@
+{
+ "name": "toolbar-rclick-customize",
+ "about": "block: right-click the toolbar's Extrude: its rows, Customize toolbar…, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "tool": "Extrude"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Customize toolbar…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "part-menu-copy-here",
+ "about": "block: right-click Part 1's row, Copy here…: its state, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy here…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

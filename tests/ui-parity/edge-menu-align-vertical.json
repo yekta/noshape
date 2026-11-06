@@ -1,0 +1,35 @@
+{
+ "name": "edge-menu-align-vertical",
+ "about": "block: click the front top edge a quarter along, right-click it: its rows, Align view with vertical axis",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     10,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Align view with vertical axis"
+   }
+  }
+ ]
+}

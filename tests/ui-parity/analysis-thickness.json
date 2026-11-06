@@ -1,0 +1,25 @@
+{
+ "name": "analysis-thickness",
+ "about": "block: the analysis tools button, Thickness analysis… (or what live offers), then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Thickness analysis…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

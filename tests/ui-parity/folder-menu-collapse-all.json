@@ -1,0 +1,51 @@
+{
+ "name": "folder-menu-collapse-all",
+ "about": "block: Sketch 1 and Extrude 1 into a new folder (feature-row-new-folder's steps), then right-click New folder, hover Collapse, Collapse all",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New folder"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "New folder"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Collapse"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Collapse all"
+   }
+  }
+ ]
+}

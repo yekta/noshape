@@ -3848,7 +3848,12 @@ impl PartStudioView {
                 // Inside a folder: indented under its guide like the children (live ROLLBACK-BAR-IN-FOLDER).
                 ListItem::Rollback(i, x) => indent(x, last, self.render_rollback_bar(i, window, cx)),
                 ListItem::Ellipsis => ellipsis(),
-                ListItem::Folder(x, fd) => indent(x, last, self.render_folder_row(&fd, slot, cx)),
+                ListItem::Folder(x, fd) => {
+                    // The parity suite clicks a folder by its name, or as its state lists it with its count ("New folder (2)").
+                    let row = crate::ui_script::wrap(self.render_folder_row(&fd, slot, cx), || format!("feature:{}", fd.name));
+                    let row = crate::ui_script::wrap(row, || format!("feature:{} ({})", fd.name, self.studio(cx).map_or(0, |s| s.folder_count(fd.id))));
+                    indent(x, last, row)
+                }
                 ListItem::Feature(x, id) => indent(x, last, self.feature_row_cached(id, slot, cx)),
                 ListItem::DerivedSketch(x, id, k) => indent(x, last, self.render_derived_sketch_row(id, k, cx)),
                 ListItem::ConstructionPlane(x, r) => indent(x, last, self.render_construction_plane_row(r, cx)),

@@ -1,0 +1,39 @@
+{
+ "name": "dialog-checkbox-rclick-convert",
+ "about": "block: the top face, Shift+E, right-click Symmetric: its rows, Convert to expression; Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 8)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+e"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "checkbox": "Symmetric"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Convert to expression"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

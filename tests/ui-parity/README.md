@@ -218,12 +218,12 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 |---|---|---|
 | toolbar | 25/76 | 0 |
 | sketch tool | 43/55 | 1 |
-| menu | 48/117 | 0 |
+| menu | 62/117 | 1 |
 | shortcut | 59/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
-| Extrude | 54 |
+| Extrude | 56 |
 | Sketch | 127 |
 | Fillet | 16 |
 | Chamfer | 6 |
