@@ -3476,6 +3476,31 @@ fn collinear_lines_meeting_alone_extrude_as_one_face() {
     }
 }
 
+/// A board's edge with another board's edge lying over part of it (cf-box-dovetail-joint's base, the upper board's
+/// sides ending on it from outside): the base alone extrudes as a box, its edge one face (live 6 / 12 / 8).
+#[test]
+fn a_line_under_another_extrudes_as_one_face() {
+    use noshape_kernel::ShapeType::Face;
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let mut rect = |x0: f64, y0: f64, x1: f64, y1: f64| {
+        let p = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)].map(|(x, y)| sk.add_point(DVec2::new(x * 1e-3, y * 1e-3)));
+        for k in 0..4 {
+            sk.add_line_between(p[k], p[(k + 1) % 4]).unwrap();
+        }
+    };
+    // (The upper board first: its edge's id is the lower, so the region credits the stretch under it to that one.)
+    rect(-175.0, 0.0, 175.0, 12.0);
+    rect(-185.0, -15.0, 185.0, 0.0);
+    let base = sk.regions().into_iter().find(|r| r.contains(DVec2::new(0.0, -7.5e-3))).unwrap();
+    let key = noshape_model::regen::eval::encode_region_key(&base.id);
+    let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    t.regen();
+    let x = t.add("extrude", &[("entities", q(vec![Reference::SketchRegion { sketch: s, key }])), ("depth", e("140 mm")), ("operationType", en("NEW"))]);
+    let r = t.ok(x);
+    assert_eq!(r.context.bodies[0].shape.count(Face), 6);
+}
+
 /// SKETCH-FACE-FRAME (live 1897): a sketch on a planar face takes Onshape's evPlane x, from the face's normal alone
 /// (±Z: +X; else y = +Z in the plane, x = y × normal); a studio saved before keeps OCCT's.
 #[test]

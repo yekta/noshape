@@ -1539,9 +1539,14 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         let alone = |p: DVec2, a: u32, b: u32| {
             s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b && !inside(e.id)).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
         };
+        // (Pieces of one line though the region credits a stretch to another line lying over it: cf-box-dovetail-joint's
+        // base board, its top edge under the upper board's.)
+        let one_line = |a: DVec2, b: DVec2| {
+            s.sketch.entities().filter(|e| !e.construction).any(|e| matches!(s.sketch.curve(e.id), Some(c @ noshape_sketch::Curve2::Line { .. }) if c.distance(a) < 1e-9 && c.distance(b) < 1e-9))
+        };
         let joins = |a0: DVec2, b0: DVec2, a: DVec2, b: DVec2, e0: u32, e: u32| {
             let (d0, d) = ((b0 - a0).normalize_or_zero(), (b - a).normalize_or_zero());
-            (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e))
+            (b0 - a).length() < 1e-12 && d0.perp_dot(d).abs() < 1e-9 && d0.dot(d) > 0.0 && (e0 == e || alone(a, e0, e) || one_line(a0, b))
         };
         for (seg, src) in lp.segments.iter().zip(lp.sources.iter()) {
             if let (Some((P::Arc { center: c0, radius: r0, start_angle: s0, end_angle: e0, ccw: w0 }, e_prev)), P::Arc { center, radius, end_angle, ccw, .. }) = (out.last_mut(), seg)
