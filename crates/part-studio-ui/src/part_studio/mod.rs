@@ -1063,7 +1063,7 @@ impl PartStudioView {
         if let Some((built, base)) = scene {
             self.set_built(built, base, cx);
         }
-        let prio = self.built.as_ref().map(|b| b.picks.priority_fn());
+        // (The new scene's pick priorities: `refresh_scene` below gives them to the viewport, `sync_pick_filter`.)
         self.ui.pick_filter = None;
         // Thickness analysis follows every edit.
         if geometry_changed && self.ui.thickness.as_ref().is_some_and(|t| !t.parts.is_empty()) {
@@ -1080,12 +1080,7 @@ impl PartStudioView {
         let pivot: Arc<dyn Fn(glam::DVec3, glam::DVec3) -> Option<glam::DVec3> + Send + Sync> = Arc::new(move |o, d| {
             noshape_model::interaction::entities_along_ray(&disp, o, d, 0.0, &|_| false, 1).first().map(|h| o + d.normalize() * h.depth)
         });
-        let old_pivot = self.viewport.update(cx, |vp, _| {
-            if let Some(prio) = prio {
-                vp.pick_priority = prio;
-            }
-            vp.orbit_pivot_fn.replace(pivot)
-        });
+        let old_pivot = self.viewport.update(cx, |vp, _| vp.orbit_pivot_fn.replace(pivot));
         // (It holds the replaced display: often its last reference.)
         drop_off_thread(old_pivot, cx);
         // The notices panel lists the open dialog's feature too (a new one isn't in the document yet).
