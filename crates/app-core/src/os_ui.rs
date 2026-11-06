@@ -541,6 +541,8 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
     let bounds: Rc<Cell<Bounds<Pixels>>> = Default::default();
     let on_select = Rc::new(on_select);
     let label = options.get(current).cloned().unwrap_or_default();
+    // (`{"dropdown": <shown value>}` for the ui-parity driver.)
+    let shown = label.clone();
     let probe = bounds.clone();
     let open = Rc::new(move |window: &mut Window, cx: &mut App| {
         let (options, disabled, on_select, b) = (options.clone(), disabled.clone(), on_select.clone(), bounds.get());
@@ -563,7 +565,7 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
     let open_key = open.clone();
     let id: ElementId = id.into();
     let selector = id.clone();
-    div()
+    let field = div()
         .debug_selector(move || selector.to_string())
         .id(id)
         .when_some(opts.focus, |d, f| {
@@ -593,7 +595,8 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
         .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
         .child(div().flex_1().truncate().map(|d| if current >= user_from { d.child(crate::ui::user_text(label)) } else { d.child(label) }))
         .child(glyph(GLYPH_CARET, 8., gpui_kit::rgb_static(0x777777))) // live assembly/181-182: `#777` (also in dark, prefs/dk-904)
-        .on_click(move |_, window, cx| open(window, cx))
+        .on_click(move |_, window, cx| open(window, cx));
+    crate::ui_script::mark(field, || format!("dropdown:{shown}"))
 }
 
 /// A solid circled × (Named views "Remove view", live psb/nv-911): the disc

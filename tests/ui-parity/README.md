@@ -239,6 +239,35 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 | Mate connector | 3 |
 | sketch tools (all 55) | 112 scenarios, 43 tools covered |
 
+### Drawings
+`tools/ui-parity/coverage_drawing.py` counts the drw-* scenarios exercising each drawing tool and drawing menu item
+(the "drawing:" rows of crates/ops/src/coverage.rs), Drawing shortcut and export format, by area. 11-06: 16 scenarios
+covered 12/58 tools, 2/119 menu items, 0/14 shortcuts, 0/10 formats; batch 3 (20 scenarios, the most-used gaps:
+centermarks and centerlines, hole callout, datum, GD&T, surface finish, callout, auxiliary view, the Dimension
+dropdown's other kinds, ordinate dimension, revision table, table, export formats, a view's and a note's context
+menus, the tools' keys) gives:
+
+36 drw-* scenarios
+
+| kind | covered |
+|---|---|
+| tool | 30/58 |
+| menu | 4/119 |
+| shortcut | 5/14 |
+| export | 4/10 |
+
+| area | covered |
+|---|---|
+| GD&T | 3/10 |
+| dimensions | 14/20 |
+| export | 4/10 |
+| insert views | 4/5 |
+| notes | 8/16 |
+| other | 3/94 |
+| section / detail / broken-out | 3/17 |
+| sheets | 0/13 |
+| tables | 4/16 |
+
 ## Comparison
 
 `tools/ui-parity/run.py` compares the keys both sides record. A size that comes from where a click landed (a drawn

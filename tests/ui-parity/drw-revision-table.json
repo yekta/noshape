@@ -1,0 +1,29 @@
+{
+  "name": "drw-revision-table",
+  "about": "Revision table placed at the sheet's upper right",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: most-used drawing tools first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Revision table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          200,
+          190
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

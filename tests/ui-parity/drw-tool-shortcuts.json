@@ -1,0 +1,50 @@
+{
+  "name": "drw-tool-shortcuts",
+  "about": "The drawing tools' keys: p (Projected view), n (Note), shift+d, shift+r, shift+h (Diameter, Radial, Foreshorten dimension), each then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: most-used drawing tools first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "key",
+      "key": "p"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "n"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "shift+d"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "shift+r"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "shift+h"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

@@ -378,7 +378,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                                 sleep(cx, 300).await;
                                 redraw(cx).await;
                                 let row = json!({ row_key: pick });
-                                match cx.update(|_, cx| locate(&row, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                // (A native-style select's list: its rows are a menu's.)
+                                let found = cx.update(|_, cx| locate(&row, &ps, &asm, &drw, cx).or_else(|e| if row_key == "list_row" { locate(&json!({ "menu": pick }), &ps, &asm, &drw, cx) } else { Err(e) })).unwrap_or_else(|e| Err(e.to_string()));
+                                match found {
                                     Ok(at) => {
                                         let _ = cx.update(|window, cx| {
                                             window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
