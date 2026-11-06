@@ -148,7 +148,7 @@ impl PartStudioView {
             };
             let mut m = m.truncate_labels().item(item(format!("Edit {model_name}…"), Box::new(move |this, w, cx| this.edit_feature(model, w, cx))));
             if let Some((sid, sname)) = sketch.clone() {
-                m = m.item(item(format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx)))).item(item("Show dimensions".into(), Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+                m = m.item(item(format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx)))).item(item("Show dimensions".into(), Box::new(move |this, w, cx| this.show_dimensions(sid, None, w, cx))));
             }
             let b = body.clone();
             let (f1, f2, f3) = (fv.clone(), fv.clone(), fv.clone());

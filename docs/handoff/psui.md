@@ -609,16 +609,22 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N000000000000. (11-06 13:18) **ui-parity coverage (lead 11-06: menus are the biggest gap).** Batches 6-8 (44 menu
-    scenarios) landed or queued, filed in live/REQUESTS.md 12:39 / 12:55 / 13:18; batch 5 (17) is being recorded
-    (none in by 13:18). Coverage (tools/ui-parity/coverage.py): toolbar 25/76, sketch tools 43/55, menus 27 -> 62/117,
-    shortcuts 59/89. New targets: `{"feature": "Top"}` (a default plane row), `{"feature": "New folder"}` (a folder row,
-    also "New folder (2)"), a submenu by `{"do": "hover", "on": {"menu": "Collapse"}}` (a click on a submenu row closes
-    it). Ours records no dialog for Add appearance, Edit sketch appearance, Release and Export as DXF/DWG: compare when
-    live's recordings arrive. Menus left: the camera menu (its button has no tooltip mark yet; ask live for its name),
-    a sketch dimension's menu (sk-dim-*; no target for a dimension yet), configurations (Configure, inputs), the
-    Variable / Feature Studio rows. Then the toolbar (25/76). Writer scripts: assert no file exists before writing
-    (batch 5 overwrote mirror-feature-type once).
+N000000000000. (11-06 15:23) **ui-parity coverage and live's batches (lead 11-06: menus are the biggest gap).** Batches
+    6-9 (58 scenarios: menus, then the toolbar's uncovered tools) are on main and filed in live/REQUESTS.md (12:39,
+    12:55, 13:18, 13:22). Coverage: toolbar 47/76, sketch tools 43/55, menus 62/117, shortcuts 59/89. Live's first
+    recordings of batches 5-7 sit in /root/parity/ui/live (not on main yet): compare them with `run.py --live <dir>`
+    (copy them to vibe5 first); 23/34 -> see SCORE 11-06 14:47, and the Export as DXF/DWG modal since (flat_export.rs
+    is now the modal for flats, sketches and planar faces: EXPORT-DXF-DIALOG, the face's file name is a guess). Left
+    from them: account memory (Hole), live runner artefacts (menu pick by prefix: REQUESTS 14:30), Mirror's Face
+    mirror focus (asked live). New targets: `{"feature": "Top"}` (a default plane row), `{"feature": "New folder"}`
+    (a folder row, also "New folder (2)"), a submenu by `{"do": "hover", "on": {"menu": "Collapse"}}`. The compare
+    drops paste rows in scenarios that copy nothing (live's session clipboard). Starts name features as they make them
+    (a default name stays default: a paste's next name is "Sketch 2", as live). Menus left: the camera menu (its
+    button has no tooltip mark yet), a sketch dimension's menu (no target for a dimension yet), configurations.
+    Open: dialog-number-rclick-menu (live: a right-click on a number field gives it the keyboard, text selected;
+    ours focused it from a capture handler on the row and stopped the right release, yet the focus was gone when the
+    state was recorded and back after Esc: something else holds it, reverted, not found yet).
+    Writer scripts: assert no file exists before writing (batch 5 overwrote mirror-feature-type once).
 
 N00000000000. (11-06) **perf.yml's macOS gate (lead P1):** 42162655806 (v0.4.32) failed on macOS 15's baseline
     comparison only, no regression: the same build's rows move 20-100 % between runs there (readback GPU p95 7.2-15.5,

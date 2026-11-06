@@ -551,8 +551,9 @@ fn add(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         noshape_model::regen::features::cplane::cplane_logic(&r.context, &mut feature.params);
     }
     if let Some(n) = a.opt_str("name")? {
+        // The default name given is no custom one (a paste names the copy as a new feature).
+        feature.custom_name = n.trim() != feature.name;
         feature.name = n.trim().to_string();
-        feature.custom_name = true;
     }
     let ps = doc::studio(od.doc(), tab)?;
     let index = match a.opt_u64("index")? {

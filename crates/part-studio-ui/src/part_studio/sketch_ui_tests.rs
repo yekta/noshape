@@ -1284,7 +1284,7 @@ fn shown_dimensions_draw_their_values(cx: &mut TestAppContext) {
     })
     .unwrap();
     draw(cx, window);
-    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.show_dimensions(sketch, w, cx))).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.show_dimensions(sketch, None, w, cx))).unwrap();
     draw(cx, window);
     let (labels, fills) = cx.update(|cx| {
         let v = view.read(cx);

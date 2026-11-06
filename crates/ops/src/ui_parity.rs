@@ -58,7 +58,8 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             continue;
         }
         let ty = f["type"].as_str().ok_or_else(|| what("no type".into()))?;
-        let made = if ty == "newSketch" {
+        // Named as it is made: a default name stays a default one, as in live's start documents (a paste's next name).
+        if ty == "newSketch" {
             let plane = format!("plane:{}", f["plane"].as_str().unwrap_or("Top").to_lowercase());
             let mut args = json!({ "plane": plane });
             if let Some(n) = f["name"].as_str() {
@@ -76,16 +77,16 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             if !shapes.is_empty() {
                 call(ctx, "sketch_draw", json!({ "sketch": id, "shapes": shapes })).map_err(what)?;
             }
-            id
         } else {
             let mut params = serde_json::Map::new();
             for (p, v) in f["params"].as_object().into_iter().flatten() {
                 params.insert(p.clone(), resolve(ctx, v).map_err(what)?);
             }
-            call(ctx, "feature_add", json!({ "type": ty, "params": params })).map_err(what)?["feature"].clone()
-        };
-        if let Some(name) = f["name"].as_str() {
-            call(ctx, "feature_rename", json!({ "feature": made, "name": name })).map_err(what)?;
+            let mut args = json!({ "type": ty, "params": params });
+            if let Some(n) = f["name"].as_str() {
+                args["name"] = json!(n);
+            }
+            call(ctx, "feature_add", args).map_err(what)?;
         }
     }
     // Live's runner names an assembly after the start ("start pin-block asm").

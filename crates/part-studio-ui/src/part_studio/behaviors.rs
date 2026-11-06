@@ -306,6 +306,8 @@ pub struct UiState {
     pub section_parts: Option<(bool, Vec<BodyId>)>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
+    /// The open "Export as DXF/DWG" modal's File name (the suite reads its focus).
+    pub cad_export_file: Option<WeakEntity<gpui_kit::component::input::InputState>>,
     pub appearance_hover: Vec<Reference>,
     /// Active analysis color map (Shift+C / Shift+D).
     pub analysis: Option<super::analysis::Analysis>,
@@ -677,6 +679,7 @@ impl UiState {
             section_hover_other: None,
             section_parts: None,
             appearance_edit: None,
+            cad_export_file: None,
             appearance_hover: Vec::new(),
             analysis: None,
             vcolor_cache: None,
@@ -981,6 +984,12 @@ impl PartStudioView {
         }
         // A hovered Characteristics row lights up its feature (live tl-99a).
         out.extend(self.ui.insp.hover_feature);
+        // Shown dimensions light up their sketch and the feature they were shown for (live ui-parity
+        // face-menu-show-dimensions: Sketch 1 and Extrude 1).
+        if let Some(d) = &self.ui.shown_dims {
+            out.insert(d.sketch);
+            out.extend(d.of);
+        }
         // In a sketch: the sketch, while something of it is selected or picked by the Dimension tool (live ui-parity
         // sketch-delete-line, sketch-circle-dimension).
         if let Some(ed) = &self.sketch
@@ -1541,38 +1550,6 @@ impl PartStudioView {
             self.selected_features.clear();
             cx.notify();
         }
-    }
-
-    /// "Export as DXF/DWG" for a sketch (DXF, millimeters, sketch plane
-    /// coordinates; construction curves as hidden lines).
-    pub(super) fn export_sketch(&mut self, id: FeatureId, ext: &'static str, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(sk) = self.display.sketches.iter().find(|s| s.feature == id) else { return };
-        let g = noshape_ops::sketch_export::sketch_sheet(sk);
-        let name = sk.name.clone();
-        let view = cx.entity();
-        crate::file_dialogs::request_save_path("Export sketch", format!("{name}.{ext}"), ext, window, cx, move |path, cx| {
-            let data = if ext == "svg" { noshape_model::drawing::export::to_svg(&g) } else { noshape_model::drawing::export::to_dxf(&g) };
-            let msg = match std::fs::write(&path, data) {
-                Ok(()) => format!("Exported {}", path.display()),
-                Err(e) => format!("Export failed: {e}"),
-            };
-            view.update(cx, |this, cx| this.flash_info(msg, cx));
-        });
-    }
-
-    /// Face menu "Export as DXF/DWG…": the planar face's boundary in its plane.
-    pub(super) fn export_face(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(ctx) = self.context.as_ref() else { return };
-        let Some(g) = noshape_ops::sketch_export::face_sheet(ctx, &self.display, &r) else { return };
-        let Some(name) = self.display.bodies.iter().find(|b| b.face_refs.contains(&r)).map(|b| b.name.clone()) else { return };
-        let view = cx.entity();
-        crate::file_dialogs::request_save_path("Export face", format!("{name} face.dxf"), "dxf", window, cx, move |path, cx| {
-            let msg = match std::fs::write(&path, noshape_model::drawing::export::to_dxf(&g)) {
-                Ok(()) => format!("Exported {}", path.display()),
-                Err(e) => format!("Export failed: {e}"),
-            };
-            view.update(cx, |this, cx| this.flash_info(msg, cx));
-        });
     }
 
     /// "Copy Part 1" / Ctrl+C on a part: the part goes to the clipboard

@@ -290,7 +290,7 @@ impl PartStudioView {
                             m = m.item(item("Copy sketch entities", Box::new(move |this, _, cx| this.copy_sketch_entities(id, entity, cx))));
                         }
                         m = m
-                            .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(id, w, cx))))
+                            .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(id, None, w, cx))))
                             .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
                                 this.ui.dependencies = Some(id);
                                 cx.notify();
@@ -338,7 +338,7 @@ impl PartStudioView {
                             // Live: Create Drawing of Sketch N…, Export as DXF/DWG… (a sketch view; asb).
                             let sk_name = creator_name.clone().unwrap_or_else(|| "Sketch".into());
                             m = m.separator().item(icon_item(&format!("Create Drawing of {sk_name}…"), "menu-create-drawing", Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))));
-                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
+                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(super::flat_export::CadSource::Sketch(id), w, cx))));
                         }
                     }
                     m = select_menu(m.separator(), &r, k, window, cx).separator().item(zoom_fit()).item(zoom_sel(&r));
@@ -403,7 +403,7 @@ impl PartStudioView {
                         if let Some((sid, sname)) = source_sketch.clone() {
                             m = m
                                 .item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))))
-                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, Some(id), w, cx))));
                         }
                         m = m
                             .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
@@ -450,7 +450,7 @@ impl PartStudioView {
                         if let Some((sid, sname)) = source_sketch.clone() {
                             m = m
                                 .item(item(&format!("Edit {sname}…"), Box::new(move |this, w, cx| this.edit_feature(sid, w, cx))))
-                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, w, cx))));
+                                .item(item("Show dimensions", Box::new(move |this, w, cx| this.show_dimensions(sid, Some(id), w, cx))));
                         }
                         m = m
                             .item(item(&format!("Show dependencies of {name}…"), Box::new(move |this, _, cx| {
@@ -556,7 +556,7 @@ impl PartStudioView {
                             })));
                         if k == PickKind::Face && planar && faces.len() <= 1 {
                             let rf = r.clone();
-                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_face(rf.clone(), w, cx))));
+                            m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(super::flat_export::CadSource::Face(rf.clone()), w, cx))));
                         }
                         m = m.item(item("Export…", Box::new(move |this, w, cx| this.open_export_dialog(vec![b8.clone()], w, cx))));
                     }
@@ -642,16 +642,20 @@ impl PartStudioView {
                     }
                     m = m.separator();
                     if section || section_dialog {
-                        m = m.item(icon_item("Turn off section view", "menu-section-view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
-                    } else {
-                        if editing && !in_sketch {
-                            m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| {
-                                this.ui.analysis_tool = None;
-                                this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
-                            })));
+                        // With the dialog closed, Edit section view… first (live ui-parity face-section-view-turn-off).
+                        if !section_dialog {
+                            m = m.item(icon_item("Edit section view…", "menu-section-view", Box::new(|this, w, cx| this.edit_section(w, cx))));
                         }
-                        // Select ▸ with nothing selected: only Create selection…
-                        // (live menus/rmb-sketch-empty-select-submenu.png).
+                        m = m.item(icon_item("Turn off section view", "menu-section-view", Box::new(|this, w, cx| this.turn_off_section(w, cx))));
+                    } else if editing && !in_sketch {
+                        m = m.item(item("Curve/surface analysis…", Box::new(|this, w, cx| {
+                            this.ui.analysis_tool = None;
+                            this.toggle_analysis_tool(super::analysis_tools::ToolKind::CurveSurface, w, cx);
+                        })));
+                    }
+                    // Select ▸ with nothing selected: only Create selection… (live menus/rmb-sketch-empty-select-submenu.png;
+                    // none while the Section view dialog is open, behaviours "spec: psui part-studio.md 8.8").
+                    if !section_dialog {
                         let vs = v.clone();
                         m = m.submenu("Select", window, cx, move |sm, _, _| {
                             let v = vs.clone();

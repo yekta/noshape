@@ -632,8 +632,9 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut f = ps.new_feature("sketch", &units).expect("sketch type");
     f.params.set("sketchPlane", ParamValue::Query(vec![plane]));
     if let Some(n) = a.opt_str("name")? {
+        // The default name given is no custom one (a paste names the copy as a new sketch).
+        f.custom_name = n.trim() != f.name;
         f.name = n.trim().to_string();
-        f.custom_name = true;
     }
     // The Sketch dialog's "Disable imprinting" (model edges aren't projected).
     if let Some(b) = a.get("disable_imprinting").and_then(Value::as_bool) {

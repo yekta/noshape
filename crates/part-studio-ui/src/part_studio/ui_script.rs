@@ -45,6 +45,17 @@ impl PartStudioView {
         } else if self.ui.appearance_edit.as_ref().is_some_and(|e| self.appearance_heading(&e.target, cx).1.is_some()) && self.focus.is_focused(window) {
             // The appearance editor's "Faces or features" field has the keyboard (live face-menu-add-appearance-to-face).
             json!({ "kind": "field", "label": "Faces or features", "text": null, "selection": null, "all": false })
+        } else if let Some(st) = crate::ui_script::open_dialog()
+            .filter(|d| d["kind"] == "modal")
+            .and(self.ui.cad_export_file.as_ref())
+            .and_then(|f| f.upgrade())
+            .filter(|f| f.read(cx).focus_handle(cx).is_focused(window))
+        {
+            // Export as DXF/DWG's File name (live sketch-row-menu-export-dxf: "other", its text).
+            let mut f = crate::feature_dialog::field_focus("", st.read(cx));
+            f["kind"] = "other".into();
+            f["label"] = Value::Null;
+            f
         } else if crate::ui_script::open_dialog().is_some_and(|d| d["kind"] == "modal") {
             // A modal holds the keyboard (live part-menu-properties: "other").
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })

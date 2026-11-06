@@ -334,6 +334,8 @@ pub fn paste_sketches_onto(ps: &mut PartStudio, sketches: &[noshape_model::parts
     for id in &ids {
         if let Some(f) = ps.feature_mut(*id) {
             f.params.set("sketchPlane", noshape_model::params::ParamValue::Query(vec![plane.clone()]));
+            // Shown, whatever the copied sketch was (live ui-parity sketch-row-copy-paste-onto-front).
+            f.hidden = false;
         }
     }
     ids

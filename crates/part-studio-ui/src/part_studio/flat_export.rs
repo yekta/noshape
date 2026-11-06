@@ -1,13 +1,12 @@
-//! Sheet metal flat view › "Export DXF/DWG of Flat pattern of <part>…": the
-//! "Export as DXF/DWG" modal (live behaviours "(10) Export DXF/DWG of Flat
-//! pattern", dom/qa5-sm-112-flat-export.html). File name "<studio> - Flat
-//! pattern of <part>"; Format DXF | DWG (DXF starts at Release 14, DWG at
-//! 2000); Version; Scope (the part, its model's parts, the Part Studio's);
-//! ☑ Use workspace units (Units grayed while on); Options; the flat's eight
-//! checkboxes with live's defaults. Bend centerlines, bend tangent lines,
-//! counterbore / countersink lines and form outlines / centermarks go on
-//! their Onshape layers; our flats are lines at z 0 already (splines as
-//! polylines, z-height to zero) and have no sketches to include.
+//! The "Export as DXF/DWG" modal: a sheet metal flat pattern ("Export DXF/DWG of Flat pattern of <part>…", live
+//! behaviours "(10) Export DXF/DWG of Flat pattern", dom/qa5-sm-112-flat-export.html), a sketch's or a planar face's
+//! "Export as DXF/DWG…" (live ui-parity sketch-row-menu-export-dxf). File name "<studio> - Flat pattern of <part>" /
+//! "<studio> - <sketch>", its text selected; Format DXF | DWG (DXF starts at Release 14, DWG at 2000); Version; a
+//! flat's Scope (the part, its model's parts, the Part Studio's); ☑ Use workspace units (Units grayed while on);
+//! Options; Export splines as polylines, Set z-height to zero and normals to positive, and a flat's six more
+//! checkboxes with live's defaults. Bend centerlines, bend tangent lines, counterbore / countersink lines and form
+//! outlines / centermarks go on their Onshape layers; flats and sketches are curves at z 0 already (splines as
+//! polylines, z-height to zero) and flats have no sketches to include.
 
 use super::PartStudioView;
 use super::export::{modal_checkbox, store_export, store_written};
@@ -15,8 +14,9 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{WindowExt as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use noshape_model::drawing::cad_export::{CAD_VERSIONS, DEFAULT_DWG, DEFAULT_DXF, to_dwg_file, to_dxf_file};
+use noshape_model::reference::{FeatureId, Reference};
 use noshape_model::BodyId;
-use noshape_model::drawing::cad_export::{CAD_VERSIONS, DEFAULT_DWG, DEFAULT_DXF};
 use noshape_model::sheetmetal::flat_dxf::{FlatExport, flats_dwg, flats_dxf};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -55,6 +55,16 @@ thread_local! {
     static LAST_CHECKS: std::cell::Cell<[bool; 8]> = const { std::cell::Cell::new(DEFAULT_CHECKS) };
 }
 
+/// What the modal exports.
+#[derive(Clone)]
+pub(super) enum CadSource {
+    /// A sheet metal part's flat pattern (and the Scope's others).
+    Flat(BodyId),
+    Sketch(FeatureId),
+    /// A planar face.
+    Face(Reference),
+}
+
 #[derive(Clone)]
 struct Settings {
     dwg: bool,
@@ -69,8 +79,18 @@ struct Settings {
 impl PartStudioView {
     /// The "Export as DXF/DWG" modal for `body`'s flat pattern.
     pub(super) fn open_flat_export(&mut self, body: BodyId, window: &mut Window, cx: &mut Context<Self>) {
-        let part = self.display.body(&body).map(|b| b.name.clone()).unwrap_or_else(|| "Part".into());
-        let base = format!("{} - Flat pattern of {part}", self.studio_name(cx));
+        self.open_cad_export(CadSource::Flat(body), window, cx);
+    }
+
+    /// The "Export as DXF/DWG" modal for `source`.
+    pub(super) fn open_cad_export(&mut self, source: CadSource, window: &mut Window, cx: &mut Context<Self>) {
+        let named = match &source {
+            CadSource::Flat(b) => format!("Flat pattern of {}", self.display.body(b).map(|b| b.name.clone()).unwrap_or_else(|| "Part".into())),
+            CadSource::Sketch(id) => self.display.sketches.iter().find(|s| s.feature == *id).map(|s| s.name.clone()).unwrap_or_else(|| "Sketch".into()),
+            CadSource::Face(r) => self.display.bodies.iter().find(|b| b.face_refs.contains(r)).map(|b| b.name.clone()).unwrap_or_else(|| "Face".into()),
+        };
+        let base = format!("{} - {named}", self.studio_name(cx));
+        let flat = matches!(source, CadSource::Flat(_));
         // The workspace's length unit, in Units' order.
         let workspace = match self.doc.read(cx).session.doc.settings.units.length {
             noshape_units::LengthUnit::Centimeter => 0,
@@ -81,8 +101,11 @@ impl PartStudioView {
             _ => 4,
         };
         let file = cx.new(|cx| InputState::new(window, cx).default_value(base));
-        let st = Rc::new(RefCell::new(Settings { dwg: false, version: DEFAULT_DXF, scope: 0, workspace_units: true, units: workspace, options: 0, checks: LAST_CHECKS.with(|c| c.get()) }));
-        let (view, part_id) = (cx.entity(), body);
+        let checks = if flat { LAST_CHECKS.with(|c| c.get()) } else { DEFAULT_CHECKS };
+        let st = Rc::new(RefCell::new(Settings { dwg: false, version: DEFAULT_DXF, scope: 0, workspace_units: true, units: workspace, options: 0, checks }));
+        let view = cx.entity();
+        self.ui.cad_export_file = Some(file.downgrade());
+        let file_focus = file.clone();
         window.open_dialog(cx, move |dialog, _, cx| {
             let s = st.borrow().clone();
             let select = |id: &'static str, label: &'static str, opts: Vec<String>, cur: usize, disabled: bool, set: fn(&mut Settings, usize)| {
@@ -116,7 +139,7 @@ impl PartStudioView {
                     s.version = if s.dwg { DEFAULT_DWG } else { DEFAULT_DXF };
                 }))
                 .child(select("fx-version", "Version", CAD_VERSIONS.iter().map(|v| v.0.to_string()).collect(), s.version, false, |s, i| s.version = i))
-                .child(select("fx-scope", "Scope", strs(&SCOPES), s.scope, false, |s, i| s.scope = i));
+                .when(flat, |b| b.child(select("fx-scope", "Scope", strs(&SCOPES), s.scope, false, |s, i| s.scope = i)));
             let units_check = {
                 let st = st.clone();
                 let on = s.workspace_units;
@@ -130,23 +153,62 @@ impl PartStudioView {
                 .child(select("fx-units", "Units", UNITS.iter().map(|u| u.0.to_string()).collect(), s.units, s.workspace_units, |s, i| s.units = i))
                 .child(select("fx-options", "Options", strs(&OPTIONS), s.options, false, |s, i| s.options = i));
             let setters: [fn(&mut Settings, bool); 8] = [|s, v| s.checks[0] = v, |s, v| s.checks[1] = v, |s, v| s.checks[2] = v, |s, v| s.checks[3] = v, |s, v| s.checks[4] = v, |s, v| s.checks[5] = v, |s, v| s.checks[6] = v, |s, v| s.checks[7] = v];
-            for (k, set) in setters.into_iter().enumerate() {
+            // A sketch or face has the first two (live sketch-row-menu-export-dxf).
+            let shown = if flat { CHECKS.len() } else { 2 };
+            for (k, set) in setters.into_iter().enumerate().take(shown) {
                 body = body.child(div().mt(px(if k == 0 { 9. } else { 12. })).child(check(k, s.checks[k], set)));
             }
-            let (st2, file2, view2) = (st.clone(), file.clone(), view.clone());
-            let body_id = part_id.clone();
+            crate::ui_script::note_dialog(|| {
+                use serde_json::json;
+                let mut fields = vec![
+                    json!({ "label": "File name View export rules", "kind": "input", "value": file.read(cx).value().to_string() }),
+                    json!({ "label": "Format", "kind": "select", "value": FORMATS[s.dwg as usize] }),
+                    json!({ "label": "Version", "kind": "select", "value": CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].0 }),
+                ];
+                if flat {
+                    fields.push(json!({ "label": "Scope", "kind": "select", "value": SCOPES[s.scope.min(2)] }));
+                }
+                fields.push(json!({ "label": "Units", "kind": "select", "value": UNITS[s.units.min(5)].0 }));
+                fields.push(json!({ "label": "Use workspace units", "kind": "checkbox", "value": s.workspace_units }));
+                fields.push(json!({ "label": "Options", "kind": "select", "value": OPTIONS[s.options.min(2)] }));
+                fields.extend(CHECKS.iter().zip(s.checks).take(shown).map(|((_, label, _), on)| json!({ "label": label, "kind": "checkbox", "value": on })));
+                json!({ "kind": "modal", "title": "Export as DXF/DWG", "fields": fields, "buttons": ["Export", "Cancel"] })
+            });
+            let (st2, file2, view2, source2) = (st.clone(), file.clone(), view.clone(), source.clone());
             crate::os_ui::modal_help(dialog, "Export as DXF/DWG", 600.)
                 .child(body)
                 .footer(crate::os_ui::modal_footer().child(crate::os_ui::modal_ok(crate::os_ui::primary_button("ok", "Export"))).child(crate::os_ui::modal_cancel(crate::os_ui::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let s = st2.borrow().clone();
-                    LAST_CHECKS.with(|c| c.set(s.checks));
                     let name = file2.read(cx).value().trim().to_string();
-                    let (view, part) = (view2.clone(), body_id.clone());
-                    window.defer(cx, move |window, cx| view.update(cx, |this, cx| this.run_flat_export(s, name, part, window, cx)));
+                    let (view, source) = (view2.clone(), source2.clone());
+                    window.defer(cx, move |window, cx| view.update(cx, |this, cx| this.run_cad_export(s, name, source, window, cx)));
                     true
                 })
         });
+        // Live: the File name has the keyboard, its text selected.
+        window.defer(cx, move |window, cx| {
+            file_focus.update(cx, |f, cx| {
+                f.focus(window, cx);
+                f.select_all(window, cx);
+            })
+        });
+    }
+
+    /// Write what the modal exports, as it set it.
+    fn run_cad_export(&mut self, s: Settings, name: String, source: CadSource, window: &mut Window, cx: &mut Context<Self>) {
+        let units = if s.workspace_units { self.workspace_insunits(cx) } else { UNITS[s.units.min(5)].1 };
+        let version = CAD_VERSIONS[s.version.min(CAD_VERSIONS.len() - 1)].1;
+        let sheet = match &source {
+            CadSource::Flat(body) => return self.run_flat_export(s, name, body.clone(), window, cx),
+            CadSource::Sketch(id) => self.display.sketches.iter().find(|sk| sk.feature == *id).map(noshape_ops::sketch_export::sketch_sheet),
+            CadSource::Face(r) => self.context.as_ref().and_then(|ctx| noshape_ops::sketch_export::face_sheet(ctx, &self.display, r)),
+        };
+        let Some(g) = sheet else { return self.flash_info("Export failed: nothing to export".into(), cx) };
+        match if s.dwg { to_dwg_file(&g, units, version) } else { to_dxf_file(&g, units, version) } {
+            Ok(bytes) => self.save_cad_export(bytes, if name.is_empty() { "Export".into() } else { name }, s, window, cx),
+            Err(e) => self.flash_info(format!("Export failed: {e}"), cx),
+        }
     }
 
     /// Write the flats the scope takes, as the modal set them.
@@ -171,7 +233,13 @@ impl PartStudioView {
             Ok(b) => b,
             Err(e) => return self.flash_info(format!("Export failed: {e}"), cx),
         };
+        LAST_CHECKS.with(|c| c.set(s.checks));
         let name = if name.is_empty() { "Flat pattern".to_string() } else { name };
+        self.save_cad_export(bytes, name, s, window, cx);
+    }
+
+    /// The written file to the OS save dialog or a new tab, as Options says.
+    fn save_cad_export(&mut self, bytes: Vec<u8>, name: String, s: Settings, window: &mut Window, cx: &mut Context<Self>) {
         let ext = if s.dwg { "dwg" } else { "dxf" };
         let file = format!("{name}.{ext}");
         // Options › Store file in a new tab: no download. Live (request

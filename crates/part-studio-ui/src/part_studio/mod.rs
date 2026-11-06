@@ -2270,6 +2270,7 @@ impl PartStudioView {
         let units = self.doc.read(cx).session.doc.settings.units;
         self.apply_remembered(&mut feature, &units);
         // Preselection fills the first compatible selection field (Onshape behavior).
+        let mut preselected = false;
         if let Some(ty) = features::get(type_id) {
             // Features selected in the list preselect too (a selected
             // sketch fills Extrude's regions field, Onshape behavior).
@@ -2279,6 +2280,7 @@ impl PartStudioView {
             }).collect();
             let mut sel = self.selection.clone();
             sel.extend(self.feature_preselection(&filters));
+            preselected = !sel.is_empty();
             if !sel.is_empty() {
                 // helixEditLogic (live L34): the tab follows the preselection.
                 if type_id == "helix"
@@ -2305,7 +2307,13 @@ impl PartStudioView {
         self.selected_features.clear();
         self.ui.select_other = None;
         self.ui.mini_toolbar = None;
+        // A preselection is an edit: ✓ is enabled from the start, even with a field missing (live ui-parity
+        // face-menu-revolve, delete-face-tool, replace-face-tool).
+        let preselected = preselected && feature.params.0.values().any(|v| matches!(v, ParamValue::Query(q) if !q.is_empty()));
         self.open_dialog(feature, index, true, window, cx);
+        if preselected && let Some(e) = &self.edit {
+            e.dialog.update(cx, |d, _| d.mark_dirty());
+        }
     }
 
     pub fn edit_feature(&mut self, id: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
@@ -5717,7 +5725,7 @@ impl PartStudioView {
             if is_sketch || source_sketch.is_some() {
                 m = m.item(item("Show dimensions", Box::new(move |this, w, cx| {
                     if let Some(sk) = this.dimensions_sketch(id, cx) {
-                        this.show_dimensions(sk, w, cx);
+                        this.show_dimensions(sk, (sk != id).then_some(id), w, cx);
                     }
                 })));
             }
@@ -5741,7 +5749,7 @@ impl PartStudioView {
                 // Live order: Create Drawing of Sketch N…, Export as DXF/DWG… (a sketch view; asb).
                 let sk_name = feature_name.clone();
                 m = m.separator().item(item(&format!("Create Drawing of {sk_name}…"), Box::new(move |this, w, cx| crate::drawing_create::request_create_drawing_of_sketch(this.tab, id, &sk_name, w, cx))).icon_name("menu-create-drawing"));
-                m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.export_sketch(id, "dxf", w, cx))));
+                m = m.item(item("Export as DXF/DWG…", Box::new(move |this, w, cx| this.open_cad_export(flat_export::CadSource::Sketch(id), w, cx))));
             }
             m = m.separator();
             if is_sketch {

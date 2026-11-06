@@ -2146,6 +2146,23 @@ impl FeatureDialog {
         self.applied_value_error().is_some()
     }
 
+    /// A menu item's click leaves the keyboard outside the dialog (live ui-parity dialog-query-rclick-clear-all: after
+    /// Clear all nothing has the focus), once the closing menu has given it back.
+    fn leave_keyboard_after_menu(view: &Entity<Self>, window: &mut Window, cx: &mut App) {
+        let view = view.clone();
+        window.defer(cx, move |_, cx| {
+            view.update(cx, |this, cx| {
+                this.keyboard_left = true;
+                cx.emit(DialogEvent::LeaveFocus { forward: false });
+            })
+        });
+    }
+
+    /// The dialog counts as edited (a new feature's preselection).
+    pub(crate) fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
     /// Whether ✓ is disabled (live `canSubmit`): until the dialog is dirty (an edit, or a regeneration without an
     /// error), and while an applied value doesn't evaluate.
     pub(crate) fn ok_blocked(&self) -> bool {
@@ -2377,11 +2394,12 @@ impl FeatureDialog {
                         let mut m = m;
                         if query {
                             let (v, p) = (view.clone(), path.clone());
-                            m = m.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, _, cx| {
+                            m = m.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, window, cx| {
                                 v.update(cx, |this, cx| {
                                     this.set_value(&p, ParamValue::Query(Vec::new()), cx);
                                     cx.emit(DialogEvent::HoverRef(None));
-                                })
+                                });
+                                Self::leave_keyboard_after_menu(&v, window, cx);
                             }));
                         }
                         configure_items(m, &view, &pid, is_configured)
@@ -3094,11 +3112,12 @@ impl FeatureDialog {
                                 move |menu, _, _| {
                                     let v2 = view.clone();
                                     let pb = p3.clone();
-                                    let mut m = menu.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, _, cx| {
+                                    let mut m = menu.item(crate::os_menu::OsMenuItem::new("Clear all").on_click(move |_, window, cx| {
                                         v2.update(cx, |this, cx| {
                                             this.set_value(&pb, ParamValue::Query(Vec::new()), cx);
                                             cx.emit(DialogEvent::HoverRef(None));
-                                        })
+                                        });
+                                        Self::leave_keyboard_after_menu(&v2, window, cx);
                                     }));
                                     if any_missing {
                                         let v = view.clone();

@@ -16,6 +16,8 @@ use noshape_render::{Drawable, Instance, LineData, LineSegment};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ShownDims {
     pub sketch: FeatureId,
+    /// The feature they were shown for (Extrude 1's: its sketch's), lit up in the list with the sketch.
+    pub of: Option<FeatureId>,
     pub hover: Option<u32>,
 }
 
@@ -49,8 +51,8 @@ const HOVER_BOX: u32 = 0xaa9c85;
 
 impl PartStudioView {
     /// Show the dimensions of `sketch` (a sketch feature).
-    pub(super) fn show_dimensions(&mut self, sketch: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
-        self.ui.shown_dims = Some(ShownDims { sketch, hover: None });
+    pub(super) fn show_dimensions(&mut self, sketch: FeatureId, of: Option<FeatureId>, window: &mut Window, cx: &mut Context<Self>) {
+        self.ui.shown_dims = Some(ShownDims { sketch, of, hover: None });
         let d = self.display.clone();
         self.apply_display(d, window, cx);
     }
