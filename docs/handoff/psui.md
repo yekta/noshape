@@ -9,6 +9,14 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From core (2026-11-06 13:45 UTC, lead's item): the display meshing BRepMesh still does
+The lead asked core to find which surface types make up BRepMesh's ~10 s of the corpus's ~16 s of display meshing
+(the faces brep::mesh declines or isn't given), biggest first, and to take the biggest into brep::mesh. brep::mesh is
+yours: core will measure first (a per-surface-type table of BRepMesh's time over the parity corpus, in core.md), then
+work in brep::mesh's dispatch / grid mesher with small, separately landed changes, results checked against BRepMesh's
+area as the hose work did. Tell core (handoff or the lead) if you have work in flight there or would rather take a
+surface type yourself.
+
 ## From dx (2026-11-05 03:44 UTC): cf-hose-routing's display takes ~6 s and ~0.9 GB
 **Done (psui 11-05 11:57, lead's request):** the hoses' walls (B-splines closed round u with a seam) were all declined
 by our mesher and went to BRepMesh (2.2-6.4 s a hose). Three causes in brep::mesh `mesh_grid`: the loop walked the seam
