@@ -183,10 +183,7 @@ pub fn eval(ev: &mut EvalCtx) -> FResult<()> {
             match eval_text_expression(ev, &t.text) {
                 Ok(v) if !v.trim().is_empty() => {
                     t.text = v;
-                    let width = t.layout().width;
-                    if let Some(rc) = t.ratio_constraint {
-                        let _ = sk.set_length_ratio(ConstraintId(rc), width.max(1e-6));
-                    }
+                    let _ = t.fit_box(&mut sk, t.layout().width);
                 }
                 Ok(_) => problems.push("The text expression is empty".into()),
                 Err(e) => problems.push(e),
@@ -344,6 +341,23 @@ fn split_top(text: &str, sep: char) -> Vec<String> {
     out
 }
 
+/// `name(argument)`'s argument when the whole of `text` is that one call.
+fn call_argument<'a>(text: &'a str, name: &str) -> Option<&'a str> {
+    let inner = text.strip_prefix(name)?.strip_prefix('(')?.strip_suffix(')')?;
+    let mut depth = 0i32;
+    for ch in inner.chars() {
+        depth += match ch {
+            '(' => 1,
+            ')' => -1,
+            _ => 0,
+        };
+        if depth < 0 {
+            return None;
+        }
+    }
+    (depth == 0).then_some(inner)
+}
+
 /// A number with up to `max` decimals, trailing zeros removed.
 fn trim_number(v: f64, max: usize) -> String {
     let s = format!("{v:.max$}");
@@ -352,12 +366,15 @@ fn trim_number(v: f64, max: usize) -> String {
 
 /// Evaluates a sketch text expression: string literals ("..."), numeric
 /// expressions (variables, units, functions; unitless results print as
-/// numbers, lengths and angles with their unit), `roundToPrecision(x, n)`
-/// and `~` concatenation (Onshape's text expressions).
+/// numbers, lengths and angles with their unit), `roundToPrecision(x, n)`,
+/// `toString(x)` and `~` concatenation (Onshape's text expressions).
 pub fn eval_text_expression(ev: &EvalCtx, text: &str) -> Result<String, String> {
     let mut out = String::new();
     for piece in split_top(text, '~') {
-        let p = piece.trim();
+        let mut p = piece.trim();
+        while let Some(inner) = call_argument(p, "toString") {
+            p = inner.trim();
+        }
         if p.is_empty() {
             continue;
         }
@@ -775,6 +792,8 @@ mod text_expression_tests {
         assert_eq!(split_top("roundToPrecision(#l / in, 3)", ','), vec!["roundToPrecision(#l / in, 3)"]);
         assert_eq!(trim_number(2.500, 6), "2.5");
         assert_eq!(trim_number(3.0, 6), "3");
+        assert_eq!(call_argument("toString(roundToPrecision(#t / mm, 0))", "toString"), Some("roundToPrecision(#t / mm, 0)"));
+        assert_eq!(call_argument("toString(#a) + toString(#b)", "toString"), None);
     }
 
     #[test]

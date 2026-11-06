@@ -1741,3 +1741,80 @@ fn a_bend_beside_a_spline_rolled_wall_is_a_cylinder() {
     let slivers = faces.iter().filter(|f| f.area().is_ok_and(|a| a < 1e-6)).count();
     assert!(parts == 1 && faces.len() == 14 && cylinders == 2 && slivers == 0, "{parts} parts, {} faces, {cylinders} cylinders, {slivers} slivers, {} mm³: {:#?}", faces.len(), volume_mm3(&r), face_report(&r));
 }
+
+/// A part pattern of an active sheet metal part is std's sheet metal pattern: an Add of the 60 × 40 plate's copy
+/// 60 mm along x joins it into the one 120 × 40 sheet metal part (c2-sm-louver's Linear pattern 1, 278 faces as
+/// live's); a plain part's Add into active sheet metal is std's error, as Extrude's.
+#[test]
+fn a_pattern_of_active_sheet_metal_is_stds() {
+    let mut s = plate("2 mm");
+    let r = s.ok();
+    let body = r.context.bodies[part(&r)].id.clone();
+    let along_x = |p: &mut ParamValues| {
+        p.set("patternType", en("PART"));
+        p.set("directionOne", ParamValue::Query(vec![Reference::Plane(DatumPlane::Right)]));
+        p.set("distance", expr("60 mm"));
+        p.set("instanceCount", expr("2"));
+        p.set("operationType", en("ADD"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    };
+    s.add("linearPattern", |p| {
+        along_x(p);
+        p.set("entities", ParamValue::Query(vec![Reference::Body(body.clone())]));
+    });
+    let r = s.ok();
+    let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).collect();
+    assert_eq!(solids.len(), 1, "one part");
+    assert!((volume_mm3(&r) - 9600.0).abs() < 1e-3, "{} mm³", volume_mm3(&r));
+    assert!(r.context.sheet_metal.get(&solids[0].id).is_some_and(|d| d.active), "still active sheet metal");
+
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(glam::DVec2::new(mm(100.0), mm(20.0)), mm(5.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions[0].key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("NEW"));
+        p.set("depth", expr("10 mm"));
+    });
+    let r = s.ok();
+    let pin = r.context.bodies.iter().find(|b| b.kind == BodyKind::Solid && !r.context.sheet_metal.contains_key(&b.id)).expect("the pin").id.clone();
+    s.add("linearPattern", |p| {
+        along_x(p);
+        p.set("entities", ParamValue::Query(vec![Reference::Body(pin)]));
+    });
+    let r = Regenerator::new().regenerate(&s.ps, &ConfigValues::default(), &s.units, &RegenOptions::default());
+    let last = r.display.features.last().unwrap();
+    assert_eq!((last.status, last.message.as_deref()), (FeatureStatus::Error, Some("Only Remove can be used with sheet metal. Add Finish sheet metal model to allow other operations.")), "{:?}", last.message);
+}
+
+/// SM-FACES with the L's first leg drawn as two collinear lines (c2-sm-louver's Louver, live 22 faces): the two are
+/// one wall, unified apart from the rest, so its ends stay in wall / bend / wall pieces: the L's 3211.3274 mm³ and
+/// 14 faces (a unify of the whole part made each end one face: 10).
+#[test]
+fn collinear_walls_keep_the_ends_in_pieces() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p = [(0.0, 0.0), (25.0, 0.0), (50.0, 0.0), (50.0, 30.0)].map(|(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y))));
+    let lines: Vec<_> = p.windows(2).map(|w| sk.add_line_between(w[0], w[1]).unwrap()).collect();
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    s.ok();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("EXTRUDE"));
+        pv.set("sketchCurves", ParamValue::Query(lines.iter().map(|e| Reference::SketchEntity { sketch, entity: e.0 }).collect()));
+        pv.set("depth", expr("20 mm"));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("3 mm"));
+    });
+    let r = s.ok();
+    let faces = r.context.bodies[part(&r)].shape.faces().len();
+    assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {faces} faces: {:#?}", volume_mm3(&r), face_report(&r));
+}

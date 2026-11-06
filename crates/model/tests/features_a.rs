@@ -784,6 +784,33 @@ fn split_face_with_sketch_line() {
     assert_eq!(res.context.bodies[0].faces.len(), 7);
 }
 
+/// A curve over one of the target faces only splits that one (c2-hunting-knife's Split 3, live OK): a slot's two
+/// round ends, a Front line at z 5 over the right one (x 25..40) projected along the sketch normal: the right end
+/// splits in two (7 faces), the miss on the left end is no error.
+#[test]
+fn split_face_curve_over_one_of_the_faces() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let (r, l) = (0.03, 0.0);
+    sk.add_line(DVec2::new(l, 0.005), DVec2::new(r, 0.005));
+    sk.add_line(DVec2::new(l, -0.005), DVec2::new(r, -0.005));
+    sk.add_arc(DVec2::new(r, 0.0), DVec2::new(r, -0.005), DVec2::new(r, 0.005));
+    sk.add_arc(DVec2::new(l, 0.0), DVec2::new(l, 0.005), DVec2::new(l, -0.005));
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = t.regions(s)[0].clone();
+    t.extrude(region, "10 mm", "NEW");
+    let res = t.ok();
+    let body = &res.context.bodies[0];
+    let ends: Vec<Reference> = body.shape.faces().iter().enumerate().filter(|(_, f)| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).map(|(i, _)| Reference::Face((*body.faces[i]).clone())).collect();
+    assert_eq!(ends.len(), 2);
+    let mut tool = noshape_sketch::Sketch::new();
+    let line = tool.add_line(DVec2::new(0.025, 0.005), DVec2::new(0.04, 0.005));
+    let ts = t.sketch(Reference::Plane(DatumPlane::Front), tool);
+    t.add("splitPart", &[("splitType", en("FACE")), ("faceTargets", q(ends)), ("faceTools", q(vec![Reference::SketchEntity { sketch: ts, entity: line.0 }]))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies[0].shape.faces().len(), 7);
+}
+
 // ------------------------------------------------------------------ patterns
 
 fn x_axis_dir() -> Reference {

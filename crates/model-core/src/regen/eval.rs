@@ -1254,6 +1254,20 @@ impl<'a> EvalCtx<'a> {
     pub fn fuse_targets(&mut self, targets: &[usize], tools: Vec<NamedShape>, opts: &k::BooleanOptions) -> FResult<()> {
         let mut targets: Vec<usize> = targets.to_vec();
         targets.dedup();
+        // Only the parts a tool meets join it, not the parts that only touch those (c2-bottle-split's Revolve 2: the
+        // cap joins the neck, not the bottle the neck was split from).
+        if !tools.is_empty() && targets.iter().all(|&i| self.ctx.bodies[i].kind == BodyKind::Solid) {
+            let tool_shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
+            let candidates: Vec<Arc<Body>> = targets.iter().map(|&i| self.ctx.bodies[i].clone()).collect();
+            let meet: Vec<usize> = touching(&candidates, &tool_shapes, true).into_iter().map(|j| targets[j]).collect();
+            if meet.len() < targets.len() {
+                let kept = if meet.is_empty() { vec![targets[0]] } else { meet };
+                if kept.len() == 1 {
+                    return self.boolean_into_with(&kept, tools, k::BooleanOp::Fuse, opts);
+                }
+                targets = kept;
+            }
+        }
         let bodies: Vec<Arc<Body>> = targets.iter().map(|&ti| self.ctx.bodies[ti].clone()).collect();
         let mut shapes: Vec<Shape> = bodies.iter().map(|b| b.shape.clone()).collect();
         shapes.extend(tools.iter().map(|t| t.shape.clone()));

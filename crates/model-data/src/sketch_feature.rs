@@ -152,6 +152,19 @@ pub struct SketchText {
 }
 
 impl SketchText {
+    /// The box's width to `width` (box units) for its laid-out text: the ratio constraint, and the right edge moved
+    /// so it holds before solving, keeping the height (the solver would otherwise split the change).
+    pub fn fit_box(&self, sk: &mut noshape_sketch::Sketch, width: f64) -> Result<(), String> {
+        let Some(c) = self.ratio_constraint.filter(|_| width > 1e-6) else { return Ok(()) };
+        sk.set_length_ratio(noshape_sketch::ConstraintId(c), width).map_err(|e| e.to_string())?;
+        if let (Some(pl), [_, p1, p2, _]) = (sk.text_placement(&self.corner_ids(), false, false), self.box_points.as_slice()) {
+            let r = pl.origin + pl.x * pl.height * width;
+            let _ = sk.set_point(EntityId(*p1), r);
+            let _ = sk.set_point(EntityId(*p2), r + pl.y * pl.height);
+        }
+        Ok(())
+    }
+
     /// The laid-out text in box units (the box's height 1).
     pub fn layout(&self) -> noshape_sketch::text::TextLayout {
         if self.ascent_box {
@@ -237,19 +250,7 @@ impl SketchData {
         let width = nt.layout().width;
         *t = nt;
         let t = t.clone();
-        if let Some(c) = t.ratio_constraint
-            && width > 1e-6
-        {
-            self.sketch.set_length_ratio(noshape_sketch::ConstraintId(c), width).map_err(|e| e.to_string())?;
-            // Keep the text height: move the right edge so the new ratio holds
-            // before solving (the solver would otherwise split the change).
-            if let (Some(pl), [_, p1, p2, _]) = (self.sketch.text_placement(&t.corner_ids(), false, false), t.box_points.as_slice()) {
-                let r = pl.origin + pl.x * pl.height * width;
-                let _ = self.sketch.set_point(EntityId(*p1), r);
-                let _ = self.sketch.set_point(EntityId(*p2), r + pl.y * pl.height);
-            }
-        }
-        Ok(())
+        t.fit_box(&mut self.sketch, width)
     }
 
     /// Text box owning an entity: one of its box points/lines or a derived

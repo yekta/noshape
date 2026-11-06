@@ -1672,3 +1672,38 @@ Run `python3 tools/ui-parity/run.py --app <noshape> --scenarios tests/ui-parity 
   - unchanged: fan-blade-sweep / hex-bookcase-derived (Derived NOT BUILT), housing-draft "Bohrung 1" (Cannot
     resolve entities), tpd-fillet-variable / variable-fillet-faceblend (core).
 - Full lines: /root/dx-scratch/walk/run136.log. I'll rerun when live ticks 2132.
+
+## 11-06 morning: c2-sm-louver, c2-valve-config, c2-bottle-split (lead 11-06: bool's louver trace)
+- Full suite at 10:09 UTC (/root/parity/models, now 80 documents): 58/80 to the end, 549/872 features; the 72 of the
+  last run 521 -> 530 features, nothing worse (bottle-split 7 -> 9/9, hunting-knife 8 -> 9/24, sm-louver 4 -> 10/36).
+- **Patterns of active sheet metal are std's** (std_route.rs `patterns_active_sheet_metal`): a part Linear / Circular /
+  Curve pattern or Mirror whose entities hold an active sheet metal part, or whose Add's merge scope does, runs std's
+  sheet metal pattern. Its scope leaves active sheet metal out and an Add into it is std's error ("Only Remove can be
+  used with sheet metal…"), where our "Merge with all" took every solid. Louver Linear pattern 1: live's 278 faces;
+  the studio regenerates in ~22 s (was 616 s; Linear pattern 3 1.3 s, was 174 s). Test
+  `sheetmetal_std::a_pattern_of_active_sheet_metal_is_stds`.
+- **Coplanar walls unified apart from the rest** (host/sheetmetal.rs build_part): a whole-part unify merged each end
+  cap into one face whenever two collinear lines made one wall; now the walls of a rip are unified alone, and the ends
+  stay in wall / bend pieces (Louver: live's 22/44/24). Test `sheetmetal_std::collinear_walls_keep_the_ends_in_pieces`.
+  Left: live's 1.6° and 2.9° bends there are PLANE faces (chords); ours cylinders, same volume. Live request filed
+  (skasm 09:37) for where live switches.
+- **Translator**: live's solved line ends by its `.start` / `.end` point records (a segment record can run the other
+  way: the Louver sketch's 0.9 µm line, endParam < startParam); a solved text box from `sketchText`; a text converted
+  to an expression stays one (sketch_text `expression`), `toString(x)` evaluates, and the box is sized to the
+  evaluated text before solving (`SketchText::fit_box`, shared with Edit). Headless point snap 0.1 px (100 nm): the
+  0.9 µm line drew as nothing at 9 µm. c2-valve-config's "6" is engraved as live's (Extrude 3's volume; 2 edges
+  differ in type: live 11 circles, ours 9).
+- **An Add joins only the parts its tool meets** (eval.rs `fuse_targets`): parts that only touch those stay apart
+  (c2-bottle-split's Revolve 2: the cap joins the neck, not the bottle body the neck was split from). Bottle-split
+  9/9 to the end. Test `engine::add_joins_only_the_parts_its_tool_meets`.
+- **Split face: a curve that misses one target face** projects onto the others (split.rs): one failed projection
+  aborted the split (c2-hunting-knife's Split 3, the edge's arc over one of the two R750 spine faces). Knife 9/24;
+  next Delete face 1 heals with 2 edges / 1 vertex more than live (core's). Test
+  `features_a::split_face_curve_over_one_of_the_faces`.
+- **Translator: a BODY reference takes a part of live's kind** (SOLID / WIRE / SHEET): c2-helical-sweep's path is the
+  helix (a wire in the same box as the part it winds round), not Part 1. The sweep now runs, and is **core's** next:
+  Sweep 1 (Remove, a profile along the 8-turn helix, keepProfileOrientation false, which our sweep lacks, as our helix
+  lacks helixType) takes 28.7 s (live 40 ms) and leaves 14/25/21 faces / edges / vertices, live 6/10/6.
+- Not mine / waiting: sm-corner-break's Corner break 1 (queries without live geometry: dx / the refetch);
+  duct-multipart's Extrude 3 needs Sketch 5's regions split by the edges of Extrude 2's body on its plane (our imprint
+  takes only the sketch's own face's edges): to check on live before building.

@@ -295,11 +295,20 @@ fn split_faces(ev: &mut EvalCtx) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let faces: Vec<Shape> = fs.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
         let target = Shape::compound(&faces);
+        // A curve that misses a face projects onto the others (c2-hunting-knife's Split 3: the edge's arc lies over
+        // one of the two spine faces); the error only when none projects anywhere.
         let mut imprint: Vec<Shape> = Vec::new();
+        let mut missed = None;
         for face in &faces {
             for c in &curves {
-                imprint.extend(project_onto(&c.shape, face, direction)?);
+                match project_onto(&c.shape, face, direction) {
+                    Ok(edges) => imprint.extend(edges),
+                    Err(e) => missed = Some(e),
+                }
             }
+        }
+        if let Some(e) = missed.filter(|_| imprint.is_empty() && surf_tools.is_empty()) {
+            return Err(e);
         }
         for t in &surf_tools {
             if let Ok(sec) = k::section(&target, t) {

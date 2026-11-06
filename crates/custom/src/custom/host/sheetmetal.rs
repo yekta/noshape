@@ -1644,9 +1644,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         solids.push(bend);
     }
     // Walls: pulled back from their bends and thickened.
+    let mut wall_solid: BTreeMap<usize, usize> = BTreeMap::new();
     for (fi, outline) in outlines.iter().enumerate() {
         let Some((l, n, pulled)) = outline else {
             if plain.contains(&fi) {
+                wall_solid.insert(fi, solids.len());
                 plain_wall(&topo, fi, front, back, &mut solids, &mut pieces)?;
                 wall_flats.push((fi, topo.faces[fi].clone()));
                 continue;
@@ -1766,18 +1768,46 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             pieces.push(Piece { face: f, from });
         }
         wall_flats.push((fi, flat));
+        wall_solid.insert(fi, solids.len());
         solids.push(slab);
     }
-    let fused = if solids.len() == 1 {
-        solids.remove(0)
-    } else {
-        // The walls and bends only touch (on the faces they share): glued
-        // (kept only when the volumes add up, else fused as usual).
-        let glued = k::BooleanOptions { glue: k::Glue::ShiftChecked, ..Default::default() };
-        k::fuse_all(&solids, &glued).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape
+    // The walls and bends only touch (on the faces they share): glued (kept only when the volumes add up, else
+    // fused as usual).
+    let glued = k::BooleanOptions { glue: k::Glue::ShiftChecked, ..Default::default() };
+    let fuse = |solids: &[Shape]| -> FResult<Shape> {
+        match solids {
+            [one] => Ok(one.clone()),
+            _ => Ok(k::fuse_all(solids, &glued).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape),
+        }
     };
-    // Coplanar walls (split by a rip) are one face.
-    let fused = if (0..topo.edges.len()).any(|e| coplanar_rip(&topo, e)) { k::unify_same_domain(&fused).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape } else { fused };
+    // Coplanar walls (split by a rip) are one wall: unified apart from the rest, so the ends of the walls and bends
+    // beside them stay in pieces (c2-sm-louver's Louver, live's 22 faces).
+    let mut root: Vec<usize> = (0..solids.len()).collect();
+    fn find(root: &mut [usize], i: usize) -> usize {
+        if root[i] != i {
+            root[i] = find(root, root[i]);
+        }
+        root[i]
+    }
+    for e in (0..topo.edges.len()).filter(|&e| coplanar_rip(&topo, e)) {
+        let [a, b] = topo.edge_faces[e][..] else { continue };
+        if let (Some(&sa), Some(&sb)) = (wall_solid.get(&(a as usize)), wall_solid.get(&(b as usize))) {
+            let (ra, rb) = (find(&mut root, sa), find(&mut root, sb));
+            root[ra] = rb;
+        }
+    }
+    let mut groups: BTreeMap<usize, Vec<Shape>> = BTreeMap::new();
+    for (i, solid) in solids.into_iter().enumerate() {
+        groups.entry(find(&mut root, i)).or_default().push(solid);
+    }
+    let mut parts = Vec::with_capacity(groups.len());
+    for group in groups.into_values() {
+        parts.push(match group.as_slice() {
+            [one] => one.clone(),
+            _ => k::unify_same_domain(&fuse(&group)?).map_err(|e| fe(format!("Sheet metal part failed: {e}")))?.shape,
+        });
+    }
+    let fused = fuse(&parts)?;
     Ok(Built { part: fused, pieces, topo, wall_flats, strips })
 }
 

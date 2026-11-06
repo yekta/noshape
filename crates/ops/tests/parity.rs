@@ -1131,6 +1131,41 @@ fn a_conic_is_translated_with_its_rho() {
     assert_eq!(g["regions"].as_array().map(Vec::len), Some(1), "{g}");
 }
 
+/// A text converted to an expression (c2-valve-config's Sketch 3: `toString(roundToPrecision(#espesor_material/mm, 0))`,
+/// live's "6"): ours an expression text, evaluated on regeneration, not live's empty value.
+#[test]
+fn a_text_expression_is_translated_as_one() {
+    let features = json!({ "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": "query=dummyQuery(id+\"Top.planeOp\",EntityType.FACE);" }] }],
+          "entities": [{ "btType": "BTMSketchTextEntity-1761", "entityId": "t", "baselineStartX": -0.0002, "baselineStartY": 0.007, "baselineDirectionX": 0.0004, "baselineDirectionY": 0.0, "ascent": 0.0045,
+              "parameters": [
+                  { "btType": "BTMParameterString-149", "parameterId": "fontName", "value": "OpenSans-Bold.ttf" },
+                  { "btType": "BTMParameterQuantity-147", "parameterId": "text", "value": 0, "units": "", "expression": "toString(roundToPrecision(6 mm / mm, 0))" },
+                  { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorHorizontal", "value": false },
+                  { "btType": "BTMParameterBoolean-144", "parameterId": "mirrorVertical", "value": false }
+              ] }],
+          "constraints": [] }
+    ], "sketches": { "sketches": [{ "featureId": "FS", "geomEntities": [
+        { "id": "t", "entityType": "sketchText", "startPoint": [-0.0018872, 0.002], "direction": [0.0037744, 0.0], "textAscent": 0.0045, "text": "" }
+    ] }] } });
+    let mut ctx = Ctx::new();
+    let mut t = Translator::open(&mut ctx, &scratch("text-expression.noshape"), &features, Default::default()).unwrap();
+    let step = t.step(0);
+    assert!(step.problems.is_empty(), "{:?}", step.problems);
+    assert_eq!(step.status.as_deref(), Some("Ok"), "{:?}", step.message);
+    let g = t.call("sketch_get", json!({ "sketch": step.ours.unwrap() })).unwrap();
+    assert_eq!(g["texts"][0]["text"], "toString(roundToPrecision(6 mm / mm, 0))", "{g}");
+    // "6": its outline and its counter, where live's MIDPOINT solved it (the stored baseline is at y 7 mm): centred
+    // on x 0 between y 2 and 6.5 mm.
+    let regions = g["regions"].as_array().unwrap();
+    assert_eq!(regions.len(), 2, "{g}");
+    let outer = regions.iter().max_by(|a, b| a["area"].as_f64().unwrap().total_cmp(&b["area"].as_f64().unwrap())).unwrap();
+    let (lo, hi) = (&outer["bounds"]["min"], &outer["bounds"]["max"]);
+    let at = |v: &Value, i: usize| v[i].as_f64().unwrap();
+    assert!(((at(lo, 0) + at(hi, 0)) / 2.0).abs() < 0.2 && at(lo, 1) > 1.9 && at(hi, 1) < 6.6, "{outer}");
+}
+
 /// Live's constraints that had no counterpart in the translator (c2 corpus): an elliptical arc's QUADRANT point,
 /// VERTICAL major axis and MINOR_DIAMETER, two pieces of one trimmed ellipse COINCIDENT, a point MIRRORed onto itself
 /// (on the mirror line), a spline handle's LENGTH. All taken, nothing moved.

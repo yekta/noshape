@@ -875,7 +875,7 @@ impl<'a> Translator<'a> {
     }
 
     /// Sketch entity `e` of sketch `oid` moved to live's solved geometry
-    /// (lines, circles, arcs and points; `None`: no solve given or no change).
+    /// (lines, circles, arcs, points and texts; `None`: no solve given or no change).
     fn solved_entity(&self, oid: &str, e: &Value) -> Option<Value> {
         let id = e["entityId"].as_str()?;
         let g = self.solved.get(&(oid.to_string(), id.to_string()))?;
@@ -884,7 +884,13 @@ impl<'a> Translator<'a> {
         let gt = e["geometry"]["btType"].as_str().unwrap_or("");
         match g["entityType"].as_str()? {
             "lineSegment" if gt.starts_with("BTCurveGeometryLine") => {
-                let (a, b) = (p2(&g["startPoint"])?, p2(&g["endPoint"])?);
+                // Its ends by their point records: the segment's own may run the other way (c2-sm-louver's 0.9 µm
+                // line, stored with its end parameter below its start).
+                let end = |which: &str| self.solved.get(&(oid.to_string(), format!("{id}.{which}"))).and_then(|p| p2(&p["point"]));
+                let (a, b) = match (end("start"), end("end")) {
+                    (Some(a), Some(b)) => (a, b),
+                    _ => (p2(&g["startPoint"])?, p2(&g["endPoint"])?),
+                };
                 let l = (b[0] - a[0]).hypot(b[1] - a[1]);
                 if l < 1e-12 {
                     return None;
@@ -921,6 +927,18 @@ impl<'a> Translator<'a> {
                 let p = p2(&g["point"])?;
                 out["x"] = json!(p[0]);
                 out["y"] = json!(p[1]);
+            }
+            // A text's box where its constraints put it (c2-valve-config's "6" centred by a MIDPOINT; the stored
+            // baseline is where it was typed).
+            "sketchText" if e["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketchTextEntity")) => {
+                let (start, dir) = (p2(&g["startPoint"])?, p2(&g["direction"])?);
+                out["baselineStartX"] = json!(start[0]);
+                out["baselineStartY"] = json!(start[1]);
+                out["baselineDirectionX"] = json!(dir[0]);
+                out["baselineDirectionY"] = json!(dir[1]);
+                if let Some(ascent) = g["textAscent"].as_f64() {
+                    out["ascent"] = json!(ascent);
+                }
             }
             _ => return None,
         }
@@ -2116,11 +2134,10 @@ impl<'a> Translator<'a> {
                     Some([lo, hi]) => (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - lo[i]).powi(2) + (at(&b["bounding_box"]["max"], i) - hi[i]).powi(2)).sum::<f64>().sqrt(),
                     None => (0..3).map(|i| (at(&b["bounding_box"]["min"], i) - p[i]).max(p[i] - at(&b["bounding_box"]["max"], i)).max(0.0).powi(2)).sum::<f64>().sqrt(),
                 };
-                parts["parts"]
-                    .as_array()
+                let all: Vec<&Value> = parts["parts"].as_array().into_iter().flatten().filter(|b| !off(b).is_nan()).collect();
+                let same_kind: Vec<&Value> = all.iter().copied().filter(|b| r.geometry.as_deref().is_some_and(|g| b["kind"] == g)).collect();
+                if same_kind.is_empty() { all } else { same_kind }
                     .into_iter()
-                    .flatten()
-                    .filter(|b| !off(b).is_nan())
                     .min_by(|a, b| off(a).total_cmp(&off(b)))
                     .and_then(|b| b["id"].as_str().map(str::to_string))
                     .ok_or_else(|| format!("{id}: no part of ours"))
@@ -2565,6 +2582,9 @@ impl<'a> Translator<'a> {
         // Its baseline vector is the advances plus ~40 font units (39-40 of
         // 2048 in cf-fix-pcb's and cf-straight-spline's Open Sans), so only
         // without an ascent is the height what lays the text out that wide.
+        // A text converted to an expression is a quantity parameter with its expression (c2-valve-config's
+        // `toString(roundToPrecision(#espesor_material/mm, 0))`).
+        let expression = t["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == "text").and_then(|p| p["expression"].as_str()).filter(|x| !x.trim().is_empty()).map(str::to_string);
         let text = param("text").as_str().unwrap_or("").to_string();
         let font = if name.is_empty() { noshape_sketch::text::SKETCH_DEFAULT_FONT.to_string() } else { name.clone() };
         let (bold, italic) = (style.contains("Bold"), style.contains("Italic"));
@@ -2581,6 +2601,10 @@ impl<'a> Translator<'a> {
             "bold": style.contains("Bold"), "italic": style.contains("Italic"), "flip_horizontal": param("mirrorHorizontal") == true, "flip_vertical": param("mirrorVertical") == true });
         if !name.is_empty() {
             args["font"] = json!(name);
+        }
+        if let Some(expression) = expression {
+            args["text"] = json!(expression);
+            args["expression"] = json!(true);
         }
         let made = self.call("sketch_text", args)?;
         let angle = (ahead[1] - start[1]).atan2(ahead[0] - start[0]);
@@ -3473,7 +3497,14 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
             if let Some(id) = b["id"].as_str()
                 && lo[0].is_finite()
             {
-                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), ..Default::default() });
+                // Its kind in query_parts' words (c2-helical-sweep's helix: a wire in the box of the part it winds round).
+                let kind = match b["type"].as_str() {
+                    Some("SOLID") => Some("Solid"),
+                    Some("WIRE") => Some("Wire"),
+                    Some("SHEET") => Some("Surface"),
+                    _ => None,
+                };
+                out.insert((at, id.to_string()), LiveRef { kind: "BODY".into(), point: Some([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0]), bbox: Some([lo, hi]), geometry: kind.map(str::to_string), ..Default::default() });
             }
             // A sketch's wire body and regions (live's FeatureScript fetch).
             if b["type"] == "SKETCH" {

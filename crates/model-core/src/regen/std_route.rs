@@ -176,9 +176,9 @@ core_features! {
 }
 
 macro_rules! sheet_metal_aware {
-    ($($f:ident => $ty:literal, $native:path, $module:literal, $name:literal;)*) => {
+    ($($f:ident => $ty:literal, $native:path, $module:literal, $name:literal, $when:path;)*) => {
         $(fn $f(ev: &mut EvalCtx) -> FResult<()> {
-            if adds_to_active_sheet_metal(ev) { evaluate_std(ev, $module, $name) } else { $native(ev) }
+            if $when(ev) { evaluate_std(ev, $module, $name) } else { $native(ev) }
         })*
 
         /// Core features std runs when they add to or cut an active sheet
@@ -188,10 +188,14 @@ macro_rules! sheet_metal_aware {
 }
 
 sheet_metal_aware! {
-    sm_extrude => "extrude", crate::regen::features::extrude::eval, "extrude.fs", "extrude";
-    sm_revolve => "revolve", crate::regen::features::revolve::eval, "revolve.fs", "revolve";
-    sm_sweep => "sweep", crate::regen::features::solid_a::sweep, "sweep.fs", "sweep";
-    sm_loft => "loft", crate::regen::features::solid_a::loft, "loft.fs", "loft";
+    sm_extrude => "extrude", crate::regen::features::extrude::eval, "extrude.fs", "extrude", adds_to_active_sheet_metal;
+    sm_revolve => "revolve", crate::regen::features::revolve::eval, "revolve.fs", "revolve", adds_to_active_sheet_metal;
+    sm_sweep => "sweep", crate::regen::features::solid_a::sweep, "sweep.fs", "sweep", adds_to_active_sheet_metal;
+    sm_loft => "loft", crate::regen::features::solid_a::loft, "loft.fs", "loft", adds_to_active_sheet_metal;
+    sm_linear_pattern => "linearPattern", crate::regen::features::pattern::linear_pattern, "linearPattern.fs", "linearPattern", patterns_active_sheet_metal;
+    sm_circular_pattern => "circularPattern", crate::regen::features::pattern::circular_pattern, "circularPattern.fs", "circularPattern", patterns_active_sheet_metal;
+    sm_curve_pattern => "curvePattern", crate::regen::features::pattern::curve_pattern, "curvePattern.fs", "curvePattern", patterns_active_sheet_metal;
+    sm_mirror => "mirror", crate::regen::features::pattern::mirror, "mirror.fs", "mirror", patterns_active_sheet_metal;
 }
 
 /// Sheet metal runs by std (the setting; a legacy studio still runs natively).
@@ -215,6 +219,18 @@ fn adds_to_active_sheet_metal(ev: &EvalCtx) -> bool {
         return false;
     }
     crate::regen::features::extrude::scope(ev).is_some_and(|s| s.iter().any(|&i| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active)))
+}
+
+/// A part pattern (or mirror) of an active sheet metal part, or whose Add's merge scope holds one (c2-sm-louver's
+/// Linear pattern 1 of the Side): std's sheet metal pattern; its merge scope leaves active sheet metal out (an Add into
+/// one is live's error), where the native pattern's "Merge with all" took every solid.
+fn patterns_active_sheet_metal(ev: &EvalCtx) -> bool {
+    let active = |i: usize| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active);
+    if !ev.ctx.sheet_metal.values().any(|d| d.active) || ev.enum_("patternType") != "PART" {
+        return false;
+    }
+    ev.resolve_bodies(ev.query("entities")).into_iter().any(active)
+        || (!matches!(ev.enum_("operationType"), "NEW" | "") && crate::regen::features::extrude::scope(ev).is_some_and(|s| s.into_iter().any(active)))
 }
 
 /// The built-in feature type std's feature `name` stands for (Transform: fTransform), else `name`.

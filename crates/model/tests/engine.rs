@@ -1504,6 +1504,30 @@ fn add_into_several_parts_is_one_union() {
     }
 }
 
+/// An Add joins the parts its tool meets, not the parts that only touch those (c2-bottle-split's Revolve 2: the cap
+/// joins the neck, not the bottle the neck was split from). Part 1 (0..10) and Part 2 (10..20) touch face to face;
+/// the Add over 15..25 makes Part 2 1500 mm³ and leaves Part 1 its 1000.
+#[test]
+fn add_joins_only_the_parts_its_tool_meets() {
+    let mut t = T::new();
+    let s1 = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.01, 0.01));
+    let r1 = t.regions(s1)[0].clone();
+    t.extrude(r1, "10 mm", "NEW");
+    let s2 = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.01, 0.0, 0.02, 0.01));
+    let r2 = t.regions(s2)[0].clone();
+    t.extrude(r2, "10 mm", "NEW");
+    let ids: Vec<BodyId> = parts(&t.ok()).into_iter().map(|p| p.0).collect();
+    assert_eq!(ids.len(), 2);
+    let s3 = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.015, 0.0, 0.025, 0.01));
+    let r3 = t.regions(s3)[0].clone();
+    let x = t.extrude(r3, "10 mm", "ADD");
+    t.set(x, "defaultScope", b(true));
+    let ps = parts(&t.ok());
+    assert_eq!(ps.len(), 2, "{ps:?}");
+    assert!(ps.iter().any(|p| p.0 == ids[0] && (p.2 - 1000.0).abs() < 1e-6), "Part 1 as it was: {ps:?}");
+    assert!(ps.iter().any(|p| p.0 == ids[1] && (p.2 - 1500.0).abs() < 1e-6), "Part 2 with the tool: {ps:?}");
+}
+
 /// Live "qa5 booleans": Union Part 1 + Part 2 is one part of 9178.097 mm³
 /// keeping the first pick's id, name and colour, and the old Part 3 is then
 /// "Part 2"; Subtract (tools Part 2, targets Part 1) leaves Part 1 7607.301;
