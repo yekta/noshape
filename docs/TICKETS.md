@@ -680,7 +680,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ticket documents, the volume sweep and the user's cases is unchanged; dx's cf-wave-spring 916.5953 → 916.6061 mm³ (live 916.53,
   in band). Likely d6af88ae (a full round's end arcs one edge: renamed edges) or 4a7f7264; saved studios usually keep the old
   behaviour by a ScopeRule — please check whether this one should. No live value (fuzz). (qa 2026-11-05 08:45, build 8cc1b766)
-- [ ] P1 DRAFT-NONDETERMINISTIC (core / bool) **the same saved document regenerates to different parts from one open to the
+- [x] verified b7afdb57 (qa 11-06 10:28: 24 / 24 opens on vibe3 under load 4–6 and 4 / 4 pinned to one core (taskset -c 0)
+  all give 37305.64 with D4 Ok D5 Error D6 Error D7 Ok; the 44 ticket documents on b7afdb57 and e91ccfda give 37305.6428 too.
+  core's faces_cross budget (b) is still open, in core's note below) P1 DRAFT-NONDETERMINISTIC (core / bool) **the same saved document regenerates to different parts from one open to the
   next**: /root/qa-scratch/tickets/cli-draft-hang2.noshape (a fuzz document, 3 parts; `python3 tickets/draft-nondet/opens.py
   <cli> 8`). On v0.4.29, v0.4.30 and green a1ec7849 (vibe3, idle-ish): Part 1 is 29954.56 mm³ (16 faces) or **37305.64**, Part 2
   133.88 or 17.01 — v0.4.29 4 / 10 vs 6 / 10; per open Draft 4, 6 and 7 succeed or fail ("Selected faces could not be drafted.")
