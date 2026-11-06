@@ -1,16 +1,16 @@
 {
  "scenario": "face-menu-add-appearance-to-face",
- "recorded": "2026-11-06T13:50:01.304Z",
+ "recorded": "2026-11-06T15:24:08.212Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.4 c2684ac9"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "dbbe5d121cd5db879a83309c",
+  "element": "0a2f71c710e046c33f0c7ac4",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -162,7 +162,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 52923
+   "t": 28219
   },
   {
    "step": 2,
@@ -183,8 +183,46 @@
      "tag": "div",
      "label": "Faces or features"
     },
-    "dialog": null,
-    "dialogs": [],
+    "dialog": {
+     "title": "Face appearance 1",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": "Faces or features",
+       "kind": "query",
+       "items": [
+        "Face of Extrude 1"
+       ],
+       "active": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Face appearance 1",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Faces or features",
+        "kind": "query",
+        "items": [
+         "Face of Extrude 1"
+        ],
+        "active": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -232,7 +270,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 64618
+   "t": 32675
   },
   {
    "step": 3,
@@ -288,7 +326,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 68636
+   "t": 35944
   }
  ]
 }

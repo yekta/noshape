@@ -1,16 +1,16 @@
 {
  "scenario": "sketch-row-menu-edit-appearance",
- "recorded": "2026-11-06T13:27:16.090Z",
+ "recorded": "2026-11-06T15:20:13.280Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.3 3b32b16a"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "f6a5c2973bb742dd9e94fe9c",
+  "element": "11a561b576249d1f0987a3e4",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -146,7 +146,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 27315
+   "t": 29563
   },
   {
    "step": 2,
@@ -173,8 +173,26 @@
      ],
      "all": true
     },
-    "dialog": null,
-    "dialogs": [],
+    "dialog": {
+     "title": "Appearance",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Appearance",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
     "list": null,
     "selection": {
      "count": 1,
@@ -222,7 +240,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30293
+   "t": 34582
   },
   {
    "step": 3,
@@ -278,7 +296,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33995
+   "t": 37907
   }
  ]
 }

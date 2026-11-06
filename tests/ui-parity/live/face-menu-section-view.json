@@ -1,16 +1,16 @@
 {
  "scenario": "face-menu-section-view",
- "recorded": "2026-11-06T10:30:14.578Z",
+ "recorded": "2026-11-06T15:24:51.178Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.1 backfilled"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "3602778396ef22da0cb71500",
+  "element": "e76c13b44e8d2488243c05df",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -162,7 +162,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 29114
+   "t": 29004
   },
   {
    "step": 2,
@@ -183,8 +183,78 @@
      "tag": "div",
      "label": "Section planes"
     },
-    "dialog": null,
-    "dialogs": [],
+    "dialog": {
+     "title": "Section view",
+     "titleState": "ok",
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Exclude",
+       "selected": true
+      },
+      {
+       "label": "Include",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Section planes",
+       "kind": "query",
+       "items": [
+        "Section plane 1 (Top)"
+       ],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Items to exclude",
+       "kind": "query",
+       "items": [],
+       "active": false,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "enabled"
+    },
+    "dialogs": [
+     {
+      "title": "Section view",
+      "titleState": "ok",
+      "kind": "feature",
+      "tabs": [
+       {
+        "label": "Exclude",
+        "selected": true
+       },
+       {
+        "label": "Include",
+        "selected": false
+       }
+      ],
+      "fields": [
+       {
+        "label": "Section planes",
+        "kind": "query",
+        "items": [
+         "Section plane 1 (Top)"
+        ],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Items to exclude",
+        "kind": "query",
+        "items": [],
+        "active": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "enabled"
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -226,7 +296,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33965
+   "t": 33995
   },
   {
    "step": 3,
@@ -282,7 +352,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37257
+   "t": 37340
   }
  ]
 }

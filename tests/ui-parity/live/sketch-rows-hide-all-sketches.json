@@ -1,16 +1,16 @@
 {
  "scenario": "sketch-rows-hide-all-sketches",
- "recorded": "2026-11-06T13:31:00.298Z",
+ "recorded": "2026-11-06T15:22:22.582Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.3 3b32b16a"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7140934a6f0850d09f0463dc",
+  "element": "bbf0d43b349b2949cd4df8c8",
   "start": "overlap",
   "startElement": "56e99ed44e36a35b0686cca8"
  },
@@ -185,7 +185,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 25546
+   "t": 25357
   },
   {
    "step": 2,
@@ -198,7 +198,7 @@
    "ok": true,
    "at": [
     179,
-    378
+    424
    ],
    "state": {
     "focus": {
@@ -218,9 +218,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
-       "hidden": true,
-       "cls": "related-highlight  ns-list-item-hidden"
+       "related": false,
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 1",
@@ -258,7 +258,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -266,7 +266,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 27787
+   "t": 28369
   },
   {
    "step": 3,
@@ -295,6 +295,7 @@
       "Copy sketch",
       "Show dimensions",
       "Add selection to folder…",
+      "Show",
       "Show all sketches",
       "Create Drawing of Sketch 2…",
       "Export as DXF/DWG…",
@@ -323,9 +324,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
-       "hidden": true,
-       "cls": "related-highlight  ns-list-item-hidden"
+       "related": false,
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 1",
@@ -363,7 +364,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -371,7 +372,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30279
+   "t": 30923
   },
   {
    "step": 4,
@@ -384,7 +385,7 @@
    "ok": true,
    "at": [
     180,
-    430
+    476
    ],
    "state": {
     "focus": {
@@ -405,8 +406,8 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 1",
@@ -422,9 +423,9 @@
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": true,
-       "hidden": true,
-       "cls": "related-highlight  ns-list-item-hidden"
+       "related": false,
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 2",
@@ -444,7 +445,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -452,7 +453,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 32466
+   "t": 33731
   },
   {
    "step": 5,
@@ -492,8 +493,8 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 1",
@@ -510,8 +511,8 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 2",
@@ -531,7 +532,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -539,7 +540,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 35051
+   "t": 36632
   },
   {
    "step": 6,
@@ -564,7 +565,8 @@
      "kind": "context-menu",
      "rows": [
       "Add selection to folder…",
-      "Show all sketches",
+      "Hide other sketches",
+      "Hide all sketches",
       "Section view…",
       "Suppress",
       "Dynamic suppression",
@@ -594,8 +596,8 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+       "hidden": false,
+       "cls": "fake-hover context-menu-active"
       },
       {
        "name": "Extrude 1",
@@ -612,8 +614,8 @@
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": true,
-       "cls": "ns-list-item-hidden"
+       "hidden": false,
+       "cls": ""
       },
       {
        "name": "Extrude 2",
@@ -633,7 +635,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -641,7 +643,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37466
+   "t": 39145
   },
   {
    "step": 7,
@@ -651,30 +653,18 @@
      "menu": "Hide all sketches"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Hide all sketches\"}",
+   "ok": true,
+   "at": [
+    178,
+    356
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Add selection to folder…",
-      "Show all sketches",
-      "Section view…",
-      "Suppress",
-      "Dynamic suppression",
-      "Clear selection",
-      "Edit sketch appearance…",
-      "Add appearance to feature…",
-      "Delete"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 1,
      "items": [
@@ -694,7 +684,7 @@
        "editing": false,
        "related": false,
        "hidden": true,
-       "cls": "ns-list-item-hidden fake-hover context-menu-active"
+       "cls": "ns-list-item-hidden"
       },
       {
        "name": "Extrude 1",
@@ -732,7 +722,7 @@
     ],
     "partsHeading": "Parts (2)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -740,7 +730,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 39175
+   "t": 42323
   }
  ]
 }
