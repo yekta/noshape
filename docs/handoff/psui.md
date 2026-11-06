@@ -585,6 +585,17 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N000000000000. (11-06 13:18) **ui-parity coverage (lead 11-06: menus are the biggest gap).** Batches 6-8 (44 menu
+    scenarios) landed or queued, filed in live/REQUESTS.md 12:39 / 12:55 / 13:18; batch 5 (17) is being recorded
+    (none in by 13:18). Coverage (tools/ui-parity/coverage.py): toolbar 25/76, sketch tools 43/55, menus 27 -> 62/117,
+    shortcuts 59/89. New targets: `{"feature": "Top"}` (a default plane row), `{"feature": "New folder"}` (a folder row,
+    also "New folder (2)"), a submenu by `{"do": "hover", "on": {"menu": "Collapse"}}` (a click on a submenu row closes
+    it). Ours records no dialog for Add appearance, Edit sketch appearance, Release and Export as DXF/DWG: compare when
+    live's recordings arrive. Menus left: the camera menu (its button has no tooltip mark yet; ask live for its name),
+    a sketch dimension's menu (sk-dim-*; no target for a dimension yet), configurations (Configure, inputs), the
+    Variable / Feature Studio rows. Then the toolbar (25/76). Writer scripts: assert no file exists before writing
+    (batch 5 overwrote mirror-feature-type once).
+
 N00000000000. (11-06) **perf.yml's macOS gate (lead P1):** 42162655806 (v0.4.32) failed on macOS 15's baseline
     comparison only, no regression: the same build's rows move 20-100 % between runs there (readback GPU p95 7.2-15.5,
     1x texture 6.6-9.6, 2x fps 65-82; readback UI CPU p95 2.9-7.0 over v0.4.23-v0.4.32 with no trend) and macOS 26
