@@ -1,0 +1,27 @@
+{
+  "name": "drw-drawing-properties-panel",
+  "about": "The Drawing properties panel opened from its button at the right edge, then closed with the same button",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: the drawing tools without scenarios, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "Drawing properties"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Drawing properties"
+      }
+    }
+  ]
+}

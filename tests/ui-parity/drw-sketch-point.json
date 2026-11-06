@@ -1,0 +1,29 @@
+{
+  "name": "drw-sketch-point",
+  "about": "The drawing sketch's Sketch point at a sheet point",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: the drawing tools without scenarios, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Sketch point"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

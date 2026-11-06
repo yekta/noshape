@@ -1,0 +1,67 @@
+{
+  "name": "drw-inspection-item",
+  "about": "Inspection item on a dimension, then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: the drawing tools without scenarios, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            18
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "tool": "Inspection item"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "annotation": "1.575"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

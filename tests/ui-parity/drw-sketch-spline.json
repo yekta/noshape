@@ -1,0 +1,51 @@
+{
+  "name": "drw-sketch-spline",
+  "about": "The drawing sketch's Spline through three sheet points, ended with Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-06: the drawing tools without scenarios, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Spline"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          40,
+          40
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          55
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          80,
+          40
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

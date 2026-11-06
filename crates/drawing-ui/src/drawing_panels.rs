@@ -73,6 +73,7 @@ impl DrawingEditor {
         let btn = |id: &'static str, icon: &'static str, tip: &'static str, panel: Option<RightPanel>, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{tip}")))
                 .relative()
                 .w(px(33.))
                 .h(px(34.))
