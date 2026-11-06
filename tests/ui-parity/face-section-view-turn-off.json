@@ -1,0 +1,41 @@
+{
+ "name": "face-section-view-turn-off",
+ "about": "block: right-click the top face, Section view…, Enter; right-click empty space: the menu's rows, Turn off section view",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Section view…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Turn off section view"
+   }
+  }
+ ]
+}

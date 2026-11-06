@@ -1,0 +1,21 @@
+{
+ "name": "sketch-row-menu-show",
+ "about": "block: right-click Sketch 1 (hidden by its Extrude), Show",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show"
+   }
+  }
+ ]
+}

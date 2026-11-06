@@ -1,0 +1,37 @@
+{
+ "name": "sketch-row-menu-paste-into-sketch",
+ "about": "block: right-click Sketch 1, Copy sketch; right-click Sketch 1, Paste into sketch: the sketch opens with the copy, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy sketch"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Paste into sketch"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

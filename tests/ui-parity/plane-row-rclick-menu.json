@@ -1,0 +1,19 @@
+{
+ "name": "plane-row-rclick-menu",
+ "about": "block: right-click the Top plane's row: the menu's rows, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

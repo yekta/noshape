@@ -1,0 +1,25 @@
+{
+ "name": "sketch-row-menu-export-dxf",
+ "about": "block: right-click Sketch 1, Export as DXF/DWG…: its dialog, then Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export as DXF/DWG…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

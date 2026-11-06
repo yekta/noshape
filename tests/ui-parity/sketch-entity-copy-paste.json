@@ -1,0 +1,94 @@
+{
+ "name": "sketch-entity-copy-paste",
+ "about": "in a sketch, a line, right-click it, Copy sketch entities; right-click empty space, Paste sketch entities, click at (15, 20) to place, Escape",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     7.5,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy sketch entities"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     15,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Paste sketch entities"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

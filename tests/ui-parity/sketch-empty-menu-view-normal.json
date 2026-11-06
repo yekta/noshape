@@ -1,0 +1,66 @@
+{
+ "name": "sketch-empty-menu-view-normal",
+ "about": "in a sketch with a line, right-click empty space, View normal to sketch plane",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     15,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View normal to sketch plane"
+   }
+  }
+ ]
+}

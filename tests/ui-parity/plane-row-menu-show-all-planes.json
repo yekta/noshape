@@ -1,0 +1,33 @@
+{
+ "name": "plane-row-menu-show-all-planes",
+ "about": "block: Top row's Hide all planes, then the Top row's menu again and Show all planes",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide all planes"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show all planes"
+   }
+  }
+ ]
+}

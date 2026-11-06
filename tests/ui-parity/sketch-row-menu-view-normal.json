@@ -1,0 +1,21 @@
+{
+ "name": "sketch-row-menu-view-normal",
+ "about": "block: right-click Sketch 1, View normal to",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View normal to"
+   }
+  }
+ ]
+}

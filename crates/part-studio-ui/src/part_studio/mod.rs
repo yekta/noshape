@@ -3593,7 +3593,8 @@ impl PartStudioView {
             let view = cx.entity();
             let name = self.default_name(&r, cx);
             let renaming = self.ui.dg_renaming.as_ref().filter(|(x, ..)| *x == r).map(|(_, st, _)| st.clone());
-            dg_rows.push(
+            // The parity suite clicks a default row by its name ({"feature": "Top"}).
+            dg_rows.push(crate::ui_script::wrap(
                 // Live (part-studio/16): the hover band spans the list (x 40
                 // to 239); the indent is inside the row.
                 crate::ui::with_user_side_tooltip(crate::ui::tree_row(SharedString::from(format!("dg-{label}")), selected), name.clone())
@@ -3741,7 +3742,8 @@ impl PartStudioView {
                         m
                     })
                     .into_any_element(),
-            );
+                move || format!("feature:{label}"),
+            ));
         }
         let dg_count = dg_rows.len();
         if !dg_rows.is_empty() {

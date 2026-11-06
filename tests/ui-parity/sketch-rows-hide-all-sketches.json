@@ -1,0 +1,51 @@
+{
+ "name": "sketch-rows-hide-all-sketches",
+ "about": "overlap: Show Sketch 1 and Sketch 2 from their menus; select Extrude 1, right-click Sketch 1: its rows, then Hide all sketches",
+ "area": "psui",
+ "source": "coverage 11-06 (lead: menus, batch 7)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Sketch 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Hide all sketches"
+   }
+  }
+ ]
+}
