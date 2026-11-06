@@ -6,7 +6,7 @@ use crate::reference::{BodyId, FeatureId, Reference};
 use glam::DVec3;
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum BodyKind {
     Solid,
     Surface,
@@ -15,7 +15,7 @@ pub enum BodyKind {
 }
 
 /// Triangle mesh of a body; faces occupy contiguous index ranges.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct MeshBuffers {
     pub positions: Vec<[f32; 3]>,
     pub normals: Vec<[f32; 3]>,
@@ -122,7 +122,7 @@ impl MeshBuffers {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BodyDisplay {
     pub id: BodyId,
     pub name: String,
@@ -157,14 +157,14 @@ pub struct BodyDisplay {
 /// A Composite part's members (Help PartStudio__composite_part). An open
 /// composite keeps them as parts of their own (its body is not drawn: the
 /// members are); a closed one consumed them.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CompositeInfo {
     pub members: Vec<BodyId>,
     pub closed: bool,
 }
 
 /// Constraint state of a sketch entity (drives color).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SketchEntityState {
     Under,
     Full,
@@ -173,7 +173,7 @@ pub enum SketchEntityState {
     Inactive,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SketchCurveDisplay {
     pub entity: u32,
     pub points: Vec<[f32; 3]>,
@@ -182,7 +182,7 @@ pub struct SketchCurveDisplay {
     pub state: SketchEntityState,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SketchPointDisplay {
     pub entity: u32,
     pub position: [f32; 3],
@@ -196,7 +196,7 @@ pub struct SketchPointDisplay {
     pub external: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SketchRegionDisplay {
     pub key: Vec<u32>,
     /// Triangulated region in world space.
@@ -209,7 +209,7 @@ pub struct SketchRegionDisplay {
 }
 
 /// Coordinate frame of a sketch plane (world space).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlaneFrame {
     pub origin: DVec3,
     pub x: DVec3,
@@ -245,7 +245,7 @@ impl PlaneFrame {
     pub const RIGHT: PlaneFrame = PlaneFrame { origin: DVec3::ZERO, x: DVec3::Y, y: DVec3::Z, normal: DVec3::X };
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DimensionDisplay {
     pub constraint: u32,
     /// Anchor position for the label (world).
@@ -265,7 +265,7 @@ pub struct ConstraintGlyph {
     pub conflicting: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SketchDisplay {
     pub feature: FeatureId,
     pub name: String,
@@ -274,6 +274,7 @@ pub struct SketchDisplay {
     pub points: Vec<SketchPointDisplay>,
     pub regions: Vec<SketchRegionDisplay>,
     pub dimensions: Vec<DimensionDisplay>,
+    #[serde(skip)]
     pub glyphs: Vec<ConstraintGlyph>,
     pub hidden: bool,
     /// Remaining degrees of freedom (0 = fully defined).
@@ -285,7 +286,7 @@ pub struct SketchDisplay {
     pub images: Vec<SketchImageDisplay>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SketchImageDisplay {
     pub id: u32,
     pub corners: [[f32; 3]; 4],
@@ -293,7 +294,7 @@ pub struct SketchImageDisplay {
     pub data_base64: std::sync::Arc<str>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlaneDisplay {
     pub reference: Reference,
     pub name: String,
@@ -313,7 +314,7 @@ impl PlaneDisplay {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ConnectorDisplay {
     pub reference: Reference,
     pub name: String,
@@ -446,7 +447,7 @@ impl FeatureState {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct StudioDisplay {
     pub bodies: Vec<BodyDisplay>,
     pub sketches: Vec<SketchDisplay>,
@@ -456,19 +457,24 @@ pub struct StudioDisplay {
     pub planes: Vec<PlaneDisplay>,
     pub connectors: Vec<ConnectorDisplay>,
     /// Decals: images on faces (drawn by the scene).
+    #[serde(skip)]
     pub decals: Vec<crate::regen::context::DecalRecord>,
+    #[serde(skip)]
     pub features: Vec<FeatureState>,
     /// Origin visible.
     pub show_origin: bool,
     /// Total regeneration time.
     pub regen_ms: f32,
     /// Variables defined by the evaluated features (for expression entry).
+    #[serde(skip)]
     pub variables: std::collections::BTreeMap<String, noshape_units::Quantity>,
     /// The shown Assembly context's bodies (translucent, pickable for
     /// references; not parts of this Part Studio, see `crate::in_context`).
+    #[serde(skip)]
     pub context_bodies: Vec<BodyDisplay>,
     /// Their kernel bodies, for tools that take context geometry outside a
     /// feature's regeneration (sketch Use on a context face, qa5 CTX-USE).
+    #[serde(skip)]
     pub context_shapes: Vec<Arc<crate::regen::context::Body>>,
     /// Bodies that are rigidly moved copies of one shape (pattern instances
     /// sharing a TShape, `Shape::partner_hash`): the renderer uploads the
@@ -477,7 +483,7 @@ pub struct StudioDisplay {
 }
 
 /// A body's mesh as a placed copy of one its pattern partners share.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SharedMesh {
     /// The shape's mesh at its identity location (`Shape::unlocated`).
     pub mesh: Arc<MeshBuffers>,
@@ -487,6 +493,7 @@ pub struct SharedMesh {
     pub transform: [f64; 12],
     /// The body's world mesh this stands for ([`BodyDisplay::mesh`]); a
     /// body whose mesh was replaced since is drawn from its own mesh.
+    #[serde(skip)]
     pub world: Arc<MeshBuffers>,
 }
 

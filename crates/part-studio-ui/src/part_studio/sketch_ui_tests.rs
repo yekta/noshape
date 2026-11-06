@@ -3004,3 +3004,46 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
     let own = labels_over(cx, DatumPlane::Top);
     assert!(!own.iter().any(|l| l.starts_with("Hide ")), "{own:?}");
 }
+
+/// Lead 11-06, the display cache: a regenerated display comes back from the cache as it was; shown in its place the
+/// view is view-only (a dialog asked for waits, the user told at once, "Regenerating…" in the list), and the real
+/// regeneration replaces it with the same meshes and opens the dialog.
+#[gpui::test]
+fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAppContext) {
+    let (window, view, _top, _) = block_part(cx, "display-cache");
+    let real = cx.update(|cx| view.read(cx).display.clone());
+    type Meshes = Vec<(String, Vec<[f32; 3]>, Vec<u32>, Vec<(u32, u32)>, usize)>;
+    let meshes = |d: &noshape_model::display::StudioDisplay| -> Meshes {
+        d.bodies.iter().map(|b| (b.name.clone(), b.mesh.positions.clone(), b.mesh.indices.clone(), b.mesh.face_ranges.clone(), b.mesh.edges.len())).collect()
+    };
+    assert!(!real.bodies.is_empty(), "the block's part");
+    let dir = std::env::temp_dir().join(format!("noshape-display-cache-ui-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    super::super::display_cache::store(&dir, "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    assert_eq!(meshes(&cached), meshes(&real), "cached as it was");
+    assert_eq!((cached.planes.len(), cached.sketches.len()), (real.planes.len(), real.sketches.len()));
+    let _ = std::fs::remove_dir_all(&dir);
+    // Reopened: the cached display stands in.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.real_display_in = false;
+            v.show_cached_display("k".into(), cached, w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.cached_view && view.read(cx).render_regenerating_row().is_some()), "view-only, Regenerating… shown");
+    // A dialog waits, with feedback at once.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("fillet", w, cx))).unwrap();
+    draw(cx, window);
+    let (opened, said) = cx.update(|cx| (view.read(cx).edit.is_some(), view.read(cx).message.as_ref().map(|(_, m)| m.clone())));
+    assert!(!opened, "no dialog on the cached model");
+    assert_eq!(said.as_deref(), Some(super::super::cached_open::WAITING));
+    // The real regeneration lands: the same meshes, the dialog opens.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| view.read(cx).edit.is_some());
+    let after = cx.update(|cx| view.read(cx).display.clone());
+    assert!(!cx.update(|cx| view.read(cx).ui.cached_view), "the model's own again");
+    assert_eq!(meshes(&after), meshes(&real), "the regenerated display is the cached one");
+}

@@ -98,7 +98,24 @@ fn opennurbs_libs(target_os: &str) -> &'static [&'static str] {
     }
 }
 
+/// The OCCT patch set this build's OCCT carries (`patches/occt/*`, names and contents) as 16 hex digits:
+/// `OCCT_PATCHES`, part of the display cache's key (a patched OCCT may regenerate a model differently).
+fn occt_patches() {
+    use std::hash::{Hash, Hasher};
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../patches/occt");
+    println!("cargo:rerun-if-changed={}", dir.display());
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir).map(|d| d.filter_map(|e| e.ok().map(|e| e.path())).collect()).unwrap_or_default();
+    files.sort();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for f in &files {
+        f.file_name().hash(&mut h);
+        std::fs::read(f).unwrap_or_default().hash(&mut h);
+    }
+    println!("cargo:rustc-env=NOSHAPE_OCCT_PATCHES={:016x}", h.finish());
+}
+
 fn main() {
+    occt_patches();
     println!("cargo:rerun-if-env-changed=OCCT_ROOT");
     println!("cargo:rerun-if-env-changed=OPENNURBS_ROOT");
     println!("cargo:rerun-if-env-changed=NOSHAPE_REQUIRE_OPENNURBS");

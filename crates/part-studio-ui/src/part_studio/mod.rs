@@ -41,6 +41,8 @@ mod flatten_tool;
 mod draft_tool;
 pub mod export;
 mod flat_export;
+pub mod cached_open;
+mod display_cache;
 mod connector_look;
 mod inference;
 mod healthy;
@@ -683,6 +685,8 @@ impl PartStudioView {
     #[track_caller]
     pub fn schedule_regen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let caller = std::panic::Location::caller();
+        // The opened studio: its cached display while this first regeneration runs.
+        self.load_cached_display(window, cx);
         self.perf_script_note("regen scheduled");
         // A new feature's preview waits for std's editing logic's first run (std_edit_logic runs it then).
         if self.edit.is_some()
@@ -835,6 +839,7 @@ impl PartStudioView {
                 if !refine {
                     this.ui.first_full_shown = true;
                 }
+                this.note_real_display(!refine, window, cx);
                 this.note_done(done_studio, upto, done_config, full.clone());
                 this.perf_script_note("display applied");
                 if !refine {
@@ -881,6 +886,7 @@ impl PartStudioView {
                         this.apply_display(display, window, cx);
                     }
                     this.ui.first_full_shown = true;
+                    this.note_real_display(true, window, cx);
                     this.note_done(studio, upto, config, full);
                     this.perf_script_step(cx);
                 });
@@ -2253,6 +2259,11 @@ impl PartStudioView {
     }
 
     pub fn start_feature(&mut self, type_id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        // A dialog needs the real model: on the cached display it opens once that is in.
+        let ty = type_id.to_string();
+        if self.defer_until_regenerated(Box::new(move |this, w, cx| this.start_feature(&ty, w, cx)), cx) {
+            return;
+        }
         // Live 10-27: the open tool's button or shortcut again leaves its
         // dialog as it is.
         if self.sketch.is_none() && self.edit.as_ref().is_some_and(|e| e.is_new && e.dialog.read(cx).feature.type_id == type_id) {
@@ -2329,6 +2340,9 @@ impl PartStudioView {
     }
 
     pub fn edit_feature(&mut self, id: FeatureId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.defer_until_regenerated(Box::new(move |this, w, cx| this.edit_feature(id, w, cx)), cx) {
+            return;
+        }
         // Live (ui-parity new-variable-enter-then-dblclick-other): the open feature is kept as with ✓.
         if self.edit.is_some() {
             self.accept_open_dialog(window, cx);
@@ -3765,6 +3779,8 @@ impl PartStudioView {
             ));
         }
         let dg_count = dg_rows.len();
+        // The cached display standing in: "Regenerating…" above everything (cached_open.rs).
+        rows.extend(self.render_regenerating_row());
         if !dg_rows.is_empty() {
             // Onshape: a collapsible "Default geometry" folder; children are
             // indented 22 px under a 1 px guide line.

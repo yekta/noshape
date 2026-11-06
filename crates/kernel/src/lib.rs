@@ -18,6 +18,9 @@
 // `!(x > 0.0)` is used deliberately to also reject NaN inputs.
 #![allow(clippy::neg_cmp_op_on_partial_ord)]
 
+/// The OCCT patch set this build's OCCT carries (a hash of `patches/occt`).
+pub const OCCT_PATCHES: &str = env!("NOSHAPE_OCCT_PATCHES");
+
 #[allow(dead_code)]
 mod ffi;
 mod brep_bridge;

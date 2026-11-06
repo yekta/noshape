@@ -97,9 +97,15 @@ impl PartStudioView {
         self.perf_script = Some(match step {
             Script::OpenOnly => {
                 log::info!(target: "perf", "perf script: open shown {:.0} ms after start", noshape_render::perf::process_start().elapsed().as_secs_f64() * 1e3);
-                // Long enough for the armed frame to be presented and logged.
-                cx.spawn(async move |_, cx| {
+                // Long enough for the armed frame to be presented and logged, and the display cache written.
+                cx.spawn(async move |this, cx| {
                     cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+                    for _ in 0..200 {
+                        if this.update(cx, |this, _| this.ui.cache_save_task.is_none()).unwrap_or(true) {
+                            break;
+                        }
+                        cx.background_executor().timer(std::time::Duration::from_millis(100)).await;
+                    }
                     cx.update(|cx| cx.quit());
                 })
                 .detach();

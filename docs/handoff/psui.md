@@ -729,6 +729,20 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+N000000000000000. (11-06 21:49) **Display cache (lead 11-06: open like Onshape, instantly).** part_studio/display_cache.rs
+    (key: blake3 of the whole document's JSON, the tab, configuration values, View in high quality, the build: version,
+    the executable's size and time, `noshape_kernel::OCCT_PATCHES` from kernel's build.rs; files
+    `paths::cache_dir()/displays/<key>.display` = magic + zstd(bincode(StudioDisplay)), written beside and renamed in,
+    least recently used evicted past 1 GiB; feature states, decals, variables, in-context bodies and constraint glyphs
+    aren't kept, shared pattern meshes re-linked on load) and part_studio/cached_open.rs (looked up on the studio's first
+    regeneration; shown with `show_cached_display` unless the real one came first; `cached_view` until the first real
+    display: "Regenerating…" with the spinner at the top of the feature list, `start_feature` / `edit_feature` deferred
+    with the message WAITING and run when it lands; the first full display after opening saved at once, later ones 2 s
+    after the last full regeneration with no dialog). Enabled by the app only (`cached_open::enable`, never under the
+    ui-parity driver or in tests; NOSHAPE_CACHE_DIR moves it). GPUI test
+    `a_cached_display_stands_in_until_the_identical_real_one_lands`. The opened studio's displays build their scenes off
+    the UI thread until its first full one (`first_full_shown`). bench.sh OPEN_DOCS on the macOS perf jobs.
+
 N00000000000000. (11-06 19:58) **Coverage complete for the toolbar and sketch tools; live's batches 5-9 in.** Batches 13
     (the toolbar's last 29) and 14 (15 menu items) filed with live. Menus left (25/117): assembly in-context (Go to
     assembly, Current assembly position…), releases, MBD annotations, the appearance panel's rows, a configured

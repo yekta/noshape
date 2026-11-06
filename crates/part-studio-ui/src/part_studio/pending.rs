@@ -36,21 +36,23 @@ pub(super) struct Spinner;
 
 impl Render for Spinner {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        spinner()
+        spinner(41.)
     }
 }
 
-fn spinner() -> impl IntoElement {
-    div().size(px(41.)).flex_none().with_animation("pending-spinner", Animation::new(Duration::from_millis(900)).repeat(), |d, t| {
+/// The spinner in a `size` px box (the overlay's 41 px; a list row's smaller).
+pub(super) fn spinner(size: f32) -> impl IntoElement {
+    let scale = size / 41.;
+    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(Duration::from_millis(900)).repeat(), move |d, t| {
         d.child(
             canvas(
                 |_, _, _| {},
                 move |bounds, _, window, _| {
                     let c = bounds.center();
-                    let r = 13.5_f32;
+                    let r = 13.5_f32 * scale;
                     let ring = |from: f32, to: f32, color: Rgba, window: &mut Window| {
                         let steps = 48;
-                        let mut pb = PathBuilder::stroke(px(3.));
+                        let mut pb = PathBuilder::stroke(px((3. * scale).max(1.5)));
                         for i in 0..=steps {
                             let a = from + (to - from) * i as f32 / steps as f32;
                             let p = point(c.x + px(r * a.cos()), c.y + px(r * a.sin()));

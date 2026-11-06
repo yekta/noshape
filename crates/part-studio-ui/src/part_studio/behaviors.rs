@@ -310,6 +310,15 @@ pub struct UiState {
     pub open_frames: u8,
     /// The opened studio's first full display was applied (until then its scenes build off the UI thread).
     pub first_full_shown: bool,
+    /// The display cache (cached_open.rs): looked up once; its display standing in (view-only) until a real one
+    /// is in; the lookup and the save; the key of what is cached; an action waiting for the real model.
+    pub cache_checked: bool,
+    pub cached_view: bool,
+    pub real_display_in: bool,
+    pub cache_task: Option<Task<()>>,
+    pub cache_save_task: Option<Task<()>>,
+    pub cache_key: Option<String>,
+    pub after_regen: Option<super::cached_open::Deferred>,
     /// The open "Export as DXF/DWG" modal's File name (the suite reads its focus).
     pub cad_export_file: Option<WeakEntity<gpui_kit::component::input::InputState>>,
     pub appearance_hover: Vec<Reference>,
@@ -685,6 +694,13 @@ impl UiState {
             appearance_edit: None,
             open_frames: 0,
             first_full_shown: false,
+            cache_checked: false,
+            cached_view: false,
+            real_display_in: false,
+            cache_task: None,
+            cache_save_task: None,
+            cache_key: None,
+            after_regen: None,
             cad_export_file: None,
             appearance_hover: Vec::new(),
             analysis: None,

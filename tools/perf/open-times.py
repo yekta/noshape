@@ -5,10 +5,11 @@ its log:
 
     open → model   "opening document" to the first frame drawing the model (the preview display: what users see first)
     open → full    to the frame drawing the full display (refined meshes)
+    reopen → model the same opening again on the display cache the cold open wrote (the cached model's frame)
     regen          the regeneration of the preview / full display (its own clock)
     shown          the display coming in to its first frame (scene build, upload, the frame)
 
-    tools/perf/open-times.py --app <noshape> --out <dir> [--runs 3] [--display :390] [--live /root/parity/models]
+    tools/perf/open-times.py --app <noshape> --out <dir> [--runs 3] [--reopen 3] [--display :390] [--live /root/parity/models]
         <document.noshape | directory>...
 
 Prints a markdown table (median of the runs) sorted slowest first, with live's full regeneration time
@@ -25,17 +26,17 @@ import tempfile
 import time
 from pathlib import Path
 
-MILESTONE = re.compile(r"(opening document|open: first regen started|open: (preview|full) display in \(regen ([0-9.]+) ms\)|open: (preview|full) model frame presented|first viewport frame presented): ([0-9.]+) ms since start")
+MILESTONE = re.compile(r"(opening document|open: first regen started|open: (preview|full) display in \(regen ([0-9.]+) ms\)|open: (preview|full|cached) model frame presented|first viewport frame presented): ([0-9.]+) ms since start")
 
 
-def run_one(app, doc, display, timeout):
+def run_one(app, doc, display, timeout, cache):
     work = Path(tempfile.mkdtemp(prefix="noshape-open-"))
     copy = work / doc.name
     # A document is SQLite: its write-ahead log goes with it.
     for ext in ("", "-wal", "-shm"):
         if Path(f"{doc}{ext}").exists():
             shutil.copy(f"{doc}{ext}", f"{copy}{ext}")
-    env = dict(os.environ, NOSHAPE_PERF="1", NOSHAPE_PERF_SCRIPT="open", DISPLAY=display, NOSHAPE_CONFIG_DIR=str(work / "config"), NOSHAPE_NO_NATIVE_DIALOGS="1", RUST_LOG="info")
+    env = dict(os.environ, NOSHAPE_PERF="1", NOSHAPE_PERF_SCRIPT="open", DISPLAY=display, NOSHAPE_CONFIG_DIR=str(work / "config"), NOSHAPE_NO_NATIVE_DIALOGS="1", RUST_LOG="info", NOSHAPE_CACHE_DIR=str(cache))
     t = {}
     try:
         p = subprocess.run([app, str(copy)], env=env, capture_output=True, text=True, timeout=timeout)
@@ -81,6 +82,16 @@ def summary(runs):
     }
 
 
+def reopen_summary(runs):
+    """The reopens' median to the first frame with a model: the cached one, else the regenerated one."""
+    vals = []
+    for r in runs:
+        at = r.get("cached_frame", r.get("preview_frame", r.get("full_frame")))
+        if at is not None and "open" in r:
+            vals.append(at - r["open"])
+    return {"reopen_ms": round(statistics.median(vals)) if vals else None, "reopen_cached": sum(1 for r in runs if "cached_frame" in r)}
+
+
 def live_regen(live_dir, name):
     f = Path(live_dir) / name / "live.jsonl"
     if not f.exists():
@@ -99,7 +110,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--app", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--runs", type=int, default=3)
+    ap.add_argument("--runs", type=int, default=3, help="cold opens (each with an empty display cache)")
+    ap.add_argument("--reopen", type=int, default=3, help="reopens on the last cold open's display cache")
     ap.add_argument("--display", default=":390")
     ap.add_argument("--timeout", type=int, default=180)
     ap.add_argument("--live", default="/root/parity/models")
@@ -112,19 +124,27 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     rows = {}
     for doc in docs:
-        runs = [run_one(a.app, doc, a.display, a.timeout) for _ in range(a.runs)]
-        rows[doc.stem] = dict(summary(runs), live_regen_ms=live_regen(a.live, doc.stem), runs=runs)
+        runs = []
+        for _ in range(a.runs):
+            cache = Path(tempfile.mkdtemp(prefix="noshape-open-cache-"))
+            runs.append(run_one(a.app, doc, a.display, a.timeout, cache))
+            if len(runs) < a.runs:
+                shutil.rmtree(cache, ignore_errors=True)
+        again = [run_one(a.app, doc, a.display, a.timeout, cache) for _ in range(a.reopen)]
+        shutil.rmtree(cache, ignore_errors=True)
+        rows[doc.stem] = dict(summary(runs), **reopen_summary(again), live_regen_ms=live_regen(a.live, doc.stem), runs=runs, reopens=again)
         (out / "open-times.json").write_text(json.dumps(rows, indent=1))
-        print(f"{doc.stem}: model {rows[doc.stem]['model_ms']} ms, full {rows[doc.stem]['full_ms']} ms", flush=True)
+        print(f"{doc.stem}: model {rows[doc.stem]['model_ms']} ms, full {rows[doc.stem]['full_ms']} ms, reopen {rows[doc.stem]['reopen_ms']} ms", flush=True)
     key = lambda kv: -(kv[1]["model_ms"] if kv[1]["model_ms"] is not None else 1e9)
-    print("\n| document | open → model (ms) | open → full | regen starts | regen (preview) | regen (full) | display → frame | live regen |")
-    print("|---|---|---|---|---|---|---|---|")
+    print("\n| document | open → model (ms) | reopen → model | open → full | regen starts | regen (preview) | regen (full) | display → frame | live regen |")
+    print("|---|---|---|---|---|---|---|---|---|")
     for name, r in sorted(rows.items(), key=key):
         cell = lambda v: "–" if v is None else str(v)
         flag = " (timeout)" if r["timeouts"] else ""
-        print(f"| {name}{flag} | {cell(r['model_ms'])} | {cell(r['full_ms'])} | {cell(r.get('regen_start_ms'))} | {cell(r['regen_ms'])} | {cell(r['full_regen_ms'])} | {cell(r['shown_ms'])} | {cell(r['live_regen_ms'])} |")
+        print(f"| {name}{flag} | {cell(r['model_ms'])} | {cell(r.get('reopen_ms'))}{'' if r.get('reopen_cached') else ' (no cache)'} | {cell(r['full_ms'])} | {cell(r.get('regen_start_ms'))} | {cell(r['regen_ms'])} | {cell(r['full_regen_ms'])} | {cell(r['shown_ms'])} | {cell(r['live_regen_ms'])} |")
     met = [r for r in rows.values() if r["model_ms"] is not None and r["model_ms"] <= 500]
-    print(f"\n{len(met)}/{len(rows)} documents show their model within 0.5 s of opening")
+    again = [r for r in rows.values() if r.get("reopen_ms") is not None and r["reopen_ms"] <= 500]
+    print(f"\n{len(met)}/{len(rows)} documents show their model within 0.5 s of opening, {len(again)}/{len(rows)} of reopening")
 
 
 if __name__ == "__main__":
