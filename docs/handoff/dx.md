@@ -11,6 +11,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-06 20:57 UTC: drawing batch 3 and the exchange suite's P0
+- Drawings (70e75ac4): batch 3 30/35 scenarios (192 -> ~200/211 states). Left: drw-export-formats (live's runner
+  couldn't pick the Format; re-record asked, REQUESTS 20:19), drw-hole-callout (does live place one on an extruded
+  cut? asked) and drw-note-delete step 6 (does live's recorder read an annotation's selection? asked).
+  drw-revision-table dropped: live's free plan has no Revision table tool; ours keeps it (paid plans have it).
+- Exchange: Onshape rejected every multi-part ours.x_t because our writer chained each part's name / colour
+  attributes into the next part (9b48a753; found by comparing node graphs, /root/dx-scratch/xtdump/{xtdump,cross}.py
+  parse any text x_t). The five files are rewritten; live's re-import asked (REQUESTS 20:22, P0).
+  STL / OBJ / 3MF: a part per connected mesh, a mesh inside another its hollow (a896672b; ours made one solid).
+  IGES: revolved faces that are tori etc. read as one (e0da2198; pulley 9 faces, knob 81, as live). No T1 test for
+  that one (our IGES writer writes tori as 198, not live's 120 surfaces of revolution); the exchange suite checks it.
+- Exchange left: edges / vertices of IGES-merged periodic faces (pulley 13/8, live 10/4: the half circles stay
+  split at the seam vertex), the o-ring's rational B-spline torus quarters (live: 1 face), motor-mount STEP rings
+  (16/28/8 vs 16/24/0), hose STEP 12/15/6 vs 12/16/8, cf-spur-gear STEP volume (within the file's precision).
+  cf-wave-spring's IGES takes 16 s in ours (OCCT's healing projects every edge onto its B-spline faces;
+  read.surfacecurve.mode doesn't help).
+- Commit ea7eacce's message says the IGES merge made NIST STEP import 50 % slower: that was uncommitted code.
+
 ## 11-05 03:06 UTC: lead's list (Fold SM, bend centrelines, opDerip, spur gear, speed)
 - Landed: opTransform keeps the moved bodies' attributes (86cbc2c4: Fold SM 1 29/69/42 -> 34/84/52); @opDerip on
   curved part faces, std's signed distance (6767e2f4; every std caller goes through deripEdges: Tab, cuts in the
