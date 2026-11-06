@@ -585,7 +585,7 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
-N000000000. (11-06 06:10) **First-frames hitch (lead 11-06): not ours, found on the runners' GPU.** The bench gates the
+N000000000. (11-06 05:25) **First-frames hitch (lead 11-06): not ours, found on the runners' GPU.** The bench gates the
     steady state (first 30 frames left out); their max per frame is its own row ("First frames", analyze.py;
     `--gate-first-frames-gpu MS` ready, not on). Four diagnosis runs (perf/psui-firstframes: 42137141138, 42145731291,
     42154493047, 42161346296; `BENCH FIRST FRAMES` per frame): only the bench's first frame (sometimes the second) is
