@@ -117,6 +117,8 @@
 #include <Geom_SphericalSurface.hxx>
 #include <functional>
 #include <GeomProjLib.hxx>
+#include <GeomAdaptor_Curve.hxx>
+#include <Extrema_LocateExtPC.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom2dConvert.hxx>
@@ -5950,8 +5952,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     };
     struct Polyline
     {
-      std::vector<gp_XYZ> pts;
-      double              sag = 0;
+      std::vector<gp_XYZ>             pts;
+      double                          sag = 0;
+      occ::handle<GeomAdaptor_Curve> ad;
     };
     std::map<const void*, Polyline> polylines; // an edge's points (by its TShape), for the march's crossing test
     // The distance between segments pq and rs.
@@ -6066,7 +6069,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           gp_Pnt         ep;
           int            ej = 0;
           const double   L  = (y - x).Modulus();
-          const occ::handle<Geom_Line> seg = new Geom_Line(gp_Pnt(x), gp_Dir(y - x));
           for (const int o : {b, c})
             for (const TopoDS_Face& Fo : of_owner[(size_t)o])
               for (TopExp_Explorer ex2(Fo, TopAbs_EDGE); ex2.More(); ex2.Next())
@@ -6091,23 +6093,36 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
                     P.sag = std::max(P.sag, (c3->Value(c0 + (c1 - c0) * (k + 0.5) / 64).XYZ() - 0.5 * (P.pts[(size_t)k] + P.pts[(size_t)k + 1])).Modulus());
                   pl = polylines.emplace(E.TShape().get(), std::move(P)).first;
                 }
-                const double reach0 = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
-                double       dmin   = 1e300;
-                for (size_t k = 0; k + 1 < pl->second.pts.size() && dmin > reach0 + 2 * pl->second.sag; ++k)
-                  dmin = std::min(dmin, segments_apart(x, y, pl->second.pts[k], pl->second.pts[k + 1]));
-                if (dmin > reach0 + 2 * pl->second.sag)
-                  continue;
-                GeomAPI_ExtremaCurveCurve xc(seg, c3, 0, L, c0, c1);
-                if (xc.NbExtrema() == 0)
-                  continue;
-                double sa, sb;
-                xc.LowerDistanceParameters(sa, sb);
                 const double reach = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
+                double       dmin  = 1e300;
+                size_t       kmin  = 0;
+                for (size_t k = 0; k + 1 < pl->second.pts.size(); ++k)
+                  if (const double d = segments_apart(x, y, pl->second.pts[k], pl->second.pts[k + 1]); d < dmin)
+                    dmin = d, kmin = k;
+                if (dmin > reach + 2 * pl->second.sag)
+                  continue;
+                // (Refined from the polyline's nearest piece: the step's nearest point to the curve's, the curve's
+                // nearest to that, a few times.)
+                if (pl->second.ad.IsNull())
+                  pl->second.ad = new GeomAdaptor_Curve(c3, c0, c1);
+                double u = c0 + (c1 - c0) * (kmin + 0.5) / 64, sa = 0, dist = 1e300;
+                for (int it2 = 0; it2 < 6; ++it2)
+                {
+                  const gp_XYZ C  = c3->Value(u).XYZ();
+                  const gp_XYZ d1 = y - x;
+                  sa              = std::clamp((C - x).Dot(d1) / std::max(d1.SquareModulus(), 1e-300), 0.0, 1.0);
+                  const gp_XYZ Q  = x + d1 * sa;
+                  Extrema_LocateExtPC lx(gp_Pnt(Q), *pl->second.ad, u, 1e-12);
+                  if (lx.IsDone())
+                    u = lx.Point().Parameter();
+                  dist = (c3->Value(u).XYZ() - Q).Modulus();
+                }
+                sa *= L;
                 // (Not where it starts: the edges through its first point.)
-                if (xc.LowerDistance() > reach || (pts.size() == 1 && sa < 1e-2 * thickness))
+                if (dist > reach || (pts.size() == 1 && sa < 1e-2 * thickness))
                   continue;
                 if (sa / L < es)
-                  es = sa / L, ep = c3->Value(sb), ej = oj;
+                  es = sa / L, ep = c3->Value(u), ej = oj;
               }
           if (ej != 0)
           {
@@ -7013,8 +7028,10 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
     }
   }
+  lap("thin check");
   out.result  = wall;
   out.history = shell_history(solid, wall, {h, h2}, {}, sources, removed);
+  lap("history");
   return true;
 }
 
