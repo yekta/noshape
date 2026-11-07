@@ -46,6 +46,7 @@ extern "C" char etext;
 #include <Geom2d_TrimmedCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepLProp_CLProps.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <Precision.hxx>
@@ -1078,6 +1079,18 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
             const gp_Circ p = xa.Circle(), q = xb.Circle();
             const double  tol = 1e-9 * std::max(1.0, p.Radius());
             one = p.Location().Distance(q.Location()) <= tol && std::abs(p.Radius() - q.Radius()) <= tol && p.Axis().Direction().IsParallel(q.Axis().Direction(), 1e-9);
+          }
+          // A section OCCT approximates on each side of the seam (two B-splines, one curve in live: Parasolid's
+          // periodic faces have no seam; c2-rings-loft's slots through its rounds): their curvatures agree there, unlike
+          // a profile's segments that only meet tangentially.
+          if (!one && xa.GetType() == GeomAbs_BSplineCurve && xb.GetType() == GeomAbs_BSplineCurve)
+          {
+            auto curvature = [&](BRepAdaptor_Curve& c, int j) {
+              BRepLProp_CLProps pr(c, BRep_Tool::Parameter(v, TopoDS::Edge(em(j))), 2, 1e-9);
+              return pr.Curvature();
+            };
+            const double k0 = curvature(xa, two[0]), k1 = curvature(xb, two[1]);
+            one = std::abs(k0 - k1) <= 0.02 * std::max(k0, k1);
           }
         }
         if (!one)

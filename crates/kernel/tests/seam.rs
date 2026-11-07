@@ -28,6 +28,23 @@ fn seams_poles_and_circle_vertices_are_not_topology() {
     assert_eq!(counts(&make_cone(&frame, 10.0, 0.0, 20.0, 2.0 * PI).unwrap()), (2, 1, 1));
 }
 
+/// A notch cut into a torus (R 20, r 5) by a box beyond x = 22, |y| <= 3: its four section curves each cross one of the
+/// torus's seams, where OCCT approximates each side as a B-spline of its own. Parasolid's torus has no seam: live's
+/// notch is 4 faces, 6 edges, 4 vertices (c2-rings-loft's slots through its rounds), on both Booleans.
+#[test]
+fn a_section_across_a_tori_seam_is_one_edge() {
+    let frame = Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let torus = make_torus(&frame, 20.0, 5.0, 2.0 * PI).unwrap();
+    let notch = make_box_corners(DVec3::new(22.0, -3.0, -10.0), DVec3::new(30.0, 3.0, 10.0)).unwrap();
+    for rust in [true, false] {
+        set_rust_boolean(Some(rust));
+        let r = unify_same_domain(&boolean(BooleanOp::Cut, &[torus.clone()], &[notch.clone()], &BooleanOptions::default()).unwrap().shape).unwrap().shape;
+        set_rust_boolean(None);
+        assert!(r.is_valid());
+        assert_eq!(counts(&r), (4, 6, 4), "rust {rust}");
+    }
+}
+
 /// bushing2-0-joshua's Extrude 4: a tube (Ø75 / Ø50 along y) with notches at one end and two windows through its
 /// wall. Each cylinder's seam splits its notched end's arc (live has no seam: 18 faces, 40 edges, 24 vertices). The
 /// bore's seam moves to a notch corner though a window lies nearer its end circle (a hole's loop isn't the loop round
