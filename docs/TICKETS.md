@@ -2859,6 +2859,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   scenarios at 01:25 (green 04121633: bom-table, broken-out-section, centerline-circle-3-point, centermark, detail-view,
   dimension point-to-line / point-to-point, hole-table, tool-shortcuts, view-properties), drw-note at 05:25; each matches
   4 / 4 run alone. The start state should wait for the views. (qa 2026-11-07 07:16)
+  qa 09:57: the 09:40 suite run (727f5b09) had 21 drawing scenarios failing this way: the scenario score swings by ~20 run to
+  run until it's fixed.
 - [x] P2 EXPORT-DXF-DIALOG (psui; done 11-06: flat_export.rs's modal for flats, sketches and planar faces; a face's
   File name "<studio> - <part>" is a guess, asked live) a sketch's (and a planar face's) "Export as DXF/DWG…" opens live's modal "Export as
   DXF/DWG" (ui-parity sketch-row-menu-export-dxf): File name (with "View export rules"), Format DXF / DWG, Version
