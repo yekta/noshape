@@ -1,16 +1,16 @@
 {
  "scenario": "feature-filter-no-match",
- "recorded": "2026-11-06T10:33:39.069Z",
+ "recorded": "2026-11-07T15:55:28.512Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.1 backfilled"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "06a3464416fbeea976faaa4b",
+  "element": "2ce6e063bc6768f793274a5b",
   "start": "block-fillet",
   "startElement": "f52d62d96bea15774711c619"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -97,6 +98,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -147,7 +149,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 25009
+   "t": 59368
   },
   {
    "step": 2,
@@ -169,6 +171,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -201,7 +204,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 27038
+   "t": 61618
   }
  ]
 }

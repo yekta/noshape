@@ -1,16 +1,16 @@
 {
  "scenario": "feature-row-tooltip-error",
- "recorded": "2026-11-04T06:23:44.712Z",
+ "recorded": "2026-11-07T15:53:45.435Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "a0b99b8a1cfa9d3bbffb7ff8",
+  "element": "fcfd349b50defa82ec478e24",
   "start": "block-broken",
   "startElement": "698ffe62d5a06c7057497190"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -67,7 +68,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -90,6 +92,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -137,9 +140,10 @@
     },
     "message": null,
     "tooltip": "Fillet 1 did not regenerate properly: Select edges or faces to fillet. 1 missing selection",
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 33824
+   "t": 65333
   }
  ]
 }

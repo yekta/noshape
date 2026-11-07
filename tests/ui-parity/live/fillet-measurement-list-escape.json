@@ -1,16 +1,16 @@
 {
  "scenario": "fillet-measurement-list-escape",
- "recorded": "2026-11-06T11:16:49.321Z",
+ "recorded": "2026-11-07T15:39:19.151Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.2 backfilled"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "bd5dbb3fe3c76d96d2917e64",
+  "element": "d9d6b9e818525157d1965b50",
   "start": "block-fillet",
   "startElement": "f52d62d96bea15774711c619"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -110,7 +111,7 @@
        "label": "Entities to fillet",
        "kind": "query",
        "items": [
-        "Unknown of Extrude 1"
+        "Edge of Extrude 1"
        ],
        "active": true,
        "state": "ok"
@@ -194,7 +195,7 @@
         "label": "Entities to fillet",
         "kind": "query",
         "items": [
-         "Unknown of Extrude 1"
+         "Edge of Extrude 1"
         ],
         "active": true,
         "state": "ok"
@@ -259,6 +260,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -316,7 +318,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37957
+   "t": 37983
   },
   {
    "step": 2,
@@ -331,6 +333,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -381,7 +384,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 42316
+   "t": 45758
   }
  ]
 }

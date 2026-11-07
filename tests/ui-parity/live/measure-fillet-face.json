@@ -1,16 +1,16 @@
 {
  "scenario": "measure-fillet-face",
- "recorded": "2026-11-04T06:05:18.287Z",
+ "recorded": "2026-11-07T15:57:42.406Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "a66fabb03a3b4c0448c90b7f",
+  "element": "0eb32f28e2056d63f6439f60",
   "start": "block-fillet",
   "startElement": "f52d62d96bea15774711c619"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -67,7 +68,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -96,6 +98,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -150,9 +153,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 42098
+   "t": 113023
   }
  ]
 }

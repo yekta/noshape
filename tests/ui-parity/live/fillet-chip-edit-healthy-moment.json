@@ -1,16 +1,16 @@
 {
  "scenario": "fillet-chip-edit-healthy-moment",
- "recorded": "2026-11-07T05:12:50.640Z",
+ "recorded": "2026-11-07T15:50:42.545Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "904488e8af62ef94991524ff",
+  "element": "e805a809ac6c9c718f8a19ae",
   "start": "block-broken",
   "startElement": "698ffe62d5a06c7057497190"
  },
@@ -315,7 +315,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 53802
+   "t": 86832
   },
   {
    "step": 2,
@@ -569,7 +569,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 85301
+   "t": 118347
   },
   {
    "step": 3,
@@ -811,7 +811,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 116618
+   "t": 150435
   },
   {
    "step": 4,
@@ -877,7 +877,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 121646
+   "t": 155564
   }
  ]
 }

@@ -1,16 +1,16 @@
 {
  "scenario": "in-context-caret-hide-show",
- "recorded": "2026-11-07T05:31:26.711Z",
+ "recorded": "2026-11-07T16:13:02.251Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.7 cb0eee3a"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "4de9b39682d72040e12d66bb",
+  "element": "f26d076f7be8eba88c3193da",
   "start": "two-blocks",
   "startElement": "94efa1d13f38aa3acb2f1952"
  },
@@ -280,7 +280,7 @@
     },
     "drawing": null
    },
-   "t": 27052
+   "t": 62199
   },
   {
    "step": 2,
@@ -460,7 +460,7 @@
     },
     "drawing": null
    },
-   "t": 31254
+   "t": 68747
   },
   {
    "step": 3,
@@ -551,7 +551,7 @@
     },
     "drawing": null
    },
-   "t": 46341
+   "t": 81698
   },
   {
    "step": 4,
@@ -651,7 +651,7 @@
     },
     "drawing": null
    },
-   "t": 49427
+   "t": 84883
   },
   {
    "step": 5,
@@ -682,6 +682,28 @@
         "placeholder": "Filter by name",
         "value": ""
        }
+      ],
+      "rows": [
+       {
+        "name": "start two-blocks asm",
+        "hidden": false,
+        "selected": false
+       },
+       {
+        "name": "Part 1 <1>",
+        "hidden": false,
+        "selected": false
+       },
+       {
+        "name": "Part 2 <1>",
+        "hidden": false,
+        "selected": false
+       },
+       {
+        "name": "Mate features (0)",
+        "hidden": false,
+        "selected": false
+       }
       ]
      }
     ],
@@ -691,44 +713,7 @@
      "items": []
     },
     "features": {
-     "rows": [
-      {
-       "name": "start two-blocks asm",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Part 1 <1>",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Part 2 <1>",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-instance"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
-      }
-     ],
+     "rows": [],
      "rollbackAfter": "Default geometry"
     },
     "parts": [
@@ -796,7 +781,7 @@
     },
     "drawing": null
    },
-   "t": 51886
+   "t": 90637
   }
  ]
 }
