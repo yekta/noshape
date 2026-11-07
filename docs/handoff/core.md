@@ -16,6 +16,22 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 14:59 UTC: cf-surface-pattern's Fillet 1, what live's side rounds are.**
+- The fillet's input (dump: vibe2 ~/core-surf/fillet-11, local /root/core-scratch/surf): our chain is the ellipse
+  (JtS / bore cylinder) + the two side edges (side planes / sweep) + the two 0.693 mm front lines, the last two by
+  tangent propagation (the sweep is tangent to the front face, so each side edge runs on smoothly into a front line).
+  Live blends only the ellipse and the sides.
+- Live's side rounds JuW / Jua are **cylinders tangent to the side plane and to the slanted top plane JtS extended**
+  (JtS meets the sweep tangentially along its top line JtB), not rolling against the sweep: their axis is
+  side normal x JtS normal to 4 digits, 2.540 mm from the side plane and 2.543 mm below JtS (bd-35.json gives the
+  cylinder). The cylinder only cuts the sweep (Jut is an icurve) and the round ends where that cut meets its line on
+  the side plane, 1.617 mm up the edge. Our rolling ball against the sweep agrees at the top corner (0.012 mm off live's
+  axis) and drifts from it down the edge (1 mm at z 6.4), then no longer fits (its touch on the sweep jumps to the
+  front line). So the round is the lone blend trimmed by the body (as rings-loft's), but against JtS, and the rule for
+  when live rolls against the plane a face runs on into is unknown: asked live (REQUESTS core 14:59, a minimal
+  profile with a plane running tangentially into a spline). The ellipse's round would go the ring route as an arc (the
+  rest of its ellipse lies above the sweep, off the part) once the sides are known.
+
 **Shell: one builder, bool's (lead 11-07).** shell.cpp's `by_quadrics` (Path 2b: the direct inner offset of planes,
 cylinders and cones, each wall cut at its neighbours) is the one Shell builder, and **bool owns it from now**:
 bool extends it to curved seams, B-spline walls and bigger corners, folding in core-walls-wip (below); the other routes
