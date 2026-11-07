@@ -36,6 +36,22 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 18:54: v0.4.35 (published 18:49, run 42396148281, cut 04b3eaa93 = b3f393b8 + the installer without Restart Manager +
+asm's translator) checked: good, no blocker.** Linux files = the smoked artifact, SHA256SUMS OK, 11 assets, every job green. Smoke =
+v0.4.34 except cli-fillet-segv (P2 SAVED-CHAMFER-CHANGE, shipped here as the 17:00 list said); the 47 ticket documents =
+b3f393b8. **Updates on all three:** the run's new post-publish "Restart into" jobs update from v0.4.34 through the update card's
+Restart: Windows 52 s (installer exit 0, installed 0.4.35), macOS 19 s, Linux 20 s, each "document reopened"; Linux on vibe3 :64
+too (the mcp copy still left on the old binary, UPDATE-HELPER-LINUX-PARITY). CI timing tables: within the runners' hardware
+(macOS ran on an M1 this time, Linux on a 9V74). GUI rows = v0.4.34; title bar menus open, About shows 0.4.35; memory ±6 %.
+**Suites, lead 11-07: speed and new failures compared too.** qa-suites.sh copies each run's report.json from vibe2
+(~/qa-parity/report.json → <run>/models-report.json); bin/suites-diff.py flags a document whose whole regeneration is > 30 % and
+> 0.5 s slower than the previous run's, and any feature that errors now but didn't before (from `differing`, past the first
+difference too). Report flags to the lead and the owner. The 13:32 → 16:34 flags (cf-snap-hook 26.7 → 36.7 s, cf-hose-routing,
+cf-o-ring-generator) are the host change (13:32 here, 16:34 on vibe2): not reported. cf-snap-hook's Shell 1 already errored at
+13:32 (26.7 s); the earlier reports were overwritten, so when it broke isn't known from qa's runs. Note for dx: the 17:09 finish
+ran with vibe2's shared /home/ngyekta/parity/models, so it wrote /home/ngyekta/parity/report.json there (qa's runs use
+~/qa-parity now).
+
 **11-07 17:46:** the model suite on vibe2 reads qa's own copy, vibe2:~/qa-parity/models, rsynced from /root/parity/models
 before each run (qa-suites.sh): vibe2's shared /home/ngyekta/parity/models had 107 of the 128 entries (no assembly corpus), so the
 16:34 run counted 86 documents, not 88; from 20:34 the totals are this machine's again. 16:34's "worse" scenarios were all load
