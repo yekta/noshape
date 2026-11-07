@@ -2516,6 +2516,43 @@ fn folders_and_display_states() {
     assert!(asm.folders.iter().find(|f| f.id == mf).unwrap().features.is_empty());
 }
 
+/// Live 2204: with identically oriented mates and Reverse off, a relation's follower goes the opposite way to its
+/// driver (Linear: B = -ratio·A).
+#[test]
+fn a_linear_relation_moves_its_follower_the_opposite_way() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.01), false),
+            part_instance(3, "Block <3>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.01), false),
+        ],
+        mates: vec![
+            mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid)),
+            mate(11, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid)),
+        ],
+        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("1"), reverse: false, suppressed: false, base: None }],
+        ..Default::default()
+    };
+    let z = |res: &eval::AssemblyResult, s: &eval::Solved, id: u64| {
+        let _ = res;
+        DVec3::from(s.placement(InstanceId(id)).unwrap().translation).z
+    };
+    for (reverse, sign) in [(false, -1.0), (true, 1.0)] {
+        asm.relations[0].reverse = reverse;
+        let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+        let (a0, b0) = (z(&res, &res.solved, 2), z(&res, &res.solved, 3));
+        let s = res.prepared.solve(&SolveOptions { drags: vec![(InstanceId(2), DVec3::ZERO, DVec3::new(0.0, 0.0, a0 + 0.01))], ..Default::default() });
+        let (da, db) = (z(&res, &s, 2) - a0, z(&res, &s, 3) - b0);
+        assert!(da.abs() > 1e-3, "the driver moved: {da}");
+        assert!((db - sign * da).abs() < 1e-4, "reverse {reverse}: driver {da}, follower {db}");
+    }
+}
+
 /// ASM-FLEX-SUB-RIGID: a flexible subassembly with a relation stays flexible; the relation holds in the parent.
 #[test]
 fn a_flexible_subassembly_keeps_its_relations() {

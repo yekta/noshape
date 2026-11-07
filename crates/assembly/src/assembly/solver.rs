@@ -687,9 +687,11 @@ fn relation_residual(bodies: &[Frame], mates: &[SolverMate], r: &SolverRelation)
     let sign = if r.reverse { -1.0 } else { 1.0 };
     let da = if r.value_a == 0 { wrap_angle(r.a_start - r.base_a) + std::f64::consts::TAU * r.turns + wrap_angle(va[0] - r.a_start) } else { va[r.value_a.min(3)] - r.base_a };
     let db = if r.value_b == 0 { wrap_angle(vb[0] - r.base_b) } else { vb[r.value_b.min(3)] - r.base_b };
+    // Live 2204: in identically oriented mate frames the follower goes the opposite way (B = −ratio·A), Reverse
+    // direction flips it; the values are live's (`mate_values`).
     match r.kind {
         RelationKind::Gear => wrap_angle(db + sign * r.ratio * da),
-        RelationKind::Linear | RelationKind::RackAndPinion | RelationKind::Screw => db - sign * r.ratio * da,
+        RelationKind::Linear | RelationKind::RackAndPinion | RelationKind::Screw => db + sign * r.ratio * da,
     }
 }
 
@@ -714,7 +716,7 @@ fn started(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelat
             r.a_start = a;
             r.turns = match r.kind {
                 RelationKind::Gear => (-8..=8).map(f64::from).min_by(|x, y| wrap_angle(db + sign * r.ratio * (da + turn * x)).abs().total_cmp(&wrap_angle(db + sign * r.ratio * (da + turn * y)).abs())).unwrap_or(0.0),
-                RelationKind::RackAndPinion | RelationKind::Screw if r.ratio.abs() > 1e-12 => ((db / (sign * r.ratio) - da) / turn).round(),
+                RelationKind::RackAndPinion | RelationKind::Screw if r.ratio.abs() > 1e-12 => ((-db / (sign * r.ratio) - da) / turn).round(),
                 _ => 0.0,
             };
             r

@@ -3526,8 +3526,10 @@ were checked in code by asm; "(verify)" ones need a live check first.
   no fine / coarse thread from a Hole feature, a tapped hole likely sizes a bolt one size down.
 - [ ] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply
   to it; the defaults are 50 mm / 2 (live Part Studio 25 mm / 1); Onshape's help names a third direction.
-- [ ] P1 ASM-RELATION-DIRECTION (asm, verify) Gear couples opposite, Linear the same way (`db = ∓ratio·da`): check each
-  relation's default direction against live.
+- [x] P1 ASM-RELATION-DIRECTION (asm, verify) Gear couples opposite, Linear the same way (`db = ∓ratio·da`): check each
+  relation's default direction against live. Fixed 2026-11-07 (live 2204: every relation's follower goes the opposite
+  way, B = −ratio·A; Linear, Rack and pinion and Screw went the same way; T1
+  a_linear_relation_moves_its_follower_the_opposite_way).
 - [ ] P1 ASM-API-GAPS (asm) agent API: (done 11-07: `assembly_properties`; `part_set_properties` takes Exclude from
   all BOMs / Unit of measure / Not revision managed (State is the releases'); `assembly_exploded_view` duplicate;
   mate / group Show / Hide; `assembly_measure`, `assembly_mass_properties`; `assembly_replace` takes several
