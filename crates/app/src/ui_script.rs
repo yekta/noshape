@@ -316,7 +316,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         };
         // (An assembly tab's state when no Part Studio is shown: skasm's
         // assembly scenarios.)
-        let state = |cx: &mut AsyncWindowContext| -> Value { ws.update_in(cx, |w, window, cx| window_state(w, window, cx)).unwrap_or(Value::Null) };
+        let state = |cx: &mut AsyncWindowContext| -> Value { ws.update_in(cx, window_state).unwrap_or(Value::Null) };
         // The state with the tooltip drawn now (a redraw notes it).
         let read = async |cx: &mut AsyncWindowContext| -> Value {
             noshape_app_core::ui_script::clear_tooltip();

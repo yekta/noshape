@@ -417,7 +417,7 @@ impl WorkspaceUnits {
 
     /// An underlined select (feature dialogs): `options`, the current one,
     /// and what picking option `i` does to the draft.
-    fn select(&self, id: SharedString, label: String, w: f32, options: Vec<String>, current: usize, set: impl Fn(&mut noshape_units::UnitPrefs, usize) + 'static, cx: &mut Context<Self>) -> AnyElement {
+    fn select(&self, label: String, w: f32, options: Vec<String>, current: usize, set: impl Fn(&mut noshape_units::UnitPrefs, usize) + 'static, cx: &mut Context<Self>) -> AnyElement {
         use gpui_kit::component::button::{Button, ButtonCustomVariant, ButtonVariants as _};
         use crate::os_ui::OsDropdownExt as _;
         let pal = p();
@@ -425,6 +425,7 @@ impl WorkspaceUnits {
         let set = Rc::new(set);
         let plain = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false);
         let shown = options.get(current).cloned().unwrap_or_default();
+        let id = SharedString::from(format!("wu-{label}"));
         let id2 = id.clone();
         noshape_app_core::ui_script::note_field(|| serde_json::json!({ "label": label, "kind": "enum", "text": shown }));
         div()
@@ -484,20 +485,20 @@ impl Render for WorkspaceUnits {
         // Length and angle (the units expressions use), in Onshape's lists.
         let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
         let (dl, dc) = dec(d.length_precision, 6);
-        let unit = self.select("wu-length".into(), "Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
-        let decimals = self.select("wu-length-dec".into(), "Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
+        let unit = self.select("Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
+        let decimals = self.select("Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
         groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));
         let au = AngleUnit::ALL.iter().position(|u| *u == d.angle).unwrap_or(0);
         let (al, ac) = dec(d.angle_precision, 7);
-        let unit = self.select("wu-angle".into(), "Angle default unit".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
-        let decimals = self.select("wu-angle-dec".into(), "Angle display decimals".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
+        let unit = self.select("Angle default unit".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
+        let decimals = self.select("Angle display decimals".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
         groups[1].push(self.row("wu-row-angle", "Angle default unit".into(), unit, decimals));
         for (k, (label, group, names, _, _)) in OTHER_UNITS.iter().enumerate() {
             let (dl, dc) = dec(d.other[k].1, OTHER_DECIMALS[k]);
             let shown = OTHER_UNITS_SHOWN[k];
             let at = shown.iter().position(|&i| i == d.other[k].0).unwrap_or(0);
-            let unit = self.select(SharedString::from(format!("wu-{k}")), format!("{label} default unit"), 210., shown.iter().map(|&i| names[i as usize].to_string()).collect(), at, move |p, i| p.other[k].0 = shown[i], cx);
-            let decimals = self.select(SharedString::from(format!("wu-{k}-dec")), format!("{label} display decimals"), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
+            let unit = self.select(format!("{label} default unit"), 210., shown.iter().map(|&i| names[i as usize].to_string()).collect(), at, move |p, i| p.other[k].0 = shown[i], cx);
+            let decimals = self.select(format!("{label} display decimals"), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
             let key: &'static str = ["wu-r0", "wu-r1", "wu-r2", "wu-r3", "wu-r4", "wu-r5", "wu-r6", "wu-r7", "wu-r8"][k];
             groups[*group as usize].push(self.row(key, format!("{label} default unit"), unit, decimals));
         }
