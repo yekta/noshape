@@ -89,6 +89,22 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             call(ctx, "feature_add", args).map_err(what)?;
         }
     }
+    // The Part Studio's configuration inputs (README "### start"): a List's rows, the first its default.
+    for (k, input) in start["configuration"].as_array().into_iter().flatten().enumerate() {
+        let what = |e: String| format!("configuration input {k}: {e}");
+        if input["type"] != "list" {
+            return Err(what("only List inputs".into()));
+        }
+        let name = input["name"].as_str().ok_or_else(|| what("no name".into()))?;
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": name })).map_err(what)?;
+        for (r, row) in input["rows"].as_array().into_iter().flatten().filter_map(Value::as_str).enumerate() {
+            if r == 0 {
+                call(ctx, "config_edit_option", json!({ "tab": "Part Studio 1", "input": name, "option": "Default", "name": row })).map_err(what)?;
+            } else {
+                call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": name, "name": row })).map_err(what)?;
+            }
+        }
+    }
     // Live's runner names an assembly after the start ("start pin-block asm").
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
     let asm_tab = format!("start {stem} asm");

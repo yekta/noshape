@@ -51,6 +51,10 @@ list's rows (the assembly's own, Origin, instances, "Mate features (n)", its row
 [{"name", "fixed", "transform"}], "mates": [{"name", "type", "status"}]}` as live's REST gives them (type
 "REVOLUTE", status "OK"); a mate selected in the list is a `FEATURE` item.
 
+A start's `"configuration"` (asm, 11-07): the Part Studio's configuration inputs, made after its features:
+`[{"type": "list", "name": "Size", "rows": ["Small", "Large"]}]` (the first row the default; nothing configured by
+them), as start `config-blocks`.
+
 ### remembered (psui, 11-06)
 
 Onshape remembers a feature dialog's REMEMBER_PREVIOUS_VALUE parameters per account, saved on ✓ (behaviours 1987;
@@ -90,6 +94,9 @@ other string an Enum id.
   picked where it shows in the current view; `{"sketch_point": [x, y]}` on the active sketch plane (mm);
   `{"plane": "Top"}`, `{"origin": true}`, `{"empty": true}` (empty graphics area).
 - `{"view_cube": "Top"}`, `{"view_cube": "Isometric"}`.
+- The move triad (asm, 11-07), shown at the pick once a part is clicked: `{"triad": "x" | "y" | "z"}` an arrow's shaft,
+  `{"triad": "ring-z"}` the rotation ring at an arrow's tip, `{"triad": "origin"}` its centre (right-clicked for its
+  menu: Align / Anti-align with Z, Rotate 90 / 180 deg, Move to origin).
 - In an assembly: `{"instance": "Part 2 <1>"}` an instance list row by its text: also the assembly's own row
   (`"start two-blocks asm"`), an instance folder (`"Folder 1"`) and `"Mate features"` (the folder, whatever its
   count); `{"mate": "Revolute 1"}` a row under Mate features (a mate, connector, relation, group or mate folder);

@@ -1,0 +1,25 @@
+{
+ "name": "asm-menu-change-configuration",
+ "about": "A configured Part Studio's instance: Part 2's row menu › Change configuration…; Esc.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Change configuration…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

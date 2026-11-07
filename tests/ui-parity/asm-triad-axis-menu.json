@@ -1,0 +1,30 @@
+{
+ "name": "asm-triad-axis-menu",
+ "about": "Part 2's triad X arrow right-clicked: its menu; Esc.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "x"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

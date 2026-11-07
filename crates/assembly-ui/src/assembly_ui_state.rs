@@ -32,6 +32,26 @@ impl AssemblyView {
         if let Some(name) = t.get("view_cube").and_then(Value::as_str) {
             return crate::view_cube::ui_cell_point(name, self.cube_origin, vp.camera.rotation);
         }
+        // The move triad's handles (README "triad"): an axis's shaft, the ring at its tip, the centre; drawn as the
+        // scene draws the manipulator (asm_scene, world sizes).
+        let triad_point = |handle: &str| -> Result<DVec3, String> {
+            let f = self.manipulator(cx).ok_or("no triad shown")?;
+            let size = self.triad_size() * 1.6;
+            let axes = [f.x(), f.y(), f.z()];
+            let k = |c: &str| ["x", "y", "z"].iter().position(|a| *a == c).ok_or(format!("no triad handle {handle}"));
+            if handle == "origin" {
+                return Ok(f.origin);
+            }
+            if let Some(c) = handle.strip_prefix("ring-") {
+                let k = k(c)?;
+                return Ok(f.origin + axes[k] * (size * 0.93) + axes[(k + 1) % 3] * (size * 0.12));
+            }
+            Ok(f.origin + axes[k(handle)?] * (size * 0.4))
+        };
+        let world = match t.get("triad").and_then(Value::as_str) {
+            Some(h) => Some(triad_point(h)?),
+            None => None,
+        };
         if t.get("empty").is_some() {
             // From the middle outwards, off every part's box on screen and the open dialog (as the Part Studio's).
             let size = vp.size();
@@ -57,7 +77,9 @@ impl AssemblyView {
             let at = free.ok_or("no empty spot in the graphics area")?;
             return Ok(vp.origin() + point(px(at.x as f32), px(at.y as f32)));
         }
-        let world = if t.get("origin").is_some() {
+        let world = if let Some(w) = world {
+            w
+        } else if t.get("origin").is_some() {
             DVec3::ZERO
         } else if let Some(p) = ["face", "edge", "vertex"].iter().find_map(|k| t.get(*k)) {
             let local = mm(p).ok_or("a model point: [x, y, z] mm")?;

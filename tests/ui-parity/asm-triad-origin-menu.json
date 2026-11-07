@@ -1,0 +1,30 @@
+{
+ "name": "asm-triad-origin-menu",
+ "about": "Part 2's face clicked (its triad at the pick), the triad's centre right-clicked: its menu; Esc.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "origin"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

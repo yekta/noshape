@@ -1,0 +1,19 @@
+{
+ "name": "asm-config-instance-menu",
+ "about": "A configured Part Studio's instance (Size: Small / Large): Part 2's row menu; Esc.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

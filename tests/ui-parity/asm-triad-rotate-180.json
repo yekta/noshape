@@ -1,0 +1,32 @@
+{
+ "name": "asm-triad-rotate-180",
+ "about": "Part 2's triad Z ring › Rotate 180 deg.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "ring-z"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rotate 180 deg"
+   }
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+{
+ "name": "asm-triad-move-to-origin",
+ "about": "Part 2's triad centre › Move to origin.",
+ "area": "asm",
+ "source": "lead 11-07: assembly coverage, batch 6",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     70,
+     10,
+     10
+    ],
+    "instance": "Part 2 <1>"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "triad": "origin"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to origin"
+   }
+  }
+ ]
+}
