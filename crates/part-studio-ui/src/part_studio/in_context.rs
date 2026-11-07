@@ -360,6 +360,7 @@ impl PartStudioView {
                                                 })
                                             }))
                                     });
+                                    crate::os_menu::mark_page_dropdown(&menu, cx);
                                     crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
                                 }))),
                         ) };
@@ -572,6 +573,19 @@ impl PartStudioView {
         let studio = self.tab;
         self.exit_context(cx);
         cx.emit(PartStudioEvent::InsertInAssembly { assembly, studio, parts, sketches, at });
+    }
+
+    /// "Select items to insert" as the parity suite records a feature dialog (live in-context-caret-insert-go).
+    pub(super) fn insert_go_state(&self, cx: &App) -> Option<serde_json::Value> {
+        if !self.insert_go_open() {
+            return None;
+        }
+        let items: Vec<String> = self.insert_go_items().iter().map(|r| match r {
+            Reference::Body(b) => self.display.body(b).map(|b| b.name.clone()).unwrap_or_default(),
+            Reference::Sketch(f) => self.studio(cx).and_then(|s| s.features.iter().find(|x| x.id == *f).map(|x| x.name.clone())).unwrap_or_default(),
+            _ => String::new(),
+        }).collect();
+        Some(serde_json::json!({ "title": "Select items to insert", "titleState": "ok", "kind": "feature", "tabs": [], "fields": [{ "label": "Select parts/surfaces/sketches", "kind": "query", "items": items, "active": true, "state": "ok" }], "error": null, "ok": "enabled" }))
     }
 
     /// The 220 px feature-style dialog "Select items to insert" (live
@@ -903,10 +917,11 @@ impl PartStudioView {
                     for (id, name, asm) in &list {
                         let (v, id) = (v.clone(), *id);
                         let dot = if stale.contains(&id) { "• " } else { "" };
-                        m = m.item(crate::os_menu::OsMenuItem::new(format!("{dot}{name}  {asm}")).checked(active == Some(id)).on_click(move |_, _, cx| v.update(cx, |this, cx| this.activate_context(Some(id), cx))));
+                        m = m.item(crate::os_menu::OsMenuItem::new(format!("{dot}{name}")).note(asm.clone()).checked(active == Some(id)).on_click(move |_, _, cx| v.update(cx, |this, cx| this.activate_context(Some(id), cx))));
                     }
                     m
                 });
+                crate::os_menu::mark_page_dropdown(&menu, cx);
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
         let more = current.as_ref().filter(|_| !editing).map(|(id, name, _)| {
@@ -949,6 +964,7 @@ impl PartStudioView {
                             .separator()
                             .item(it("Delete", Rc::new(move |this, _, cx| this.delete_context(id, cx))))
                     });
+                    crate::os_menu::mark_page_dropdown(&menu, cx);
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
         });
@@ -1033,6 +1049,7 @@ impl PartStudioView {
                             })
                         }))
                 });
+                crate::os_menu::mark_page_dropdown(&menu, cx);
                 crate::os_menu::open_anchored(ev.position(), Anchor::TopLeft, menu, window, cx);
             })))
             .into_any_element()

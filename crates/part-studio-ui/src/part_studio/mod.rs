@@ -2547,23 +2547,16 @@ impl PartStudioView {
         // configuration variables included.
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
-        // Missing references: their creating feature is gone. One whose creator is suppressed reads "Unknown of" and
-        // is broken like a later one (Edit healthy moment, no Clear missing references: live fillet-chip-clear-missing).
-        let unknown: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
-            Some(s) => Arc::new(noshape_ops::studio::suppressed_creator_reference(s)),
-            None => Arc::new(|_: &Reference| false),
-        };
+        // A reference whose creating feature is gone (deleted or suppressed) is missing: a red "Missing Edge" chip with
+        // Clear missing references (live 1993 (c)). (block-fillet's REST-built Fillet reads "Unknown of" in live from the
+        // start: its query isn't a pick.)
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
-            Some(s) => {
-                let (gone, unknown) = (noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s), unknown.clone());
-                Arc::new(move |r: &Reference| gone(r) && !unknown(r))
-            }
+            Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
             None => Arc::new(|_: &Reference| false),
         };
         let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
             Some(s) => {
-                let (later, unknown) = (later_reference(s, index), unknown.clone());
-                Arc::new(move |r: &Reference| later(r) || unknown(r))
+                Arc::new(later_reference(s, index))
             }
             None => Arc::new(|_: &Reference| false),
         };
@@ -2581,7 +2574,6 @@ impl PartStudioView {
             }
             d.missing = missing;
             d.later = later_refs;
-            d.unknown = unknown;
             d.configured = configured;
             d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));
@@ -5699,6 +5691,11 @@ impl PartStudioView {
             .flatten();
         row.os_context_menu_ctrl_click(move |menu, window, cx| {
             view.update(cx, |this, cx| {
+                // A right press on a row takes the keyboard out of a panel's field (live feature-menu-configure-suppression:
+                // the page's body); a dialog keeps its own.
+                if this.edit.is_none() && !this.focus.is_focused(window) {
+                    window.focus(&this.focus, cx);
+                }
                 if this.ui.list_menu != Some(id) {
                     this.ui.list_menu = Some(id);
                     this.refresh_scene(false, cx);
@@ -5858,6 +5855,8 @@ impl PartStudioView {
                 m = m.item(item("Section view…", Box::new(move |this, w, cx| this.section_through_all(&[Reference::Sketch(id)], w, cx))).icon_name("menu-section-view"));
             }
             m = m.item(suppress);
+            // Live feature-menu-configure-suppression: Dynamic suppression, then Configure suppression.
+            m = dynamic(m, window, cx);
             if let Some(input) = first_config_input.clone() {
                 // Configure suppression adds the feature to the configuration table.
                 m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {
@@ -5866,7 +5865,6 @@ impl PartStudioView {
                     cx.notify();
                 })));
             }
-            m = dynamic(m, window, cx);
             if let Some((tab, name)) = derived_source.clone() {
                 m = m.separator().item(item(&format!("Switch to {name}"), Box::new(move |_, _, cx| cx.emit(PartStudioEvent::ActivateTab(tab)))).icon_name("part-studio"));
             }

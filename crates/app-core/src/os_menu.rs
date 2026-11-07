@@ -62,7 +62,7 @@ pub enum MenuIcon {
 
 /// One row of an [`OsMenu`].
 pub enum OsMenuItem {
-    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool },
+    Item { label: SharedString, icon: Option<MenuIcon>, checked: bool, disabled: bool, handler: Option<Handler>, keys: Vec<SharedString>, user: bool, note: Option<SharedString> },
     Separator,
     /// `disabled`: an empty submenu, greyed and never opened (live's greyed
     /// "Merge ▸" for one table cell).
@@ -71,7 +71,16 @@ pub enum OsMenuItem {
 
 impl OsMenuItem {
     pub fn new(label: impl Into<SharedString>) -> Self {
-        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new(), user: false }
+        Self::Item { label: label.into(), icon: None, checked: false, disabled: false, handler: None, keys: Vec::new(), user: false, note: None }
+    }
+
+    /// A grey italic note after the label (live's contexts list: "Context 1" then its assembly's name); not part of
+    /// the row's name.
+    pub fn note(mut self, text: impl Into<SharedString>) -> Self {
+        if let Self::Item { note, .. } = &mut self {
+            *note = Some(text.into());
+        }
+        self
     }
 
     /// The label is user content (a configuration, part, view… name), drawn
@@ -195,6 +204,9 @@ pub struct OsMenu {
     /// One-shot Esc handler: the first Esc runs it and the menu stays open
     /// (a sketch tool's menu: Esc exits the tool), the next one dismisses.
     on_escape: Option<EscapeHandler>,
+    /// A page's dropdown (a panel's ⋯, the in-context carets): Escape leaves it open (live: the page keeps the
+    /// keyboard, the key never reaches a Bootstrap dropdown).
+    page: bool,
     /// A native `<select>`'s field while its list is open: Chrome draws it
     /// with a 2 px `#3e94ff` focus ring (live assembly/182, navigation/62).
     /// Drawn by the menu host, so it shows exactly while the list is open.
@@ -217,7 +229,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, ring: None, truncate: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, ring: None, truncate: false }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -594,7 +606,7 @@ impl Render for OsMenu {
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
-                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, .. } => row(ix)
+                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, .. } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         // Chrome's native list: #1967d2 / white; in dark #99c8ff / black (live dk-pref-select-open).
@@ -609,6 +621,7 @@ impl Render for OsMenu {
                         // Live: a label around a name ("Create Drawing of „…“…")
                         // stays on one line, cut with "…"; fixed labels wrap.
                         .child(div().when(wraps || truncate, |d| d.flex_1().min_w_0()).when(wraps && (*user || crate::i18n::names_an_entity(label)), |d| d.truncate()).child(label_el(label, *user)))
+                        .when_some(note.clone(), |d, n| d.child(div().ml(px(6.)).italic().text_color(gpui_kit::rgb(0x999999)).child(crate::ui::user_text(n))))
                         .when(!keys.is_empty(), |d| {
                             let chip = |k: &SharedString| div().px(px(3.)).h(px(18.)).flex().items_center().rounded(px(2.)).border_1().border_color(gpui_kit::rgb(0x333333)).text_size(px(12.)).text_color(pal.text).child(k.clone());
                             d.child(div().flex_1().min_w(px(16.))).child(h_flex().gap(px(2.)).children(keys.iter().map(chip)))
@@ -659,6 +672,7 @@ impl Render for OsMenu {
             // Esc closes the menu, like Onshape; Left leaves a submenu.
             .on_action(cx.listener(|this, _: &MenuDismiss, window, cx| match this.on_escape.take() {
                 Some(f) => f(window, cx),
+                None if this.page => {}
                 None => {
                     this.dismiss(window, cx);
                 }
@@ -812,6 +826,11 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
         return Some(serde_json::json!({ "kind": "camera-menu", "rows": rows, "highlighted": highlighted, "disabled": flags }));
     }
     Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
+}
+
+/// Make `menu` a page's dropdown (see `OsMenu::page`), before it opens.
+pub fn mark_page_dropdown(menu: &Entity<OsMenu>, cx: &mut App) {
+    menu.update(cx, |m, _| m.page = true);
 }
 
 /// Where a press outside the open menu last closed it.

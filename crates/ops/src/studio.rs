@@ -670,17 +670,6 @@ pub fn missing_reference(doc: &noshape_model::Document, ps: &PartStudio) -> impl
     }
 }
 
-/// A reference whose creating feature is in the studio but suppressed (a feature dialog reads it "Unknown of", not
-/// missing: live ui-parity fillet-chip-clear-missing).
-pub fn suppressed_creator_reference(ps: &PartStudio) -> impl Fn(&Reference) -> bool + Send + Sync + 'static {
-    let suppressed: std::collections::HashSet<FeatureId> = ps.features.iter().filter(|f| f.suppressed).flat_map(|f| std::iter::once(f.id).chain(f.sub_features.iter().map(|s| s.id))).collect();
-    let order: std::collections::HashMap<FeatureId, usize> = ps.features.iter().enumerate().map(|(i, f)| (f.id, i)).collect();
-    move |r: &Reference| match r {
-        Reference::Edge(n) | Reference::Vertex(n) => edge_creator_by(n, |f| order.get(&f).copied()).is_some_and(|f| suppressed.contains(&f)),
-        r => r.depends_on().is_some_and(|f| suppressed.contains(&f)),
-    }
-}
-
 /// Clear missing references on feature `id`'s query fields (`param`, or
 /// every field, arrays' rows included). How many were removed.
 pub fn clear_missing(ps: &mut PartStudio, id: FeatureId, param: Option<&str>, missing: &dyn Fn(&Reference) -> bool) -> usize {

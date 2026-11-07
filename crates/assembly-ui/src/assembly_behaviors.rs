@@ -59,7 +59,7 @@ pub fn fill_menu(m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>,
                         cx.notify();
                     })
                 });
-                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler), keys: Vec::new(), user: false };
+                let mut it = OsMenuItem::Item { label: label.into(), icon: None, checked: false, disabled, handler: Some(handler), keys: Vec::new(), user: false, note: None };
                 if let Some(i) = icon {
                     it = it.icon_name(i);
                 }

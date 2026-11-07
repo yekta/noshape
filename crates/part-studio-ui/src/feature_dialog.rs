@@ -227,8 +227,6 @@ pub struct FeatureDialog {
     drag_grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
     /// Whether a reference is missing (its feature was deleted/suppressed).
     pub missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
-    /// A pick whose creating feature is suppressed: it reads "Unknown of".
-    pub unknown: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// References made by a feature after this one (it was moved above its input).
     pub later: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// Number of regions of a sketch (a field holding all of them shows
@@ -430,7 +428,6 @@ impl FeatureDialog {
             preview_track: Default::default(),
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
-            unknown: Arc::new(|_| false),
             later: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
@@ -1742,7 +1739,6 @@ impl FeatureDialog {
             }
             // An entity whose creating feature is gone reads by its kind (live 1993 (c): "Missing Edge").
             let missing = match r {
-                Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) if (self.unknown)(r) => Some("Unknown of"),
                 Reference::Face(_) if self.ref_missing(r) => Some("Missing Face"),
                 Reference::Edge(_) if self.ref_missing(r) => Some("Missing Edge"),
                 Reference::Vertex(_) if self.ref_missing(r) => Some("Missing Vertex"),
@@ -2392,8 +2388,17 @@ impl FeatureDialog {
                 if menu {
                     let view = cx.entity();
                     let query = matches!(s.kind, ParamKind::Query { .. });
+                    let field_path = path.clone();
                     let path = path.clone();
-                    let build = move |m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
+                    let build = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                        // The menu takes the press before the field's own handler: give the field the keyboard, its text
+                        // all selected, before it opens (live config-depth-configure: "Depth", [0, 5]).
+                        if !query && let Some(st) = view.read(cx).inputs.get(&field_path).cloned() {
+                            st.update(cx, |s, cx| {
+                                window.focus(&s.focus_handle(cx), cx);
+                                s.select_all(window, cx);
+                            });
+                        }
                         let mut m = m;
                         if query {
                             let (v, p) = (view.clone(), path.clone());

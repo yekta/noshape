@@ -433,20 +433,25 @@ impl PartStudioView {
             .child(div().flex_1().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(tab_name))
             .child({
                 let v1 = cx.entity();
+                // Live 2213 (a): "Collapse all tables" only with more than one table (an inserted Variable Studio's).
+                let several = !noshape_model::variables::element_studios(&self.doc.read(cx).session.doc, self.tab).is_empty();
                 div().id("pvar-more").map(|d| crate::ui_script::mark(d, || "panel_more:Variable table".into())).cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
                     let v1 = v1.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         let v1 = v1.clone();
                         let v2 = v1.clone();
-                        m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_variable_table(cx))))
-                            // Live 11-02: "Collapse all tables".
-                            .item(crate::os_menu::OsMenuItem::new("Collapse all tables").on_click(move |_, _, cx| {
-                                v2.update(cx, |this, cx| {
-                                    this.ui.var_folded = true;
-                                    cx.notify();
-                                })
-                            }))
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_variable_table(cx))));
+                        if !several {
+                            return m;
+                        }
+                        m.item(crate::os_menu::OsMenuItem::new("Collapse all tables").on_click(move |_, _, cx| {
+                            v2.update(cx, |this, cx| {
+                                this.ui.var_folded = true;
+                                cx.notify();
+                            })
+                        }))
                     });
+                    crate::os_menu::mark_page_dropdown(&menu, cx);
                     crate::os_menu::open(e.position(), menu, window, cx);
                 })
             });
@@ -1264,6 +1269,7 @@ impl PartStudioView {
                             m.item(crate::os_menu::OsMenuItem::new("Visibility conditions…").on_click(move |_, window, cx| v3.update(cx, |this, cx| this.open_visibility_conditions(None, window, cx))))
                                 .item(crate::os_menu::OsMenuItem::new("Input propagation…").on_click(move |_, window, cx| v4.update(cx, |this, cx| this.open_input_propagation(None, window, cx))))
                         });
+                        crate::os_menu::mark_page_dropdown(&menu, cx);
                         crate::os_menu::open(e.position(), menu, window, cx);
                     })
                 }),
@@ -1497,6 +1503,7 @@ impl PartStudioView {
                                 this.edit_config(noshape_ops::config::DELETE_INPUT, cx, |ps| noshape_ops::config::delete_input(ps, &id));
                             })))
                         });
+                        crate::os_menu::mark_page_dropdown(&menu, cx);
                         crate::os_menu::open(e.position(), menu, window, cx);
                     })
             });

@@ -58,6 +58,9 @@ impl PartStudioView {
         } else if let Some(sd) = self.ui.section_dialog.as_ref().filter(|sd| !sd.keyboard_left) {
             // The Section view panel's active field (live reads it as the focused control).
             json!({ "kind": "field", "label": if sd.items_active { if sd.include { "Items to include" } else { "Items to exclude" } } else { "Section planes" }, "text": null, "selection": null, "all": false })
+        } else if self.ui.measure_pinned && self.focus.is_focused(window) {
+            // [ › Measure: its selection field has the keyboard (live key-bracket-measure).
+            json!({ "kind": "field", "label": "Select entities to measure", "text": null, "selection": null, "all": false })
         } else if self.shortcut_sheet.is_some() {
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
         } else if let Some(st) = self.ui.filter.as_ref().map(|f| f.0.read(cx)).filter(|_| filter_focused) {
@@ -89,6 +92,8 @@ impl PartStudioView {
             .or_else(|| dialog.and_then(|d| d.ui_list()))
             .or_else(|| self.dim_completion_state(cx))
             .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state(None)))
+            .or_else(|| self.ui_select_other_state(cx))
+            .or_else(|| self.ui_mini_toolbar_state())
             .or_else(crate::ui_script::open_list);
         let feature_name = |id: FeatureId| self.studio(cx).and_then(|s| s.features.iter().find(|f| f.id == id).map(|f| f.name.clone())).unwrap_or_default();
         // In a sketch the selection is its own, with what the Dimension tool picked (drawn selected); in a feature
@@ -209,7 +214,7 @@ impl PartStudioView {
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         // The parts list's heading, as drawn (render_parts_list).
         let parts_heading = format!("Parts ({})", self.display.bodies.iter().filter(|b| super::part_section(b) == "parts").count());
-        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
+        let dialog_state = dialog.map(|d| d.ui_state(window, cx)).or_else(|| self.section_dialog_state()).or_else(|| self.appearance_dialog_state(cx)).or_else(|| self.isolate_panel_state()).or_else(|| self.insert_go_state(cx)).or_else(|| self.show_mass.then(|| self.ui.mass_state.clone()).flatten()).or_else(crate::ui_script::open_dialog);
         // The dialog the focused field is in (live `focus.dialog`; the Create variable popup stands for its dialog).
         let mut focus = focus;
         if in_dialog.is_some() {
@@ -229,6 +234,35 @@ impl PartStudioView {
             "undo": self.ui_undo_state(cx),
             "sketch": self.ui_sketch_state(cx),
         })
+    }
+
+    /// The Select other popup (live: "select-other", its rows; the bold one isn't read as highlighted).
+    fn ui_select_other_state(&self, cx: &App) -> Option<Value> {
+        let so = self.ui.select_other.as_ref()?;
+        let labeler = self.labeler(cx);
+        let rows: Vec<String> = so.hits.iter().map(|r| labeler(r)).collect();
+        Some(json!({ "kind": "select-other", "rows": rows, "highlighted": null }))
+    }
+
+    /// The S shortcut toolbar outside a sketch (live: "shortcut-toolbar", its tools by icon name: "new-sketch",
+    /// "boolean-bodies").
+    fn ui_mini_toolbar_state(&self) -> Option<Value> {
+        self.ui.mini_toolbar?;
+        if self.sketch.is_some() {
+            return None;
+        }
+        let kebab = |id: &str| {
+            let mut out = String::new();
+            for c in id.chars() {
+                if c.is_ascii_uppercase() {
+                    out.push('-');
+                }
+                out.push(c.to_ascii_lowercase());
+            }
+            out
+        };
+        let rows: Vec<String> = self.ui.toolbar.shortcut_tools().iter().filter(|id| noshape_model::features::get(id).is_some()).map(|id| if id == "sketch" { "new-sketch".to_string() } else { kebab(id) }).collect();
+        Some(json!({ "kind": "shortcut-toolbar", "rows": rows, "disabled": [], "highlighted": null }))
     }
 
     /// `undo`: whether the toolbar's Undo and Redo do something (in a sketch
@@ -308,6 +342,18 @@ impl PartStudioView {
         }
         let mut dimensions: Vec<(String, f64, Option<String>)> = Vec::new();
         let units = self.doc.read(cx).session.doc.settings.units;
+        // A driven (reference) dimension: its kind without a value (live sketch-dim-menu-driven).
+        let mut driven: Vec<String> = Vec::new();
+        for c in sk.constraints().filter(|c| !c.driving && c.kind.is_dimension()) {
+            let kind = match &c.kind {
+                K::Length { .. } | K::Distance { .. } | K::HorizontalDistance { .. } | K::VerticalDistance { .. } => "LINEAR".to_string(),
+                K::Radius { .. } => "RADIUS".into(),
+                K::Diameter { .. } => "DIAMETER".into(),
+                K::Angle { .. } | K::ArcAngle { .. } => "ANGLE".into(),
+                k => k.name().to_uppercase().replace(' ', "_"),
+            };
+            driven.push(kind);
+        }
         for c in sk.constraints().filter(|c| c.driving) {
             let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
             let typed = |unit: &str| data.dimension_exprs.get(&c.id.0).map(|e| onshape_dimension_expression(&e.text, unit));
@@ -337,7 +383,8 @@ impl PartStudioView {
         }
         constraints.sort();
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
-        let dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
+        let mut dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();
+        dimensions.extend(driven.into_iter().map(|kind| json!({ "kind": kind, "expression": null })));
         json!({ "tool": tool, "entities": entities, "constraints": constraints, "dimensions": dimensions })
     }
 
