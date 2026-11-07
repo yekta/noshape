@@ -1845,3 +1845,9 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   face takes live's x direction (ours horizontal, live (0.389, 0.910, -0.143)). The handle arm's colour is live's
   grey-purple (~(112, 112, 151), not measured cleanly; ours 0x808080). c2-valve-config's 0.039 mm circle is the Boolean's
   (plane ∩ surface of revolution kept as a circle, live 2229): core / bool.
+- 11-07 evening: c2-sm-louver R8BC fixed (queued cdff3d4e: the region bounded by the most named curves; Part 3's volume
+  as live's). Its one extra face: the definition sheet's side has two collinear edges at x = 677.12 (Sketch 5's lines
+  qTubuc8Y6xsg and pIGznHdo2PDZ along y = -75.02), live's one; merging collinear pieces at joined-region vertices in
+  `union_touching` changed nothing (the vertex isn't from a join): look at std's convertRegion opExtrude of the qUnion
+  of regions in our host. cf-snap-hook Fillet 5 (4 R24 corner arcs on the bottom, tangent propagation): ours makes
+  each corner's blend ~15 small B-spline patches (59 faces, live 4); kernel blend splitting, core's fillet area.
