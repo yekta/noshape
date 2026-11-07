@@ -458,7 +458,7 @@ fn evaluate_source(doc: &Document, key: &SourceKey, hash: u64, regen: &mut Regen
             let collapsed: Vec<Collapsed> = lines
                 .iter()
                 .filter_map(|l| match &l.source {
-                    crate::assembly::bom::BomSource::Assembly(t) => {
+                    crate::assembly::bom::BomSource::Assembly { tab: t, .. } => {
                         let number = match doc.tab(*t).map(|t| &t.content) {
                             Some(TabContent::Assembly(a)) => a.properties.part_number.clone().unwrap_or_default(),
                             _ => String::new(),

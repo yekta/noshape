@@ -6426,3 +6426,54 @@ fn a_drawing_view_keeps_its_exploded_view_and_named_position() {
     call(&mut ctx, "history_undo", json!({}));
     assert_eq!(views(&mut ctx), vec![(Some(0), None), (None, Some(0))]);
 }
+
+/// The BOM in configurations: a part's configured Part number per configuration (two instances, Small and Large, are
+/// two rows with their own numbers), and a configured subassembly (its second part suppressed in "Small") walked in each
+/// instance's configuration (two rows, two parts and one).
+#[test]
+fn the_bom_follows_configurations() {
+    let mut ctx = Ctx::new();
+    let path = scratch("bom-configurations.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm" } }));
+    // Part Studio 1: Size (Small, Large); Part 1's Part number configured.
+    call(&mut ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": "Size" }));
+    call(&mut ctx, "config_edit_option", json!({ "tab": "Part Studio 1", "input": "Size", "option": "Default", "name": "Small" }));
+    call(&mut ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": "Size", "name": "Large" }));
+    let cfg = call(&mut ctx, "config_list", json!({ "tab": "Part Studio 1" }));
+    let input = cfg["inputs"][0]["id"].as_str().unwrap().to_string();
+    let option = |name: &str| cfg["inputs"][0]["configurations"].as_array().unwrap().iter().find(|o| o["name"] == name).map(|o| o["id"].as_str().unwrap().to_string()).unwrap_or_else(|| panic!("{cfg}"));
+    let (small, large) = (option("Small"), option("Large"));
+    call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "action": "add_property", "property": "Part number" }));
+    call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "action": "set", "property": "Part number", "value": "PN-S", "configuration": { input.clone(): small } }));
+    call(&mut ctx, "part_configured_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "action": "set", "property": "Part number", "value": "PN-L", "configuration": { input.clone(): large.clone() } }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_configuration", json!({ "tab": "Assembly 1", "instance": "Part 1 <2>", "configuration": { input.clone(): large } }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Assembly 1", "type": "flattened", "columns": ["Item", "Quantity", "Part number"] }));
+    let numbers: Vec<(String, u64)> = bom["rows"].as_array().unwrap().iter().map(|r| (r["cells"]["Part number"].as_str().unwrap_or_default().to_string(), r["quantity"].as_u64().unwrap())).collect();
+    assert_eq!(numbers, vec![("PN-S".to_string(), 1), ("PN-L".to_string(), 1)], "{bom}");
+
+    // Sub: two parts, the second suppressed in its configuration "Small" (Variant: Full, Small).
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "config_add_input", json!({ "tab": "Sub", "kind": "list", "name": "Variant" }));
+    call(&mut ctx, "config_edit_option", json!({ "tab": "Sub", "input": "Variant", "option": "Default", "name": "Full" }));
+    call(&mut ctx, "config_add_option", json!({ "tab": "Sub", "input": "Variant", "name": "Small" }));
+    call(&mut ctx, "config_configure", json!({ "tab": "Sub", "instance": "Part 1 <2>", "param": "suppressed", "input": "Variant" }));
+    call(&mut ctx, "config_set_value", json!({ "tab": "Sub", "instance": "Part 1 <2>", "param": "suppressed", "configuration": "Small", "value": true }));
+    let sub_cfg = call(&mut ctx, "config_list", json!({ "tab": "Sub" }));
+    let variant = sub_cfg["inputs"][0]["id"].as_str().unwrap().to_string();
+    let sub_small = sub_cfg["inputs"][0]["configurations"].as_array().unwrap().iter().find(|o| o["name"] == "Small").map(|o| o["id"].as_str().unwrap().to_string()).unwrap_or_else(|| panic!("{sub_cfg}"));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Top" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Top", "source": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Top", "source": "Sub" }));
+    call(&mut ctx, "assembly_set_configuration", json!({ "tab": "Top", "instance": "Sub <2>", "configuration": { variant: sub_small } }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Top", "type": "structured", "columns": ["Item", "Quantity"] }));
+    let rows: Vec<(u64, String, u64)> = bom["rows"].as_array().unwrap().iter().map(|r| (r["depth"].as_u64().unwrap(), r["name"].as_str().unwrap().to_string(), r["quantity"].as_u64().unwrap())).collect();
+    assert_eq!(rows, vec![(0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 2), (0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 1)], "{bom}");
+}

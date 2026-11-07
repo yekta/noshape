@@ -262,6 +262,37 @@ pub fn configured_value(ps: &PartStudio, part: &BodyId, prop: &str, active: &Con
     applying_row(&ps.configuration, t, active)?.values.get(prop).cloned()
 }
 
+/// `part`'s properties in configuration `active`: its own, with its configured table's values for that configuration
+/// (None: nothing is configured for it). Appearance, Mass and Tessellation quality are read where they're drawn or
+/// measured.
+pub fn properties_in(ps: &PartStudio, part: &BodyId, active: &ConfigValues) -> Option<PartProperties> {
+    let t = table(ps, part)?;
+    let row = applying_row(&ps.configuration, t, active)?;
+    let mut p = ps.part_properties.get(part).cloned().unwrap_or_default();
+    for prop in &t.properties {
+        let Some(v) = row.values.get(prop) else { continue };
+        let text = (!v.is_empty()).then(|| v.clone());
+        match prop.as_str() {
+            "Name" => p.name = text,
+            "Description" => p.description = text,
+            "Part number" => p.part_number = text,
+            "Revision" => p.revision = text,
+            "Vendor" => p.meta.vendor = text,
+            "Project" => p.meta.project = text,
+            "Product line" => p.meta.product_line = text,
+            "Material" => p.material = text,
+            "Title 1" => p.meta.title1 = text,
+            "Title 2" => p.meta.title2 = text,
+            "Title 3" => p.meta.title3 = text,
+            "Not revision managed" => p.meta.not_revision_managed = v == "true",
+            "Exclude from all BOMs" => p.meta.exclude_from_bom = v == "true",
+            "Unit of measure" => p.meta.unit_of_measure = text.filter(|u| u != UNITS_OF_MEASURE[0]),
+            _ => {}
+        }
+    }
+    Some(p)
+}
+
 /// ⋯ › Copy table: tab-separated, headers first (live: `Size\tShape\tPart
 /// number\nSmall\tA\tPN-1`).
 pub fn copy_table(ps: &PartStudio, part: &BodyId) -> String {
