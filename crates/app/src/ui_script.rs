@@ -669,18 +669,24 @@ pub fn start_page(cx: &mut App) {
             let mut found = Err(String::new());
             if matches!(what, "click" | "dblclick" | "rclick" | "hover") {
                 found = find(&target, cx);
+                // The wheel at the right edge, where no inner list (Keyboard shortcuts') takes it.
+                let (vw, vh) = w.update(cx, |_, window, _| (f32::from(window.viewport_size().width), f32::from(window.viewport_size().height))).unwrap_or((1919., 992.));
                 for _ in 0..12 {
                     let Ok(at) = found else { break };
-                    let vh = w.update(cx, |_, window, _| f32::from(window.viewport_size().height)).unwrap_or(992.);
                     let y = f32::from(at.y);
                     if (60.0..vh - 20.0).contains(&y) {
                         break;
                     }
-                    let wheel = ScrollWheelEvent { position: point(px(960.), px(vh / 2.)), delta: ScrollDelta::Pixels(point(px(0.), px((vh / 2. - y).clamp(-600., 600.)))), ..Default::default() };
+                    let wheel = ScrollWheelEvent { position: point(px(vw - 40.), px(vh / 2.)), delta: ScrollDelta::Pixels(point(px(0.), px((vh / 2. - y).clamp(-600., 600.)))), ..Default::default() };
                     let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
                     sleep(cx, 120).await;
                     redraw(w, cx).await;
                     found = find(&target, cx);
+                }
+                if let Ok(at) = found
+                    && !(0.0..vh).contains(&f32::from(at.y))
+                {
+                    found = Err(format!("{} is out of view", control_name(&target).unwrap_or_default()));
                 }
             }
             let result: Result<(), String> = match what {

@@ -1,0 +1,25 @@
+{
+ "name": "fs-monitor-menu",
+ "about": "Monitor ▾: Monitor / Profile per Part Studio; Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

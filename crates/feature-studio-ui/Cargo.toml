@@ -16,4 +16,5 @@ anyhow.workspace = true
 log.workspace = true
 parking_lot.workspace = true
 regex = "1"
+serde_json.workspace = true
 noshape-workspace-hack = { version = "0.1", path = "../workspace-hack" }

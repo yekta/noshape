@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-only-differences",
+ "about": "compare Main with V1, untick Only show differences (every feature listed)",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Only show differences"
+   }
+  }
+ ]
+}

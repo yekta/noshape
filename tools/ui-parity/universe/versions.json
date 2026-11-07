@@ -1917,7 +1917,21 @@
    "where": "compare bar button: swaps base and target",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:2629"
+   "source": "behaviours.md:2629",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "button": "Reverse compare"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-help",
@@ -1980,7 +1994,21 @@
    "where": "click a feature: two read-only dialogs side by side, changed values outlined",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3509"
+   "source": "behaviours.md:3509",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "panel_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-only-differences",
@@ -1989,7 +2017,21 @@
    "where": "compare panel checkbox (on by default)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3512"
+   "source": "behaviours.md:3512",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Only show differences"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-slider",

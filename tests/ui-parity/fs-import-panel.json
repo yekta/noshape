@@ -1,8 +1,8 @@
 {
  "name": "fs-import-panel",
- "about": "the toolbar's Import: its panel, Escape",
+ "about": "the toolbar's Import: the panel (Current document, Part Studios), then its ✕",
  "area": "studios",
- "source": "everyday (studios 11-07, Feature Studio batch 1)",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
  "start": "fs-studio",
  "steps": [
   {
@@ -18,8 +18,10 @@
    }
   },
   {
-   "do": "key",
-   "key": "Escape"
+   "do": "click",
+   "on": {
+    "button": "Close import"
+   }
   }
  ]
 }

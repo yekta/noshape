@@ -253,7 +253,11 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
   (an expression's result while the cell isn't being edited).
 - A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
-  `features` in Main (start `doc-versions`); `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
+  `features` in Main (start `doc-versions`). While comparing, `document.compare` is `{"base": "Main", "target": "V1",
+  "only_differences": true, "features": [{"name": "Extrude 2", "change": "added"}], "selected": null}` (`features` the
+  compare panel's rows on a Part Studio, `change` modified | removed | added | moved | null; `null` elsewhere); targets
+  `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`;
+  `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
   from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's

@@ -4813,6 +4813,7 @@ dependencies = [
  "noshape-workspace-hack",
  "parking_lot",
  "regex",
+ "serde_json",
 ]
 
 [[package]]

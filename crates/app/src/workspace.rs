@@ -467,6 +467,7 @@ impl Workspace {
         serde_json::json!({
             "workspace": workspace,
             "history": history,
+            "compare": noshape_history_ui::compare_mode::ui_state(&self.doc, self.active, cx),
             "tabs": tabs,
             "folder": open.and_then(|f| d.folder(f).map(|x| x.name.clone())),
             "renaming": renaming,

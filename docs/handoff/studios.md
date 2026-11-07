@@ -28,7 +28,7 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
-### 2026-11-08 00:0x UTC: batch 2 (147 scenarios), DOCS-SELECT-LEAVES-WAL fixed; batch 1 filed with live
+### 2026-11-07 23:44 UTC: batch 2 (147 scenarios), DOCS-SELECT-LEAVES-WAL fixed; batch 1 filed with live
 - Batch 1 (198 scenarios, 7a746fd8) filed in live/REQUESTS.md for live and live2 (23:40). Ours: 176 of 185 clean; the
   failures were the driver (controls below the fold: now wheeled into view; the toolbar's Undo not named) and
   ver-version-restore (ours restores at once, live's Restore to Main… dialog not captured: wait for its recording).

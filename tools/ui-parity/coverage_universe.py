@@ -15,6 +15,7 @@ not covered by anything yet.
 import argparse
 import json
 import re
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -70,7 +71,11 @@ def coverage(area, scenarios_dir):
     for path in sorted(Path(scenarios_dir).glob("*.json")):
         if path.stem == "starts":
             continue
-        sc = json.loads(path.read_text())
+        try:
+            sc = json.loads(path.read_text())
+        except ValueError as e:
+            print(f"{path.name}: not a scenario ({e}), skipped", file=sys.stderr)
+            continue
         scenarios.append((sc.get("name", path.stem), steps_of(sc)))
     hits = {}
     for item in items:

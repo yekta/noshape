@@ -1614,6 +1614,7 @@ impl FeatureStudioView {
             .child(
                 h_flex()
                     .id("fs-monitor")
+                    .map(|d| crate::ui_script::mark(d, || "button:Monitor".into()))
                     .relative()
                     .flex_none()
                     .h(px(29.))

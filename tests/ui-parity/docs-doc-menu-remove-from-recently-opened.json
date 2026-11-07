@@ -6,6 +6,12 @@
  "start": "docs-page",
  "steps": [
   {
+   "do": "click",
+   "on": {
+    "nav": "Recently opened"
+   }
+  },
+  {
    "do": "rclick",
    "on": {
     "doc_row": "uip Bracket"

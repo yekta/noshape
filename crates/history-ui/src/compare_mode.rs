@@ -397,6 +397,7 @@ pub fn render_bar(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
             .child(
                 div()
                     .id("compare-reverse")
+                    .map(|d| crate::ui_script::mark(d, || "button:Reverse compare".into()))
                     .h(px(27.))
                     .px(px(8.))
                     .flex()
@@ -482,6 +483,39 @@ fn units_label(d: &Document) -> String {
     format!("({}, {})", u.length.name().to_lowercase(), u.angle.name().to_lowercase())
 }
 
+/// The panel's feature rows: every feature, or only the changed and moved ones.
+fn panel_rows(s: &CompareSession, a: &noshape_model::partstudio::PartStudio, b: &noshape_model::partstudio::PartStudio) -> Vec<FeatureCompare> {
+    noshape_model::compare::compare_features(a, b).into_iter().filter(|r| !s.only_differences || r.status.is_some() || r.moved.is_some()).collect()
+}
+
+/// Compare mode as the ui-parity state's `document.compare` (tests/ui-parity/README.md "Variable Studio and
+/// Versions"): its two sides and, on a Part Studio, the panel's rows (`change`: modified, removed, added, moved).
+pub fn ui_state(doc: &Entity<DocModel>, tab: Option<TabId>, cx: &App) -> Option<serde_json::Value> {
+    let s = session(doc, cx)?;
+    let mut out = serde_json::json!({ "base": s.base_label, "target": s.target_label, "only_differences": s.only_differences, "features": null, "selected": null });
+    let ps = |d: &Document| tab.and_then(|t| d.tab(t)).and_then(|t| match &t.content {
+        TabContent::PartStudio(p) => Some(p.clone()),
+        _ => None,
+    });
+    let (Some(a), Some(b)) = (ps(&s.base), ps(&s.target)) else { return Some(out) };
+    let configured = |ps: &noshape_model::partstudio::PartStudio, values: &noshape_model::configuration::ConfigValues| {
+        let mut out = ps.clone();
+        out.features = ps.features.iter().map(|f| ps.configuration.for_editing(f, values)).collect();
+        out
+    };
+    let rows = panel_rows(s, &configured(&a, &s.base_config), &configured(&b, &s.target_config));
+    let change = |r: &FeatureCompare| match r.status {
+        _ if r.moved.is_some() => Some("moved"),
+        Some(ChangeKind::Modified) => Some("modified"),
+        Some(ChangeKind::Removed) => Some("removed"),
+        Some(ChangeKind::Added) => Some("added"),
+        None => None,
+    };
+    out["features"] = rows.iter().map(|r| serde_json::json!({ "name": r.name, "change": change(r) })).collect();
+    out["selected"] = serde_json::json!(s.selected.and_then(|id| rows.iter().find(|r| r.id == id)).map(|r| r.name.clone()));
+    Some(out)
+}
+
 /// The Part Studio compare panel (live 953): 400 px in place of the
 /// feature list. `tab` must be a Part Studio on both sides.
 pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyElement> {
@@ -496,7 +530,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
         out
     };
     let (a, b) = (&configured(a, &s.base_config), &configured(b, &s.target_config));
-    let rows: Vec<FeatureCompare> = noshape_model::compare::compare_features(a, b).into_iter().filter(|r| !s.only_differences || r.status.is_some() || r.moved.is_some()).collect();
+    let rows = panel_rows(s, a, b);
     let selected = s.selected.and_then(|id| rows.iter().find(|r| r.id == id)).cloned();
     let side = |name: String, color: u32, units: String| {
         v_flex()
@@ -549,6 +583,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
             let d2 = doc.clone();
             h_flex()
                 .id(SharedString::from(format!("compare-feature-{}-{rk}", id.0)))
+                .map(|d| crate::ui_script::mark(d, || format!("panel_row:{}", r.name)))
                 .group(group.clone())
                 .h(px(29.))
                 .flex_none()
@@ -633,6 +668,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
             .child(
                 h_flex()
                     .id("compare-only-diffs")
+                    .map(|d| crate::ui_script::mark(d, || "checkbox:Only show differences".into()))
                     .h(px(30.))
                     .flex_none()
                     .px(px(10.))

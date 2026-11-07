@@ -546,7 +546,16 @@
    "where": "Feature Studio toolbar right",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3172"
+   "source": "behaviours.md:3172",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Monitor"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-module-outline",
@@ -1167,7 +1176,21 @@
    "where": "Import panel",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1602"
+   "source": "behaviours.md:1602",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      }
+     },
+     {
+      "on": {
+       "button": "re:(Part Studios|Files|Feature Studios|Variable Studios)"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-imp-pick-inserts",
@@ -1176,7 +1199,21 @@
    "where": "Import panel row click",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1599"
+   "source": "behaviours.md:1599",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      }
+     },
+     {
+      "on": {
+       "panel_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-imp-stays-open",
@@ -1185,7 +1222,26 @@
    "where": "Import panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1599"
+   "source": "behaviours.md:1599",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      }
+     },
+     {
+      "on": {
+       "panel_row": "*"
+      }
+     },
+     {
+      "on": {
+       "panel_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-imp-other-doc-version",
@@ -1194,7 +1250,21 @@
    "where": "Import panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1654"
+   "source": "behaviours.md:1654",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      }
+     },
+     {
+      "on": {
+       "button": "Other documents"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-imp-close",
@@ -1203,7 +1273,21 @@
    "where": "Import panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1924"
+   "source": "behaviours.md:1924",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      }
+     },
+     {
+      "on": {
+       "button": "Close import"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-navbar-icon",
@@ -1250,7 +1334,21 @@
    "where": "notices panel",
    "freq": 2,
    "cloud": false,
-   "source": "dom/featurescript-notices-panel.txt"
+   "source": "dom/featurescript-notices-panel.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     },
+     {
+      "on": {
+       "field": "Filter notices"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-filter-button",
@@ -1259,7 +1357,21 @@
    "where": "notices panel",
    "freq": 3,
    "cloud": false,
-   "source": "dom/featurescript-notices-panel.txt"
+   "source": "dom/featurescript-notices-panel.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     },
+     {
+      "on": {
+       "button": "Filter FeatureScript notices"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-expand-stack",
@@ -1318,7 +1430,21 @@
    "where": "Monitor ▾",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3172"
+   "source": "behaviours.md:3172",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Monitor"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Monitor .*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-profile-start",
@@ -1327,7 +1453,21 @@
    "where": "Monitor ▾",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3172"
+   "source": "behaviours.md:3172",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Monitor"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-profile-stop",
@@ -1336,7 +1476,21 @@
    "where": "Monitor split button",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3180"
+   "source": "behaviours.md:3180",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     },
+     {
+      "on": {
+       "button": "Monitor"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-profile-total-badge",

@@ -1,0 +1,27 @@
+{
+ "name": "fs-import-pick",
+ "about": "Import panel › Part Studio 1: an import line goes in after the last import; the panel stays",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Import"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Part Studio 1"
+   }
+  }
+ ]
+}

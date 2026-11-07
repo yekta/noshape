@@ -253,6 +253,7 @@ impl Render for ImportPanel {
         let tab = |id: &'static str, label: &'static str, on: bool, w: f32, h: f32| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
                 .w(px(w))
                 .h(px(h))
                 .flex_none()
@@ -271,6 +272,7 @@ impl Render for ImportPanel {
         let square = |id: &'static str, icon: &'static str, tip: &'static str, on: bool, cx: &App| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{tip}")))
                 .size(px(30.))
                 .flex()
                 .items_center()
@@ -292,7 +294,7 @@ impl Render for ImportPanel {
             .border_b_1()
             .border_color(rgb(LINE))
             .child(div().flex_1().text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(pal.text).child("Import"))
-            .child(div().id("fsimp-close").cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 14., pal.text_faint)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(ImportEvent::Close))));
+            .child(div().id("fsimp-close").map(|d| crate::ui_script::mark(d, || "button:Close import".into())).cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 14., pal.text_faint)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(ImportEvent::Close))));
         let sources = h_flex()
             .h(px(28.))
             .flex_none()
@@ -431,10 +433,18 @@ impl Render for ImportPanel {
         if rows.is_empty() {
             list = list.child(div().px(px(10.)).py(px(8.)).text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(format!("No {} available.", self.kind.label().to_lowercase())));
         }
+        crate::ui_script::note_dialog(|| {
+            let tabs = serde_json::json!([{ "label": "Current document", "selected": !self.other }, { "label": "Other documents", "selected": self.other }]);
+            let items: Vec<&String> = rows.iter().map(|r| &r.1).collect();
+            let fields = serde_json::json!([{ "label": "Kind", "kind": "enum", "text": self.kind.label() }, { "label": "Search", "kind": "string", "text": self.search.read(cx).value().to_string() }, { "label": "Rows", "kind": "list", "items": items }]);
+            serde_json::json!({ "title": "Import", "kind": "other", "tabs": tabs, "fields": fields, "error": null })
+        });
         for (i, (tab_id, name, icon)) in rows.into_iter().enumerate() {
+            let row_mark = format!("panel_row:{name}");
             list = list.child(
                 h_flex()
                     .id(("fsimp-row", i))
+                    .map(|d| crate::ui_script::mark(d, || row_mark))
                     .h(px(40.))
                     .flex_none()
                     .mb(px(1.))

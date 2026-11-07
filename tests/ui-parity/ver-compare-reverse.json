@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-reverse",
+ "about": "compare Main with V1, then Reverse compare (V1 and Main)",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Reverse compare"
+   }
+  }
+ ]
+}

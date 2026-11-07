@@ -6,6 +6,12 @@
  "start": "docs-page",
  "steps": [
   {
+   "do": "click",
+   "on": {
+    "button": "Folders"
+   }
+  },
+  {
    "do": "rclick",
    "on": {
     "doc_row": "uip Folder"

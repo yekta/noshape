@@ -1165,7 +1165,9 @@ impl StartView {
         }
         let v = view.clone();
         let f2 = f.clone();
+        // Live's "Open in new browser tab": the documents page is one window here, so it opens the folder in it.
         menu.item(item("Open", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
+            .item(item("Open in new browser tab", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
             .item(item("Rename", &f, |t, f, w, cx| t.rename_folder(f, w, cx)))
             .item(item("Details", &f, |t, f, _, cx| t.show_folder_details(f, cx)))
             .item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
@@ -2238,6 +2240,8 @@ impl StartView {
         let menu = menu
             .list_no_icons()
             .item(item("Open", &view, &d, |t, d, w, cx| t.open_path(d.path, w, cx)))
+            // Live's "Open in new browser tab": a document always opens in a window of its own here.
+            .item(item("Open in new browser tab", &view, &d, |t, d, w, cx| t.open_path(d.path, w, cx)))
             .item(item("Rename", &view, &d, |t, d, w, cx| t.rename(d, w, cx)))
             .item(item("Copy workspace…", &view, &d, |t, d, w, cx| t.duplicate(d, w, cx)))
             .separator()
