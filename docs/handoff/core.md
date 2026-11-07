@@ -33,6 +33,17 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-07 19:56 UTC: seam pieces shown as one edge; c2-housing-draft to the end.**
+- A section OCCT approximates on each side of a periodic face's seam (two B-splines, tangent, curvatures within 2%)
+  shows as one edge with no vertex (common.cpp shown topology; Parasolid has no seams). The curvature test keeps the
+  twisted vase's profile joints, which only meet tangentially. c2-rings-loft's Circular pattern 1 now has live's
+  counts (273/762/508); its area is still 0.056% short, from the ring's blend faces (blend's). T1
+  seam::a_section_across_a_tori_seam_is_one_edge (a notched torus, live 4/6/4). A studio saved before keeps its pieces
+  and their names (`joined_pieces` stays off there), but shows them joined; the shown topology is cached on the shape,
+  so a C++ gate on legacy_topology() can't hold (kernel_robustness's legacy case is now 5/10/0).
+- The translator reads live's packed Origin query (`Origin.pointOp`): c2-housing-draft 8 -> 22 of 22, to the end.
+- blend's 2e49088a9 regresses learning-center-michael (7 -> 5) and cf-lighten (5 -> 4): written in blend.md.
+
 **State 11-07 19:18 UTC: part patterns of one; c2-rings-loft's Extrude 3.**
 - An extrude up to a cylindrical face runs to the whole cylinder (c2-rings-loft's Extrude 3, 11 -> 12; T1
   features_a::up_to_a_cylinder_face_takes_the_whole_cylinder).

@@ -12,6 +12,13 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
+- Corpus on vibe5, my tree rebased onto main: learning-center-michael 7 -> 5 (Fillet 2 now fails, "Failed to fillet
+  selections.", after 22-52 s; live OK in 46 ms) and cf-lighten 5 -> 4 (Lighten 1's area 48549.85 mm², live
+  48550.21). cf-surface-pattern 34 -> 36 in the same run.
+- With 2e49088a9 undone in my tree (and nothing else changed), learning-center-michael matches to the end again
+  (Fillet 2 662 ms). Repro: `NOSHAPE_PARITY_ONLY=learning-center-michael,cf-lighten` parity_models.
+
 ## List (lead 11-07 18:00)
 1. cf-surface-pattern's Fillet 1 (side rounds against the slanted top extended).
 2. c2-tpd-fillet-variable's variable Fillet 1: exact from its radius law, and fast (1.7 s, live 44 ms).
