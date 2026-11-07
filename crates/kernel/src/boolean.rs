@@ -55,11 +55,15 @@ pub struct BooleanOptions {
     /// Oriented bounding boxes for the interference pre-tests.
     #[serde(default)]
     pub obb: bool,
+    /// At the working scale (`set_working_scale`): OCCT's Booleans of curved faces that coincide (a round's
+    /// region on the faces it rounds) are several times faster there than in metres.
+    #[serde(default)]
+    pub scaled: bool,
 }
 
 impl Default for BooleanOptions {
     fn default() -> Self {
-        BooleanOptions { fuzzy: 0.0, glue: Glue::Off, unify: false, parallel: true, obb: false }
+        BooleanOptions { fuzzy: 0.0, glue: Glue::Off, unify: false, parallel: true, obb: false, scaled: false }
     }
 }
 
@@ -77,6 +81,7 @@ impl BooleanOptions {
             unify: self.unify,
             parallel: self.parallel,
             obb: self.obb,
+            scaled: self.scaled,
         }
     }
 }

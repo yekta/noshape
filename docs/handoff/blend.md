@@ -42,3 +42,20 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   data/surface-pattern-part5.brep: face picked with propagation, and the edge alone without).
 - The document's time isn't the fillet's (44 ms, live 11): Surface Pattern 3 7.7 s (live 537 ms), the next difference
   (11 parts, live 6): custom feature, not a blend.
+
+**11-07 20:20 UTC: two P0 regressions (lead), both fixed in one change.**
+- cf-snap-hook's Fillet 5 (85 faces into Shell 1, live 30; Shell ~27 s): not core's run-on change. skasm's 5baedbe49
+  made Fillet 4 live's (each boss rim a torus R5 from its cap to the floor); Fillet 5 (R1, 4 concave circles where
+  those tori meet the floor) then went through OCCT's fillet, whose volume is live's (401925.854 vs 401925.861 mm³)
+  but whose round is 16 approximate B-spline pieces an edge, and Shell 1 crawled over them. `coaxial_round`: a whole
+  circle between faces of revolution about it (plane across the axis, coaxial cylinder / cone / torus / sphere, a
+  torus or sphere among them) rounds as a torus: the 2D round of the two faces' sections revolved, the region added
+  (concave) or cut (convex). Its fuse runs at the working scale with Glue Shift (new `BooleanOptions::scaled`):
+  306 ms in metres, 38 ms so; Fillet 5 68 ms (live 6; frame / containment checks ~7 ms an edge left), Shell 1
+  535 ms (it was 5.8 s before Fillet 4 changed). Snap-hook 9 -> 11 of 18; next: Plane 1 "Point-Plane requires a
+  point and a plane." (not a blend). T1 model features_c::rounds_where_boss_tori_meet_the_floor_are_tori_as_live
+  (data/snap-hook-case.brep: the case as Fillet 4 leaves it).
+- learning-center-michael's Fillet 2 (failed after 22-52 s, 7 -> 5): my 2e49088a9's "a picked face's edges aren't
+  propagated". The translator gives Fillet 2's eight edge queries as seven edges and the cap face (one query maps to
+  a Face), so the face's edges stopped propagating, the selection "stopped" and went to the section route. Now only a
+  selection of faces alone isn't propagated (live 2202's case); with edges picked too, all are, as before.

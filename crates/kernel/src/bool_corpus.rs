@@ -198,13 +198,14 @@ fn write_failed(dir: &Path, name: &str, bytes: &[u8], call: &Call, error: &str, 
     let _ = std::fs::create_dir_all(dir);
     if std::fs::write(dir.join(format!("{name}.brep")), bytes).is_ok() {
         let text = format!(
-            "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid 0\nvolume 0e0\nfaces 0\nedges 0\nvertices 0\nhistory 0000000000000000\nms {:.3}\npath failed\nerror {}\n",
+            "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nscaled {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid 0\nvolume 0e0\nfaces 0\nedges 0\nvertices 0\nhistory 0000000000000000\nms {:.3}\npath failed\nerror {}\n",
             op_name(op),
             opts.fuzzy,
             glue_name(opts.glue),
             opts.unify as u8,
             opts.parallel as u8,
             opts.obb as u8,
+            opts.scaled as u8,
             objects.len(),
             tools.len(),
             objects.iter().map(|o| o.count(ShapeType::Face)).sum::<usize>(),
@@ -239,13 +240,14 @@ fn write_case(dir: &Path, name: &str, bytes: &[u8], call: &Call, res: &OpResult,
     let _ = std::fs::create_dir_all(dir);
     if std::fs::write(dir.join(format!("{name}.brep")), bytes).is_ok() {
         let text = format!(
-            "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid {}\nvolume {:.17e}\nfaces {}\nedges {}\nvertices {}\nhistory {:016x}\nms {:.3}\npath {}\n",
+            "op {}\nfuzzy {:e}\nglue {}\nunify {}\nparallel {}\nobb {}\nscaled {}\nobjects {}\ntools {}\ntarget_faces {}\nvalid {}\nvolume {:.17e}\nfaces {}\nedges {}\nvertices {}\nhistory {:016x}\nms {:.3}\npath {}\n",
             op_name(op),
             opts.fuzzy,
             glue_name(opts.glue),
             opts.unify as u8,
             opts.parallel as u8,
             opts.obb as u8,
+            opts.scaled as u8,
             objects.len(),
             tools.len(),
             objects.iter().map(|o| o.count(ShapeType::Face)).sum::<usize>(),
@@ -309,7 +311,7 @@ pub fn load(dir: &Path, name: &str) -> Option<Case> {
         "inside_checked" => Glue::InsideChecked,
         _ => Glue::Off,
     };
-    let opts = BooleanOptions { fuzzy: num("fuzzy")?, glue, unify: flag("unify"), parallel: flag("parallel"), obb: flag("obb") };
+    let opts = BooleanOptions { fuzzy: num("fuzzy")?, glue, unify: flag("unify"), parallel: flag("parallel"), obb: flag("obb"), scaled: flag("scaled") };
     let inputs = match std::fs::read(dir.join(format!("{name}.bin"))) {
         Ok(bin) => Shape::from_bin_bytes(&bin).ok()?,
         Err(_) => Shape::from_brep_bytes(&std::fs::read(dir.join(format!("{name}.brep"))).ok()?).ok()?,

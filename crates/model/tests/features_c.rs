@@ -3527,3 +3527,40 @@ fn a_rounded_arc_runs_straight_on_past_its_ends_as_live() {
         assert_eq!(runs, 2);
     }
 }
+
+/// cf-snap-hook's Fillet 5 on its case as Fillet 4 leaves it (live's: the bosses' R5 rounds are tori running from
+/// their caps down to the floor): R1 on the four circles where those tori meet the floor. Each round is one torus (live
+/// adds 4 faces), not OCCT's sixteen B-spline pieces an edge, which Shell 1 then took 27 s over.
+#[test]
+fn rounds_where_boss_tori_meet_the_floor_are_tori_as_live() {
+    let brep = include_str!("data/snap-hook-case.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    assert_eq!(b.shape.faces().len(), 26);
+    let ef = b.shape.edge_faces().unwrap();
+    let faces = b.shape.faces();
+    // The circles between a boss's torus (its axis inside its tube) and the floor plane.
+    let feet: Vec<Reference> = (0..ef.len())
+        .filter(|&e| {
+            let kinds: Vec<_> = ef[e].iter().map(|&f| faces[f as usize].face_surface().unwrap()).collect();
+            kinds.len() == 2 && kinds.iter().any(|k| matches!(k, noshape_kernel::Surface::Torus { major_radius, minor_radius, .. } if major_radius < minor_radius)) && kinds.iter().any(|k| matches!(k, noshape_kernel::Surface::Plane(p) if p.origin.z.abs() < 1e-9 && p.normal.z.abs() > 1.0 - 1e-9))
+        })
+        .map(|e| Reference::Edge((*b.edges[e]).clone()))
+        .collect();
+    assert_eq!(feet.len(), 4);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(feet));
+        p.set("radius", expr("1 mm"));
+        p.set("allowEdgeOverflow", ParamValue::Bool(false));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid());
+    assert_eq!(shape.faces().len(), 30);
+    let v = volume(&r, 0) * 1e9;
+    assert!((401925.0..401926.7).contains(&v), "{v} (live 401925.861)");
+    let rounds = shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Torus { minor_radius, .. }) if near(minor_radius, mm(1.0), 1e-9))).count();
+    assert_eq!(rounds, 4);
+}

@@ -335,7 +335,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             None
         }
     };
-    let picked_edges: BTreeSet<(usize, usize)> = ev.resolve_edges(&refs.iter().filter(|r| !matches!(r, crate::reference::Reference::Face(_))).cloned().collect::<Vec<_>>()).into_iter().collect();
+    let faces_only = refs.iter().all(|r| matches!(r, crate::reference::Reference::Face(_)));
     let groups = by_body(sharp_of_picked_faces(ev, refs));
     // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
@@ -344,8 +344,9 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
-        // Live 2202 / 2227: a picked face's edges aren't propagated (the result doesn't depend on propagation).
-        let mut chain = if propagate { propagate_tangent(&body.shape, &edges.iter().copied().filter(|&e| picked_edges.contains(&(bi, e))).collect::<Vec<_>>()) } else { edges.clone() };
+        // Live 2202 / 2227: picked faces alone, their edges aren't propagated (the result doesn't depend on propagation).
+        // With edges picked too, all are (learning-center-michael's Fillet 2: seven edges and a cap face, as live).
+        let mut chain = if propagate && !faces_only { propagate_tangent(&body.shape, &edges) } else { edges.clone() };
         chain.extend(edges.iter().filter(|&&e| !chain.contains(&e)).copied().collect::<Vec<_>>());
         chain.sort_unstable();
         // The selection stops where its edges run on tangentially into edges left out.
@@ -420,6 +421,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
         // Boss rims whose wall is shorter than the round, overflow off: the ball rolls over the wall's far edge.
         if !ev.bool("allowEdgeOverflow") && super::blend_section::cliff_rim_blend(ev, bi, &edges, &radii)? {
+            continue;
+        }
+        // Whole circles between faces of revolution about them, a torus or sphere among them: exact toroidal rounds.
+        if !width && super::blend_section::coaxial_round(ev, bi, &edges, radius)? {
             continue;
         }
         // Rims whose rounds run off their plane or into each other: each round trimmed by what it meets, as live's.

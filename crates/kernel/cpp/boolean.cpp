@@ -7331,7 +7331,7 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
   std::unique_ptr<ScaledInputs> scaled;
   // (Not every Boolean: scaling all those of 9+ tools made the corpus 25 %
   // slower and changed 7 of 974; the cases that gain are hard ones.)
-  if (op == 1 && n_tools >= 64 && opts.glue == 0 && facets.source.empty() && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
+  if ((opts.scaled || (op == 1 && n_tools >= 64 && opts.glue == 0)) && facets.source.empty() && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr)
   {
     scaled = std::make_unique<ScaledInputs>(working_scale());
     for (TopoDS_Shape& x : a)

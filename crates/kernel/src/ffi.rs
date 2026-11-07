@@ -285,6 +285,8 @@ pub(crate) mod ffi {
         unify: bool,
         parallel: bool,
         obb: bool,
+        /// at the working scale (the kernel's unit, e.g. mm), as op_boolean's cuts by many tools
+        scaled: bool,
     }
 
     #[derive(Debug, Clone, Copy)]

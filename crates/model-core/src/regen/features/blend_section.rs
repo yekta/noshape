@@ -1359,6 +1359,176 @@ pub fn run_on_rim_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) ->
     Ok(true)
 }
 
+/// A face's section through its axis, in (distance from the axis, height along it) about a circle edge's centre.
+enum Meridian {
+    Line { at: glam::DVec2, dir: glam::DVec2 },
+    Circle { center: glam::DVec2, radius: f64 },
+}
+
+/// Rounds of whole circles between faces of revolution about the circle's axis, a torus or sphere among them (cf-snap-hook's
+/// Fillet 5: R1 where the bosses' R5 rounds meet the case's floor): the round is a torus, the 2D round of the two faces'
+/// sections revolved, the region between it and the edge added (concave) or cut away (convex). OCCT approximates it in
+/// sixteen B-spline pieces an edge (live: one face). `Ok(false)` (nothing done) unless every edge is such a circle.
+pub fn coaxial_round(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<bool> {
+    use super::sheetmetal_util::body_named;
+    use glam::DVec2;
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let tol = scale * 1e-9;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let feature = ev.feature;
+    let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    for &e in edges {
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        let k::Curve::Circle { center: o, axis, .. } = info.curve else { return Ok(false) };
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2 && info.closed) else { return Ok(false) };
+        let a = axis.normalize();
+        let p0 = info.start;
+        let x = (p0 - o - a * (p0 - o).dot(a)).normalize();
+        let to3 = |q: DVec2| o + x * q.x + a * q.y;
+        let to2 = |q: DVec3| DVec2::new((q - o).dot(x), (q - o).dot(a));
+        let on_axis = |c: DVec3, ax: DVec3| ax.normalize().cross(a).length() < 1e-9 && (c - o - a * (c - o).dot(a)).length() < tol * 1e3;
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        let mut curved = false;
+        let mut mer = Vec::new();
+        for f in ff {
+            let n = f.normal_at_point(p0)?.normalize();
+            let line = || Meridian::Line { at: to2(p0), dir: DVec2::new(-n.dot(a), n.dot(x)) };
+            mer.push(match f.face_surface()? {
+                k::Surface::Plane(pl) if pl.normal.normalize().cross(a).length() < 1e-9 => line(),
+                k::Surface::Cylinder { origin, axis, .. } | k::Surface::Cone { origin, axis, .. } if on_axis(origin, axis) => line(),
+                k::Surface::Torus { center, axis, major_radius, minor_radius } if on_axis(center, axis) => {
+                    curved = true;
+                    Meridian::Circle { center: DVec2::new(major_radius, (center - o).dot(a)), radius: minor_radius }
+                }
+                k::Surface::Sphere { center, radius, .. } if on_axis(center, a) => {
+                    curved = true;
+                    Meridian::Circle { center: DVec2::new(0.0, (center - o).dot(a)), radius }
+                }
+                _ => return Ok(false),
+            });
+        }
+        if !curved {
+            return Ok(false);
+        }
+        let fr = frame_at(shape, ff, p0, edge.tangent_at(info.first_param)?.normalize(), scale)?;
+        let convex = fr.u[0].dot(fr.m[1]) > 0.0;
+        // The ball's centre: r from both sections, on the material's side of both (convex) or the air's.
+        let side = |i: usize| to2(o + fr.m[i] * if convex { 1.0 } else { -1.0 });
+        let offset = |i: usize| -> Meridian {
+            let s = side(i);
+            match mer[i] {
+                Meridian::Line { at, dir } => {
+                    let nrm = DVec2::new(-dir.y, dir.x).normalize();
+                    Meridian::Line { at: at + nrm * (r * nrm.dot(s).signum()), dir }
+                }
+                Meridian::Circle { center, radius } => {
+                    let away = (to2(p0) - center).dot(s) > 0.0;
+                    Meridian::Circle { center, radius: if away { radius + r } else { radius - r } }
+                }
+            }
+        };
+        let near = to2(p0);
+        let cands: Vec<DVec2> = match (offset(0), offset(1)) {
+            (Meridian::Line { at: a0, dir: d0 }, Meridian::Line { at: a1, dir: d1 }) => {
+                let den = d0.perp_dot(d1);
+                if den.abs() < 1e-12 { vec![] } else { vec![a0 + d0 * ((a1 - a0).perp_dot(d1) / den)] }
+            }
+            (Meridian::Line { at, dir }, Meridian::Circle { center, radius }) | (Meridian::Circle { center, radius }, Meridian::Line { at, dir }) => {
+                let d = dir.normalize();
+                let t = (center - at).dot(d);
+                let h2 = radius * radius - (at + d * t - center).length_squared();
+                if h2 < 0.0 { vec![] } else { vec![at + d * (t - h2.sqrt()), at + d * (t + h2.sqrt())] }
+            }
+            (Meridian::Circle { center: c0, radius: r0 }, Meridian::Circle { center: c1, radius: r1 }) => {
+                let dd = (c1 - c0).length();
+                if dd < 1e-12 || dd > r0 + r1 || dd < (r0 - r1).abs() {
+                    vec![]
+                } else {
+                    let l = (r0 * r0 - r1 * r1 + dd * dd) / (2.0 * dd);
+                    let h = (r0 * r0 - l * l).max(0.0).sqrt();
+                    let u = (c1 - c0) / dd;
+                    let m = c0 + u * l;
+                    vec![m + u.perp() * h, m - u.perp() * h]
+                }
+            }
+        };
+        let Some(c) = cands.into_iter().filter(|c| c.x > r).min_by(|p, q| (*p - near).length().total_cmp(&(*q - near).length())) else { return Ok(false) };
+        if (c - near).length() > 4.0 * r {
+            return Ok(false);
+        }
+        let foot = |m: &Meridian| match *m {
+            Meridian::Line { at, dir } => {
+                let d = dir.normalize();
+                at + d * (c - at).dot(d)
+            }
+            Meridian::Circle { center, radius } => center + (c - center).normalize() * radius,
+        };
+        let t = [foot(&mer[0]), foot(&mer[1])];
+        for i in 0..2 {
+            if (to3(t[i]) - p0).dot(fr.u[i]) <= 0.0 || !ff[i].contains_point(to3(t[i]), scale * 1e-7)? {
+                return Ok(false);
+            }
+        }
+        // Along a section from the edge's point to its touch point.
+        let along = |m: &Meridian, from: DVec2, to: DVec2| -> FResult<Shape> {
+            Ok(match *m {
+                Meridian::Line { .. } => k::make_line(to3(from), to3(to))?,
+                Meridian::Circle { center, radius } => {
+                    let mid = center + ((from - center).normalize() + (to - center).normalize()).normalize() * radius;
+                    k::make_arc_3pts(to3(from), to3(mid), to3(to))?
+                }
+            })
+        };
+        let mid = c + (near - c).normalize() * r;
+        let wire = k::make_wire(&[along(&mer[0], near, t[0])?, k::make_arc_3pts(to3(t[0]), to3(mid), to3(t[1]))?, along(&mer[1], t[1], near)?])?;
+        let tool = k::revolve(&k::make_face_from_wire(&wire, true)?, o, a, std::f64::consts::TAU)?;
+        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+            return Err(fail("the coaxial round's region didn't revolve"));
+        }
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool
+            .shape
+            .faces()
+            .iter()
+            .map(|f| match f.face_surface() {
+                Ok(k::Surface::Torus { major_radius, minor_radius, .. }) if (minor_radius - r).abs() < tol * 1e3 && (major_radius - c.x).abs() < tol * 1e3 => blend.clone(),
+                _ => generated.clone(),
+            })
+            .collect();
+        let named = NamedShape::new(tool.shape, names);
+        if convex { cuts.push(named) } else { adds.push(named) }
+    }
+    let mut named = body_named(&body);
+    for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
+        if tools.is_empty() {
+            continue;
+        }
+        // (At the working scale, an added region glued: OCCT's Boolean of tools lying on the tori they round took
+        // 306 ms in metres, 38 so.)
+        let glue = if op == k::BooleanOp::Fuse { k::Glue::Shift } else { k::Glue::Off };
+        let opts = k::BooleanOptions { glue, scaled: true, ..Default::default() };
+        let shapes: Vec<Shape> = tools.iter().map(|t| t.shape.clone()).collect();
+        let res = k::boolean(op, std::slice::from_ref(&named.shape), &shapes, &opts)?;
+        let mut args: Vec<&crate::naming::ShapeNames> = vec![&named.names];
+        args.extend(tools.iter().map(|t| &t.names));
+        let n = ev.name_result(&args, &res.history, &res.shape, &BTreeMap::new(), None);
+        named = NamedShape::new(res.shape, n);
+    }
+    let un = k::unify_same_domain(&named.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 /// Rounds of boss rims (closed edges where a plane meets a cylinder square to it, the material inside) whose wall is
 /// shorter than the round needs, with Allow edge overflow off: as Onshape's, the ball rolls on the cap and over the
 /// wall's far edge, the round replacing the wall (cf-snap-hook's Fillet 4: R5 on Ø12 bosses 2 mm tall, live 18

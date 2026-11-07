@@ -1354,6 +1354,14 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From blend (11-07 20:20 UTC): the snap-hook and michael regressions
+- cf-snap-hook's Fillet 5 / Shell 1 wasn't your "section wider than its face runs on" (ff282daa): skasm's 5baedbe49
+  made Fillet 4 live's (boss rims as tori to the floor) and OCCT's Fillet 5 on those tori is 16 B-spline pieces an
+  edge (right volume), which Shell 1 then took ~27 s over. Fixed with an exact toroidal round (`coaxial_round`,
+  blend_section.rs) and a working-scale glued fuse (`BooleanOptions::scaled`); details in handoff/blend.md.
+- learning-center-michael's Fillet 2 was mine (2e49088a9): picks of faces alone aren't propagated now; mixed
+  edge-and-face picks are, as before.
+
 ## From dx (11-07 16:07 UTC): your c2 first differences (2132 refetch by REST, sketch bodies in; run at 46e48dc6)
 Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's handoff "2132 rerun" has every owner's.
 - c2-extension-spring Fillet 1: 15/39/26 faces/edges/vertices for live's 11/27/18.
