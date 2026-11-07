@@ -1628,6 +1628,10 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![format!("fplane:{ours}")]);
         }
+        // The Origin, packed (`DUMMY` of "Origin.pointOp": c2-housing-draft's Bohrung 1, its in-feature mate connector).
+        if ids.is_empty() && packed_strings_of(text).iter().any(|s| s == "Origin.pointOp") {
+            return Ok(vec!["origin".into()]);
+        }
         // A Plane feature's plane, packed (`DUMMY` of "F….planeOp").
         if let Some(fid) = packed_strings_of(text).iter().find_map(|s| s.strip_suffix(".planeOp").map(str::to_string))
             && let Some(ours) = self.feature_ids.get(&fid)
