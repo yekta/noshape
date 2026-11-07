@@ -201,10 +201,15 @@ impl DrawingEditor {
 
     /// The ui-parity runner's export of every sheet in `label`'s format with the dialog's defaults (a scenario's
     /// `export`, compared with live's export of the same sheet: tools/drawing-export), bundled as the dialog's.
-    pub fn ui_export(&self, label: &str, cx: &App) -> Result<Vec<u8>, String> {
+    /// `version` (its label in the dialog's Version list) instead of the default: live's dialog remembers its account's
+    /// last one.
+    pub fn ui_export(&self, label: &str, version: Option<&str>, cx: &App) -> Result<Vec<u8>, String> {
         let f = DrawingFormat::ALL.into_iter().find(|f| f.label() == label).ok_or_else(|| format!("no export format {label}"))?;
         let mut settings = ExportSettings::default();
         settings.set_format(f);
+        if let Some(v) = version {
+            settings.version = f.versions().iter().position(|x| *x == v).ok_or_else(|| format!("no {label} version {v}"))?;
+        }
         let sheets: Vec<usize> = (0..self.drawing.sheets.len()).collect();
         let extras = ExportExtras { shaded: self.shaded_exports(), shaded_sheet: self.sheet, watermark: crate::drawing_watermark::text(self.doc.read(cx), self.tab).map(|text| Box::new(move |w: f64, h: f64| crate::drawing_watermark::overlays(&text, w, h)) as Box<noshape_ops::drawing_export::WatermarkFn>) };
         let files = noshape_ops::drawing_export::export_files(&self.drawing, &sheets, &settings, &self.sources, &self.cache, &self.info, &extras)?;

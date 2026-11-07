@@ -560,10 +560,13 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // The drawing's exports after the last step (`"export": ["PDF", "DXF", "DWG"]`), beside the recording as
         // <recording>.<ext>, for tools/drawing-export to compare with live's.
         let mut exported = Vec::new();
-        for format in scenario["export"].as_array().cloned().unwrap_or_default().iter().filter_map(Value::as_str) {
+        // (An entry is the format's name, or {"format", "version"}: live's dialog shows its account's last version.)
+        for entry in scenario["export"].as_array().cloned().unwrap_or_default() {
+            let format = entry.as_str().or_else(|| entry["format"].as_str()).unwrap_or("").to_string();
+            let version = entry["version"].as_str().map(str::to_string);
             let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() else { break };
             let file = out_path().with_extension(format.to_lowercase());
-            match cx.update(|_, cx| d.read(cx).ui_export(format, cx)).map_err(|e| e.to_string()).and_then(|r| r) {
+            match cx.update(|_, cx| d.read(cx).ui_export(&format, version.as_deref(), cx)).map_err(|e| e.to_string()).and_then(|r| r) {
                 Ok(bytes) => match std::fs::write(&file, bytes) {
                     Ok(()) => exported.push(json!(file.display().to_string())),
                     Err(e) => eprintln!("UI-SCRIPT export {format}: {e}"),

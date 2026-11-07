@@ -1496,16 +1496,22 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     // (square-capped on screen, `square_caps`).
     // The sheet's edits (Delete, Move to) apply by each line's key.
     let mut keys: Vec<Option<[i64; 4]>> = Vec::new();
+    // A template line's own pen (the projection symbol's), carried to the lines it is split into.
+    let mut own_pens: Vec<Option<f64>> = Vec::new();
     if sheet.imported.is_none() {
         let lines: Vec<Polyline2> = g.lines.drain(mark_l..).collect();
-        for l in lines {
+        let pen_of: Vec<Option<f64>> = (0..lines.len()).map(|k| g.pens.iter().rev().find(|p| p.lines.contains(&(mark_l + k))).map(|p| p.width_mm)).collect();
+        g.pens.retain(|p| p.lines.end <= mark_l);
+        for (k, l) in lines.into_iter().enumerate() {
             let n = l.points.len();
+            let pen = pen_of[k];
             // A circle (the projection symbol's) stays one line, as live's CIRCLE.
             if l.closed && n > 8 && matches!(super::cad_fit::fit_curve(&l.points, true, 1e-6), Some(super::cad_fit::FitCurve::Circle { .. })) {
                 let key = super::format_line_key(l.points[0], l.points[n / 2]);
                 if !sheet.format_edit(key).is_some_and(|e| e.deleted) {
                     g.lines.push(l);
                     keys.push(Some(key));
+                    own_pens.push(pen);
                 }
                 continue;
             }
@@ -1518,6 +1524,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 }
                 g.lines.push(Polyline2 { points: vec![a, b], style: l.style, closed: false, pick: 0 });
                 keys.push(Some(key));
+                own_pens.push(pen);
             }
         }
     }
@@ -1545,6 +1552,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
         if let Some(width_mm) = layer.thickness(fp) {
             let dashes = g.lines[i].style.dashes().to_vec();
             g.pens.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm, dashes });
+        }
+        if let Some(width_mm) = own_pens.get(i - mark_l).copied().flatten() {
+            g.pens.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm, dashes: Vec::new() });
         }
     }
     for i in mark_t..end_t {

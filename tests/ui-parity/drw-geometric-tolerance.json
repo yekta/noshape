@@ -51,6 +51,9 @@
   "export": [
     "PDF",
     "DXF",
-    "DWG"
+    {
+      "format": "DWG",
+      "version": "2018"
+    }
   ]
 }

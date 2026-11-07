@@ -58,6 +58,9 @@ impl LineStyle {
     }
 }
 
+/// The title block projection symbol's circles and cone (mm): live's PDF pen of 7 plot units of 1/600 in.
+pub const PROJECTION_SYMBOL_PEN_MM: f64 = 7.0 * 25.4 / 600.0;
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Polyline2 {
     pub points: Vec<[f64; 2]>,
@@ -1203,12 +1206,19 @@ impl SheetGeometry {
         let (circ_x, cone_x) = if third { (c[0] - half + big, c[0] - half + 2.0 * big + gap) } else { (c[0] + half - big, c[0] - half) };
         let y = c[1];
         let n = 64;
+        // Live's PDF draws the circles and the cone with a heavier pen (7 plot units, 0.84 pt; drw-note's export),
+        // the axes thin.
+        let heavy = |g: &mut Self| {
+            let i = g.lines.len() - 1;
+            g.pens.push(PenSpan { centered: false, lines: i..i + 1, width_mm: PROJECTION_SYMBOL_PEN_MM, dashes: Vec::new() });
+        };
         for r in [small, big] {
             let pts = (0..n).map(|k| {
                 let t = k as f64 / n as f64 * std::f64::consts::TAU;
                 [circ_x + r * t.cos(), y + r * t.sin()]
             });
             self.lines.push(Polyline2 { points: pts.collect(), style: LineStyle::Thin, closed: true, pick: 0 });
+            heavy(self);
         }
         let at = |u: [f64; 2], t: f64| [circ_x + u[0] * t, y + u[1] * t];
         for u in [[1.0, 0.0], [0.0, 1.0]] {
@@ -1220,6 +1230,7 @@ impl SheetGeometry {
         // The cone, narrow end towards the circles in third angle.
         let (narrow, wide) = if third { (cone_x, cone_x + len) } else { (cone_x + len, cone_x) };
         self.lines.push(Polyline2 { points: vec![[wide, y - big], [wide, y + big], [narrow, y + small], [narrow, y - small]], style: LineStyle::Thin, closed: true, pick: 0 });
+        heavy(self);
         // Its axis: long, short, long dashes from 0.014 before it to 0.013 past it.
         let s = if third { 1.0 } else { -1.0 };
         for (a, b) in [(-0.014, 0.081), (0.097, 0.119), (0.135, 0.229)] {

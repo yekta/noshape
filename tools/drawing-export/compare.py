@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export fidelity of drawings: ours against live's export of the same sheet (lead 11-06).
 
-    tools/drawing-export/compare.py <live dir> <ours dir> [name ...]
+    tools/drawing-export/compare.py <live dir> <ours dir> [name ...] [--drawn-by <name>]...
 
 Each dir holds <name>.pdf / .dxf / .dwg: live's from its runner (a scenario's "export" key, after the last step),
 ours from tools/ui-parity/run.py (the same key). Compared:
@@ -22,6 +22,10 @@ from pathlib import Path
 
 
 # ---------------------------------------------------------------- DXF
+
+# The drawn-by names of the two sides' accounts (the title block's DRAWN), set by --drawn-by.
+DRAWN_BY = set()
+
 
 def dxf_pairs(text):
     lines = text.splitlines()
@@ -95,12 +99,16 @@ def entity_length(e):
     return 0.0
 
 
-MTEXT_CODES = re.compile(r"\\[A-Za-z][^;\\]*;|\\[PpNn~]|[{}]")
+# MTEXT formatting: \H…; \f…; and the like, \P paragraphs, toggles \L \l \O \o \K \k, braces. Line breaks kept apart
+# as they're written: live writes "^J"; another form is a difference.
+MTEXT_CODES = re.compile(r"\\[ACcFfHQTWp][^;\\]*;|\\[LlOoKk~]|[{}]")
+# What differs by machine and account, not by the drawing: a date, the account's name in DRAWN.
+ENVIRONMENT = [re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$")]
 
 
 def text_of(e):
     s = "".join(e.get("3", [])) + "".join(e.get("1", []))
-    return " ".join(MTEXT_CODES.sub(" ", s).split())
+    return " ".join(MTEXT_CODES.sub(" ", s).replace("\\P", " ^J ").split())
 
 
 def dxf_summary(path):
@@ -115,7 +123,7 @@ def dxf_summary(path):
         layer = e.get("8", ["0"])[0]
         if e["type"] in ("TEXT", "MTEXT", "ATTRIB"):
             t = text_of(e)
-            if t:
+            if t and not any(p.match(t) for p in ENVIRONMENT) and t not in DRAWN_BY:
                 texts[(layer, t)] += times
             continue
         k = (layer, e["type"])
@@ -156,7 +164,16 @@ def pdf_words(path):
 PATH_TOKEN = re.compile(r"[MLCZHVmlczhv]|-?\d*\.?\d+(?:e-?\d+)?")
 
 
-def path_length(d):
+def matrix_of(attrs):
+    m = re.search(r'transform="matrix\(([^)]*)\)"', attrs)
+    return [float(x) for x in re.split(r"[ ,]+", m.group(1).strip())] if m else [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+
+
+def path_length(d, m):
+    """The path's drawn length on the page (pt), through its transform `m`; a cubic between its chord and its control
+    polygon."""
+    a, b, c, dd, e, f = m
+    on_page = lambda p: (a * p[0] + c * p[1] + e, b * p[0] + dd * p[1] + f)
     toks, i, pos, start, total = PATH_TOKEN.findall(d), 0, (0.0, 0.0), (0.0, 0.0), 0.0
     cmd = None
     while i < len(toks):
@@ -165,27 +182,28 @@ def path_length(d):
             cmd = t
             i += 1
             if cmd in "Zz":
-                total += math.dist(pos, start)
+                total += math.dist(on_page(pos), on_page(start))
                 pos = start
             continue
         if cmd in ("M", "L"):
             p = (float(toks[i]), float(toks[i + 1]))
             if cmd == "L":
-                total += math.dist(pos, p)
+                total += math.dist(on_page(pos), on_page(p))
             else:
                 start = p
             pos, i = p, i + 2
         elif cmd == "C":
-            pts = [(float(toks[i + k]), float(toks[i + k + 1])) for k in (0, 2, 4)]
-            # A cubic's length: between its chord and its control polygon.
-            total += (math.dist(pos, pts[0]) + math.dist(pts[0], pts[1]) + math.dist(pts[1], pts[2]) + math.dist(pos, pts[2])) / 2
-            pos, i = pts[2], i + 6
+            pts = [on_page((float(toks[i + k]), float(toks[i + k + 1]))) for k in (0, 2, 4)]
+            p0 = on_page(pos)
+            total += (math.dist(p0, pts[0]) + math.dist(pts[0], pts[1]) + math.dist(pts[1], pts[2]) + math.dist(p0, pts[2])) / 2
+            pos, i = (float(toks[i + 4]), float(toks[i + 5])), i + 6
         else:
             i += 1
     return total
 
 
 def pdf_strokes(path):
+    """Stroked length (pt) per (line width in pt, dash pattern in pt), on the page."""
     with tempfile.TemporaryDirectory() as d:
         out = Path(d) / "p.svg"
         subprocess.run(["pdftocairo", "-svg", str(path), str(out)], check=True, capture_output=True)
@@ -200,8 +218,11 @@ def pdf_strokes(path):
         d = re.search(r' d="([^"]+)"', attrs)
         if not d:
             continue
-        key = (round(float(w.group(1)), 2) if w else 1.0, dash.group(1).replace(" ", "") if dash else "solid")
-        per[key] += path_length(d.group(1))
+        mx = matrix_of(attrs)
+        scale = math.sqrt(abs(mx[0] * mx[3] - mx[1] * mx[2]))
+        width = round((float(w.group(1)) if w else 1.0) * scale, 2)
+        pattern = ",".join(f"{float(x) * scale:.1f}" for x in re.split(r"[ ,]+", dash.group(1).strip())) if dash else "solid"
+        per[(width, pattern)] += path_length(d.group(1), mx)
     return per
 
 
@@ -231,8 +252,13 @@ def main():
     if len(sys.argv) < 3:
         print(__doc__)
         return 2
-    live, ours = Path(sys.argv[1]), Path(sys.argv[2])
-    names = sys.argv[3:] or sorted({p.stem for p in live.iterdir() if p.suffix in (".pdf", ".dxf", ".dwg")})
+    args = sys.argv[1:]
+    while "--drawn-by" in args:
+        k = args.index("--drawn-by")
+        DRAWN_BY.add(args[k + 1])
+        del args[k : k + 2]
+    live, ours = Path(args[0]), Path(args[1])
+    names = args[2:] or sorted({p.stem for p in live.iterdir() if p.suffix in (".pdf", ".dxf", ".dwg")})
     ok = total = 0
     for name in names:
         for ext, cmp in ((".pdf", compare_pdf), (".dxf", compare_dxf), (".dwg", compare_dwg)):

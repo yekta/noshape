@@ -4884,6 +4884,10 @@ fn title_block_mtexts_as_lives() {
     let raw = String::from_utf8_lossy(&dxf);
     assert!(raw.contains("\n^JANGULAR = ± °^JFRACTIONAL = ±\r\n") || raw.contains("\n^JANGULAR = ± °^JFRACTIONAL = ±\n"), "angular block");
     assert!(raw.contains("    .XX = ±.0-^J  .XXX = ±.00-^J.XXXX = ±.000-"), "tolerance block");
+    // Release 14 (Export's DXF default; an ANSI file): the breaks as ^J there too (live's drw-note export).
+    let r14 = super::cad_export::to_dxf_version(&b.geometry, 1, acadrust::DxfVersion::AC1014).unwrap();
+    let r14 = String::from_utf8_lossy(&r14);
+    assert!(r14.contains("^JANGULAR = ") && !r14.contains("\\U+E00A"), "Release 14 breaks");
     let doc = acadrust::DxfReader::from_reader(std::io::Cursor::new(dxf)).unwrap().read().unwrap();
     let m: Vec<_> = doc.entities().filter_map(|e| match e {
         EntityType::MText(m) if m.common.layer == "TITLE_BLOCK" => Some(m.clone()),
@@ -4984,6 +4988,19 @@ fn title_block_texts_where_lives_are() {
         let got = circles(g);
         assert!(got.iter().any(|(p, gr)| (p[0] - c[0]).abs() < 0.01 && (p[1] - c[1]).abs() < 0.01 && (gr - r).abs() < 0.01), "{got:?}, live {c:?} r {r}");
     }
+}
+
+/// Live's PDF (drw-note's export): the projection symbol's circles and cone with a pen of 7 plot units (0.84 pt),
+/// its axes and the rest of the title block thin.
+#[test]
+fn ansi_projection_symbol_pen_as_live() {
+    let mut d = Drawing::default();
+    templates::apply_template(&mut d, 0, &templates::DrawingTemplate::standard("ANSI A", SheetSize::AnsiA, TitleBlockStyle::Ansi, true, Projection::ThirdAngle));
+    let b = render_sheet(&d, 0, &super::views::Sources::new(), &ViewCache::new(), false).unwrap();
+    let heavy: Vec<usize> = (0..b.geometry.lines.len()).filter(|&i| (b.geometry.line_pen(i).0 - super::sheet::PROJECTION_SYMBOL_PEN_MM).abs() < 1e-9).collect();
+    // Two circles (one line each) and the cone's four sides.
+    assert_eq!(heavy.len(), 6, "{heavy:?}");
+    assert_eq!(heavy.iter().filter(|&&i| b.geometry.lines[i].closed).count(), 2);
 }
 
 /// Live 1857 (ANSI_A_INCH DXF): the projection symbol's circles are two

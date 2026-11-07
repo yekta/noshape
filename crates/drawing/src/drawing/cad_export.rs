@@ -1396,23 +1396,27 @@ pub fn to_dxf_r12(g: &SheetGeometry, insunits: u8) -> String {
 /// live's `^J` in DXF (acadrust escapes a literal caret), `\P` in DWG.
 const MTEXT_BREAK: char = '\u{E00A}';
 
-/// DXF bytes with [`MTEXT_BREAK`] as `^J`.
+/// DXF bytes with [`MTEXT_BREAK`] as `^J`: the character itself (UTF-8, 2007 and later) or as an ANSI file escapes
+/// it, `\U+E00A` (Release 14 to 2004; live's drw-note export reads `^J` there too).
 fn caret_breaks(dxf: Vec<u8>) -> Vec<u8> {
-    let mark = MTEXT_BREAK.to_string();
-    let mark = mark.as_bytes();
-    if !dxf.windows(mark.len()).any(|w| w == mark) {
+    let raw = MTEXT_BREAK.to_string();
+    let escaped = format!("\\U+{:04X}", MTEXT_BREAK as u32);
+    let marks: [&[u8]; 2] = [raw.as_bytes(), escaped.as_bytes()];
+    if !marks.iter().any(|m| dxf.windows(m.len()).any(|w| w == *m)) {
         return dxf;
     }
     let mut out = Vec::with_capacity(dxf.len());
     let mut i = 0;
-    while i < dxf.len() {
-        if dxf[i..].starts_with(mark) {
-            out.extend_from_slice(b"^J");
-            i += mark.len();
-        } else {
-            out.push(dxf[i]);
-            i += 1;
+    'next: while i < dxf.len() {
+        for m in marks {
+            if dxf[i..].starts_with(m) {
+                out.extend_from_slice(b"^J");
+                i += m.len();
+                continue 'next;
+            }
         }
+        out.push(dxf[i]);
+        i += 1;
     }
     out
 }
