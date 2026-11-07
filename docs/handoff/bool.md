@@ -3,6 +3,50 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Where things stand (2026-11-07 20:05 UTC; paused for the quota until 11-10)
+- **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure
+  there is only vibe2 lacking /root/core-scratch: infra, not the Boolean). RUST-MIRROR-SPLIT-FACES has been fixed
+  since d0838e9a2; T1 kernel_robustness::part_mirror_of_a_half_counterbored_hole_merges_across_the_plane (13eb48ac).
+  BOOL-RUST-LATE-DECLINE is done (2ad474ac): section_from made an edge backwards between two faces' parts of a
+  section that were apart (lo > hi passed the "near" test on a B-spline's long chord). prize-wheel-tim's six Booleans
+  are now all ours, each faster than OCCT. T1 bool_patterns::tools_under_a_sphere_knob_fused_as_occt. The gate was
+  clean: every corpus at 0 differences, parity56 349 -> 351 taken, shfall its known 2, knurl and gear results and
+  times level.
+- **c2-rings-loft's Circular pattern 1 (core, 11-07 19:23; next up): the cut of 51 tools, case 87333ba72edb289e.** To
+  replay it: vibe5 ~/agents/bool-corpora/rl-cut (a link to ~/core-rl-cut), `bin/why.sh rl-cut 87333ba72edb289e`.
+  - Ours declines "a piece's point near a coincident face's boundary" after building the pieces, then OCCT takes
+    4.6 s (live 767 ms). The Boolean's tol is 12.3 um (the input's tolerances), so the grey band is 49 um.
+  - The pieces at fault are the tools' end caps. The tools are 17 instances x 3 solids, all with caps on the same
+    planes (x 1.95 and 6.16 mm), so the caps overlap each other.
+  - Example: piece 272 of face 62 (arg 2 #1). Its sample point is 237 um from its own boundary, but only 40 um from
+    the boundary of the coincident face 224 (arg 29 #1). So that face's edge passes through the piece without
+    splitting it.
+  - Not the pattern shortcuts: it declines the same with the symmetry and the copies off.
+  - Next: print the piece's loop and face 224's edges near the point, and find why that edge isn't in face 62's
+    arrangement (edge_on_surface / edge_in_face between coplanar caps at this tol?). Then try
+    rust_cut_one_by_one, which takes 2-16 tools now, so it would have to take 51.
+  - Debug prints and the two switches (NOSHAPE_BOOL_NO_SYM / NO_COPIES): /root/bool-scratch/wip/rings-cp1-debug-1107.patch.
+- **Impeller (stage 2): live's answer is in (REQUESTS 2246; behaviours.md "bool (2246)").**
+  - On our input, live gives 12 faces. The inlet's wall reaches the z = 0 opening all along: x 14.2 at y +-26.5, x
+    23.3 at y 0. Live also splits the C0 side's inner wall at its kinks.
+  - The real document's loft (core's 2228 export: live-shell target 6 faces / 16 edges / 12 vertices, 45,272.92 mm3) is
+    C1 and has 4 faces like ours. Its inlet is a cubic with zero curvature at x = 10.
+  - Continuing the inlet's polynomial past x = 10 curls it down, so its offset never reaches z = 0 there. A tangent
+    (linear) extension reaches it: x 23.7 against live's 23.3 at y 0. Python check:
+    /root/bool-scratch/py/inlet_ext.py.
+  - WIP patch /root/bool-scratch/wip/stage2-impeller-live-loft-1107d.patch (worktree bool-b), with the test
+    reading live's STEP through IMP_STEP. It adds:
+    - corners at vertices within an edge run (two faces);
+    - the extension long enough by construction (t / sin of the angle to the removed face, by the slowest
+      parameter speed).
+  - With NOSHAPE_SHELL_TANGENT_EXTENSION=1, live's body builds every phase. It then fails "the wall is invalid": one
+    inner face near (4.8, 0, -3.3) mm (BRepCheck 8/11/27, the repair finds no crossing). That's next.
+  - Still open: which extension rule live uses (polynomial on the vase in 1799, about tangent here), and the 0.45 mm
+    difference.
+  - The STEP sent to live was 1000x off. That was my export script, not the app's export (noted in REQUESTS).
+- Then: c2-valve-config's 7-tool cut. Live's capture (2210) is in: over the flat, two vertices on each side, joined by a
+  0.071 mm edge.
+
 ## Shell's direct builder is by_quadrics, bool's: offsets that change the part's topology (11-07 15:01 UTC)
 The lead's call (11-07): Shell's one direct builder is `by_quadrics` (shell.cpp, "Path 2b"), bool owns it, extended in
 stages that each fall back, pass the full gate and are reported per Shell against live (core's walls branch folded in,
