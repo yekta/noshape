@@ -755,6 +755,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P2 SELF-OVERLAPPING-FACE (core; psui 2026-11-07) **c2-fan-blade-sweep's Part 2 bottom face (z -5) is one face of two 2 mm
+  strips joined by a zero-width bridge** (its single loop runs along y -95 twice, overlapping): area 120 mm², but its
+  mesh (BRepMesh: noshape's declines it) covers 717 mm², one triangle across the 21 mm gap between the strips and half of
+  the left strip missing, which shows the inside as a black wedge from below. Live's model has two faces there (or none
+  bridging); the regeneration should leave two faces.
+
 - [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet
   Ansaugflansch zum Gehaeuse 1.3 s, Fillet 4 1.2 s, Delete face 1 0.6 s.** Repro: /root/psui-scratch/open-slow/
