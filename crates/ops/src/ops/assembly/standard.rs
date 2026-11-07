@@ -79,7 +79,7 @@ fn ci_eq(a: &str, b: &str) -> bool {
 }
 
 /// The component named by the arguments (a unique `component` name is enough).
-fn find_component(a: &Args) -> Result<&'static Component, OpError> {
+pub(super) fn find_component(a: &Args) -> Result<&'static Component, OpError> {
     let (st, cat, cl, comp) = (a.opt_str("standard")?, a.opt_str("category")?, a.opt_str("class")?, a.opt_str("component")?);
     let hits: Vec<&'static Component> = standard::CATALOGUE
         .iter()
@@ -94,7 +94,7 @@ fn find_component(a: &Args) -> Result<&'static Component, OpError> {
 }
 
 /// The spec from the arguments over `base` (checked against the catalogue).
-fn apply_spec(mut spec: StandardSpec, c: &Component, a: &Args) -> Result<StandardSpec, OpError> {
+pub(super) fn apply_spec(mut spec: StandardSpec, c: &Component, a: &Args) -> Result<StandardSpec, OpError> {
     if let Some(sz) = a.opt_str("size")? {
         let names = c.size_names();
         let n = names.iter().find(|n| ci_eq(n, sz)).ok_or_else(|| OpError::param("size", &format!("one of {}", names.join(", "))))?;

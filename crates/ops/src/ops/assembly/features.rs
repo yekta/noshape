@@ -73,13 +73,19 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "replace",
             summary: "Replace instances with another part, sketch, Part Studio or assembly",
-            description: "Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, or with `document` + `version` one of another document's named versions (the Replace dialog's Other documents). One edit per instance (\"Replace instance : Part 2\").",
+            description: "Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents), or with `component` Standard content. One edit per instance (\"Replace instance : Part 2\").",
             fields: vec![
                 doc_field(),
                 asm_field(),
                 opt("instance", s(), "Instance id or name."),
                 opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Several instances (ids or names), as the dialog's Instances to replace."),
-                req("source", s(), "Part Studio or Assembly tab (name or id), in `document` when given."),
+                opt("source", s(), "Part Studio or Assembly tab (name or id), in `document` when given; required but with `component`."),
+                opt("component", s(), "Standard content: the component (with `standard`, `category`, `class` when its name is ambiguous, and `size`, `length`)."),
+                opt("standard", s(), "Standard content: the standard."),
+                opt("category", s(), "Standard content: the category."),
+                opt("class", s(), "Standard content: the class."),
+                opt("size", s(), "Standard content: the size (default its default)."),
+                opt("length", s(), "Standard content: the length."),
                 opt("part", s(), "A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio."),
                 opt("sketch", s(), "A sketch of that Part Studio (feature id or name)."),
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
@@ -285,6 +291,12 @@ fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         _ => return Err(OpError::invalid("give `instance` or `instances`")),
     };
     let (source, base) = match (a.opt_str("document")?, a.opt_str("version")?) {
+        _ if a.opt_str("component")?.is_some() => {
+            let c = super::standard::find_component(a)?;
+            let spec = super::standard::apply_spec(noshape_model::assembly::standard::StandardSpec::new(c), c, a)?;
+            let name = spec.part_name();
+            (InstanceSource::Standard { spec }, name)
+        }
         (Some(document), Some(version)) => replacement_from_document(a, document, version)?,
         (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
         (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),

@@ -1775,6 +1775,11 @@ fn assembly_groups_relations_connectors() {
     assert_eq!(sketches, 2, "{rp}");
     let e = try_call(&mut ctx, "assembly_replace", json!({ "source": "Part Studio 1" })).unwrap_err();
     assert!(e.message.contains("instance"), "{e:?}");
+    // Standard content (the dialog's Standard content tab).
+    let rp = call(&mut ctx, "assembly_replace", json!({ "instance": p1, "component": "Hex socket head cap screw ISO 4762", "size": "M6" }));
+    let src = rp["instances"].as_array().unwrap().iter().find(|i| i["id"] == p1).unwrap()["source"].clone();
+    assert!(src["standard_content"].as_str().is_some_and(|n| n.contains("M6")), "{src}");
+    assert!(last(&mut ctx).starts_with("Assembly 1 :: Replace instance : "), "{}", last(&mut ctx));
 }
 
 /// A custom feature written in a Feature Studio, committed, then used in a

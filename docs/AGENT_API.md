@@ -2758,7 +2758,7 @@ Examples:
 
 Replace instances with another part, sketch, Part Studio or assembly (edits the document (one undoable history entry)).
 
-Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, or with `document` + `version` one of another document's named versions (the Replace dialog's Other documents). One edit per instance ("Replace instance : Part 2").
+Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, with `document` + `version` one of another document's named versions (the Replace dialog's Other documents), or with `component` Standard content. One edit per instance ("Replace instance : Part 2").
 
 Examples:
 
@@ -2772,7 +2772,13 @@ Examples:
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `instance` | string |  | Instance id or name. |
 | `instances` | array of string |  | Several instances (ids or names), as the dialog's Instances to replace. |
-| `source` | string | required | Part Studio or Assembly tab (name or id), in `document` when given. |
+| `source` | string |  | Part Studio or Assembly tab (name or id), in `document` when given; required but with `component`. |
+| `component` | string |  | Standard content: the component (with `standard`, `category`, `class` when its name is ambiguous, and `size`, `length`). |
+| `standard` | string |  | Standard content: the standard. |
+| `category` | string |  | Standard content: the category. |
+| `class` | string |  | Standard content: the class. |
+| `size` | string |  | Standard content: the size (default its default). |
+| `length` | string |  | Standard content: the length. |
 | `part` | string |  | A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio. |
 | `sketch` | string |  | A sketch of that Part Studio (feature id or name). |
 | `configuration` | object |  | Configuration of the source: {input id: value}. |

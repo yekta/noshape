@@ -10,7 +10,18 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
-## Latest (2026-11-07 08:00 UTC)
+## Latest (2026-11-07 08:40 UTC)
+- ASM-CONFIGURE-PATTERNS done (live 2209): patterns and mate connectors configurable (rows, dialog fields, configured
+  counts making that configuration's copies, configured edits). Every P1 of the audit is now closed but the rest of
+  ASM-API-GAPS (standard content as a replacement, explode-line entities, mate value typing / reorder, a connector's
+  move from the mate dialog).
+- Model suite: the corpus' part names now map to ours by name, by the only part, or by live's volume band
+  (`.mass.json`): bjr-config 4 → 46/137, clamp 0 → 9/27, gearbox 0 → 11/23, hand-drill 0 → 13/41. What's left is
+  mostly Part Studio translation (dx's translator: variables, patterns, external references).
+- Waiting on live2: config panel focus (which input), the Export format reset, asm-linear-pattern-third-direction,
+  what Edit dynamic suppression shows.
+
+## Before (2026-11-07 08:00 UTC)
 - Since 05:01: every P1 but ASM-CONFIGURE-PATTERNS (waiting on live2) and the rest of ASM-API-GAPS is fixed:
   relation directions (B = −ratio·A), linear pattern Second/Third direction, tapped-hole auto-size, BOM of linked
   parts, configuration variables, flexible subassemblies with relations. New ops: assembly_properties,
