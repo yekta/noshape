@@ -85,11 +85,10 @@ scratch /root/bool-scratch.
   and spheres as copies: parity56's cuts by copies of filleted tools went to ours and 9 differed from OCCT (1abdab7d:
   123 edges, OCCT 117), shfall one more. Tori and spheres out of copy_of again (extrusions and revolutions stay); T1
   bool_patterns::copies_of_a_filleted_tool_cut_as_occt. A change in crates/brep goes through the gate (bool.md top).
-- (22:55 UTC) c2-valve-config's unify after Extrude 1, Extrude 2 and Circular pattern 1: one cone left in two pieces,
-  and unify_in's retry ran three whole unifies in other face orders (40 / 76 / 98 ms). Only the reversed order ever
-  merged more (Extrude 1's pieces, as live's 37 faces; the RUST-MIRROR-SPLIT-FACES and cone T1s; none other in the
-  parity suite): only it now. Valve 630 -> 565 ms on vibe5 (live 175). Extrude 2's and the pattern's pieces stay
-  apart in ours and in OCCT's USD of the same shape (live has the cone whole: 38 / 46 faces, ours 39 / 47).
+- (01:52 UTC) Reverted 2ab0be70 (the unify's retry only in reversed order): the two other orders do merge more in
+  shfall 8b25831a (a Fuse of 12 tools: history differs from OCCT with only the reversed order). Its gate had run on a
+  main with skasm's torus/sphere copies in it, and that case's difference was taken for theirs. Valve's 60 ms back.
+  To try instead: stop the retry where the reversed order merged nothing for the same cone pieces.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change

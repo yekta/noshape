@@ -4464,8 +4464,9 @@ bool cylinder_faces_apart(const TopoDS_Shape& s)
   return false;
 }
 
-// The shape with each shell's faces in reversed order, the same faces; null where it isn't solids.
-TopoDS_Shape shell_faces_reversed(const TopoDS_Shape& s0)
+// The shape with each shell's faces in another order (`k` 1: reversed; 2, 3: the reversed and the plain order
+// turned by half), the same faces; null where it isn't solids.
+TopoDS_Shape faces_reordered(const TopoDS_Shape& s0, int k)
 {
   BRep_Builder bb;
   auto         solid = [&](const TopoDS_Solid& so) {
@@ -4478,7 +4479,10 @@ TopoDS_Shape shell_faces_reversed(const TopoDS_Shape& s0)
       std::vector<TopoDS_Shape> fs;
       for (TopoDS_Iterator f(it.Value(), false, false); f.More(); f.Next())
         fs.push_back(f.Value());
-      std::reverse(fs.begin(), fs.end());
+      if (k == 1 || k == 2)
+        std::reverse(fs.begin(), fs.end());
+      if (k >= 2)
+        std::rotate(fs.begin(), fs.begin() + fs.size() / 2, fs.end());
       TopoDS_Shell sh;
       bb.MakeShell(sh);
       for (const TopoDS_Shape& f : fs)
@@ -4520,11 +4524,9 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
 {
   if (legacy_topology())
     return unify_faces_in(s0, hist, sc, clean);
-  // (Faces on one cylinder or cone USD left apart: again with the faces in reversed order (a part mirrored over a hole
-  // on the mirror plane: its wall left in 4 pieces in 20 of the 24 orders of the half's faces, RUST-MIRROR-SPLIT-FACES),
-  // kept where it has fewer faces, is valid and of the same volume; with the history as it came. Only that order: the
-  // two turned by half never merged more in the parity documents and the tests, and each try is a whole unify again
-  // (c2-valve-config's Extrude 2 and Circular pattern 1: 76 and 98 ms for nothing).)
+  // (Faces on one cylinder USD left apart: again with the faces in other orders (a part mirrored over a hole on the
+  // mirror plane: its wall left in 4 pieces in 20 of the 24 orders of the half's faces, RUST-MIRROR-SPLIT-FACES), the
+  // fewest faces kept where valid and of the same volume; each try with the history as it came.)
   auto copy = [](const HHist& h) {
     HHist c;
     if (!h.IsNull())
@@ -4537,14 +4539,18 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   const bool   may    = cylinder_faces_apart(s0);
   const HHist  before = may ? copy(hist) : HHist();
   TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
-  // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none.)
+  // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none, after
+  // three more passes.)
   if (may && !r.IsSame(s0) && cylinder_faces_apart(r) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");
     GProp_GProps      v0;
     BRepGProp::VolumeProperties(r, v0);
-    if (const TopoDS_Shape sk = shell_faces_reversed(s0); !sk.IsNull())
+    for (int k = 1; k <= 3 && cylinder_faces_apart(r); ++k)
     {
+      const TopoDS_Shape sk = faces_reordered(s0, k);
+      if (sk.IsNull())
+        break;
       HHist              hk = copy(before);
       bool               ck = false;
       const TopoDS_Shape rk = unify_seams_in(sk, hk, sc, clean != nullptr ? &ck : nullptr);
