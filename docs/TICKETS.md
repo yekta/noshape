@@ -804,6 +804,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   1e-7 / 1e-6 and fusing the tools first don't help. The lever: the rounds and their meeting curve built directly from
   the rims' geometry (BLEND-RUST), not through OCCT's surface intersection. Its Chamfer 1 the same way: 523 ms (live
   30 ms) for four notch arcs (four wedges, chamfers and one cut).
+  core 11-07 16:07: Chamfer 1 ~680 -> ~340 ms (vibe5; ~200 ms was its own checks: solid classifications at ~0.7 ms on
+  the rounds' faces, 64 an arc, twice: now 32, none off the part's box, once). Both features are now the tools (~35 ms)
+  and OCCT's one cut (210 ms for the chamfers, 320 for the rounds); Fillet 1 366-413 ms. Left: the cut, i.e. building
+  the blends directly.
 
 - [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet

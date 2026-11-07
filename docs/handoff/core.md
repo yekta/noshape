@@ -16,6 +16,19 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 16:07 UTC: cf-lighten to the end (4 -> 5); ring blends faster.**
+- Lighten 1's last difference (44/106/66 vs live 44/108/68) wasn't Modify fillet: OCCT's offset of its pocket tool
+  (op_offset_faces, BRepOffset_MakeOffset) lost the 0.79 mm strip between two rounds (live's 0.8 mm edges Jih / KitE): a
+  vertex where two tangent faces meet a kept cap sits at their offsets' ill-conditioned crossing, both strip corners on
+  one point (Inter mode and a uniform offset do the same). Where OCCT keeps every face but loses edges, a prism's sides
+  are built directly (`offset_prism_sides`: the cap outline's 2D offset extruded; faces Modified to their offsets).
+  Modify fillet then re-rolls there and the part is live's. T1 kernel features::
+  offset_prism_sides_keep_a_short_face_between_tangent_rounds (data/offset/lighten-tool.brep). In-place Modify fillet
+  isn't needed for it.
+- RING-BLEND-SPEED: Chamfer 1 ~680 -> ~340 ms (rims found once, an arc's rest classified only inside the part's box);
+  what's left is OCCT's cut (TICKETS).
+- Timing note: vibe2 was at load 14-18 this afternoon (its times 3-4x vibe5's); compare times on one idle host.
+
 **State 11-07 14:59 UTC: cf-surface-pattern's Fillet 1, what live's side rounds are.**
 - The fillet's input (dump: vibe2 ~/core-surf/fillet-11, local /root/core-scratch/surf): our chain is the ellipse
   (JtS / bore cylinder) + the two side edges (side planes / sweep) + the two 0.693 mm front lines, the last two by
