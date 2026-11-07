@@ -57,6 +57,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
   click that drw-hide-inspection-items records adding one) is worth a re-record too.
 
+## 11-07 16:59 UTC: export fidelity, PDF and DXF differences worked through (lead: until 24/24 or known live quirks)
+- From 14/24 to 17/24, after these (each from live's own files):
+  - PDF: filled arrowheads and the cutting line's shafts outlined at 1 plot unit (`outlined_fills`); a symbol with no
+    outline in our fonts (GD&T ⌖) written filled, not stroked; a radial / diameter leader starts at the arrow's base;
+    a detail view's own border solid 0.15 mm (Detail profile lines style the parent's circle, now its Phantom).
+  - DXF: the cutting line's shafts as one 4-point SOLID each, no pick line under them; a detail border as its
+    POLYLINE, the parent circle's ARC naming ONS_PHANTOM, the letter on SKETCHED_GEOMETRY, a two-line view label as
+    one MTEXT ("DETAIL A ^JSCALE 2:1"); a feature control frame's TOLERANCE without trailing empty fields; Release 14
+    style names upper case, 26 characters, repeats ending 0, 1… (`r14_style_names`). compare.py now reads TOLERANCE
+    text.
+  - Fixture: the pin-block starts built the hole's disc as Part 1 ("Sketch 1 region 1" is the disc in our region
+    order): now region 0, the block; the start test checks Part 1's volume. Every pin-block scenario ran on it.
+- Known, waiting on live (REQUESTS): the 2 point centerline's overshoot past its picks (~3/32 in); a section's Auto
+  hatch spacing (live 0.1804 in for the block, ours 2.5 mm). The detail view's circle is 3 % bigger in live: its
+  clicks, not ours.
+- Next: an assembly view gets no automatic centermarks (live: "Auto centermarks (Parts)"; set it when the view is
+  made: DrawingSource and the Insert view tool don't know the source is an assembly yet); the BOM table's layout and
+  pens (live: a block of 9 LINEs, 0.72 / 1.08 pt; ours 5 LINEs + a POLYLINE, 0.36 / 1.08).
+
 ## 11-07 16:05 UTC: export fidelity against live's 8 exports (lead's item 3)
 - Ours rerun at ece74c57's binary, compared with `compare.py --drawn-by "LOOPELF LOOPELF" --drawn-by ROOT` (the
   title block's drawn-by is each side's user): **14/24 files** (all 8 DWG, drw-note and drw-insert-front-and-right PDF, 4 DXF; /root/dx-scratch/exp2-cmp.txt).

@@ -952,6 +952,9 @@ fn reference_view<'a>(drawing: &'a Drawing, sheet: &'a Sheet) -> Option<&'a supe
     sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))
 }
 
+/// A detail view's own border (live: 4 plot units, DXF lineweight 15).
+const DETAIL_BORDER_PEN_MM: f64 = 0.15;
+
 /// Annotation lines' pens (live's PDF: dimension and leader lines, GD&T
 /// frames and drawn centerlines at 0.13 mm, 3 plot units), placed before the
 /// annotations' own pens so those still win.
@@ -1929,24 +1932,19 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 g.cad_since(cad_mark, CadLayer::SectionJogLines);
             }
             // Detail boundary ("Show detail view profile"; none with "Clip
-            // border to geometry").
-            // Detail profile lines: Phantom / Dashed / Solid.
-            let detail_line = match vt.detail_line {
-                0 => LineStyle::Phantom,
-                1 => LineStyle::Hidden,
-                _ => LineStyle::Thin,
-            };
+            // border to geometry"): solid, 0.15 mm (live's PDF and DXF
+            // DETAIL_VIEW_BORDER; Detail profile lines style the parent's
+            // circle).
             let cad_mark = g.mark();
             if !v.detail_hide_profile && !v.detail_clip_border {
                 if let Some(poly) = &geo.clip_poly {
-                    g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: detail_line, closed: true, pick: view_pick });
+                    g.lines.push(Polyline2 { points: poly.iter().map(|p| pl.to_sheet(*p)).collect(), style: LineStyle::Thin, closed: true, pick: view_pick });
                 } else if let Some((c, r)) = geo.clip {
-                    g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: detail_line, closed: true, pick: view_pick });
+                    g.lines.push(Polyline2 { points: circle_points(pl.to_sheet(c), pl.len_to_sheet(r), 96), style: LineStyle::Thin, closed: true, pick: view_pick });
                 }
             }
             let border = cad_mark.0..g.lines.len();
-            pen_lines(&mut g, border, &vt.detail_pen);
-            color_lines_since(&mut g, cad_mark, vt.detail_pen.color);
+            pen_lines(&mut g, border, &super::PenProps::new(DETAIL_BORDER_PEN_MM));
             g.cad_since(cad_mark, CadLayer::DetailViewBorder);
             // Automatic centermarks on face-on circles and centerlines on
             // cylinders seen from the side.
@@ -2329,6 +2327,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 y -= 2.0;
             }
             g.cad_text_style_since(label_mark, CadTextStyle::ViewLabel);
+            // Live's DXF: a label of several lines is one MTEXT ("DETAIL A ^JSCALE 2:1").
+            if g.texts.len() > label_mark + 1 {
+                g.cad_mtext_since(label_mark, 0.0, 0.0, false);
+            }
             if let Some(font) = vt.view_label_font.clone().filter(|_| g.texts.len() > label_mark) {
                 g.fonts.push(super::sheet::FontSpan { texts: label_mark..g.texts.len(), font });
             }
@@ -2404,9 +2406,8 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         let neck = [end[0] + sight[0] * a, end[1] + sight[1] * a];
                         let tip = [end[0] + sight[0] * 2.0 * a, end[1] + sight[1] * 2.0 * a];
                         let w = [-sight[1] * a / 24.0, sight[0] * a / 24.0];
+                        g.outlined_fills.push(g.fills.len());
                         g.fills.push(Fill2 { points: vec![[end[0] - w[0], end[1] - w[1]], [neck[0] - w[0], neck[1] - w[1]], [neck[0] + w[0], neck[1] + w[1]], [end[0] + w[0], end[1] + w[1]]] });
-                        // Under the fill, for picking.
-                        g.lines.push(Polyline2 { points: vec![end, neck], style: LineStyle::Thin, closed: false, pick });
                         g.arrow_as(tip, sight, a, vtab.section_arrow.kind);
                         let at = [tip[0] + sight[0] * 1.1 * h, tip[1] + sight[1] * 1.1 * h];
                         g.texts.push(Text2 { pos: at, height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
@@ -2487,6 +2488,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                     // the label on the circle at 0°, the circle broken
                     // around it, an arrow each side along the circle
                     // pointing at it, tips 0.75 of the text height away.
+                    // Drawing properties › Detail views › Detail profile lines: Phantom / Dashed / Solid.
+                    let profile_line = match vtab.detail_line {
+                        0 => LineStyle::Phantom,
+                        1 => LineStyle::Hidden,
+                        _ => LineStyle::Thin,
+                    };
                     let in_line_circle = v.detail_profile.is_none() && v.detail_style != 1 && v.detail_style != 2 && v.detail_label_at.is_none();
                     if in_line_circle && r > 1e-6 {
                         let half = |chord: f64| 2.0 * (chord / (2.0 * r)).min(1.0).asin();
@@ -2496,7 +2503,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         let n = 96;
                         let arc: Vec<[f64; 2]> = (0..=n).map(|i| on(base_a + (std::f64::consts::TAU - 2.0 * base_a) * i as f64 / n as f64)).collect();
                         let line = g.lines.len();
-                        g.lines.push(Polyline2 { points: arc, style: LineStyle::Thin, closed: false, pick });
+                        g.lines.push(Polyline2 { points: arc, style: profile_line, closed: false, pick });
                         pen_lines(&mut g, line..line + 1, &vtab.detail_pen);
                         for sign in [1.0, -1.0] {
                             let (tip, base) = (on(sign * tip_a), on(sign * base_a));
@@ -2505,7 +2512,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                         g.texts.push(Text2 { pos: on(0.0), height: h, text: label.clone(), angle: 0.0, anchor: Anchor::Center, pick });
                     } else {
                         let line = g.lines.len();
-                        g.lines.push(Polyline2 { points: outline, style: LineStyle::Thin, closed: true, pick });
+                        g.lines.push(Polyline2 { points: outline, style: profile_line, closed: true, pick });
                         pen_lines(&mut g, line..line + 1, &vtab.detail_pen);
                     }
                     match (v.detail_style, v.detail_label_at) {
@@ -2540,6 +2547,10 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
             _ => {}
         }
         g.cad_since(cad_mark, if matches!(v.kind, ViewKind::Detail { .. }) { CadLayer::DetailViewParentBorder } else { CadLayer::SectionCuttingLine });
+        // Live's DXF has a detail circle's letter on SKETCHED_GEOMETRY.
+        if matches!(v.kind, ViewKind::Detail { .. }) && g.texts.len() > cad_mark.1 {
+            g.cad.push(super::cad_layers::CadSpan { lines: 0..0, texts: cad_mark.1..g.texts.len(), fills: 0..0, layer: CadLayer::SketchedGeometry });
+        }
     }
 
     // Annotations with resolved references.

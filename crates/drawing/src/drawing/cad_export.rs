@@ -386,7 +386,7 @@ pub fn to_dxf_sheets(sheets: &[(String, SheetGeometry, [f64; 2])], insunits: u8,
     let mut doc = cad_document_sheets(sheets, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
     live_line_types(&mut doc, version);
-    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
+    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map(|b| r14_style_names(b, version)).map_err(|e| e.to_string())
 }
 
 /// Live's line type table: ByBlock, ByLayer, Continuous and only the types a layer or an entity uses (DASHED with
@@ -742,7 +742,9 @@ impl Sheet<'_> {
         // A free-form model edge stays a spline though it looks like an
         // ellipse (live 1857: a fillet's B-spline edges are SPLINEs).
         let free = l.points.len() > 2 && self.g.freeform_lines.binary_search(&li).is_ok();
-        let mut e = match if free { None } else { fit_curve(&l.points, l.closed, FIT_TOL) } {
+        // Live writes a detail view's border as its closed polyline, not a CIRCLE.
+        let fitted = !free && self.g.cad_line_layer(li) != CadLayer::DetailViewBorder;
+        let mut e = match if fitted { fit_curve(&l.points, l.closed, FIT_TOL) } else { None } {
             Some(FitCurve::Circle { center, radius }) => EntityType::Circle(Circle::from_center_radius(p3(center), radius * k)),
             Some(FitCurve::Arc { center, radius, start, end }) => {
                 let mut e = Arc::new();
@@ -790,6 +792,9 @@ impl Sheet<'_> {
         } else if self.g.cad_line_layer(li) == CadLayer::Centermarks {
             // Live 1857: a mark's extended lines CENTER, its cross continuous.
             common.linetype = if l.style == super::sheet::LineStyle::Centerline { "CENTER" } else { "Continuous" }.to_string();
+        } else if self.g.cad_line_layer(li) == CadLayer::DetailViewParentBorder {
+            // Live drw-detail-view: the parent's circle names its linetype.
+            common.linetype = CadLayer::DetailViewParentBorder.line_type().to_string();
         }
         put(doc, e, owner).map(|_| ())
     }
@@ -805,6 +810,16 @@ impl Sheet<'_> {
             None if dim => Color::from_index(7),
             c => color(c),
         };
+        // A quad is one SOLID (live's cutting line shafts), its corners in
+        // DXF's 1 2 4 3 order; else a fan of triangles.
+        if f.points.len() == 4 {
+            let [p0, p1, p2, p3] = [0, 1, 2, 3].map(|k| self.p3(f.points[k]));
+            let mut e = Solid::new(p0, p1, p3, p2);
+            e.common.layer = layer.into();
+            e.common.color = c;
+            put(doc, EntityType::Solid(e), owner)?;
+            return Ok(());
+        }
         for i in 1..f.points.len() - 1 {
             let (a, b, t) = (self.p3(f.points[0]), self.p3(f.points[i]), self.p3(f.points[i + 1]));
             let mut e = Solid::new(a, b, t, t);
@@ -849,7 +864,9 @@ impl Sheet<'_> {
             TextIn::Space => match self.g.cad_mtext_of(ti) {
                 Some(m) => {
                     let v: Vec<String> = m.texts.clone().map(|i| mtext_value(&self.g.texts[i].text)).collect();
-                    let v = v.join(&if m.wrapped { " ".to_string() } else { MTEXT_BREAK.to_string() });
+                    // A view label's lines keep the label's trailing space (its empty suffix) before each break, as live's.
+                    let label = self.g.cad_text_style(m.texts.start) == Some(CadTextStyle::ViewLabel);
+                    let v = v.join(&if m.wrapped { " ".to_string() } else if label { format!(" {MTEXT_BREAK}") } else { MTEXT_BREAK.to_string() });
                     if v.is_empty() { " ".to_string() } else { v }
                 }
                 None => mtext_value(&t.text),
@@ -903,7 +920,12 @@ impl Sheet<'_> {
             .map(|r| {
                 let f = |i: usize| r.get(i).map(|c| mtext_value(c)).unwrap_or_default();
                 let sym = r.first().filter(|c| !c.is_empty()).map(|c| format!("{{\\fDrawing Symbols Sans;{c}}}")).unwrap_or_default();
-                [sym, f(1), String::new(), f(2), f(3), f(4), String::new(), String::new(), String::new()].join("%%v")
+                // Live leaves out the empty fields at the end (a lone symbol: no %%v).
+                let mut fields = vec![sym, f(1), String::new(), f(2), f(3), f(4)];
+                while fields.last().is_some_and(String::is_empty) {
+                    fields.pop();
+                }
+                fields.join("%%v")
             })
             .collect::<Vec<_>>()
             .join("^J");
@@ -1396,6 +1418,56 @@ pub fn to_dxf_r12(g: &SheetGeometry, insunits: u8) -> String {
 /// live's `^J` in DXF (acadrust escapes a literal caret), `\P` in DWG.
 const MTEXT_BREAK: char = '\u{E00A}';
 
+/// A Release 14 DXF's style names as live writes them: upper case, at most
+/// 26 characters ("ONSHAPE-STANDARD-GTOLERANC"); a name that would repeat an
+/// earlier one of its table ends in 0, 1… instead ("…-BOMTABLE-",
+/// "…-BOMTABLE0"). Tables are separate: a text style and a dimension style
+/// may share one.
+fn r14_style_names(dxf: Vec<u8>, version: DxfVersion) -> Vec<u8> {
+    if version != DxfVersion::AC1014 {
+        return dxf;
+    }
+    // (table, long name, short name); the table being written.
+    let mut names: Vec<(Vec<u8>, Vec<u8>, Vec<u8>)> = Vec::new();
+    let mut table: Vec<u8> = Vec::new();
+    let (mut prev, mut prev2): (Vec<u8>, Vec<u8>) = (Vec::new(), Vec::new());
+    let mut out = Vec::with_capacity(dxf.len());
+    for line in dxf.split_inclusive(|b| *b == b'\n') {
+        let body = line.strip_suffix(b"\n").unwrap_or(line);
+        let body = body.strip_suffix(b"\r").unwrap_or(body);
+        if prev2.as_slice() == b"TABLE" && prev.trim_ascii() == b"2" {
+            table = body.to_vec();
+        } else if body == b"ENDTAB" {
+            table.clear();
+        }
+        (prev2, prev) = (std::mem::take(&mut prev), body.to_vec());
+        if !body.starts_with(b"Onshape-Standard") {
+            out.extend_from_slice(line);
+            continue;
+        }
+        let known = names.iter().find(|(t, long, _)| long == body && (table.is_empty() || *t == table));
+        let short = match known {
+            Some((_, _, short)) => short.clone(),
+            None => {
+                let mut short: Vec<u8> = body.iter().take(26).map(u8::to_ascii_uppercase).collect();
+                if short.len() == 26 {
+                    for d in b'0'..=b'9' {
+                        if !names.iter().any(|(t, _, s)| *t == table && *s == short) {
+                            break;
+                        }
+                        short[25] = d;
+                    }
+                }
+                names.push((table.clone(), body.to_vec(), short.clone()));
+                short
+            }
+        };
+        out.extend_from_slice(&short);
+        out.extend_from_slice(&line[body.len()..]);
+    }
+    out
+}
+
 /// DXF bytes with [`MTEXT_BREAK`] as `^J`: the character itself (UTF-8, 2007 and later) or as an ANSI file escapes
 /// it, `\U+E00A` (Release 14 to 2004; live's drw-note export reads `^J` there too).
 fn caret_breaks(dxf: Vec<u8>) -> Vec<u8> {
@@ -1464,7 +1536,7 @@ pub fn to_dxf_version(g: &SheetGeometry, insunits: u8, version: DxfVersion) -> R
     let mut doc = cad_document(g, insunits, version)?;
     strip_layouts_r14(&mut doc, version);
     live_line_types(&mut doc, version);
-    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map_err(|e| e.to_string())
+    DxfWriter::new(&doc).write_to_vec().map(caret_breaks).map(|b| r14_style_names(b, version)).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -1472,6 +1544,21 @@ mod tests {
     use super::*;
     use crate::drawing::sheet::LineStyle;
     use crate::drawing::{DimOrientation, Sheet};
+
+    /// Release 14 style names as live's drw-bom-table.dxf: upper case, 26
+    /// characters, a repeat ending in 0, 1…; other versions untouched.
+    #[test]
+    fn r14_style_names_as_live() {
+        let dxf = b"  2\r\nOnshape-Standard-BomTable-DataRow\r\n  2\r\nOnshape-Standard-BomTable-TitleRow\r\n  2\r\nOnshape-Standard-BomTable-HeaderRow\r\n  3\r\nOnshape-Standard-BomTable-TitleRow\r\n  7\r\nOnshape-Standard\r\n".to_vec();
+        let out = String::from_utf8(r14_style_names(dxf.clone(), DxfVersion::AC1014)).unwrap();
+        let names: Vec<&str> = out.lines().filter(|l| l.starts_with("ONSHAPE")).collect();
+        assert_eq!(names, ["ONSHAPE-STANDARD-BOMTABLE-", "ONSHAPE-STANDARD-BOMTABLE0", "ONSHAPE-STANDARD-BOMTABLE1", "ONSHAPE-STANDARD-BOMTABLE0", "ONSHAPE-STANDARD"]);
+        assert_eq!(r14_style_names(dxf.clone(), DxfVersion::AC1032), dxf);
+        // A text style and a dimension style may share a short name (live's GTOLERANC twice).
+        let two = b"  0\r\nTABLE\r\n  2\r\nSTYLE\r\n  2\r\nOnshape-Standard-GTolerance-TextStyle\r\n  0\r\nENDTAB\r\n  0\r\nTABLE\r\n  2\r\nDIMSTYLE\r\n  2\r\nOnshape-Standard-GTolerance\r\n  0\r\nENDTAB\r\n  3\r\nOnshape-Standard-GTolerance\r\n".to_vec();
+        let out = String::from_utf8(r14_style_names(two, DxfVersion::AC1014)).unwrap();
+        assert_eq!(out.lines().filter(|l| *l == "ONSHAPE-STANDARD-GTOLERANC").count(), 3, "{out}");
+    }
 
     /// Adjust linestyle edges as live writes them (dx-linestyles.dxf): the
     /// LINE with its LTYPE, Dashes as the entity's linetype scale, the

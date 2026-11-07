@@ -101,6 +101,10 @@ pub struct SheetGeometry {
     /// Each annotation's fills (annotation id, fill range): a dangling
     /// one's arrowheads and triangles turn red with it.
     pub annotation_fills: Vec<(u64, std::ops::Range<usize>)>,
+    /// Filled arrowheads and cutting line shafts (fill indices): live's PDF
+    /// outlines each with a 1 plot unit stroke.
+    #[serde(default)]
+    pub outlined_fills: Vec<usize>,
     pub width: f64,
     pub height: f64,
     pub lines: Vec<Polyline2>,
@@ -848,7 +852,10 @@ impl SheetGeometry {
         let (left, right) = ([base[0] - dy * w, base[1] + dx * w], [base[0] + dy * w, base[1] - dx * w]);
         match kind {
             ArrowType::None => {}
-            ArrowType::Filled => self.fills.push(Fill2 { points: vec![tip, left, right] }),
+            ArrowType::Filled => {
+                self.outlined_fills.push(self.fills.len());
+                self.fills.push(Fill2 { points: vec![tip, left, right] });
+            }
             ArrowType::Unfilled => self.lines.push(Polyline2 { points: vec![tip, left, right], style: LineStyle::Thin, closed: true, pick: 0 }),
             ArrowType::Open => self.lines.push(Polyline2 { points: vec![left, tip, right], style: LineStyle::Thin, closed: false, pick: 0 }),
             ArrowType::Oblique => {
@@ -1527,10 +1534,11 @@ impl SheetGeometry {
                         // horizontal shoulder an arrow long on the side
                         // facing the circle, the value inline past its end.
                         // Flipped: the arrow inside pointing out.
+                        // The leader starts at the arrow's base (live's PDF: not under the arrowhead).
                         let start = match (*diameter, *dim_line || self.flip_arrows) {
                             (true, true) => far,
                             (false, true) => c,
-                            (_, false) => tip,
+                            (_, false) => [tip[0] + dir[0] * self.style.dim_arrow, tip[1] + dir[1] * self.style.dim_arrow],
                         };
                         self.lines.push(Polyline2 { points: vec![start, out], style: LineStyle::Thin, closed: false, pick });
                         let (inward, node) = if self.flip_arrows { (1.0, -4.0) } else { (-1.0, 4.0) };
@@ -1900,7 +1908,8 @@ impl SheetGeometry {
                     let (h, rh) = (3.0 * k, 7.0 * k);
                     let cell_w = |c: &str| (font::text_width(c, h) + 3.0 * k).max(7.0 * k);
                     let rows: Vec<&Vec<String>> = std::iter::once(frame).chain(extra.rows.iter()).collect();
-                    let sym_w = rows.iter().filter_map(|r| r.first()).filter(|c| c.as_str() != "Composite").map(|c| cell_w(c)).fold(7.0 * k, f64::max);
+                    // The symbol cell: 2.5 text heights wide at least (live's PDF: 0.30 in at 0.12 in).
+                    let sym_w = rows.iter().filter_map(|r| r.first()).filter(|c| c.as_str() != "Composite").map(|c| cell_w(c)).fold(2.5 * ah, f64::max);
                     // On a dimension it follows the dimension (live request 1624).
                     let frame_w = || rows.iter().map(|r| sym_w + r.iter().skip(1).filter(|c| !c.is_empty()).map(|c| cell_w(c)).sum::<f64>()).fold(0.0, f64::max);
                     let mut beside_leader = None;
@@ -3825,6 +3834,16 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// A filled arrowhead is marked for the PDF's outline; an open one isn't a fill.
+    #[test]
+    fn filled_arrowheads_are_marked() {
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.fills.push(Fill2 { points: vec![[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]] });
+        g.arrow_as([50.0, 50.0], [1.0, 0.0], 3.0, super::ArrowType::Filled);
+        g.arrow_as([60.0, 50.0], [1.0, 0.0], 3.0, super::ArrowType::Open);
+        assert_eq!(g.outlined_fills, vec![1]);
     }
 
     /// Live's nine inspection shapes: a double circle is two rings in the

@@ -4184,8 +4184,9 @@ fn ansi_radial_dimension_leader_knee_and_shoulder() {
         assert!((base[0].hypot(base[1]) - (5.0 + a)).abs() < 1e-9, "outside, pointing in: {f:?}");
         // A third as wide as long (live DXF SOLIDs).
         assert!(((f[1][0] - f[2][0]).hypot(f[1][1] - f[2][1]) - a / 3.0).abs() < 1e-9, "{f:?}");
-        // The leader from the circle to the knee, nothing inside.
-        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], tip) && near(l.points[1], knee)), "{:?}", g.lines);
+        // The leader from the arrow's base to the knee (live's PDF), nothing inside.
+        let from = [100.0 + (5.0 + a) * d[0], 100.0 + (5.0 + a) * d[1]];
+        assert!(g.lines.iter().any(|l| l.points.len() == 2 && near(l.points[0], from) && near(l.points[1], knee)), "{:?}", g.lines);
         // The shoulder on the circle's side, the value inline past it.
         let side = if d[0] < 0.0 { -1.0 } else { 1.0 };
         let end = [knee[0] + side * a, knee[1]];

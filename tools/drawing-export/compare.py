@@ -144,7 +144,7 @@ def dxf_summary(path):
         if times == 0 or e["type"] in ("INSERT", "ATTDEF", "SEQEND", "VERTEX"):
             continue
         layer = e.get("8", ["0"])[0]
-        if e["type"] in ("TEXT", "MTEXT", "ATTRIB"):
+        if e["type"] in ("TEXT", "MTEXT", "ATTRIB", "TOLERANCE"):
             t = text_of(e)
             if t and not any(p.match(t) for p in ENVIRONMENT) and t not in DRAWN_BY:
                 texts[(layer, t)] += times

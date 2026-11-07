@@ -193,7 +193,7 @@ mod tests {
     fn an_assembly_start_builds() {
         let start = json!({ "units": "mm", "features": [
             { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[-20, -20], [20, 20]] }, { "circle": [[0, 0], [5, 0]] }] },
-            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 1"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
+            { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "endBound": "BLIND", "depth": "20 mm", "operationType": "NEW" } },
             { "type": "newSketch", "name": "Sketch 2", "plane": "Top", "shapes": [{ "circle": [[60, 0], [65, 0]] }] },
             { "type": "extrude", "name": "Extrude 2", "params": { "entities": ["Sketch 2 region 0"], "endBound": "BLIND", "depth": "30 mm", "operationType": "NEW" } }
         ], "assembly": {
@@ -209,6 +209,10 @@ mod tests {
         let t: Vec<f64> = pin["translation"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
         assert!((t[0] + 60.0).abs() < 1e-6 && t[1].abs() < 1e-6 && (t[2] + 5.0).abs() < 1e-6, "{pin}");
         assert_eq!(list["mates"][0]["name"], "Revolute 1", "{list}");
+        // "Sketch 1 region 0" is the square with the hole (live's block; our first region), not the hole's disc.
+        let mp = call(&mut ctx, "query_mass_properties", json!({ "tab": "Part Studio 1", "parts": ["Part 1"] })).unwrap();
+        let v = 40.0 * 40.0 * 20.0 - std::f64::consts::PI * 25.0 * 20.0;
+        assert!((mp["volume"].as_f64().unwrap() - v).abs() < 1.0, "{mp}");
         call(&mut ctx, "tab_activate", json!({ "tab": "start pin asm" })).unwrap();
         let _ = std::fs::remove_dir_all(dir);
     }

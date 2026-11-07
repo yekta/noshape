@@ -151,6 +151,18 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
                 fk.push(kind);
                 fo.push(obj);
             }
+        } else if !o.strokes && !g.text_font(i).is_some_and(|f| super::sheet::is_shx(&f.family)) {
+            // A symbol with no outline in our fonts (GD&T ⌖ …): its strokes
+            // filled, as live's outlined text.
+            for st in font::text_strokes_font(&t, g.text_font(i)) {
+                for quad in stroke_quads(&st, stroke_width(&t) / 2.0) {
+                    out.fills.push(Fill2 { points: quad.to_vec() });
+                    fc.push(c);
+                    fl.push(layer);
+                    fk.push(kind);
+                    fo.push(obj);
+                }
+            }
         } else {
             for points in font::text_strokes_font(&t, g.text_font(i)).into_iter().filter(|s| s.len() >= 2) {
                 out.lines.push(Polyline2 { points, style: LineStyle::Thin, closed: false, pick: t.pick });
@@ -204,6 +216,12 @@ pub fn prepare(g: &SheetGeometry, o: &ExportOptions) -> SheetGeometry {
         out.lines.retain(|_| *k.next().unwrap_or(&true));
         let mut k = keep_f.iter();
         out.fills.retain(|_| *k.next().unwrap_or(&true));
+        let kept: Vec<usize> = keep_f.iter().scan(0, |n, k| {
+            let i = *n;
+            *n += *k as usize;
+            Some(i)
+        }).collect();
+        out.outlined_fills = out.outlined_fills.iter().filter(|&&i| keep_f.get(i).copied().unwrap_or(true)).map(|&i| kept.get(i).copied().unwrap_or(i)).collect();
         let mut k = keep_t.iter();
         out.texts.retain(|_| *k.next().unwrap_or(&true));
     }
@@ -251,6 +269,23 @@ pub(crate) fn aci(c: Option<[u8; 3]>) -> u8 {
     const TABLE: [(u8, [u8; 3]); 9] = [(1, [255, 0, 0]), (2, [255, 255, 0]), (3, [0, 255, 0]), (4, [0, 255, 255]), (5, [0, 0, 255]), (6, [255, 0, 255]), (7, [0, 0, 0]), (8, [128, 128, 128]), (9, [192, 192, 192])];
     let d = |a: [u8; 3]| (0..3).map(|i| (a[i] as i32 - c[i] as i32).pow(2)).sum::<i32>();
     TABLE.iter().min_by_key(|(_, rgb)| d(*rgb)).map(|t| t.0).unwrap_or(7)
+}
+
+/// A stroke `r` thick on each side as filled quads, one per segment (all
+/// turning the same way, so a nonzero fill makes their union).
+fn stroke_quads(points: &[[f64; 2]], r: f64) -> Vec<[[f64; 2]; 4]> {
+    points
+        .windows(2)
+        .filter_map(|w| {
+            let (a, b) = (w[0], w[1]);
+            let len = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+            if len < 1e-9 {
+                return None;
+            }
+            let (u, n) = ([(b[0] - a[0]) / len * r, (b[1] - a[1]) / len * r], [-(b[1] - a[1]) / len * r, (b[0] - a[0]) / len * r]);
+            Some([[a[0] - u[0] + n[0], a[1] - u[1] + n[1]], [b[0] + u[0] + n[0], b[1] + u[1] + n[1]], [b[0] + u[0] - n[0], b[1] + u[1] - n[1]], [a[0] - u[0] - n[0], a[1] - u[1] - n[1]]])
+        })
+        .collect()
 }
 
 fn stroke_width(t: &Text2) -> f64 {
@@ -737,14 +772,44 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
             content.push_str("f\n");
         }
     }
-    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
-        layer(&mut content, Some(g.cad_text_layer(ti)));
-        let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
-        for st in font::text_strokes_font(t, g.text_font(ti)) {
-            for (i, p) in st.iter().enumerate() {
+    // Live outlines each filled arrowhead with a 1 plot unit stroke.
+    if !g.outlined_fills.is_empty() {
+        let _ = writeln!(content, "{:.3} w", plot_width(0.0) * pt);
+        for &fi in &g.outlined_fills {
+            let Some(f) = g.fills.get(fi).filter(|f| f.points.len() >= 3) else { continue };
+            layer(&mut content, Some(g.cad_fill_layer(fi)));
+            let _ = writeln!(content, "{} RG", rgb(g.fill_color(fi)));
+            for (i, p) in f.points.iter().enumerate() {
                 path_point(&mut content, p, pt, i == 0);
             }
-            content.push_str("S\n");
+            content.push_str("s\n");
+        }
+    }
+    for (ti, t) in g.texts.iter().enumerate().filter(|(ti, t)| stroked(g, *ti, t)) {
+        layer(&mut content, Some(g.cad_text_layer(ti)));
+        let shx = g.text_font(ti).is_some_and(|f| super::sheet::is_shx(&f.family));
+        if shx {
+            let _ = writeln!(content, "{:.3} w {} RG", stroke_width(t) * pt, rgb(g.text_color(ti)));
+            for st in font::text_strokes_font(t, g.text_font(ti)) {
+                for (i, p) in st.iter().enumerate() {
+                    path_point(&mut content, p, pt, i == 0);
+                }
+                content.push_str("S\n");
+            }
+            continue;
+        }
+        // A symbol our fonts have no outline for (GD&T ⌖ …): its strokes as
+        // filled outlines, as live's PDF fills every glyph (Text Normal).
+        let _ = writeln!(content, "{} rg", rgb(g.text_color(ti)));
+        let r = stroke_width(t) / 2.0;
+        for st in font::text_strokes_font(t, g.text_font(ti)) {
+            for quad in stroke_quads(&st, r) {
+                for (i, p) in quad.iter().enumerate() {
+                    path_point(&mut content, p, pt, i == 0);
+                }
+                content.push_str("h\n");
+            }
+            content.push_str("f\n");
         }
     }
     // Empty title block cells draw nothing.

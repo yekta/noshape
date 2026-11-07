@@ -233,7 +233,7 @@
     "name": "Extrude 1",
     "params": {
      "entities": [
-      "Sketch 1 region 1"
+      "Sketch 1 region 0"
      ],
      "endBound": "BLIND",
      "depth": "20 mm",
@@ -645,7 +645,7 @@
     "name": "Extrude 1",
     "params": {
      "entities": [
-      "Sketch 1 region 1"
+      "Sketch 1 region 0"
      ],
      "endBound": "BLIND",
      "depth": "20 mm",
