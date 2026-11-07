@@ -2407,6 +2407,8 @@ fn op_offset_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("moveFaceType", ParamValue::Enum("OFFSET".into()));
     p.set("moveFaces", ParamValue::Query(faces));
     p.set("offsetDistance", length_param(dist));
+    // (opOffsetFace moves the faces only: Move face's "Reapply fillet" is the feature's, not the operation's.)
+    p.set("reFillet", ParamValue::Bool(false));
     run_op_with(i, &cx, &id, "DIRECT_EDIT_OFFSET_FACE_FAILED", &p, |ev| {
         crate::regen::features::direct::move_face(ev)?;
         keep_modified_names(ev);

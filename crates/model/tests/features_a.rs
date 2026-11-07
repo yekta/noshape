@@ -468,6 +468,23 @@ fn enclose_body() {
     assert!(near(total_volume(&res.context), 2.0 * 8e-6, 1e-6));
 }
 
+/// Enclose of a hollowed part is its cavity, not the part again with the cavity filled (cf-lighten's Lighten encloses
+/// its shelled tools to get their insides, live): a 20 mm block hollowed 2 mm encloses a 16 mm cube.
+#[test]
+fn enclose_of_a_hollowed_part_is_its_cavity() {
+    let mut t = T::new();
+    let (_, x) = t.block(0.0, 0.0, 0.02, 0.02, "20 mm");
+    let part = body_ref(&BodyId { feature: x, index: 0 });
+    t.add("shell", &[("isHollow", b(true)), ("parts", q(vec![part.clone()])), ("thickness", e("2 mm"))]);
+    t.add("enclose", &[("entities", q(vec![part])), ("keepTools", b(true))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 2);
+    let mut v: Vec<f64> = res.context.bodies.iter().map(|b| noshape_kernel::volume_properties(&b.shape).unwrap().mass).collect();
+    v.sort_by(f64::total_cmp);
+    // The hollowed part (8000 - 4096 mm³) and the cavity (4096 mm³), not the filled block (8000).
+    assert!(near(v[0], 0.02f64.powi(3) - 0.016f64.powi(3), 1e-6) && near(v[1], 0.016f64.powi(3), 1e-6), "{v:?}");
+}
+
 /// qa ENCLOSE-NO-REGION-MSG: Enclose of the three default planes: live L30
 /// "Selections do not enclose a region." (was "Failed to create a part from
 /// enclosed region.").

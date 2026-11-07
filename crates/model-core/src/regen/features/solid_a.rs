@@ -1372,6 +1372,21 @@ fn thicken_names(ev: &EvalCtx, inp: &ThickenInput, out: &Shape, tmax: f64) -> Ve
 
 // ------------------------------------------------------------------ enclose
 
+/// Whether `region` is `part`'s material: the same volume, and a point just inside it inside `part`.
+fn is_material_of(region: &Shape, part: &Shape) -> bool {
+    let vol = |s: &Shape| k::volume_properties(s).map(|p| p.mass).unwrap_or(f64::NAN);
+    let (vr, vp) = (vol(region), vol(part));
+    let off = (vr - vp).abs();
+    if off.is_nan() || off > 1e-6 * vp.abs() {
+        return false;
+    }
+    let Some(f) = region.faces().into_iter().next() else { return false };
+    let Some(p) = super::helpers_a::inner_point(&f) else { return false };
+    let Ok(n) = f.normal_at_point(p) else { return false };
+    let step = region.bounding_box(false).map(|b| (b.max - b.min).length() * 1e-6).unwrap_or(1e-9);
+    matches!(part.classify_point(p - n * step, step * 1e-2), Ok(k::PointClass::Inside))
+}
+
 pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     let refs = ev.query("entities");
     // Live L29: the empty field is marked.
@@ -1422,8 +1437,18 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
     if res.shape.count(ShapeType::Solid) == 0 {
         return err("Selections do not enclose a region.");
     }
+    // A region that is a selected part's own material isn't enclosed again: a hollowed part encloses its cavity (live:
+    // cf-lighten's Lighten, which encloses its shelled tools to get their insides).
+    let parts: Vec<&Shape> = shapes.iter().filter(|s| s.count(ShapeType::Solid) > 0).collect();
+    let mut solids = res.shape.solids();
+    if !parts.is_empty() {
+        let empty: Vec<Shape> = solids.iter().filter(|r| !parts.iter().any(|s| is_material_of(r, s))).cloned().collect();
+        if !empty.is_empty() && empty.len() < solids.len() {
+            solids = empty;
+            res.shape = if solids.len() == 1 { solids[0].clone() } else { Shape::compound(&solids) };
+        }
+    }
     // Live L31: every enclosed region goes into one part.
-    let solids = res.shape.solids();
     if solids.len() > 1 {
         let fused = k::boolean(k::BooleanOp::Fuse, &solids[..1], &solids[1..], &k::BooleanOptions::default()).map_err(|_| fe("Failed to create a part from enclosed region."))?;
         let un = k::unify_same_domain(&fused.shape)?;
