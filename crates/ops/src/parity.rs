@@ -1981,6 +1981,16 @@ impl<'a> Translator<'a> {
                 return Ok(only["id"].as_str().map(whole));
             }
         }
+        // None has them all, and they don't close round one (a face's region named by curves of which ours bound it
+        // with only some, others lying along its neighbours' edges: c2-sm-louver's R8BC): the one region bounded by
+        // the most of them.
+        if bounded.is_empty() && !named.is_empty() {
+            let count = |r: &Value| named.iter().filter(|e| r["boundary"].as_array().is_some_and(|b| b.iter().any(|x| x == e.as_str()))).count();
+            let most = all.iter().map(count).max().unwrap_or(0);
+            if let [only] = all.iter().filter(|r| most > 0 && count(r) == most).collect::<Vec<_>>().as_slice() {
+                return Ok(only["id"].as_str().map(whole));
+            }
+        }
         // A text query's face by its edge and side (a piece of a curve from where two curves meet, `INTERSECT`; or the
         // whole curve): the region at a point a hair along that piece from the vertex (-1: the piece starting there, +1:
         // ending there) and a hair to the face's side (+1 its left, as a loop runs; a circle's inside).
