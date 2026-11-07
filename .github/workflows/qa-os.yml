@@ -1,0 +1,59 @@
+name: QA on Windows and macOS
+
+# qa's release checks that need a real desktop (docs/handoff/qa.md): the documents page's folder links
+# (.github/qa/footer.py). Opt-in: run it by hand on a release or a branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to test (default: the latest release)'
+        required: false
+      ref:
+        description: 'Build this branch/commit from source instead of a release'
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  NOSHAPE_NO_NATIVE_DIALOGS: '1'
+  NOSHAPE_NO_SETUP_PROMPT: '1'
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS, os: macos-15, asset: macos-arm64.dmg }
+          - { name: Windows, os: windows-latest, asset: windows-x86_64.zip }
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/noshape-binary
+        with:
+          tag: ${{ inputs.tag }}
+          ref: ${{ inputs.ref }}
+          asset: ${{ matrix.asset }}
+
+      - name: Documents page folder links
+        shell: bash
+        run: |
+          python -m pip install -q pillow || python3 -m pip install -q --break-system-packages pillow
+          py=python; command -v python3 > /dev/null && [ "$RUNNER_OS" != Windows ] && py=python3
+          $py .github/qa/footer.py --bin "$BIN" --out "$RUNNER_TEMP/qa"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qa-${{ matrix.name }}
+          path: ${{ runner.temp }}/qa
+          if-no-files-found: warn
