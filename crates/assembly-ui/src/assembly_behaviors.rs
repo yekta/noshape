@@ -1317,7 +1317,8 @@ impl AssemblyView {
             let tg: Vec<InstanceId> = targets.iter().copied().filter(|id| asm.instance(*id).is_some_and(|i| matches!(i.source, InstanceSource::Assembly { .. }))).collect();
             m.push(item("Dissolve subassembly", move |t, _, cx| t.dissolve_subassemblies(tg.clone(), cx)));
         }
-        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::External { .. }) {
+        // (A subassembly of this document too: live asm-menu-dissolve-subassembly.)
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. } | InstanceSource::External { .. }) {
             let tg = targets.clone();
             m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
@@ -1325,8 +1326,9 @@ impl AssemblyView {
         if !suppressed {
             m.push(export);
         }
-        // Live qa5 CA2: Release… after Export… (the instances' parts).
-        if matches!(inst.source, InstanceSource::Part { .. }) {
+        // Live qa5 CA2: Release… after Export… (the instances' parts; a subassembly's own release items, live
+        // asm-menu-dissolve-subassembly).
+        if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. }) {
             let tg = targets.clone();
             m.push(item("Release…", move |t, w, cx| t.release_instances(tg.clone(), w, cx)));
         }
@@ -1470,6 +1472,14 @@ impl AssemblyView {
     fn release_of(&mut self, insts: Vec<Instance>, window: &mut Window, cx: &mut Context<Self>) {
         let mut items = Vec::new();
         for inst in &insts {
+            if let InstanceSource::Assembly { assembly, .. } = &inst.source {
+                for it in crate::assembly_hooks::release_tab_items(self.doc.read(cx), *assembly) {
+                    if !items.iter().any(|x: &noshape_model::release::ReleaseItem| x.same_object(&it)) {
+                        items.push(it);
+                    }
+                }
+                continue;
+            }
             let InstanceSource::Part { studio, body, config } = &inst.source else { continue };
             // The part's name: the instance name without its " <n>".
             let name = inst.name.rsplit_once(" <").map_or(inst.name.as_str(), |(n, _)| n).to_string();
@@ -1551,9 +1561,8 @@ impl AssemblyView {
         let Some(fid) = self.edit(noshape_ops::assembly::ADD_FOLDER_DESCRIPTION, cx, |a| noshape_ops::assembly::add_folder(a, &instances, &features, &name)) else {
             return;
         };
-        if features.is_empty() {
-            self.expanded.insert(vec![InstanceId(fid.0)]);
-        } else {
+        // A new instance folder stays collapsed (live asm-menu-add-selection-to-folder: "New folder (1)" alone).
+        if !features.is_empty() {
             self.ui.expanded_mates.insert(fid);
         }
         cx.notify();

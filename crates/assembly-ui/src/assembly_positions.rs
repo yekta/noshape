@@ -544,7 +544,7 @@ impl AssemblyView {
                     .overflow_y_scroll()
                     .pt(px(2.))
                     .child(table)
-                    .when(drivers.is_empty() && !asm.named_positions.is_empty(), |d| {
+                    .when(drivers.is_empty() && asm.position_subs.is_empty() && !asm.named_positions.is_empty(), |d| {
                         d.child(
                             // Live 150: flush with the table's left edge, 6 px from the right.
                             v_flex()

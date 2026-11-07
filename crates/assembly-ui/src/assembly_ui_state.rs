@@ -124,7 +124,9 @@ impl AssemblyView {
         // top-level instances (a pattern's or a folder's row where its first
         // instance is), then "Mate features (n)" and its rows by creation.
         let tab = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
-        let mut rows: Vec<Value> = vec![row(&tab, "ok", false, false, false, false), row("Origin", "ok", false, false, false, false)];
+        // The root row is selected while the whole assembly is checked for interference (live asm-root-menu-check-interference).
+        let root = self.ui.interference.as_ref().is_some_and(|d| d.whole);
+        let mut rows: Vec<Value> = vec![row(&tab, "ok", root, false, false, false), row("Origin", "ok", false, false, false, false)];
         let mut placed_groups: HashSet<MateId> = HashSet::new();
         for i in &asm.instances {
             if let Some(p) = asm.generated_by(i.id) {
@@ -135,7 +137,7 @@ impl AssemblyView {
             }
             if let Some(f) = asm.folder_of_instance(i.id) {
                 if placed_groups.insert(f.id) {
-                    rows.push(row(&f.name, "ok", false, false, false, false));
+                    rows.push(row(&format!("{} ({})", f.name, f.instances.len()), "ok", false, false, false, false));
                 }
                 if !self.expanded.contains(&vec![InstanceId(f.id.0)]) {
                     continue;
@@ -326,6 +328,10 @@ impl AssemblyView {
     /// Configuration panel with inputs and nothing configured.
     /// The panel's how-to box, then a Named positions toast after it (live reads both: "<box> / <toast>").
     fn panel_info_and_toast(&self, cx: &App) -> Option<String> {
+        // (Not while the Driving mate selector is open: live asm-mate-menu-edit-driver-mate.)
+        if self.ui.np_driver.is_some() {
+            return None;
+        }
         let toast = self.ui.np_toast.clone();
         match (self.panel_info(cx), toast) {
             (Some(info), Some(t)) => Some(format!("{info} / {t}")),
@@ -339,7 +345,8 @@ impl AssemblyView {
             Some(SidePanel::Explode) if asm.exploded_views.len() == 1 && asm.exploded_views[0].steps.is_empty() => {
                 Some("Build steps by dragging components Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.".into())
             }
-            Some(SidePanel::Positions) if asm.position_drivers.is_empty() && !asm.named_positions.is_empty() => {
+            // (Not once the table has a subassembly column: live asm-menu-add-to-named-positions.)
+            Some(SidePanel::Positions) if asm.position_drivers.is_empty() && asm.position_subs.is_empty() && !asm.named_positions.is_empty() => {
                 Some("Capture variants of the assembly as named positions Position instances in the graphics area and define driving mates.".into())
             }
             Some(SidePanel::Configurations) if !asm.configuration.inputs.is_empty() && asm.configuration.configured.is_empty() => {

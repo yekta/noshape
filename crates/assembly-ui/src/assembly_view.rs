@@ -1869,6 +1869,8 @@ impl AssemblyView {
         match &self.mate {
             Some(m) => m.dialog.read(cx).pick_history(),
             None if self.ui.group.is_some() => (!self.ui.group_picks.0.is_empty(), !self.ui.group_picks.1.is_empty()),
+            // The Driving mate selector has no picks to undo (live asm-mate-menu-edit-driver-mate).
+            None if self.ui.np_driver.is_some() => (false, false),
             None => {
                 let d = self.doc.read(cx);
                 (d.can_undo(), d.can_redo())
@@ -6458,12 +6460,12 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, _, cx| {
-                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) {
+                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, _, cx| {
-                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) {
+                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))

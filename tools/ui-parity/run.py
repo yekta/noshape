@@ -340,6 +340,7 @@ def compare(live, ours):
             lst = side.get("list")
             if isinstance(lst, dict):
                 lst["rows"] = [new_asm(r) for r in lst.get("rows") or []]
+            side["message"] = new_asm(side.get("message"))
             for i in ((side.get("assembly") or {}).get("instances") or []):
                 i["name"] = new_asm(i.get("name"))
             for i in ((side.get("selection") or {}).get("items") or []):
