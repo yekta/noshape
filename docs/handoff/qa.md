@@ -36,6 +36,18 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 08:49: v0.4.34 (published 08:40, run 42350272727, cut c373da6e3) checked: good, no blocker.** Linux files = the smoked
+artifact byte for byte, SHA256SUMS OK, 11 assets, every job green. Smoke = v0.4.33 (the vase's 1e-8 from a7f4c4f9 only); the 44
+ticket documents = green 6d194fa1 (SAVED-CHAMFER-CHANGE is after the cut). **Updater on all three:** Windows: the run's "update
+across UAC" step, 3 scenarios all UPDATED to 0.4.34 with the document reopened at Medium (v0.4.28's helper + Claude Desktop's
+mcp, v0.4.32's helper + an elevated mcp, today's helper + mcp: its update-helper.log says "closing …noshape.exe (4004)",
+"installer exit 0, installed 0.4.34"); macOS: the check job's bundle update passed; Linux (vibe3 :64, v0.4.33's helper): ends on
+0.4.34, g34 reopened, the mcp copy left on the deleted binary and no helper log (UPDATE-HELPER-LINUX-PARITY, now Linux only).
+CI timing tables vs v0.4.33: macOS ~2x faster, Windows 15–30 % faster, Linux 20–28 % slower, but that runner was an EPYC 7763
+(v0.4.33's a 9V74): hardware, not a regression; draft-pool-hang 3.9 / 8.0 / 11.5 s (macOS / Windows / Linux). Memory (fixed
+documents, bin/hwmwrap.sh) within ±6 %. Title bar: all menus open (tickets/titlebar-menus-linux-v0434.png). vibe3 is overloaded
+now (load 12–14 / 8 cores: asm's builds + qa's loops): its timings are noise; use the CI tables or this machine for speed.
+
 **11-07 00:30:** psui's display cache (f297f1b1 / 85c7ebdc, green e02e95e9) checked on vibe3 :65 (bin/cachetest.sh <app>
 <cli wrapper> <tag>): a reopen shows the cached display (pixel-identical); after a change made through the CLI (Extrude 3
 suppressed) the reopen shows the new state at 2 s, never the old one. **Waiting on live (REQUESTS.md line 2201, lead 11-07):
