@@ -1,0 +1,66 @@
+{
+  "name": "drw-hole-table-flip-y",
+  "about": "A hole table's origin indicator › Flip Y direction",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items; the hole_axis and sheet_ref targets)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Hole table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Top"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            -20,
+            -20,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          120
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "hole_axis": "Y"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Flip Y direction"
+      }
+    }
+  ]
+}
