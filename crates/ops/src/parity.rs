@@ -4256,8 +4256,15 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         {
             out.push(format!("{who}: area {:.6} mm², live {:.6}", o.area.unwrap_or(f64::NAN) * 1e6, a * 1e6));
         }
+        // Where live's mass properties are approximate (it gives a volume band), its centroid is as uncertain: the
+        // band's relative half-width times the part's extent each way (c2-rings-loft's ring: our area is the exact
+        // 136.82166 mm² of its profile, live's volume 7e-5 short, its centroid 2 µm off; band ±0.16 %).
+        let centroid_tol = |j: usize| {
+            let rel = l.volume_band.zip(l.volume).map_or(0.0, |([lo, hi], v)| (hi - lo) / 2.0 / v.abs().max(1e-30));
+            l.bbox.map_or(1e-6, |b| (rel * (b[1][j] - b[0][j])).max(1e-6))
+        };
         if let (Some(a), Some(b)) = (o.centroid, l.centroid)
-            && (0..3).any(|j| (a[j] - b[j]).abs() > 1e-6 && !l.centroid_band.is_some_and(|[lo, hi]| a[j] >= lo[j] - 1e-9 && a[j] <= hi[j] + 1e-9))
+            && (0..3).any(|j| (a[j] - b[j]).abs() > centroid_tol(j) && !l.centroid_band.is_some_and(|[lo, hi]| a[j] >= lo[j] - 1e-9 && a[j] <= hi[j] + 1e-9))
         {
             out.push(format!("{who}: centroid {:?} mm, live {:?}", a.map(|c| c * 1e3), b.map(|c| c * 1e3)));
         }

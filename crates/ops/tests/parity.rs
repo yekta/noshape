@@ -997,6 +997,12 @@ fn differences_use_lives_bands() {
     assert!(differences(&[free(round(-0.015, 0.015))], &[free(round(-0.015, 0.0150025))]).is_empty());
     assert!(differences(&[free(round(-0.015, 0.015))], &[free(round(-0.015, 0.0151))]).iter().any(|d| d.contains("box")));
     assert!(differences(&[round(-0.015, 0.015)], &[round(-0.015, 0.0150025)]).iter().any(|d| d.contains("box")));
+    // A centroid within live's volume band's uncertainty along the part (c2-rings-loft's ring: band ±0.16 %, 25.5 mm
+    // tall, 2 µm off), not past it; without a band, 1 µm.
+    let ring = |z: f64, band: bool| PartState { bbox: Some([[0.0, -0.012, -0.01125], [0.008, 0.012, 0.01425]]), centroid: Some([0.004, 0.0, z]), volume_band: band.then_some([0.9984e-6, 1.0016e-6]), ..part(1.0e-6, 6) };
+    assert!(differences(&[ring(0.004043, true)], &[ring(0.004041, true)]).is_empty());
+    assert!(differences(&[ring(0.004043, true)], &[ring(0.00395, true)]).iter().any(|d| d.contains("centroid")));
+    assert!(differences(&[ring(0.004043, false)], &[ring(0.004041, false)]).iter().any(|d| d.contains("centroid")));
 }
 
 /// Variables from a Variable Studio (live's `variables` with a studio
