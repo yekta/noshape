@@ -13,8 +13,11 @@ pub fn active() -> bool {
     *ON.get_or_init(|| std::env::var_os("NOSHAPE_UI_SCRIPT").is_some())
 }
 
-fn bounds() -> &'static Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>> {
-    static B: OnceLock<Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>>> = OnceLock::new();
+/// Each named control's window and bounds when last painted.
+type Marks = Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>>;
+
+fn bounds() -> &'static Marks {
+    static B: OnceLock<Marks> = OnceLock::new();
     B.get_or_init(Default::default)
 }
 
