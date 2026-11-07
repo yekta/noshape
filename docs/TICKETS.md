@@ -744,6 +744,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   app ended on 0.4.32 and reopened g34; the mcp copy (pid 2606651) was left running /proc/…/exe "(deleted)"; no update-helper.log.
 - [x] fixed (lead 11-06: app-core's rust-embed has `debug-embed`, so every profile embeds the icons; green 10:05 has no build-tree asset path) P1 GREEN-ICONS-PATH (lead, greens 4b9d7eaf and b8f46ab6): the green app shows **no icons at all** (toolbar, left rail, feature list, dialog ✓ / ✕, toasts, bottom-right controls; tickets/green-no-icons-4b9d.png) and logs thousands of `could not find asset at path "icons/part.svg"`. Cause: these greens were built in /home/ngyekta/projects/noshape-wt/watch (strings in the binary); 4994be03 and earlier in /root/projects/noshape-wt/watch. crates/app-core/src/assets.rs uses rust-embed 8 without `debug-embed`, so in this non-release profile the icons are read at run time from `<build tree>/crates/app/assets`, which doesn't exist on this box (`has_icon` fails → the `icons/part.svg` fallback fails too; i18n is embedded the same way). A symlink doesn't help (rust-embed canonicalizes and rejects it). qa's workaround: a copy of main's crates/app/assets at /home/ngyekta/projects/noshape-wt/watch/crates/app/assets (+ an empty crates/app-core dir) — icons back (0 errors), but stale when icons change. Fix: build the green where it runs, or enable rust-embed's `debug-embed` feature for the green profile. Release CI builds (release profile) embed the files, so the published app isn't affected (v0.4.12 smoke had icons). (qa 10-28 20:25)
 
+- [x] fixed (psui 2026-11-07 01:52) P0 FLAT-FACE-DARK-WEDGES (user's friend, Windows, v0.4.33; lead 11-07) **A flat face shows
+  dark wedges.** Some of a face's triangles were wound against its normal (noshape's mesher: slivers on an arc flatter than
+  its triangulation grid, c2-sm-louver; BRepMesh too, c2-fan-blade-sweep); since 5423c54a8 (v0.4.32, a closed solid's back
+  faces culled) such a triangle was culled and the solid's inside showed through, drawn dark by the back-face pass. Fixed in
+  the kernel's `tidy_triangles` (every display tessellation: each triangle turned along its corners' normals, none without
+  area). Guard: crates/ops/tests/planar_face_mesh.rs (T1 synthetic plates both meshers at four qualities; T2 the corpus).
+- [ ] P2 DEPTH24-BLANK (psui) **With the Depth24PlusStencil8 fallback (an adapter without DEPTH32FLOAT_STENCIL8) the 3D view
+  renders nothing**: the synthetic cable box forced onto it came out a blank white image (vibe5, lavapipe). Rare (DX12, Metal
+  and current Vulkan drivers have the float format), but the fallback must draw.
+
 ## Core modelling (core)
 - [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet

@@ -186,5 +186,55 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
         .iter()
         .map(|r| EdgeRange { first_point: r[0], point_count: r[1] })
         .collect();
+    tidy_triangles(&mut t);
     Ok(t)
+}
+
+/// Each triangle wound counter-clockwise about its corners' normals (the outward side), and none without area. The
+/// viewport culls a closed solid's back faces, as live does, so a triangle a mesher wound the other way (BRepMesh's,
+/// or a sliver of ours turned over on its grid) left a hole there showing the solid's inside, dark (P0 11-07: dark
+/// wedges on a flat face). Returns how many were turned and how many dropped.
+pub fn tidy_triangles(t: &mut Tessellation) -> (usize, usize) {
+    let v = |a: &[[f32; 3]], i: u32| a.get(i as usize).map_or(glam::DVec3::ZERO, |p| glam::DVec3::new(p[0] as f64, p[1] as f64, p[2] as f64));
+    // The faces' ranges in order, covering the indices: kept triangles packed and the ranges moved with them.
+    let mut at = 0;
+    let packed = t.faces.iter().all(|f| {
+        let ok = f.first_index == at && f.index_count % 3 == 0;
+        at += f.index_count;
+        ok
+    }) && at as usize == t.indices.len();
+    let (mut turned, mut dropped) = (0, 0);
+    let mut keep = |tri: &mut [u32; 3]| {
+        let (a, b, c) = (v(&t.positions, tri[0]), v(&t.positions, tri[1]), v(&t.positions, tri[2]));
+        let cross = (b - a).cross(c - a);
+        let longest = (b - a).length_squared().max((c - b).length_squared()).max((a - c).length_squared());
+        if !(cross.length() > 1e-9 * longest) {
+            dropped += 1;
+            return false;
+        }
+        if cross.dot(v(&t.normals, tri[0]) + v(&t.normals, tri[1]) + v(&t.normals, tri[2])) < 0.0 {
+            tri.swap(1, 2);
+            turned += 1;
+        }
+        true
+    };
+    if !packed {
+        for tri in t.indices.as_chunks_mut::<3>().0 {
+            keep(tri);
+        }
+        return (turned, 0);
+    }
+    let mut out: Vec<u32> = Vec::with_capacity(t.indices.len());
+    for f in &mut t.faces {
+        let start = out.len();
+        for tri in t.indices[f.first_index as usize..(f.first_index + f.index_count) as usize].as_chunks::<3>().0 {
+            let mut tri = *tri;
+            if keep(&mut tri) {
+                out.extend(tri);
+            }
+        }
+        (f.first_index, f.index_count) = (start as u32, (out.len() - start) as u32);
+    }
+    t.indices = out;
+    (turned, dropped)
 }
