@@ -1102,6 +1102,41 @@ export const cube = defineFeature(function(context is Context, id is Id, definit
     assert_eq!((r.custom_matching, r.custom_compared, r.custom.len()), (1, 1, 0), "{:?}", r.custom);
 }
 
+/// A custom feature's lookup path as live saves it, level → option with a level left out (cf-t-slot-joint's
+/// `connectorStandard` names standard, fit and size, not the nut's shape and type): ours in the table's level order,
+/// the missing level at its default (Hex here, not the first option), so the 3 mm cube, not Square's 5 mm.
+#[test]
+fn a_custom_lookup_path_takes_its_tables_level_order_and_defaults() {
+    let source = r#"FeatureScript 3095;
+import(path : "onshape/std/common.fs", version : "3095.0");
+
+const SIZES = { "name" : "standard", "displayName" : "Standard", "entries" : {
+    "ANSI" : { "name" : "shape", "displayName" : "Shape", "default" : "Hex", "entries" : {
+        "Square" : { "name" : "fit", "displayName" : "Fit", "entries" : { "Close" : { "d" : 4 }, "Free" : { "d" : 5 } } },
+        "Hex" : { "name" : "fit", "displayName" : "Fit", "entries" : { "Close" : { "d" : 2 }, "Free" : { "d" : 3 } } } } } } };
+
+annotation { "Feature Type Name" : "Sized cube" }
+export const sizedCube = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Size", "Lookup Table" : SIZES }
+        definition.size is LookupTablePath;
+    }
+    {
+        const d = getLookupTable(SIZES, definition.size).d * millimeter;
+        fCuboid(context, id + "cuboid", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(d, d, d) });
+    });
+"#;
+    let features = json!({
+        "featureStudios": { "0123": { "name": "Sizes", "source": source } },
+        "features": [{ "btType": "BTMFeature-134", "featureType": "sizedCube", "namespace": "e0123::m4567", "featureId": "FC", "name": "Sized cube 1",
+            "parameters": [{ "btType": "BTMParameterLookupTablePath-1419", "parameterId": "size", "value": { "standard": "ANSI", "fit": "Free" } }] }]
+    });
+    let live = vec![json!({ "index": 0, "status": "OK", "parts": [{ "faces": 6, "edges": 12, "vertices": 8, "volume": 27e-9 }] })];
+    let r = run_model("custom-lookup", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// Custom features are counted apart, and their failures reported apart
 /// from geometry: a Feature Studio that doesn't compile, a feature that
 /// throws where live's built; a studio pinned to std 1963 is served at 1963.

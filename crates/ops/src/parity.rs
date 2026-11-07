@@ -726,9 +726,12 @@ impl<'a> Translator<'a> {
                     params.insert(id.to_string(), v);
                     unknown.push(id.to_string());
                 }
-                Ok(Some(v)) => {
-                    params.insert(id.to_string(), v);
-                }
+                Ok(Some(v)) => match lookup_path_in_level_order(ty, id, v) {
+                    Ok(v) => {
+                        params.insert(id.to_string(), v);
+                    }
+                    Err(e) => problems.push(format!("{id}: {e}")),
+                },
                 Err(e) => problems.push(format!("{id}: {e}")),
             }
         }
@@ -3803,6 +3806,39 @@ fn sketch_moved(before: &Value, after: &Value) -> f64 {
 }
 
 /// The strings of a query's packed form (`qCompressed(1.0, "…", id)`), if any.
+/// A custom feature's lookup path as live gives it (level key → option: `{"standard": "ANSI", "fit": "Free", …}`), as
+/// ours takes it: the options in the order of its table's levels (the table its Feature Studio defines), a level live
+/// leaves out at its default. Other values as they are.
+fn lookup_path_in_level_order(ty: &str, id: &str, v: Value) -> Result<Value, String> {
+    let Value::Object(by_level) = &v else { return Ok(v) };
+    let table = noshape_model::features::get(ty).and_then(|t| t.params.iter().find(|s| s.id == id)).and_then(|s| match s.kind {
+        noshape_model::params::ParamKind::Lookup { table } => Some(table),
+        _ => None,
+    });
+    let Some(table) = table else { return Ok(v) };
+    // (A level live leaves out is at its default: T-Slot Joint's nut shape and type.)
+    use noshape_model::features::hole_tables::{table_level_default, table_level_key};
+    let mut path: Vec<String> = Vec::new();
+    let mut used = 0;
+    while let Some(level) = table_level_key(table, &path) {
+        let option = match by_level.get(&level).and_then(Value::as_str) {
+            Some(o) => {
+                used += 1;
+                o.to_string()
+            }
+            None => match table_level_default(table, &path) {
+                Some(d) => d,
+                None => break,
+            },
+        };
+        path.push(option);
+    }
+    if used < by_level.len() {
+        return Err(format!("lookup path {v} only partly in its table ({})", path.join(" › ")));
+    }
+    Ok(json!(path))
+}
+
 fn packed_strings_of(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next())
