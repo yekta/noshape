@@ -1,0 +1,25 @@
+{
+ "name": "fs-search-pane",
+ "about": "Ctrl+Shift+F: the FeatureScript search pane",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+shift+f"
+  }
+ ]
+}

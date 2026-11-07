@@ -1,0 +1,21 @@
+{
+ "name": "doc-tab-manager-filter",
+ "about": "Tab manager: Filter tabs: the type filters",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Filter tabs"
+   }
+  }
+ ]
+}

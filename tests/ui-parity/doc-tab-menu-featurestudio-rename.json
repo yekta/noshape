@@ -1,0 +1,34 @@
+{
+ "name": "doc-tab-menu-featurestudio-rename",
+ "about": "Feature Studio tab › Rename, type, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Gears"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

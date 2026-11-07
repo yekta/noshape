@@ -1,0 +1,22 @@
+{
+ "name": "prefs-mouse-preset",
+ "about": "Mouse controls › View settings › SOLIDWORKS, Save mouse controls",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Mouse controls › View settings",
+    "pick": "SOLIDWORKS"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mouse controls › Save mouse controls"
+   }
+  }
+ ]
+}

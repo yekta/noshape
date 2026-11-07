@@ -1,0 +1,37 @@
+{
+ "name": "prefs-shortcut-edit-confirm",
+ "about": "Keyboard shortcuts › Extrude: Alt+X confirmed (the row customized), then the row's Reset",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Confirm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Reset Extrude"
+   }
+  }
+ ]
+}

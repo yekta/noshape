@@ -1,0 +1,27 @@
+{
+ "name": "doc-menu-copy-workspace",
+ "about": "☰ › Copy workspace…: the modal (name '<name> - Copy'), then cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

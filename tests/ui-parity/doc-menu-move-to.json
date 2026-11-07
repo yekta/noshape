@@ -1,0 +1,27 @@
+{
+ "name": "doc-menu-move-to",
+ "about": "☰ › Move to…: the modal, then cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

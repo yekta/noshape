@@ -1,0 +1,21 @@
+{
+ "name": "ver-other-workspace-dblclick",
+ "about": "double-click B1's row: that workspace",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "history_row": "B1"
+   }
+  }
+ ]
+}

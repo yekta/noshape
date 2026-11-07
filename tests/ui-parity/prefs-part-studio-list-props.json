@@ -1,0 +1,21 @@
+{
+ "name": "prefs-part-studio-list-props",
+ "about": "Part Studio settings › Display parts list properties, Save Part Studio settings",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Part Studio settings › Display parts list properties"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Part Studio settings › Save Part Studio settings"
+   }
+  }
+ ]
+}

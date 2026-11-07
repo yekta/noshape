@@ -28,6 +28,21 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-07 23:26 UTC: restarted on a pinned account; the previous agent's work landed
+- Page driver (next-step 1): a document opened from the documents page is read as the document now (docs-create-document
+  step 4: tabs Part Studio 1, Assembly 1, workspace Main); nothing left to fix there.
+- Recorder: the documents page's name prompts (New document / folder, Rename, Create label) note their fields
+  (name, labels, location as shown) and buttons; every primary / cancel / danger / secondary button is clickable by its
+  text, `modal-ok` / `modal-cancel` by role; Preferences: every section's controls are noted as "<Section> › <label>"
+  (Keyboard shortcuts: tab, customized rows, Edit / Reset per row, the Edit shortcut popup as a modal; Shortcut
+  toolbars: Toolbar select, ticked Tools list, a checkbox per tool; Material libraries; User export rules and their
+  dialog; Language, Theming, Mouse, Drawings, Labs, Updates).
+- Starts: `branches` (workspace from Main's head with its own features; start doc-branches; ops test
+  `a_start_with_a_workspace_builds`).
+- Scenarios: 198 (doc 75, docs 15, prefs 28, ver 30, vs 19, fs 31); ours ran them on :108 (/root/studios-scratch/uip2).
+- Coverage: documents 126/313 (40.3 %), versions 47/174 (27.0 %), Variable Studio 18/98 (18.4 %), Feature Studio
+  42/119 (35.3 %). Match: no live recordings yet (req-batch1 to file next).
+
 ### 2026-11-07 22:31 UTC: P0 "an agent's first MCP calls fail" (lead, user's screenshot of a Claude Desktop session)
 - `~` paths: `noshape_scene::expand_home` (`~`, `~/…`, `~\…`), applied in `registry::run` to every path argument
   at any depth (`PATH_ARGS`: doc, path, file, files, folder, csv, template, out…), so every op and the CLI take them.

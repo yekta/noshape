@@ -1,0 +1,31 @@
+{
+ "name": "prefs-export-rule-add",
+ "about": "User export rules › Add export rule…: Part, the first format, ${name}_x, Add (the rule listed), then its Remove",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Add export rule…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "_x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Remove 1"
+   }
+  }
+ ]
+}

@@ -102,13 +102,16 @@ pub fn primary_button(id: impl Into<ElementId>, label: impl Into<SharedString>) 
 /// Onshape's danger button (Bootstrap `btn-danger`, live documents/70
 /// "Delete forever"): `#bd3039`, white 14 px text.
 pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
-    Button::new(id)
+    let label: SharedString = label.into();
+    let name = label.clone();
+    let button = Button::new(id)
         .custom(ButtonCustomVariant::new(cx).color(rgb(0xbd3039).into()).foreground(rgb(0xffffff).into()).hover(rgb(0xd27177).into()).active(rgb(0xa3272f).into()).shadow(false))
         .bg(rgb(0xbd3039))
-        .child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(label.into()))
+        .child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(0xffffff)).child(label))
         .h(px(34.))
         .px(px(11.))
-        .rounded(px(3.))
+        .rounded(px(3.));
+    crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
 /// Onshape's gray modal "Cancel" button: `#d7d7d7`, hover `#eeeeee`,
@@ -132,7 +135,9 @@ pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
 /// `#eaeaea`.
 pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
     let pal = p();
-    Button::new(id)
+    let label: SharedString = label.into();
+    let name = label.clone();
+    let button = Button::new(id)
         .custom(
             ButtonCustomVariant::new(cx)
                 .color(pal.panel.into())
@@ -144,10 +149,11 @@ pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>
         .bg(pal.panel)
         .border_1()
         .border_color(pal.border_strong)
-        .child(div().text_size(px(14.)).child(label.into()))
+        .child(div().text_size(px(14.)).child(label))
         .h(px(34.))
         .px(px(11.))
-        .rounded(px(3.))
+        .rounded(px(3.));
+    crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
 /// Restyle a kit dialog as an Onshape modal: white, square-ish corners,
@@ -224,12 +230,14 @@ pub fn modal_footer() -> Div {
 
 /// A footer button that confirms the dialog (runs its `on_ok`).
 pub fn modal_ok(button: impl IntoElement) -> Div {
-    div().flex_none().debug_selector(|| "modal-ok".into()).child(gpui_kit::component::dialog::DialogAction::new().child(button))
+    let d = div().flex_none().debug_selector(|| "modal-ok".into()).child(gpui_kit::component::dialog::DialogAction::new().child(button));
+    // The ui-parity driver's `{"button": "modal-ok"}`: the modal's confirming button, whatever it says.
+    crate::ui_script::mark(d, || "button:modal-ok".into())
 }
 
 /// A footer button that closes the dialog.
 pub fn modal_cancel(button: impl IntoElement) -> Div {
-    div().flex_none().debug_selector(|| "modal-cancel".into()).child(DialogClose::new().child(button))
+    crate::ui_script::mark(div().flex_none().debug_selector(|| "modal-cancel".into()).child(DialogClose::new().child(button)), || "button:modal-cancel".into())
 }
 
 /// A bold 14 px field label ("Document name").

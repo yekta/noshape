@@ -1,0 +1,21 @@
+{
+ "name": "prefs-toolbars-untick",
+ "about": "Shortcut toolbars (Sketch): untick Revolve, Save shortcut toolbar settings",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Shortcut toolbars › Revolve"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Shortcut toolbars › Save shortcut toolbar settings"
+   }
+  }
+ ]
+}

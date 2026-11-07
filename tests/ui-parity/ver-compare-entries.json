@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-entries",
+ "about": "Compare history entries: pick V1, then Main",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Compare history entries"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Main"
+   }
+  }
+ ]
+}

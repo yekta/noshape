@@ -1,0 +1,21 @@
+{
+ "name": "prefs-matlib-add-cancel",
+ "about": "Material libraries › Add material library…: the picker, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Material libraries › Add material library…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

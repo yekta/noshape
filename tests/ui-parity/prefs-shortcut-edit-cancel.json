@@ -1,0 +1,31 @@
+{
+ "name": "prefs-shortcut-edit-cancel",
+ "about": "Keyboard shortcuts › Part Studio › Extrude's Edit: the Edit shortcut popup, a key pressed, ✕ closes it unchanged",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Cancel"
+   }
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "name": "prefs-open",
+ "about": "Preferences at the account's defaults: every section's controls",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  }
+ ]
+}

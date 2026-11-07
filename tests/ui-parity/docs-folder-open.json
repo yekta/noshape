@@ -1,10 +1,16 @@
 {
  "name": "docs-folder-open",
- "about": "double-click a folder's tile: the page shows its documents",
+ "about": "the Folders section opened, then double-click a folder's tile: the page shows its documents",
  "area": "studios",
  "source": "everyday (studios 11-07, Documents batch 2)",
  "start": "docs-page",
  "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Folders"
+   }
+  },
   {
    "do": "dblclick",
    "on": {

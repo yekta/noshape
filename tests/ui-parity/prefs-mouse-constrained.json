@@ -1,0 +1,21 @@
+{
+ "name": "prefs-mouse-constrained",
+ "about": "Mouse controls: tick constrained rotate, then untick it: Save stays as it was",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Mouse controls › Set default rotation behavior to constrained rotate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Mouse controls › Set default rotation behavior to constrained rotate"
+   }
+  }
+ ]
+}

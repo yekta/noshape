@@ -20,7 +20,7 @@
   {
    "do": "click",
    "on": {
-    "button": "Cancel"
+    "button": "modal-cancel"
    }
   }
  ]

@@ -2728,6 +2728,7 @@ impl StartView {
                                 .child(
                                     h_flex()
                                         .id("folders-caption")
+                                        .map(|d| crate::ui_script::mark(d, || "button:Folders".into()))
                                         .h_full()
                                         .pl(px(23.))
                                         .gap(px(7.))
@@ -3849,6 +3850,12 @@ impl Location {
         Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None }
     }
 
+    /// The place shown in the header: "Owned by me" or the folder's name.
+    fn shown(&self) -> String {
+        let chosen = self.chosen.borrow();
+        if *chosen == self.root { "Owned by me".to_string() } else { folder_label(&chosen) }
+    }
+
     /// The folders listed in `dir`.
     fn children(&self, dir: &Path) -> Vec<PathBuf> {
         let mut v = subfolders(dir);
@@ -3918,7 +3925,7 @@ impl Location {
                             .text_size(px(14.))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(os::glyph(if at_root { os::GLYPH_OWNED } else { os::GLYPH_FOLDER }, 18., pal.text))
-                            .child(if at_root { "Owned by me".to_string() } else { folder_label(&chosen) }),
+                            .child(self.shown()),
                     ),
             )
             .child(div().id("loc-list").flex_1().min_h_0().overflow_y_scrollbar().child(list))
@@ -4068,6 +4075,16 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
     window.open_dialog(cx, move |dialog, window, cx| {
         let st = state.clone();
         let then = then.clone();
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": label, "kind": "input", "value": state.read(cx).value().to_string() })];
+            if let Some((l, st)) = labels.as_ref().zip(label_search.as_ref()) {
+                fields.push(serde_json::json!({ "label": "Document labels", "kind": "input", "value": l.chosen.borrow().join(", "), "search": st.read(cx).value().to_string() }));
+            }
+            if let Some(loc) = &location {
+                fields.push(serde_json::json!({ "label": loc.0, "kind": "location", "value": loc.1.shown() }));
+            }
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok_label, "Cancel"] })
+        });
         os::modal_doc_page(dialog, title, if location.is_some() { 598. } else { 460. })
             .child(
                 // Live documents/10: the first label right under the header,

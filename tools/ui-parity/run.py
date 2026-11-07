@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CAUSES = {}
 KEYS = ["focus", "dialog", "list", "selection", "features", "parts", "message", "tooltip"]
 # Added later (README "undo", "sketch", "assembly"): compared once live's recording has them.
-LATER_KEYS = ["undo", "sketch", "assembly", "drawing"]
+LATER_KEYS = ["undo", "sketch", "assembly", "drawing", "document", "documents", "preferences", "variables", "featurestudio"]
 # Read from the main page, which a drawing's iframe leaves alone (README "### Drawings"): not compared there.
 NOT_IN_DRAWINGS = {"selection", "undo", "assembly"}
 
@@ -290,6 +290,14 @@ def cloud_menu(a, b):
         lb["highlighted"] = la.get("highlighted")
 
 
+# The scenarios' start documents (starts.json), read in main.
+STARTS = {}
+
+
+# Rows only a local app has (a document's file in the OS's file manager; user 11-07): not compared.
+LOCAL_ROWS = {"Show in folder", "Show in Explorer", "Show in Finder"}
+
+
 # Rows that depend on what the clipboard held before the scenario (live's runner keeps one browser session, so a copy
 # from an earlier scenario shows Paste into sketch in a later one): compared only in scenarios that copy something.
 CLIPBOARD_ROWS = {"Paste into sketch", "Paste sketch", "Paste sketch entities"}
@@ -322,8 +330,10 @@ def drop_rows(state, drop):
     return state
 
 
-def compare(live, ours):
-    """(matched steps, total steps, first difference or None)."""
+def compare(live, ours, whole_document=True):
+    """(matched steps, total steps, first difference or None). `whole_document`: the scenario starts on a whole
+    document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
+    tab bar isn't the start's, so `document` isn't compared."""
     pairs = [("start", live.get("start"), ours.get("start"), None)]
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
@@ -340,14 +350,14 @@ def compare(live, ours):
             CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
             continue
         a = normalize_live(json.loads(json.dumps(a)))
-        keys = KEYS + [k for k in LATER_KEYS if k in (a or {})]
+        keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document")]
         if (a or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]
         a = {k: (a or {}).get(k) for k in keys}
         b = json.loads(json.dumps({k: (b or {}).get(k) for k in keys}))
         if str(live.get("recorded", "")) < PANEL_DIALOGS_SINCE and a.get("dialog") is None and is_panel_dialog(b.get("dialog")):
             b["dialog"] = None
-        drop = PLAN_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
+        drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = drop_rows(a, drop), drop_rows(b, drop)
         # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
         # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
@@ -450,6 +460,8 @@ def main():
     args = ap.parse_args()
     scen_dir, out_dir = Path(args.scenarios), Path(args.out)
     live_dir = Path(args.live) if args.live else scen_dir / "live"
+    global STARTS
+    STARTS = json.loads((scen_dir / "starts.json").read_text())
     out_dir.mkdir(parents=True, exist_ok=True)
     names = args.names or sorted(p.stem for p in scen_dir.glob("*.json") if p.stem != "starts" and (args.all or (live_dir / p.name).exists()))
     if not names:
@@ -483,7 +495,9 @@ def main():
         except (OSError, ValueError) as e:
             print(f"{name}: {e}")
             continue
-        m, n, first = compare(forget_old_query_states(json.loads(live.read_text())), ours)
+        start = json.loads((scen_dir / f"{name}.json").read_text()).get("start")
+        whole = isinstance(start, str) and any(k in STARTS.get(start, {}) for k in ("tabs", "page"))
+        m, n, first = compare(forget_old_query_states(json.loads(live.read_text())), ours, whole)
         steps_ok, steps_all = steps_ok + m, steps_all + n
         if first is None:
             score += 1

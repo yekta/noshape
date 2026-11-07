@@ -97,6 +97,18 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "history_create_version", json!({ "name": name })).map_err(|e| format!("start version {name}: {e}"))?;
         add_features(ctx, &v["features"])?;
     }
+    // Workspaces (README "Variable Studio and Versions"): each branched from Main's head with its own `features`, the
+    // run back on Main.
+    let branches = start["branches"].as_array().cloned().unwrap_or_default();
+    for b in &branches {
+        let name = b["name"].as_str().ok_or_else(|| format!("a start workspace without a name: {b}"))?;
+        call(ctx, "history_switch_branch", json!({ "branch": "Main" })).map_err(|e| format!("start workspace {name}: {e}"))?;
+        call(ctx, "history_create_branch", json!({ "name": name })).map_err(|e| format!("start workspace {name}: {e}"))?;
+        add_features(ctx, &b["features"])?;
+    }
+    if !branches.is_empty() {
+        call(ctx, "history_switch_branch", json!({ "branch": "Main" }))?;
+    }
     // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
     if let Some(d) = start.get("drawing") {
         let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
@@ -298,6 +310,23 @@ mod tests {
         assert!(at("Part Studio 1") < at("Assembly 1") && at("Assembly 1") < at("Part Studio 2") && at("Part Studio 2") < at("Variable Studio 1") && at("Variable Studio 1") < at("Feature Studio 1"), "{names:?}");
         assert_eq!(tab("Variable Studio 1")["kind"], "Variable Studio", "{info}");
         assert_eq!(tab("Part Studio 3")["folder"], "Folder 1", "{info}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A start's workspaces (`branches`): doc-branches' B1 is Main's head and its own hole, the run on Main.
+    #[test]
+    fn a_start_with_a_workspace_builds() {
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("noshape-uip-branches-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("branches.noshape"), &starts["doc-branches"]).unwrap();
+        let names = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "feature_list", json!({})).unwrap()["features"].as_array().unwrap().iter().filter_map(|f| f["name"].as_str().map(str::to_string)).collect() };
+        let main = names(&mut ctx);
+        assert!(main.iter().any(|n| n == "Extrude 2") && !main.iter().any(|n| n == "Extrude 3"), "Main: {main:?}");
+        call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" })).unwrap();
+        let b1 = names(&mut ctx);
+        assert_eq!(b1.last().map(String::as_str), Some("Extrude 3"), "B1: {b1:?}");
+        assert_eq!(b1[..b1.len() - 2], main[..], "B1 from Main's head: {b1:?}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

@@ -1,0 +1,19 @@
+{
+ "name": "doc-help-menu",
+ "about": "the navbar's ? menu: its rows",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Help"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

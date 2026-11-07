@@ -862,6 +862,7 @@ impl Workspace {
         let pal = p();
         Button::new("help-menu")
             .custom(navbar_variant(cx))
+            .map(|d| noshape_app_core::ui_script::mark(d, || "button:Help".into()))
             // Live (part-studio/00): a filled dark "?" disc and a solid caret.
             .child(h_flex().gap(px(6.)).child(crate::assets::icon("help", 20., cx)).child(crate::ui::glyph("ui-caret-down", 9., pal.text)))
             .h(px(crate::ui::NAVBAR_H))
@@ -2312,6 +2313,7 @@ impl Workspace {
                 .hover(|d| d.bg(p().border))
                 .when(self.fs_notices.is_some(), |d| d.bg(p().border))
                 .tooltip(crate::ui::tooltip("FeatureScript notices"))
+                .map(|d| noshape_app_core::ui_script::mark(d, || "button:FeatureScript notices".into()))
                 .items_center()
                 .child(crate::assets::icon(if errors { "fs-notices-error" } else { "fs-notices" }, 20., cx))
                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_fs_notices(window, cx)))

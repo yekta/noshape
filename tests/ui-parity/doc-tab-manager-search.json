@@ -1,0 +1,25 @@
+{
+ "name": "doc-tab-manager-search",
+ "about": "Tab manager: Search tabs, type: the rows that match",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search tabs"
+   }
+  },
+  {
+   "do": "type",
+   "text": "studio 2"
+  }
+ ]
+}

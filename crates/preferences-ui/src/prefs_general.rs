@@ -75,11 +75,16 @@ fn help(id: &'static str, text: &'static str, cx: &App) -> AnyElement {
 /// A label over a control (14 px; the control's top 25 px under the
 /// label's, live prefs/00, 02).
 fn labelled(label: &str, control: impl IntoElement) -> Div {
-    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(control)
+    crate::ui_script::label_last_field(label);
+    let name = crate::ui_script::in_section(label);
+    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(crate::ui_script::mark(div().child(control), || format!("field:{name}")))
 }
 
 /// A 250 × 34 browser select, or its greyed look when `enabled` is false.
 fn select(id: &'static str, options: Vec<String>, at: usize, enabled: bool, w: f32, on_select: impl Fn(usize, &mut Window, &mut App) + 'static) -> AnyElement {
+    // Named by the label `labelled` puts over it (`label_last_field`).
+    let field = serde_json::json!({ "label": null, "kind": "select", "value": options.get(at), "enabled": enabled, "id": id });
+    crate::ui_script::note_field(|| field);
     if enabled {
         return div().w(px(w)).child(os::select_field(id, options, at, on_select)).into_any_element();
     }
@@ -117,12 +122,14 @@ impl Default for LanguagePrefsView {
 
 impl Render for LanguagePrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::set_section("Language");
         let changed = self.edited != self.saved;
         let at = crate::i18n::LANGUAGES.iter().position(|(c, _)| *c == self.edited).unwrap_or(2);
         let view = cx.entity();
         // The languages are listed by their own names in every language
         // (live: "Deutsch", "日本語"), so never translated.
-        let pick = div().w(px(170.)).child(os::user_select_field("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, move |i, _, cx| {
+        let lang = crate::ui_script::note_control("Display language", "select", serde_json::json!(crate::i18n::LANGUAGES.get(at).map(|(_, n)| *n)));
+        let pick = div().w(px(170.)).map(|d| crate::ui_script::mark(d, || format!("field:{lang}"))).child(os::user_select_field("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, move |i, _, cx| {
             view.update(cx, |this, cx| {
                 this.edited = crate::i18n::LANGUAGES[i].0;
                 cx.notify();
@@ -179,6 +186,7 @@ fn radio(on: bool) -> Div {
 
 impl Render for ThemingPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::set_section("Theming");
         let pal = p();
         let changed = self.edited != self.saved;
         let edited = self.edited;
@@ -187,6 +195,10 @@ impl Render for ThemingPrefsView {
                 .child(
                     h_flex()
                         .id(id)
+                        .map(|d| {
+                            let name = crate::ui_script::note_control(label, "radio", serde_json::json!(edited == dark));
+                            crate::ui_script::mark(d, || format!("checkbox:{name}"))
+                        })
                         .h(px(21.))
                         .gap(px(8.))
                         .cursor_pointer()
@@ -364,6 +376,7 @@ impl EnvProfilePrefsView {
 
 impl Render for EnvProfilePrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::set_section("Environment profile settings");
         let prefs = ListPrefs::load();
         let selected = prefs.env_profile.clone().filter(|n| prefs.env_profiles.iter().any(|p| &p.name == n));
         let saved_density = selected.as_ref().and_then(|n| prefs.env_profiles.iter().find(|p| &p.name == n)).map_or(PixelDensity::Automatic, |p| p.density);
@@ -488,10 +501,14 @@ impl LabsPrefsView {
 
 impl Render for LabsPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::set_section("Onshape Labs");
         let pal = p();
         let prefs = ListPrefs::load();
         let (on, co) = (prefs.labs, prefs.labs_co_complete);
-        let check_row = |id: &'static str, checked: bool, label: SharedString| h_flex().id(id).h(px(21.)).gap(px(3.)).text_size(px(13.33)).text_color(pal.text).cursor_pointer().child(PreferencesView::checkbox_box(checked)).child(label);
+        let check_row = |id: &'static str, checked: bool, label: SharedString| h_flex().id(id).map(|d| {
+            let name = crate::ui_script::note_control(&label, "checkbox", serde_json::json!(checked));
+            crate::ui_script::mark(d, || format!("checkbox:{name}"))
+        }).h(px(21.)).gap(px(3.)).text_size(px(13.33)).text_color(pal.text).cursor_pointer().child(PreferencesView::checkbox_box(checked)).child(label);
         let external = |id: &'static str, label: &'static str, url: &'static str, cx: &App| {
             div()
                 .id(id)
@@ -557,6 +574,7 @@ pub struct UpdatesPrefsView;
 
 impl Render for UpdatesPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        crate::ui_script::set_section("Updates");
         let pal = p();
         let on = !ListPrefs::load().updates_off;
         section(
@@ -566,6 +584,10 @@ impl Render for UpdatesPrefsView {
                 .child(
                     h_flex()
                         .id("pref-updates")
+                        .map(|d| {
+                            let name = crate::ui_script::note_control("Check for updates and download them in the background", "checkbox", serde_json::json!(on));
+                            crate::ui_script::mark(d, || format!("checkbox:{name}"))
+                        })
                         .h(px(21.))
                         .gap(px(3.))
                         .text_size(px(13.33))

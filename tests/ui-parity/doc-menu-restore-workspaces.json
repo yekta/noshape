@@ -1,0 +1,27 @@
+{
+ "name": "doc-menu-restore-workspaces",
+ "about": "☰ › Restore deleted workspaces…: the modal, then cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Restore deleted workspaces…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

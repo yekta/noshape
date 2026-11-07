@@ -1,0 +1,46 @@
+{
+ "name": "doc-units-mass-decimals",
+ "about": "Workspace units: Mass display decimals › 0.1, ✓; the panel again shows it",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Mass display decimals",
+    "pick": "0.1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  }
+ ]
+}

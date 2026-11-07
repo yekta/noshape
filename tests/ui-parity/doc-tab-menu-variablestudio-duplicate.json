@@ -1,0 +1,26 @@
+{
+ "name": "doc-tab-menu-variablestudio-duplicate",
+ "about": "Variable Studio tab › Duplicate",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Duplicate"
+   }
+  }
+ ]
+}

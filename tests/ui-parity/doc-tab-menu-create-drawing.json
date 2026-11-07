@@ -1,0 +1,32 @@
+{
+ "name": "doc-tab-menu-create-drawing",
+ "about": "Assembly tab › Create Drawing of Assembly 1…: the modal, then cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Drawing of Assembly 1…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

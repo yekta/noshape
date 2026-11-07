@@ -24,7 +24,7 @@
   {
    "do": "click",
    "on": {
-    "button": "Create"
+    "button": "modal-ok"
    }
   }
  ]

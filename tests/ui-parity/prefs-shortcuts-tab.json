@@ -1,0 +1,21 @@
+{
+ "name": "prefs-shortcuts-tab",
+ "about": "Keyboard shortcuts: the Part Studio tab, then 3D view",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › 3D view"
+   }
+  }
+ ]
+}

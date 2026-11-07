@@ -221,7 +221,9 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   - in the Tab manager: `{"panel_row": "Part Studio 1"}` a tab's or folder's row, its header's buttons by tooltip
     (`"Search tabs"`, `"Sort tabs"`, `"Filter tabs"`, `"List view"`, `"Detail view"`, `"Close tab manager"`: the ×);
   - a modal's (Properties, Delete tabs, Rename document, Copy workspace, Workspace units…) fields `{"field":
-    "<label>"}`, its buttons by their text (`{"button": "OK"}`, `{"button": "Cancel"}`), its `×` `{"button": "close"}`.
+    "<label>"}`, its buttons by their text (`{"button": "OK"}`, `{"button": "Cancel"}`), its `×` `{"button": "close"}`;
+    `{"button": "modal-ok"}` / `{"button": "modal-cancel"}` the footer's confirming / cancelling button whatever it
+    says (New document's reads "Create public document" on live's free plan, "Create document" in ours).
 - State: every state has `"document"` (`null` on the documents page):
   ```json
   "document": { "tabs": [{"name": "Part Studio 1", "kind": "partstudio", "active": true},
@@ -251,7 +253,8 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
   (an expression's result while the cell isn't being edited).
 - A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
-  `features` in Main (start `doc-versions`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  `features` in Main (start `doc-versions`); `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
+  from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
   (`"Versions and history"`, `"Create version…"`).

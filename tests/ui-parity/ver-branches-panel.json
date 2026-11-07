@@ -1,0 +1,15 @@
+{
+ "name": "ver-branches-panel",
+ "about": "Versions and history with a second workspace: its rows and graph",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

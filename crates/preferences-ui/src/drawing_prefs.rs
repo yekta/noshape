@@ -52,6 +52,10 @@ impl DrawingPrefsView {
         let label = OPTIONS.iter().find(|o| o.1 == current).map_or("", |o| o.0);
         div()
             .id("drawing-background-selector")
+            .map(|d| {
+                let name = crate::ui_script::note_control("Background color of model space (imported DWG and DXF files)", "select", serde_json::json!(label));
+                crate::ui_script::mark(d, || format!("field:{name}"))
+            })
             .relative()
             .w(px(SELECT_W))
             .h(px(34.))
@@ -106,6 +110,7 @@ impl Render for DrawingPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let changed = self.edited != self.saved;
+        crate::ui_script::set_section("Drawings");
         let select = self.select(cx);
         v_flex()
             .child(
@@ -126,6 +131,10 @@ impl Render for DrawingPrefsView {
                         h_flex().mt(px(24.)).child(
                             div()
                                 .id("drawing-prefs-save")
+                                .map(|d| {
+                                    let name = crate::ui_script::note_control("Save drawing settings", "button", serde_json::json!(changed));
+                                    crate::ui_script::mark(d, || format!("button:{name}"))
+                                })
                                 .h(px(33.))
                                 .px(px(11.))
                                 .flex()

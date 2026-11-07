@@ -61,8 +61,10 @@ impl MousePrefsView {
 
     fn checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
         let pal = p();
+        let name = crate::ui_script::note_control(label, "checkbox", serde_json::json!(on));
         h_flex()
             .id(id)
+            .map(|d| crate::ui_script::mark(d, || format!("checkbox:{name}")))
             .h(px(26.))
             .gap(px(8.))
             .cursor_pointer()
@@ -94,6 +96,10 @@ impl MousePrefsView {
         let bounds = self.field_bounds.clone();
         div()
             .id("mouse-view-settings")
+            .map(|d| {
+                let name = crate::ui_script::note_control("View settings", "select", serde_json::json!(current.label()));
+                crate::ui_script::mark(d, || format!("field:{name}"))
+            })
             .relative()
             .w(px(SELECT_W))
             .h(px(34.))
@@ -196,6 +202,7 @@ impl Render for MousePrefsView {
         let pal = p();
         let changed = self.edited != self.saved;
         let e = self.edited;
+        crate::ui_script::set_section("Mouse controls");
         let select = self.select(cx);
         let toggle = |f: fn(&mut MouseControls)| {
             cx.listener(move |this: &mut Self, _: &ClickEvent, _, cx| {
@@ -231,6 +238,10 @@ impl Render for MousePrefsView {
                         h_flex().mt(px(24.)).child(
                             div()
                                 .id("mouse-save")
+                                .map(|d| {
+                                    let name = crate::ui_script::note_control("Save mouse controls", "button", serde_json::json!(changed));
+                                    crate::ui_script::mark(d, || format!("button:{name}"))
+                                })
                                 .h(px(34.))
                                 .px(px(10.5))
                                 .flex()

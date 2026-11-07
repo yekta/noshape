@@ -1,0 +1,53 @@
+{
+ "name": "doc-units-energy",
+ "about": "Workspace units: Energy default unit › Foot-pound force and its decimals › 0.1, ✓; the panel again shows them",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Energy default unit",
+    "pick": "Foot-pound force"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Energy display decimals",
+    "pick": "0.1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "name": "prefs-drawings-background",
+ "about": "Drawings › Background color of model space › Light view, Save drawing settings",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Drawings › Background color of model space (imported DWG and DXF files)",
+    "pick": "Light view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Drawings › Save drawing settings"
+   }
+  }
+ ]
+}

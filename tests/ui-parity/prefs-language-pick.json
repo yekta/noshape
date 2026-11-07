@@ -1,0 +1,16 @@
+{
+ "name": "prefs-language-pick",
+ "about": "Language › Display language › Deutsch: Save language enables (not saved)",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Language › Display language",
+    "pick": "Deutsch"
+   }
+  }
+ ]
+}

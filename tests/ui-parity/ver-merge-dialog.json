@@ -1,0 +1,33 @@
+{
+ "name": "ver-merge-dialog",
+ "about": "B1 › Merge into current workspace…: the merge dialog, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

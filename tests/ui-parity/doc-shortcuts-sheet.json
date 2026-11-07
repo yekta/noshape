@@ -1,0 +1,17 @@
+{
+ "name": "doc-shortcuts-sheet",
+ "about": "Shift+/ : the Keyboard shortcuts sheet, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "key",
+   "key": "?"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

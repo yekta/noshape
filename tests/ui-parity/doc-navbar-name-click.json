@@ -1,0 +1,19 @@
+{
+ "name": "doc-navbar-name-click",
+ "about": "click the document's name in the navbar",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "navbar": "name"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

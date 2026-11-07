@@ -1,0 +1,33 @@
+{
+ "name": "ver-version-restore",
+ "about": "V1 › Restore to Main…: the dialog, then cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Restore to Main…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

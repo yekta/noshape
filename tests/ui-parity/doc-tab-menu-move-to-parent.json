@@ -1,0 +1,27 @@
+{
+ "name": "doc-tab-menu-move-to-parent",
+ "about": "a tab inside a folder › Move to parent folder",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 3"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to parent folder"
+   }
+  }
+ ]
+}

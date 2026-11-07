@@ -294,7 +294,17 @@
    "where": "Feature Studio toolbar",
    "freq": 2,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Feature parameters"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-query-functions",
@@ -303,7 +313,17 @@
    "where": "Feature Studio toolbar",
    "freq": 2,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Query functions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-evaluate-functions",
@@ -312,7 +332,17 @@
    "where": "Feature Studio toolbar",
    "freq": 2,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Evaluate functions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-math-functions",
@@ -321,7 +351,17 @@
    "where": "Feature Studio toolbar",
    "freq": 3,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Math functions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-sketch-functions",
@@ -330,7 +370,17 @@
    "where": "Feature Studio toolbar",
    "freq": 3,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Sketch functions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-operation-functions",
@@ -339,7 +389,17 @@
    "where": "Feature Studio toolbar",
    "freq": 2,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Operation functions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-snippet-insert-at-caret",
@@ -348,7 +408,21 @@
    "where": "any snippet menu item",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:2363"
+   "source": "behaviours.md:2363",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:.* (parameters|functions)"
+      }
+     },
+     {
+      "on": {
+       "menu": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-snippet-compact",
@@ -643,7 +717,17 @@
    "where": "editor after New feature",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1573"
+   "source": "behaviours.md:1573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "New feature"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-ctrl-click-definition",
@@ -781,7 +865,19 @@
    "where": "autocomplete list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20374"
+   "source": "behaviours.md:20374",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-doc-tooltip",
@@ -833,7 +929,23 @@
    "where": "autocomplete list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20389"
+   "source": "behaviours.md:20389",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Tab"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-esc",
@@ -876,7 +988,23 @@
    "where": "autocomplete list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:22379"
+   "source": "behaviours.md:22379",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Backspace"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-enum-members",
@@ -912,7 +1040,20 @@
    "where": "editor",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:22391"
+   "source": "behaviours.md:22391",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re://.*"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-placeholder-tab",
@@ -921,7 +1062,27 @@
    "where": "inserted snippet",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:22315"
+   "source": "behaviours.md:22315",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     },
+     {
+      "do": "key",
+      "key": "Tab"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-placeholder-shift-tab",
@@ -1012,7 +1173,17 @@
    "where": "document navbar",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:1574"
+   "source": "behaviours.md:1574",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-panel",
@@ -1021,7 +1192,17 @@
    "where": "{!} click",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:1574"
+   "source": "behaviours.md:1574",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-filter",
@@ -1075,7 +1256,21 @@
    "where": "notices panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1923"
+   "source": "behaviours.md:1923",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     },
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-monitor-start",
@@ -1324,7 +1519,15 @@
    "where": "Ctrl+Shift+F / navbar Search Feature Studios",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:36977"
+   "source": "behaviours.md:36977",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+shift+f"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-search-navbar-button",
@@ -1468,7 +1671,17 @@
    "where": "Part Studio toolbar",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:37225"
+   "source": "behaviours.md:37225",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-acf-current-document",
@@ -1477,7 +1690,17 @@
    "where": "Add custom features dialog",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:37248"
+   "source": "behaviours.md:37248",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-acf-click-adds",

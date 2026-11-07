@@ -37,6 +37,8 @@ impl Render for ExportRulesPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let rules = saved_rules();
+        crate::ui_script::set_section("User export rules");
+        crate::ui_script::note_control("Rules", "list", serde_json::json!(rules.iter().map(|r| serde_json::json!([r.element.label(), r.format, r.template])).collect::<Vec<_>>()));
         let help = div()
             .id("er-help")
             .child(crate::assets::icon("help-gray", 18., cx))
@@ -65,8 +67,8 @@ impl Render for ExportRulesPrefsView {
                             h_flex()
                                 .gap(px(4.))
                                 .pr(px(10.))
-                                .child(small(SharedString::from(format!("er-edit-{i}")), tr("Edit")).on_click(move |_, window, cx| open_dialog(v1.clone(), Some(i), window, cx)))
-                                .child(small(SharedString::from(format!("er-remove-{i}")), tr("Remove")).on_click(move |_, _, cx| {
+                                .child(small(SharedString::from(format!("er-edit-{i}")), tr("Edit")).map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section(&format!("Edit {}", i + 1))))).on_click(move |_, window, cx| open_dialog(v1.clone(), Some(i), window, cx)))
+                                .child(small(SharedString::from(format!("er-remove-{i}")), tr("Remove")).map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section(&format!("Remove {}", i + 1))))).on_click(move |_, _, cx| {
                                     // Live: removed at once, no confirmation.
                                     let mut rules = saved_rules();
                                     if i < rules.len() {
@@ -92,7 +94,7 @@ impl Render for ExportRulesPrefsView {
                     .pl(px(15.))
                     .pt(px(14.))
                     .child(body)
-                    .child(h_flex().mt(px(add_gap)).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx)))),
+                    .child(h_flex().mt(px(add_gap)).map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Add export rule…")))).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx)))),
             )
     }
 }
@@ -235,6 +237,16 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
             .child(field)
             .children(list);
         let (st_ok, conv_ok, view_ok) = (state.clone(), conv.clone(), view.clone());
+        crate::ui_script::note_dialog(|| {
+            let fields = serde_json::json!([
+                { "label": "Scope", "kind": "select", "value": scope.label() },
+                { "label": "Format", "kind": "select", "value": scope.formats().get(format_ix).copied() },
+                { "label": "Convention", "kind": "input", "value": text },
+            ]);
+            let title = if editing.is_some() { "Edit export rule" } else { "Add export rule" };
+            let ok = if editing.is_some() { "Save changes" } else { "Add" };
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"], "ok": if error.is_some() { "disabled" } else { "enabled" }, "text": error.into_iter().collect::<Vec<_>>() })
+        });
         os::modal_doc_page(dialog, tr(if editing.is_some() { "Edit export rule" } else { "Add export rule" }), 600.)
             .child(
                 os::modal_body()
@@ -242,9 +254,9 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
                     .pb(px(23.))
                     .gap_0()
                     .child(label("Scope", "The rule will apply to objects of the selected object type.", "er-scope-help", cx))
-                    .child(scope_select)
+                    .child(crate::ui_script::mark(div().child(scope_select), || "field:Scope".into()))
                     .child(label("Format", "The rule will apply when exporting applicable objects to the selected file format.", "er-format-help", cx).mt(px(14.)))
-                    .child(format_select)
+                    .child(crate::ui_script::mark(div().child(format_select), || "field:Format".into()))
                     .child(label("Convention", "Create a file naming convention template to use when exporting applicable objects. Use template placeholder expressions of the form ${propertyName} to include an active metadata property in your naming convention. All properties must be valid and active and will be highlighted in blue, while invalid or inactive properties will be highlighted in red.", "er-conv-help", cx).mt(px(14.)))
                     .child(field_box)
                     // Live er-902: 14 px body text right under the field.

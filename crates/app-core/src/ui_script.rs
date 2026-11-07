@@ -144,6 +144,53 @@ pub fn note_field(field: impl FnOnce() -> serde_json::Value) {
     }
 }
 
+thread_local! {
+    /// The page section being drawn (Preferences' headings): its controls are named "<section> › <label>".
+    static SECTION: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// The page section drawn from now on (a Preferences heading).
+pub fn set_section(title: &str) {
+    if active() {
+        SECTION.with(|s| *s.borrow_mut() = title.to_string());
+    }
+}
+
+/// `label` in the section being drawn: "Units › Length default unit".
+pub fn in_section(label: &str) -> String {
+    SECTION.with(|s| {
+        let s = s.borrow();
+        if s.is_empty() { label.to_string() } else { format!("{s} › {label}") }
+    })
+}
+
+/// A page control drawn now, named in its section (`kind`: select, checkbox, radio, button; `value`: its shown
+/// value, checked or enabled state). Returns the name its mark should carry after `kind:` ("Units › Save changes").
+pub fn note_control(label: &str, kind: &str, value: serde_json::Value) -> String {
+    let name = in_section(label);
+    if active() {
+        let field = serde_json::json!({ "label": name, "kind": kind, "value": value });
+        note_field(|| field);
+    }
+    name
+}
+
+/// Names the first field noted without a label (a select drawn before the label put over it), in its section.
+pub fn label_last_field(label: &str) {
+    if !active() {
+        return;
+    }
+    let name = in_section(label);
+    if let Ok(mut f) = fields_slot().lock()
+        && let Some(field) = f.iter_mut().find(|f| f["label"].is_null())
+    {
+        field["label"] = serde_json::json!(name);
+        if let Some(o) = field.as_object_mut() {
+            o.remove("id");
+        }
+    }
+}
+
 /// The fields noted since the last take (a page's: Preferences).
 pub fn take_fields() -> Vec<serde_json::Value> {
     let all = fields_slot().lock().map(|mut f| std::mem::take(&mut *f)).unwrap_or_default();

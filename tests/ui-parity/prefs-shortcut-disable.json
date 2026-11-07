@@ -1,0 +1,39 @@
+{
+ "name": "prefs-shortcut-disable",
+ "about": "Keyboard shortcuts › Extrude: Disable shortcut, confirm (Unassigned), then Reset",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Keyboard shortcuts › Disable shortcut"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Confirm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Reset Extrude"
+   }
+  }
+ ]
+}

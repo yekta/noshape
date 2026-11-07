@@ -380,7 +380,16 @@
    "where": "graph column: Main blue, branches amber/teal; legend Workspace / Version / Change / Release candidate / Release / Contains obsoletion / Automatic version",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1732"
+   "source": "behaviours.md:1732",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-history-entry-granularity",
@@ -1345,7 +1354,21 @@
    "where": "version / workspace Properties modal footer",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:69"
+   "source": "behaviours.md:69",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     },
+     {
+      "on": {
+       "button": "re:Close|Apply|Save"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-wsprops-edit",
@@ -1408,7 +1431,21 @@
    "where": "Workspace protection dialog footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5570"
+   "source": "behaviours.md:5570",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Workspace protection…"
+      }
+     },
+     {
+      "on": {
+       "button": "re:modal-cancel|modal-ok|Apply|Cancel"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-wp-outdated-tab-links",
@@ -1462,7 +1499,22 @@
    "where": "workspace row › Delete (confirmation not captured)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3336"
+   "source": "behaviours.md:3336",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-restore-to",
@@ -1471,7 +1523,16 @@
    "where": "version / change row › Restore to Main… (dialog not captured)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3317"
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Restore to Main…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-restore-deleted-workspaces",
@@ -1480,7 +1541,21 @@
    "where": "☰ document menu (also while viewing a version)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1566"
+   "source": "behaviours.md:1566",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Restore deleted workspaces…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-copy-workspace",
@@ -1489,7 +1564,21 @@
    "where": "☰ › \"Copy the active workspace to a new document\": Document name, Copy document to folder browser, Create / Cancel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29685"
+   "source": "behaviours.md:29685",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-copy-version",
@@ -1507,7 +1596,21 @@
    "where": "☰ document menu (dialog not captured)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1566"
+   "source": "behaviours.md:1566",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Update workspace…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "nav-version-label",
@@ -1562,7 +1665,21 @@
    "where": "☰ in a workspace",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1566"
+   "source": "behaviours.md:1566",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace properties…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "view-only-bar",
@@ -1681,7 +1798,16 @@
    "where": "tab bar dots: yellow \"Compare has found differences.\", white \"no differences\" / \"not supported\", red \"Tab only exists in 'Main'.\"; disabled tabs can't open",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:2630"
+   "source": "behaviours.md:2630",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-not-comparable",
@@ -1699,7 +1825,16 @@
    "where": "compare panel list: ≠ changed, > / < only on one side",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3503"
+   "source": "behaviours.md:3503",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-feature-params",
@@ -1780,7 +1915,26 @@
    "where": "header Compare history entries › pick two rows › \"Comparing V3 and V2\"",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:4712"
+   "source": "behaviours.md:4712",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Compare history entries"
+      }
+     },
+     {
+      "on": {
+       "history_row": "*"
+      }
+     },
+     {
+      "on": {
+       "history_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-missing-tab-toast",
@@ -1798,7 +1952,22 @@
    "where": "click the workspace row (no close button on the bar)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3518"
+   "source": "behaviours.md:3518",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-leave-other-row",
@@ -1816,7 +1985,16 @@
    "where": "workspace row › Merge into current workspace…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5015"
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-overall-keep",
@@ -1834,7 +2012,21 @@
    "where": "merge dialog overall strategy card (default)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5032"
+   "source": "behaviours.md:5032",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Merge"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-overall-replace",
@@ -1888,7 +2080,21 @@
    "where": "merge dialog footer",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5072"
+   "source": "behaviours.md:5072",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Merge"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-cancel",
@@ -1897,7 +2103,21 @@
    "where": "merge dialog footer (also ✕)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5073"
+   "source": "behaviours.md:5073",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Cancel"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-help",

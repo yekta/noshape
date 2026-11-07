@@ -1,0 +1,21 @@
+{
+ "name": "prefs-theme-dark",
+ "about": "Theming › Dark mode, Save theme",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Theming › Dark mode"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Theming › Save theme"
+   }
+  }
+ ]
+}

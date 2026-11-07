@@ -1,0 +1,31 @@
+{
+ "name": "prefs-shortcut-edit-conflict",
+ "about": "Keyboard shortcuts › Extrude: Shift+F (Fillet's) shows the already-in-use alert; ✕",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+f"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Cancel"
+   }
+  }
+ ]
+}

@@ -355,7 +355,7 @@
      },
      {
       "on": {
-       "button": "Create"
+       "button": "modal-ok"
       }
      }
     ]
@@ -383,7 +383,7 @@
      },
      {
       "on": {
-       "button": "Cancel"
+       "button": "modal-cancel"
       }
      }
     ]
@@ -1983,7 +1983,21 @@
    "where": "a document you can't edit / view-only mode",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5576"
+   "source": "behaviours.md:5576",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Switch to view only mode"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "doc-menu-rename-document",
@@ -2323,7 +2337,43 @@
    "where": "☰ › Copy workspace…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:29693"
+   "source": "behaviours.md:29693",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "modal-cancel"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "modal-ok"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-copy-version-same-dialog-titled-copy-the-active-version-to-a-new-document",
@@ -4809,7 +4859,21 @@
    "where": "tab › Properties… footer (Apply renames the tab, stays open)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29628"
+   "source": "behaviours.md:29628",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     },
+     {
+      "on": {
+       "button": "re:Close|Apply|Save"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-export-tab-file-name-view-export-rules-format-options-download-download-a",
@@ -4880,7 +4944,21 @@
    "where": "Tabs panel",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:21959"
+   "source": "behaviours.md:21959",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Tab manager"
+      }
+     },
+     {
+      "on": {
+       "button": "Search tabs"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-sort-tabs-tab-order-name-a-z-name-z-a-type",
@@ -7261,21 +7339,7 @@
     [
      {
       "on": {
-       "field": "Drawings › Background color of model space"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Drawings › Background color of model space"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Drawings › Background color of model space"
+       "field": "Drawings › Background color of model space (imported DWG and DXF files)"
       }
      }
     ]

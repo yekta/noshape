@@ -1,0 +1,29 @@
+{
+ "name": "fs-module-outline-key",
+ "about": "Ctrl+Shift+O: the module outline, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+shift+o"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

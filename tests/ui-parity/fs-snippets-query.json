@@ -1,0 +1,43 @@
+{
+ "name": "fs-snippets-query",
+ "about": "the toolbar's Query functions ▾: its list, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Query functions"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

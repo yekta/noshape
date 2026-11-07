@@ -1,0 +1,21 @@
+{
+ "name": "prefs-mouse-reverse-scroll",
+ "about": "Mouse controls: tick Reverse scroll wheel zoom direction, Save mouse controls",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Mouse controls › Reverse scroll wheel zoom direction"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mouse controls › Save mouse controls"
+   }
+  }
+ ]
+}

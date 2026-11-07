@@ -1,0 +1,25 @@
+{
+ "name": "doc-tab-manager-sort",
+ "about": "Tab manager: Sort tabs › Name: A → Z",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Sort tabs"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

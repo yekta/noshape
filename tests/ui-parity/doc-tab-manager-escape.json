@@ -1,0 +1,19 @@
+{
+ "name": "doc-tab-manager-escape",
+ "about": "Tab manager open, Escape: it stays open",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "name": "prefs-toolbars-reset",
+ "about": "Toolbars › Reset to defaults",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Toolbars › Reset to defaults"
+   }
+  }
+ ]
+}

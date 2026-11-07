@@ -1,0 +1,29 @@
+{
+ "name": "prefs-export-rule-blank",
+ "about": "User export rules › Add export rule…: the convention cleared shows Convention is blank and Add greys; Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Add export rule…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "key",
+   "key": "Delete"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

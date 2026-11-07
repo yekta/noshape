@@ -1,0 +1,21 @@
+{
+ "name": "doc-folder-all-tabs",
+ "about": "open a folder, then the crumbs' home: all tabs again",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Folder 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "All tabs"
+   }
+  }
+ ]
+}

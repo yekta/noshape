@@ -1,0 +1,27 @@
+{
+ "name": "doc-tab-manager-list-view",
+ "about": "Tab manager: List view, then Detail view",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "List view"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Detail view"
+   }
+  }
+ ]
+}

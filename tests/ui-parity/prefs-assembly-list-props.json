@@ -1,0 +1,21 @@
+{
+ "name": "prefs-assembly-list-props",
+ "about": "Assembly settings › Display instance list properties, Save assembly settings",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Preferences batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Assembly settings › Display instance list properties"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Assembly settings › Save assembly settings"
+   }
+  }
+ ]
+}

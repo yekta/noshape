@@ -493,6 +493,8 @@ impl PreferencesView {
     /// A section heading: 18 px / 500 over a 1 px `#333` rule.
     pub fn heading(title: impl Into<SharedString>, extra: Option<AnyElement>) -> Div {
         let pal = p();
+        let title: SharedString = title.into();
+        crate::ui_script::set_section(&title);
         v_flex().child(
             h_flex()
                 .h(px(32.))
@@ -500,7 +502,7 @@ impl PreferencesView {
                 .gap(px(6.))
                 .border_b_1()
                 .border_color(pal.text)
-                .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title.into()))
+                .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(title))
                 .children(extra),
         )
     }
@@ -508,8 +510,10 @@ impl PreferencesView {
     /// A browser checkbox (13 px, `#767676` outline) with its 13.33 px label.
     fn checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
         let pal = p();
+        let name = crate::ui_script::note_control(label, "checkbox", serde_json::json!(on));
         h_flex()
             .id(id)
+            .map(|d| crate::ui_script::mark(d, || format!("checkbox:{name}")))
             .h(px(27.))
             .gap(px(4.))
             .cursor_pointer()
@@ -534,8 +538,11 @@ impl PreferencesView {
     /// "Save … settings": Onshape's primary button, faded until changed.
     pub(crate) fn save_button(id: &'static str, label: impl Into<SharedString>, enabled: bool) -> Stateful<Div> {
         let pal = p();
+        let label: SharedString = label.into();
+        let name = crate::ui_script::note_control(&label, "button", serde_json::json!(enabled));
         div()
             .id(id)
+            .map(|d| crate::ui_script::mark(d, || format!("button:{name}")))
             .h(px(34.))
             .px(px(11.))
             .flex()
@@ -545,7 +552,7 @@ impl PreferencesView {
             .text_size(px(14.))
             .text_color(if enabled { gpui_kit::rgb_static(0xffffff) } else { pal.button_disabled_text })
             .when(enabled, |d| d.cursor_pointer().hover(|d| d.bg(pal.accent_hover)))
-            .child(label.into())
+            .child(label)
     }
 
     fn render_list_settings(&self, cx: &mut Context<Self>) -> (AnyElement, AnyElement) {
@@ -587,10 +594,13 @@ impl PreferencesView {
     fn render_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let s = shortcuts::current();
+        crate::ui_script::set_section("Keyboard shortcuts");
+        crate::ui_script::note_control("Tab", "select", serde_json::json!(self.tab.label()));
         let tabs: Vec<AnyElement> = Tab::CUSTOMIZE.iter().map(|&t| {
             let on = t == self.tab;
             div()
                 .id(SharedString::from(format!("kb-tab-{}", t.label())))
+                .map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section(t.label()))))
                 .h_full()
                 .px(px(5.))
                 .flex()
@@ -629,7 +639,7 @@ impl PreferencesView {
         let right = v_flex()
             .ml(px(20.))
             .flex_none()
-            .child(h_flex().child(os::primary_button("kb-reset-all", "Reset all").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_reset_all(window, cx)))))
+            .child(h_flex().map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Reset all")))).child(os::primary_button("kb-reset-all", "Reset all").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_reset_all(window, cx)))))
             .child(Self::legend(cx));
         let help = div().id("kb-help").child(crate::assets::icon("help-gray", 18., cx)).into_any_element();
         let popup = self.render_popup(window, cx);
@@ -672,6 +682,10 @@ impl PreferencesView {
             None => vec![key_chip("Unassigned", style).into_any_element()],
         };
         let customized = s.is_customized(e);
+        // A changed row as it shows (the rest are Onshape's defaults).
+        if customized {
+            crate::ui_script::note_control(e.name, "shortcut", serde_json::json!(key.as_deref().map(shortcuts::key_text)));
+        }
         let group = SharedString::from(format!("kb-row-{}", e.id));
         h_flex()
             .id(SharedString::from(format!("kb-{}", e.id)))
@@ -684,6 +698,7 @@ impl PreferencesView {
             .child(
                 div()
                     .id(SharedString::from(format!("kb-edit-{}", e.id)))
+                    .map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section(&format!("Edit {}", e.name)))))
                     .ml(px(8.))
                     .cursor_pointer()
                     .opacity(0.)
@@ -696,6 +711,7 @@ impl PreferencesView {
                 d.child(
                     div()
                         .id(SharedString::from(format!("kb-reset-{}", e.id)))
+                        .map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section(&format!("Reset {}", e.name)))))
                         .ml(px(12.))
                         .cursor_pointer()
                         .opacity(0.)
@@ -721,9 +737,14 @@ impl PreferencesView {
         let width = f32::from(window.viewport_size().width);
         let left = ((width - POPUP_W) / 2.0 - NAV_W - CONTENT_PAD).max(0.0);
         let text = ed.pressed.as_deref().map(shortcuts::key_text).unwrap_or_default();
+        crate::ui_script::note_dialog(|| {
+            let alert = conflict.map(|o| format!("This combination is already in use by {0}. Confirming the changes will disable the shortcut {0}.", o.name));
+            serde_json::json!({ "kind": "modal", "title": format!("Edit shortcut: {}", entry.name), "fields": [{ "label": "Shortcut", "kind": "input", "value": text }, { "label": "Disable shortcut", "kind": "checkbox", "value": ed.disable }], "buttons": ["Confirm", "Cancel", "Reset to default"], "ok": if changed { "enabled" } else { "disabled" }, "text": alert.into_iter().collect::<Vec<_>>() })
+        });
         // ✓: green `#009400` (faded until something changed), ✕: `#bd3039`.
         let ok = div()
             .id("kb-edit-ok")
+            .map(|d| crate::ui_script::mark(d, || "button:Keyboard shortcuts › Confirm".into()))
             .w(px(28.))
             .h(px(25.))
             .flex()
@@ -736,6 +757,7 @@ impl PreferencesView {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.confirm_edit(cx)));
         let close = div()
             .id("kb-edit-cancel")
+            .map(|d| crate::ui_script::mark(d, || "button:Keyboard shortcuts › Cancel".into()))
             .size(px(22.))
             .flex()
             .items_center()
@@ -807,6 +829,7 @@ impl PreferencesView {
             .child(
                 h_flex()
                     .id("kb-edit-reset")
+                    .map(|d| crate::ui_script::mark(d, || "button:Keyboard shortcuts › Reset to default".into()))
                     .gap(px(6.))
                     .text_size(px(14.))
                     .text_color(pal.text_faint)
@@ -851,6 +874,8 @@ impl PreferencesView {
         let pal = p();
         // Live: Sketch (the default) | Part Studio | Assembly | Drawing.
         let contexts = vec!["Sketch".to_string(), "Part Studio".to_string(), "Assembly".to_string(), "Drawing".to_string()];
+        crate::ui_script::set_section("Shortcut toolbars");
+        let toolbar = crate::ui_script::note_control("Toolbar", "select", serde_json::json!(contexts.get(self.toolbar_context)));
         let select = os::select_field("tb-context", contexts, self.toolbar_context, {
             let view = cx.entity().downgrade();
             move |i, _, cx| {
@@ -860,7 +885,8 @@ impl PreferencesView {
                 });
             }
         })
-        .w(px(150.));
+        .w(px(150.))
+        .map(|d| crate::ui_script::mark(d, || format!("field:{toolbar}")));
         // Tools that can be on the 5x2 S toolbar (id, name, icon), and the ones shown.
         use crate::preferences_hooks as sc;
         let (items, shown): (Vec<(String, String, SharedString)>, Vec<String>) = if self.toolbar_context == 3 {
@@ -889,6 +915,7 @@ impl PreferencesView {
                 let id2 = id.clone();
                 h_flex()
                     .id(SharedString::from(format!("tb-item-{i}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("checkbox:{}", crate::ui_script::in_section(name))))
                     .h(px(26.))
                     .pl(px(6.))
                     .gap(px(10.))
@@ -914,6 +941,8 @@ impl PreferencesView {
             .collect();
         // Live: the ticked tools in list order (a newly ticked tool takes its list place).
         // Live (z3): every ticked tool in list order, rows of five; no cap.
+        // The ticked tools (the preview's), in list order: one field rather than a checkbox per tool.
+        crate::ui_script::note_control("Tools", "list", serde_json::json!(items.iter().filter(|(i, _, _)| shown.contains(i)).map(|(_, n, _)| n.clone()).collect::<Vec<_>>()));
         let preview_icons: Vec<SharedString> = items.iter().filter(|(i, _, _)| shown.contains(i)).map(|(_, _, icon)| icon.clone()).collect();
         let preview = div()
             .ml(px(23.))

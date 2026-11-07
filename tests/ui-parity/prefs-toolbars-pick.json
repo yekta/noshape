@@ -1,0 +1,30 @@
+{
+ "name": "prefs-toolbars-pick",
+ "about": "Shortcut toolbars › Toolbar: Part Studio, then Assembly, then Drawing (each one's tools)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Shortcut toolbars › Toolbar",
+    "pick": "Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Shortcut toolbars › Toolbar",
+    "pick": "Assembly"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Shortcut toolbars › Toolbar",
+    "pick": "Drawing"
+   }
+  }
+ ]
+}

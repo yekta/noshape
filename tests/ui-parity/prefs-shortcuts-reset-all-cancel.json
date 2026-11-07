@@ -1,0 +1,21 @@
+{
+ "name": "prefs-shortcuts-reset-all-cancel",
+ "about": "Keyboard shortcuts › Reset all: the Reset shortcuts to defaults confirmation, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Reset all"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

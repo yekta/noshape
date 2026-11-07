@@ -1,0 +1,26 @@
+{
+ "name": "doc-tab-menu-thumbnail",
+ "about": "Part Studio tab › Select as document thumbnail",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 3)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Select as document thumbnail"
+   }
+  }
+ ]
+}
