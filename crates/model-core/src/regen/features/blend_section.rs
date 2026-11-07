@@ -1244,6 +1244,121 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, rims: &Rims, edges: &[usize], siz
     Ok(())
 }
 
+/// Rounds of arcs where a plane meets a cylinder whose ends run on tangentially into edges left out (a picked face's
+/// edge, or tangent propagation off): as live's (cf-surface-pattern's Fillet 1, live 2227), the ball rolls between the
+/// plane and the cylinder along the arc, then runs straight on past each end between the plane and the cylinder's
+/// tangent plane there (a cylinder), until the body trims it. Built on a wedge: the slab under the plane with the
+/// cylinder's arc and its two tangent planes, whose three top edges OCCT rounds; the wedge minus its round is cut away.
+/// `Ok(false)` (nothing done) unless every edge is such an arc.
+pub fn run_on_rim_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], r: f64) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    const TAU: f64 = std::f64::consts::TAU;
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let feature = ev.feature;
+    let mut cuts = Vec::new();
+    for &e in edges {
+        let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return Ok(false) };
+        let pair = match (faces[fs[0] as usize].face_surface()?, faces[fs[1] as usize].face_surface()?) {
+            (k::Surface::Plane(_), k::Surface::Cylinder { .. }) => [fs[0], fs[1]],
+            (k::Surface::Cylinder { .. }, k::Surface::Plane(_)) => [fs[1], fs[0]],
+            _ => return Ok(false),
+        };
+        let Ok(rim) = rim_of(shape, [&faces[pair[0] as usize], &faces[pair[1] as usize]], e, scale) else { return Ok(false) };
+        let edge = shape.sub_shape(ShapeType::Edge, e)?;
+        let info = edge.edge_info()?;
+        if info.closed {
+            return Ok(false);
+        }
+        // The arc's angles about the axis, less than half way round (its end tangents then part).
+        let [a0, a1, am] = [info.start, info.end, edge.point_at(0.5 * (info.first_param + info.last_param))?].map(|q| rim.angle_of(q));
+        let sweep = (a1 - a0).rem_euclid(TAU);
+        let (start, sweep) = if (am - a0).rem_euclid(TAU) < sweep { (a0, sweep) } else { (a1, TAU - sweep) };
+        if !(1e-3..std::f64::consts::PI - 0.05).contains(&sweep) {
+            return Ok(false);
+        }
+        // In the plane square to the axis through its origin: the arc, its ends' tangents away from it and a far
+        // side closing them.
+        let (x, y) = rim.frame();
+        let radial = |a: f64| x * a.cos() + y * a.sin();
+        let o = rim.origin;
+        let (pa, pb, pm) = (o + radial(start) * rim.rc, o + radial(start + sweep) * rim.rc, o + radial(start + 0.5 * sweep) * rim.rc);
+        let (ta, tb) = (-rim.axis.cross(radial(start)), rim.axis.cross(radial(start + sweep)));
+        let len = 2.0 * scale.max(rim.rc) + 4.0 * r;
+        let back = -radial(start + 0.5 * sweep) * len;
+        let (fa, fb) = (pa + ta * len, pb + tb * len);
+        let tall = 4.0 * (len + rim.rc + 4.0 * r) + (rim.p - o).dot(rim.axis).abs();
+        let at = |q: DVec3| q - rim.axis * tall;
+        let wire = k::make_wire(&[
+            k::make_arc_3pts(at(pa), at(pm), at(pb))?,
+            k::make_line(at(pb), at(fb))?,
+            k::make_line(at(fb), at(fb + back))?,
+            k::make_line(at(fb + back), at(fa + back))?,
+            k::make_line(at(fa + back), at(fa))?,
+            k::make_line(at(fa), at(pa))?,
+        ])?;
+        let prism = k::extrude(&k::make_face_from_wire(&wire, true)?, rim.axis * (2.0 * tall))?.shape;
+        // The slab under the plane, its top on it.
+        let np = rim.np;
+        let cos = rim.axis.dot(np);
+        let q = o + rim.axis * ((rim.p - o).dot(np) / cos);
+        let half = (rim.rc + 2.0 * len) / cos.abs();
+        let down = if rim.wp.dot(np) < 0.0 { -np } else { np };
+        let sx = (rim.axis - np * cos).try_normalize().unwrap_or_else(|| np.any_orthonormal_vector());
+        let sy = down.cross(sx);
+        let slab = k::make_box(&k::Plane::new(q - sx * half - sy * half, down, sx), 2.0 * half, 2.0 * half, 4.0 * r)?;
+        let wedge = if rim.out < 0.0 { k::common(&slab, &prism)? } else { k::cut(&slab, &prism)? }.shape;
+        // Its top edges along the arc and the tangents (not the far side's).
+        let flat = |v: DVec3| v - rim.axis * v.dot(rim.axis);
+        let tol = scale * 1e-7;
+        let chain: Vec<Shape> = wedge
+            .edges()
+            .into_iter()
+            .filter(|c| {
+                let Ok(i) = c.edge_info() else { return false };
+                let Ok(m) = c.point_at(0.5 * (i.first_param + i.last_param)) else { return false };
+                let on_top = [i.start, i.end, m].iter().all(|v| (*v - rim.p).dot(np).abs() < tol);
+                on_top && flat(m - pa).length().min(flat(m - pb).length()) < 0.75 * len
+            })
+            .collect();
+        if chain.len() != 3 {
+            return Err(fail("the run-on wedge's top chain"));
+        }
+        let rounded = k::fillet(&wedge, &chain, r)?;
+        let tool = k::cut(&wedge, &rounded.shape)?;
+        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+            return Err(fail("the run-on round left no one solid to cut"));
+        }
+        // Its round: the faces on neither the planes nor the wall.
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool
+            .shape
+            .faces()
+            .iter()
+            .map(|f| match f.face_surface() {
+                Ok(k::Surface::Plane(_)) => generated.clone(),
+                Ok(k::Surface::Cylinder { axis, radius, .. }) if (radius - rim.rc).abs() < tol && axis.normalize().cross(rim.axis).length() < 1e-9 => generated.clone(),
+                _ => blend.clone(),
+            })
+            .collect();
+        cuts.push(NamedShape::new(tool.shape, names));
+    }
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &cuts)?;
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 /// Rounds of boss rims (closed edges where a plane meets a cylinder square to it, the material inside) whose wall is
 /// shorter than the round needs, with Allow edge overflow off: as Onshape's, the ball rolls on the cap and over the
 /// wall's far edge, the round replacing the wall (cf-snap-hook's Fillet 4: R5 on Ø12 bosses 2 mm tall, live 18

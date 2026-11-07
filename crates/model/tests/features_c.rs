@@ -3489,3 +3489,41 @@ fn a_coil_springs_helical_strips_are_one_face_each() {
     let (_, shown) = strips(&r, 10.0);
     assert_eq!(shown, 8);
 }
+
+/// cf-surface-pattern's Fillet 1 on its Part 5 as imported (live 2202 / 2227): R 2.54 on the ellipse where the slanted
+/// top meets the nose's cylinder. Its ends run on tangentially into the side edges, which live leaves out (a picked
+/// face's edges aren't propagated; with the edge picked and propagation off the same): the round runs straight on
+/// past each end between the side plane and the top's plane (a cylinder) until the sweep below trims it.
+#[test]
+fn a_rounded_arc_runs_straight_on_past_its_ends_as_live() {
+    let counts = |r: &RegenResult| {
+        let s = &r.context.bodies[0].shape;
+        let shown = s.shown_topology().unwrap();
+        (s.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count())
+    };
+    for pick_face in [true, false] {
+        let brep = include_str!("data/surface-pattern-part5.brep").to_string();
+        let mut s = Studio::new();
+        s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+        let r = s.ok();
+        assert_eq!(counts(&r), (7, 13, 8));
+        let b = &r.context.bodies[0];
+        let ellipse = b.shape.edges().iter().position(|e| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Ellipse { .. })).expect("the ellipse");
+        let ef = b.shape.edge_faces().unwrap();
+        let faces = b.shape.faces();
+        let top = ef[ellipse].iter().map(|&f| f as usize).find(|&f| faces[f].face_plane().unwrap().is_some()).expect("the top");
+        let pick = if pick_face { Reference::Face((*b.faces[top]).clone()) } else { Reference::Edge((*b.edges[ellipse]).clone()) };
+        s.add("fillet", move |p| {
+            p.set("entities", ParamValue::Query(vec![pick]));
+            p.set("radius", expr("0.1 in"));
+            p.set("tangentPropagation", ParamValue::Bool(pick_face));
+        });
+        let r = s.ok();
+        assert_eq!(counts(&r), (10, 22, 14));
+        let v = volume(&r, 0) * 1e9;
+        assert!((2882.48..2885.36).contains(&v), "{v} (live 2883.9207)");
+        // The run-on rounds: cylinders R 2.54 along the side planes.
+        let runs = r.context.bodies[0].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if near(radius, mm(2.54), 1e-9))).count();
+        assert_eq!(runs, 2);
+    }
+}

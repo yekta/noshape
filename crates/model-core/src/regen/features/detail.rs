@@ -79,13 +79,17 @@ impl TangentLinks {
 
 /// Without tangent propagation Parasolid runs a straight edge's blend out
 /// onto a tangent neighbour, but refuses a curved edge that continues
-/// tangentially into an edge left out (Onshape G7: one top arc of a
-/// filleted corner, alone or with its straight neighbour).
+/// tangentially into an edge left out on one of its faces (Onshape G7: one
+/// top arc of a filleted corner, alone or with its straight neighbour). A
+/// curved edge whose neighbour lies between other faces runs on (live 2227:
+/// cf-surface-pattern's ellipse between its top and its nose).
 fn curved_edge_left_open(shape: &k::Shape, edges: &[usize]) -> bool {
     let Some(links) = TangentLinks::new(shape) else { return false };
+    let Ok(ef) = shape.edge_faces() else { return false };
+    let shares_face = |a: usize, b: usize| ef.get(a).zip(ef.get(b)).is_some_and(|(fa, fb)| fa.iter().any(|f| fb.contains(f)));
     edges.iter().any(|&e| {
         let straight = links.edges.get(e).and_then(|x| x.edge_info().ok()).is_some_and(|i| matches!(i.curve, k::Curve::Line { .. }));
-        !straight && links.neighbours(e).iter().any(|o| !edges.contains(o))
+        !straight && links.neighbours(e).iter().any(|&o| !edges.contains(&o) && shares_face(e, o))
     })
 }
 
@@ -331,6 +335,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             None
         }
     };
+    let picked_edges: BTreeSet<(usize, usize)> = ev.resolve_edges(&refs.iter().filter(|r| !matches!(r, crate::reference::Reference::Face(_))).cloned().collect::<Vec<_>>()).into_iter().collect();
     let groups = by_body(sharp_of_picked_faces(ev, refs));
     // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
@@ -339,17 +344,23 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
+        // Live 2202 / 2227: a picked face's edges aren't propagated (the result doesn't depend on propagation).
+        let mut chain = if propagate { propagate_tangent(&body.shape, &edges.iter().copied().filter(|&e| picked_edges.contains(&(bi, e))).collect::<Vec<_>>()) } else { edges.clone() };
+        chain.extend(edges.iter().filter(|&&e| !chain.contains(&e)).copied().collect::<Vec<_>>());
+        chain.sort_unstable();
+        // The selection stops where its edges run on tangentially into edges left out.
+        let stops = propagate_tangent(&body.shape, &chain).len() > chain.len();
         // Live 1796: Width control takes one unbranched chain of edges per part (open or closed); a corner of three
         // edges, two separate edges or a box's 12 fail.
-        if width && !single_chain(&body.shape, &if propagate { propagate_tangent(&body.shape, &edges) } else { edges.clone() }) {
+        if width && !single_chain(&body.shape, &chain) {
             return err("Edges must form single chain per part.");
         }
         let unpropagated = |r: f64| super::blend_section::BlendSpec { section: super::blend_section::Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: true, cliff: false, sides: None };
-        if !propagate && curved_edge_left_open(&body.shape, &edges) {
+        if stops && curved_edge_left_open(&body.shape, &chain) {
             return err("Adjoining edge not filleted.");
         }
         if let Some(spec) = &special {
-            let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
+            let edges = chain;
             if let Some(p) = &spec.partial {
                 super::blend_section::check_partial(&body.shape, &edges, p)?;
             }
@@ -363,13 +374,16 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             super::blend_section::section_blend(ev, bi, &edges, &spec)?;
             continue;
         }
-        if !propagate && propagate_tangent(&body.shape, &edges).len() > edges.len() {
+        if stops {
             // OCCT always runs a fillet on along tangent edges; Onshape stops at the
             // selection (the blend runs straight on into the tangent neighbour).
-            super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius))?;
+            if !width && super::blend_section::run_on_rim_blend(ev, bi, &chain, radius)? {
+                continue;
+            }
+            super::blend_section::section_blend(ev, bi, &chain, &unpropagated(radius))?;
             continue;
         }
-        let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
+        let edges = chain;
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let t0 = std::time::Instant::now();
         // Checked: a valid solid or an error, also where OCCT needs help (blends consuming a face).
