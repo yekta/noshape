@@ -16,6 +16,19 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 16:42 UTC: c2-extension-spring's Fillet 1, the translator side (for asm too).**
+- Its edges aren't resolved from the sketch queries: Fillet 1's (configured, default True) queries carry live ids,
+  so `query_with` takes them by live's geometry at line 9 (`by_geometry`): JKJ / JKR at (-11.7, -0.5 / -1.5, 0.5),
+  the 1 mm vertical edges at the slot's end of part "Spring" (JLd / JLZ at x +11.7 are on "DON'T USE!"). Live rounds
+  those two concave corners (R = gap / 2 = 0.5) and the slot's 1 mm end face is consumed. Ours rounds edges whose
+  rounds lie at y -1.67 / -0.67 and keeps a 1 mm² face at x -11.7: the edge by_geometry picks at (-11.7, -1.5, 0.5)
+  is the wrong one (nearest-midpoint ambiguity, or our slot's end isn't at x -11.7 before Fillet 1). Next: our
+  edges at those points before Fillet 1 (the CLI's rollback by name is ambiguous there: "Spring 2" is a sketch and an
+  extrude; roll back by index).
+- Found on the way: a SWEPT_EDGE named by sides from two sketches (an extrude of regions from Spring and Spring 2)
+  looks every side up in the first sketch only (`extrude_name_from_tree`'s `sk`); a fix (each in its own sketch,
+  mapped through both frames) didn't change this document, which takes the id path, so it's not landed.
+
 **Review of bool's de4907d9 (by_quadrics stage 1 + the repair), core 11-07 16:27 UTC (lead's ask).**
 - Sound: every new loop has a fixed iteration cap (the march 400 steps, solves 16-100), so a failing case gives up the
   same way everywhere and falls back; no unordered containers; the repair runs only on an invalid inward wall, inside
