@@ -767,10 +767,14 @@ impl PartStudioView {
                     // menu also over the cells' inputs (qa4 Fixed 11).
                     .child({
                         let target = format!("panel_row:{}", r.name);
-                        // The row takes the keyboard before its menu opens (and keeps it to return to).
-                        let row = h_flex().on_mouse_down(MouseButton::Right, cx.listener(|this, _, window, cx| window.focus(&this.panel_row_focus, cx)));
-                        crate::ui_script::mark(row.child(name_el).child(kind_select).child(value_cell), move || target)
-                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable))
+                        crate::ui_script::mark(h_flex().child(name_el).child(kind_select).child(value_cell), move || target)
+                            .os_context_menu_over_inputs(move |menu, window, cx| {
+                                // The pressed row takes the keyboard before its menu opens (live variable-table-row-filter: "other").
+                                let row_focus = view.read(cx).panel_row_focus.clone();
+                                window.focus(&row_focus, cx);
+                                let menu = menu.focus_after_action(view.read(cx).focus.clone());
+                                var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable)
+                            })
                     })
                     // Right-clicking the Description adds Copy | Convert to
                     // expression (or text) (live 563, 652–656).
@@ -1641,7 +1645,12 @@ impl PartStudioView {
                             let is_default = matches!(&input.kind, ConfigInputKind::List { default, .. } if default == rk);
                             let row_name = rname.clone();
                             let current = current.clone();
-                            d.os_context_menu(move |m, _, _| {
+                            d.os_context_menu(move |m, window, cx| {
+                                // The pressed row takes the keyboard before the menu opens (live config-row-move-up: "other").
+                                let row_focus = vr.read(cx).panel_row_focus.clone();
+                                window.focus(&row_focus, cx);
+                                // After its action the keyboard is on the page (live config-row-duplicate: none).
+                                let m = m.focus_after_action(vr.read(cx).focus.clone());
                                 type OptEdit = fn(&mut noshape_model::partstudio::PartStudio, &str, &str);
                                 let op = |label: String, undo: &'static str, f: OptEdit| {
                                     let (v, a, b) = (vr.clone(), da.clone(), db.clone());

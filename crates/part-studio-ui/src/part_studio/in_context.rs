@@ -937,6 +937,9 @@ impl PartStudioView {
                 .cursor_pointer()
                 .child(crate::assets::icon("more", 20., cx))
                 .on_click(move |e: &ClickEvent, window, cx| {
+                    // The ⋯ button keeps the keyboard while its menu is open (live in-context-follow-position: "other").
+                    let held = v.read(cx).context_select_focus.clone();
+                    window.focus(&held, cx);
                     let v = v.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
                         let it = |label: &'static str, f: StudioAct| {

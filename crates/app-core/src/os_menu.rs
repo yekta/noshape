@@ -207,6 +207,9 @@ pub struct OsMenu {
     /// A page's dropdown (a panel's ⋯, the in-context carets): Escape leaves it open (live: the page keeps the
     /// keyboard, the key never reaches a Bootstrap dropdown).
     page: bool,
+    /// Where the keyboard goes after an item's action, instead of back to where it was (a panel row's menu: live's
+    /// click on the row lands on the page's body).
+    action_focus: Option<FocusHandle>,
     /// A native `<select>`'s field while its list is open: Chrome draws it
     /// with a 2 px `#3e94ff` focus ring (live assembly/182, navigation/62).
     /// Drawn by the menu host, so it shows exactly while the list is open.
@@ -229,7 +232,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, ring: None, truncate: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -300,6 +303,12 @@ impl OsMenu {
     /// Where this menu's item text starts instead of its style's.
     pub fn text_inset(mut self, x: f32) -> Self {
         self.text_inset = Some(x);
+        self
+    }
+
+    /// After an item's action the keyboard goes to `h` (see `action_focus`).
+    pub fn focus_after_action(mut self, h: FocusHandle) -> Self {
+        self.action_focus = Some(h);
         self
     }
 
@@ -423,7 +432,7 @@ impl OsMenu {
             let handler = handler.clone();
             // Focus goes back first, so a prompt the item opens returns there too.
             let ret = self.dismiss(window, cx);
-            if let Some(ret) = ret {
+            if let Some(ret) = self.action_focus.clone().or(ret) {
                 window.focus(&ret, cx);
             }
             if let Some(h) = handler {

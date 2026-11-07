@@ -5859,9 +5859,13 @@ impl PartStudioView {
             m = dynamic(m, window, cx);
             if let Some(input) = first_config_input.clone() {
                 // Configure suppression adds the feature to the configuration table.
+                let name = feature_name.clone();
                 m = m.item(item("Configure suppression", Box::new(move |this, _, cx| {
                     this.add_configured(id, noshape_model::configuration::SUPPRESSED_PARAM, &input, cx);
                     this.right_panel = Some(config_panel::RightPanel::Configurations);
+                    // Live feature-menu-configure-suppression: "Extrude 1 suppression configured in Configuration".
+                    let input_name = this.studio(cx).and_then(|s| s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone())).unwrap_or_else(|| input.clone());
+                    this.message = Some((FeatureStatus::Info, format!("{name} suppression configured in {input_name}")));
                     cx.notify();
                 })));
             }
