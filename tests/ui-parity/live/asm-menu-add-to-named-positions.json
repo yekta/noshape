@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-add-to-named-positions",
- "recorded": "2026-11-07T01:53:58.107Z",
+ "recorded": "2026-11-07T05:36:40.300Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "c12f128c3ee07a2061868e9d",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "7bb774209030510d0ed601b8",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 42596
+   "t": 24634
   },
   {
    "step": 2,
@@ -323,6 +325,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -459,25 +462,66 @@
     },
     "drawing": null
    },
-   "t": 48631
+   "t": 27783
   },
   {
    "step": 3,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Assembly 1 <1>"
+     "instance": "Assembly"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"instance\":\"Assembly 1 <1>\"}",
+   "ok": true,
+   "at": [
+    90,
+    235
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Use best available tessellation",
+      "Check interference…",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Switch to Assembly 2",
+      "Add to named positions…",
+      "Lock/follow position to…",
+      "Copy Assembly 2 <1>",
+      "Move to new subassembly",
+      "Dissolve subassembly",
+      "Change to version…",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Assembly 2…",
+      "Add selection to folder…",
+      "Expand",
+      "Collapse",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -518,7 +562,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -613,7 +657,7 @@
     },
     "drawing": null
    },
-   "t": 51140
+   "t": 30613
   },
   {
    "step": 4,
@@ -623,14 +667,18 @@
      "menu": "Add to named positions…"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Add to named positions…\"}",
+   "ok": true,
+   "at": [
+    225,
+    609
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -688,10 +736,10 @@
     },
     "parts": [],
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Assembly 2 <1> added to named positions × Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
@@ -765,9 +813,19 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "panel": {
+     "title": "Named positions",
+     "rows": [
+      {
+       "name": "Named position 1 | ",
+       "active": false
+      }
+     ],
+     "banner": "Editing Named position 1"
+    }
    },
-   "t": 53741
+   "t": 33646
   },
   {
    "step": 5,
@@ -782,6 +840,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -839,7 +898,7 @@
     },
     "parts": [],
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -916,9 +975,19 @@
      ],
      "mates": []
     },
-    "drawing": null
+    "drawing": null,
+    "panel": {
+     "title": "Named positions",
+     "rows": [
+      {
+       "name": "Named position 1 | ",
+       "active": false
+      }
+     ],
+     "banner": null
+    }
    },
-   "t": 57624
+   "t": 38391
   }
  ]
 }

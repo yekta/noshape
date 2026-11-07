@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-unlock",
- "recorded": "2026-11-07T01:55:13.307Z",
+ "recorded": "2026-11-07T05:35:50.991Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "6e0eb8a8054b375e23a53299",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "284927b77153331b3b43d469",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 42771
+   "t": 25980
   },
   {
    "step": 2,
@@ -323,6 +325,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -389,8 +392,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -411,8 +414,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -459,25 +462,66 @@
     },
     "drawing": null
    },
-   "t": 47383
+   "t": 29281
   },
   {
    "step": 3,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Assembly 1 <1>"
+     "instance": "Assembly"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"instance\":\"Assembly 1 <1>\"}",
+   "ok": true,
+   "at": [
+    90,
+    235
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Use best available tessellation",
+      "Check interference…",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Switch to Assembly 2",
+      "Add to named positions…",
+      "Lock/follow position to…",
+      "Copy Assembly 2 <1>",
+      "Move to new subassembly",
+      "Dissolve subassembly",
+      "Change to version…",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Assembly 2…",
+      "Add selection to folder…",
+      "Expand",
+      "Collapse",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -518,7 +562,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -543,8 +587,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -565,8 +609,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -613,7 +657,7 @@
     },
     "drawing": null
    },
-   "t": 49647
+   "t": 32149
   },
   {
    "step": 4,
@@ -624,15 +668,74 @@
     },
     "ms": 600
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Lock/follow position to…\"}",
+   "ok": true,
+   "at": [
+    225,
+    631
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Lock current position"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Properties…",
+       "Instance properties…",
+       "Hide",
+       "Hide other instances",
+       "Hide all instances",
+       "Show center of mass",
+       "Isolate…",
+       "Make transparent…",
+       "Suppress",
+       "Dynamic suppression",
+       "Use best available tessellation",
+       "Check interference…",
+       "Add mate connector to instance origin…",
+       "Replace instances…",
+       "Switch to Assembly 2",
+       "Add to named positions…",
+       "Lock/follow position to…",
+       "Copy Assembly 2 <1>",
+       "Move to new subassembly",
+       "Dissolve subassembly",
+       "Change to version…",
+       "Export…",
+       "Release…",
+       "Add comment",
+       "Zoom to selection",
+       "Create Drawing of Assembly 2…",
+       "Add selection to folder…",
+       "Expand",
+       "Collapse",
+       "Create empty subassembly",
+       "Delete"
+      ],
+      "highlighted": 16,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Lock current position"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
     "selection": {
      "count": 0,
      "items": []
@@ -673,7 +776,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -698,8 +801,8 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -720,8 +823,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -768,7 +871,7 @@
     },
     "drawing": null
    },
-   "t": 51407
+   "t": 34768
   },
   {
    "step": 5,
@@ -778,14 +881,18 @@
      "menu": "Lock current position"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Lock current position\"}",
+   "ok": true,
+   "at": [
+    418,
+    632
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -843,17 +950,17 @@
     },
     "parts": [],
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Assembly 2 <1> locked at current position. × Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -874,8 +981,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -922,25 +1029,67 @@
     },
     "drawing": null
    },
-   "t": 53771
+   "t": 37553
   },
   {
    "step": 6,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Assembly 1 <1>"
+     "instance": "Assembly"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"instance\":\"Assembly 1 <1>\"}",
+   "ok": true,
+   "at": [
+    90,
+    235
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Use best available tessellation",
+      "Check interference…",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Switch to Assembly 2",
+      "Add to named positions…",
+      "Unlock",
+      "Lock/follow position to…",
+      "Copy Assembly 2 <1>",
+      "Move to new subassembly",
+      "Dissolve subassembly",
+      "Change to version…",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Assembly 2…",
+      "Add selection to folder…",
+      "Expand",
+      "Collapse",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -981,7 +1130,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -997,17 +1146,17 @@
     },
     "parts": [],
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Assembly 2 <1> locked at current position. × Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -1028,8 +1177,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -1076,7 +1225,7 @@
     },
     "drawing": null
    },
-   "t": 55934
+   "t": 40384
   },
   {
    "step": 7,
@@ -1086,14 +1235,18 @@
      "menu": "Unlock"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Unlock\"}",
+   "ok": true,
+   "at": [
+    225,
+    631
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1151,17 +1304,17 @@
     },
     "parts": [],
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Assembly 2 <1> position unlocked. × Close",
     "tooltip": null,
     "sketch": null,
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
-       "fixed": false,
+       "name": "Part 1 <1>",
+       "fixed": true,
        "transform": [
         1,
         0,
@@ -1182,8 +1335,8 @@
        ]
       },
       {
-       "name": "Part 1 <1>",
-       "fixed": true,
+       "name": "Assembly 2 <1>",
+       "fixed": false,
        "transform": [
         1,
         0,
@@ -1230,7 +1383,7 @@
     },
     "drawing": null
    },
-   "t": 58152
+   "t": 42881
   }
  ]
 }

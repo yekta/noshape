@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-dissolve-subassembly",
- "recorded": "2026-11-07T00:44:04.482Z",
+ "recorded": "2026-11-07T05:33:33.933Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "d434fb734585b9e3f85b1cca",
-  "workspace": "e46def584afd02d0b1b2ea03",
-  "element": "4031ce540c056dac34e4a51f",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "55aeaed879fd744c65df92e9",
   "start": "two-blocks",
-  "startElement": "17925cad4a23714ccd49b367",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 39132
+   "t": 26429
   },
   {
    "step": 2,
@@ -323,6 +325,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -459,25 +462,66 @@
     },
     "drawing": null
    },
-   "t": 43951
+   "t": 29796
   },
   {
    "step": 3,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Assembly 1 <1>"
+     "instance": "Assembly"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"instance\":\"Assembly 1 <1>\"}",
+   "ok": true,
+   "at": [
+    90,
+    235
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Properties…",
+      "Instance properties…",
+      "Hide",
+      "Hide other instances",
+      "Hide all instances",
+      "Show center of mass",
+      "Isolate…",
+      "Make transparent…",
+      "Suppress",
+      "Dynamic suppression",
+      "Use best available tessellation",
+      "Check interference…",
+      "Add mate connector to instance origin…",
+      "Replace instances…",
+      "Switch to Assembly 2",
+      "Add to named positions…",
+      "Lock/follow position to…",
+      "Copy Assembly 2 <1>",
+      "Move to new subassembly",
+      "Dissolve subassembly",
+      "Change to version…",
+      "Export…",
+      "Release…",
+      "Add comment",
+      "Zoom to selection",
+      "Create Drawing of Assembly 2…",
+      "Add selection to folder…",
+      "Expand",
+      "Collapse",
+      "Create empty subassembly",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -518,7 +562,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "is-instance"
+       "cls": "is-instance  fake-hover context-menu-active"
       },
       {
        "name": "Mate features (0)",
@@ -613,7 +657,7 @@
     },
     "drawing": null
    },
-   "t": 46204
+   "t": 32652
   },
   {
    "step": 4,
@@ -623,14 +667,18 @@
      "menu": "Dissolve subassembly"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Dissolve subassembly\"}",
+   "ok": true,
+   "at": [
+    225,
+    699
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -666,7 +714,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Assembly 2 <1>",
+       "name": "Part 2 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -697,7 +745,7 @@
     "assembly": {
      "instances": [
       {
-       "name": "Assembly 2 <1>",
+       "name": "Part 2 <1>",
        "fixed": false,
        "transform": [
         1,
@@ -739,35 +787,13 @@
         0,
         1
        ]
-      },
-      {
-       "name": "Assembly 2 <1> > Part 2 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-       ]
       }
      ],
      "mates": []
     },
     "drawing": null
    },
-   "t": 48427
+   "t": 35103
   }
  ]
 }
