@@ -185,7 +185,10 @@ subprocess.Popen(start_cmd, env=env, stdin=subprocess.DEVNULL, start_new_session
 wait_for(["started "], 5)
 wait_for([f"found {args.want}", f"verified {args.want}"], args.find_minutes, stop=[f"refused {args.want}", "manual:"])
 say("verified; the card shows Restart")
-time.sleep(3)
+# As a user reads the card first. On Windows runners, Restart pressed within a few seconds of "verified" took the
+# whole runner down as the elevated installer started (5 of 6 rehearsals, agent/updater-uac 11-07); 20 s or more
+# later, never (5 of 5).
+time.sleep(30)
 
 # 3. Restart pressed: the button found on the screen, clicked until the app says it restarts.
 for attempt in range(6):
