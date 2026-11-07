@@ -16,6 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 03:40 UTC: cf-surface-pattern's Fillet 1 (live capture in: behaviours.md "core (2202)").**
+- Queued: a fillet of a picked face blends its sharp edges only (its 0° edge to a neighbour is left; live: "live
+  fillets the picked face's sharp edges and leaves its smooth ones"; tangent propagation off gives the same).
+- Still failing (34/39): live blends the ellipse (a B-spline face, 78.5 mm²) and the two B-spline side edges
+  (cylinders R 2.54, 45.5 mm² each) whose blends end in a point about 1.6 mm above the front's bottom corners
+  (their contact lines 18.335 / 18.872 mm meet; the side keeps an icurve 1.617 and the 0.693 line), the front face
+  untouched. OCCT takes the whole tangent chain (ellipse -> sides -> the 0.693 mm edges) and fails on it, even from the
+  ellipse alone. Needs a blend whose chain ends where its width runs out (noshape's own blends, or OCCT's chain cut
+  at the sides' ends). Full live listing: /root/onshape-research/live/core/fillet-2202/part5-faces.json.
+
 **State 11-07 02:57 UTC: cf-lighten's Lighten 1 nearly as live.**
 - Queued: FeatureScript tracking follows a face to faces named after it (`derives_from`: Offset / Generated / Copy /
   Split, query.rs `tracking`); Enclose's history re-indexed onto the regions it keeps (`History::onto`: the cavity's
