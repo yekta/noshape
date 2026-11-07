@@ -985,7 +985,8 @@ fn ev_raycast(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Live hit keys: distance, entity, entityType, intersection, parameter.
     let face = std_enum("query.fs", "EntityType", "FACE").unwrap_or_else(|| Value::str("FACE"));
     for (t, r, p, uv) in hits.into_iter().take(take) {
-        let q = super::query::query_of_refs(&cx, &[r]);
+        // One entity: qTransient(id), as std's RaycastResult has it (and the bare id for a std before 2473: legacy.rs).
+        let q = super::query::transient_query(cx.state.lock().transient(&r));
         out.push(Value::map_from([("entity", q), ("entityType", face.clone()), ("intersection", point_value(p)), ("distance", length_value(t)), ("parameter", uv)]));
     }
     Ok(Value::array(out))

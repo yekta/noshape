@@ -1438,6 +1438,38 @@ export const pinnedHelix = defineFeature(function(context is Context, id is Id, 
     assert!(compiled.diagnostics.iter().any(|d| d.message.contains("HelixType")), "{:?}", compiled.diagnostics);
 }
 
+/// evRaycast's hit is one entity, `qTransient(id)` (std's RaycastResult); a std before 2473 gets the bare id and wraps
+/// it itself (1431's evaluate.fs: `qTransient(data[i].entity)`: cf-t-slot-joint's T-Slot Joints raised "Call
+/// qTransient(map) does not match qTransient(string)").
+#[test]
+fn a_raycast_hit_is_one_transient_entity_on_old_and_new_std() {
+    let body = r#"
+annotation { "Feature Type Name" : "Ray probe" }
+export const rayProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 10, 5) * millimeter });
+        const hits = evRaycast(context, { "entities" : qCreatedBy(id + "box", EntityType.FACE),
+                                          "ray" : line(vector(5, 5, 20) * millimeter, vector(0, 0, -1)) });
+        if (size(hits) != 1)
+            throw regenError("hits: " ~ size(hits));
+        const faces = evaluateQuery(context, hits[0].entity);
+        if (size(faces) != 1 || abs(hits[0].distance - 15 * millimeter) > 1e-9 * meter)
+            throw regenError("hit: " ~ toString(hits[0]));
+        if (abs(evPlane(context, { "face" : faces[0] }).origin[2] - 5 * millimeter) > 1e-9 * meter)
+            throw regenError("not the top face");
+    });
+"#;
+    for v in [1431, 3095] {
+        let fx = Fixture::new(&format!("FeatureScript {v};\nimport(path : \"onshape/std/geometry.fs\", version : \"{v}.0\");\n{body}"));
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty("rayProbe"), &fx.units).unwrap();
+        ps.features.push(f);
+        let r = fx.regen(&mut Regenerator::new(), &ps);
+        assert_ok(&r);
+    }
+}
+
 /// evSurfaceDefinition of a B-spline face: std's BSplineSurface with live's
 /// keys (live "fs (10-25 b)" (2): a loft from a circle to a rectangle).
 #[test]
