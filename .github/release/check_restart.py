@@ -29,6 +29,7 @@ a.add_argument("--doc", required=True)
 a.add_argument("--shots", required=True)
 a.add_argument("--label", default="")
 a.add_argument("--find-minutes", type=float, default=75)
+a.add_argument("--card-wait", type=float, default=0, help="seconds on the card before Restart (default: pressed at once)")
 a.add_argument("start", nargs=argparse.REMAINDER)
 args = a.parse_args()
 start_cmd = args.start[1:] if args.start[:1] == ["--"] else args.start
@@ -184,11 +185,8 @@ subprocess.Popen(start_cmd, env=env, stdin=subprocess.DEVNULL, start_new_session
 # 2. Found on GitHub, downloaded and verified (the card says "Updated - restart to finish").
 wait_for(["started "], 5)
 wait_for([f"found {args.want}", f"verified {args.want}"], args.find_minutes, stop=[f"refused {args.want}", "manual:"])
-say("verified; the card shows Restart")
-# As a user reads the card first. On Windows runners, Restart pressed within a few seconds of "verified" took the
-# whole runner down as the elevated installer started (5 of 6 rehearsals, agent/updater-uac 11-07); 20 s or more
-# later, never (5 of 5).
-time.sleep(30)
+say(f"verified; the card shows Restart: pressed {'at once, as users do' if not args.card_wait else f'after {args.card_wait:.0f} s'}")
+time.sleep(args.card_wait)
 
 # 3. Restart pressed: the button found on the screen, clicked until the app says it restarts.
 for attempt in range(6):

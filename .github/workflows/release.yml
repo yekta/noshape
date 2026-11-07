@@ -573,6 +573,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "v0.4.32's helper didn't update" }
           & $uac -From $latest -Helper "$env:RUNNER_TEMP\helper-today.ps1" -Setup $setup -Want $want -Version $want -Mcp
           if ($LASTEXITCODE -ne 0) { throw "today's helper didn't update" }
+          # A program with noshape.exe loaded, in a console it shares: untouched, the install waits for it.
+          & $uac -From $latest -Helper "$env:RUNNER_TEMP\helper-today.ps1" -Setup $setup -Want $want -Version $want -Reader 20
+          if ($LASTEXITCODE -ne 0) { throw "the update closed another program or didn't wait for it" }
 
       # The release's speed on each platform, through its CLI-only download (qa's 1.5x between green and v0.4.32 on
       # release-fillet-hang was green's x86-64-v3 OCCT, 11-06). Not a gate: a table in the job summary.

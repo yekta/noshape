@@ -498,14 +498,15 @@ function Failed($why) {
 trap { Failed "The update was not installed: $_. Details: $HelperLog" }
 while (Get-Process -Id $AppPid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }
 # Other copies from the install folder (a coding agent's `noshape mcp`, a terminal's `noshape`) hold the files Windows
-# won't replace; the agents start them again when they need them. The installer closes the elevated ones.
+# won't replace; the agents start them again when they need them. The installer closes the elevated ones and waits
+# for the files to be free.
 $dir = Split-Path $Exe
 Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Split-Path $_.Path) -eq $dir } | ForEach-Object { Log "closing $($_.Path) ($($_.Id))"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 if ($Mode -eq 'installer') {
   # Elevated through Windows' permission prompt; waited on by its handle (not Start-Process -Wait, which waits for
   # everything the installer starts), then judged by the version it installed.
   $si = New-Object System.Diagnostics.ProcessStartInfo $Payload
-  $si.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /FORCECLOSEAPPLICATIONS `"/LOG=$InstallLog`""
+  $si.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL `"/LOG=$InstallLog`""
   $si.Verb = 'runas'
   $si.UseShellExecute = $true
   try { $p = [System.Diagnostics.Process]::Start($si) } catch { Failed "The update was not installed: Windows' permission prompt was declined or failed. Restart from the update card to try again." }
@@ -516,7 +517,12 @@ if ($Mode -eq 'installer') {
   $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{6E0B3C55-2D7A-4C4B-9C8E-5F1A4E2B7D10}_is1'
   $got = (Get-ItemProperty $key -ErrorAction SilentlyContinue).DisplayVersion
   Log "installer exit $code, installed $got"
-  if ($got -ne $Version) { Failed "The update was not installed: its installer stopped (code $code). Close noshape everywhere it runs, then restart from the update card. Details: $InstallLog" }
+  if ($got -ne $Version) {
+    # The installer's own reason when it gave one (another program holding noshape's files, say).
+    $said = Select-String -Path $InstallLog -Pattern 'PrepareToInstall failed: (.+)' -ErrorAction SilentlyContinue | Select-Object -Last 1
+    $why = if ($said) { $said.Matches[0].Groups[1].Value.Trim() } else { 'Close noshape everywhere it runs, then restart from the update card.' }
+    Failed "The update was not installed: its installer stopped (code $code). $why Details: $InstallLog"
+  }
 } else {
   Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force -ErrorAction Stop
   if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force -ErrorAction Stop }

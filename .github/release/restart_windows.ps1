@@ -29,7 +29,11 @@ Set-Content "$out\start.ps1" @"
 `$c = New-Object System.Management.Automation.PSCredential 'nsuser', (ConvertTo-SecureString '$pw' -AsPlainText -Force)
 Start-Process powershell.exe -Credential `$c -LoadUserProfile -WorkingDirectory '$out' -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File "$out\as_user.ps1"' -WindowStyle Hidden
 "@
-python "$PSScriptRoot\check_restart.py" --want $Want --exe $exe --log $log --doc $doc --shots "$env:RUNNER_TEMP\restart-shots" --label 'Windows installer, across UAC' -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$out\start.ps1"
+# Installers up to v0.4.34 used Restart Manager, which closed whatever had noshape.exe loaded together with its
+# console: GitHub's runner went with a scanner of its own that reads a freshly started exe for about a minute
+# (agent/updater-uac, 11-07). Their Restart is pressed after 30 s; from v0.4.35 on, at once.
+$wait = if ([version]$Want -le [version]'0.4.34') { @('--card-wait', '30') } else { @() }
+python "$PSScriptRoot\check_restart.py" --want $Want --exe $exe --log $log --doc $doc --shots "$env:RUNNER_TEMP\restart-shots" --label 'Windows installer, across UAC' @wait -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$out\start.ps1"
 $code = $LASTEXITCODE
 Get-Process noshape -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 if ($code -ne 0) { exit 1 }

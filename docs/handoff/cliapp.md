@@ -156,6 +156,14 @@ PATH, a never-answering check times out, the menu action opens the dialog: it fa
   writes the installer's log beside the download (`update-install.log`), and on any error (a `trap`) starts the old
   noshape with the reason. Runners' own account is the built-in administrator (no UAC split): the test logs a second
   admin account on runas-style to get UAC's Medium token (`.github/release/uac`, in release.yml's dry run).
+- **No Restart Manager (11-07).** Restart pressed at once lost GitHub's Windows runner 7 times in 10: the installer's
+  Restart Manager (`/FORCECLOSEAPPLICATIONS`, `CloseApplications=force`) closed a scanner of GitHub's that had
+  noshape.exe loaded, and with it its console, which the runner shared (a user's terminal could go the same way).
+  The installer now has `CloseApplications=no`; `packaging/windows/prepare.ps1` (PrepareToInstall) ends noshape's own
+  copies by process and waits up to 120 s for the files, else fails with the reason, which the helper passes on.
+  Shown with an image-loaded reader sharing a console with a sentinel (update_across_uac.ps1 `-Reader`): v0.4.33's
+  installer closed the sentinel, the new one waited (agent/updater-uac run 42355757410). release.yml's restart job
+  presses Restart at once (after 30 s for target releases up to v0.4.34).
 - **Tests.** crates/update/tests/update.rs (T1): real Sigstore fixtures (tests/fixtures, made by update-test-fixtures.yml
   on a runner; `identity.txt` is that run's workflow identity) verify, and a changed SHA256SUMS, signature, digest,
   certificate, signed entry timestamp or log time, another signer (a release tag's, a fork's, a prefix), a trust root
