@@ -89,6 +89,18 @@ scratch /root/bool-scratch.
   shfall 8b25831a (a Fuse of 12 tools: history differs from OCCT with only the reversed order). Its gate had run on a
   main with skasm's torus/sphere copies in it, and that case's difference was taken for theirs. Valve's 60 ms back.
   To try instead: stop the retry where the reversed order merged nothing for the same cone pieces.
+- (04:50 UTC) c2-valve-config's two cuts that go to OCCT, not landed (/root/bool-scratch/wip/valve-handle-cut-1107.patch
+  then valve-rim-regroup-1107.patch; their gate was clean: corpora, shfall, T1s, knurls and gears):
+  - Extrude 2's (81493b18, 1 tool) is ours with three changes: the apex fix again (a plane past a cone's apex meets
+    nothing), the end of OCCT's section on the cone's rim (its curve ends 0.2065 mm off the rim vertex, the section
+    0.206 mm: one vertex, as OCCT puts that vertex on the curve; first in pick, then as a regroup in split_reach,
+    since in the 7-tool cut the rim vertices don't exist yet when pick runs), and the inside test's boundary closed
+    across a tolerant vertex's 0.17 mm gap. Pool::near_tol (no regroups) for the lookups: find_tol's regroups made
+    the knurl k25-25 differ.
+  - Circular pattern 1's (42cf7278, 7 tools) then goes past the apex check and declines "a non-manifold result"
+    after 171 ms of ours (the 7th tool reaches 1.2 m out, z -2 m: its own faces' loops used once; and the y = -70
+    handle keeps vertex pairs 0.07 mm apart), so the document got slower (Extrude 2 -30 ms, the pattern +150 ms):
+    not landed. Take the 7-tool cut, or decline it early, before landing the first.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change
