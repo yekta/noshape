@@ -316,6 +316,7 @@ impl AssemblyView {
             None => rename,
         };
         let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
+        let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": label, "dialog": d["title"] })));
         let focus = focus.or_else(|| if self.mate.is_none() { active_field() } else { None });
         // The Driving mate selector's box has the keyboard (live asm-mate-menu-edit-driver-mate).
         let focus = focus.or_else(|| self.ui.np_driver.as_ref().map(|_| json!({ "kind": "field", "label": "Mates to drive positions", "dialog": "Driving mate selector" })));
@@ -535,7 +536,8 @@ impl AssemblyView {
                     PatternDialogKind::PartPattern => s.mate.is_some(),
                     PatternDialogKind::Replicate => s.mate.is_some() && !s.scope_refs.is_empty(),
                 };
-            out.push(dialog(s.name.clone(), complete, complete, fields));
+            // ✓ turns on once the dialog has been changed, complete or not (live asm-linear-pattern-third-direction).
+            out.push(dialog(s.name.clone(), complete, complete || s.touched, fields));
         }
         if let Some((editing, ids)) = &self.ui.group {
             let title = match editing {

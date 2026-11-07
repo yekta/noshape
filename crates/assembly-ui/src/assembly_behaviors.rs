@@ -455,6 +455,8 @@ pub struct AsmUi {
     /// A side panel's button or row holds the keyboard as a web page's would (live: the Named positions footer's Add
     /// once positions exist, a right-clicked row); any other click or a menu item clears it.
     pub panel_focus: bool,
+    /// A dialog checkbox just clicked holds the keyboard (live: the DOM input), by its label; any click clears it.
+    pub checkbox_focus: Option<&'static str>,
     pub cfg_only_kinds: [bool; 3],
     pub cfg_toast_ok: bool,
     pub cfg_props_tab: bool,

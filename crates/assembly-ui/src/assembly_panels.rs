@@ -131,6 +131,53 @@ impl McSession {
     }
 }
 
+/// A pattern dialog's checkboxes and flips (its dialog-level undo).
+#[derive(Clone, Copy, PartialEq)]
+pub struct PatternToggles {
+    pub second: bool,
+    pub third: bool,
+    pub opposite: [bool; 3],
+    pub equal: [bool; 3],
+    pub centered: [bool; 3],
+}
+
+impl PatternSession {
+    fn toggles(&self) -> PatternToggles {
+        PatternToggles {
+            second: self.second,
+            third: self.third,
+            opposite: [self.opposite, self.opposite2, self.opposite3],
+            equal: [self.equal, self.equal2, self.equal3],
+            centered: [self.centered, self.centered2, self.centered3],
+        }
+    }
+
+    fn set_toggles(&mut self, t: PatternToggles) {
+        (self.second, self.third) = (t.second, t.third);
+        [self.opposite, self.opposite2, self.opposite3] = t.opposite;
+        [self.equal, self.equal2, self.equal3] = t.equal;
+        [self.centered, self.centered2, self.centered3] = t.centered;
+    }
+
+    /// Before a toggle: remember the state for Undo (and enable ✓).
+    pub fn note_toggle(&mut self) {
+        let t = self.toggles();
+        self.toggle_history.0.push(t);
+        self.toggle_history.1.clear();
+        self.touched = true;
+    }
+
+    /// Undo / redo a toggle; false when there is none.
+    pub fn undo_toggle(&mut self, redo: bool) -> bool {
+        let now = self.toggles();
+        let (from, to) = if redo { (&mut self.toggle_history.1, &mut self.toggle_history.0) } else { (&mut self.toggle_history.0, &mut self.toggle_history.1) };
+        let Some(t) = from.pop() else { return false };
+        to.push(now);
+        self.set_toggles(t);
+        true
+    }
+}
+
 pub struct PatternSession {
     pub kind: PatternDialogKind,
     pub editing: Option<MateId>,
@@ -166,6 +213,11 @@ pub struct PatternSession {
     pub third: bool,
     /// Fields configured from the dialog (its right-click Configure, live 2209): configured with the pattern on ✓.
     pub cfg_pending: Vec<&'static str>,
+    /// A checkbox or toggle was changed (live enables ✓ then, complete or not).
+    pub touched: bool,
+    /// The dialog's own Undo / Redo while it is open (live: a toggled checkbox is undoable): toggles before each
+    /// change, and the undone ones.
+    pub toggle_history: (Vec<PatternToggles>, Vec<PatternToggles>),
     /// Seed mate (part pattern / replicate).
     pub mate: Option<MateId>,
     /// Replicate: the match scope (None: the default for the seed mate's
@@ -1092,6 +1144,8 @@ impl AssemblyView {
             second: false,
             third: false,
             cfg_pending: Vec::new(),
+            touched: false,
+            toggle_history: Default::default(),
             mate: None,
             scope: None,
             scope_refs: Vec::new(),
@@ -1576,12 +1630,14 @@ impl AssemblyView {
             let flip: fn(&mut Self) = if n == 1 {
                 |t| {
                     if let Some(p) = &mut t.pattern {
+                        p.note_toggle();
                         p.opposite2 = !p.opposite2;
                     }
                 }
             } else {
                 |t| {
                     if let Some(p) = &mut t.pattern {
+                        p.note_toggle();
                         p.opposite3 = !p.opposite3;
                     }
                 }
@@ -1594,6 +1650,7 @@ impl AssemblyView {
                 .child(h_flex().child(if n == 1 { configurable(this, "pat-cfg-count2", value_row("Instance count", count).into_any_element(), noshape_model::assembly::config::param::COUNT_2, cx) } else { value_row("Instance count", count).into_any_element() }).child(toggle(ids[1], icon, opposite, cx, flip)))
                 .child(os::checkbox(ids[2], "Equal spacing", equal).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
+                        p.note_toggle();
                         let e = if n == 1 { &mut p.equal2 } else { &mut p.equal3 };
                         *e = !*e;
                     }
@@ -1602,6 +1659,7 @@ impl AssemblyView {
                 })))
                 .child(os::checkbox(ids[3], "Centered", centered).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
+                        p.note_toggle();
                         let c = if n == 1 { &mut p.centered2 } else { &mut p.centered3 };
                         *c = !*c;
                     }
@@ -1629,11 +1687,13 @@ impl AssemblyView {
                     .child(configurable(self, pc, value_row(if circular { "Angle" } else { "Distance" }, &s.distance).into_any_element(), pd, cx))
                     .child(h_flex().child(configurable(self, "pat-cfg-count", value_row("Instance count", &s.count).into_any_element(), noshape_model::assembly::config::param::COUNT, cx)).child(toggle("pat-opp", flip, opposite, cx, |this| {
                         if let Some(p) = &mut this.pattern {
-                            p.opposite = !p.opposite;
+                            p.note_toggle();
+                        p.opposite = !p.opposite;
                         }
                     })))
                     .child(os::checkbox("pat-eq", "Equal spacing", equal).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
+                            p.note_toggle();
                             p.equal = !p.equal;
                         }
                         this.update_pattern_preview(cx);
@@ -1641,6 +1701,7 @@ impl AssemblyView {
                     })))
                     .child(os::checkbox("pat-centered", "Centered", centered).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
+                            p.note_toggle();
                             p.centered = !p.centered;
                         }
                         this.update_pattern_preview(cx);
@@ -1648,12 +1709,12 @@ impl AssemblyView {
                     })));
                 if !circular {
                     body = body.child(os::checkbox("pat-second", "Second direction", second).map(|d| crate::ui_script::mark(d, || "checkbox:Second direction".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        // Live (asm-linear-pattern-third-direction): the active field stays; the checkbox keeps the focus.
                         if let Some(p) = &mut this.pattern {
+                            p.note_toggle();
                             p.second = !p.second;
-                            if p.second && p.axis2.is_none() {
-                                p.active = Some(1);
-                            }
                         }
+                        this.ui.checkbox_focus = Some("Second direction");
                         this.update_capture(cx);
                         cx.notify();
                     })));
@@ -1662,11 +1723,10 @@ impl AssemblyView {
                         let third = s.third;
                         body = body.child(os::checkbox("pat-third", "Third direction", third).map(|d| crate::ui_script::mark(d, || "checkbox:Third direction".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             if let Some(p) = &mut this.pattern {
+                                p.note_toggle();
                                 p.third = !p.third;
-                                if p.third && p.axis3.is_none() {
-                                    p.active = Some(2);
-                                }
                             }
+                            this.ui.checkbox_focus = Some("Third direction");
                             this.update_capture(cx);
                             this.update_pattern_preview(cx);
                             cx.notify();

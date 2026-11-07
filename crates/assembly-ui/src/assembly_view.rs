@@ -1841,6 +1841,16 @@ impl AssemblyView {
         cx.notify();
     }
 
+    /// Undo / redo in an open pattern dialog: its toggles. False when no pattern dialog is open.
+    fn pattern_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
+        let Some(p) = &mut self.pattern else { return false };
+        if p.undo_toggle(redo) {
+            self.update_pattern_preview(cx);
+        }
+        cx.notify();
+        true
+    }
+
     /// Undo / redo in an open mate dialog: its connector picks (live 1962).
     /// False when no mate dialog is open (the document's undo then).
     fn mate_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
@@ -1873,6 +1883,7 @@ impl AssemblyView {
         match &self.mate {
             Some(m) => m.dialog.read(cx).pick_history(),
             None if self.ui.group.is_some() => (!self.ui.group_picks.0.is_empty(), !self.ui.group_picks.1.is_empty()),
+            None if self.pattern.is_some() => self.pattern.as_ref().map_or((false, false), |p| (!p.toggle_history.0.is_empty(), !p.toggle_history.1.is_empty())),
             // The Driving mate selector has no picks to undo (live asm-mate-menu-edit-driver-mate).
             None if self.ui.np_driver.is_some() => (false, false),
             None => {
@@ -6474,12 +6485,12 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, _, cx| {
-                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, _, cx| {
-                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) && this.ui.np_driver.is_none() {
+                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
@@ -6550,6 +6561,7 @@ impl Render for AssemblyView {
             .track_focus(&self.focus)
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
                 this.ui.panel_focus = false;
+                this.ui.checkbox_focus = None;
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
                 if !this.focus.contains_focused(window, cx) {
