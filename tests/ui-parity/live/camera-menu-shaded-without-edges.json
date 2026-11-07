@@ -1,16 +1,16 @@
 {
  "scenario": "camera-menu-shaded-without-edges",
- "recorded": "2026-11-07T02:45:04.882Z",
+ "recorded": "2026-11-07T07:13:24.214Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.2 5b12f20a"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "0a5c6034ccb430fa467f3760",
+  "element": "cc8cb230334fad8a5c1140dc",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -81,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-menu",
      "rows": [
@@ -179,7 +181,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 26822
+   "t": 22884
   },
   {
    "step": 2,
@@ -201,6 +203,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-submenu",
      "rows": [
@@ -345,7 +348,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 28940
+   "t": 25001
   },
   {
    "step": 3,
@@ -366,6 +369,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -407,7 +411,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 31019
+   "t": 27064
   },
   {
    "step": 4,
@@ -428,6 +432,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-menu",
      "rows": [
@@ -520,7 +525,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33091
+   "t": 29105
   },
   {
    "step": 5,
@@ -535,6 +540,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -576,7 +582,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 36350
+   "t": 32338
   }
  ]
 }

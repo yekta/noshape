@@ -1,16 +1,16 @@
 {
  "scenario": "feature-menu-edit-expression",
- "recorded": "2026-11-07T05:19:40.657Z",
+ "recorded": "2026-11-07T09:59:41.723Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "76a7891c57c0021cc91404b7",
+  "element": "c8209374ec796f00cb108b72",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -142,7 +142,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 25737
+   "t": 55048
   },
   {
    "step": 2,
@@ -242,7 +242,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 27851
+   "t": 57412
   },
   {
    "step": 3,
@@ -331,7 +331,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 29991
+   "t": 60834
   },
   {
    "step": 4,
@@ -423,52 +423,32 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 32116
+   "t": 63044
   },
   {
    "step": 5,
    "do": {
-    "do": "key",
-    "key": "Enter"
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
    },
    "ok": true,
+   "at": [
+    424,
+    93
+   ],
    "state": {
     "focus": {
-     "kind": "field",
-     "tag": "input",
-     "label": "Unsuppressed if",
-     "text": "true",
-     "selection": [
-      0,
-      4
-     ],
-     "all": true
+     "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "panels": [
-     {
-      "id": "suppression-expression-dialog",
-      "title": "Dynamic suppression",
-      "text": "Dynamic suppression / Unsuppressed if",
-      "inputs": [
-       {
-        "placeholder": null,
-        "value": "true"
-       }
-      ]
-     }
-    ],
+    "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FOH5BjIXS9aThFr_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -484,11 +464,11 @@
       {
        "name": "Extrude 1",
        "state": "ok",
-       "selected": true,
+       "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "selected"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Extrude 1"
@@ -498,15 +478,15 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Dynamic suppression added. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 33848
+   "t": 75511
   },
   {
    "step": 6,
@@ -527,29 +507,29 @@
     },
     "dialog": null,
     "dialogs": [],
-    "panels": [
-     {
-      "id": "suppression-expression-dialog",
-      "title": "Dynamic suppression",
-      "text": "Dynamic suppression / Unsuppressed if",
-      "inputs": [
-       {
-        "placeholder": null,
-        "value": "true"
-       }
-      ]
-     }
-    ],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit…",
+      "Edit Sketch 1…",
+      "Show dimensions",
+      "Add selection to folder…",
+      "Suppress",
+      "Edit dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "Show dependencies…",
+      "Add appearance to feature…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FOH5BjIXS9aThFr_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -565,11 +545,11 @@
       {
        "name": "Extrude 1",
        "state": "ok",
-       "selected": true,
+       "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "selected"
+       "cls": "fake-hover context-menu-active"
       }
      ],
      "rollbackAfter": "Extrude 1"
@@ -579,15 +559,15 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Dynamic suppression added. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 36174
+   "t": 78053
   },
   {
    "step": 7,
@@ -598,37 +578,40 @@
     },
     "ms": 600
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Edit dynamic suppression\"}",
+   "ok": true,
+   "at": [
+    178,
+    472
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "panels": [
-     {
-      "id": "suppression-expression-dialog",
-      "title": "Dynamic suppression",
-      "text": "Dynamic suppression / Unsuppressed if",
-      "inputs": [
-       {
-        "placeholder": null,
-        "value": "true"
-       }
-      ]
-     }
-    ],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit…",
+      "Edit Sketch 1…",
+      "Show dimensions",
+      "Add selection to folder…",
+      "Suppress",
+      "Edit dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "Show dependencies…",
+      "Add appearance to feature…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FOH5BjIXS9aThFr_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -644,11 +627,11 @@
       {
        "name": "Extrude 1",
        "state": "ok",
-       "selected": true,
+       "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "selected"
+       "cls": "fake-hover context-menu-active"
       }
      ],
      "rollbackAfter": "Extrude 1"
@@ -658,15 +641,15 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
-    "tooltip": "Extrude 1 <- Sketch 1",
+    "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 37404
+   "t": 80576
   },
   {
    "step": 8,
@@ -684,29 +667,29 @@
     },
     "dialog": null,
     "dialogs": [],
-    "panels": [
-     {
-      "id": "suppression-expression-dialog",
-      "title": "Dynamic suppression",
-      "text": "Dynamic suppression / Unsuppressed if",
-      "inputs": [
-       {
-        "placeholder": null,
-        "value": "true"
-       }
-      ]
-     }
-    ],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename",
+      "Edit…",
+      "Edit Sketch 1…",
+      "Show dimensions",
+      "Add selection to folder…",
+      "Suppress",
+      "Edit dynamic suppression",
+      "Add comment",
+      "Zoom to selection",
+      "Show dependencies…",
+      "Add appearance to feature…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "FEATURE",
-       "owner": "Extrude 1",
-       "id": "FOH5BjIXS9aThFr_0"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -722,11 +705,11 @@
       {
        "name": "Extrude 1",
        "state": "ok",
-       "selected": true,
+       "selected": false,
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "selected"
+       "cls": "fake-hover context-menu-active"
       }
      ],
      "rollbackAfter": "Extrude 1"
@@ -736,7 +719,7 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -744,7 +727,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 39123
+   "t": 82321
   },
   {
    "step": 9,
@@ -793,7 +776,7 @@
     ],
     "partsHeading": "Parts (1)",
     "undo": {
-     "undo": false,
+     "undo": true,
      "redo": false
     },
     "message": null,
@@ -801,7 +784,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 42433
+   "t": 85595
   }
  ]
 }

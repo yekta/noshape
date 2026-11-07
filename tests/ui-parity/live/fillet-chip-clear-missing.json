@@ -1,16 +1,16 @@
 {
  "scenario": "fillet-chip-clear-missing",
- "recorded": "2026-11-07T05:10:05.832Z",
+ "recorded": "2026-11-07T07:58:30.924Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "5feb00aed814758c4393dc02",
+  "element": "a74e18636bf1735844ab2cdc",
   "start": "block-fillet",
   "startElement": "f52d62d96bea15774711c619"
  },
@@ -161,20 +161,20 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33495
+   "t": 125781
   },
   {
    "step": 2,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Suppress"
+     "menu": "Delete"
     }
    },
    "ok": true,
    "at": [
     178,
-    450
+    610
    ],
    "state": {
     "focus": {
@@ -200,15 +200,6 @@
        "cls": ""
       },
       {
-       "name": "Extrude 1",
-       "state": "suppressed",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "suppressed not-computed"
-      },
-      {
        "name": "Fillet 1",
        "state": "error",
        "selected": false,
@@ -231,7 +222,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37108
+   "t": 145967
   },
   {
    "step": 3,
@@ -244,7 +235,7 @@
    "ok": true,
    "at": [
     70,
-    339
+    313
    ],
    "state": {
     "focus": {
@@ -439,15 +430,6 @@
        "cls": ""
       },
       {
-       "name": "Extrude 1",
-       "state": "suppressed",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "suppressed not-computed"
-      },
-      {
        "name": "Fillet 1",
        "state": "error",
        "selected": true,
@@ -470,7 +452,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 42659
+   "t": 161116
   },
   {
    "step": 4,
@@ -687,15 +669,6 @@
        "cls": ""
       },
       {
-       "name": "Extrude 1",
-       "state": "suppressed",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "suppressed not-computed"
-      },
-      {
        "name": "Fillet 1",
        "state": "error",
        "selected": true,
@@ -718,7 +691,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 45345
+   "t": 168453
   },
   {
    "step": 5,
@@ -931,15 +904,6 @@
        "cls": ""
       },
       {
-       "name": "Extrude 1",
-       "state": "suppressed",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "suppressed not-computed"
-      },
-      {
        "name": "Fillet 1",
        "state": "error",
        "selected": true,
@@ -962,7 +926,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 47134
+   "t": 170205
   },
   {
    "step": 6,
@@ -995,15 +959,6 @@
        "cls": ""
       },
       {
-       "name": "Extrude 1",
-       "state": "suppressed",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "suppressed not-computed"
-      },
-      {
        "name": "Fillet 1",
        "state": "error",
        "selected": false,
@@ -1026,7 +981,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 50807
+   "t": 173859
   }
  ]
 }

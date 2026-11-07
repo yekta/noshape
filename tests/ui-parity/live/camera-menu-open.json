@@ -1,16 +1,16 @@
 {
  "scenario": "camera-menu-open",
- "recorded": "2026-11-07T02:18:13.713Z",
+ "recorded": "2026-11-07T07:09:46.078Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.1 5f5b5b21"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7121239b4a73e591aaa00924",
+  "element": "a9be5a5dd0370869cc25c14c",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -81,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-menu",
      "rows": [
@@ -179,7 +181,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 44983
+   "t": 21103
   },
   {
    "step": 2,
@@ -194,6 +196,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -235,7 +238,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 48337
+   "t": 24344
   }
  ]
 }

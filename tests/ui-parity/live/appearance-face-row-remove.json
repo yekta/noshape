@@ -1,16 +1,16 @@
 {
  "scenario": "appearance-face-row-remove",
- "recorded": "2026-11-07T05:15:44.483Z",
+ "recorded": "2026-11-07T08:03:18.266Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "c56a3a9d9d09ac4a7472af1c",
+  "element": "9c9a8615d302acf91fe6358f",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -121,7 +121,7 @@
       "Edit appearance for Part 1…",
       "Add appearance to face…"
      ],
-     "highlighted": 21,
+     "highlighted": null,
      "disabled": []
     },
     "selection": {
@@ -164,7 +164,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30471
+   "t": 223417
   },
   {
    "step": 2,
@@ -197,7 +197,7 @@
        "items": [
         "Face of Extrude 1"
        ],
-       "active": true,
+       "active": false,
        "state": "ok"
       }
      ],
@@ -217,7 +217,7 @@
         "items": [
          "Face of Extrude 1"
         ],
-        "active": true,
+        "active": false,
         "state": "ok"
        }
       ],
@@ -273,7 +273,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 35393
+   "t": 247737
   },
   {
    "step": 3,
@@ -388,7 +388,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37522
+   "t": 254164
   },
   {
    "step": 4,
@@ -497,7 +497,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 39285
+   "t": 255937
   },
   {
    "step": 5,
@@ -606,7 +606,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 44546
+   "t": 268675
   },
   {
    "step": 6,
@@ -715,7 +715,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 46272
+   "t": 270517
   },
   {
    "step": 7,
@@ -778,7 +778,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 48549
+   "t": 285863
   },
   {
    "step": 8,
@@ -841,18 +841,21 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 50936
+   "t": 309312
   },
   {
    "step": 9,
    "do": {
     "do": "rclick",
     "on": {
-     "panel_row": "1 face"
+     "panel_row": "Face appearance 1"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"panel_row\":\"1 face\"}",
+   "ok": true,
+   "at": [
+    1273,
+    193
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -860,7 +863,17 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename…",
+      "Edit appearance…",
+      "Suppress",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -901,7 +914,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 52694
+   "t": 311536
   },
   {
    "step": 10,
@@ -920,7 +933,17 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename…",
+      "Edit appearance…",
+      "Suppress",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -961,7 +984,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 54418
+   "t": 313320
   }
  ]
 }

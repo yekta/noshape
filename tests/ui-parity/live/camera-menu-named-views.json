@@ -1,18 +1,18 @@
 {
  "scenario": "camera-menu-named-views",
- "recorded": "2026-11-07T03:06:36.107Z",
+ "recorded": "2026-11-07T07:08:54.926Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
-  "document": "095b4566eca1e1a3a5b6b340",
-  "workspace": "ea75236f4599cc410588c328",
-  "element": "5d748aa65c0dc60b12af080d",
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "a556c2305e961c6192e3ec4f",
   "start": "block",
-  "startElement": "04f7e36901304a29cb05231d"
+  "startElement": "23614b0537e04a173a620e75"
  },
  "start": {
   "focus": {
@@ -181,7 +181,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 27304
+   "t": 20394
   },
   {
    "step": 2,
@@ -264,7 +264,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 29466
+   "t": 22472
   },
   {
    "step": 3,
@@ -321,7 +321,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33661
+   "t": 25695
   }
  ]
 }
