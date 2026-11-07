@@ -3487,10 +3487,10 @@ were checked in code by asm; "(verify)" ones need a live check first.
 - [x] (asm 11-07: `Document::remap_assembly_views` in the same undo step; e2e a_drawing_view_keeps_its_exploded_view_and_named_position) P0 ASM-DRAWING-VIEW-INDEX (asm) a drawing view names its exploded view and named position by list position
   (`DrawingView.explode`, `named_position: Option<usize>`); deleting or reordering one (Delete, Move up / down) leaves
   drawing views showing another (or none). Refer to them by id, as Onshape.
-- [ ] P0 ASM-BOM-CONFIGURED-SUBASSEMBLY (asm) the BOM walks a subassembly instance without its configuration
+- [x] (asm 11-07: walked as `configured(config)`, its row keyed by its configuration; e2e the_bom_follows_configurations) P0 ASM-BOM-CONFIGURED-SUBASSEMBLY (asm) the BOM walks a subassembly instance without its configuration
   (`assembly/bom.rs` `walk`: `InstanceSource::Assembly { assembly, .. }`): two instances in different configurations
   are one row with the unconfigured children.
-- [ ] P0 ASM-BOM-CONFIGURED-PROPERTIES (asm, verify in code) BOM cells read `part_properties` as stored: configured
+- [x] (asm 11-07: confirmed; `configured_properties::properties_in` for the cells and Exclude from all BOMs; e2e the_bom_follows_configurations) P0 ASM-BOM-CONFIGURED-PROPERTIES (asm) BOM cells read `part_properties` as stored: configured
   Part number / Description / Material / Exclude from all BOMs show one value for every configuration.
 - [ ] P0 ASM-MASS-OVERRIDES (asm, verify in code) assembly mass properties use material density only: a part's
   mass override counts as "no material", a subassembly's override and configured materials are ignored, parts excluded

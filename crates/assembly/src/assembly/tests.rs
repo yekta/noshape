@@ -3088,7 +3088,7 @@ fn bom_flattened_structured_exclusion_and_cell_edits() {
     assert_eq!(bom::lines(&f.doc, top_tab, &res, &s).len(), 2);
     s.bom_type = BomType::Flattened;
     let flat = bom::lines(&f.doc, top_tab, &res, &s);
-    assert!(matches!(flat[1].source, bom::BomSource::Assembly(t) if t == sub_tab));
+    assert!(matches!(flat[1].source, bom::BomSource::Assembly { tab: t, .. } if t == sub_tab));
     if let Some(TabContent::Assembly(a)) = f.doc.tab_mut(sub_tab).map(|t| &mut t.content) {
         a.properties.bom_behavior = BomBehavior::AssemblyAndComponents;
     }

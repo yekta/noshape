@@ -40,8 +40,8 @@ pub enum BomSource {
     External { key: String, body: Option<BodyId>, config: ConfigValues },
     /// Standard content.
     Standard(StandardSpec),
-    /// A subassembly (Assembly tab of this document).
-    Assembly(TabId),
+    /// A subassembly (Assembly tab of this document) in its instance's configuration.
+    Assembly { tab: TabId, config: ConfigValues },
     /// An Assembly of another document (read-only properties).
     ExternalAssembly { key: String, config: ConfigValues },
 }
@@ -49,7 +49,7 @@ pub enum BomSource {
 impl BomSource {
     /// A subassembly row (this document's or another's).
     pub fn is_assembly(&self) -> bool {
-        matches!(self, BomSource::Assembly(_) | BomSource::ExternalAssembly { .. })
+        matches!(self, BomSource::Assembly { .. } | BomSource::ExternalAssembly { .. })
     }
 }
 
@@ -86,9 +86,13 @@ struct Use {
     behavior: BomBehavior,
 }
 
-fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId) -> Option<&'a PartProperties> {
+/// A part's properties in configuration `config`: its own, with its configured properties for that configuration.
+fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId, config: &ConfigValues) -> Option<std::borrow::Cow<'a, PartProperties>> {
     match doc.tab(studio).map(|t| &t.content) {
-        Some(TabContent::PartStudio(ps)) => ps.part_properties.get(body),
+        Some(TabContent::PartStudio(ps)) => match crate::configured_properties::properties_in(ps, body, config) {
+            Some(p) => Some(std::borrow::Cow::Owned(p)),
+            None => ps.part_properties.get(body).map(std::borrow::Cow::Borrowed),
+        },
         _ => None,
     }
 }
@@ -128,7 +132,7 @@ fn part_name(doc: &Document, result: &AssemblyResult, path: &InstancePath, studi
     if let Some(o) = result.occurrences.iter().find(|o| Some(o.studio) == studio && &o.body == body) {
         return o.body_name.clone();
     }
-    studio.and_then(|s| part_props(doc, s, body)).and_then(|p| p.name.clone()).unwrap_or_else(|| "Part".into())
+    studio.and_then(|s| part_props(doc, s, body, &ConfigValues::default())).and_then(|p| p.name.clone()).unwrap_or_else(|| "Part".into())
 }
 
 fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &AssemblyResult, suppressed_above: bool, depth: usize, out: &mut Vec<Use>) {
@@ -146,7 +150,7 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
         let suppressed = false;
         match &inst.source {
             InstanceSource::Part { studio, body, config } | InstanceSource::MirroredPart { studio, body, config, .. } => {
-                let excluded = suppressed || part_props(doc, *studio, body).is_some_and(|p| p.meta.exclude_from_bom);
+                let excluded = suppressed || part_props(doc, *studio, body, config).is_some_and(|p| p.meta.exclude_from_bom);
                 let mirrored = matches!(inst.source, InstanceSource::MirroredPart { .. });
                 let mut name = part_name(doc, result, &path, Some(*studio), body);
                 if mirrored {
@@ -157,7 +161,7 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
             InstanceSource::PartStudio { studio, config } => {
                 // Every solid / surface part of the rigid Part Studio instance.
                 for o in result.occurrences.iter().filter(|o| o.path == path) {
-                    let excluded = suppressed || part_props(doc, *studio, &o.body).is_some_and(|p| p.meta.exclude_from_bom);
+                    let excluded = suppressed || part_props(doc, *studio, &o.body, config).is_some_and(|p| p.meta.exclude_from_bom);
                     out.push(Use { source: BomSource::Part { studio: *studio, body: o.body.clone(), config: canonical_config(doc, *studio, config), mirrored: false }, name: o.body_name.clone(), path: path.clone(), excluded, children: Vec::new(), behavior: BomBehavior::default() });
                 }
             }
@@ -185,13 +189,22 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
             }
             // Sketches are not BOM items.
             InstanceSource::Sketch { .. } => {}
-            InstanceSource::Assembly { assembly, .. } => {
-                let Some(sub) = assembly_of(doc, *assembly) else { continue };
+            InstanceSource::Assembly { assembly, config } => {
+                let Some(stored) = assembly_of(doc, *assembly) else { continue };
+                // The subassembly in the instance's configuration (as evaluated): its rows, and its own row per
+                // configuration.
+                let configured;
+                let (sub, config) = if stored.has_configured() {
+                    configured = stored.configured(config);
+                    (&configured, config.clone())
+                } else {
+                    (stored, ConfigValues::default())
+                };
                 let mut children = Vec::new();
                 walk(doc, sub, &path, result, suppressed, depth + 1, &mut children);
                 let name = doc.tab(*assembly).map(|t| t.name.clone()).unwrap_or_default();
                 let excluded = suppressed || sub.properties.meta.exclude_from_bom;
-                out.push(Use { source: BomSource::Assembly(*assembly), name, path, excluded, children, behavior: sub.properties.bom_behavior });
+                out.push(Use { source: BomSource::Assembly { tab: *assembly, config }, name, path, excluded, children, behavior: sub.properties.bom_behavior });
             }
         }
     }
@@ -306,7 +319,7 @@ pub fn lines(doc: &Document, tab: TabId, result: &AssemblyResult, settings: &Bom
     // The top level assembly row goes at the bottom, its name as the Item.
     if settings.show_top_level {
         let name = doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
-        out.push(BomLine { item: Some(name.clone()), depth: 0, source: BomSource::Assembly(tab), name, quantity: 1, instances: Vec::new(), excluded: false, top_level: true, has_children: false });
+        out.push(BomLine { item: Some(name.clone()), depth: 0, source: BomSource::Assembly { tab, config: ConfigValues::default() }, name, quantity: 1, instances: Vec::new(), excluded: false, top_level: true, has_children: false });
     }
     out
 }
@@ -370,8 +383,9 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
         _ => {}
     }
     match &line.source {
-        BomSource::Part { studio, body, .. } => {
-            let props = part_props(doc, *studio, body);
+        BomSource::Part { studio, body, config, .. } => {
+            let owned = part_props(doc, *studio, body, config);
+            let props = owned.as_deref();
             let meta = props.map(|p| &p.meta);
             match col {
                 BomColumn::PartNumber => t(props.and_then(|p| p.part_number.as_ref())),
@@ -398,11 +412,11 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
                 BomColumn::Item | BomColumn::Quantity | BomColumn::Name => unreachable!(),
             }
         }
-        BomSource::Assembly(_) | BomSource::ExternalAssembly { .. } => {
+        BomSource::Assembly { .. } | BomSource::ExternalAssembly { .. } => {
             // Another document's Assembly: its own properties, read-only.
             let linked = line.instances.first().and_then(|p| result.node(p)).and_then(|n| n.linked.clone());
             let p = match &line.source {
-                BomSource::Assembly(tab) => assembly_of(doc, *tab).map(|a| (*a.properties).clone()),
+                BomSource::Assembly { tab, .. } => assembly_of(doc, *tab).map(|a| (*a.properties).clone()),
                 _ => linked.map(|(_, a)| (*a.properties).clone()),
             };
             let Some(p) = p.as_ref() else { return BomCell::Text(String::new()) };
@@ -445,7 +459,7 @@ pub fn editable(line: &BomLine, col: BomColumn) -> bool {
     }
     match &line.source {
         BomSource::Part { .. } => col.edit() != CellEdit::ReadOnly && col != BomColumn::SubassemblyBomBehavior,
-        BomSource::Assembly(_) => col.edit() != CellEdit::ReadOnly && col != BomColumn::TessellationQuality,
+        BomSource::Assembly { .. } => col.edit() != CellEdit::ReadOnly && col != BomColumn::TessellationQuality,
         BomSource::Standard(_) | BomSource::External { .. } | BomSource::ExternalAssembly { .. } => false,
     }
 }
@@ -485,7 +499,7 @@ pub fn set_cell(doc: &mut Document, line: &BomLine, col: BomColumn, value: &str)
             }
             *p != before
         }
-        BomSource::Assembly(tab) => {
+        BomSource::Assembly { tab, .. } => {
             if col == BomColumn::Name {
                 let Some(t) = doc.tab_mut(*tab) else { return false };
                 if value.trim().is_empty() || t.name == value {
