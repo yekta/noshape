@@ -26,6 +26,18 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   as many (`parts_by_count`).
 - 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
   profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+- 2026-11-07 15:11 UTC: an id-only part query or merge scope without live's geometry, when the counts don't settle it: each part by
+  the feature that made it (`part_by_creator`: Onshape gives ids out in creation order; the one feature that made a part
+  of ours before the first feature naming a later id). `rebuild_assembly` maps an instance's part the same way after
+  name, only part and volume band.
+- 2026-11-07 15:11 UTC: an Import without `foreignId` (assembly corpus) takes its file from `blobData`'s namespace (`e<element>::m…`);
+  the assembly suite passes live's studios/foreign/foreign.json as `foreignFiles`; instances insert from the Import's tab.
+- 2026-11-07 18:24 UTC: `part_by_creator` reads ids by their creation counter (`onshape_counter`: `J`+c+type, then `R`+c+`B`+type;
+  `K…` ids don't count up and are ignored) and takes the feature whose own references come last below the id
+  (gearbox-std's merge scopes picked the first part when `KMCB` sorted above `J7D`).
+- 2026-11-07 18:24 UTC: the assembly suite passes live's per-studio `<element>.live.jsonl` (live2 11-07) to the translator as its refs
+  (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
+  the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
 ## Resume here (2026-11-05 03:01 UTC)
 - Landed 11-05: ScopeRule 11 blend finish (b0595b8f; core.md), subassembly "Add to named positions…" + the

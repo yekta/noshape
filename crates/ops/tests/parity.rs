@@ -1716,12 +1716,11 @@ fn parity_assemblies() {
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
             let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass")) else { continue };
-            // Its parts: <element>.parts.json, else the last state of live's
-            // <element>.live.jsonl (live's layout, 1842).
-            let last_state = || {
-                let lines = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).ok()?;
-                lines.lines().rev().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|l| l.get("index").is_some()).map(|l| l["parts"].clone())
-            };
+            // Live's per-feature lines (<element>.live.jsonl, live's layout, 1842).
+            let live: Vec<Value> = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).map(|t| t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect()).unwrap_or_default();
+            // Its parts: <element>.parts.json, else the last state of live's lines (a suppressed feature's line lists
+            // none: the one before it).
+            let last_state = || live.iter().rev().find(|l| l["status"] != "SUPPRESSED").map(|l| l["parts"].clone()).filter(|p| p.as_array().is_some_and(|a| !a.is_empty()));
             // Else (live's later fetches: <element>.mass.json only) the parts the assembly's instances name ("Part 1 <2>"
             // → "Part 1"), at every level.
             let from_instances = || {
@@ -1744,7 +1743,19 @@ fn parity_assemblies() {
                 }
                 (!seen.is_empty()).then_some(Value::Array(list))
             };
-            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
+            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
+            if !live.is_empty() {
+                features["live"] = Value::Array(live.clone());
+            }
+            // Imported files (live's studios/foreign/foreign.json: blob element → file) as the Part Studio corpus'
+            // `foreignFiles`.
+            if features["foreignFiles"].is_null()
+                && let Some(Value::Object(files)) = read(&dir.join("studios/foreign/foreign.json"))
+            {
+                let foreign = dir.join("studios/foreign");
+                let map: serde_json::Map<String, Value> = files.iter().filter_map(|(k, v)| Some((k.clone(), serde_json::json!({ "path": foreign.join(v["path"].as_str()?).to_string_lossy() })))).collect();
+                features["foreignFiles"] = Value::Object(map);
+            }
             studios.push((element.to_string(), features, parts));
         }
         studios.sort_by(|a, b| a.0.cmp(&b.0));

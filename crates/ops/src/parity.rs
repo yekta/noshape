@@ -598,7 +598,10 @@ impl<'a> Translator<'a> {
     /// after it then built in that Part Studio.
     fn import_foreign(&mut self, f: &Value) -> Result<(String, String, Option<String>), String> {
         let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
-        let id = param("foreignId")["foreignId"].as_str().ok_or("no foreignId")?.to_string();
+        // The file: `foreignId`, else (an assembly corpus' studio) the blob element of `blobData`'s namespace
+        // ("e<element>::m<microversion>").
+        let blob = param("blobData")["namespace"].as_str().and_then(|n| n.strip_prefix('e')).and_then(|n| n.split("::").next()).map(str::to_string);
+        let id = param("foreignId")["foreignId"].as_str().map(str::to_string).or(blob).ok_or("no foreignId")?;
         let file = self.foreign.get(&id).cloned().ok_or_else(|| format!("its file {id} not fetched"))?;
         let path = file["path"].as_str().ok_or_else(|| format!("its file {id}: no path"))?;
         if !self.feature_ids.is_empty() {
@@ -1229,15 +1232,61 @@ impl<'a> Translator<'a> {
         (set(&found) != set(ids)).then_some(found)
     }
 
-    /// Our solid parts, when `queries` are id-only and name as many (no live geometry to tell them apart).
-    fn parts_by_count(&mut self, queries: &[Value]) -> Option<Vec<String>> {
+    /// The part of ours (among `ours`) that our copy of the feature which made live's part `id` made, when that
+    /// feature made one. Onshape gives out ids in creation order ([`onshape_counter`]): the maker is the feature that
+    /// made one of our parts before the first feature naming a later id, with the latest references below it.
+    fn part_by_creator(&self, k: usize, id: &str, ours: &[String]) -> Option<String> {
+        let value = onshape_counter(id)?;
+        let refs = |f: &Value| -> Vec<u32> {
+            let mut out = Vec::new();
+            let mut stack = vec![f];
+            while let Some(v) = stack.pop() {
+                match v {
+                    Value::Object(m) => {
+                        if let Some(a) = m.get("deterministicIds").and_then(Value::as_array) {
+                            out.extend(a.iter().filter_map(Value::as_str).filter_map(onshape_counter));
+                        }
+                        stack.extend(m.values());
+                    }
+                    Value::Array(a) => stack.extend(a),
+                    _ => {}
+                }
+            }
+            out
+        };
+        let made = |f: &Value| -> Vec<&String> {
+            let Some(theirs) = f["featureId"].as_str().and_then(|o| self.feature_ids.get(o)) else { return Vec::new() };
+            let head = format!("body:{theirs}.");
+            ours.iter().filter(|p| p.starts_with(&head)).collect()
+        };
+        // Made before the first feature that names a later id, by the feature whose own references come last below it.
+        let upto = k.min(self.features.len());
+        let before = self.features[..upto].iter().position(|f| refs(f).iter().any(|r| *r > value)).unwrap_or(upto);
+        let mut candidates: Vec<(u32, &Value)> = self.features[..before].iter().filter(|f| !made(f).is_empty()).filter_map(|f| refs(f).into_iter().max().map(|m| (m, f))).filter(|(m, _)| *m < value).collect();
+        candidates.sort_by_key(|(m, _)| std::cmp::Reverse(*m));
+        match candidates.as_slice() {
+            [(m, maker), rest @ ..] if rest.first().is_none_or(|(n, _)| n < m) => match made(maker).as_slice() {
+                [one] => Some(one.to_string()),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Our solid parts, when `queries` are id-only and name as many (no live geometry to tell them apart); else each
+    /// by the feature that made it.
+    fn parts_by_count(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
         if self.part_order.is_empty() || queries.iter().any(|q| q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty())) {
             return None;
         }
-        let ids: usize = queries.iter().map(|q| q["deterministicIds"].as_array().map_or(0, Vec::len)).sum();
+        let ids: Vec<String> = queries.iter().flat_map(|q| q["deterministicIds"].as_array().into_iter().flatten().filter_map(|i| i.as_str().map(str::to_string))).collect();
         let ours = self.call("query_parts", json!({})).ok()?;
         let all: Vec<String> = ours["parts"].as_array()?.iter().filter(|p| p["kind"] == "Solid").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
-        (ids > 0 && all.len() == ids).then_some(all)
+        if ids.is_empty() || all.len() == ids.len() {
+            return (!ids.is_empty()).then_some(all);
+        }
+        let by_creator: Vec<String> = ids.iter().filter_map(|id| self.part_by_creator(k, id, &all)).collect();
+        (by_creator.len() == ids.len() && by_creator.iter().collect::<std::collections::HashSet<_>>().len() == ids.len()).then_some(by_creator)
     }
 
     /// A revolve's axis named by id alone: the last sketch's one
@@ -1369,7 +1418,7 @@ impl<'a> Translator<'a> {
                 // we have then are ours.
                 if p["parameterId"] == "booleanScope"
                     && ids.is_empty()
-                    && let Some(all) = self.parts_by_count(&queries)
+                    && let Some(all) = self.parts_by_count(k, &queries)
                 {
                     return Ok(Some(json!(all)));
                 }
@@ -1620,6 +1669,11 @@ impl<'a> Translator<'a> {
             let all: Vec<String> = ours["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
             if all.len() == ids.len() {
                 return Ok(all);
+            }
+            // Else each by the feature that made it (`part_by_creator`).
+            let by_creator: Vec<String> = ids.iter().filter_map(|id| self.part_by_creator(k, id, &all)).collect();
+            if by_creator.len() == ids.len() && by_creator.iter().collect::<std::collections::HashSet<_>>().len() == ids.len() {
+                return Ok(by_creator);
             }
         }
         // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`).
@@ -4683,12 +4737,34 @@ fn outer_region(g: &Value, ids: usize) -> Option<Vec<String>> {
     }
 }
 
+/// The creation counter in an Onshape deterministic id of the forms that count up as a Part Studio is built:
+/// `J` + counter + type (JGC, JHD … J/D), then `R` + counter + `B` + type (RBBC, RjBD). Other forms (`K…`, an
+/// entity's sub-ids) don't follow it: None.
+fn onshape_counter(id: &str) -> Option<u32> {
+    const B64: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let c: Vec<char> = id.chars().collect();
+    let index = |ch: char| B64.find(ch).map(|i| i as u32);
+    match c.as_slice() {
+        ['J', n, _] => index(*n),
+        ['R', n, 'B', _] => index(*n).map(|i| 64 + i),
+        _ => None,
+    }
+}
+
 fn onshape_id_value(id: &str) -> u128 {
     const B: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     id.chars().fold(0u128, |n, c| n.saturating_mul(64).saturating_add(B.find(c).unwrap_or(0) as u128))
 }
 
 pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(String, Value, Value)]) -> AssemblyResult {
+    // NOSHAPE_PARITY_TRACE: each step on stderr with the seconds since the start (to find a hang).
+    let started = std::time::Instant::now();
+    let tracing = std::env::var_os("NOSHAPE_PARITY_TRACE").is_some();
+    let trace = |what: &str| {
+        if tracing {
+            eprintln!("[{:8.2}s] {what}", started.elapsed().as_secs_f64());
+        }
+    };
     let mut res = AssemblyResult::default();
     let call = |ctx: &mut Ctx, tool: &str, args: Value| -> Result<Value, String> {
         let op = registry::by_tool_name(tool).ok_or_else(|| format!("no tool {tool}"))?;
@@ -4800,7 +4876,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             studio["partVolumes"] = json!(bands);
         }
         let studio = &studio;
-        let mut t = match Translator::open_in(ctx, &name, studio, HashMap::new()) {
+        // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
+        let refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
+        let mut t = match Translator::open_in(ctx, &name, studio, refs) {
             Ok(t) => t,
             Err(e) => {
                 res.untranslated.push(format!("Part Studio {element}: {e}"));
@@ -4808,6 +4886,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         };
         for k in 0..t.len() {
+            trace(&format!("{name}: feature {k}"));
             let step = t.step(k);
             res.untranslated.extend(step.problems.iter().map(|p| format!("{name} › {} ({}): {p}", step.name, step.feature_type)));
             if step.status.as_deref().is_some_and(|s| s != "Ok") {
@@ -4818,6 +4897,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             if path.last().and_then(|i| element_of.get(i)) != Some(element) {
                 continue;
             }
+            trace(&format!("{name}: mate connector {}", key.1));
             let found = match t.resolve(q) {
                 Ok(ids) if !ids.is_empty() => Ok(ids[0].clone()),
                 Ok(_) => Err("its entity resolved to nothing".to_string()),
@@ -4834,16 +4914,19 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 Err(e) => res.untranslated.push(format!("mate connector {}: {e}", key.1)),
             }
         }
-        tabs.insert(element.clone(), name);
+        // (An Import's Part Studio is a tab of its own.)
+        tabs.insert(element.clone(), t.tab.clone().unwrap_or(name));
         // Our parts (name, volume m³): live's part names come from its Part Studio's properties, which translation
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.
-        let ours_parts: Vec<(String, f64)> = t
+        let solids: Vec<(String, f64, String)> = t
             .call("query_parts", json!({}))
             .map(|q| {
                 let k = per_unit(&q["units"]);
-                q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k))).collect()
+                q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k, p["id"].as_str()?.to_string()))).collect()
             })
             .unwrap_or_default();
+        let ours_parts: Vec<(String, f64)> = solids.iter().map(|(n, v, _)| (n.clone(), *v)).collect();
+        let our_ids: Vec<String> = solids.iter().map(|(_, _, id)| id.clone()).collect();
         // Parts of the same volume are taken one each (alike parts place alike), then shared.
         let mut taken: Vec<String> = Vec::new();
         for p in parts.as_array().into_iter().flatten() {
@@ -4855,9 +4938,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 only.clone()
             } else {
                 let fits: Vec<&String> = band.map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n).collect()).unwrap_or_default();
+                // Else by the feature that made it (ids in creation order).
+                let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
                 match fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
                     Some(n) => (*n).clone(),
-                    None => pname.to_string(),
+                    None => by_creator().unwrap_or_else(|| pname.to_string()),
                 }
             };
             taken.push(ours.clone());
@@ -4866,6 +4951,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     }
     let occurrences: Vec<&Value> = values(&root["occurrences"]);
     let transform_of = |path: &[String]| occurrences.iter().find(|o| ids(&o["path"]) == path).and_then(|o| o["transform"].as_array()).map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>());
+    trace("placing");
     let mut placer = match Translator::new(ctx, &json!({ "features": [] }), HashMap::new()) {
         Ok(t) => t,
         Err(e) => {
@@ -4905,6 +4991,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 res.untranslated.push(format!("instance {}: its {} {element} wasn't translated", i["name"], if i["type"] == "Assembly" { "subassembly" } else { "Part Studio" }));
                 continue;
             };
+            trace(&format!("insert {}", i["name"]));
             let mut args = json!({ "tab": l.tab, "source": source });
             // Its configuration variables (see the studio's synthesized configuration).
             let vars = instance_config_values(i);
@@ -5018,6 +5105,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     args["rotation_axis"] = json!(axis.to_lowercase());
                 }
             }
+            trace(&format!("mate {}", args["name"]));
             match placer.call("assembly_mate", args) {
                 Ok(_) => {
                     if k == 0 {
@@ -5047,6 +5135,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             res.differences.push(format!("{name}: not moved to live's place after the mates: {e}"));
         }
     }
+    trace("comparing");
     // Compared with live: each occurrence's place (a top-level instance by its placement, a part inside a
     // subassembly by assembly_list's occurrences; a subassembly inside another is placed by its parts), each mate's
     // status.

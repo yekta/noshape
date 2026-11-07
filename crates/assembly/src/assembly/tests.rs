@@ -3140,6 +3140,42 @@ fn best_available_tessellation_refines_only_flagged_instances() {
     assert!(back.best_tessellation);
 }
 
+/// An open composite has no mesh of its own in its Part Studio (its members
+/// are drawn): its instance is meshed at the display quality, finer only with
+/// "Use best available tessellation", and the mesh is kept between evaluations
+/// (robot-relations: a composite of an imported part re-meshed at Very fine on
+/// every insert).
+#[test]
+fn an_open_composite_instance_is_meshed_once_at_the_display_quality() {
+    let units = UnitPrefs::default();
+    let mut ps = pin_studio();
+    let r = Regenerator::new().regenerate(&ps, &ConfigValues::default(), &units, &RegenOptions::default());
+    let pin = r.context.bodies[0].id.clone();
+    let mut c = ps.new_feature("compositePart", &units).unwrap();
+    c.params.set("bodies", ParamValue::Query(vec![Reference::Body(pin.clone())]));
+    ps.features.push(c);
+    let f = doc_with(vec![ps]);
+    let mut ev = AssemblyEvaluator::new();
+    let r = ev.studio(&f.doc, f.studios[0], &ConfigValues::default()).unwrap();
+    let comp = r.display.bodies.iter().find(|b| b.composite.as_ref().is_some_and(|c| !c.closed)).expect("an open composite").id.clone();
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Pin <1>", f.studios[0], pin, DVec3::ZERO, true),
+            part_instance(2, "Composite part 1 <1>", f.studios[0], comp.clone(), DVec3::new(0.05, 0.0, 0.0), false),
+            part_instance(3, "Composite part 1 <2>", f.studios[0], comp, DVec3::new(0.1, 0.0, 0.0), false),
+        ],
+        ..Default::default()
+    };
+    asm.instances[2].best_tessellation = true;
+    let tris = |r: &eval::AssemblyResult, i: usize| r.occurrences[i].mesh.indices.len() / 3;
+    let first = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(tris(&first, 1) > 0, "the composite is drawn");
+    assert_eq!(tris(&first, 1), tris(&first, 0), "the display quality, as its member's");
+    assert!(tris(&first, 2) > tris(&first, 1), "finer with the best tessellation: {} vs {}", tris(&first, 2), tris(&first, 1));
+    let again = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(std::sync::Arc::ptr_eq(&first.occurrences[1].mesh, &again.occurrences[1].mesh), "kept, not re-meshed");
+}
+
 #[test]
 fn sketch_instances_are_wire_occurrences_with_edges() {
     let f = doc_with(vec![block_studio()]);

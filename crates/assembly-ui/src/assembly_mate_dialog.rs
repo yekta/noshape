@@ -531,7 +531,12 @@ impl MateDialog {
         }
         // Live (behaviours "skasm (2026-11-04 00:22, P3)", superseding E1): a
         // second pick on the same instance goes in; the mate is flagged
-        // "Mate connectors are on same instance." (`same_instance`).
+        // "Mate connectors are on same instance." (`same_instance`). The same
+        // connector again adds nothing (asm-cylindrical-pin-hole: two clicks
+        // on one hole face leave one).
+        if field_slots.iter().any(|f| self.slot(*f).as_ref() == Some(&c)) {
+            return false;
+        }
         let before = self.pick_state();
         self.picks_undo.push(before);
         self.picks_redo.clear();
@@ -1255,12 +1260,16 @@ mod advance_tests {
     }
 
     /// Live (behaviours "skasm (2026-11-04 00:22, P3)" (a)): a second pick on the same instance goes in, and the
-    /// mate can't be made: "Mate connectors are on same instance.".
+    /// mate can't be made: "Mate connectors are on same instance."; the same connector again adds nothing
+    /// (asm-cylindrical-pin-hole: two clicks on one hole face leave one chip).
     #[gpui::test]
     fn two_picks_on_one_instance_are_taken_and_flagged(cx: &mut TestAppContext) {
         let d = dialog(cx, MateType::Fastened);
         assert!(set(cx, &d, 1));
-        assert!(set(cx, &d, 1), "the second pick on the same instance goes in");
+        assert!(!set(cx, &d, 1), "the same connector again is not taken");
+        assert_eq!(state(cx, &d).2, None);
+        let side = MateConnectorRef { reference: Reference::Plane(DatumPlane::Front), ..connector(1) };
+        assert!(cx.update(|cx| d.update(cx, |d, cx| d.set_connector(side, cx))), "another face of the same instance goes in");
         assert_eq!(state(cx, &d).1.zip(state(cx, &d).2), Some((1, 1)));
         cx.update(|cx| {
             let d = d.read(cx);

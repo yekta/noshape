@@ -1144,9 +1144,9 @@ pub struct AssemblyEvaluator {
     external_assemblies: HashMap<(String, String), Option<LinkedAssembly>>,
     /// Generated standard content parts (never change).
     standard: HashMap<super::standard::StandardSpec, Result<Arc<RegenResult>, String>>,
-    /// Finest meshes of bodies drawn with "Use best available tessellation",
-    /// by shape hash.
-    fine_meshes: HashMap<u64, Arc<MeshBuffers>>,
+    /// Meshes of bodies drawn with "Use best available tessellation" (and of
+    /// open composites), by shape hash and whether the finest.
+    fine_meshes: HashMap<(u64, bool), Arc<MeshBuffers>>,
     /// Inserted sketches as wire bodies, by (studio, sketch, configuration),
     /// with the studio regeneration they were built from.
     sketch_bodies: HashMap<SketchKey, SketchBodyEntry>,
@@ -2274,18 +2274,20 @@ impl AssemblyEvaluator {
                     color: b.color,
                     mesh: match leaf.path.first().filter(|p| best.contains(p) || open_composite || best_occ(&leaf.path)).and_then(|_| leaf.regen.context.body(&b.id)) {
                         Some(body) => {
-                            let key = body.shape.hash_code();
+                            // An open composite has no mesh of its own in its Part Studio: Auto's, unless drawn with the best
+                            // tessellation. Kept once made, also when the finest fails (a mesher time limit: not retried on
+                            // every evaluation).
+                            let fine = leaf.path.first().is_some_and(|p| best.contains(p)) || best_occ(&leaf.path);
+                            let key = (body.shape.hash_code(), fine);
                             used_fine.insert(key);
                             match self.fine_meshes.get(&key) {
                                 Some(m) => m.clone(),
-                                None => match crate::regen::tessellate_shape(&body.shape, BEST_TESSELLATION) {
-                                    Some(m) => {
-                                        let m = Arc::new(m);
-                                        self.fine_meshes.insert(key, m.clone());
-                                        m
-                                    }
-                                    None => b.mesh.clone(),
-                                },
+                                None => {
+                                    let made = fine.then(|| crate::regen::tessellate_shape(&body.shape, BEST_TESSELLATION)).flatten().or_else(|| crate::regen::tessellate_shape(&body.shape, 1.0));
+                                    let m = made.map(Arc::new).unwrap_or_else(|| b.mesh.clone());
+                                    self.fine_meshes.insert(key, m.clone());
+                                    m
+                                }
                             }
                         }
                         None => b.mesh.clone(),

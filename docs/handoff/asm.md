@@ -10,7 +10,43 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
-## Latest (2026-11-07 08:40 UTC)
+## Paused (2026-11-07 20:08 UTC; lead: Claude quota, resume Monday 11-10)
+Where everything stands:
+- Landing: the batch below (translator for the corpus, open-composite mesh fix, same-connector pick, Edit dynamic
+  suppression submenu, pin-block-apart start + asm-revolute-pin-hole-flip scenario) queued with land.sh at pause time;
+  check `tools/tiers/land.sh --status` first thing and fix forward if it failed.
+- Assembly corpus (corpus7, SCORE.md row 11-07 20:08): 827/1291 occurrences on the 20 documents measured, mates
+  90/182. Not measured: **suspension ran 35 min without finishing** (stopped; the next slow case: trace it with
+  NOSHAPE_PARITY_TRACE=1 on a copy in parity-one, profile with gdb on vibe5, which allows ptrace of a child: see
+  /root/asm-scratch/bin/prof5.sh), then tvc-mount, welding-config, xdev-subs. Down since corpus4: hand-drill-pinslot
+  18 → 12/41 and isaac-ball 73 → 71/121: diff their messages (corpus4.log vs corpus7.log in /root/asm-scratch) first.
+- Part Studio suite with all of it: no document worse (ps-after5: 61/88, 648/947).
+- Pin-block scenarios after dx's fixture fix: 36/41 (before this batch). Left: asm-mate-menu-edit and
+  asm-mate-edit-escape (our hole axis connector Z may point the other way from live's: waiting on live2 for
+  asm-revolute-pin-hole-flip, REQUESTS 2241), asm-menu-hide-mates / asm-menu-show-mates (live2 2241: Hide mates is an
+  undo step even when nothing changes; ours drops no-op commits in crates/store's UndoStack::commit: needs a way to
+  record a no-change step). Re-run the 41 (/root/asm-scratch/pinblock-set.txt) and asm-menu-edit-dynamic-suppression
+  once the batch is on main.
+- Waiting on live / live2: 2241 (1) the pin-hole flip capture; the config panel focus input and Export format reset
+  (2208); A1000 timed in live (2189).
+
+## Latest (2026-11-07 18:24 UTC)
+- Translator for the assembly corpus (lead 11-07; one line each in dx.md / skasm.md): standard-content configurations,
+  part ids by creation counter (`onshape_counter`, `part_by_creator`), id-only regions by live's part volumes or the
+  outer region, revolve axes on the profile's side, Imports from live's foreign.json, and live2's per-studio
+  `.live.jsonl` as the translator's refs. NOSHAPE_PARITY_TRACE=1 prints each studio feature / insert / mate with its
+  time (the suite hung in robot-relations).
+- P0 speed (fixed): an instance of an **open composite part** was meshed at Very fine on every assembly evaluation,
+  and a mesh that ran into the mesher's time limit wasn't kept: robot-relations' composite of an imported part cost
+  ~60 s per insert. Now Auto unless "Use best available tessellation", kept once made (T1
+  an_open_composite_instance_is_meshed_once_at_the_display_quality).
+- Pin-block re-run after dx's start fix (f3fec6a8): 36/41 scenarios. Fixed: the same connector picked twice adds
+  nothing (asm-cylindrical-pin-hole). Asked live2 (REQUESTS 18:06): a pin-in-hole mate's automatic flip (our hole
+  mid-axis Z may point the other way: asm-mate-menu-edit, asm-mate-edit-escape) and whether Hide / Show mates with
+  nothing to change is an undo step (asm-menu-hide-mates, asm-menu-show-mates; our store drops no-op commits).
+- Edit dynamic suppression is a submenu (Edit expression…, Remove expression) as live2 recorded.
+
+## Earlier today (2026-11-07 08:40 UTC)
 - ASM-CONFIGURE-PATTERNS done (live 2209): patterns and mate connectors configurable (rows, dialog fields, configured
   counts making that configuration's copies, configured edits). Every P1 of the audit is now closed but the rest of
   ASM-API-GAPS (standard content as a replacement, explode-line entities, mate value typing / reorder, a connector's

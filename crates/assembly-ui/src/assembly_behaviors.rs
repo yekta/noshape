@@ -1139,7 +1139,7 @@ impl AssemblyView {
         let tg = targets.clone();
         if inst.unsuppressed_if.is_some() && !multi {
             // Suppressed with an expression (live assembly/142): Unsuppress
-            // (drops the expression) and Edit dynamic suppression.
+            // (drops the expression) and Edit dynamic suppression ▸ Edit expression… / Remove expression.
             m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Instance(top), true));
         } else {
             let sup = if suppressed { "Unsuppress" } else { "Suppress" };

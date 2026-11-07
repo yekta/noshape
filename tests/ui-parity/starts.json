@@ -308,6 +308,97 @@
    ]
   }
  },
+ "pin-block-apart": {
+  "units": "mm",
+  "features": [
+   {
+    "type": "newSketch",
+    "name": "Sketch 1",
+    "plane": "Top",
+    "shapes": [
+     {
+      "corner_rectangle": [
+       [
+        -20,
+        -20
+       ],
+       [
+        20,
+        20
+       ]
+      ]
+     },
+     {
+      "circle": [
+       [
+        0,
+        0
+       ],
+       [
+        5,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 1",
+    "params": {
+     "entities": [
+      "Sketch 1 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "20 mm",
+     "operationType": "NEW"
+    }
+   },
+   {
+    "type": "newSketch",
+    "name": "Sketch 2",
+    "plane": "Top",
+    "shapes": [
+     {
+      "circle": [
+       [
+        60,
+        0
+       ],
+       [
+        65,
+        0
+       ]
+      ]
+     }
+    ]
+   },
+   {
+    "type": "extrude",
+    "name": "Extrude 2",
+    "params": {
+     "entities": [
+      "Sketch 2 region 0"
+     ],
+     "endBound": "BLIND",
+     "depth": "30 mm",
+     "operationType": "NEW"
+    }
+   }
+  ],
+  "assembly": {
+   "instances": [
+    {
+     "part": "Part 1",
+     "fixed": true
+    },
+    {
+     "part": "Part 2"
+    }
+   ]
+  },
+  "about": "pin-block without its Revolute: the pin stands beside the block (live2 2241: both the pin's side and the hole's wall in view)"
+ },
  "two-blocks": {
   "units": "mm",
   "features": [

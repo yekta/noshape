@@ -1,0 +1,13 @@
+{
+ "name": "asm-revolute-pin-hole-flip",
+ "about": "Revolute between the pin's side and the hole's wall with the pin beside the block (the flip button after both picks: a hole's axis connector Z against the pin's); Esc.",
+ "area": "asm",
+ "source": "asm 11-07: live2 2241",
+ "start": "pin-block-apart",
+ "steps": [
+  {"do": "click", "on": {"tool": "Revolute mate"}},
+  {"do": "click", "on": {"face": [63.54, -3.54, 15], "instance": "Part 2 <1>"}},
+  {"do": "click", "on": {"face": [-3.54, 3.54, 18], "instance": "Part 1 <1>"}},
+  {"do": "key", "key": "Escape"}
+ ]
+}
