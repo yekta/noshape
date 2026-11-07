@@ -1137,7 +1137,9 @@ impl PartStudioView {
                 self.message = None;
             }
             self.ui.dialog_info = info;
-            let regen_ok = self.display.feature_state(id).is_some_and(|s| matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning));
+            // An existing feature's dialog takes ✓ once regenerated, failing or not (live: 50 of 50 edits opened enabled,
+            // ui-parity fillet-chip-edit-healthy-moment); a new one only without an error (EMPTY-COMMIT).
+            let regen_ok = !e.is_new || self.display.feature_state(id).is_some_and(|s| matches!(s.status, FeatureStatus::Ok | FeatureStatus::Info | FeatureStatus::Warning));
             e.dialog.update(cx, |d, cx| {
                 d.note_regenerated(regen_ok);
                 d.set_status(st, cx);
@@ -2538,13 +2540,24 @@ impl PartStudioView {
         // configuration variables included.
         let vars = self.scope_variables(Some(index), cx);
         let later = self.studio(cx).is_some_and(|s| !is_new && index + 1 < s.features.len());
-        // Missing references: their creating feature is gone or suppressed.
+        // Missing references: their creating feature is gone. One whose creator is suppressed reads "Unknown of" and
+        // is broken like a later one (Edit healthy moment, no Clear missing references: live fillet-chip-clear-missing).
+        let unknown: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
+            Some(s) => Arc::new(noshape_ops::studio::suppressed_creator_reference(s)),
+            None => Arc::new(|_: &Reference| false),
+        };
         let missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx) {
-            Some(s) => Arc::new(noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s)),
+            Some(s) => {
+                let (gone, unknown) = (noshape_ops::studio::missing_reference(&self.doc.read(cx).session.doc, s), unknown.clone());
+                Arc::new(move |r: &Reference| gone(r) && !unknown(r))
+            }
             None => Arc::new(|_: &Reference| false),
         };
         let later_refs: Arc<dyn Fn(&Reference) -> bool + Send + Sync> = match self.studio(cx).filter(|_| !is_new) {
-            Some(s) => Arc::new(later_reference(s, index)),
+            Some(s) => {
+                let (later, unknown) = (later_reference(s, index), unknown.clone());
+                Arc::new(move |r: &Reference| later(r) || unknown(r))
+            }
             None => Arc::new(|_: &Reference| false),
         };
         let (configured, configurable_inputs) = self.configured_of(feature_id, cx);
@@ -2561,6 +2574,7 @@ impl PartStudioView {
             }
             d.missing = missing;
             d.later = later_refs;
+            d.unknown = unknown;
             d.configured = configured;
             d.configurable_inputs = configurable_inputs;
             d.sketch_region_count = Arc::new(move |id| region_counts.get(&id).copied().unwrap_or(0));

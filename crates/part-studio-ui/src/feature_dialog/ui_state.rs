@@ -189,6 +189,12 @@ impl FeatureDialog {
                     let shown = self.reference_shown(noshape_model::params::ReferenceKind::PartStudio, &value);
                     fields.push(json!({ "label": label, "kind": "other", "text": format!("{} {shown}", crate::i18n::spec(s.label)), "state": "ok" }));
                 }
+                // A file / studio picker (Decal's Image, a custom feature's reference): its label and what it shows, as
+                // one control (live ui-parity decal-tool: "Image Select image…").
+                ParamKind::Reference { kind } => {
+                    let shown = self.reference_shown(*kind, values.text(s.id));
+                    fields.push(json!({ "label": label, "kind": "other", "text": format!("{} {shown}", crate::i18n::spec(s.label)), "state": "ok" }));
+                }
                 ParamKind::Text { .. } => {
                     let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or_else(|| (false, values.text(s.id).to_string()));
                     fields.push(json!({ "label": label, "kind": "text", "text": text, "focused": focused, "state": "ok" }));

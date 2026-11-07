@@ -920,13 +920,18 @@ impl PartStudioView {
                 );
             }
         }
+        // Face appearances are numbered in order, as their editor's title (live batch 15: "Face appearance 1").
+        let mut face_n = 0;
         for (i, a) in studio.appearances.iter().enumerate() {
             let is_sketch = matches!(&a.target, AppearanceTarget::Feature(f) if self.display.sketches.iter().any(|s| s.feature == *f));
+            if !is_sketch {
+                face_n += 1;
+            }
             if is_sketch != sketches_tab {
                 continue;
             }
             let (label, target) = match &a.target {
-                AppearanceTarget::Faces(f) => (format!("{} face{}", f.len(), if f.len() == 1 { "" } else { "s" }), EditTarget::Faces(f.clone(), Some(i))),
+                AppearanceTarget::Faces(f) => (format!("Face appearance {face_n}"), EditTarget::Faces(f.clone(), Some(i))),
                 AppearanceTarget::Feature(f) => (names(&Reference::Feature(*f)), EditTarget::Feature(*f, Some(i))),
             };
             let faces = match &a.target {

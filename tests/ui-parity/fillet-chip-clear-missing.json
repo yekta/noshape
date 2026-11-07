@@ -1,6 +1,6 @@
 {
  "name": "fillet-chip-clear-missing",
- "about": "block-fillet: Extrude 1 suppressed (Fillet 1's edge gone); edit Fillet 1, right-click its missing pick: Clear all · Clear missing references; Clear missing references; Escape",
+ "about": "block-fillet: Extrude 1 deleted (Fillet 1's edge gone: live reads a suppressed creator's pick as \"Unknown of\", not missing); edit Fillet 1, right-click its missing pick: Clear all · Clear missing references · Edit healthy moment; Clear missing references; Escape",
  "area": "psui",
  "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
  "start": "block-fillet",
@@ -14,7 +14,7 @@
   {
    "do": "click",
    "on": {
-    "menu": "Suppress"
+    "menu": "Delete"
    }
   },
   {

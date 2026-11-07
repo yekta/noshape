@@ -227,6 +227,8 @@ pub struct FeatureDialog {
     drag_grab: Arc<parking_lot::Mutex<Point<Pixels>>>,
     /// Whether a reference is missing (its feature was deleted/suppressed).
     pub missing: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
+    /// A pick whose creating feature is suppressed: it reads "Unknown of".
+    pub unknown: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// References made by a feature after this one (it was moved above its input).
     pub later: Arc<dyn Fn(&Reference) -> bool + Send + Sync>,
     /// Number of regions of a sketch (a field holding all of them shows
@@ -428,6 +430,7 @@ impl FeatureDialog {
             preview_track: Default::default(),
             drag_grab: Default::default(),
             missing: Arc::new(|_| false),
+            unknown: Arc::new(|_| false),
             later: Arc::new(|_| false),
             sketch_region_count: Arc::new(|_| 0),
             sketch_vertices: Arc::new(|_| Vec::new()),
@@ -1740,6 +1743,7 @@ impl FeatureDialog {
             }
             // An entity whose creating feature is gone reads by its kind (live 1993 (c): "Missing Edge").
             let missing = match r {
+                Reference::Face(_) | Reference::Edge(_) | Reference::Vertex(_) if (self.unknown)(r) => Some("Unknown of"),
                 Reference::Face(_) if self.ref_missing(r) => Some("Missing Face"),
                 Reference::Edge(_) if self.ref_missing(r) => Some("Missing Edge"),
                 Reference::Vertex(_) if self.ref_missing(r) => Some("Missing Vertex"),
