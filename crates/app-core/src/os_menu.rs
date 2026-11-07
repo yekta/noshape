@@ -806,7 +806,9 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
         }
         rows.push(label);
     }
-    Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
+    // Live's recorder names the view cube's menu apart (ui-parity camera-menu-*).
+    let kind = if m.camera { "camera-menu" } else { "context-menu" };
+    Some(serde_json::json!({ "kind": kind, "rows": rows, "highlighted": highlighted, "disabled": disabled }))
 }
 
 /// Where a press outside the open menu last closed it.
