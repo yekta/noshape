@@ -6680,3 +6680,45 @@ fn standard_content_auto_sizes_by_a_tapped_holes_thread() {
     assert_eq!(e.param.as_deref(), Some("auto_size"), "{e:?}");
     assert!(e.message.starts_with("Unable to find matching size for selection."), "{e:?}");
 }
+
+/// ASM-CONFIGURE-PATTERNS (live 2209): a pattern's Instance count and a mate connector's X translation configured;
+/// Long has five pattern instances (its copies placed by the pattern, no new mates) and the connector moved.
+#[test]
+fn assembly_patterns_and_connectors_are_configured() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm-config-patterns.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    let block = call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }))["instance"].clone();
+    let pin = call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 2" }))["instance"].clone();
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": [block], "fixed": true }));
+    let edges = call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": block, "kind": "edges" }));
+    let x_edge = edges["edges"].as_array().unwrap().iter().find(|e| e["curve"] == "line" && num(&e["direction"][0]).abs() > 0.99).unwrap()["id"].clone();
+    call(&mut ctx, "assembly_pattern", json!({ "tab": "Assembly 1", "kind": "linear", "seeds": [pin], "direction": { "instance": block, "entity": x_edge }, "distance": "60 mm" }));
+    let top = call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": block, "kind": "faces", "normal": [0, 0, 1] }))["faces"][0]["id"].clone();
+    call(&mut ctx, "assembly_mate_connector", json!({ "tab": "Assembly 1", "on": { "instance": block, "entity": top }, "offset": { "x": "10 mm" } }));
+    let i = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "list" }));
+    let input = i["input"].as_str().unwrap().to_string();
+    call(&mut ctx, "config_add_option", json!({ "tab": "Assembly 1", "input": input, "name": "Long" }));
+    call(&mut ctx, "config_configure", json!({ "tab": "Assembly 1", "pattern": "Linear pattern 1", "param": "count", "input": input }));
+    let last = |ctx: &mut Ctx| call(ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Configure Linear pattern 1");
+    call(&mut ctx, "config_set_value", json!({ "tab": "Assembly 1", "pattern": "Linear pattern 1", "param": "count", "configuration": "Long", "value": "5" }));
+    call(&mut ctx, "config_configure", json!({ "tab": "Assembly 1", "connector": "Mate connector 1", "param": "translation_x", "input": input }));
+    call(&mut ctx, "config_set_value", json!({ "tab": "Assembly 1", "connector": "Mate connector 1", "param": "translation_x", "configuration": "Long", "value": "25 mm" }));
+    let e = try_call(&mut ctx, "config_configure", json!({ "tab": "Assembly 1", "pattern": "Linear pattern 1", "param": "angle", "input": input })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("param"), "{e:?}");
+    let l = call(&mut ctx, "config_list", json!({ "tab": "Assembly 1" }));
+    assert!(l["configured"].as_array().unwrap().iter().any(|c| c["pattern"].is_string() && c["param"] == "count"), "{l}");
+    let pins = |ctx: &mut Ctx| call(ctx, "assembly_list", json!({ "tab": "Assembly 1" }))["instances"].as_array().unwrap().len() - 1;
+    assert_eq!(pins(&mut ctx), 2);
+    call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "values": { input.clone(): "Long" } }));
+    assert_eq!(pins(&mut ctx), 5, "Long: five pins");
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(list["mates"].as_array().unwrap().len(), 0, "{list}");
+    call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "reset": true }));
+    assert_eq!(pins(&mut ctx), 2);
+}

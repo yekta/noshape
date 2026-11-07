@@ -82,6 +82,8 @@ pub struct McSession {
     pub implicit: bool,
     /// Move checked (the X/Y/Z translation and rotation apply).
     pub moving: bool,
+    /// Fields configured from the dialog (right-click Configure, live 2209): configured with the connector on ✓.
+    pub cfg_pending: Vec<&'static str>,
     /// Origin type and Rotation axis selects.
     origin_sel: Entity<crate::os_select::OsSelect>,
     axis_sel: Entity<crate::os_select::OsSelect>,
@@ -162,6 +164,8 @@ pub struct PatternSession {
     pub second: bool,
     /// Third direction (shown with the second).
     pub third: bool,
+    /// Fields configured from the dialog (its right-click Configure, live 2209): configured with the pattern on ✓.
+    pub cfg_pending: Vec<&'static str>,
     /// Seed mate (part pattern / replicate).
     pub mate: Option<MateId>,
     /// Replicate: the match scope (None: the default for the seed mate's
@@ -382,6 +386,7 @@ impl AssemblyView {
             extra: existing.as_ref().map(|c| [c.between.clone(), c.primary_axis.clone(), c.secondary_axis.clone()]).unwrap_or_default(),
             implicit: false,
             moving,
+            cfg_pending: Vec::new(),
             origin_sel,
             axis_sel,
             _subs: subs,
@@ -426,6 +431,8 @@ impl AssemblyView {
         };
         let editing = s.editing;
         let for_mate = s.for_mate;
+        let pending = s.cfg_pending.clone();
+        let input = self.cfg_input(cx).map(|i| i.id);
         self.mc = None;
         let desc = if editing { format!("Edit : {}", c.name) } else { format!("Insert : {}", c.name) };
         if let (Some(field), Some(d)) = (for_mate, self.mate.as_ref().map(|m| m.dialog.clone())) {
@@ -442,14 +449,33 @@ impl AssemblyView {
                     }
                 }
             }
+            let id = c.id;
             match a.connectors.iter().position(|x| x.id == c.id) {
                 Some(i) => a.connectors[i] = c,
                 None => a.connectors.push(c),
+            }
+            for p in pending.iter().filter(|_| input.is_some()) {
+                noshape_ops::asm_config::configure(a, input.as_deref().unwrap_or_default(), noshape_model::assembly::config::ConfigTarget::Connector(id), p);
             }
         });
         self.infer = None;
         window.focus(&self.focus, cx);
         self.update_capture(cx);
+        cx.notify();
+    }
+
+    /// The open mate connector dialog's field › Configure: the column comes with the connector on ✓; the toast now
+    /// (live 2209: "Mate connector 1 X translation added to Configuration").
+    fn configure_mc_field(&mut self, param: &'static str, cx: &mut Context<Self>) {
+        let Some(input) = self.cfg_input(cx) else { return };
+        let configured = self.mc.as_ref().is_some_and(|s| self.doc.read(cx).session.doc.tab(self.tab).is_some_and(|t| matches!(&t.content, TabContent::Assembly(a) if a.configuration.configured.iter().any(|c| c.target == noshape_model::assembly::config::ConfigTarget::Connector(s.id) && c.param == param))));
+        let Some(s) = &mut self.mc else { return };
+        if configured || s.cfg_pending.contains(&param) {
+            return;
+        }
+        s.cfg_pending.push(param);
+        let text = format!("{} {} added to {}", s.name, noshape_model::assembly::config::param_label(param), input.name);
+        self.show_cfg_toast(text, false, cx);
         cx.notify();
     }
 
@@ -587,21 +613,45 @@ impl AssemblyView {
                 .child(crate::assets::icon(icon, 20., cx))
         };
         let (flip, reorient) = (s.flip, s.reorient);
+        // A configured assembly: each field's right-click menu is Configure (live 2209), not for a mate field's
+        // implicit connector.
+        let can_cfg = !implicit && self.cfg_input(cx).is_some();
+        let view = cx.entity();
+        let cfg = move |id: &'static str, el: AnyElement, param: &'static str| -> AnyElement {
+            if !can_cfg {
+                return el;
+            }
+            let view = view.clone();
+            div()
+                .id(id)
+                .child(el)
+                .os_context_menu(move |menu, _, _| {
+                    let v = view.clone();
+                    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_mc_field(param, cx))))
+                })
+                .into_any_element()
+        };
+        use noshape_model::assembly::config::param as cp;
         let body = v_flex()
             .pb(px(1.))
             .child(div().id("mcd-origin-type-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Origin type")).child(s.origin_sel.clone()))
             .child(origin)
             .children(between_field)
             .child(div().h(px(5.)))
-            .child(check("mcd-realign", "Realign", realign, |m, v| {
-                m.realign = v;
-                if v && m.extra[1].is_none() {
-                    m.active = true;
-                    m.slot = 2;
-                }
-            }))
+            .child(cfg(
+                "mcd-cfg-realign",
+                check("mcd-realign", "Realign", realign, |m, v| {
+                    m.realign = v;
+                    if v && m.extra[1].is_none() {
+                        m.active = true;
+                        m.slot = 2;
+                    }
+                })
+                .into_any_element(),
+                cp::REALIGN,
+            ))
             .children(realign_fields.into_iter().flatten())
-            .child(check("mcd-move", "Move", moving, |m, v| m.moving = v))
+            .child(cfg("mcd-cfg-move", check("mcd-move", "Move", moving, |m, v| m.moving = v).into_any_element(), cp::MOVE))
             .when(moving, |d| {
                 // Live (qa5/asm-043, MT8): X↘ Y↗ Z↑ axis icons, as the
                 // mate dialog's offsets.
@@ -612,29 +662,41 @@ impl AssemblyView {
                         .child(div().size(px(26.)).flex_none().flex().items_center().justify_center().child(crate::assets::icon(icon, 26., cx)))
                         .child(div().w(px(168.)).h(px(26.)).child(st.clone()))
                 };
-                d.child(axis_row("xyz-along-x", &s.inputs[0], cx))
-                    .child(axis_row("xyz-along-y", &s.inputs[1], cx))
-                    .child(axis_row("xyz-along-z", &s.inputs[2], cx))
-                    .child(div().id("mcd-rot-axis-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Rotation axis")).child(s.axis_sel.clone()))
-                    .child(value_row("Rotation angle", &s.inputs[3]))
+                d.child(cfg("mcd-cfg-x", axis_row("xyz-along-x", &s.inputs[0], cx).into_any_element(), cp::TRANSLATION[0]))
+                    .child(cfg("mcd-cfg-y", axis_row("xyz-along-y", &s.inputs[1], cx).into_any_element(), cp::TRANSLATION[1]))
+                    .child(cfg("mcd-cfg-z", axis_row("xyz-along-z", &s.inputs[2], cx).into_any_element(), cp::TRANSLATION[2]))
+                    .child(cfg("mcd-cfg-axis", div().id("mcd-rot-axis-tt").w(px(194.)).h(px(28.)).tooltip(crate::ui::tooltip("Rotation axis")).child(s.axis_sel.clone()).into_any_element(), cp::ROTATION_AXIS))
+                    .child(cfg("mcd-cfg-rot", value_row("Rotation angle", &s.inputs[3]).into_any_element(), cp::ROTATION))
             })
             .child(
                 h_flex()
                     .h(px(28.))
-                    .child(icon_tool("mcd-flip", "flip-direction-opposite", "Flip primary axis", flip, cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        if let Some(m) = &mut this.mc {
-                            m.flip = !m.flip;
-                        }
-                        this.schedule_eval(window, cx);
-                        cx.notify();
-                    })))
-                    .child(icon_tool("mcd-reorient", "realign-mate-dialog", "Reorient secondary axis", !reorient.is_multiple_of(4), cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                        if let Some(m) = &mut this.mc {
-                            m.reorient = (m.reorient + 1) % 4;
-                        }
-                        this.schedule_eval(window, cx);
-                        cx.notify();
-                    })))
+                    .child(cfg(
+                        "mcd-cfg-flip",
+                        icon_tool("mcd-flip", "flip-direction-opposite", "Flip primary axis", flip, cx)
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                if let Some(m) = &mut this.mc {
+                                    m.flip = !m.flip;
+                                }
+                                this.schedule_eval(window, cx);
+                                cx.notify();
+                            }))
+                            .into_any_element(),
+                        cp::FLIP,
+                    ))
+                    .child(cfg(
+                        "mcd-cfg-reorient",
+                        icon_tool("mcd-reorient", "realign-mate-dialog", "Reorient secondary axis", !reorient.is_multiple_of(4), cx)
+                            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                if let Some(m) = &mut this.mc {
+                                    m.reorient = (m.reorient + 1) % 4;
+                                }
+                                this.schedule_eval(window, cx);
+                                cx.notify();
+                            }))
+                            .into_any_element(),
+                        cp::REORIENT,
+                    ))
                     .child(div().flex_1())
                     // Live (qa5/asm-043, MT8): no preview slider; the `?` on
                     // the flip row.
@@ -1026,6 +1088,7 @@ impl AssemblyView {
             centered3: false,
             second: false,
             third: false,
+            cfg_pending: Vec::new(),
             mate: None,
             scope: None,
             scope_refs: Vec::new(),
@@ -1287,14 +1350,37 @@ impl AssemblyView {
             None
         };
         let editing = s.editing.is_some();
+        let pending = s.cfg_pending.clone();
+        let input = self.cfg_input(cx).map(|i| i.id);
         self.pattern = None;
         let id = pat.id;
         let desc = noshape_ops::assembly::pattern_description(&pat.name, editing);
         // Live shows no message after accepting an assembly pattern (polled
         // 20 s; behaviours "qa5 (10-26 p6)" (1), qa5 P2-A8).
-        let _created = self.edit(&desc, cx, move |a| noshape_ops::assembly::commit_pattern(a, pat, targets));
+        let _created = self.edit(&desc, cx, move |a| {
+            let created = noshape_ops::assembly::commit_pattern(a, pat, targets);
+            for p in pending.iter().filter(|_| input.is_some()) {
+                noshape_ops::asm_config::configure(a, input.as_deref().unwrap_or_default(), noshape_model::assembly::config::ConfigTarget::Pattern(id), p);
+            }
+            created
+        });
         self.expanded.insert(vec![InstanceId(id.0)]);
         self.update_capture(cx);
+        cx.notify();
+    }
+
+    /// The open pattern dialog's field › Configure: the column comes with the pattern on ✓; the toast now (live 2209:
+    /// "Linear pattern 1 Distance added to Configuration").
+    fn configure_pattern_field(&mut self, param: &'static str, cx: &mut Context<Self>) {
+        let Some(input) = self.cfg_input(cx) else { return };
+        let Some(s) = &mut self.pattern else { return };
+        let configured = s.editing.is_some_and(|id| self.doc.read(cx).session.doc.tab(self.tab).is_some_and(|t| matches!(&t.content, TabContent::Assembly(a) if a.configuration.configured.iter().any(|c| c.target == noshape_model::assembly::config::ConfigTarget::Pattern(id) && c.param == param))));
+        if configured || s.cfg_pending.contains(&param) {
+            return;
+        }
+        s.cfg_pending.push(param);
+        let text = format!("{} {} added to {}", s.name, noshape_model::assembly::config::param_label(param), input.name);
+        self.show_cfg_toast(text, false, cx);
         cx.notify();
     }
 
@@ -1460,6 +1546,21 @@ impl AssemblyView {
                 }))
         };
         let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
+        // A configured assembly: a field's right-click menu is one row, Configure (live 2209).
+        let configurable = |this: &Self, id: &'static str, el: AnyElement, param: &'static str, cx: &mut Context<Self>| -> AnyElement {
+            if this.cfg_input(cx).is_none() {
+                return el;
+            }
+            let view = cx.entity();
+            div()
+                .id(id)
+                .child(el)
+                .os_context_menu(move |menu, _, _| {
+                    let v = view.clone();
+                    menu.item(crate::os_menu::OsMenuItem::new("Configure").on_click(move |_, _, cx| v.update(cx, |this, cx| this.configure_pattern_field(param, cx))))
+                })
+                .into_any_element()
+        };
         // A linear pattern's second (n = 1) or third (n = 2) direction: Direction, Distance, Instance count with the
         // flip, Equal spacing, Centered (live 2204).
         let further = |this: &Self, s: &PatternSession, body: Div, n: usize, cx: &mut Context<Self>| -> Div {
@@ -1481,8 +1582,8 @@ impl AssemblyView {
             let ids: [&'static str; 4] = if n == 1 { ["pat-axis2", "pat-opp2", "pat-eq2", "pat-centered2"] } else { ["pat-axis3", "pat-opp3", "pat-eq3", "pat-centered3"] };
             body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(this, ids[0], axis, "Direction", n, cx)))
                 .child(div().h(px(5.)))
-                .child(value_row("Distance", distance))
-                .child(h_flex().child(value_row("Instance count", count)).child(toggle(ids[1], icon, opposite, cx, flip)))
+                .child(if n == 1 { configurable(this, "pat-cfg-distance2", value_row("Distance", distance).into_any_element(), noshape_model::assembly::config::param::DISTANCE_2, cx) } else { value_row("Distance", distance).into_any_element() })
+                .child(h_flex().child(if n == 1 { configurable(this, "pat-cfg-count2", value_row("Instance count", count).into_any_element(), noshape_model::assembly::config::param::COUNT_2, cx) } else { value_row("Instance count", count).into_any_element() }).child(toggle(ids[1], icon, opposite, cx, flip)))
                 .child(os::checkbox(ids[2], "Equal spacing", equal).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     if let Some(p) = &mut this.pattern {
                         let e = if n == 1 { &mut p.equal2 } else { &mut p.equal3 };
@@ -1514,10 +1615,11 @@ impl AssemblyView {
                     (false, false) => "flip-direction-opposite",
                     (false, true) => "flip-direction",
                 };
+                let (pd, pc) = if circular { (noshape_model::assembly::config::param::ANGLE, "pat-cfg-angle") } else { (noshape_model::assembly::config::param::DISTANCE, "pat-cfg-distance") };
                 body = body
                     .child(div().h(px(5.)))
-                    .child(value_row(if circular { "Angle" } else { "Distance" }, &s.distance))
-                    .child(h_flex().child(value_row("Instance count", &s.count)).child(toggle("pat-opp", flip, opposite, cx, |this| {
+                    .child(configurable(self, pc, value_row(if circular { "Angle" } else { "Distance" }, &s.distance).into_any_element(), pd, cx))
+                    .child(h_flex().child(configurable(self, "pat-cfg-count", value_row("Instance count", &s.count).into_any_element(), noshape_model::assembly::config::param::COUNT, cx)).child(toggle("pat-opp", flip, opposite, cx, |this| {
                         if let Some(p) = &mut this.pattern {
                             p.opposite = !p.opposite;
                         }

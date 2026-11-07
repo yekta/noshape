@@ -286,9 +286,9 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
     let k = len_scale(&units);
     let r = solve(od, tab, &SolveOptions::default())?;
     let a = assembly(od, tab)?;
-    // Suppression as the active configuration makes it.
+    // As the active configuration makes it: suppression, and a configured pattern's copies (live 2209).
     let eff = sa::effective(a, &super::configuration::asm::values(od, tab, a));
-    let instances: Vec<Value> = a
+    let instances: Vec<Value> = eff
         .instances
         .iter()
         .map(|i| {

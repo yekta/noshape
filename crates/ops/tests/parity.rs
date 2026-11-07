@@ -1687,7 +1687,10 @@ fn parity_assemblies() {
                         seen.entry(pid.to_string()).or_insert_with(|| name.rsplit_once(" <").map_or(name, |(n, _)| n).to_string());
                     }
                 }
-                (!seen.is_empty()).then(|| Value::Array(seen.into_iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n })).collect()))
+                // With live's volume band (m³) from <element>.mass.json, to find the part when ours has another name.
+                let mass = read(&dir.join("studios").join(format!("{element}.mass.json")));
+                let band = |p: &str| mass.as_ref().and_then(|m| m["bodies"][p]["volume"].as_array().cloned()).filter(|v| v.len() >= 3).map(|v| serde_json::json!([v[1], v[2]]));
+                (!seen.is_empty()).then(|| Value::Array(seen.into_iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n, "volume": band(&p) })).collect()))
             };
             let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
             studios.push((element.to_string(), features, parts));

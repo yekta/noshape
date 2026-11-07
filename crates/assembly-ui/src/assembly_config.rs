@@ -128,11 +128,16 @@ impl AssemblyView {
 
     /// Instance row › Configure suppression (live 199).
     pub(super) fn configure_instance_suppression(&mut self, id: InstanceId, cx: &mut Context<Self>) {
+        self.configure_suppression(ConfigTarget::Instance(id), cx);
+    }
+
+    /// An instance's, pattern's or mate connector's row › Configure suppression (live 199, 2209).
+    pub(super) fn configure_suppression(&mut self, target: ConfigTarget, cx: &mut Context<Self>) {
         let Some(asm) = self.assembly(cx) else { return };
         let Some(input) = asm.configuration.inputs.iter().find(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).cloned() else { return };
-        let name = asm.instance(id).map(|i| i.name.clone()).unwrap_or_default();
+        let name = self.cfg_column_names(target, acfg::param::UNSUPPRESSED, cx).0;
         let mut added = false;
-        self.edit(&noshape_ops::asm_config::configure_suppression_description(&name), cx, |a| added = noshape_ops::asm_config::configure(a, &input.id, ConfigTarget::Instance(id), acfg::param::UNSUPPRESSED));
+        self.edit(&noshape_ops::asm_config::configure_suppression_description(&name), cx, |a| added = noshape_ops::asm_config::configure(a, &input.id, target, acfg::param::UNSUPPRESSED));
         if added {
             self.show_cfg_toast(format!("{name} suppression configured in {}", input.name), false, cx);
         }
@@ -142,9 +147,19 @@ impl AssemblyView {
 
     /// Whether the instance row menu offers Configure suppression.
     pub(super) fn can_configure_suppression(&self, id: InstanceId, cx: &App) -> bool {
+        self.can_configure(ConfigTarget::Instance(id), acfg::param::UNSUPPRESSED, cx)
+    }
+
+    /// The input new configured columns go to: the first List or Checkbox input.
+    pub(super) fn cfg_input(&self, cx: &App) -> Option<ConfigInput> {
+        self.assembly(cx)?.configuration.inputs.iter().find(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. })).cloned()
+    }
+
+    /// Whether a configuration input exists and `target`'s `param` isn't configured yet.
+    pub(super) fn can_configure(&self, target: ConfigTarget, param: &str, cx: &App) -> bool {
         self.assembly(cx).is_some_and(|a| {
             a.configuration.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::List { .. } | ConfigInputKind::Checkbox { .. }))
-                && !a.configuration.configured.iter().any(|c| c.target == ConfigTarget::Instance(id) && c.param == acfg::param::UNSUPPRESSED)
+                && !a.configuration.configured.iter().any(|c| c.target == target && c.param == param)
         })
     }
 
@@ -319,6 +334,8 @@ impl AssemblyView {
         let name = match target {
             ConfigTarget::Instance(id) => asm.and_then(|a| a.instance(id)).map(|i| i.name.clone()),
             ConfigTarget::Mate(id) => asm.and_then(|a| a.mate(id)).map(|m| m.name.clone()),
+            ConfigTarget::Pattern(id) => asm.and_then(|a| a.pattern(id)).map(|p| p.name.clone()),
+            ConfigTarget::Connector(id) => asm.and_then(|a| a.connectors.iter().find(|c| c.id == id)).map(|c| c.name.clone()),
         };
         (name.unwrap_or_else(|| "Deleted".into()), self.cfg_param_label(target, param, cx))
     }
@@ -730,12 +747,18 @@ impl AssemblyView {
                 .into_any_element();
         }
         // A propagated input: the instance's option, chosen from its own list.
-        if let (Some(ParamValue::Text(t)), Some(input), ConfigTarget::Instance(iid)) = (&val, c.param.strip_prefix(acfg::param::INPUT_PREFIX), c.target) {
-            let options: Vec<(String, String)> = match self.instance_source_input(iid, input, cx).map(|i| i.kind) {
-                Some(ConfigInputKind::List { options, .. }) => options.into_iter().map(|o| (o.id, o.name)).collect(),
+        // A select parameter (a connector's Rotation axis / Reorient secondary axis, live 2209): its options.
+        let select = match (&val, c.param.strip_prefix(acfg::param::INPUT_PREFIX), c.target) {
+            (Some(ParamValue::Text(t)), Some(input), ConfigTarget::Instance(iid)) => Some((t.clone(), match self.instance_source_input(iid, input, cx).map(|i| i.kind) {
+                Some(ConfigInputKind::List { options, .. }) => options.into_iter().map(|o| (o.id, o.name)).collect::<Vec<(String, String)>>(),
                 Some(ConfigInputKind::Checkbox { .. }) => vec![("true".into(), "Checked".into()), ("false".into(), "Unchecked".into())],
                 _ => Vec::new(),
-            };
+            })),
+            (Some(ParamValue::Text(t)), None, _) => acfg::param_options(&c.param).map(|o| (t.clone(), o.iter().map(|x| (x.to_string(), x.to_string())).collect())),
+            _ => None,
+        };
+        if let Some((t, options)) = select {
+            let t = &t;
             let label = options.iter().find(|(id, _)| id == t).map(|(_, n)| n.clone()).unwrap_or_else(|| t.clone());
             let view = cx.entity();
             return div()

@@ -6,7 +6,7 @@ use super::text;
 use crate::error::OpError;
 use crate::registry::Args;
 use crate::{Ctx, OpenDoc, asm_config, config, doc};
-use noshape_model::assembly::Assembly;
+use noshape_model::assembly::{Assembly, MateId};
 use noshape_model::assembly::config::{ConfigTarget, param};
 use noshape_model::configuration::{ConfigInputKind, ConfigValues, VariableKind};
 use noshape_model::document::{TabContent, TabId};
@@ -69,12 +69,14 @@ fn target_name(a: &Assembly, t: ConfigTarget) -> String {
     match t {
         ConfigTarget::Instance(id) => a.instance(id).map(|i| i.name.clone()),
         ConfigTarget::Mate(id) => a.mate(id).map(|m| m.name.clone()),
+        ConfigTarget::Pattern(id) => a.pattern(id).map(|p| p.name.clone()),
+        ConfigTarget::Connector(id) => a.connectors.iter().find(|c| c.id == id).map(|c| c.name.clone()),
     }
     .unwrap_or_default()
 }
 
 /// API names of the configurable parameters.
-const PARAMS: [(&str, &str); 7] = [
+const PARAMS: [(&str, &str); 19] = [
     ("suppressed", param::UNSUPPRESSED),
     ("offset", param::OFFSET),
     ("offset_x", param::OFFSET_X),
@@ -82,6 +84,18 @@ const PARAMS: [(&str, &str); 7] = [
     ("offset_z", param::OFFSET_Z),
     ("rotation", param::ROTATION),
     ("flip_primary", param::FLIP),
+    ("distance", param::DISTANCE),
+    ("count", param::COUNT),
+    ("distance2", param::DISTANCE_2),
+    ("count2", param::COUNT_2),
+    ("angle", param::ANGLE),
+    ("realign", param::REALIGN),
+    ("move", param::MOVE),
+    ("translation_x", param::TRANSLATION[0]),
+    ("translation_y", param::TRANSLATION[1]),
+    ("translation_z", param::TRANSLATION[2]),
+    ("rotation_axis", param::ROTATION_AXIS),
+    ("reorient_secondary", param::REORIENT),
 ];
 
 fn param_name(p: &str) -> String {
@@ -115,6 +129,8 @@ fn describe(a: &Assembly) -> Value {
             match c.target {
                 ConfigTarget::Instance(id) => j["instance"] = json!(format!("inst:{}", id.0)),
                 ConfigTarget::Mate(id) => j["mate"] = json!(format!("mate:{}", id.0)),
+                ConfigTarget::Pattern(id) => j["pattern"] = json!(format!("pattern:{}", id.0)),
+                ConfigTarget::Connector(id) => j["connector"] = json!(format!("mc:{}", id.0)),
             }
             j["name"] = json!(target_name(a, c.target));
             j
@@ -289,17 +305,23 @@ pub(super) fn edit_option(ctx: &mut Ctx, a: &Args) -> Result<crate::registry::Op
 /// The configured target and parameter of config_configure / set_value.
 fn column(a: &Assembly, args: &Args) -> Result<(ConfigTarget, &'static str), OpError> {
     let p = args.str("param")?;
-    let pid = PARAMS.iter().find(|x| x.0 == p).map(|x| x.1).ok_or_else(|| OpError::param("param", "suppressed, offset, offset_x, offset_y, offset_z, rotation or flip_primary"))?;
-    let t = match (args.opt_str("instance")?, args.opt_str("mate")?) {
-        (Some(i), None) => {
+    let pid = PARAMS.iter().find(|x| x.0 == p).map(|x| x.1).ok_or_else(|| OpError::param("param", &PARAMS.iter().map(|x| x.0).collect::<Vec<_>>().join(", ")))?;
+    let by = |name: &str, id: MateId, k: &str, prefix: &str| name == k || format!("{prefix}:{}", id.0) == k || id.0.to_string() == k;
+    let t = match (args.opt_str("instance")?, args.opt_str("mate")?, args.opt_str("pattern")?, args.opt_str("connector")?) {
+        (Some(i), None, None, None) => {
             if pid != param::UNSUPPRESSED {
                 return Err(OpError::param("param", "an instance configures only `suppressed`"));
             }
             ConfigTarget::Instance(crate::ops::assembly::find_instance(a, i, "instance")?)
         }
-        (None, Some(m)) => ConfigTarget::Mate(a.mates.iter().find(|x| x.name == m || format!("mate:{}", x.id.0) == m || x.id.0.to_string() == m).map(|x| x.id).ok_or_else(|| OpError::param("mate", "no such mate"))?),
-        _ => return Err(OpError::invalid("give `instance` or `mate` (assemblies configure instances and mates)")),
+        (None, Some(m), None, None) => ConfigTarget::Mate(a.mates.iter().find(|x| by(&x.name, x.id, m, "mate")).map(|x| x.id).ok_or_else(|| OpError::param("mate", "no such mate"))?),
+        (None, None, Some(k), None) => ConfigTarget::Pattern(a.patterns.iter().filter(|x| matches!(x.kind, noshape_model::assembly::PatternKind::Linear { .. } | noshape_model::assembly::PatternKind::Circular { .. })).find(|x| by(&x.name, x.id, k, "pattern")).map(|x| x.id).ok_or_else(|| OpError::param("pattern", "no such linear or circular pattern"))?),
+        (None, None, None, Some(k)) => ConfigTarget::Connector(a.connectors.iter().find(|x| by(&x.name, x.id, k, "mc")).map(|x| x.id).ok_or_else(|| OpError::param("connector", "no such mate connector"))?),
+        _ => return Err(OpError::invalid("give one of `instance`, `mate`, `pattern` or `connector`")),
     };
+    if a.config_param_value(t, pid).is_none() {
+        return Err(OpError::param("param", &format!("{} has no {p}", target_name(a, t))));
+    }
     Ok((t, pid))
 }
 
@@ -317,7 +339,8 @@ pub(super) fn configure(ctx: &mut Ctx, args: &Args) -> Result<crate::registry::O
     let name = target_name(a, t);
     let desc = match t {
         ConfigTarget::Instance(_) => asm_config::configure_suppression_description(&name),
-        ConfigTarget::Mate(_) => asm_config::configure_mate_description(&name),
+        ConfigTarget::Pattern(_) | ConfigTarget::Connector(_) if p == param::UNSUPPRESSED => asm_config::configure_suppression_description(&name),
+        _ => asm_config::configure_mate_description(&name),
     };
     edit(od, tab, &desc, |x| {
         if asm_config::configure(x, &input, t, p) { Ok(json!({ "configured": param_name(p) })) } else { Err(OpError::param("param", "the mate has no such parameter")) }

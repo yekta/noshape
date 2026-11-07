@@ -994,6 +994,55 @@ fn a_linear_pattern_fills_three_directions() {
     assert_eq!(indices.len(), created.len(), "every copy's index is its own");
 }
 
+/// Live 2209: a pattern's Instance count configured to 5 in Long makes five instances there (no mates for the extra
+/// ones), its suppression configured too; Default keeps two.
+#[test]
+fn a_configured_pattern_count_makes_its_copies_in_that_configuration() {
+    use super::config::{param, ConfigTarget};
+    use crate::configuration::ConfigValues;
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        connectors: vec![x_axis_connector(60)],
+        ..Default::default()
+    };
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 2, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    asm.sync_pattern(MateId(70));
+    asm.configuration.inputs.push(super::config::new_list_input("in1".into(), 1));
+    asm.add_config_row("in1", "Long", "long".into());
+    assert!(asm.configure_param("in1", ConfigTarget::Pattern(MateId(70)), param::COUNT));
+    assert!(asm.configure_param("in1", ConfigTarget::Pattern(MateId(70)), param::UNSUPPRESSED));
+    assert!(!asm.configure_param("in1", ConfigTarget::Pattern(MateId(70)), param::ANGLE), "a linear pattern has no Angle");
+    asm.set_config_cell(0, "long", ParamValue::Expr(ExprValue::new("5")));
+    let mut long = ConfigValues::default();
+    long.0.insert("in1".into(), "long".into());
+    let copies = |a: &Assembly| a.pattern(MateId(70)).unwrap().generated.len();
+    assert_eq!(copies(&asm.configured(&ConfigValues::default())), 1);
+    let l = asm.configured(&long);
+    assert_eq!(copies(&l), 4, "five with the seed in Long");
+    assert_eq!(l.mates.len(), 1, "no mates for the extra copies");
+    assert_eq!(copies(&asm), 1, "the stored assembly keeps Default's");
+    let res = ev.evaluate(&f.doc, &l, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    assert_eq!(res.occurrences.len(), 6);
+    // Suppressed in Long.
+    asm.set_config_cell(1, "long", ParamValue::Bool(false));
+    assert!(asm.configured(&long).pattern(MateId(70)).unwrap().suppressed);
+    assert!(!asm.configured(&ConfigValues::default()).pattern(MateId(70)).unwrap().suppressed);
+}
+
 /// Help "Assembly linear pattern" 7 / live qa5 dialog: Centered puts the
 /// seed in the middle, `count` instances (with the seed) each way.
 #[test]

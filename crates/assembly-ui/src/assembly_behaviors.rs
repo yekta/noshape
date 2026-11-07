@@ -2546,6 +2546,11 @@ impl AssemblyView {
             }));
             m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
         }
+        // A configured assembly (live 2209): Configure suppression after Dynamic suppression.
+        let target = noshape_model::assembly::config::ConfigTarget::Pattern(id);
+        if self.can_configure(target, noshape_model::assembly::config::param::UNSUPPRESSED, cx) {
+            m.push(item("Configure suppression", move |t, _, cx| t.configure_suppression(target, cx)));
+        }
         m.push(MenuEntry::Sep);
         if replicate {
             m.push(item(format!("Dissolve {}", p.name), move |t, _, cx| {
@@ -2718,6 +2723,10 @@ impl AssemblyView {
             if !graphics {
                 m.extend(AssemblyView::dynamic_suppression_entries(super::props::DynTarget::Mate(id), false));
             }
+        }
+        let target = noshape_model::assembly::config::ConfigTarget::Connector(id);
+        if !graphics && self.can_configure(target, noshape_model::assembly::config::param::UNSUPPRESSED, cx) {
+            m.push(item("Configure suppression", move |t, _, cx| t.configure_suppression(target, cx)));
         }
         m.push(MenuEntry::Sep);
         if graphics {

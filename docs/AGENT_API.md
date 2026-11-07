@@ -2060,7 +2060,7 @@ Examples:
 
 Make a parameter (or suppression) of a feature, assembly instance or mate, or a Variable Studio cell, configured by an input (edits the document (one undoable history entry)).
 
-Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or "suppressed" (Configure suppression). Assembly: `instance` with `param` "suppressed", or `mate` with "suppressed", "offset", "offset_x", "offset_y", "offset_z", "rotation" or "flip_primary". Variable Studio: `variable` and `field` (the cell's Configure with <input>; a configuration Variable `input` is the Value's "Set to #<input>"), or `unconfigure`.
+Every configuration starts with the current value; then set values with config_set_value. Part Studio: `feature` and `param`, a parameter id of the feature (see feature_schema) or "suppressed" (Configure suppression). Assembly: `instance` with `param` "suppressed"; `mate` with "suppressed", "offset", "offset_x", "offset_y", "offset_z", "rotation" or "flip_primary"; `pattern` with "suppressed", "distance", "count", "distance2", "count2" (a linear pattern's second direction) or "angle" (circular); `connector` (an assembly mate connector) with "suppressed", "realign", "move", "translation_x", "translation_y", "translation_z", "rotation_axis", "rotation", "flip_primary" or "reorient_secondary". Variable Studio: `variable` and `field` (the cell's Configure with <input>; a configuration Variable `input` is the Value's "Set to #<input>"), or `unconfigure`.
 
 Examples:
 
@@ -2076,6 +2076,8 @@ Examples:
 | `feature` | string |  | Feature id or name (Part Studio). |
 | `instance` | string |  | Instance id or name (Assembly). |
 | `mate` | string |  | Mate id or name (Assembly). |
+| `pattern` | string |  | Linear or circular pattern name (Assembly). |
+| `connector` | string |  | Assembly mate connector name (Assembly). |
 | `variable` | string |  | Variable name (Variable Studio). |
 | `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
 | `param` | string |  | Parameter id, or "suppressed" (Part Studio, Assembly; required there). |
@@ -2101,6 +2103,8 @@ Examples:
 | `feature` | string |  | Feature id or name (Part Studio). |
 | `instance` | string |  | Instance id or name (Assembly). |
 | `mate` | string |  | Mate id or name (Assembly). |
+| `pattern` | string |  | Linear or circular pattern name (Assembly). |
+| `connector` | string |  | Assembly mate connector name (Assembly). |
 | `variable` | string |  | Variable name (Variable Studio). |
 | `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
 | `param` | string |  | Parameter id, or "suppressed" (see config_configure; Part Studio, Assembly). |

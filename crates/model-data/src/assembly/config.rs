@@ -6,7 +6,7 @@
 //! offset values, flip). The configuration chosen above the instance list
 //! (or for a subassembly instance) is applied before solving.
 
-use super::{Assembly, InstanceId, Mate, MateId};
+use super::{AsmMateConnector, Assembly, InstanceId, InstancePattern, Mate, MateId};
 use crate::configuration::{ConfigInput, ConfigInputKind, ConfigValues, Configuration, ListOption};
 use crate::params::ParamValue;
 use noshape_units::ExprValue;
@@ -18,6 +18,10 @@ use std::collections::BTreeMap;
 pub enum ConfigTarget {
     Instance(InstanceId),
     Mate(MateId),
+    /// A linear or circular pattern (live 2209: Configure suppression, Distance, Instance count, Angle).
+    Pattern(MateId),
+    /// An assembly mate connector (live 2209: Realign, Move, its translations and rotation, the flips).
+    Connector(MateId),
 }
 
 /// Configurable parameters (column ids).
@@ -33,6 +37,19 @@ pub mod param {
     pub const ROTATION: &str = "rotation";
     /// Mate "Flip primary axis".
     pub const FLIP: &str = "flipPrimary";
+    /// Pattern parameters: a linear pattern's Distance / Instance count (and its second direction's), a circular
+    /// pattern's Angle / Instance count.
+    pub const DISTANCE: &str = "distance";
+    pub const COUNT: &str = "instanceCount";
+    pub const DISTANCE_2: &str = "distance2";
+    pub const COUNT_2: &str = "instanceCount2";
+    pub const ANGLE: &str = "angle";
+    /// Mate connector parameters (ROTATION and FLIP as a mate's).
+    pub const REALIGN: &str = "realign";
+    pub const MOVE: &str = "move";
+    pub const TRANSLATION: [&str; 3] = ["translationX", "translationY", "translationZ"];
+    pub const ROTATION_AXIS: &str = "rotationAxis";
+    pub const REORIENT: &str = "reorientSecondary";
     /// An instance's own configuration input (`input:<id>`), set from the
     /// assembly's input (Input propagation; values `Text(option id)` /
     /// `Text("true" | "false")`).
@@ -50,13 +67,119 @@ pub fn param_label(p: &str) -> &'static str {
         param::OFFSET_Y => "Offset Y",
         param::ROTATION => "Rotation angle",
         param::FLIP => "Flip primary axis",
+        // Live 2209's column titles.
+        param::DISTANCE | param::DISTANCE_2 => "Distance",
+        param::COUNT | param::COUNT_2 => "Instance count",
+        param::ANGLE => "Angle",
+        param::REALIGN => "Realign",
+        param::MOVE => "Move",
+        "translationX" => "X translation",
+        "translationY" => "Y translation",
+        "translationZ" => "Z translation",
+        param::ROTATION_AXIS => "Rotation axis",
+        param::REORIENT => "Reorient secondary axis",
         _ => "",
     }
 }
 
 /// Whether a configured parameter's cells are checkboxes.
 pub fn param_is_bool(p: &str) -> bool {
-    matches!(p, param::UNSUPPRESSED | param::OFFSET | param::FLIP)
+    matches!(p, param::UNSUPPRESSED | param::OFFSET | param::FLIP | param::REALIGN | param::MOVE)
+}
+
+/// A select cell's options (live 2209: Rotation axis and Reorient secondary axis read "+X").
+pub fn param_options(p: &str) -> Option<&'static [&'static str]> {
+    match p {
+        param::ROTATION_AXIS => Some(&ROTATION_AXES),
+        param::REORIENT => Some(&REORIENTS),
+        _ => None,
+    }
+}
+
+const ROTATION_AXES: [&str; 3] = ["+X", "+Y", "+Z"];
+const REORIENTS: [&str; 4] = ["+X", "+Y", "-X", "-Y"];
+
+fn pattern_param(p: &InstancePattern, k: &str) -> Option<ParamValue> {
+    use super::PatternKind;
+    let count = |n: u32| ParamValue::Expr(ExprValue::new(n.to_string()));
+    Some(match (&p.kind, k) {
+        (_, param::UNSUPPRESSED) => ParamValue::Bool(!p.suppressed),
+        (PatternKind::Linear { distance, .. }, param::DISTANCE) => ParamValue::Expr(distance.clone()),
+        (PatternKind::Linear { count: n, .. } | PatternKind::Circular { count: n, .. }, param::COUNT) => count(*n),
+        (PatternKind::Linear { second: Some(s), .. }, param::DISTANCE_2) => ParamValue::Expr(s.distance.clone()),
+        (PatternKind::Linear { second: Some(s), .. }, param::COUNT_2) => count(s.count),
+        (PatternKind::Circular { angle, .. }, param::ANGLE) => ParamValue::Expr(angle.clone()),
+        _ => return None,
+    })
+}
+
+/// Set a pattern parameter; true when its copies change (the count or spacing).
+fn set_pattern_param(p: &mut InstancePattern, k: &str, v: &ParamValue) -> bool {
+    use super::PatternKind;
+    let count = |v: &ParamValue| match v {
+        ParamValue::Expr(e) => e.text.trim().parse::<f64>().ok().filter(|n| *n >= 1.0).map(|n| n.round() as u32),
+        _ => None,
+    };
+    match (&mut p.kind, k, v) {
+        (_, param::UNSUPPRESSED, ParamValue::Bool(b)) => {
+            p.suppressed = !b;
+            false
+        }
+        (PatternKind::Linear { distance, .. }, param::DISTANCE, ParamValue::Expr(e)) | (PatternKind::Circular { angle: distance, .. }, param::ANGLE, ParamValue::Expr(e)) => {
+            *distance = e.clone();
+            false
+        }
+        (PatternKind::Linear { second: Some(s), .. }, param::DISTANCE_2, ParamValue::Expr(e)) => {
+            s.distance = e.clone();
+            false
+        }
+        (PatternKind::Linear { count: n, .. } | PatternKind::Circular { count: n, .. }, param::COUNT, v) => count(v).is_some_and(|c| std::mem::replace(n, c) != c),
+        (PatternKind::Linear { second: Some(s), .. }, param::COUNT_2, v) => count(v).is_some_and(|c| std::mem::replace(&mut s.count, c) != c),
+        _ => false,
+    }
+}
+
+fn connector_param(c: &AsmMateConnector, k: &str) -> Option<ParamValue> {
+    let e = |v: &Option<ExprValue>| ParamValue::Expr(v.clone().unwrap_or_else(|| ExprValue::new("0")));
+    Some(match k {
+        param::UNSUPPRESSED => ParamValue::Bool(!c.suppressed),
+        param::REALIGN => ParamValue::Bool(c.primary_axis.is_some()),
+        param::MOVE => ParamValue::Bool(!c.move_off),
+        param::ROTATION => e(&c.rotation),
+        param::FLIP => ParamValue::Bool(c.flip_primary),
+        param::ROTATION_AXIS => ParamValue::Text(ROTATION_AXES.get(c.rotation_axis as usize).copied().unwrap_or("+Z").to_string()),
+        param::REORIENT => ParamValue::Text(REORIENTS.get(c.reorient as usize).copied().unwrap_or("+X").to_string()),
+        k => e(&c.translation[param::TRANSLATION.iter().position(|t| *t == k)?]),
+    })
+}
+
+fn set_connector_param(c: &mut AsmMateConnector, k: &str, v: &ParamValue) {
+    let expr = |v: &ParamValue| match v {
+        ParamValue::Expr(e) => Some(e.clone()),
+        _ => None,
+    };
+    let pick = |list: &[&str], v: &ParamValue| match v {
+        ParamValue::Text(t) => list.iter().position(|x| x == t).map(|i| i as u8),
+        _ => None,
+    };
+    match (k, v) {
+        (param::UNSUPPRESSED, ParamValue::Bool(b)) => c.suppressed = !b,
+        // Realign off drops the alignment entities; on keeps them (there is nothing to realign to otherwise).
+        (param::REALIGN, ParamValue::Bool(false)) => {
+            c.primary_axis = None;
+            c.secondary_axis = None;
+        }
+        (param::MOVE, ParamValue::Bool(b)) => c.move_off = !b,
+        (param::ROTATION, v) => c.rotation = expr(v),
+        (param::FLIP, ParamValue::Bool(b)) => c.flip_primary = *b,
+        (param::ROTATION_AXIS, v) => c.rotation_axis = pick(&ROTATION_AXES, v).unwrap_or(c.rotation_axis),
+        (param::REORIENT, v) => c.reorient = pick(&REORIENTS, v).unwrap_or(c.reorient),
+        (k, v) => {
+            if let Some(i) = param::TRANSLATION.iter().position(|t| *t == k) {
+                c.translation[i] = expr(v);
+            }
+        }
+    }
 }
 
 /// One configured parameter of an assembly feature: its value per list
@@ -194,6 +317,8 @@ impl Assembly {
                 _ => None,
             },
             ConfigTarget::Mate(id) => self.mate(id).and_then(|m| mate_param(m, p)),
+            ConfigTarget::Pattern(id) => self.pattern(id).and_then(|x| pattern_param(x, p)),
+            ConfigTarget::Connector(id) => self.connectors.iter().find(|c| c.id == id).and_then(|c| connector_param(c, p)),
         }
     }
 
@@ -233,6 +358,7 @@ impl Assembly {
     pub fn apply_configuration(&mut self, values: &ConfigValues) {
         self.active_config = Some(values.clone());
         let cfg = self.configuration.clone();
+        let mut resync: Vec<MateId> = Vec::new();
         for c in &cfg.configured {
             let Some(key) = cfg.value_of(values, &c.input) else { continue };
             let Some(v) = c.values.get(&key) else { continue };
@@ -255,7 +381,24 @@ impl Assembly {
                         set_mate_param(m, &c.param, v);
                     }
                 }
+                ConfigTarget::Pattern(id) => {
+                    if let Some(p) = self.patterns.iter_mut().find(|p| p.id == id)
+                        && set_pattern_param(p, &c.param, v)
+                        && !resync.contains(&id)
+                    {
+                        resync.push(id);
+                    }
+                }
+                ConfigTarget::Connector(id) => {
+                    if let Some(x) = self.connectors.iter_mut().find(|x| x.id == id) {
+                        set_connector_param(x, &c.param, v);
+                    }
+                }
             }
+        }
+        // A configured count: this configuration's copies (live 2209: Long's 5 copies; no mates for the extra ones).
+        for id in resync {
+            self.sync_pattern(id);
         }
     }
 
@@ -320,9 +463,13 @@ impl Assembly {
     pub fn prune_configured(&mut self) {
         let instances: Vec<InstanceId> = self.instances.iter().map(|i| i.id).collect();
         let mates: Vec<MateId> = self.mates.iter().map(|m| m.id).collect();
+        let patterns: Vec<MateId> = self.patterns.iter().map(|p| p.id).collect();
+        let connectors: Vec<MateId> = self.connectors.iter().map(|c| c.id).collect();
         self.configuration.configured.retain(|c| match c.target {
             ConfigTarget::Instance(id) => instances.contains(&id),
             ConfigTarget::Mate(id) => mates.contains(&id),
+            ConfigTarget::Pattern(id) => patterns.contains(&id),
+            ConfigTarget::Connector(id) => connectors.contains(&id),
         });
     }
 }

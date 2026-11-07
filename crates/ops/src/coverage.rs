@@ -241,6 +241,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Clear selection", Op("ui_select")),
     ("assembly:Collapse all", Op("ui_list")),
     ("assembly:Collapse selected", Op("ui_list")),
+    ("assembly:Configure", Op("config_configure")),
     ("assembly:Configure suppression", Op("config_configure")),
     ("assembly:Copy all inputs", Op("config_copy_inputs")),
     ("assembly:Copy input", Op("config_duplicate_input")),
