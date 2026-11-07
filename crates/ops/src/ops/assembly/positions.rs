@@ -8,7 +8,7 @@ use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, assembly as sa};
 use glam::DVec3;
 use noshape_model::assembly::eval::{AssemblyResult, SolveOptions};
-use noshape_model::assembly::{Assembly, ExplodeStep, ExplodedView, MateId};
+use noshape_model::assembly::{Assembly, ExplodeStep, ExplodedView, MateConnectorRef, MateId};
 use noshape_model::document::{TabContent, TabId};
 use noshape_model::drawing::{AssemblyViewList, ListChange};
 use noshape_units::{Dim, EmptyScope, UnitPrefs};
@@ -94,6 +94,7 @@ pub fn ops() -> Vec<Op> {
                 opt("angle", json!({ "type": ["string", "number"] }), "Rotate by this angle instead."),
                 opt("pivot", json!({ "type": "array", "items": { "type": "number" } }), "Rotation pivot [x, y, z] in document units."),
                 opt("lines", json!({ "type": "boolean", "default": true }), "Show explode lines."),
+                opt("line_entities", json!({ "type": "array", "items": { "type": "object" } }), "The dialog's \"Edges, vertices, or faces\" the explode lines start from: [{\"instance\", \"entity\"}] (default the instances' centers; on edit, kept unless given)."),
                 opt("step", json!({ "type": "integer", "minimum": 1 }), "Edit this step (1-based) instead of adding one."),
             ],
             mutates: true,
@@ -145,7 +146,7 @@ pub(super) fn json(a: &Assembly) -> (Value, Value) {
     let views: Vec<Value> = a
         .exploded_views
         .iter()
-        .map(|v| json!({ "name": v.name, "steps": v.steps.len(), "step_instances": v.steps.iter().map(|s| s.instances.iter().map(|i| format!("inst:{}", i.0)).collect::<Vec<_>>()).collect::<Vec<_>>() }))
+        .map(|v| json!({ "name": v.name, "steps": v.steps.len(), "step_instances": v.steps.iter().map(|s| s.instances.iter().map(|i| format!("inst:{}", i.0)).collect::<Vec<_>>()).collect::<Vec<_>>(), "step_line_entities": v.steps.iter().map(|s| s.line_refs.len()).collect::<Vec<_>>() }))
         .collect();
     (json!(positions), json!(views))
 }
@@ -523,15 +524,22 @@ fn explode_step(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         _ => return Err(OpError::invalid("give `distance` (translate) or `angle` (rotate)")),
     };
     step.lines = a.bool_or("lines", true)?;
+    let line_refs: Option<Vec<MateConnectorRef>> = match a.opt_array("line_entities")? {
+        Some(list) => Some(list.iter().enumerate().map(|(i, e)| parse_connector(&asm, od, tab, e, &format!("line_entities[{i}]"))).collect::<Result<_, _>>()?),
+        None => None,
+    };
     commit(od, tab, "Edit : Explode step", &result, |a| {
         let steps = &mut a.exploded_views[v].steps;
         match editing {
             Some(k) => {
                 step.name = steps[k].name.clone();
-                step.line_refs = std::mem::take(&mut steps[k].line_refs);
+                step.line_refs = line_refs.unwrap_or_else(|| std::mem::take(&mut steps[k].line_refs));
                 steps[k] = step;
             }
-            None => steps.push(step),
+            None => {
+                step.line_refs = line_refs.unwrap_or_default();
+                steps.push(step);
+            }
         }
     })?;
     let now = assembly(od, tab)?.clone();

@@ -2937,6 +2937,7 @@ Examples:
 | `angle` | string or number |  | Rotate by this angle instead. |
 | `pivot` | array of number |  | Rotation pivot [x, y, z] in document units. |
 | `lines` | boolean |  | Show explode lines. |
+| `line_entities` | array of object |  | The dialog's "Edges, vertices, or faces" the explode lines start from: [{"instance", "entity"}] (default the instances' centers; on edit, kept unless given). |
 | `step` | integer |  | Edit this step (1-based) instead of adding one. |
 
 #### assembly_animate

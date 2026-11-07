@@ -2103,6 +2103,12 @@ fn assembly_named_positions_and_exploded_views() {
     // The reply says where the step puts the pin.
     assert!((num(&st["exploded"][0]["offset"][2]) - 30.0).abs() < 1e-6 && st["exploded"].as_array().unwrap().len() == 1, "{st}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Edit : Explode step");
+    // Its explode lines start from a face of the pin (the dialog's "Edges, vertices, or faces"); an edit keeps them.
+    let face = call(&mut ctx, "assembly_entities", json!({ "instance": p, "kind": "faces" }))["faces"][0]["id"].clone();
+    call(&mut ctx, "assembly_explode_step", json!({ "view": "Explode 1", "step": 1, "instances": [p], "direction": [0, 0, 1], "distance": "30 mm", "line_entities": [{ "instance": p, "entity": face }] }));
+    call(&mut ctx, "assembly_explode_step", json!({ "view": "Explode 1", "step": 1, "instances": [p], "direction": [0, 0, 1], "distance": "35 mm" }));
+    let views = call(&mut ctx, "assembly_list", json!({}))["exploded_views"].clone();
+    assert_eq!(views[0]["step_line_entities"], json!([1]), "{views}");
     call(&mut ctx, "assembly_exploded_view", json!({ "action": "rename", "view": "Explode 1", "name": "Pin out" }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Rename : Pin out");
     // The view's menu: Hide all explode lines, Show all explode lines.
