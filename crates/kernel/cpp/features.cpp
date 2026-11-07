@@ -1947,13 +1947,35 @@ static bool match_vertex_counts(std::vector<TopoDS_Wire>& wires, HHist& hist)
       if (cost < best_cost - 1e-12)
         best_cost = cost, best_t = tw, best_rot = rot;
     }
-    // Split our edges at the inserted points (params not at our vertices).
+    // Split our edges at the inserted points (params not at our vertices), an edge's evenly along it (live 2162:
+    // c2-impeller-loft's circle, two arcs, gets the D's two other corners as its long arc's thirds, 3 x 92.88 deg;
+    // G12's triangle the square's fourth corner at its edge's middle). `best_t` follows them (the start below).
     std::vector<TopoDS_Edge> out;
     std::vector<double>      cuts;
     for (double t : best_t)
       if (std::none_of(sw.begin(), sw.end(), [&](double s) { return std::abs(s - t) < 1e-12; }))
         cuts.push_back(t);
     std::sort(cuts.begin(), cuts.end());
+    {
+      std::vector<double> even = cuts;
+      for (size_t e = 0; e < k; ++e)
+      {
+        std::vector<size_t> on;
+        for (size_t c = 0; c < cuts.size(); ++c)
+          if (point_at(q, cuts[c]).first == e)
+            on.push_back(c);
+        for (size_t j = 0; j < on.size(); ++j)
+          even[on[j]] = sw[e] + q.len[e] / q.total * double(j + 1) / double(on.size() + 1);
+      }
+      for (double& t : best_t)
+        for (size_t c = 0; c < cuts.size(); ++c)
+          if (std::abs(t - cuts[c]) < 1e-12)
+          {
+            t = even[c];
+            break;
+          }
+      cuts = even;
+    }
     for (size_t e = 0; e < k; ++e)
     {
       std::vector<double> mine;

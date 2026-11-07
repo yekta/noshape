@@ -108,6 +108,23 @@ fn a_lofts_rims_keep_their_sections_curves() {
     assert_eq!(kinds(|c| matches!(c, Curve::Circle { .. })), 4, "the circle's arcs");
 }
 
+/// LOFT-VERTEX-MATCH (live 2162: c2-impeller-loft's circle, two arcs of 81.36 and 278.64 deg, lofted to the four
+/// corners of a D): the section with fewer vertices gets the others' corners spread evenly along the edge they fall
+/// in, its long arc in thirds (3 x 92.88 deg), not at the other section's arc-length positions.
+#[test]
+fn a_lofts_added_vertices_split_their_edge_evenly() {
+    let r = rect_face(&Plane::xy(), 4.0, 4.0);
+    let at = |deg: f64| DVec2::new(deg.to_radians().cos(), deg.to_radians().sin()) * 2.0;
+    let (a, b) = (90.0 - 40.68, 90.0 + 40.68);
+    let c = make_wire_2d(&Plane::xy().offset(5.0), &[Segment2d::Arc3 { a: at(a), mid: at(90.0), b: at(b) }, Segment2d::Arc3 { a: at(b), mid: at(270.0), b: at(a + 360.0) }]).unwrap();
+    let l = loft(&[r, c], &LoftOptions { solid: true, ..Default::default() }).unwrap();
+    assert!(l.shape.is_valid());
+    let mut arcs: Vec<f64> = l.shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, Curve::Circle { .. })).map(|i| (i.length / 2.0).to_degrees()).collect();
+    arcs.sort_by(f64::total_cmp);
+    assert_eq!(arcs.len(), 4, "{arcs:?}");
+    assert!((arcs[0] - 81.36).abs() < 1e-6 && arcs[1..].iter().all(|x| (x - 92.88).abs() < 1e-6), "{arcs:?}");
+}
+
 #[test]
 fn extrude_variants() {
     let f = rect_face(&Plane::xy(), 2.0, 2.0);
