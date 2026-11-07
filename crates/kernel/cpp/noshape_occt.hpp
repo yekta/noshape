@@ -955,6 +955,8 @@ OpOut op_defeature(const OcShape& s, const OcShapeList& faces);
 OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
                       rust::Slice<const double> offsets);
 OpOut op_offset_shape(const OcShape& s, double offset, uint8_t join);
+OpOut op_round_tool(P3 a, P3 d, P3 u0, P3 u1, double half, rust::Slice<const double> knots, rust::Slice<const int32_t> mults,
+                    rust::Slice<const double> radii, rust::Slice<const double> along);
 OpOut op_sew(const OcShapeList& shapes, double tol, bool make_solid);
 OpOut op_fill(const OcShapeList& edges, const OcShapeList& supports,
               rust::Slice<const int32_t> orders, rust::Slice<const double> points,

@@ -551,6 +551,24 @@ fn merged_blends(res: &k::OpResult) -> Option<k::OpResult> {
 /// OCCT interpolates its law smoothly through the given points (even two), so
 /// the pieces are sampled densely.
 fn variable_law(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) -> Vec<(f64, f64)> {
+    let (knots, slope) = law_hermite(ends, points, smooth);
+    let mut law = Vec::new();
+    for (i, w) in knots.windows(2).enumerate() {
+        let h = w[1].0 - w[0].0;
+        let steps = 16;
+        for j in 0..steps {
+            let f = j as f64 / steps as f64;
+            // Cubic Hermite; with zero end slopes this is smoothstep.
+            let (h00, h10, h01, h11) = (2.0 * f * f * f - 3.0 * f * f + 1.0, f * f * f - 2.0 * f * f + f, -2.0 * f * f * f + 3.0 * f * f, f * f * f - f * f);
+            law.push((w[0].0 + h * f, h00 * w[0].1 + h10 * h * slope[i] + h01 * w[1].1 + h11 * h * slope[i + 1]));
+        }
+    }
+    law.push(*knots.last().expect("two knots"));
+    law
+}
+
+/// The variable law as cubic Hermite spans: its points (fraction, radius), from 0 to 1, and the slope at each.
+pub(super) fn law_hermite(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) -> super::blend_section::RadiusLaw {
     points.retain(|p| p.0 > 1e-9 && p.0 < 1.0 - 1e-9);
     points.sort_by(|a, b| a.0.total_cmp(&b.0));
     points.dedup_by(|a, b| (a.0 - b.0).abs() < 1e-9);
@@ -574,19 +592,7 @@ fn variable_law(ends: (f64, f64), points: &mut Vec<(f64, f64)>, smooth: bool) ->
         slope[0] = end(chord[0], slope[1]);
         slope[n - 1] = end(chord[n - 2], slope[n - 2]);
     }
-    let mut law = Vec::new();
-    for (i, w) in knots.windows(2).enumerate() {
-        let h = w[1].0 - w[0].0;
-        let steps = 16;
-        for j in 0..steps {
-            let f = j as f64 / steps as f64;
-            // Cubic Hermite; with zero end slopes this is smoothstep.
-            let (h00, h10, h01, h11) = (2.0 * f * f * f - 3.0 * f * f + 1.0, f * f * f - 2.0 * f * f + f, -2.0 * f * f * f + 3.0 * f * f, f * f * f - f * f);
-            law.push((w[0].0 + h * f, h00 * w[0].1 + h10 * h * slope[i] + h01 * w[1].1 + h11 * h * slope[i + 1]));
-        }
-    }
-    law.push(*knots.last().expect("two knots"));
-    law
+    (knots, slope)
 }
 
 
@@ -662,7 +668,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
         let body = ev.ctx.bodies[bi].clone();
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
         // Each edge's law on the part as it is (for the section route, where OCCT's fails).
-        let mut laws: Vec<(usize, Vec<(f64, f64)>)> = Vec::new();
+        let mut laws: Vec<(usize, super::blend_section::RadiusLaw)> = Vec::new();
         for &e in &edges {
             let edge = body.shape.sub_shape(ShapeType::Edge, e)?;
             let info = edge.edge_info()?;
@@ -677,7 +683,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
                     points.push((t, *r));
                 }
             }
-            laws.push((e, variable_law((radius_at(info.start), radius_at(info.end)), &mut points, smooth)));
+            laws.push((e, law_hermite((radius_at(info.start), radius_at(info.end)), &mut points, smooth)));
         }
         let names: Vec<Name> = edges.iter().map(|&e| body.edges[e].clone()).collect();
         let occt = (|| -> FResult<()> {

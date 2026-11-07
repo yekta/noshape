@@ -684,6 +684,7 @@ pub(crate) mod ffi {
         ) -> Result<OpOut>;
         fn op_defeature(s: &OcShape, faces: &OcShapeList) -> Result<OpOut>;
         fn op_offset_faces(s: &OcShape, faces: &OcShapeList, offsets: &[f64]) -> Result<OpOut>;
+        fn op_round_tool(a: P3, d: P3, u0: P3, u1: P3, half: f64, knots: &[f64], mults: &[i32], radii: &[f64], along: &[f64]) -> Result<OpOut>;
         fn op_offset_shape(s: &OcShape, offset: f64, join: u8) -> Result<OpOut>;
         fn op_sew(shapes: &OcShapeList, tol: f64, make_solid: bool) -> Result<OpOut>;
         fn op_fill(

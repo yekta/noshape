@@ -8238,6 +8238,92 @@ static bool offset_prism_sides(const TopoDS_Shape& solid, const std::vector<Topo
   return true;
 }
 
+// A variable round's tool along a straight edge between two planes, exact: the round S(s, t) = a + d s + r(s) Q(t),
+// Q the unit section (the rational quadratic from tan(half) u0 round the corner to tan(half) u1, middle weight
+// cos(half)) and r(s) the law's cubic B-spline (`knots` / `mults` distinct, `radii` its poles, `along` their Greville
+// places in s), so its poles are a + d s_i + r_i Q_j; with the two faces' bands from the edge to it and the two end
+// sections, sewn into a solid.
+OpOut op_round_tool(P3 a, P3 d, P3 u0, P3 u1, double half, rust::Slice<const double> knots, rust::Slice<const int32_t> mults,
+                    rust::Slice<const double> radii, rust::Slice<const double> along)
+{
+  const int n = (int)radii.size();
+  if (n < 4 || along.size() != radii.size() || knots.size() != mults.size() || knots.size() < 2 || !(half > 1e-6 && half < M_PI / 2 - 1e-6))
+    fail_invalid("round tool: bad law");
+  const gp_XYZ A(a.x, a.y, a.z), D(d.x, d.y, d.z), U0(u0.x, u0.y, u0.z), U1(u1.x, u1.y, u1.z);
+  const gp_XYZ Q[3] = {U0 * std::tan(half), gp_XYZ(0, 0, 0), U1 * std::tan(half)};
+  NCollection_Array2<gp_Pnt> poles(1, n, 1, 3);
+  NCollection_Array2<double> weights(1, n, 1, 3);
+  for (int i = 1; i <= n; ++i)
+    for (int j = 1; j <= 3; ++j)
+    {
+      poles(i, j)   = gp_Pnt(A + D * along[(size_t)i - 1] + Q[j - 1] * radii[(size_t)i - 1]);
+      weights(i, j) = j == 2 ? std::cos(half) : 1.0;
+    }
+  NCollection_Array1<double> uk(1, (int)knots.size());
+  NCollection_Array1<int>    um(1, (int)knots.size());
+  for (int i = 1; i <= (int)knots.size(); ++i)
+  {
+    uk(i) = knots[(size_t)i - 1];
+    um(i) = mults[(size_t)i - 1];
+  }
+  NCollection_Array1<double> vk(1, 2);
+  NCollection_Array1<int>    vm(1, 2);
+  vk(1) = 0;
+  vk(2) = 1;
+  vm(1) = vm(2) = 3;
+  occ::handle<Geom_BSplineSurface> surf = new Geom_BSplineSurface(poles, weights, uk, vk, um, vm, 3, 2);
+  const double s0 = uk(1), s1 = uk(uk.Length());
+  double       size = 0;
+  for (int i = 1; i <= n; ++i)
+    size = std::max(size, poles(i, 1).Distance(poles(i, 3)) + std::abs(along[(size_t)i - 1]));
+  const double tol = 1e-9 * std::max(size, 1e-3);
+  BRepBuilderAPI_MakeFace round(surf, s0, s1, 0, 1, tol);
+  if (!round.IsDone())
+    fail_op("round tool: no round face");
+  const gp_Pnt c0(A + D * s0), c1(A + D * s1);
+  const occ::handle<Geom_Curve> side0 = surf->VIso(0), side1 = surf->VIso(1);
+  auto seg = [](const gp_Pnt& p, const gp_Pnt& q) { return BRepBuilderAPI_MakeEdge(p, q).Edge(); };
+  // A face's band: from the edge out to the round's side on it.
+  auto band = [&](const occ::handle<Geom_Curve>& side) {
+    const gp_Pnt e0 = side->Value(s0), e1 = side->Value(s1);
+    BRepBuilderAPI_MakeWire w;
+    w.Add(seg(c0, c1));
+    w.Add(seg(c1, e1));
+    w.Add(BRepBuilderAPI_MakeEdge(side, s1, s0).Edge());
+    w.Add(seg(e0, c0));
+    return BRepBuilderAPI_MakeFace(w.Wire(), true).Face();
+  };
+  // An end: the round's section there, closed by the two faces' lines to the edge.
+  auto cap = [&](double s, const gp_Pnt& c) {
+    const occ::handle<Geom_Curve> arc = surf->UIso(s);
+    BRepBuilderAPI_MakeWire       w;
+    w.Add(seg(c, arc->Value(0)));
+    w.Add(BRepBuilderAPI_MakeEdge(arc, 0, 1).Edge());
+    w.Add(seg(arc->Value(1), c));
+    return BRepBuilderAPI_MakeFace(w.Wire(), true).Face();
+  };
+  BRepBuilderAPI_Sewing sew(1e3 * tol);
+  sew.Add(round.Face());
+  sew.Add(band(side0));
+  sew.Add(band(side1));
+  sew.Add(cap(s0, c0));
+  sew.Add(cap(s1, c1));
+  sew.Perform();
+  TopoDS_Shell shell;
+  int          shells = 0;
+  for (TopExp_Explorer x(sew.SewedShape(), TopAbs_SHELL); x.More(); x.Next(), ++shells)
+    shell = TopoDS::Shell(x.Current());
+  if (shells != 1 || !BRep_Tool::IsClosed(shell))
+    fail_op("round tool: not closed");
+  BRepBuilderAPI_MakeSolid ms(shell);
+  if (!ms.IsDone())
+    fail_op("round tool: no solid");
+  TopoDS_Solid solid = ms.Solid();
+  BRepLib::OrientClosedSolid(solid);
+  std::vector<TopoDS_Shape> args;
+  return make_result(args, solid, nullptr);
+}
+
 OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
                       rust::Slice<const double> offsets)
 {

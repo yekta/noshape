@@ -742,6 +742,30 @@ pub fn replace_face(_shape: &Shape, _faces: &[Shape], _template: &Shape) -> Resu
 }
 
 /// Offset a face, shell or solid surface by `distance` (offset surface).
+/// A variable round's tool along a straight edge between two planes, exact: `a` the edge's point at s = 0, `d` its unit
+/// direction, `u0` / `u1` along the two faces away from the edge, `half` half the angle between the faces' normals;
+/// the radius as cubic Bézier spans `(s0, s1, [r0, r1, r2, r3])` in order, each starting where the last ends. The solid
+/// between the edge, the round and the end sections (the round's surface a + d s + r(s) Q(t), Q the unit section).
+pub fn round_tool(a: DVec3, d: DVec3, u0: DVec3, u1: DVec3, half: f64, spans: &[(f64, f64, [f64; 4])]) -> Result<Shape> {
+    if spans.is_empty() {
+        return Err(KernelError::invalid("round tool: no spans"));
+    }
+    let mut knots = vec![spans[0].0];
+    let mut mults = vec![4];
+    let (mut radii, mut along) = (vec![spans[0].2[0]], vec![spans[0].0]);
+    for (k, &(s0, s1, r)) in spans.iter().enumerate() {
+        let h = s1 - s0;
+        for (j, &x) in r.iter().enumerate().skip(1) {
+            radii.push(x);
+            along.push(s0 + h * j as f64 / 3.0);
+        }
+        knots.push(s1);
+        mults.push(if k + 1 == spans.len() { 4 } else { 3 });
+    }
+    let r = ck(ffi::op_round_tool(p3(a), p3(d), p3(u0), p3(u1), half, &knots, &mults, &radii, &along))?;
+    Ok(OpResult::from_ffi(r).shape)
+}
+
 pub fn offset_shape(shape: &Shape, distance: f64, join: JoinType) -> Result<OpResult> {
     op(ffi::op_offset_shape(shape.raw(), distance, join.code()))
 }

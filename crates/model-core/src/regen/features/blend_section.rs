@@ -1359,12 +1359,17 @@ fn seam_where_whole(rim: &Rim, r: f64) -> FResult<DVec3> {
     Ok(x)
 }
 
+/// A variable round's radius law as cubic Hermite spans: its points (fraction from the edge's start, radius) and the
+/// slope (per fraction) at each.
+pub type RadiusLaw = (Vec<(f64, f64)>, Vec<f64>);
+
 /// A variable round of straight edges between planes where OCCT's fails (c2-tpd-fillet-variable's Fillet 1: radii to
-/// 40 mm on 25 mm walls, the round running down onto the floor): per edge, its circular sections lofted along it with
-/// the radius its law gives (`law`: (fraction from the edge's start, radius), increasing), on past a free end (into a
-/// corner's neighbour's round, mitred there), and every edge's region between the edge and its round cut away (added
-/// at a concave edge) at once, so a round ends where it meets the faces beyond or another round.
-pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, Vec<(f64, f64)>)]) -> FResult<()> {
+/// 40 mm on 25 mm walls, the round running down onto the floor): per edge, its exact round (`k::round_tool`: the
+/// circular section swept with the radius its law gives, `law`: the Hermite spans' points (fraction from the edge's
+/// start, radius) and slopes per fraction), on past a free end (into a corner's neighbour's round, mitred there), and
+/// every edge's region between the edge and its round cut away (added at a concave edge) at once, so a round ends where
+/// it meets the faces beyond or another round.
+pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)]) -> FResult<()> {
     use super::sheetmetal_util::{body_named, bool_named};
     let body = ev.ctx.bodies[bi].clone();
     let shape = &body.shape;
@@ -1373,15 +1378,8 @@ pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, Vec<(f64, f64
     let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
-    for (e, law) in laws {
-        let r_at = |f: f64| -> f64 {
-            let f = f.clamp(0.0, 1.0);
-            match law.windows(2).find(|w| f <= w[1].0) {
-                Some(w) if w[1].0 > w[0].0 => w[0].1 + (w[1].1 - w[0].1) * (f - w[0].0) / (w[1].0 - w[0].0),
-                Some(w) => w[1].1,
-                None => law.last().map_or(0.0, |x| x.1),
-            }
-        };
+    for (e, (points, slopes)) in laws {
+        let (Some(&(_, r_start)), Some(&(_, r_end))) = (points.first(), points.last()) else { return Err(fail("an empty law")) };
         let edge = shape.sub_shape(ShapeType::Edge, *e)?;
         let info = edge.edge_info()?;
         if !matches!(info.curve, k::Curve::Line { .. }) {
@@ -1405,41 +1403,32 @@ pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, Vec<(f64, f64
             let probe = p + out * (r * 0.5) + (fr.u[0] + fr.u[1]) * (r * 0.05);
             Ok(if shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside { 1.5 * r } else { 0.0 })
         };
-        let (e0, e1) = (ext(a, -d, r_at(0.0))?, ext(b, d, r_at(1.0))?);
-        // Stations: the law's own points and enough between them for the loft to follow it.
-        const N: usize = 48;
-        let mut at: Vec<f64> = (0..=N).map(|k| k as f64 / N as f64).chain(law.iter().map(|x| x.0)).filter(|f| (0.0..=1.0).contains(f)).collect();
-        at.sort_by(f64::total_cmp);
-        at.dedup_by(|x, y| (*x - *y).abs() < 1e-6);
-        let mut secs = Vec::new();
-        let mut starts = Vec::new();
-        let mut put = |s: f64, r: f64| -> FResult<()> {
-            let spec = BlendSpec { section: Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: false, cliff: false, sides: None };
-            let p = a + d * s;
-            let (face, _, _) = section_face(p, &fr, &spec, true)?;
-            secs.push(face);
-            starts.push(p);
-            Ok(())
-        };
+        let (e0, e1) = (ext(a, -d, r_start)?, ext(b, d, r_end)?);
+        // The law's spans as cubic Béziers in s (the slopes per fraction: per length / len), the ends' run-ons constant.
+        let mut spans: Vec<(f64, f64, [f64; 4])> = Vec::new();
         if e0 > 0.0 {
-            put(-e0, r_at(0.0))?;
+            spans.push((-e0, 0.0, [r_start; 4]));
         }
-        for f in &at {
-            put(f * len, r_at(*f))?;
+        for (k, w) in points.windows(2).enumerate() {
+            let (s0, s1) = (w[0].0 * len, w[1].0 * len);
+            let h = s1 - s0;
+            let (m0, m1) = (slopes[k] / len, slopes[k + 1] / len);
+            spans.push((s0, s1, [w[0].1, w[0].1 + m0 * h / 3.0, w[1].1 - m1 * h / 3.0, w[1].1]));
         }
         if e1 > 0.0 {
-            put(len + e1, r_at(1.0))?;
+            spans.push((len, len + e1, [r_end; 4]));
         }
-        let tool = k::loft(&secs, &k::LoftOptions { solid: true, start_points: Some(starts), ..Default::default() })?;
-        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
-            return Err(fail("a variable round's sections didn't loft"));
+        let half = fr.m[0].dot(fr.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
+        let tool = k::round_tool(a, d, fr.u[0], fr.u[1], half, &spans)?;
+        if !tool.is_valid() || tool.count(ShapeType::Solid) != 1 {
+            return Err(fail("a variable round's tool isn't one solid"));
         }
         // Its round: the face on neither support's plane.
         let ename = body.edges[*e].clone();
         let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
         let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
-        let names: Vec<Name> = tool.shape.faces().iter().map(|f| if f.face_plane().ok().flatten().is_some() { generated.clone() } else { blend.clone() }).collect();
-        let named = NamedShape::new(tool.shape, names);
+        let names: Vec<Name> = tool.faces().iter().map(|f| if f.face_plane().ok().flatten().is_some() { generated.clone() } else { blend.clone() }).collect();
+        let named = NamedShape::new(tool, names);
         if convex { cuts.push(named) } else { adds.push(named) }
     }
     let mut named = body_named(&body);

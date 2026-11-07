@@ -16,6 +16,23 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**Blends: handed to blend (lead 11-07 18:23 UTC).** Fillets, chamfers and blends are blend's from now; core keeps
+the seam-split faces, naming, the other features and SELF-OVERLAPPING-FACE, and reviews blend's changes when asked.
+What blend takes over:
+- The routes (crates/model-core/src/regen/features/blend_section.rs): `ring_blend` / `rims_overflow` (plane /
+  cylinder rims and arcs, each rim blended alone on a wedge and the wedge minus its blend cut away; tried first where a
+  blend leaves its plane or meets another on its cylinder, convex only), `section_blend` (now runs a section wider than
+  its face on past it), `variable_round` (landed with this note: exact, `k::round_tool` / C++ `op_round_tool`, the
+  round a + d s + r(s) Q(t) from the law's Hermite spans, no loft; c2-tpd-fillet-variable to the end, its Fillet 1
+  1.7 s -> 267 ms, live 44 ms).
+- RING-BLEND-SPEED (TICKETS, parked by the lead): c2-rings-loft's Fillet 1 ~370-410 ms, nearly all OCCT's cut of the
+  two rounds against each other; the lever is building the rounds and their meeting curve directly.
+- cf-surface-pattern's Fillet 1: live's side rounds are cylinders against the top plane JtS extended (State 14:59
+  below); live's 2222 showed a simple profile rolls against the curved face; Part 5's side edge alone asked (REQUESTS
+  core 16:09, open).
+- Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
+- Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
+
 **State 11-07 18:03 UTC: faces OCCT splits only at a periodic surface's seam are one face (lead's P1).**
 - As 2e0ec154 for edges: shown_topology groups faces of one surface handle that meet across an edge on its seam (an
   isoline at the period's start; a split line elsewhere stays an edge); those edges are hidden like seams, and edge
