@@ -319,7 +319,7 @@ pub fn group_description(editing: bool) -> &'static str {
 }
 
 /// The Group dialog's check.
-pub const GROUP_TOO_FEW: &str = "Select at least two instances to group.";
+pub const GROUP_TOO_FEW: &str = "Select instances to group.";
 
 /// Accept the Group dialog: a new group ("Group 1"...) or the edited
 /// group's instances. Returns the group's id.

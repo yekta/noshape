@@ -22,7 +22,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "group",
             summary: "Group instances so they move as one rigid body",
-            description: "The Group dialog (at least two instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit (\"Insert : Group\" / \"Edit : Group\").",
+            description: "The Group dialog (one or more instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit (\"Insert : Group\" / \"Edit : Group\").",
             fields: vec![doc_field(), asm_field(), req("instances", strings(), "Instance ids or names (two or more, or a pattern's copy)."), opt("edit", s(), "An existing group to edit (id or name).")],
             mutates: true,
             destructive: false,
@@ -128,7 +128,7 @@ fn group(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             None => {}
         }
     }
-    if ids.len() < 2 && patterns.is_empty() {
+    if ids.is_empty() && patterns.is_empty() {
         return Err(OpError::param("instances", sa::GROUP_TOO_FEW));
     }
     let editing = match a.opt_str("edit")? {

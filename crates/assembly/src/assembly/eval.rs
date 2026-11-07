@@ -859,6 +859,8 @@ pub struct AssemblyResult {
     /// Explode lines of the displayed exploded view: (start, end) of each
     /// step's instance centers.
     pub explode_trails: Vec<(DVec3, DVec3)>,
+    /// Parts from other documents: their key's pinned document and Part Studio tab.
+    pub external_docs: Arc<HashMap<String, (Arc<Document>, TabId)>>,
 }
 
 impl AssemblyResult {
@@ -2395,7 +2397,18 @@ impl AssemblyEvaluator {
                 flag(n);
             }
         }
-        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0, explode_trails: Vec::new() };
+        // The pinned documents of parts from other documents (their BOM properties).
+        let mut external_docs = HashMap::new();
+        if let Some(p) = self.external.clone() {
+            for key in occurrences.iter().filter_map(|o| o.external.as_ref()) {
+                if !external_docs.contains_key(key)
+                    && let Some(d) = p.studio(key)
+                {
+                    external_docs.insert(key.clone(), d);
+                }
+            }
+        }
+        let mut result = AssemblyResult { occurrences, nodes, solved: Solved::default(), mates, relations, connectors, pattern_errors, prepared: Arc::new(prepared), eval_ms: 0.0, explode_trails: Vec::new(), external_docs: Arc::new(external_docs) };
         let ev = explode.and_then(|i| assembly.exploded_views.get(i));
         result.apply_placements(solved, ev);
         result.eval_ms = t0.elapsed().as_secs_f32() * 1000.0;

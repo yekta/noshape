@@ -28,7 +28,7 @@ pub struct NpCell {
 }
 
 /// The value indices a mate type can drive (0 = Rz, 1..3 = Tx / Ty / Tz).
-fn driven_dofs(t: MateType) -> &'static [u8] {
+pub(super) fn driven_dofs(t: MateType) -> &'static [u8] {
     match t {
         MateType::Revolute => &[0],
         MateType::Slider => &[3],
@@ -41,6 +41,16 @@ fn driven_dofs(t: MateType) -> &'static [u8] {
 }
 
 /// Column / checkbox label of a degree of freedom: "⟳ - z", "↔ - x".
+/// A driven DOF's row in the Driving mate selector: its icon, then "- Z" (live assembly/105).
+pub(super) fn driver_dof(ix: u8) -> (&'static str, &'static str) {
+    match ix {
+        0 => ("⟳", "- Z"),
+        1 => ("↔", "- X"),
+        2 => ("↔", "- Y"),
+        _ => ("↔", "- Z"),
+    }
+}
+
 fn dof_label(ix: u8) -> &'static str {
     match ix {
         0 => "⟳ - z",
@@ -690,7 +700,8 @@ impl AssemblyView {
                                     .bg(if on { rgb(0x1651b0) } else { rgb(0xffffff) })
                                     .when(on, |d| d.child(Icon::new(IconName::Check).size(px(10.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                             )
-                            .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(dof_label(ix)))
+                            .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(driver_dof(ix).0))
+                            .child(div().text_size(px(13.33)).text_color(rgb(0x666666)).child(driver_dof(ix).1))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if let Some(d) = &mut this.ui.np_driver {
                                     match d.checked.iter().position(|x| *x == (m, ix)) {

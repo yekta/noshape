@@ -398,6 +398,15 @@ impl Workspace {
         }
     }
 
+    /// An open Assembly tab's view, active or not (the ui-parity driver reads the start's assembly from a Part Studio
+    /// edited in context, as live's recorder reads it over REST).
+    pub(crate) fn any_assembly(&self) -> Option<Entity<AssemblyView>> {
+        self.active_assembly().or_else(|| self.views.values().find_map(|v| match v {
+            TabView::Assembly(v) => Some(v.clone()),
+            _ => None,
+        }))
+    }
+
     /// Opens the first tab named `name` (ui-parity driver); false if none.
     pub(crate) fn activate_named(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let Some(tab) = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == name).map(|t| t.id) else { return false };

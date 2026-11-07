@@ -114,7 +114,11 @@ impl AssemblyView {
             _ => "ok",
         };
         let editing = self.mate.as_ref().and_then(|s| s.editing);
-        let related = self.related_instances(cx);
+        let mut related = self.related_instances(cx);
+        // The Driving mate selector's mates relate their instances (live asm-mate-menu-edit-driver-mate).
+        for m in self.ui.np_driver.iter().flat_map(|d| d.mates.iter()) {
+            related.extend(self.mate_instances(*m, cx));
+        }
         let row = |name: &str, state: &str, selected: bool, editing: bool, related: bool, hidden: bool| json!({ "name": name, "state": state, "selected": selected, "editing": editing, "related": related, "hidden": hidden });
         // As the list draws them: the assembly's own row, the Origin, the
         // top-level instances (a pattern's or a folder's row where its first
@@ -138,7 +142,7 @@ impl AssemblyView {
                 }
             }
             // Related through a selected mate (live: a selected row alone isn't).
-            let selected = self.selected.contains(&i.id);
+            let selected = self.selected.contains(&i.id) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id));
             rows.push(row(&i.name, if i.suppressed { "suppressed" } else { "ok" }, selected, false, related.contains(&i.id), i.hidden));
             if let Some(n) = self.result.node(&[i.id]) {
                 self.nested_state_rows(n, &mut rows, cx);
@@ -148,7 +152,7 @@ impl AssemblyView {
             let ok = self.pattern_from_session(p, cx).is_ok();
             rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
-        let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
+        let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id)) || self.ui.np_driver.as_ref().is_some_and(|d| d.mates.contains(&id));
         let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, "ok", mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
         items.extend(asm.mates.iter().filter(|m| asm.mate_generated_by(m.id).is_none()).map(|m| (m.id, row(&m.name, mate_state(m), mate_selected(m.id), editing == Some(m.id), mate_selected(m.id), m.hidden || !self.show_mates))));
         items.extend(asm.relations.iter().map(|r| (r.id, row(&r.name, "ok", mate_selected(r.id), false, mate_selected(r.id), false))));
@@ -170,13 +174,19 @@ impl AssemblyView {
             items.push((m.id, row(&m.name, if m.on.is_some() { "ok" } else { "error" }, true, true, false, false)));
         }
         if let Some((_, members)) = self.ui.group.as_ref().filter(|g| g.0.is_none()) {
-            let ok = members.len() >= 2 || !self.ui.group_patterns.is_empty();
+            let ok = !members.is_empty() || !self.ui.group_patterns.is_empty();
             items.push((MateId(u64::MAX - 1), row(&asm.next_feature_name("Group"), if ok { "ok" } else { "error" }, true, true, false, !self.show_mates)));
         }
-        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked;
+        let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked || self.ui.np_driver.is_some();
         rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
         if !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]) {
-            rows.extend(items.into_iter().map(|(_, r)| r));
+            for (id, r) in items {
+                // An expanded mate's implicit connectors under it, hidden as it is.
+                let children = asm.mate(id).filter(|_| self.ui.expanded_mates.contains(&id)).map_or(0, |m| m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).count());
+                let hidden = r["hidden"].as_bool().unwrap_or(false);
+                rows.push(r);
+                rows.extend((0..children).map(|_| row("Mate connector", "ok", false, false, false, hidden)));
+            }
         }
         // A transform as live's occurrences give it: 16 numbers, row-major,
         // the translation in mm (rounded to 1e-6).
@@ -212,7 +222,11 @@ impl AssemblyView {
         let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": rest_status(m) })).collect();
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
-        let mut items: Vec<Value> = mates_selected.filter_map(|id| asm.mates.iter().find(|m| m.id == id)).map(|m| json!({ "kind": "FEATURE", "owner": m.name })).collect();
+        // A mate held by Animate mate's or the Driving mate selector's field reads without an owner (live asm-mate-menu-animate,
+        // asm-mate-menu-edit-driver-mate).
+        let held: Vec<MateId> = self.anim.as_ref().map(|a| a.mate).into_iter().chain(self.ui.np_driver.iter().flat_map(|d| d.mates.iter().copied())).collect();
+        let mut items: Vec<Value> = mates_selected.filter(|id| !held.contains(id)).filter_map(|id| asm.mates.iter().find(|m| m.id == id)).map(|m| json!({ "kind": "FEATURE", "owner": m.name })).collect();
+        items.extend(held.iter().map(|_| json!({ "kind": "FEATURE", "owner": null })));
         // A clicked face, edge or vertex is selected itself, owned by its part (live asm-face-menu-clear-selection: FACE of
         // "Part 2"; the instance's row highlights); an instance only when picked whole.
         items.extend(self.ui.entity_sel.iter().map(|(path, r)| {
@@ -224,7 +238,13 @@ impl AssemblyView {
             let owner = self.result.occurrences.iter().find(|o| &o.path == path).map(|o| o.body_name.clone());
             json!({ "kind": kind, "owner": owner })
         }));
-        items.extend(asm.instances.iter().filter(|i| self.selected.contains(&i.id) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
+        // Check interference… of the whole assembly: its root is selected (live asm-root-menu-check-interference).
+        if self.ui.interference.as_ref().is_some_and(|d| d.whole) {
+            items.push(json!({ "kind": "INSTANCE", "owner": null }));
+        }
+        // The Group dialog's members are selected (live asm-group-two-instances).
+        let group: &[InstanceId] = self.ui.group.as_ref().map_or(&[], |(_, ids)| ids.as_slice());
+        items.extend(asm.instances.iter().filter(|i| (self.selected.contains(&i.id) || group.contains(&i.id)) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
             items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
@@ -278,6 +298,8 @@ impl AssemblyView {
         };
         let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
         let focus = focus.or_else(|| if self.mate.is_none() { active_field() } else { None });
+        // The Driving mate selector's box has the keyboard (live asm-mate-menu-edit-driver-mate).
+        let focus = focus.or_else(|| self.ui.np_driver.as_ref().map(|_| json!({ "kind": "field", "label": "Mates to drive positions", "dialog": "Driving mate selector" })));
         // The mate dialog's query box has the focus while it takes picks (live: field "Mate connectors").
         let focus = focus.or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } }))).unwrap_or_else(|| json!({ "kind": "none" }));
         let history = self.history_state(cx);
@@ -485,8 +507,8 @@ impl AssemblyView {
                 Some(g) => asm.and_then(|a| a.groups.iter().find(|x| x.id == *g).map(|x| x.name.clone())).unwrap_or_else(|| "Group".into()),
                 None => asm.map(|a| a.next_feature_name("Group")).unwrap_or_else(|| "Group 1".into()),
             };
-            let complete = ids.len() >= 2 || !self.ui.group_patterns.is_empty();
-            // Live (asm-group-two-instances): ✓ off until two members.
+            // Live (asm-group-two-instances): ✓ on from the first member.
+            let complete = !ids.is_empty() || !self.ui.group_patterns.is_empty();
             out.push(dialog(title, complete, complete, vec![query("Instances", ids.iter().filter_map(|i| names.get(i).cloned()).collect(), true, false)]));
         }
         if let Some(r) = &self.relation {
@@ -503,11 +525,11 @@ impl AssemblyView {
         if let Some(s) = &self.replace_panel {
             let fields = vec![
                 query("Instances to replace", s.instances.iter().filter_map(|i| names.get(i).cloned()).collect(), !s.picking, false),
+                other(s.replacement.as_ref().map_or("Select replacement component…", |(_, n)| n.as_str())),
                 check("Replace all instances", s.all),
-                other(s.replacement.as_ref().map_or("Select replacement component", |(_, n)| n.as_str())),
             ];
-            let complete = s.replacement.is_some();
-            out.push(dialog("Replace instance".into(), complete, complete, fields));
+            // (✓ stays enabled without a replacement: live asm-replace-instance-open-escape.)
+            out.push(dialog("Replace instance".into(), s.replacement.is_some(), true, fields));
         }
         // Origin of new Part Studio (live assembly/114, 542): its one field, the Origin when opened from its row.
         if let Some(o) = self.ui.ps_in_context {
@@ -523,6 +545,16 @@ impl AssemblyView {
         if let Some(f) = &self.ui.folder_name {
             out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));
         }
+        // Display states (live asm-display-states-open-escape): the name field's hint, then the states or the empty note.
+        if self.ui.display_states {
+            let mut text = vec!["(New display state name)".to_string()];
+            let names: Vec<String> = self.assembly(cx).map(|a| a.display_states.iter().map(|d| d.name.clone()).collect()).unwrap_or_default();
+            if names.is_empty() {
+                text.push("No display states created".into());
+            }
+            text.extend(names);
+            out.push(panel("Display states", text));
+        }
         if let Some((rows, _, _)) = &self.ui.select_other {
             out.push(panel("Select other", rows.iter().map(|r| self.select_other_label(r, cx)).collect()));
         }
@@ -533,8 +565,18 @@ impl AssemblyView {
             out.push(dialog("Make transparent".into(), true, true, vec![]));
         }
         // Driving mate selector (live assembly/105–107): the mates listed.
+        // Live's recorder reads the box's checkbox as "Mates to drive positions", then each open mate's DOF boxes.
         if let Some(d) = &self.ui.np_driver {
-            out.push(dialog("Driving mate selector".into(), true, true, vec![query("Mates to drive positions", d.mates.iter().map(|m| mate_name(*m)).collect(), true, false)]));
+            let mut dofs = Vec::new();
+            for m in d.mates.iter().filter_map(|m| asm.and_then(|a| a.mate(*m))) {
+                let ixs = super::positions::driven_dofs(m.mate_type);
+                if d.expanded.contains(&m.id) {
+                    dofs.extend(ixs.iter().map(|ix| check(super::positions::driver_dof(*ix).1, d.checked.contains(&(m.id, *ix)))));
+                }
+            }
+            let mut fields = vec![check("Mates to drive positions", false)];
+            fields.extend(dofs);
+            out.push(dialog("Driving mate selector".into(), true, true, fields));
         }
         // Reference manager (live assembly/111–112): its two tabs.
         if let Some(r) = &self.ui.ref_manager {
@@ -561,7 +603,7 @@ impl AssemblyView {
                 number(json!("Start value"), quantity(&a.start)),
                 number(json!("End value"), quantity(&a.end)),
                 number(json!("Steps"), quantity(&a.steps)),
-                choice(a.playback.label()),
+                json!({ "label": "Playback type", "kind": "enum", "text": a.playback.label(), "state": "ok" }),
                 toggle(false),
                 current,
             ]));

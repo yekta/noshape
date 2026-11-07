@@ -1711,7 +1711,7 @@ fn assembly_groups_relations_connectors() {
     let g = call(&mut ctx, "assembly_group", json!({ "instances": [b1, b2] }));
     assert_eq!(g["name"], "Group 1", "{g}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Insert : Group");
-    let e = try_call(&mut ctx, "assembly_group", json!({ "instances": [b1] })).unwrap_err();
+    let e = try_call(&mut ctx, "assembly_group", json!({ "instances": [] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("instances"));
 
     // Pin 1 turns in the hole; pin 2 turns about a mate connector on the block's top face.

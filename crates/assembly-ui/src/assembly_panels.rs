@@ -3013,7 +3013,7 @@ impl AssemblyView {
             .child(div().opacity(if replacement.is_some() { 1.0 } else { 0.4 }).child(crate::assets::icon("part", 20., cx)))
             .child(match replacement {
                 Some(n) => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(rgb(0x555555)).child(n),
-                None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if missing { red } else { pal.text_faint }).child("Select replacement component"),
+                None => div().flex_1().min_w_0().truncate().text_size(px(13.33)).text_color(if missing { red } else { pal.text_faint }).child("Select replacement component…"),
             })
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(s) = &mut this.replace_panel {

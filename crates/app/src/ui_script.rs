@@ -277,7 +277,14 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // assembly scenarios.)
         let state = |cx: &mut AsyncWindowContext| -> Value {
             if let Some(ps) = studio(cx) {
-                return cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null);
+                let mut s = cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null);
+                // Edit in context: the assembly's instances as live reads them (asm-menu-edit-in-context).
+                if s.is_object()
+                    && let Some(a) = ws.update(cx, |w, _| w.any_assembly()).ok().flatten()
+                {
+                    s["assembly"] = cx.update(|_, cx| a.read(cx).ui_state(cx)["assembly"].clone()).unwrap_or(Value::Null);
+                }
+                return s;
             }
             if let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() {
                 return cx.update(|_, cx| d.read(cx).ui_state(cx)).unwrap_or(Value::Null);

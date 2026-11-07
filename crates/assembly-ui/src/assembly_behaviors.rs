@@ -513,6 +513,9 @@ pub struct AsmUi {
     pub ds_duplicate: bool,
     /// Group dialog: (group being edited, instances).
     pub group: Option<(Option<MateId>, Vec<InstanceId>)>,
+    /// The open Group dialog's picks, for Undo / Redo while it is open (live asm-group-two-instances): (members,
+    /// patterns) before each pick, and the undone ones.
+    pub group_picks: (Vec<GroupPicks>, Vec<GroupPicks>),
     /// The Group dialog's patterns (a pick on a pattern's copy, live 1681).
     pub group_patterns: Vec<MateId>,
     /// Mate indicators in overlay pick order.
@@ -2121,7 +2124,8 @@ impl AssemblyView {
             m.push(item("Rename", move |t, w, cx| t.start_row_rename(RenameRow::Feature(id), w, cx)));
             m.push(item("Edit…", move |t, w, cx| t.edit_mate(id, w, cx)));
         }
-        let movable = mate.as_ref().is_some_and(|mt| mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width));
+        // Live (asm-mate-menu-suppress): a suppressed mate has no Reset, driver or Animate items.
+        let movable = !suppressed && mate.as_ref().is_some_and(|mt| mt.mate_type.dof() > 0 && !matches!(mt.mate_type, MateType::Tangent | MateType::Width));
         if let Some(mt) = &mate {
             m.push(MenuEntry::Sep);
             if movable && !np_editing {
@@ -3560,7 +3564,12 @@ impl AssemblyView {
     }
 
     pub(super) fn close_animation(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.anim = None;
+        // The animated mate is no longer selected (live asm-mate-menu-animate).
+        if let Some(a) = self.anim.take()
+            && self.selected_mate == Some(a.mate)
+        {
+            self.selected_mate = None;
+        }
         // The keyboard goes back to the view (its fields are gone; Alt+C's
         // tool search then got no typing).
         window.focus(&self.focus, cx);
@@ -3939,8 +3948,12 @@ impl AssemblyView {
 
 // ---------------------------------------------------------------- Group dialog
 
+/// The Group dialog's members and patterns at one point of its pick history.
+pub type GroupPicks = (Vec<InstanceId>, Vec<MateId>);
+
 impl AssemblyView {
     pub(super) fn open_group(&mut self, editing: Option<MateId>, ids: Vec<InstanceId>, patterns: Vec<MateId>, cx: &mut Context<Self>) {
+        self.ui.group_picks = Default::default();
         self.ui.group_patterns = patterns;
         self.ui.group = Some((editing, ids));
         self.insert_open = false;
@@ -3956,6 +3969,7 @@ impl AssemblyView {
             self.toggle_group_pattern(pid, cx);
             return;
         }
+        self.note_group_pick();
         if let Some((_, ids)) = &mut self.ui.group {
             match ids.iter().position(|x| *x == id) {
                 Some(i) => {
@@ -3968,7 +3982,27 @@ impl AssemblyView {
         cx.notify();
     }
 
+    fn note_group_pick(&mut self) {
+        if let Some((_, ids)) = &self.ui.group {
+            self.ui.group_picks.0.push((ids.clone(), self.ui.group_patterns.clone()));
+            self.ui.group_picks.1.clear();
+        }
+    }
+
+    /// Undo / redo in an open Group dialog: its picks. False when it isn't open (the document's undo then).
+    pub(super) fn group_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
+        let Some((_, ids)) = &mut self.ui.group else { return false };
+        let (from, to) = if redo { (&mut self.ui.group_picks.1, &mut self.ui.group_picks.0) } else { (&mut self.ui.group_picks.0, &mut self.ui.group_picks.1) };
+        if let Some((members, patterns)) = from.pop() {
+            to.push((std::mem::replace(ids, members), std::mem::replace(&mut self.ui.group_patterns, patterns)));
+        }
+        self.refresh_scene(false, cx);
+        cx.notify();
+        true
+    }
+
     fn toggle_group_pattern(&mut self, pid: MateId, cx: &mut Context<Self>) {
+        self.note_group_pick();
         match self.ui.group_patterns.iter().position(|x| *x == pid) {
             Some(i) => {
                 self.ui.group_patterns.remove(i);

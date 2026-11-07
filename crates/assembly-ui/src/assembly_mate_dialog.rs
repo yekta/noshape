@@ -422,7 +422,10 @@ impl MateDialog {
             let flip_shown = self.flip_icon_on();
             fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": flip_shown, "state": "ok" }));
         }
-        fields.push(json!({ "label": null, "kind": "other", "text": "", "state": "ok" }));
+        // (Tangent and Width have no help row live reads: asm-tangent-open-escape, asm-width-open-escape.)
+        if !matches!(t, MateType::Tangent | MateType::Width) {
+            fields.push(json!({ "label": null, "kind": "other", "text": "", "state": "ok" }));
+        }
         fields
     }
 

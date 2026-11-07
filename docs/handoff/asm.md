@@ -10,6 +10,19 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## Latest (2026-11-07 05:01 UTC)
+- Round 4 (lead): the three P0s (BOM ×2, mass overrides) and the face-click P1 are done. P1s fixed since:
+  ASM-DISPLAY-STATE-NESTED, ASM-REPLICATE-SEEDS, ASM-CONFIG-VARIABLE-NOOP, ASM-BOM-EXTERNAL, ASM-FLEX-SUB-RIGID
+  (relations only: patterns / tangent mates / nested flexible subassemblies still make a subassembly rigid).
+- Open P1s: ASM-CONFIGURE-PATTERNS (asked live2, REQUESTS 04:50), the rest of ASM-API-GAPS, the three live checks
+  (ASM-STD-AUTOSIZE-HOLE, ASM-LINEAR-PATTERN-SECOND, ASM-RELATION-DIRECTION).
+- ui-parity: 90/129 at the 04:20 run (82 before); fixes since (named positions, Export modal, Display states,
+  Replace instance, Tangent / Width, Animate, Driving mate selector, Group picks) take it higher.
+- Left on purpose (live's shortcomings, not parity): Create empty subassembly not undoable in live; Hide mates on
+  already hidden mates records a no-op step in live; Release… opens live's Professional-trial upsell; Change to
+  version… shows live's document names. Waiting on live2: config panel focus (which input), Export format (live's
+  account remembers STEP), "New folder (1)", the 5 subassembly re-records.
+
 ## State (2026-11-06 20:40 UTC)
 
 ### Open P0 / P1 assembly items

@@ -1703,7 +1703,7 @@ impl AssemblyView {
     fn accept_group(&mut self, cx: &mut Context<Self>) {
         let Some((editing, ids)) = self.ui.group.take() else { return };
         let patterns = self.ui.group_patterns.clone();
-        if ids.len() < 2 && patterns.is_empty() {
+        if ids.is_empty() && patterns.is_empty() {
             self.message = Some((false, noshape_ops::assembly::GROUP_TOO_FEW.into()));
             self.ui.group = Some((editing, ids));
             cx.notify();
@@ -1864,10 +1864,11 @@ impl AssemblyView {
         crate::ui::undo_redo_actions(self.history_state(cx), cx)
     }
 
-    /// Undo / Redo for the toolbar: a mate dialog's pick history while it is open.
+    /// Undo / Redo for the toolbar: a mate or Group dialog's pick history while it is open.
     pub(super) fn history_state(&self, cx: &App) -> (bool, bool) {
         match &self.mate {
             Some(m) => m.dialog.read(cx).pick_history(),
+            None if self.ui.group.is_some() => (!self.ui.group_picks.0.is_empty(), !self.ui.group_picks.1.is_empty()),
             None => {
                 let d = self.doc.read(cx);
                 (d.can_undo(), d.can_redo())
@@ -4174,12 +4175,12 @@ impl AssemblyView {
 
     /// A mate's row in Mate features (None when the filter hides it).
     /// A mate's list row, a ui-parity target (`mate:<name>`).
-    fn mate_list_row(&self, m: &Mate, result: &AssemblyResult, labeler: &ConnectorLabeler, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn mate_list_row(&self, m: &Mate, result: &AssemblyResult, cx: &mut Context<Self>) -> Option<AnyElement> {
         let name = m.name.clone();
-        self.mate_list_row_inner(m, result, labeler, cx).map(|row| crate::ui_script::wrap(row, || format!("mate:{name}")))
+        self.mate_list_row_inner(m, result, cx).map(|row| crate::ui_script::wrap(row, || format!("mate:{name}")))
     }
 
-    fn mate_list_row_inner(&self, m: &Mate, result: &AssemblyResult, labeler: &ConnectorLabeler, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn mate_list_row_inner(&self, m: &Mate, result: &AssemblyResult, cx: &mut Context<Self>) -> Option<AnyElement> {
         let st = result.mates.iter().find(|s| s.id == m.id);
         let ok = st.is_none_or(|s| s.ok);
         let inactive = m.suppressed || st.is_some_and(|s| s.inactive);
@@ -4187,7 +4188,8 @@ impl AssemblyView {
         if !self.feature_passes(noshape_model::assembly::ops::RowKind::Mate, &m.name, !ok, inactive, hidden, !m.limits.is_empty()) {
             return None;
         }
-        let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| (labeler(c), c.clone())).collect();
+        // Live (asm-root-menu-expand-all): the children read "Mate connector".
+        let implicit: Vec<(String, MateConnectorRef)> = m.connectors().filter(|c| c.connector.is_none() && !c.is_origin()).map(|c| ("Mate connector".to_string(), c.clone())).collect();
         Some(self.feature_row(
             FeatureRow { id: m.id, icon: mate_icon(m.mate_type), name: m.name.clone(), ok, inactive, message: st.and_then(|s| s.message.clone()), has_limits: !m.limits.is_empty(), hidden: Some(hidden), tooltip: Some(self.mate_tooltip(m)), implicit },
             cx,
@@ -4264,9 +4266,8 @@ impl AssemblyView {
                         .into_any_element(),
                 );
                 if open {
-                    let labeler = self.labeler(cx);
                     for m in mates {
-                        if let Some(row) = self.mate_list_row(m, result, &labeler, cx) {
+                        if let Some(row) = self.mate_list_row(m, result, cx) {
                             rows.push(div().pl(px(17. + 22.)).child(row).into_any_element());
                         }
                     }
@@ -4487,7 +4488,6 @@ impl AssemblyView {
         let filtering = !self.ui.filter.is_empty();
         let tree = filtering && !self.ui.filter_flat;
         let mut rows: Vec<AnyElement> = Vec::new();
-        let labeler = self.labeler(cx);
         // Connectors, mates, relations and groups in creation order (their
         // ids count up; live request 1541: "Fastened 1 · Mate connector 1";
         // ASM-MC-LIST-ORDER: connectors came first).
@@ -4506,7 +4506,7 @@ impl AssemblyView {
             if !filtering && asm.mate_generated_by(m.id).is_some() {
                 continue;
             }
-            if let Some(row) = self.mate_list_row(m, &result, &labeler, cx) {
+            if let Some(row) = self.mate_list_row(m, &result, cx) {
                 items.push((m.id, row));
             }
         }
@@ -6462,12 +6462,12 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
             .on_action(cx.listener(|this, _: &Undo, _, cx| {
-                if !this.mate_undo(false, cx) {
+                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) {
                     cx.propagate();
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, _, cx| {
-                if !this.mate_undo(true, cx) {
+                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) {
                     cx.propagate();
                 }
             }))

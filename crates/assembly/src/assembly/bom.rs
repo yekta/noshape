@@ -97,6 +97,12 @@ fn part_props<'a>(doc: &'a Document, studio: TabId, body: &BodyId, config: &Conf
     }
 }
 
+/// A part of another document's properties, from its pinned document.
+fn external_props<'a>(result: &'a AssemblyResult, key: &str, body: &BodyId, config: &ConfigValues) -> Option<std::borrow::Cow<'a, PartProperties>> {
+    let (d, tab) = result.external_docs.get(key)?;
+    part_props(d, *tab, body, config)
+}
+
 /// `config` without the entries a Part Studio's defaults give anyway (or
 /// that aren't its inputs): instances in the same configuration share one
 /// BOM row however their values were stored (qa5 CA6).
@@ -172,17 +178,21 @@ fn walk(doc: &Document, asm: &Assembly, prefix: &InstancePath, result: &Assembly
                 let excluded = suppressed || sub.properties.meta.exclude_from_bom;
                 out.push(Use { source: BomSource::ExternalAssembly { key: key.clone(), config: config.clone() }, name, path, excluded, children, behavior: sub.properties.bom_behavior });
             }
-            InstanceSource::External { key, body, config } => match body {
-                Some(b) => {
-                    let name = part_name(doc, result, &path, None, b);
-                    out.push(Use { source: BomSource::External { key: key.clone(), body: Some(b.clone()), config: config.clone() }, name, path, excluded: suppressed, children: Vec::new(), behavior: BomBehavior::default() });
-                }
-                None => {
-                    for o in result.occurrences.iter().filter(|o| o.path == path) {
-                        out.push(Use { source: BomSource::External { key: key.clone(), body: Some(o.body.clone()), config: config.clone() }, name: o.body_name.clone(), path: path.clone(), excluded: suppressed, children: Vec::new(), behavior: BomBehavior::default() });
+            InstanceSource::External { key, body, config } => {
+                // Its Exclude from all BOMs in its own document (ASM-BOM-EXTERNAL).
+                let excluded = |b: &BodyId| suppressed || external_props(result, key, b, config).is_some_and(|p| p.meta.exclude_from_bom);
+                match body {
+                    Some(b) => {
+                        let name = part_name(doc, result, &path, None, b);
+                        out.push(Use { source: BomSource::External { key: key.clone(), body: Some(b.clone()), config: config.clone() }, name, excluded: excluded(b), path, children: Vec::new(), behavior: BomBehavior::default() });
+                    }
+                    None => {
+                        for o in result.occurrences.iter().filter(|o| o.path == path) {
+                            out.push(Use { source: BomSource::External { key: key.clone(), body: Some(o.body.clone()), config: config.clone() }, name: o.body_name.clone(), path: path.clone(), excluded: excluded(&o.body), children: Vec::new(), behavior: BomBehavior::default() });
+                        }
                     }
                 }
-            },
+            }
             InstanceSource::Standard { spec } => {
                 let name = result.occurrences.iter().find(|o| o.path == path).map(|o| o.body_name.clone()).unwrap_or_else(|| spec.component.clone());
                 out.push(Use { source: BomSource::Standard(spec.clone()), name, path, excluded: suppressed, children: Vec::new(), behavior: BomBehavior::default() });
@@ -382,9 +392,15 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
         BomColumn::Mass if line.top_level => return BomCell::Text(NO_VALUE.into()),
         _ => {}
     }
+    // This document's parts, and another document's from its pinned copy (ASM-BOM-EXTERNAL).
+    let part = match &line.source {
+        BomSource::Part { studio, body, config, .. } => Some(part_props(doc, *studio, body, config)),
+        BomSource::External { key, body: Some(body), config } if result.external_docs.contains_key(key) => Some(external_props(result, key, body, config)),
+        _ => None,
+    };
     match &line.source {
-        BomSource::Part { studio, body, config, .. } => {
-            let owned = part_props(doc, *studio, body, config);
+        _ if part.is_some() => {
+            let owned = part.flatten();
             let props = owned.as_deref();
             let meta = props.map(|p| &p.meta);
             match col {
@@ -443,7 +459,7 @@ pub fn cell(doc: &Document, result: &AssemblyResult, line: &BomLine, col: BomCol
             BomColumn::UnitOfMeasure => BomCell::Text(DEFAULT_UNIT_OF_MEASURE.into()),
             _ => BomCell::Text(String::new()),
         },
-        BomSource::External { .. } => match col {
+        BomSource::Part { .. } | BomSource::External { .. } => match col {
             BomColumn::State => BomCell::Text(RELEASE_STATES[0].into()),
             BomColumn::UnitOfMeasure => BomCell::Text(DEFAULT_UNIT_OF_MEASURE.into()),
             _ => BomCell::Text(String::new()),

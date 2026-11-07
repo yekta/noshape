@@ -3511,8 +3511,9 @@ were checked in code by asm; "(verify)" ones need a live check first.
   Studios' `#name`s for mates, relations, dynamic suppression and the number fields.
 - [ ] P1 ASM-CONFIGURE-PATTERNS (asm) assembly patterns (count, distance, suppression) and mate connectors can't be
   configured (`ConfigTarget` is Instance | Mate).
-- [ ] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is
-  ignored.
+- [x] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is
+  ignored. Fixed 2026-11-07: the result keeps each linked part's pinned document; the BOM reads its properties (in
+  its configuration) and its Exclude from all BOMs (T1 assemblies_from_other_documents).
 - [ ] P1 ASM-STD-AUTOSIZE-HOLE (asm, verify) standard content's Auto-size uses the hole's cylinder diameter only:
   no fine / coarse thread from a Hole feature, a tapped hole likely sizes a bolt one size down.
 - [ ] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply

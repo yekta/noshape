@@ -1911,12 +1911,17 @@ fn assemblies_from_other_documents() {
     let mut o = doc_with(vec![block_studio()]);
     let mut ev = AssemblyEvaluator::new();
     let (obody, or) = body_of(&mut ev, &o.doc, o.studios[0]);
+    let block = obody.clone();
     let sub = Assembly {
         instances: vec![part_instance(1, "Block <1>", o.studios[0], obody.clone(), DVec3::ZERO, true), part_instance(2, "Block <2>", o.studios[0], obody, DVec3::new(0.07, 0.03, -0.02), false)],
         mates: vec![mate(10, MateType::Fastened, conn(1, face_with(&or, "CapEnd"), Inference::Centroid), conn(2, face_with(&or, "CapStart"), Inference::Centroid))],
         ..Default::default()
     };
     let sub_tab = o.doc.add_tab("Assembly 1", TabContent::Assembly(Box::new(sub)));
+    // Its block's part number there (ASM-BOM-EXTERNAL: the BOM shows it).
+    if let TabContent::PartStudio(ps) = &mut o.doc.tabs[0].content {
+        ps.part_properties.entry(block).or_default().part_number = Some("EXT-1".into());
+    }
     let odoc = std::sync::Arc::new(o.doc.clone());
     let ext = TestExternal { docs: vec![(format!("ext:v1/{sub_tab}"), odoc.clone(), sub_tab), (format!("ext:v1/{}", o.studios[0]), odoc, o.studios[0])] };
     ev.set_external(std::sync::Arc::new(ext));
@@ -1945,6 +1950,8 @@ fn assemblies_from_other_documents() {
     assert_eq!(summary, vec![("1".into(), 0, 1), ("2".into(), 0, 1), ("2.1".into(), 1, 2)]);
     assert_eq!(st[1].name, "Assembly 1");
     assert!(matches!(st[1].source, super::bom::BomSource::ExternalAssembly { .. }));
+    assert!(matches!(st[2].source, super::bom::BomSource::External { .. }));
+    assert_eq!(super::bom::cell(&f.doc, &res, &st[2], super::bom::BomColumn::PartNumber), super::bom::BomCell::Text("EXT-1".into()), "the part's number in its own document");
     // Reference updates re-point the whole subassembly; a missing version is reported.
     assert_eq!(asm.update_external(&key, "ext:gone"), 1);
     let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);

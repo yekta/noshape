@@ -2593,7 +2593,7 @@ Examples:
 
 Group instances so they move as one rigid body (edits the document (one undoable history entry)).
 
-The Group dialog (at least two instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit ("Insert : Group" / "Edit : Group").
+The Group dialog (one or more instances, or a pattern: a pattern's copy stands for its pattern, whose copies all join). Give `edit` to change an existing group's instances. One edit ("Insert : Group" / "Edit : Group").
 
 Examples:
 
