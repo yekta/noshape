@@ -1,14 +1,15 @@
 # rb.sh's build server per worktree (11-01): the first line whose pattern matches the worktree's directory name
 # (a bash glob) wins; no match: vibe4. Each worktree keeps its warm target dir on its own host.
 # 11-06 (lead): spread so no host sits idle. vibe4 (16 cores, 62 GB): the land checks plus bool (replay corpora).
-# vibe5 (16 cores, 29 GB): psui, dx, skasm. vibe2 (8 cores, 31 GB): core. vibe3 (8 cores, 31 GB): asm and qa.
+# vibe5 (16 cores, 29 GB): psui, skasm. vibe4 also dx (11-07: vibe4 idle while dx built here). vibe2 (8 cores, 31 GB): core.
+# vibe3 (8 cores, 31 GB): asm and qa. This machine runs Chrome for live/live2: build on your host through rb.sh, not here.
 # Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
 bool*     vibe4
 core*     vibe2
 dev*      vibe4
 psui*     vibe5
 skasm*    vibe5
-dx*       vibe5
+dx*       vibe4
 asm*      vibe3
 cliapp*   vibe5
 appicon*  vibe5
