@@ -171,12 +171,13 @@ pub fn selection_bounds(display: &StudioDisplay, refs: &[Reference]) -> Option<(
             Reference::Origin => add(DVec3::ZERO),
             r => {
                 for b in &display.bodies {
-                    if let Some(fi) = b.face_refs.iter().position(|x| x == r)
-                        && let Some(&(first, count)) = b.mesh.face_ranges.get(fi)
-                    {
-                        for &i in &b.mesh.indices[first as usize..(first + count) as usize] {
-                            if let Some(q) = b.mesh.positions.get(i as usize) {
-                                add(p3(*q));
+                    if b.face_refs.iter().any(|x| x == r) {
+                        // (Every piece: pieces shown as one face share its reference.)
+                        for (_, &(first, count)) in b.face_refs.iter().zip(&b.mesh.face_ranges).filter(|(x, _)| *x == r) {
+                            for &i in &b.mesh.indices[first as usize..(first + count) as usize] {
+                                if let Some(q) = b.mesh.positions.get(i as usize) {
+                                    add(p3(*q));
+                                }
                             }
                         }
                     } else if b.edge_refs.iter().any(|x| x == r) {

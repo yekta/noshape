@@ -406,6 +406,15 @@ pub fn measure_shapes(shapes: &[Vec<Shape>]) -> Vec<(String, Measurement)> {
         out.push(("Length".into(), Measurement::Length(total)));
         return out;
     }
+    // A face in pieces (one shown face OCCT split at its surface's seam: a helical strip round a cylinder): one face,
+    // its area theirs together; a cylinder's a part of one, by its radius.
+    if shapes.len() == 1 && shapes[0].len() > 1 && shapes[0].iter().all(|s| s.shape_type() == ShapeType::Face) {
+        if let Ok(k::Surface::Cylinder { radius, .. } | k::Surface::Sphere { radius, .. }) = shapes[0][0].face_surface() {
+            out.push(("Radius".into(), Measurement::Radius(radius)));
+        }
+        out.push(("Area".into(), Measurement::Area(shapes[0].iter().filter_map(|s| s.area().ok()).sum())));
+        return out;
+    }
     if shapes.len() == 1 {
         for s in &shapes[0] {
             match s.shape_type() {

@@ -16,7 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-07 17:47 UTC: c2-helical-sweep's Sweep 1 counts (decision asked).**
+**State 11-07 18:03 UTC: faces OCCT splits only at a periodic surface's seam are one face (lead's P1).**
+- As 2e0ec154 for edges: shown_topology groups faces of one surface handle that meet across an edge on its seam (an
+  isoline at the period's start; a split line elsewhere stays an edge); those edges are hidden like seams, and edge
+  pieces meeting across one join whatever their curves (`face_joins`, `ShownTopology::faces_joined`, `face_count`).
+  The group takes one name, the least of its pieces' (stable whatever their order; not in studios saved before),
+  `find_faces` returns every piece, Measure sums the area (a cylinder's radius), ops lists and counts it once (area
+  summed, centroid by area), zoom-to-selection and the statistics panel take every piece; highlight already did.
+- c2-helical-sweep to the end (4 -> 5), corpus 651/947. T1 model features_c::a_threaded_rods_helical_strip_is_one_face
+  (named, found, measured, stable after the rod changes), a_coil_springs_helical_strips_are_one_face_each.
+- Earlier finding: 
 - The geometry is live's: a V groove cut along an 8-turn helix round a Ø50.8 cylinder; our pieces' areas sum to live's
   faces. The counts differ because OCCT splits the cylinder's remaining helical strip at its seam every turn: 9 faces
   (921-1364 mm², 7,959 mm² in all) where live has one (JMS, 7,955.9 mm²), and the groove's edges at each crossing. A

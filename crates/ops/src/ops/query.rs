@@ -175,7 +175,8 @@ fn parts(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 "id": refs::body_id(&b.id),
                 "name": d.map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone()),
                 "kind": format!("{:?}", b.kind),
-                "faces": b.shape.count(ShapeType::Face),
+                // (Pieces of one face OCCT split at its surface's seam: one face.)
+                "faces": (0..b.faces.len()).filter(|&i| face_pieces(b, &shown, i).first() == Some(&i)).count(),
                 // Onshape's topology: no seams, no vertices on full circles.
                 "edges": shown.edge_count(),
                 "vertices": shown.vertices.iter().filter(|&&v| v).count(),
@@ -234,6 +235,28 @@ fn curve_name(c: &Curve) -> &'static str {
         Curve::BSpline { .. } | Curve::Bezier { .. } => "bspline",
         _ => "other",
     }
+}
+
+/// The pieces of the face `i` is shown as one with ([`noshape_kernel::ShownTopology::faces_joined`], sharing its name: a
+/// studio saved before names them apart), in order; `[i]` alone if none.
+fn face_pieces(b: &Body, shown: &noshape_kernel::ShownTopology, i: usize) -> Vec<usize> {
+    let Some(&root) = shown.faces_joined.get(i) else { return vec![i] };
+    (0..b.faces.len()).filter(|&j| shown.faces_joined.get(j) == Some(&root) && std::sync::Arc::ptr_eq(&b.faces[j], &b.faces[i])).collect()
+}
+
+/// A face shown as one with other pieces: its area theirs together, its centroid theirs by area.
+fn joined_face_json(b: &Body, pieces: &[usize], k: f64, v: &mut Value) -> DVec3 {
+    let (mut area, mut moment) = (0.0, DVec3::ZERO);
+    for &j in pieces {
+        let Ok(f) = b.shape.sub_shape(ShapeType::Face, j) else { continue };
+        let (Ok(a), Ok(c)) = (f.area(), f.centroid()) else { continue };
+        area += a;
+        moment += c * a;
+    }
+    let c = if area > 0.0 { moment / area } else { DVec3::ZERO };
+    v["area"] = json!(r6(area * k * k));
+    v["centroid"] = pt(c, k);
+    c
 }
 
 fn face_json(b: &Body, i: usize, k: f64, names: &dyn Fn(Option<noshape_model::reference::FeatureId>) -> Option<String>) -> Option<(Value, DVec3, &'static str, Option<DVec3>)> {
@@ -436,11 +459,20 @@ pub(crate) fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let keep = |i: usize| next.as_ref().is_none_or(|n| n.contains(&i));
         match kind {
             "faces" => {
+                let shown = b.shape.shown_topology().unwrap_or_default();
                 for i in 0..b.faces.len() {
                     if created_by.is_some_and(|f| b.faces[i].creator() != Some(f)) || !keep(i) {
                         continue;
                     }
-                    let Some((v, c, sk, n)) = face_json(b, i, k, &names) else { continue };
+                    // (Pieces shown as one face: listed once, as the first, its area theirs.)
+                    let pieces = face_pieces(b, &shown, i);
+                    if pieces.first() != Some(&i) {
+                        continue;
+                    }
+                    let Some((mut v, mut c, sk, n)) = face_json(b, i, k, &names) else { continue };
+                    if pieces.len() > 1 {
+                        c = joined_face_json(b, &pieces, k, &mut v);
+                    }
                     if surface.is_some_and(|s| s != sk) {
                         continue;
                     }

@@ -7060,7 +7060,8 @@ impl PartStudioView {
         let d = &self.display;
         let sum = |f: fn(&noshape_model::display::BodyDisplay) -> usize| d.bodies.iter().map(f).sum::<usize>();
         let sketch: usize = d.sketches.iter().map(|s| s.curves.len() + s.points.len()).sum();
-        let primitives = [("Faces", sum(|b| b.face_refs.len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
+        // (Faces: pieces shown as one face share its reference.)
+        let primitives = [("Faces", sum(|b| b.face_refs.iter().collect::<std::collections::HashSet<_>>().len())), ("Edges", sum(|b| b.mesh.edges.iter().filter(|p| !p.is_empty()).count())), ("Vertices", sum(|b| b.vertex_refs.len())), ("Sketch entities", sketch), ("Planes", d.planes.len())];
         // Live: one total, the feature times' sum (the Regeneration times dialog's footer), not this run's wall time
         // (a regeneration from the cache took 46 ms where the features read 314; PERF-TOTAL-MISMATCH).
         let regen_ms = d.features.iter().map(|f| f.time_ms).sum();

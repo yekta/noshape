@@ -310,8 +310,9 @@ impl Shape {
     pub fn shown_topology(&self) -> Result<ShownTopology> {
         let flags = ck(ffi::shown_topology(self.raw()))?;
         let joined = ck(ffi::edge_joins(self.raw()))?.into_iter().map(|j| j as usize).collect();
+        let faces_joined = ck(ffi::face_joins(self.raw()))?.into_iter().map(|j| j as usize).collect();
         let ne = self.count(ShapeType::Edge);
-        Ok(ShownTopology { edges: flags[..ne].iter().map(|&f| f != 0).collect(), vertices: flags[ne..].iter().map(|&f| f != 0).collect(), joined })
+        Ok(ShownTopology { edges: flags[..ne].iter().map(|&f| f != 0).collect(), vertices: flags[ne..].iter().map(|&f| f != 0).collect(), joined, faces_joined })
     }
 
     /// Faces sharing at least one edge with face `face_index`.
@@ -393,9 +394,17 @@ pub struct ShownTopology {
     /// Per edge, the first of the pieces shown as one edge with it (OCCT split them only for a cylinder's seam; live
     /// shows one edge and no vertex there), itself if none.
     pub joined: Vec<usize>,
+    /// Per face, the first of the faces shown as one face with it (pieces of one periodic surface OCCT split only at its
+    /// seam: a cut's helical strip round a cylinder; live has one face), itself if none.
+    pub faces_joined: Vec<usize>,
 }
 
 impl ShownTopology {
+    /// The faces Onshape shows: each group of joined pieces once.
+    pub fn face_count(&self) -> usize {
+        self.faces_joined.iter().enumerate().filter(|&(i, &r)| r == i).count()
+    }
+
     /// The edges Onshape shows: each run of joined pieces once.
     pub fn edge_count(&self) -> usize {
         self.edges.iter().enumerate().filter(|&(i, &e)| e && self.joined.get(i).is_none_or(|&r| r == i)).count()

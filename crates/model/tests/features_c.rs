@@ -3387,3 +3387,105 @@ fn ring_rims_round_and_notch_arcs_chamfer_as_live() {
     let v = volume(&r, 0) * 1e9;
     assert!((703.105..708.601).contains(&v), "{v} (live 705.853)");
 }
+
+/// A helical sweep cut into a cylinder: (the rod, the groove's helix over `turns` from the rod's base circle, the
+/// regenerated result). The groove starts below the base (it opens there) and ends inside the rod.
+fn helical_cut(outer: f64, inner: Option<f64>, profile: &[(f64, f64)], turns: &str, height: &str) -> (Studio, RegenResult) {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.add_circle(DVec2::ZERO, mm(outer));
+    if let Some(r) = inner {
+        sk.add_circle(DVec2::ZERO, mm(r));
+    }
+    let rod = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    // (A tube: the ring between the circles, the smaller region.)
+    let region = if inner.is_some() {
+        let r = s.regen();
+        let sk = r.display.sketches.iter().find(|x| x.feature == rod).expect("sketch");
+        let key = sk.regions.iter().min_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+        Reference::SketchRegion { sketch: rod, key }
+    } else {
+        s.region(rod)
+    };
+    s.add("extrude", |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("40 mm"));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    let ring = sk.add_circle(DVec2::ZERO, mm(outer));
+    let base = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let (turns, height) = (turns.to_string(), height.to_string());
+    s.add("helix", move |p| {
+        p.set("axisType", en("CIRCLE"));
+        p.set("edge", q(Reference::SketchEntity { sketch: base, entity: ring.0 }));
+        p.set("pathType", en("TURNS"));
+        p.set("revolutions", expr(&turns));
+        p.set("height", expr(&height));
+    });
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, profile, true);
+    let groove = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let groove = s.region(groove);
+    let r = s.ok();
+    let helix = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Wire).map(|b| Reference::Body(b.id.clone())).expect("the helix");
+    s.add("sweep", move |p| {
+        p.set("profiles", q(groove));
+        p.set("path", q(helix));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    (s, r)
+}
+
+/// The faces of radius `radius` mm a part's cylinder became (its pieces) and the faces shown (pieces of one face once).
+fn strips(r: &RegenResult, radius: f64) -> (Vec<usize>, usize) {
+    let b = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).expect("the part");
+    let faces = b.shape.faces();
+    let pieces = (0..faces.len()).filter(|&i| matches!(faces[i].face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius: x, .. }) if near(x, mm(radius), 1e-9))).collect();
+    (pieces, b.shape.shown_topology().unwrap().face_count())
+}
+
+/// A threaded rod (live c2-helical-sweep's Sweep 1: one helical strip of its cylinder): the V groove cut along
+/// a 10-turn helix leaves the rod's cylinder a strip OCCT splits at its seam every turn; it is one face, as live's:
+/// shown, named, found, measured and listed as one, and its reference still finds it after the rod changes.
+#[test]
+fn a_threaded_rods_helical_strip_is_one_face() {
+    let (mut s, r) = helical_cut(10.0, None, &[(10.8, -0.8), (8.8, 0.0), (10.8, 0.8)], "10", "25 mm");
+    let (pieces, shown) = strips(&r, 10.0);
+    assert!(pieces.len() > 5, "OCCT's pieces: {pieces:?}");
+    // Top, bottom, the strip, the groove's two flanks, its start (the profile half above the base) and its end.
+    assert_eq!(shown, 7);
+    let b = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+    assert!(pieces.iter().all(|&i| std::sync::Arc::ptr_eq(&b.faces[i], &b.faces[pieces[0]])), "one name");
+    let strip = Reference::Face((*b.faces[pieces[0]]).clone());
+    let Reference::Face(n) = &strip else { unreachable!() };
+    assert_eq!(b.find_faces(n), pieces);
+    let total: f64 = pieces.iter().map(|&i| b.shape.faces()[i].area().unwrap()).sum();
+    let m = noshape_model::regen::measure::measure(&r.context, std::slice::from_ref(&strip));
+    assert!(m.iter().any(|(l, x)| l == "Area" && matches!(x, noshape_model::regen::measure::Measurement::Area(a) if near(*a, total, 1e-12))), "{m:?}");
+    // Persistent: the rod 45 mm tall, the strip's reference still all of its pieces.
+    let rod = s.ps.features.iter().position(|f| f.type_id == "extrude").unwrap();
+    s.ps.features[rod].params.set("depth", expr("45 mm"));
+    let r = s.ok();
+    let b = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+    let (pieces, shown) = strips(&r, 10.0);
+    assert_eq!(shown, 7);
+    assert_eq!(b.find_faces(n), pieces);
+}
+
+/// A coil spring cut from a tube by a slot swept along a helix through its wall: the tube's outer and inner cylinders
+/// each one helical strip, one face each.
+#[test]
+fn a_coil_springs_helical_strips_are_one_face_each() {
+    let (_, r) = helical_cut(10.0, Some(8.0), &[(7.5, -0.6), (10.5, -0.6), (10.5, 0.6), (7.5, 0.6)], "8", "30 mm");
+    for radius in [10.0, 8.0] {
+        let (pieces, _) = strips(&r, radius);
+        assert!(pieces.len() > 4, "R {radius}: OCCT's pieces {pieces:?}");
+        let b = r.context.bodies.iter().find(|b| b.kind == noshape_model::display::BodyKind::Solid).unwrap();
+        assert!(pieces.iter().all(|&i| std::sync::Arc::ptr_eq(&b.faces[i], &b.faces[pieces[0]])), "R {radius}: one name");
+    }
+    // The strips, the slot's two sides, its two walls, its end, the top and bottom: each once.
+    let (_, shown) = strips(&r, 10.0);
+    assert_eq!(shown, 8);
+}

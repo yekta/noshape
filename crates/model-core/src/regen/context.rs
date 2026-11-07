@@ -59,7 +59,8 @@ pub fn vertex_key(shape: &Shape, i: usize) -> GeoKey {
 impl Body {
     /// Build a body from its shape and face names; edge and vertex names are
     /// derived from face adjacency.
-    pub fn new(id: BodyId, name: String, kind: BodyKind, shape: Shape, faces: Vec<Name>, color: usize, wire_feature: FeatureId) -> Self {
+    pub fn new(id: BodyId, name: String, kind: BodyKind, shape: Shape, mut faces: Vec<Name>, color: usize, wire_feature: FeatureId) -> Self {
+        join_face_names(&shape, &mut faces);
         let (edges, vertices) = if faces.is_empty() {
             // Wire / point bodies: name edges by index from the creating feature.
             let ne = shape.count(ShapeType::Edge);
@@ -94,6 +95,11 @@ impl Body {
     pub fn named(id: BodyId, name: String, kind: BodyKind, shape: Shape, names: crate::naming::ShapeNames, color: usize, wire_feature: FeatureId) -> Self {
         if names.faces.is_empty() || names.edges.len() != shape.count(ShapeType::Edge) || names.vertices.len() != shape.count(ShapeType::Vertex) {
             return Body::new(id, name, kind, shape, names.faces, color, wire_feature);
+        }
+        // (Faces shown as one: one name, and the edges and vertices named again from it.)
+        let mut joined = names.faces.clone();
+        if join_face_names(&shape, &mut joined) {
+            return Body::new(id, name, kind, shape, joined, color, wire_feature);
         }
         Self {
             id,
@@ -147,8 +153,12 @@ impl Body {
     /// Indices of faces matching a name: exact, else all split descendants.
     pub fn find_faces(&self, n: &TopoName) -> Vec<usize> {
         let map = Self::lookup(&self.face_lookup, &self.faces);
-        if let Some(i) = map.get(n) {
-            return vec![*i];
+        if let Some(&i) = map.get(n) {
+            // (Pieces shown as one face share its name, one Arc: all of them. Only when some name repeats.)
+            if map.len() == self.faces.len() {
+                return vec![i];
+            }
+            return (0..self.faces.len()).filter(|&j| j == i || Arc::ptr_eq(&self.faces[j], &self.faces[i])).collect();
         }
         let pieces: Vec<usize> = self.faces.iter().enumerate().filter(|(_, f)| f.descends_from(n)).map(|(i, _)| i).collect();
         if !pieces.is_empty() {
@@ -862,6 +872,34 @@ impl Context {
     pub fn bounds(&self) -> Option<(DVec3, DVec3)> {
         self.bodies.bounds()
     }
+}
+
+/// Faces shown as one face ([`noshape_kernel::ShownTopology::faces_joined`]: pieces of one periodic surface OCCT split
+/// only at its seam, a cut's helical strip round a cylinder) take one name, one Arc: the least of theirs, so it doesn't
+/// depend on the pieces' order. Not in a studio saved before (its references name the pieces). True when any changed.
+pub fn join_face_names(shape: &Shape, faces: &mut [Name]) -> bool {
+    if noshape_kernel::legacy_topology() || faces.len() < 2 {
+        return false;
+    }
+    let Ok(t) = shape.shown_topology() else { return false };
+    if t.faces_joined.len() != faces.len() || t.faces_joined.iter().enumerate().all(|(i, &r)| r == i) {
+        return false;
+    }
+    let mut changed = false;
+    for root in 0..faces.len() {
+        let group: Vec<usize> = (0..faces.len()).filter(|&i| t.faces_joined[i] == root).collect();
+        if group.len() < 2 {
+            continue;
+        }
+        let Some(least) = group.iter().map(|&i| faces[i].clone()).min() else { continue };
+        for &i in &group {
+            if !Arc::ptr_eq(&faces[i], &least) {
+                faces[i] = least.clone();
+                changed = true;
+            }
+        }
+    }
+    changed
 }
 
 /// Per edge, the first of the pieces shown as one edge with it ([`noshape_kernel::ShownTopology::joined`]): they share

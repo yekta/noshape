@@ -1,4 +1,7 @@
 // Shapes, lists, topology exploration, validation and history building.
+#include <Geom2d_Line.hxx>
+#include <Geom2d_TrimmedCurve.hxx>
+#include <numeric>
 #include "internal.hpp"
 
 #include <Geom_BSplineCurve.hxx>
@@ -923,6 +926,57 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
     const auto&       vf = ancestors_cached(s, TopAbs_VERTEX, TopAbs_FACE);
     std::vector<uint8_t>& out = s.myShown;
     out.reserve((size_t)(em.Extent() + vm.Extent()));
+    // Faces of one periodic surface OCCT split only at its seam (a cut's helical strip round a cylinder, once a turn):
+    // one face, as live's (Parasolid has no seam); the edges between them on the seam aren't edges either.
+    std::vector<uint32_t>& fj = s.myFaceJoins;
+    fj.resize((size_t)fm.Extent());
+    std::iota(fj.begin(), fj.end(), 0u);
+    auto froot = [&](uint32_t x) {
+      while (fj[x] != x)
+        x = fj[x] = fj[fj[x]];
+      return x;
+    };
+    std::vector<bool> joining(em.Extent() + 1, false);
+    for (int i = 1; i <= em.Extent(); ++i)
+    {
+      std::vector<uint32_t> two(ef.second.begin() + ef.first[(size_t)i - 1], ef.second.begin() + ef.first[(size_t)i]);
+      std::sort(two.begin(), two.end());
+      two.erase(std::unique(two.begin(), two.end()), two.end());
+      if (two.size() != 2)
+        continue;
+      const TopoDS_Edge& e  = TopoDS::Edge(em(i));
+      const TopoDS_Face& fa = TopoDS::Face(fm((int)two[0] + 1));
+      const TopoDS_Face& fb = TopoDS::Face(fm((int)two[1] + 1));
+      TopLoc_Location    la, lb;
+      const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa, la), sb = BRep_Tool::Surface(fb, lb);
+      if (sa.IsNull() || sa != sb || !la.IsEqual(lb))
+        continue;
+      // On the seam: an iso line of the periodic parameter at its period's start.
+      double f, l;
+      occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, fa, f, l);
+      while (const auto t = occ::down_cast<Geom2d_TrimmedCurve>(pc))
+        pc = t->BasisCurve();
+      const auto line = occ::down_cast<Geom2d_Line>(pc);
+      if (line.IsNull())
+        continue;
+      double u1, u2, v1, v2;
+      sa->Bounds(u1, u2, v1, v2);
+      const gp_Pnt2d o = line->Location();
+      const gp_Dir2d d = line->Direction();
+      auto on_start = [](double x, double x0, double period) {
+        const double r = std::fmod(x - x0, period);
+        return std::min(std::abs(r), period - std::abs(r)) <= 1e-9 * std::max(1.0, period);
+      };
+      const bool u_seam = sa->IsUPeriodic() && std::abs(d.X()) < 1e-12 && on_start(o.X(), u1, sa->UPeriod());
+      const bool v_seam = sa->IsVPeriodic() && std::abs(d.Y()) < 1e-12 && on_start(o.Y(), v1, sa->VPeriod());
+      if (!u_seam && !v_seam)
+        continue;
+      joining[(size_t)i] = true;
+      const uint32_t ra = froot(two[0]), rb = froot(two[1]);
+      fj[std::max(ra, rb)] = std::min(ra, rb);
+    }
+    for (uint32_t& j : fj)
+      j = froot(j);
     std::vector<bool> open(em.Extent() + 1, false);
     for (int i = 1; i <= em.Extent(); ++i)
     {
@@ -931,7 +985,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       bool seam = ef.first[(size_t)i] > ef.first[(size_t)i - 1];
       for (uint32_t k = ef.first[(size_t)i - 1]; k < ef.first[(size_t)i] && seam; ++k)
         seam = BRep_Tool::IsClosed(e, TopoDS::Face(fm((int)ef.second[k] + 1)));
-      const bool    shown = !BRep_Tool::Degenerated(e) && !seam;
+      const bool    shown = !BRep_Tool::Degenerated(e) && !seam && !joining[(size_t)i];
       TopoDS_Vertex a, b;
       TopExp::Vertices(e, a, b);
       open[i] = shown && !a.IsSame(b);
@@ -952,6 +1006,8 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
     std::vector<bool> joint(vm.Extent() + 1, false);
     auto faces_of = [&](int j) {
       std::vector<uint32_t> f(ef.second.begin() + ef.first[(size_t)j - 1], ef.second.begin() + ef.first[(size_t)j]);
+      for (uint32_t& x : f)
+        x = fj[x];
       std::sort(f.begin(), f.end());
       f.erase(std::unique(f.begin(), f.end()), f.end());
       return f;
@@ -961,7 +1017,7 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
       const uint32_t e0 = ve.first[(size_t)i - 1], e1 = ve.first[(size_t)i];
       std::vector<int> two;
       int              seams = 0;
-      bool             other = false;
+      bool             other = false, across = false;
       for (uint32_t k = e0; k < e1; ++k)
       {
         const int j = (int)ve.second[k] + 1;
@@ -972,7 +1028,10 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         else if (BRep_Tool::Degenerated(TopoDS::Edge(em(j))))
           other = true;
         else
+        {
           ++seams;
+          across = across || joining[(size_t)j];
+        }
       }
       if (other || two.size() != 2 || !open[two[0]] || !open[two[1]])
         continue;
@@ -1008,7 +1067,9 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
         double                          f, l;
         const occ::handle<Geom_Curve>   ca = BRep_Tool::Curve(TopoDS::Edge(em(two[0])), la, f, l);
         const occ::handle<Geom_Curve>   cb = BRep_Tool::Curve(TopoDS::Edge(em(two[1])), lb, f, l);
-        bool                            one = loop || (!ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9)));
+        // (Across faces split at their surface's seam the pieces are one curve however OCCT made them: its section of a
+        // cut is a curve on each side.)
+        bool                            one = loop || across || (!ca.IsNull() && !cb.IsNull() && la.IsEqual(lb) && (ca == cb || same_bspline(ca, cb, 1e-9)));
         if (!one)
         {
           BRepAdaptor_Curve xa(TopoDS::Edge(em(two[0]))), xb(TopoDS::Edge(em(two[1])));
@@ -1066,6 +1127,16 @@ rust::Vec<uint8_t> shown_topology(const OcShape& s)
   rust::Vec<uint8_t> out;
   out.reserve(s.myShown.size());
   for (uint8_t v : s.myShown)
+    out.push_back(v);
+  return out;
+}
+
+rust::Vec<uint32_t> face_joins(const OcShape& s)
+{
+  (void)shown_topology(s);
+  rust::Vec<uint32_t> out;
+  out.reserve(s.myFaceJoins.size());
+  for (uint32_t v : s.myFaceJoins)
     out.push_back(v);
   return out;
 }
