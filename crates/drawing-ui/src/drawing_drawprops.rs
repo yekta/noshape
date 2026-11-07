@@ -1513,16 +1513,16 @@ impl DrawingEditor {
                 let st = styles[k];
                 let ids = IDS[k];
                 let set_line: fn(&mut DrawingProps, f64) = match k {
-                    0 => |p, v| table_style_mut(p, 0).line = v,
-                    1 => |p, v| table_style_mut(p, 1).line = v,
-                    2 => |p, v| table_style_mut(p, 2).line = v,
-                    3 => |p, v| table_style_mut(p, 3).line = v,
-                    4 => |p, v| table_style_mut(p, 4).line = v,
-                    _ => |p, v| table_style_mut(p, 5).line = v,
+                    0 => |p, v| table_style_mut(p, 0).line = Some(v),
+                    1 => |p, v| table_style_mut(p, 1).line = Some(v),
+                    2 => |p, v| table_style_mut(p, 2).line = Some(v),
+                    3 => |p, v| table_style_mut(p, 3).line = Some(v),
+                    4 => |p, v| table_style_mut(p, 4).line = Some(v),
+                    _ => |p, v| table_style_mut(p, 5).line = Some(v),
                 };
                 body = body
                     .child(section(name))
-                    .child(trow("Line thickness", 145., 33., 2., thick_sel(ids[0], st.line, set_line, 199.)))
+                    .child(trow("Line thickness", 145., 33., 2., thick_sel(ids[0], st.shown_line(), set_line, 199.)))
                     .child(trow("Font", 145., 32., 2., font_row(FontOf::Table(k), st.font.clone(), 199.)));
                 if k >= 4 {
                     const TITLE_IDS: [(&str, &str, &str); 2] = [("dp-t4tb", "dp-t4ti", "dp-t4tc"), ("dp-t5tb", "dp-t5ti", "dp-t5tc")];

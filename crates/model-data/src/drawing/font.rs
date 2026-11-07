@@ -235,6 +235,15 @@ pub fn text_width(text: &str, height: f64) -> f64 {
     text.chars().map(char_width).sum::<f64>() * height
 }
 
+/// Width of a single line of text of cap height `height` in a font (its own advances; the default sans's
+/// [`text_width`] where the font can't draw the text).
+pub fn text_width_font(text: &str, height: f64, family: &str, bold: bool, italic: bool) -> f64 {
+    if !fill_supported(text) {
+        return text_width(text, height);
+    }
+    noshape_sketch::text::layout_drawing_text(text, family, bold, italic).width / fill_cap(family, bold, italic) * height
+}
+
 /// Offset of the text origin (left end of the baseline) from the anchor
 /// point, in the text's local frame.
 fn anchor_offset(anchor: Anchor, width: f64, height: f64) -> [f64; 2] {

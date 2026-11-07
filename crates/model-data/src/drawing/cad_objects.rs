@@ -65,8 +65,8 @@ pub enum CadObject {
     /// block of what the sheet draws (2004+), else that block's INSERT.
     /// `rows`: each grid row's text style (live: per table kind, Title /
     /// Header / Data row); `aligned`: the cells' MTEXT carry their paragraph
-    /// alignment (live: free tables only, `{\pxqc;…}`).
-    Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>>, rows: Vec<&'static str>, aligned: bool },
+    /// alignment (live: free tables only, `{\pxqc;…}`); `lineweight`: the grid lines' (mm; None: ByBlock, live 2232).
+    Table { corner: [f64; 2], widths: Vec<f64>, heights: Vec<f64>, cells: Vec<Vec<String>>, rows: Vec<&'static str>, aligned: bool, lineweight: Option<f64> },
     /// A closed cubic spline as a chain of Bézier spans (`3n + 1` poles,
     /// sheet mm): SPLINE.
     Spline { poles: Vec<[f64; 2]> },

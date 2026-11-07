@@ -44,6 +44,9 @@ pub struct TableData {
     /// Drawing properties › Tables for the table (None: tables drawn on
     /// their own, as in unit tests).
     pub style: Option<AppliedStyle>,
+    /// Columns and rows sized to their text as live's BOM tables (live 2232), columns at least `min_col` mm.
+    pub text_sized: bool,
+    pub min_col: f64,
 }
 
 /// A table's Drawing properties › Tables look, resolved: row text heights
@@ -59,6 +62,8 @@ pub struct AppliedStyle {
     pub content_text: super::RowText,
     pub font: Option<super::sheet::TextFont>,
     pub line: f64,
+    /// The Line thickness once set (mm): the CAD lines' lineweight (live 2232: ByBlock before).
+    pub lineweight: Option<f64>,
 }
 
 impl TableData {
@@ -455,7 +460,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             let header = if *header && !rows.is_empty() { Some(rows.remove(0)) } else { None };
             // Live 744–750: header cells bold and centred, body cells left-aligned.
             let col_align = vec![CellAlign::Left; cells.iter().map(|r| r.len()).max().unwrap_or(0)];
-            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None, merges: Vec::new() }
+            TableData { title: title.as_ref().map(|t| expand(t)), header, rows, pending: Vec::new(), padding: [0.0; 2], header_bottom: false, overridden: Vec::new(), col_align, header_bold: true, style: None, merges: Vec::new(), ..Default::default() }
         }
         TableKind::Bom { structured, top_level, bottom_to_top, overrides, default_template, .. } => {
             // Onshape's BOM table columns (live drawing/189): Item, Quantity,
@@ -635,7 +640,7 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
     let header = if table.own_text_height { content } else { st.header.height.unwrap_or(drawing.props.ann_text_height) };
     // Live: Title row text 0.1560 in = 1.3 x the rows' 0.1200.
     let title = if table.own_text_height { content * 1.2 } else { st.title.unwrap_or(content * 1.3) };
-    data.style = Some(AppliedStyle { title, header, content, title_text: st.title_text.clone(), header_text: st.header.clone(), content_text: st.content.clone(), font: st.font.clone(), line: st.line });
+    data.style = Some(AppliedStyle { title, header, content, title_text: st.title_text.clone(), header_text: st.header.clone(), content_text: st.content.clone(), font: st.font.clone(), line: st.drawn_line(), lineweight: st.line });
     // A split table shows its part of the rows.
     if let Some([a, b]) = table.rows {
         let n = data.rows.len();
@@ -667,6 +672,12 @@ fn finish(drawing: &Drawing, table: &Table, mut data: TableData) -> TableData {
         data.overridden = data.overridden.iter().filter(|(r, _)| *r >= a && *r < b).map(|(r, c)| (r - a, *c)).collect();
     }
     data.padding = padding(drawing);
+    if matches!(table.kind, TableKind::Bom { .. }) {
+        data.text_sized = true;
+        // Live 2232: an inch drawing's BOM columns are at least 1.0 in; a millimetre one's have no floor.
+        let inch = drawing.props.units.map_or(!drawing.units_mm, |u| u.imperial());
+        data.min_col = if inch { 25.4 } else { 0.0 };
+    }
     data
 }
 
@@ -847,6 +858,9 @@ fn cell_height(table: &Table, data: &TableData, r: usize, c: usize) -> f64 {
 /// column whether or not it is merged, so merging or unmerging never moves
 /// the columns; a merged cell's text wider than its columns widens the last.
 pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
+    if data.text_sized {
+        return text_widths(table, data);
+    }
     let n = data.columns();
     let pad = data.padding[0] * 2.0;
     let mut w = vec![data.content_height(table) * 3.0; n];
@@ -879,17 +893,41 @@ pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     w
 }
 
+/// Live 2232's BOM columns: each as wide as its widest text (in its own weight) plus a third of its height and the
+/// padding on both sides, at least `min_col`.
+fn text_widths(table: &Table, data: &TableData) -> Vec<f64> {
+    let mut w = vec![data.min_col; data.columns()];
+    let pad = data.padding[0] * 2.0;
+    let rows = data.all_rows();
+    for (ri, row) in rows.iter().enumerate() {
+        for (ci, c) in row.iter().enumerate().take(w.len()) {
+            let h = cell_height(table, data, ri, ci);
+            let f = table.cell_formats.iter().find(|s| s.row == ri && s.col == ci).map(|s| s.format.clone()).unwrap_or_else(|| data.default_format(ri, ci, rows.len()));
+            let family = f.font.as_deref().unwrap_or(font::DEFAULT_FAMILY);
+            let text = c.lines().map(|l| font::text_width_font(l, h, family, f.bold, f.italic)).fold(0.0, f64::max);
+            w[ci] = w[ci].max(text + h / 3.0 + pad);
+        }
+    }
+    w
+}
+
 /// Height (mm) a row's content needs (`vpad`: vertical padding).
 pub fn row_need(table: &Table, data: &TableData, ri: usize, row: &[String], vpad: f64) -> f64 {
     let th = data.row_text_height(table, ri);
-    let mut need = table.row_height.max(th + 2.0 * vpad);
+    // Live 2232's BOM rows: 5/3 of the text height (26/15 in a bold header) and the padding.
+    let line = |h: f64| if data.text_sized { h * if data.default_format(ri, 0, data.all_rows().len()).bold { 26.0 / 15.0 } else { 5.0 / 3.0 } } else { h };
+    let floor = if data.text_sized { 0.0 } else { table.row_height };
+    let mut need = floor.max(line(th) + 2.0 * vpad);
     for (ci, c) in row.iter().enumerate() {
         if table.merge_at(ri, ci).is_some_and(|m| m.rows > 1 || (m.row, m.col) != (ri, ci)) {
             continue;
         }
         let h = cell_height(table, data, ri, ci);
-        let lines = c.split('\n').count().max(1) as f64;
-        need = need.max(table.row_height - th + h + (lines - 1.0) * h * 1.5).max(h + 2.0 * vpad + (lines - 1.0) * h * 1.5);
+        let more = (c.split('\n').count().max(1) - 1) as f64 * h * 1.5;
+        need = need.max(line(h) + 2.0 * vpad + more);
+        if !data.text_sized {
+            need = need.max(table.row_height - th + h + more);
+        }
     }
     need
 }
@@ -952,7 +990,10 @@ fn grid_runs(g: &mut SheetGeometry, n: usize, keep: impl Fn(usize) -> bool, seg:
 pub fn render(g: &mut SheetGeometry, table: &Table, data: &TableData, l: &TableLayout, pick: u32) {
     let (lo, hi) = (l.min(), l.max());
     let line0 = g.lines.len();
-    g.lines.push(Polyline2 { points: vec![[lo[0], lo[1]], [hi[0], lo[1]], [hi[0], hi[1]], [lo[0], hi[1]]], style: LineStyle::Visible, closed: true, pick });
+    // The border as four lines (live 2232's DXF: one LINE per grid line).
+    for (a, b) in [([lo[0], hi[1]], [hi[0], hi[1]]), ([lo[0], lo[1]], [hi[0], lo[1]]), ([lo[0], lo[1]], [lo[0], hi[1]]), ([hi[0], lo[1]], [hi[0], hi[1]])] {
+        g.lines.push(Polyline2 { points: vec![a, b], style: LineStyle::Visible, closed: false, pick });
+    }
     let th = data.content_height(table);
     let mut row0 = 0usize;
     if let Some(t) = &data.title {
@@ -1101,7 +1142,8 @@ impl CadTables for SheetGeometry {
         let rows = (0..n).map(|r| if layout.title && r == 0 { title } else if Some(r) == header_row { header } else { row }).collect();
         let aligned = matches!(kind, TableKind::General { .. });
         let obj = self.cad_objects.len();
-        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells, rows, aligned });
+        let lineweight = data.style.as_ref().and_then(|s| s.lineweight);
+        self.cad_objects.push(CadObject::Table { corner: [layout.xs[0], layout.ys[0]], widths, heights, cells, rows, aligned, lineweight });
         self.cad_members.push(CadMember { lines: m.0..self.lines.len(), texts: m.1..self.texts.len(), fills: m.2..self.fills.len(), obj });
     }
 }
@@ -1138,6 +1180,42 @@ mod tests {
         render(&mut g, &t, &d, &l, 7);
         assert!(g.texts.iter().any(|x| x.text == "Long header"));
         assert!(g.lines.iter().all(|x| x.pick == 7));
+    }
+
+    /// Live 2232: a BOM table's columns sized to their text, rows to 5/3 of it (26/15 for the bold header) and the
+    /// padding; an inch drawing's columns at least 1.0 in; the pen 0.25 mm until Line thickness is set.
+    #[test]
+    fn bom_table_sizes_as_lives() {
+        let bom = TableKind::Bom { view: super::super::ViewId(0), structured: false, top_level: false, bottom_to_top: false, overrides: Vec::new(), default_template: false, source: None };
+        let t = Table::new(1, bom, [400.0, 280.0]);
+        let header = ["Item", "Quantity", "Part number", "Description"].map(String::from).to_vec();
+        let rows = vec![["1", "1", "", "Long description text here"].map(String::from).to_vec(), ["2", "1", "", ""].map(String::from).to_vec()];
+        let sized = |d: &Drawing| {
+            let data = finish(d, &t, TableData { header: Some(header.clone()), rows: rows.clone(), ..Default::default() });
+            let l = layout(&t, &data);
+            let w: Vec<f64> = l.xs.windows(2).map(|x| x[1] - x[0]).collect();
+            let h: Vec<f64> = l.ys.windows(2).map(|y| y[0] - y[1]).collect();
+            (w, h, data)
+        };
+        let near = |a: &[f64], b: &[f64], tol: f64| a.len() == b.len() && a.iter().zip(b).all(|(x, y)| (x - y).abs() <= tol * y);
+        // ISO: 3.5 mm text, 1.5 mm padding (live iso-long.json, mm).
+        let mut iso = Drawing::default();
+        (iso.props.ann_text_height, iso.props.table_h_padding, iso.props.table_v_padding) = (3.5, 1.5, 1.5);
+        let (w, h, data) = sized(&iso);
+        assert!(near(&w, &[15.6771, 25.9768, 34.9843, 64.2336], 0.02), "{w:?}");
+        assert!(near(&h, &[9.0667, 8.8333, 8.8333], 1e-4), "{h:?}");
+        assert_eq!(data.style.as_ref().map(|s| (s.line, s.lineweight)), Some((0.254, None)));
+        // ANSI: 0.12 in text, 0.06 in padding (live ansi.json, without the long description).
+        let mut ansi = Drawing { units_mm: false, ..Default::default() };
+        (ansi.props.ann_text_height, ansi.props.table_h_padding, ansi.props.table_v_padding) = (3.048, 1.524, 1.524);
+        ansi.props.table_styles.bom.line = Some(0.13);
+        let data = finish(&ansi, &t, TableData { header: Some(header.clone()), rows: vec![rows[1].clone(), rows[1].clone()], ..Default::default() });
+        let l = layout(&t, &data);
+        let w: Vec<f64> = l.xs.windows(2).map(|x| x[1] - x[0]).collect();
+        let h: Vec<f64> = l.ys.windows(2).map(|y| y[0] - y[1]).collect();
+        assert!(near(&w, &[25.4, 25.4, 1.2252 * 25.4, 1.1150 * 25.4], 0.02), "{w:?}");
+        assert!(near(&h, &[0.328 * 25.4, 0.32 * 25.4, 0.32 * 25.4], 1e-4), "{h:?}");
+        assert_eq!(data.style.as_ref().map(|s| (s.line, s.lineweight)), Some((0.13, Some(0.13))));
     }
 
     #[test]

@@ -646,7 +646,7 @@ fn table_styles_from_drawing_properties() {
     let t = Table::new(1, TableKind::General { cells: vec![vec!["H1".into(), "H2".into()], vec!["a".into(), "b".into()]], title: Some("T".into()), header: true }, [200.0, 200.0]);
     let st = &mut d.props.table_styles.general;
     st.header.color = Some([200, 0, 0]);
-    (st.content.height, st.content.italic, st.line) = (Some(5.0), true, 0.35);
+    (st.content.height, st.content.italic, st.line) = (Some(5.0), true, Some(0.35));
     let data = tables::table_data(&d, &t, None, None, None, &[], &|s| s.to_string());
     let l = tables::layout(&t, &data);
     let mut g = sheet::SheetGeometry::new(400.0, 300.0);

@@ -685,7 +685,7 @@ fn anonymous_block(doc: &mut CadDocument, prefix: char) -> Result<(String, Handl
 /// An object's lines, texts and fills (indices).
 type Members<'a> = (&'a [usize], &'a [usize], &'a [usize]);
 /// A table's top-left corner, column widths, row heights and cell texts.
-type TableGrid<'a> = ([f64; 2], &'a [f64], &'a [f64], &'a [Vec<String>], &'a [&'static str], bool);
+type TableGrid<'a> = ([f64; 2], &'a [f64], &'a [f64], &'a [Vec<String>], &'a [&'static str], bool, Option<f64>);
 
 /// One sheet's writing context.
 struct Sheet<'a> {
@@ -937,10 +937,23 @@ impl Sheet<'_> {
 
     /// A table: its elements in a new *T block, and over it an ACAD_TABLE
     /// (live 2018) or, before 2004, the block's INSERT (live R14).
-    fn table(&self, doc: &mut CadDocument, (corner, widths, heights, cells, rows, aligned): TableGrid, members: Members, owner: Owner) -> Result<(), String> {
+    fn table(&self, doc: &mut CadDocument, (corner, widths, heights, cells, rows, aligned, lineweight): TableGrid, members: Members, owner: Owner) -> Result<(), String> {
         let (name, block) = anonymous_block(doc, 'T')?;
         for &i in members.0 {
-            self.line(doc, i, Owner::Block(block), false)?;
+            // A grid line: a LINE in the block's linetype and colour (live 2232), its lineweight once the Line
+            // thickness is set.
+            let l = &self.g.lines[i];
+            if l.points.len() != 2 || l.closed {
+                self.line(doc, i, Owner::Block(block), false)?;
+                continue;
+            }
+            let mut e = Line::from_points(self.p3(l.points[0]), self.p3(l.points[1]));
+            e.common.layer = CadLayer::Tables.name(self.upper).into();
+            (e.common.linetype, e.common.color) = ("BYBLOCK".into(), Color::ByBlock);
+            if let Some(w) = lineweight {
+                e.common.line_weight = LineWeight::Value((w * 100.0).round() as i16);
+            }
+            put(doc, EntityType::Line(e), Owner::Block(block))?;
         }
         for &i in members.2 {
             self.fill(doc, i, Owner::Block(block), false)?;
@@ -1210,7 +1223,7 @@ fn add_sheet(doc: &mut CadDocument, g: &SheetGeometry, k: f64, layout: Option<&s
             CadObject::Tolerance { at, rows, height } => sh.tolerance(doc, *at, rows, *height, owner)?,
             CadObject::Symbol { at } => sh.symbol(doc, *at, &t, owner)?,
             CadObject::Spline { poles } => sh.spline(doc, poles, l[0], owner)?,
-            CadObject::Table { corner, widths, heights, cells, rows, aligned } => sh.table(doc, (*corner, widths, heights, cells, rows, *aligned), (&l, &t, &f), owner)?,
+            CadObject::Table { corner, widths, heights, cells, rows, aligned, lineweight } => sh.table(doc, (*corner, widths, heights, cells, rows, *aligned, *lineweight), (&l, &t, &f), owner)?,
         }
     }
     for im in &g.images {
@@ -1848,7 +1861,7 @@ mod tests {
         }
         g.texts.push(crate::drawing::sheet::Text2 { pos: [12.0, 94.0], height: 3.0, text: "Item".into(), angle: 0.0, anchor: Anchor::BottomLeft, pick: 0 });
         g.cad_since(m, CadLayer::Tables);
-        g.cad_objects.push(CadObject::Table { corner: [10.0, 100.0], widths: vec![50.0], heights: vec![8.0, 8.0], cells: vec![vec!["Item".into()], vec!["1".into()]], rows: vec!["Onshape-Standard-BomTable-HeaderRow", "Onshape-Standard-BomTable-DataRow"], aligned: false });
+        g.cad_objects.push(CadObject::Table { corner: [10.0, 100.0], widths: vec![50.0], heights: vec![8.0, 8.0], cells: vec![vec!["Item".into()], vec!["1".into()]], rows: vec!["Onshape-Standard-BomTable-HeaderRow", "Onshape-Standard-BomTable-DataRow"], aligned: false, lineweight: None });
         g.cad_members.push(CadMember { lines: m.0..g.lines.len(), texts: m.1..g.texts.len(), fills: 0..0, obj: 0 });
         let l = g.lines.len();
         g.lines.push(crate::drawing::sheet::Polyline2 { points: vec![[100.0, 100.0], [110.0, 100.0], [110.0, 107.0], [100.0, 107.0]], style: LineStyle::Thin, closed: true, pick: 0 });

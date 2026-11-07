@@ -3748,7 +3748,9 @@ fn is_true(b: &bool) -> bool {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TableStyle {
-    pub line: f64,
+    /// Line thickness (mm; None: never set, which the field shows as 0.13 mm and live draws at 0.25, live 2232).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub font: Option<sheet::TextFont>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -3758,10 +3760,21 @@ pub struct TableStyle {
     pub content: RowText,
 }
 
+impl TableStyle {
+    /// The Line thickness field's value (mm).
+    pub fn shown_line(&self) -> f64 {
+        self.line.unwrap_or(0.13)
+    }
+    /// The pen the table's lines are drawn with (mm).
+    pub fn drawn_line(&self) -> f64 {
+        self.line.unwrap_or(0.254)
+    }
+}
+
 impl Default for TableStyle {
     fn default() -> Self {
-        // Live: 0.13 mm, title and header rows Bold.
-        Self { line: 0.13, font: None, title: None, title_text: RowText { bold: true, ..Default::default() }, header: RowText { bold: true, ..Default::default() }, content: RowText::default() }
+        // Live: title and header rows Bold.
+        Self { line: None, font: None, title: None, title_text: RowText { bold: true, ..Default::default() }, header: RowText { bold: true, ..Default::default() }, content: RowText::default() }
     }
 }
 
