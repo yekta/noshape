@@ -3,6 +3,24 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Shell's direct builder is by_quadrics, bool's; rings-loft needs offsets that change topology (11-07 10:25 UTC)
+The lead's call (11-07): Shell's one direct builder is `by_quadrics` (shell.cpp, "Path 2b"), bool owns it, extended in
+stages that each fall back, pass the full gate and are reported per Shell against live: curved seams, B-spline walls
+on offset_bspline, corners of more than three faces (core-walls-wip's pieces folded in, no second route).
+Stage 1 (curved seams; patch /root/bool-scratch/wip/quadrics-stage1-1107b.patch, not landed): seams that aren't
+generators, their corners found along the seam; kept faces whose offsets part by less than the edge's tolerance
+(c2-rings-loft's loft sides and bore, 0.04-0.09 deg) tangent, the edge and its vertices given that slack; the march
+across an edge started on the faces' common offset point ((na + nb) t / (1 + na.nb): it started 2t off when they were
+near tangent) and run between two free-form faces. Rings-loft's Shell 1 then builds every corner and edge but the wall
+is invalid: live's result has 44 faces where one offset per face gives 32. At the ring's bottom the band (removed) lies
+1 mm from the loft crease, whose offset falls 0.06 mm outside it: the crease's and the loft sides' offsets leave
+through the removed face and the cavity pinches off (live: each loft offset in two faces, none for |y| < 5.1 mm). At the
+signet the four strips between the cylinders and the loft sides lose part of their offsets and the bore's offset comes
+in three faces. Gate: shellmatrix 96/96 and parity's results unchanged, nothing new taken, rings-loft's failing Shell
+10.9 -> 18.1 s, so not landed. Needs a fourth stage: offsets trimmed against each other in each face (an arrangement,
+the pieces a full thickness from the part kept); options A (that, in by_quadrics), B (a cavity with the removed faces
+pushed out, cut by a Boolean: the pinch, not the strips), C (the slabs' fuse) with the lead.
+
 ## Shell's walls and slabs: one builder, bool's (11-07 07:34 UTC, agreed with core, lead)
 bool owns the single wall/slab builder in shell.cpp, starting from core's branch core-walls-wip (1dad1804, not for
 main): by_cut_walls (the offset walls of the removed faces' neighbours, cut where they meet), join_in_u, cross_point,
