@@ -3337,36 +3337,7 @@ pub(super) enum ValueShape {
     Line(crate::assembly_scene::ValueLine),
 }
 
-/// A mate's values as Onshape shows them (bundle `calculateMateValues`): the
-/// first connector in the second's frame, `[rotation about Z, x, y, z]`.
-pub(super) fn onshape_mate_values(a: &noshape_model::assembly::solver::Frame, b: &noshape_model::assembly::solver::Frame) -> [f64; 4] {
-    let (bx, by, bz) = (b.rotation * DVec3::X, b.rotation * DVec3::Y, b.rotation * DVec3::Z);
-    let ax = a.rotation * DVec3::X;
-    let d = a.origin - b.origin;
-    [ax.dot(by).atan2(ax.dot(bx)), d.dot(bx), d.dot(by), d.dot(bz)]
-}
-
-/// Our solver values (`solver::mate_values`: the second connector in the
-/// first's frame) that put Onshape's value `ix` at `v`, the other shown
-/// values unchanged. Rotation: the solver's value is the one shown;
-/// translations: the first connector's offset in the second's frame,
-/// expressed back in the first's (negated).
-pub(super) fn solver_values_for(a: &noshape_model::assembly::solver::Frame, b: &noshape_model::assembly::solver::Frame, ours: [f64; 4], ix: usize, v: f64) -> [f64; 4] {
-    let mut on = onshape_mate_values(a, b);
-    let mut out = ours;
-    // The rotation shown is the solver's own value (live's rotationZ).
-    if ix == 0 {
-        out[0] = v;
-        return out;
-    }
-    on[ix] = v;
-    let (bx, by, bz) = (b.rotation * DVec3::X, b.rotation * DVec3::Y, b.rotation * DVec3::Z);
-    let d = bx * on[1] + by * on[2] + bz * on[3];
-    for (k, axis) in [DVec3::X, DVec3::Y, DVec3::Z].into_iter().enumerate() {
-        out[k + 1] = -(a.rotation * axis).dot(d);
-    }
-    out
-}
+pub(super) use noshape_ops::assembly::{onshape_mate_values, solver_values_for};
 
 impl AssemblyView {
     fn anim_defaults(&self, m: &Mate, dof: usize, cx: &App) -> (String, String) {

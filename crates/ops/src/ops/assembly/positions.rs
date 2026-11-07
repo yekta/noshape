@@ -161,7 +161,7 @@ fn row(names: Vec<&str>, key: &str, field: &str) -> Result<usize, OpError> {
         .ok_or_else(|| OpError::not_found(format!("no `{key}`; have: {}", names.join(", "))).with_param(field))
 }
 
-fn quantity(v: &Value, dim: Dim, units: &UnitPrefs, field: &str) -> Result<f64, OpError> {
+pub(super) fn quantity(v: &Value, dim: Dim, units: &UnitPrefs, field: &str) -> Result<f64, OpError> {
     let text = match v {
         Value::String(t) => t.clone(),
         Value::Number(n) => n.to_string(),

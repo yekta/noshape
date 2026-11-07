@@ -308,6 +308,14 @@ fn assembly_with_mates() {
     assert_eq!(list["dof"], 1, "{list}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Insert : Revolute 1");
+    // Type its value (the value box): the pin turns 30° about the hole's axis.
+    call(&mut ctx, "assembly_mate_value", json!({ "mate": "Revolute 1", "dof": "rz", "value": "30 deg" }));
+    let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
+    assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Move : Revolute 1");
+    let turned = call(&mut ctx, "assembly_list", json!({}))["instances"].as_array().unwrap().iter().find(|i| i["id"] == pin_i).unwrap()["rotation"].clone();
+    assert!((num(&turned[2]).abs() - (15f64).to_radians().sin()).abs() < 1e-6, "{turned}");
+    let e = try_call(&mut ctx, "assembly_mate_value", json!({ "mate": "Revolute 1", "dof": "x", "value": "3 mm" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("dof"), "{e:?}");
     // Edit it as the mate dialog does: limits, an offset, the secondary axis.
     let e = call(&mut ctx, "assembly_mate", json!({ "mate": "Revolute 1", "limits": { "rz": { "min": "-30 deg", "max": "45 deg" } }, "offset": { "z": "5 mm" }, "reorient_secondary": 1 }));
     assert_eq!(e["mate"], m["mate"], "{e}");

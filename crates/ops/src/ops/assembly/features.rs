@@ -99,6 +99,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "mate_value",
+            summary: "Type a mate's value: the parts move so that degree of freedom reads it",
+            description: "A mate's value box (while dragging, or its indicator's): the instances move so `dof` (rz, x, y or z, as the mate allows) reads `value` as Onshape shows it, the other mates enforced. One edit (\"Move : <mate>\").",
+            fields: vec![doc_field(), asm_field(), req("mate", s(), "Mate name or id."), req("dof", json!({ "type": "string", "enum": ["rz", "x", "y", "z"] }), "The degree of freedom."), req("value", json!({ "type": ["string", "number"] }), "The value (\"30 deg\", \"12 mm\"; bare numbers in the document's units).")],
+            mutates: true,
+            destructive: false,
+            run: mate_value,
+        },
+        Op {
+            group: "assembly",
             verb: "rename",
             summary: "Rename an instance, mate, relation, group, pattern or mate connector",
             description: "Rename in the instance list. One edit (\"Rename : <new name>\").",
@@ -445,5 +455,32 @@ fn set_feature_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
     }
+    Ok(describe(od, tab)?.into())
+}
+
+fn mate_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::assembly::eval::{limit_index, mate_dofs};
+    let (od, tab) = target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let asm = assembly(od, tab)?.clone();
+    let id = find_mate(&asm, a.str("mate")?).map_err(|e| e.with_param("mate"))?;
+    let m = asm.mate(id).ok_or_else(|| OpError::param("mate", "not a mate"))?;
+    let ix = limit_index(a.str("dof")?).filter(|k| *k < 4).ok_or_else(|| OpError::param("dof", "rz, x, y or z"))?;
+    let dofs = mate_dofs(m.mate_type);
+    if !dofs.iter().any(|(k, _)| *k == ix) {
+        return Err(OpError::param("dof", &format!("{} has no such degree of freedom ({})", m.name, dofs.iter().map(|(_, n)| *n).collect::<Vec<_>>().join(", "))));
+    }
+    let dim = if ix == 0 { noshape_units::Dim::ANGLE } else { noshape_units::Dim::LENGTH };
+    let v = super::positions::quantity(a.get("value").expect("required"), dim, &units, "value")?;
+    let r = solve(od, tab, &SolveOptions::default())?;
+    let ms = r.mates.iter().find(|x| x.id == id).ok_or_else(|| OpError::param("mate", "the mate doesn't solve"))?;
+    let (Some(fa), Some(fb)) = (ms.frame_a, ms.frame_b) else { return Err(OpError::param("mate", "its mate connectors don't resolve")) };
+    // As the app's value box: the typed value is Onshape's, the matching solver values held (all translations together).
+    let goal = sa::solver_values_for(&fa, &fb, ms.values, ix, v);
+    let holds: Vec<(MateId, usize, f64)> = dofs.iter().map(|(k, _)| *k).filter(|k| (ix == 0) == (*k == 0)).map(|k| (id, k, goal[k])).collect();
+    let start = r.solved.placements.iter().cloned().collect();
+    let solved = r.prepared.solve(&SolveOptions { hold_values: holds, start: Some(start), nested_start: Some(r.solved.nested.clone()), ..Default::default() });
+    let name = m.name.clone();
+    super::positions::commit_solved(od, tab, &format!("Move : {name}"), r, solved, |_| {})?;
     Ok(describe(od, tab)?.into())
 }
