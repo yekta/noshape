@@ -57,6 +57,21 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
   click that drw-hide-inspection-items records adding one) is worth a re-record too.
 
+## 11-07 18:35 UTC: drawing menu coverage 46 -> 88/106 (lead: the rest, adding starts and targets)
+- Runner targets added (README "### Drawings"): `hole_axis`, `sheet_ref`, `sheet_table`, `leader` {annotation, at},
+  `panel_more: Inspection table`; marks on the Datum dialog's tabs, Drawing properties' tabs (`tab:<tooltip>`) and
+  selects (`dropdown:<shown>`), the custom table picker (button Insert / Done, dropdown, list rows). Start key
+  `feature_studio` (start `block-drawing-table`: the custom table Part faces).
+- Fixes found on the way: a broken-out section's menu from its hatch (not only the profile); the sheet label isn't the
+  runner's `sheet_tab` while the Sheets panel is open; the Detail tool snaps its radius pick.
+- Revision table scenarios (place, properties, callout, cell Format / Merge right, Delete table, Fit to content) wait
+  on an account whose plan has the tool (REQUESTS); live's Free account has none.
+- Uncovered (18): Add spline point (Crop view's Spline ▾), Add to ordinate group, Assign number, Change
+  configuration..., Cut list table properties... (needs a frame start), Edit aligned section..., Edit section
+  (angular), Hide dimension (a datum target's dimension), Image properties..., Merge with cell below / Unmerge cells,
+  Open Feature Studio in linked document, Remove foreshorten, Replace,
+  Show (model annotations panel), Show all (display states), None, Unpin view reference.
+
 ## 11-07 16:59 UTC: export fidelity, PDF and DXF differences worked through (lead: until 24/24 or known live quirks)
 - From 14/24 to 17/24, after these (each from live's own files):
   - PDF: filled arrowheads and the cutting line's shafts outlined at 1 plot unit (`outlined_fills`); a symbol with no

@@ -1,0 +1,77 @@
+{
+  "name": "drw-view-replicate-annotations",
+  "about": "A callout on Front, Front selected for replication, then Top › Replicate annotations",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Callout"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            34,
+            0,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Select for replication"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "View"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Top"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Replicate annotations"
+      }
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "name": "drw-callout-remove-from-group",
+  "about": "A callout grouped with its view › Remove from group",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Callout"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            34,
+            0,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "annotation": "----"
+      },
+      "mods": "shift"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "----"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Group"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "----"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Remove from group"
+      }
+    }
+  ]
+}
