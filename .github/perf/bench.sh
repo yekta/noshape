@@ -155,6 +155,13 @@ if [[ -n ${OPEN_DOCS:-} && ( -z ${ONLY:-} || " $ONLY " == *" open:"* ) ]]; then
   if [[ -n ${AB_BIN:-} ]] && grep -aq "open: preview model frame presented" "$AB_BIN"; then open_times "$AB_BIN" "$AB_OUT"; fi
 fi
 if [[ -n ${LATENCY_DOC:-} && ( -z ${ONLY:-} || " $ONLY " == *" latency:"* ) ]]; then
-  latency "$BIN" "$OUT"
-  [[ -n ${AB_BIN:-} ]] && latency "$AB_BIN" "$AB_OUT"
+  # The build run first pays the colder caches (perf 42411762630, macOS 26: its first click 4-5 ms more, twice): the
+  # re-measure of a flagged row (ONLY) runs the baseline first, so a regression has to show in both orders.
+  if [[ -n ${AB_BIN:-} && -n ${ONLY:-} ]]; then
+    latency "$AB_BIN" "$AB_OUT"
+    latency "$BIN" "$OUT"
+  else
+    latency "$BIN" "$OUT"
+    [[ -n ${AB_BIN:-} ]] && latency "$AB_BIN" "$AB_OUT"
+  fi
 fi

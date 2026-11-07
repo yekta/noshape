@@ -613,7 +613,11 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   taken by the render thread / rendered / back on the UI thread / scene set / waits for a frame slot / waits for a
   layout` for the first 6 frames find where; on lavapipe it's the one frame in flight and a 150–300 ms CPU render.
   Next: perf.yml on main with them, then fix the Mac's wait.
-  Landed 611236c0 (20:10); perf 42411762630 on main dispatched 20:35 for the Mac's frame milestones.
+  Landed 611236c0 (20:10). perf 42411762630 measured v0.4.35, not main (perf.yml takes the latest release unless
+  `-f ref=<sha>`): its macOS 26 flag (row-click UI CPU p95 3.0 -> 3.7, again 4.8 -> 9.4) is one outlier sample each
+  (p50 equal), and the first click's 4-5 ms more is the build run first: bench.sh ran the latency script new-first
+  in both passes (vibe5, alternating: v0.4.34 4.1-4.3 ms, v0.4.35 4.2-6.7). The re-measure now runs the baseline
+  first. Main's frame milestones: perf 42414613905 (-f ref=f30e2e65, jobs bench).
 - P0 user dock (lead 11-07 20:00, a user's friend's AppleWatchDock; user data, kept in /root/psui-scratch/dock and
   vibe5:~/psui-scratch/dock only): the black rectangle in the hole (dock-top.png) and the section's red regions, grey
   band and hatched wedges (dock-section.png) are tab "A - Yumusak Kutu" as it stood 01:01–13:15 on 11-07 (history
