@@ -6393,3 +6393,36 @@ fn a_mate_reaches_a_part_inside_a_subassembly() {
     let e = try_call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": "Part 1 <1> > Part 2 <1>", "kind": "faces" })).unwrap_err().to_json();
     assert_eq!(e["param"], "instance", "{e}");
 }
+
+/// A drawing view showing an exploded view keeps showing it when an earlier one is deleted, and a named position
+/// when the list is reordered (the view refers to them by position: they're re-pointed in the same undo step).
+#[test]
+fn a_drawing_view_keeps_its_exploded_view_and_named_position() {
+    let mut ctx = Ctx::new();
+    let path = scratch("drawing-explode-ref.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm" } }));
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 1" }));
+    for _ in 0..2 {
+        call(&mut ctx, "assembly_exploded_view", json!({ "action": "add" }));
+        call(&mut ctx, "assembly_named_position", json!({ "action": "add" }));
+    }
+    let made = call(&mut ctx, "drawing_create", json!({ "source": "Assembly 1", "template": "ISO A3" }));
+    let drawing = made["drawing"].as_str().unwrap().to_string();
+    call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": "Assembly 1", "position": [100, 120], "explode_position": "Explode 2" }));
+    call(&mut ctx, "drawing_insert_view", json!({ "drawing": drawing, "source": "Assembly 1", "position": [250, 120], "explode_position": "Named position 1" }));
+    let views = |ctx: &mut Ctx| -> Vec<(Option<usize>, Option<usize>)> {
+        let doc = ctx.doc(path.to_str()).unwrap().doc().clone();
+        doc.tabs.iter().filter_map(|t| match &t.content { noshape_model::TabContent::Drawing(d) => Some(d), _ => None }).flat_map(|d| d.sheets.iter().flat_map(|s| s.views.iter())).map(|v| (v.explode, v.named_position)).collect()
+    };
+    assert_eq!(views(&mut ctx), vec![(Some(1), None), (None, Some(0))]);
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "delete", "view": "Explode 1" }));
+    call(&mut ctx, "assembly_named_position", json!({ "action": "move_down", "position": "Named position 1" }));
+    assert_eq!(views(&mut ctx), vec![(Some(0), None), (None, Some(1))]);
+    // One undo step each: the view follows back.
+    call(&mut ctx, "history_undo", json!({}));
+    assert_eq!(views(&mut ctx), vec![(Some(0), None), (None, Some(0))]);
+}

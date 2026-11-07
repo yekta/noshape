@@ -5,14 +5,7 @@
 use super::*;
 use serde_json::{Value, json};
 
-/// `state.focus` for a text field with the keyboard: its text and selection in characters.
-pub fn field_focus(label: &str, st: &InputState) -> Value {
-    let text = st.value().to_string();
-    let sel = st.selected_range();
-    let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
-    let (a, b) = (chars(sel.start), chars(sel.end));
-    json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 })
-}
+pub use crate::ui_script::field_focus;
 
 impl FeatureDialog {
     /// The dialog's title as shown.

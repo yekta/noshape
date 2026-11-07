@@ -452,8 +452,8 @@ impl AssemblyView {
         let Some((&top, rest)) = path.split_first() else { return };
         self.open_mc(None, window, cx);
         if let Some(m) = &mut self.mc {
+            // Live (asm-menu-connector-at-origin): the field shows the origin and still takes picks.
             m.on = Some(MateConnectorRef::on(top, rest.to_vec(), Reference::Origin));
-            m.active = false;
         }
         self.update_capture(cx);
         self.schedule_eval(window, cx);
@@ -1657,13 +1657,11 @@ impl AssemblyView {
     // ------------------------------------------------------------ snap mode
 
     pub(super) fn toggle_snap(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.snap.take().is_some() {
-            self.message = None;
-        } else {
+        // Live (asm-shift-s-snap-mode): no message; the banner says what to click.
+        if self.snap.take().is_none() {
             self.close_mate(window, cx);
             self.snap = Some(None);
             self.selected.clear();
-            self.message = Some((false, "Snap mode: click a face or mate connector on the instance to move.".into()));
         }
         self.infer = None;
         self.update_capture(cx);

@@ -208,6 +208,9 @@ def normalize_live(state):
         hl = lst.get("highlighted")
         hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
         lst["rows"] = [r for r in rows if r not in CLOUD_ONLY]
+        # An assembly start's names in menu rows: live's Part Studio is "start <name>" (ours "Part Studio 1") and its
+        # runner works in a copy of the assembly ("start <name> asm Copy 2").
+        lst["rows"] = [re.sub(r" asm Copy \d+…$", " asm…", re.sub(r"^Switch to start \S+$", "Switch to Part Studio 1", r)) if isinstance(r, str) else r for r in lst["rows"]]
         lst["highlighted"] = lst["rows"].index(hl_row) if hl_row in lst["rows"] else None
         # A row fewer, the menu sits elsewhere when it has to move to fit (live's flipped up under the still pointer,
         # ours fitted below it: face-rclick-menu): which row the pointer is over isn't compared then.
@@ -320,6 +323,20 @@ def compare(live, ours):
             b["dialog"] = None
         drop = PLAN_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = drop_rows(a, drop), drop_rows(b, drop)
+        # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
+        # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
+        for side in (a, b):
+            new_asm = lambda t: re.sub(r"\bAssembly \d+\b", "Assembly N", t) if isinstance(t, str) else t
+            for r in ((side.get("features") or {}).get("rows") or []):
+                r["name"] = new_asm(r.get("name"))
+            lst = side.get("list")
+            if isinstance(lst, dict):
+                lst["rows"] = [new_asm(r) for r in lst.get("rows") or []]
+            for i in ((side.get("assembly") or {}).get("instances") or []):
+                i["name"] = new_asm(i.get("name"))
+            for i in ((side.get("selection") or {}).get("items") or []):
+                if isinstance(i, dict):
+                    i["owner"] = new_asm(i.get("owner"))
         # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
         for side in (a, b):
             d = side.get("dialog")

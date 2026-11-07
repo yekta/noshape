@@ -91,6 +91,29 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
   81/86; left: Create new context, Open linked document, Edit standard content instance…, the Insert dialog's Reset
   to default / Set to last viewed (each needs a longer setup).
 
+- 11-07 live2's 98 assembly recordings (batches 1-5) landed: 23/98 at first, **68/98 (351/409 states)** after:
+  runner normalizations (live's start Part Studio "start <name>", its lane copies' " Copy N", a new subassembly's
+  "Assembly <n>"; prefix targets `{"instance": "Assembly"}` as live's findXY), our recorded state (the focused field of
+  a dialog with ✓, a rename / Dynamic suppression / Folder name / Display states input, a modal's focus; pending rows
+  of a new relation / connector / group / pattern, selected, editing, red until complete; panels Dynamic suppression,
+  Folder name, Select other; Isolate / Make transparent, Interference detection, Animate mate; no Insert dialog; a
+  selected row isn't "related"; empty required pattern fields red; a suppressed mate's REST status OK) and behaviour
+  (Enter-accept, menus of a hidden / suppressed / isolated instance, empty space with a selection gives its menu,
+  Show all instances, Collapse all folds Mate features, Esc closes Display states, no selection after Move to new /
+  Create empty / Dissolve subassembly, no snap-mode message, the connector at an instance origin keeps its field
+  active, a mate opened for edit keeps "Mate connectors" active, Check interference from the assembly row holds the
+  assembly). Asked of live2: re-record the five subassembly scenarios; "New folder (1)".
+  Left (main causes): a face click selects the face in live (FACE) and the instance in ours; a right-click selects
+  the row in live (selection 1 after Add expression…); Select other's first row (the face) missing in ours; Create
+  empty subassembly not undoable in live; Hide / Show mates undoable in live; Reset with no effect's message
+  "Resetting mates had no effect."; Export / Release modals don't report themselves; a mate's flip toggle on an
+  edited mate (start data); Tangent / Width dialog field counts.
+- 11-07 feature audit (3 read-only auditors over Onshape's 44 assembly help pages): tickets in docs/TICKETS.md
+  "Assemblies (asm)". Fixed: ASM-RELATION-TURNS (P0, the driver's whole turns read at each solve's start),
+  ASM-RELATION-RATIO-VARIABLES (P0), ASM-DRAWING-VIEW-INDEX (P0: list edits re-point drawing views in one undo
+  step), ASM-MATE-OFFSET-ROTATE-AXIS (P1). Next: ASM-BOM-CONFIGURED-SUBASSEMBLY, -PROPERTIES, ASM-MASS-OVERRIDES
+  (verify), then the P1s.
+
 ## Assembly model suite (lead 11-06; docs/PARITY-SUITES.md §4, SCORE.md "Assemblies")
 - T2 `parity_assemblies` (crates/ops/tests/parity.rs) over /root/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES; on
   vibe3 the copy is ~/agents/asm/parity-asm, rsync it after live adds documents). `rebuild_assembly`

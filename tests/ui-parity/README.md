@@ -97,7 +97,9 @@ other string an Enum id.
 - The move triad (asm, 11-07), shown at the pick once a part is clicked: `{"triad": "x" | "y" | "z"}` an arrow's shaft,
   `{"triad": "ring-z"}` the rotation ring at an arrow's tip, `{"triad": "origin"}` its centre (right-clicked for its
   menu: Align / Anti-align with Z, Rotate 90 / 180 deg, Move to origin).
-- In an assembly: `{"instance": "Part 2 <1>"}` an instance list row by its text: also the assembly's own row
+- In an assembly: `{"instance": "Part 2 <1>"}` an instance list row by its text, else the one row starting with it and
+  a space (`{"instance": "Assembly"}` for a new subassembly, "Assembly 2 <1>" in live's lane documents, "Assembly 1
+  <1>" in ours: compared as one name, "Assembly N"): also the assembly's own row
   (`"start two-blocks asm"`), an instance folder (`"Folder 1"`) and `"Mate features"` (the folder, whatever its
   count); `{"mate": "Revolute 1"}` a row under Mate features (a mate, connector, relation, group or mate folder);
   `{"face": [x, y, z], "instance": "Part 2 <1>"}` a point in that instance's part coordinates.
