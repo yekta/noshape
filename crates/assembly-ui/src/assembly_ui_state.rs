@@ -174,9 +174,13 @@ impl AssemblyView {
             .into_iter()
             .collect();
         dialogs.extend(self.other_dialogs(cx));
+        // A modal (Properties…, Instance properties…), as the Part Studio records one.
+        let modal = crate::ui_script::open_dialog().filter(|d| d["kind"] == "modal");
+        dialogs.extend(modal.clone());
         let dialog = dialogs.last().cloned();
         // The mate dialog's empty query box has the focus (live: field "Mate connectors").
-        let focus = self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } })).unwrap_or_else(|| json!({ "kind": "none" }));
+        let focus = if modal.is_some() { Some(json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })) } else { None };
+        let focus = focus.or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } }))).unwrap_or_else(|| json!({ "kind": "none" }));
         let history = self.history_state(cx);
         json!({
             "focus": focus,
@@ -374,6 +378,26 @@ impl AssemblyView {
             ];
             let complete = s.replacement.is_some();
             out.push(dialog("Replace instance".into(), complete, complete, fields));
+        }
+        // Origin of new Part Studio (live assembly/114, 542): its one field, the Origin when opened from its row.
+        if let Some(o) = self.ui.ps_in_context {
+            let chip = o.chip(|id| asm.and_then(|a| a.connectors.iter().find(|c| c.id == id).map(|c| c.name.clone())));
+            out.push(dialog("Origin of new Part Studio".into(), true, true, vec![query("Select origin/mate connector", chip.into_iter().collect(), true, false)]));
+        }
+        // Dynamic suppression (live assembly/104): one expression.
+        if let Some((_, input, _)) = &self.ui.dynamic_suppression {
+            out.push(dialog("Dynamic suppression".into(), true, true, vec![number(json!("Unsuppressed if"), input.read(cx).value().to_string())]));
+        }
+        // Driving mate selector (live assembly/105–107): the mates listed.
+        if let Some(d) = &self.ui.np_driver {
+            out.push(dialog("Driving mate selector".into(), true, true, vec![query("Mates to drive positions", d.mates.iter().map(|m| mate_name(*m)).collect(), true, false)]));
+        }
+        // Reference manager (live assembly/111–112): its two tabs.
+        if let Some(r) = &self.ui.ref_manager {
+            out.push(json!({ "title": "Reference manager", "titleState": "ok", "kind": "other", "tabs": [{ "label": "Update to latest", "selected": r.tab == 0 }, { "label": "Selective update", "selected": r.tab == 1 }], "fields": [], "error": null, "ok": null }));
+        }
+        if let Some(p) = self.section_props(cx) {
+            out.push(crate::section_dialog::state(&p));
         }
         if self.insert_open {
             // A list panel, not a feature dialog: its title (its rows aren't fields).

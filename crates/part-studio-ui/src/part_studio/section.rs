@@ -401,18 +401,8 @@ impl PartStudioView {
     /// dialog with its Exclude / Include tabs and two selection fields).
     pub(super) fn section_dialog_state(&self) -> Option<serde_json::Value> {
         let d = self.ui.section_dialog.as_ref()?;
-        let planes: Vec<String> = self.section_chips().into_iter().map(|(n, l)| if l.is_empty() { format!("Section plane {n}") } else { format!("Section plane {n} ({l})") }).collect();
         let items: Vec<String> = d.items.iter().map(|b| self.display.body(b).map(|x| x.name.clone()).unwrap_or_else(|| "Part".into())).collect();
-        let ok = if planes.is_empty() { "disabled" } else { "enabled" };
-        Some(serde_json::json!({
-            "title": "Section view", "titleState": "ok", "kind": "feature",
-            "tabs": [{ "label": "Exclude", "selected": !d.include }, { "label": "Include", "selected": d.include }],
-            "fields": [
-                { "label": "Section planes", "kind": "query", "items": planes, "active": !d.items_active, "state": "ok" },
-                { "label": if d.include { "Items to include" } else { "Items to exclude" }, "kind": "query", "items": items, "active": d.items_active, "state": "ok" },
-            ],
-            "error": null, "ok": ok,
-        }))
+        Some(crate::section_dialog::state(&crate::section_dialog::Props { include: d.include, items_active: d.items_active, planes: self.section_chips(), active: d.active, items, popup: None }))
     }
 
     pub(super) fn render_section_panel(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

@@ -28,6 +28,22 @@ pub struct Props {
     pub popup: Option<PlanePopup>,
 }
 
+/// The dialog as the interaction suite records it (tests/ui-parity/README.md), as live's feature dialogs: its tabs,
+/// its two query fields, ✓ enabled once a plane is picked.
+pub fn state(p: &Props) -> serde_json::Value {
+    let planes: Vec<String> = p.planes.iter().map(|(n, l)| if l.is_empty() { format!("Section plane {n}") } else { format!("Section plane {n} ({l})") }).collect();
+    let ok = if planes.is_empty() { "disabled" } else { "enabled" };
+    serde_json::json!({
+        "title": "Section view", "titleState": "ok", "kind": "feature",
+        "tabs": [{ "label": "Exclude", "selected": !p.include }, { "label": "Include", "selected": p.include }],
+        "fields": [
+            { "label": "Section planes", "kind": "query", "items": planes, "active": !p.items_active, "state": "ok" },
+            { "label": if p.include { "Items to include" } else { "Items to exclude" }, "kind": "query", "items": p.items, "active": p.items_active, "state": "ok" },
+        ],
+        "error": null, "ok": ok,
+    })
+}
+
 /// Live's message when a fourth plane is picked.
 pub const MAX_PLANES_REACHED: &str = "Maximum number of section planes reached. Remove a section plane to add another.";
 
