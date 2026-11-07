@@ -117,6 +117,8 @@
 #include <Geom_SphericalSurface.hxx>
 #include <functional>
 #include <GeomProjLib.hxx>
+#include <BOPTools_AlgoTools3D.hxx>
+#include <Geom_RectangularTrimmedSurface.hxx>
 #include <Geom2dConvert.hxx>
 #include <GeomConvert.hxx>
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
@@ -3821,7 +3823,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       const ShapeList& fl = ef.FindFromKey(e);
       const int        a  = faces.FindIndex(fl.First());
       if (fl.Extent() != 1 || !kept[(size_t)a] || sf[(size_t)a].kind != GeomAbs_Sphere)
+      {
+        if (dbg)
+        {
+          const gp_Pnt q = BRep_Tool::Pnt(TopExp::FirstVertex(e));
+          std::fprintf(stderr, "quadrics: degenerate edge on %d face(s), face %d kind %d kept %d at %.3f %.3f %.3f\n", fl.Extent(), a, (int)sf[(size_t)a].kind, (int)kept[(size_t)a], q.X() * 1e3, q.Y() * 1e3, q.Z() * 1e3);
+        }
         return no("a degenerate edge not a kept sphere's pole");
+      }
       efi[(size_t)i]   = {a, a};
       degen[(size_t)i] = 1;
       continue;
@@ -4660,7 +4669,36 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       }
       else
       {
-        GeomAPI_IntSS is(sf[(size_t)fa].off, sf[(size_t)fb].off, 1e-9 * size);
+        // (A free-form offset only round the edge, its curve's box on the face and two walls more: the offsets keep
+        // their faces' parameters; OCCT's intersection of whole B-spline offsets was most of c2-rings-loft's edges.)
+        auto near_edge = [&](int f) -> occ::handle<Geom_Surface> {
+          const occ::handle<Geom_Surface>& g = sf[(size_t)f].off;
+          if (!sf[(size_t)f].general || g->IsUPeriodic() || g->IsVPeriodic())
+            return g;
+          double                          e0, e1;
+          const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(f)), e0, e1);
+          if (pc.IsNull())
+            return g;
+          double u0 = 1e300, u1 = -1e300, v0 = 1e300, v1 = -1e300;
+          for (int k = 0; k <= 16; ++k)
+          {
+            const gp_Pnt2d q = pc->Value(e0 + (e1 - e0) * k / 16);
+            u0 = std::min(u0, q.X()), u1 = std::max(u1, q.X()), v0 = std::min(v0, q.Y()), v1 = std::max(v1, q.Y());
+          }
+          gp_Pnt P;
+          gp_Vec du, dv;
+          g->D1(0.5 * (u0 + u1), 0.5 * (v0 + v1), P, du, dv);
+          if (du.Magnitude() < 1e-12 || dv.Magnitude() < 1e-12)
+            return g;
+          const double mu = 2 * thickness / du.Magnitude(), mv = 2 * thickness / dv.Magnitude();
+          double       U0, U1, V0, V1;
+          g->Bounds(U0, U1, V0, V1);
+          u0 = std::max(U0, u0 - mu), u1 = std::min(U1, u1 + mu), v0 = std::max(V0, v0 - mv), v1 = std::min(V1, v1 + mv);
+          if (!(u1 > u0) || !(v1 > v0))
+            return g;
+          return new Geom_RectangularTrimmedSurface(g, u0, u1, v0, v1);
+        };
+        GeomAPI_IntSS is(near_edge(fa), near_edge(fb), 1e-9 * size);
         if (!is.IsDone())
           return no("two offsets don't intersect");
         for (int k = 1; k <= is.NbLines(); ++k)
@@ -5425,6 +5463,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         std::fprintf(stderr, "quadrics: repair: %s\n", why);
       return false;
     };
+    auto r_lap = std::chrono::steady_clock::now();
+    auto rlap  = [&](const char* what) {
+      if (!dbg)
+        return;
+      const auto now = std::chrono::steady_clock::now();
+      std::fprintf(stderr, "quadrics: repair: %s %.0f ms\n", what, std::chrono::duration<double, std::milli>(now - r_lap).count());
+      r_lap = now;
+    };
 
     // Each shell face's owner: the part's face whose offset it lies on, or the removed face whose surface (0: a kept
     // face of the part, a flat rim).
@@ -5579,6 +5625,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (dbg)
       for (const Triple& t : tps)
         std::fprintf(stderr, "quadrics: repair: faces %d %d %d meet at %.4f %.4f %.4f\n", t.f[0], t.f[1], t.f[2], t.p.X() * 1e3, t.p.Y() * 1e3, t.p.Z() * 1e3);
+    rlap("crossings");
     for (Triple& t : tps)
     {
       t.v = BRepBuilderAPI_MakeVertex(gp_Pnt(t.p));
@@ -5772,6 +5819,8 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     auto make_edge = [&](int b, int c, std::vector<gp_Pnt> pts, const TopoDS_Vertex& va, const TopoDS_Vertex& vb) -> bool {
       if (of_owner[(size_t)b].size() != 1 || of_owner[(size_t)c].size() != 1)
         return fail("a new edge on a face in more than one piece");
+      if (pts.size() < 2)
+        return fail("a new edge of one point");
       // (At least eight points: halves of the steps put on both offsets, square to the step.)
       while (pts.size() < 8)
       {
@@ -5899,6 +5948,22 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         pts.pop_back();
       pts.push_back(gp_Pnt(p));
     };
+    struct Polyline
+    {
+      std::vector<gp_XYZ> pts;
+      double              sag = 0;
+    };
+    std::map<const void*, Polyline> polylines; // an edge's points (by its TShape), for the march's crossing test
+    // The distance between segments pq and rs.
+    auto segments_apart = [](const gp_XYZ& p, const gp_XYZ& q, const gp_XYZ& r, const gp_XYZ& s2) {
+      const gp_XYZ d1 = q - p, d2 = s2 - r, w = p - r;
+      const double a = d1.Dot(d1), b = d1.Dot(d2), c = d2.Dot(d2), d = d1.Dot(w), e = d2.Dot(w);
+      const double den = a * c - b * b;
+      double       sc = den > 1e-30 ? std::clamp((b * e - c * d) / den, 0.0, 1.0) : 0.0;
+      double       tc = c > 1e-30 ? std::clamp((b * sc + e) / c, 0.0, 1.0) : 0.0;
+      sc              = a > 1e-30 ? std::clamp((b * tc - d) / a, 0.0, 1.0) : 0.0;
+      return (w + d1 * sc - d2 * tc).Modulus();
+    };
     // From a point where faces b and c meet without an edge of theirs: along their offsets' intersection, the way
     // that stays on the wall, until it comes to another such point of theirs or to a third surface (a new point).
     auto trace = [&](size_t ti, int b, int c) -> bool {
@@ -5954,8 +6019,22 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             !smooth.count({std::min(j, b), std::max(j, b)}) && !smooth.count({std::min(j, c), std::max(j, c)}))
           nbs.push_back(j);
       std::vector<std::array<double, 2>> hist(nbs.size(), {1e300, 1e300});
+      // (Each face's value at the last two points asked: a step's end is the next one's start.)
+      std::map<int, std::array<std::pair<gp_XYZ, double>, 2>> memo;
+      auto val = [&](int j, const gp_XYZ& q) {
+        auto& m = memo[j];
+        for (const auto& [mp, mv] : m)
+          if (mp.IsEqual(q, 0.0) && mv != -1.0)
+            return mv;
+        const double v = value(j, q);
+        m[1]           = m[0];
+        m[0]           = {q, v};
+        return v;
+      };
       for (size_t q2 = 0; q2 < nbs.size(); ++q2)
-        hist[q2][1] = std::abs(value(nbs[q2], x));
+        hist[q2][1] = std::abs(val(nbs[q2], x));
+      int  unchecked = 0;     // steps taken since the last on the wall
+      bool dense     = false; // every step tested from here
       for (int it = 0; it < 400; ++it)
       {
         gp_XYZ t2;
@@ -5997,14 +6076,26 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
                 const int           oj = G.IsNull() ? 0 : owner.Find(G);
                 if (oj == 0 || oj == b || oj == c)
                   continue;
-                Bnd_Box eb;
-                BRepBndLib::Add(E, eb);
-                eb.Enlarge(L + 1e-2 * thickness);
-                if (eb.IsOut(gp_Pnt(x)))
-                  continue;
                 double                        c0, c1;
                 const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(E, c0, c1);
                 if (c3.IsNull())
+                  continue;
+                // (First against the edge's polyline, its points cached with how far it strays from the curve.)
+                auto pl = polylines.find(E.TShape().get());
+                if (pl == polylines.end())
+                {
+                  Polyline P;
+                  for (int k = 0; k <= 64; ++k)
+                    P.pts.push_back(c3->Value(c0 + (c1 - c0) * k / 64).XYZ());
+                  for (int k = 0; k < 64; ++k)
+                    P.sag = std::max(P.sag, (c3->Value(c0 + (c1 - c0) * (k + 0.5) / 64).XYZ() - 0.5 * (P.pts[(size_t)k] + P.pts[(size_t)k + 1])).Modulus());
+                  pl = polylines.emplace(E.TShape().get(), std::move(P)).first;
+                }
+                const double reach0 = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
+                double       dmin   = 1e300;
+                for (size_t k = 0; k + 1 < pl->second.pts.size() && dmin > reach0 + 2 * pl->second.sag; ++k)
+                  dmin = std::min(dmin, segments_apart(x, y, pl->second.pts[k], pl->second.pts[k + 1]));
+                if (dmin > reach0 + 2 * pl->second.sag)
                   continue;
                 GeomAPI_ExtremaCurveCurve xc(seg, c3, 0, L, c0, c1);
                 if (xc.NbExtrema() == 0)
@@ -6037,9 +6128,20 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           }
         }
         // Touching a neighbour's offset at the last point (its value least there, all but nothing): it ends there.
+        auto near_face = [&](int j, const gp_XYZ& q) {
+          Bnd_Box b = kb_all[(size_t)j];
+          b.Enlarge(2 * thickness);
+          return !b.IsOut(gp_Pnt(q));
+        };
         for (size_t q2 = 0; q2 < nbs.size(); ++q2)
         {
-          const double ey = std::abs(value(nbs[q2], y));
+          // (A neighbour whose face is more than two walls away: no touch.)
+          if (!near_face(nbs[q2], y))
+          {
+            hist[q2] = {1e300, 1e300};
+            continue;
+          }
+          const double ey = std::abs(val(nbs[q2], y));
           const bool   dip             = pts.size() >= 2 && hist[q2][1] < 0.1 * thickness && hist[q2][1] < hist[q2][0] && hist[q2][1] < ey;
           hist[q2]                     = {hist[q2][1], ey};
           if (!dip)
@@ -6088,11 +6190,13 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             if (has(tps[ti], j) || !kept[(size_t)j] || collapse[(size_t)j] || !(adj.count({std::min(j, b), std::max(j, b)}) || adj.count({std::min(j, c), std::max(j, c)})) ||
                 smooth.count({std::min(j, b), std::max(j, b)}) || smooth.count({std::min(j, c), std::max(j, c)}))
               continue;
-            // (One on b's or c's offset: two faces of one plane or surface.)
-            if (std::abs(value(j, x)) < 1e-6 * thickness && std::abs(value(j, y)) < 1e-6 * thickness)
+            if (!near_face(j, y))
               continue;
-            const double e0 = value(j, x);
-            const double e1 = value(j, y);
+            // (One on b's or c's offset: two faces of one plane or surface.)
+            if (std::abs(val(j, x)) < 1e-6 * thickness && std::abs(val(j, y)) < 1e-6 * thickness)
+              continue;
+            const double e0 = val(j, x);
+            const double e1 = val(j, y);
             if (e0 * e1 > 0 || std::abs(e0) > 1e299 || std::abs(e1) > 1e299)
               continue;
             double lo = 0, hi = 1;
@@ -6118,10 +6222,30 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             return make_edge(b, c, pts, tps[ti].v, tps[k].v);
           }
         }
-        if (on_wall(gp_Pnt(y), eps))
+        // (On the wall tested every fourth step; where a test fails, back to the last point tested and on step by
+        // step from there.)
+        if (unchecked < 3 && !dense)
         {
+          ++unchecked;
           pts.push_back(gp_Pnt(y));
           x = y;
+          continue;
+        }
+        if (on_wall(gp_Pnt(y), eps))
+        {
+          unchecked = 0;
+          pts.push_back(gp_Pnt(y));
+          x = y;
+          continue;
+        }
+        if (unchecked > 0)
+        {
+          pts.resize(pts.size() - (size_t)unchecked);
+          x         = pts.back().XYZ();
+          unchecked = 0;
+          dense     = true;
+          for (size_t q2 = 0; q2 < nbs.size(); ++q2)
+            hist[q2] = {1e300, std::abs(val(nbs[q2], x))};
           continue;
         }
         // Off the wall: where (bisected), and by which face: one nearer than the wall, or the removed face it leaves
@@ -6173,6 +6297,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return fail("too many new points");
       if (!split_all())
         return false;
+      rlap("split");
       std::vector<std::tuple<size_t, int, int>> open;
       for (size_t ti = 0; ti < tps.size(); ++ti)
         for (const auto [x, y] : {std::pair{0, 1}, std::pair{0, 2}, std::pair{1, 2}})
@@ -6189,6 +6314,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         if (!closed && !trace(ti, b, c))
           return false;
       }
+      rlap("traces");
     }
     // The touched faces made again: their edges (pieces in place of split ones, new ones), in loops.
     BRepTools_ReShape re;
@@ -6617,6 +6743,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         std::fprintf(stderr, "quadrics: repair: face of %d in %zu pieces from %zu loops\n", o, nfs.size(), ls.size());
       re.Replace(F, cf);
     }
+    rlap("faces");
     TopoDS_Shape r = re.Apply(in);
     // Two edges meeting at a vertex of theirs alone, between the same two faces (a seam's end, once the pieces on its
     // two sides are one face): one edge, their curves joined.
@@ -6750,6 +6877,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           sources.Bind(it.Key(), it.Value());
       }
     }
+    rlap("joins");
     bld.MakeShell(fixed);
     for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
       bld.Add(fixed, x.Current());
@@ -6826,6 +6954,9 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     checker.SetArguments(args);
     checker.SetNonDestructive(true);
     checker.SetRunParallel(true);
+    // (Up to edges against faces: an offset crossing another shows as the one's edge through the other; the faces'
+    // own intersections, B-spline offsets', were most of the check: c2-rings-loft's 0.7 s.)
+    checker.SetLevelOfCheck(4);
     checker.Perform();
     const BOPDS_DS& ds       = *checker.PDS();
     bool            crossing = false;
@@ -6855,6 +6986,33 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     std::fprintf(stderr, "quadrics: wall volume %.17g solid %.17g\n", vw, vs);
   if (!(vw > 0) || !(outward || vw <= vs * (1 + 1e-3)))
     return no("the wall's volume is off");
+  // A repaired wall no thinner than it should be: a point half a wall in from each kept face, where it is in the part,
+  // is in the wall (core's review: a piece the repair dropped wrongly leaves a valid wall too small).
+  if (!h2.IsNull())
+  {
+    BRepClass3d_SolidClassifier in_part(so), in_wall(wall);
+    for (int i = 1; i <= nf; ++i)
+    {
+      if (!kept[(size_t)i])
+        continue;
+      const TopoDS_Face& f = TopoDS::Face(faces(i));
+      gp_Pnt             q;
+      gp_Pnt2d           uv;
+      if (BOPTools_AlgoTools3D::PointInFace(f, q, uv, new IntTools_Context()) != 0)
+        continue;
+      const gp_XYZ p = q.XYZ() - normal_at(f, q).XYZ() * (0.5 * thickness);
+      in_part.Perform(gp_Pnt(p), 1e3 * tol);
+      if (in_part.State() != TopAbs_IN)
+        continue;
+      in_wall.Perform(gp_Pnt(p), 1e3 * tol);
+      if (in_wall.State() == TopAbs_OUT)
+      {
+        if (dbg)
+          std::fprintf(stderr, "quadrics: half a wall in from face %d, at %.4f %.4f %.4f, not in the wall\n", i, p.X() * 1e3, p.Y() * 1e3, p.Z() * 1e3);
+        return no("a repaired wall thinner than the wall");
+      }
+    }
+  }
   out.result  = wall;
   out.history = shell_history(solid, wall, {h, h2}, {}, sources, removed);
   return true;

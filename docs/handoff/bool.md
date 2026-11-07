@@ -21,7 +21,15 @@ no second route). Landed together (lead: A, with stage 1):
 - c2-rings-loft's Shell 1 as live: 44/117/78, volume and area in live's band, 2.1 s (was "Could not shell" after
   10.9 s; live 235 ms); the document 9 -> 11 of 32 (next: Extrude 3). Parity 638 -> 640/936; shellmatrix 96/96 the
   same, time level; impeller Shell Gehäuse 3.9 -> 2.6 s (live 31 ms); snap-hook Shell 1 5.8 s unchanged (live 6 ms).
-- Next on it: speed (the base build 1.3 s and the crossing check 1.3 s on rings-loft), then stage 2 (B-spline walls).
+- Faster (11-07 17:06 UTC): rings-loft's Shell 1 2.1 -> 1.6 s (parity run): the march tests the wall every fourth step,
+  a neighbour's offset only within two walls of its face, an edge's crossing first against its cached polyline; two
+  free-form offsets intersected only round their edge (their curve's box, two walls more); the crossing check up to
+  edges against faces (OCCT's face-face pairs were most of it). Core's review: a repaired wall must hold a point half
+  a wall in from each kept face (no wall too thin), make_edge refuses one point. Still 7x live (235 ms): the rest is
+  the base build's B-spline offsets (edges ~0.4 s) and the repair's traces.
+- cf-snap-hook's Shell 1 (30 s now on main): its input changed upstream (Fillet 4 matches now, first difference
+  Fillet 5): OCCT's offset 3.7 s then slabs 26 s and fail; quadrics declines at once on a degenerate edge between two
+  B-spline faces (the input's 55 extra B-spline slivers, live's part has 30 faces before Shell). Not the repair's.
   Kernel tests: shell::a_ring_thinner_than_its_wall_shells_as_live and the pinch / strip cases in shell.rs.
 
 ## Shell's walls and slabs: one builder, bool's (11-07 07:34 UTC, agreed with core, lead)
