@@ -3520,7 +3520,9 @@ were checked in code by asm; "(verify)" ones need a live check first.
   to it; the defaults are 50 mm / 2 (live Part Studio 25 mm / 1); Onshape's help names a third direction.
 - [ ] P1 ASM-RELATION-DIRECTION (asm, verify) Gear couples opposite, Linear the same way (`db = ∓ratio·da`): check each
   relation's default direction against live.
-- [ ] P1 ASM-API-GAPS (asm) agent API: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
+- [ ] P1 ASM-API-GAPS (asm) agent API: (done 11-07: `assembly_properties`; `part_set_properties` takes Exclude from
+  all BOMs / Unit of measure / Not revision managed (State is the releases'); `assembly_exploded_view` duplicate;
+  mate / group Show / Hide.) Was: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
   number); `part_set_properties` lacks Exclude from all BOMs / Unit of measure / Not revision managed / State; no
   assembly mass or measure op; `assembly_replace` takes one instance and current-document sources only (no sketch,
   other document, standard content; its text still says mates are re-pointed); no op updates references to other

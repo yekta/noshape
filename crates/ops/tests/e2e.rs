@@ -2088,6 +2088,13 @@ fn assembly_named_positions_and_exploded_views() {
     assert_eq!(last(&mut ctx), "Assembly 1 :: Hide all explode lines");
     call(&mut ctx, "assembly_exploded_view", json!({ "action": "lines", "view": "Pin out", "on": true }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Show all explode lines");
+    // Duplicate: a copy with its steps after it (live asm-explode-duplicate).
+    let ev = call(&mut ctx, "assembly_exploded_view", json!({ "action": "duplicate", "view": "Pin out" }));
+    let views = ev["exploded_views"].as_array().unwrap();
+    assert_eq!(views.iter().map(|v| v["name"].as_str().unwrap()).collect::<Vec<_>>(), ["Pin out", "Pin out Copy 1"], "{ev}");
+    assert_eq!(views[0]["steps"], views[1]["steps"], "{ev}");
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Duplicate : Pin out Copy 1");
+    call(&mut ctx, "assembly_exploded_view", json!({ "action": "delete", "view": "Pin out Copy 1" }));
     let ev = call(&mut ctx, "assembly_exploded_view", json!({ "action": "delete", "view": "Pin out" }));
     assert_eq!(ev["exploded_views"].as_array().unwrap().len(), 0, "{ev}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Delete : Pin out");
@@ -6509,4 +6516,57 @@ fn an_assembly_configuration_variable_drives_a_mate_offset() {
     assert!((gap(&mut ctx) - 12.0).abs() < 1e-6, "12 mm: {}", gap(&mut ctx));
     call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "reset": true }));
     assert!((gap(&mut ctx) - 5.0).abs() < 1e-6, "back to the default: {}", gap(&mut ctx));
+}
+
+/// ASM-API-GAPS: the Properties dialog's Exclude from all BOMs, Unit of measure and Not revision managed through
+/// part_set_properties, as the BOM reads them.
+#[test]
+fn part_properties_reach_the_bom() {
+    let mut ctx = Ctx::new();
+    let path = scratch("part-props-bom.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "unit_of_measure": "kilogram", "not_revision_managed": true }));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 2", "exclude_from_bom": true }));
+    let e = try_call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "unit_of_measure": "furlong" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("unit_of_measure"));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 2" }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Assembly 1", "type": "flattened", "columns": ["Item", "Quantity", "Name", "Unit of measure", "Not revision managed"] }));
+    let rows = bom["rows"].as_array().unwrap();
+    assert_eq!(rows.len(), 1, "Part 2 is excluded from all BOMs: {bom}");
+    assert_eq!(rows[0]["cells"]["Name"], "Part 1", "{bom}");
+    assert_eq!(rows[0]["cells"]["Unit of measure"], "Kilogram", "{bom}");
+    assert_eq!(rows[0]["cells"]["Not revision managed"], "true", "{bom}");
+}
+
+/// ASM-API-GAPS: an assembly's Properties… (its name, part number, Subassembly BOM behavior, Exclude from all BOMs),
+/// as the parent's BOM reads them.
+#[test]
+fn assembly_properties_set_the_subassemblys_bom_row() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm-props.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1" }));
+    let p = call(&mut ctx, "assembly_properties", json!({ "tab": "Sub", "name": "Frame", "part_number": "FR-1", "bom_behavior": "Show Assembly only" }));
+    assert_eq!(p["properties"]["part_number"], "FR-1", "{p}");
+    assert_eq!(p["properties"]["state"], "In progress", "{p}");
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].clone();
+    assert_eq!(last, "Properties : Frame");
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Frame" }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Assembly 1", "type": "structured", "columns": ["Item", "Quantity", "Name", "Part number"] }));
+    let rows: Vec<(String, String)> = bom["rows"].as_array().unwrap().iter().map(|r| (r["name"].as_str().unwrap().to_string(), r["cells"]["Part number"].as_str().unwrap_or_default().to_string())).collect();
+    assert_eq!(rows, vec![("Frame".to_string(), "FR-1".to_string())], "Show Assembly only: no part rows under it: {bom}");
+    call(&mut ctx, "assembly_properties", json!({ "tab": "Frame", "exclude_from_bom": true }));
+    let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Assembly 1", "type": "structured" }));
+    assert!(bom["rows"].as_array().unwrap().is_empty(), "excluded: {bom}");
+    let e = try_call(&mut ctx, "assembly_properties", json!({ "tab": "Frame", "bom_behavior": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("bom_behavior"));
 }

@@ -63,12 +63,12 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "assembly",
             verb: "exploded_view",
-            summary: "Exploded views: add, rename or delete a view or a step, reorder steps",
-            description: "The Exploded views panel: `add` creates \"Explode N\" (renamed to `name` if given); `rename` renames a view (or its `step`); `delete` deletes a view (or its `step`); `move` drags `step` to row `to` in the explode mode's step list (\"Reorder : Explode steps\"); `lines` (with `on`) is the view's Show all explode lines / Hide all explode lines (every step's lines; one edit with that name). Add steps with assembly_explode_step.",
+            summary: "Exploded views: add, rename, duplicate or delete a view or a step, reorder steps",
+            description: "The Exploded views panel: `add` creates \"Explode N\" (renamed to `name` if given); `rename` renames a view (or its `step`); `duplicate` copies a view after it (\"<view> Copy 1\", the row menu's Duplicate); `delete` deletes a view (or its `step`); `move` drags `step` to row `to` in the explode mode's step list (\"Reorder : Explode steps\"); `lines` (with `on`) is the view's Show all explode lines / Hide all explode lines (every step's lines; one edit with that name). Add steps with assembly_explode_step.",
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("action", json!({ "type": "string", "enum": ["add", "rename", "delete", "move", "lines"] }), "What to do."),
+                req("action", json!({ "type": "string", "enum": ["add", "rename", "duplicate", "delete", "move", "lines"] }), "What to do."),
                 opt("on", json!({ "type": "boolean" }), "lines: show (true) or hide (false) all explode lines."),
                 opt("view", s(), "The view: its name or 1-based row."),
                 opt("step", json!({ "type": "integer", "minimum": 1 }), "A step of the view (1-based)."),
@@ -439,6 +439,13 @@ fn exploded_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 None => a.exploded_views[v].name = name.clone(),
             })?;
         }
+        "duplicate" => {
+            let v = view_row(&asm, a.opt_str("view")?.ok_or_else(|| OpError::param("view", "required"))?)?;
+            let mut copy = asm.exploded_views[v].clone();
+            copy.name = sa::duplicate_exploded_view_name(&asm, &copy.name);
+            let desc = format!("Duplicate : {}", copy.name);
+            commit_view_list(od, tab, &desc, &result, AssemblyViewList::ExplodedViews, ListChange::Inserted(v + 1), |a| a.exploded_views.insert(v + 1, copy))?;
+        }
         "delete" => {
             let v = view_row(&asm, a.opt_str("view")?.ok_or_else(|| OpError::param("view", "required"))?)?;
             match step_row(&asm, v, a)? {
@@ -470,7 +477,7 @@ fn exploded_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 }
             })?;
         }
-        _ => return Err(OpError::param("action", "add, rename, delete, move or lines")),
+        _ => return Err(OpError::param("action", "add, rename, duplicate, delete, move or lines")),
     }
     let now = assembly(od, tab)?;
     Ok(json!({ "exploded_views": json(now).1 }).into())

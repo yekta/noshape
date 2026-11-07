@@ -23,7 +23,7 @@ pub fn ops() -> Vec<Op> {
             group: "part",
             verb: "set_properties",
             summary: "Set a part's properties (the Properties dialog)",
-            description: "Name, description, part number, revision, vendor, project, product line, titles and a mass override (kg). Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog.",
+            description: "Name, description, part number, revision, vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and a mass override (kg); State is set by releases. Fields not given keep their value; an empty text clears it. Fields configured for the active configuration keep the part's own value, as in the dialog.",
             fields: vec![
                 doc_field(),
                 tab_field(),
@@ -32,15 +32,11 @@ pub fn ops() -> Vec<Op> {
                 opt("description", s(), "Description."),
                 opt("part_number", s(), "Part number."),
                 opt("revision", s(), "Revision."),
-                opt("vendor", s(), "Vendor."),
-                opt("project", s(), "Project."),
-                opt("product_line", s(), "Product line."),
-                opt("title1", s(), "Title 1."),
-                opt("title2", s(), "Title 2."),
-                opt("title3", s(), "Title 3."),
                 opt("mass_override", json!({ "type": ["number", "null"] }), "Mass override in kg (null: computed)."),
-                opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them."),
-            ],
+            ]
+            .into_iter()
+            .chain(meta_fields())
+            .collect(),
             mutates: true,
             destructive: false,
             run: set_properties,
@@ -147,12 +143,7 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             *f = x;
         }
     }
-    for (k, f) in [("vendor", &mut v.meta.vendor), ("project", &mut v.meta.project), ("product_line", &mut v.meta.product_line), ("title1", &mut v.meta.title1), ("title2", &mut v.meta.title2), ("title3", &mut v.meta.title3)] {
-        if let Some(x) = text(k)? {
-            *f = Some(x).filter(|s| !s.is_empty());
-        }
-    }
-    super::custom_props::apply_custom(a, &mut v.meta.custom)?;
+    apply_meta(a, &mut v.meta)?;
     match a.get("mass_override") {
         None => {}
         Some(serde_json::Value::Null) => v.mass_override = None,
@@ -168,6 +159,42 @@ fn set_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         out["configured_fields_kept"] = json!(configured);
     }
     Ok(out.into())
+}
+
+/// The Properties dialog's item fields of a part or an assembly: vendor, project, product line, titles, Not revision
+/// managed, Exclude from all BOMs, Unit of measure and custom properties (fields not given keep their value).
+pub(crate) fn apply_meta(a: &Args, meta: &mut noshape_model::partstudio::ItemMeta) -> Result<(), OpError> {
+    let text = |k: &str| -> Result<Option<String>, OpError> { Ok(a.opt_str(k)?.map(|x| x.trim().to_string())) };
+    for (k, f) in [("vendor", &mut meta.vendor), ("project", &mut meta.project), ("product_line", &mut meta.product_line), ("title1", &mut meta.title1), ("title2", &mut meta.title2), ("title3", &mut meta.title3)] {
+        if let Some(x) = text(k)? {
+            *f = Some(x).filter(|s| !s.is_empty());
+        }
+    }
+    meta.not_revision_managed = a.bool_or("not_revision_managed", meta.not_revision_managed)?;
+    meta.exclude_from_bom = a.bool_or("exclude_from_bom", meta.exclude_from_bom)?;
+    if let Some(u) = a.opt_str("unit_of_measure")? {
+        use noshape_model::configured_properties::UNITS_OF_MEASURE;
+        let u = UNITS_OF_MEASURE.iter().find(|x| x.eq_ignore_ascii_case(u.trim())).ok_or_else(|| OpError::param("unit_of_measure", &format!("one of {}", UNITS_OF_MEASURE.join(", "))))?;
+        // The first ("No value") is the default, stored as none.
+        meta.unit_of_measure = (*u != UNITS_OF_MEASURE[0]).then(|| u.to_string());
+    }
+    super::custom_props::apply_custom(a, &mut meta.custom)
+}
+
+/// The fields [`apply_meta`] reads.
+pub(crate) fn meta_fields() -> Vec<crate::registry::Field> {
+    vec![
+        opt("vendor", s(), "Vendor."),
+        opt("project", s(), "Project."),
+        opt("product_line", s(), "Product line."),
+        opt("title1", s(), "Title 1."),
+        opt("title2", s(), "Title 2."),
+        opt("title3", s(), "Title 3."),
+        opt("not_revision_managed", json!({ "type": "boolean" }), "Not revision managed."),
+        opt("exclude_from_bom", json!({ "type": "boolean" }), "Exclude from all BOMs."),
+        opt("unit_of_measure", json!({ "type": "string", "enum": noshape_model::configured_properties::UNITS_OF_MEASURE }), "Unit of measure."),
+        opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them."),
+    ]
 }
 
 fn table_json(ps: &noshape_model::PartStudio, body: &BodyId) -> serde_json::Value {

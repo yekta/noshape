@@ -2079,11 +2079,7 @@ impl AssemblyView {
     fn duplicate_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
         let Some(asm) = self.assembly(cx) else { return };
         let Some(mut v) = asm.exploded_views.get(i).cloned() else { return };
-        let mut k = 1;
-        while asm.exploded_views.iter().any(|e| e.name == format!("{} Copy {k}", v.name)) {
-            k += 1;
-        }
-        v.name = format!("{} Copy {k}", v.name);
+        v.name = noshape_ops::assembly::duplicate_exploded_view_name(asm, &v.name);
         let name = v.name.clone();
         self.edit_view_list(&format!("Duplicate : {name}"), noshape_model::drawing::AssemblyViewList::ExplodedViews, noshape_model::drawing::ListChange::Inserted(i + 1), cx, |a| a.exploded_views.insert(i + 1, v));
         if let Some(e) = self.explode.filter(|e| *e > i) {

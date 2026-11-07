@@ -10,7 +10,7 @@ use noshape_model::assembly::analysis::{instance_interferences, matched_targets}
 use noshape_model::assembly::bom::{self, BomColumn, BomType};
 use noshape_model::assembly::eval::SolveOptions;
 use noshape_model::assembly::{Assembly, InstanceId, InstancePattern, LinearDirection, MateId, MirrorPlacement, PatternKind, ReplicateScope, ScopeEntity};
-use noshape_model::document::TabId;
+use noshape_model::document::{TabContent, TabId};
 use noshape_units::ExprValue;
 use serde_json::{Value, json};
 
@@ -26,7 +26,30 @@ const KINDS: [&str; 5] = ["linear", "circular", "mirror", "part_pattern", "repli
 
 pub fn ops() -> Vec<Op> {
     let connector = json!({ "type": "object" });
+    let behaviors: Vec<&str> = noshape_model::assembly::BomBehavior::ALL.iter().map(|b| b.label()).collect();
     vec![
+        Op {
+            group: "assembly",
+            verb: "properties",
+            summary: "An assembly's Properties (its top row's Properties…, Tab › Properties…)",
+            description: "Without fields, replies with the assembly's properties. Name (the tab's), description, part number, revision, Subassembly BOM behavior, a mass override (kg), vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties; State is set by releases. Fields not given keep their value; an empty text clears it. One edit (\"Properties : <name>\").",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                opt("name", s(), "Name (the tab's)."),
+                opt("description", s(), "Description."),
+                opt("part_number", s(), "Part number."),
+                opt("revision", s(), "Revision."),
+                opt("bom_behavior", json!({ "type": "string", "enum": behaviors }), "Subassembly BOM behavior."),
+                opt("mass_override", json!({ "type": ["number", "null"] }), "Mass override in kg (null: computed)."),
+            ]
+            .into_iter()
+            .chain(crate::ops::parts::meta_fields())
+            .collect(),
+            mutates: true,
+            destructive: false,
+            run: properties,
+        },
         Op {
             group: "assembly",
             verb: "pattern",
@@ -616,4 +639,57 @@ fn change_to_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut out = describe(od, tab)?;
     out["changed"] = json!(changed);
     Ok(out.into())
+}
+
+fn properties_json(name: &str, p: &noshape_model::assembly::AssemblyProperties) -> Value {
+    json!({
+        "name": name,
+        "description": p.description, "part_number": p.part_number, "revision": p.revision,
+        "state": p.meta.state(), "vendor": p.meta.vendor, "project": p.meta.project, "product_line": p.meta.product_line,
+        "title1": p.meta.title1, "title2": p.meta.title2, "title3": p.meta.title3,
+        "not_revision_managed": p.meta.not_revision_managed, "exclude_from_bom": p.meta.exclude_from_bom,
+        "unit_of_measure": p.meta.unit_of_measure.clone().unwrap_or_else(|| noshape_model::configured_properties::UNITS_OF_MEASURE[0].into()),
+        "bom_behavior": p.bom_behavior.label(), "mass_override": p.mass_override, "custom": p.meta.custom,
+    })
+}
+
+fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let mut p = (*assembly(od, tab)?.properties).clone();
+    let mut name = od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default();
+    let before = (name.clone(), p.clone());
+    let text = |k: &str| -> Result<Option<String>, OpError> { Ok(a.opt_str(k)?.map(|x| x.trim().to_string())) };
+    if let Some(x) = text("name")? {
+        if x.is_empty() {
+            return Err(OpError::param("name", "an assembly needs a name"));
+        }
+        name = x;
+    }
+    for (k, f) in [("description", &mut p.description), ("part_number", &mut p.part_number), ("revision", &mut p.revision)] {
+        if let Some(x) = text(k)? {
+            *f = Some(x).filter(|s| !s.is_empty());
+        }
+    }
+    if let Some(b) = a.opt_str("bom_behavior")? {
+        let all = noshape_model::assembly::BomBehavior::ALL;
+        p.bom_behavior = *all.iter().find(|x| x.label().eq_ignore_ascii_case(b.trim())).ok_or_else(|| OpError::param("bom_behavior", &all.iter().map(|x| x.label()).collect::<Vec<_>>().join(", ")))?;
+    }
+    match a.get("mass_override") {
+        None => {}
+        Some(Value::Null) => p.mass_override = None,
+        Some(x) => p.mass_override = Some(x.as_f64().filter(|m| *m > 0.0).ok_or_else(|| OpError::param("mass_override", "a mass in kg greater than zero, or null"))?),
+    }
+    crate::ops::parts::apply_meta(a, &mut p.meta)?;
+    if (name.clone(), p.clone()) != before {
+        let label = format!("Properties : {name}");
+        od.session.edit_document(&label, |d| {
+            if let Some(t) = d.tab_mut(tab) {
+                t.name = name.clone();
+                if let TabContent::Assembly(asm) = &mut t.content {
+                    *asm.properties = p.clone();
+                }
+            }
+        })?;
+    }
+    Ok(json!({ "properties": properties_json(&name, &p) }).into())
 }

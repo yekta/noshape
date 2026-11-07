@@ -649,6 +649,15 @@ pub fn duplicate_position_name(a: &Assembly, name: &str) -> String {
     format!("{name} Copy {k}")
 }
 
+/// Duplicate exploded view's name: "<name> Copy 1", "<name> Copy 2"... (live asm-explode-duplicate).
+pub fn duplicate_exploded_view_name(a: &Assembly, name: &str) -> String {
+    let mut k = 1;
+    while a.exploded_views.iter().any(|v| v.name == format!("{name} Copy {k}")) {
+        k += 1;
+    }
+    format!("{name} Copy {k}")
+}
+
 /// Set a driving value of position `row` (a mate's value index `ix`);
 /// `current`: the mate's values now, for a mate the position hasn't stored.
 pub fn set_position_value(a: &mut Assembly, row: usize, mate: MateId, ix: usize, value: f64, current: [f64; 4]) {
