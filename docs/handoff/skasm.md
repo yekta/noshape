@@ -1850,4 +1850,7 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   qTubuc8Y6xsg and pIGznHdo2PDZ along y = -75.02), live's one; merging collinear pieces at joined-region vertices in
   `union_touching` changed nothing (the vertex isn't from a join): look at std's convertRegion opExtrude of the qUnion
   of regions in our host. cf-snap-hook Fillet 5 (4 R24 corner arcs on the bottom, tangent propagation): ours makes
-  each corner's blend ~15 small B-spline patches (59 faces, live 4); kernel blend splitting, core's fillet area.
+  each corner's blend ~15 small B-spline patches (59 faces, live 4). Path: OCCT's fillet_checked (4 edges, no
+  propagation, no overflow; `k::fillet_rust_accepts` refuses them): each arc lies between the bottom plane and a drafted
+  corner's cone about the same axis, so the exact blend is a torus; crates/brep's blend would need that case (bool's
+  area and gate). Handed back to the lead 11-07 (lead: skasm stays on sketches and sheet metal).
