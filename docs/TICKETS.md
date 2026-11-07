@@ -2888,6 +2888,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   to" / ours "Delete Part 2 <1>" (the right-click's menu as if the part were selected). Both match 2 / 2 run alone on the same
   green (tools/ui-parity/run.py --display :479). asm-face-menu matched in the 09:40 run, and no recording changed in between.
   Separately, asm-face-menu-clear-selection differs every time, also alone: step 2 `.list.highlighted` live 24 / ours null.
+  qa 17:46: the 16:34 run (3 shards, niced) had asm-face-menu-find-in-instance-list and asm-face-menu-section-view differ the
+  same way, and asm-empty-menu (step 1 `.list`, the empty-space menu); asm-empty-menu matches 2 / 2 run alone.
   (qa 2026-11-07 14:30)
 - [ ] P2 UIP-DRW-START-FLAKY (dx) **drawing scenarios differ at their start state in the 6-shard suite run, not alone**:
   `.drawing.views[0].scale` live "1:1" / ours null at the start (the view not ready when the state is read). 10 drw-*

@@ -36,6 +36,11 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 17:46:** the model suite on vibe2 reads qa's own copy, vibe2:~/qa-parity/models, rsynced from /root/parity/models
+before each run (qa-suites.sh): vibe2's shared /home/ngyekta/parity/models had 107 of the 128 entries (no assembly corpus), so the
+16:34 run counted 86 documents, not 88; from 20:34 the totals are this machine's again. 16:34's "worse" scenarios were all load
+flakes (drw-* starts, asm face / empty menus: matched alone).
+
 **11-07 17:10: the parity suites job changed (lead 11-07: the 16:34 run held this machine at load ~80 for 30 min, slowing
 live's / live2's Chrome).** qa-suites.sh now runs the ui-parity shards here with 3 shards under `nice -n 10`, and the model
 suite on vibe2 through rb.sh (`NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
