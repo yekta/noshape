@@ -1541,6 +1541,66 @@ fn named_position_restores_driving_mate_values() {
     assert!(old.mate_values.is_empty());
 }
 
+/// A planar face of a studio's first part whose normal points along +Z (`up`) or −Z.
+fn cap_face(r: &crate::regen::RegenResult, up: bool) -> Reference {
+    let b = &r.context.bodies[0];
+    let side = if up { 1.0 } else { -1.0 };
+    let i = (0..b.faces.len()).find(|i| b.shape.sub_shape(noshape_kernel::ShapeType::Face, *i).ok().and_then(|f| f.face_plane().ok().flatten()).is_some_and(|p| p.unit_normal().z * side > 0.99)).expect("a cap face");
+    Reference::Face((*b.faces[i]).clone())
+}
+
+/// Replicate of two seeds (live: several instances replicated together): the pin in the matched hole and a second
+/// pin Fastened to its end; each copy of the first gets a copy of the second where the seeds sit (it was cut to the
+/// first seed).
+#[test]
+fn replicate_takes_several_seeds() {
+    let f = doc_with(vec![plate_with_holes(), pin_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (plate, rp) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let (pin, rq) = body_of(&mut ev, &f.doc, f.studios[1]);
+    let b = &rp.context.bodies[0];
+    let hole = b
+        .faces
+        .iter()
+        .enumerate()
+        .find_map(|(i, n)| match b.shape.sub_shape(noshape_kernel::ShapeType::Face, i).ok()?.face_surface().ok()? {
+            noshape_kernel::Surface::Cylinder { origin, radius, .. } if (radius - 0.005).abs() < 1e-9 && origin.x < 0.0 => Some(Reference::Face((**n).clone())),
+            _ => None,
+        })
+        .unwrap();
+    let pf = cylinder_face(&rq);
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Plate <1>", f.studios[0], plate, DVec3::ZERO, true),
+            part_instance(2, "Pin <1>", f.studios[1], pin.clone(), DVec3::new(0.0, 0.05, 0.0), false),
+            part_instance(3, "Pin <2>", f.studios[1], pin, DVec3::new(0.0, 0.05, 0.05), false),
+        ],
+        mates: vec![
+            mate(10, MateType::Revolute, conn(1, hole, Inference::MidAxis), conn(2, pf, Inference::MidAxis)),
+            mate(11, MateType::Fastened, conn(3, cap_face(&rq, false), Inference::Centroid), conn(2, cap_face(&rq, true), Inference::Centroid)),
+        ],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().all(|m| m.ok));
+    asm.patterns.push(InstancePattern { id: MateId(80), name: "Replicate 1".into(), kind: PatternKind::Replicate { mate: MateId(10), all_instances: false, scope: None, scope_refs: vec![] }, seeds: vec![InstanceId(2), InstanceId(3)], generated: vec![], suppressed: false });
+    let targets = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap();
+    let created = asm.sync_matched_pattern(MateId(80), targets);
+    assert_eq!(created.len(), 2, "a copy of each seed");
+    assert_eq!(asm.pattern_mates(&asm.patterns[0]).count(), 2, "the matched mate's copy and the Fastened's");
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.mates.iter().all(|m| m.ok), "{:?}", res.mates.iter().map(|m| &m.message).collect::<Vec<_>>());
+    let at = |i: InstanceId| DVec3::from(res.solved.placement(i).unwrap().translation);
+    assert!((at(created[0]).truncate() - glam::DVec2::new(0.02, 0.0)).length() < 1e-6, "the pin's copy in the other hole: {:?}", at(created[0]));
+    let seeds = at(InstanceId(3)) - at(InstanceId(2));
+    assert!((seeds.length() - 0.03).abs() < 1e-6, "the seeds stacked: {seeds:?}");
+    assert!((at(created[1]) - at(created[0]) - seeds).length() < 1e-6, "the second pin's copy against the first's as the seeds: {:?}", at(created[1]) - at(created[0]));
+    // Synced again: nothing more.
+    let targets = analysis::matched_targets(&res, &asm, &asm.patterns[0], &UnitPrefs::default()).unwrap();
+    assert!(asm.sync_matched_pattern(MateId(80), targets).is_empty());
+    assert_eq!(asm.mates.len(), 4);
+}
+
 #[test]
 fn replicate_updates_when_target_geometry_changes() {
     let mut f = doc_with(vec![plate_with_holes(), pin_studio()]);
@@ -2052,7 +2112,7 @@ fn rename_hide_others_and_unfix_all() {
         name: "Linear pattern 1".into(),
         kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 2, opposite: false, equal_spacing: false, second: None, centered: false },
         seeds: vec![InstanceId(1)],
-        generated: vec![PatternInstance { seed: InstanceId(1), index: 1, instance: InstanceId(1), mate: None, target: None }],
+        generated: vec![PatternInstance { seed: InstanceId(1), index: 1, instance: InstanceId(1), mate: None, target: None, more_mates: Vec::new() }],
         suppressed: false,
     });
     asm.groups.push(Group { id: MateId(21), name: "Group 1".into(), instances: vec![], suppressed: false, patterns: vec![MateId(30)], hidden: false });

@@ -1164,7 +1164,8 @@ impl AssemblyView {
         };
         let generated = s.editing.and_then(|id| asm.pattern(id)).map(|p| p.generated.clone()).unwrap_or_default();
         let id = s.editing.unwrap_or_else(|| MateId(asm.next_id()));
-        let seeds = if s.kind.matched() { s.seeds[..1].to_vec() } else { s.seeds.clone() };
+        // Replicate takes several seeds (the first matched, the others following it); a part pattern one.
+        let seeds = if s.kind == PatternDialogKind::PartPattern { s.seeds[..1].to_vec() } else { s.seeds.clone() };
         Ok(InstancePattern { id, name: s.name.clone(), kind, seeds, generated, suppressed: false })
     }
 

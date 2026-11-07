@@ -2469,7 +2469,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `kind` | one of `linear`, `circular`, `mirror`, `part_pattern`, `replicate` |  | Pattern type (required for a new pattern). |
-| `seeds` | array of string |  | Instances to pattern (ids or names); part pattern / replicate use the first. |
+| `seeds` | array of string |  | Instances to pattern (ids or names); replicate: the first is the matched mate's, the others follow it through their mates to it (a bolt and its washer); a part pattern uses the first. |
 | `direction` | object |  | Linear: the direction; circular: the axis; mirror: the plane. A mate connector, as in assembly_mate (an edge, a face or {"connector": ...}). |
 | `distance` | string or number |  | Linear: the spacing (default 25 mm); circular: the angle (default 360 deg). |
 | `count` | integer |  | Instance count, the seed included (default 2). |
