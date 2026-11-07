@@ -1870,3 +1870,81 @@ fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
     let area = strip.and_then(|f| f.area().ok()).unwrap_or(0.0) * 1e6;
     assert!((area - 12.7 * 1.628).abs() < 1e-3, "the tab's bottom strip: {area} mm²: {:#?}", face_report(&r));
 }
+
+/// A flange aligned at its bend on a plate with a hole (c2-sm-louver's Flange 9: its wall has holes): std moves the
+/// plate's edge back to align the flange, the hole staying as it is ("Cannot create flange with selected alignment"
+/// while ours couldn't change an edge of a face with holes).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_bend_aligned_flange_on_a_plate_with_a_hole() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (0.0, 40.0)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    sk.add_circle(glam::DVec2::new(mm(30.0), mm(20.0)), mm(5.0));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions.iter().max_by(|a, b| a.area.total_cmp(&b.area)).unwrap().key.clone();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("THICKEN"));
+        pv.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        pv.set("thickness", expr("2 mm"));
+        pv.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(30.0, 40.0, 2.0));
+    s.add("sheetMetalFlange", |pv| {
+        pv.set("edges", ParamValue::Query(vec![edge]));
+        pv.set("distance", expr("20 mm"));
+        pv.set("flangeAlignment", en("BEND"));
+    });
+    let r = s.ok();
+    assert!(r.context.bodies[part(&r)].shape.faces().iter().any(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. })) && f.area().is_ok_and(|a| (a * 1e6 - std::f64::consts::PI * 10.0 * 2.0).abs() < 1e-3)), "the hole's wall");
+}
+
+/// A bend relief's round is centred (depth scale - 1) × R past the bend's tangent line, also on a bend that isn't 90°
+/// (live 2254: c2-sm-louver's Flange 3, depth scale 1, the round centred on the tangent line 0.51 mm past the tab).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_bend_reliefs_round_is_centred_on_the_tangent_line() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (12.7, 40.0), (12.7, 39.725), (0.0, 39.725)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    for i in 0..p.len() {
+        sk.add_line_between(p[i], p[(i + 1) % p.len()]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("THICKEN"));
+        pv.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        pv.set("thickness", expr("1.628 mm"));
+        pv.set("radius", expr("1.628 mm"));
+        pv.set("defaultBendReliefDepthScale", expr("1"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(36.0, 40.0, 1.628));
+    s.add("sheetMetalFlange", |pv| {
+        pv.set("edges", ParamValue::Query(vec![edge]));
+        pv.set("distance", expr("20 mm"));
+        pv.set("flangeAlignment", en("INNER"));
+        pv.set("bendAngle", expr("50 deg"));
+    });
+    let r = s.ok();
+    let cylinders: Vec<(DVec3, DVec3, f64)> = r.context.bodies[part(&r)].shape.faces().iter().filter_map(|f| match f.face_surface() {
+        Ok(noshape_kernel::Surface::Cylinder { origin, axis, radius, .. }) => Some((origin, axis, radius)),
+        _ => None,
+    }).collect();
+    let bend = cylinders.iter().find(|c| c.1.x.abs() > 0.999 && (c.2 - mm(1.628)).abs() < 1e-9).expect("the bend's inner face");
+    let round = cylinders.iter().find(|c| c.1.z.abs() > 0.999 && (c.2 - mm(1.628 * 1.0625 / 2.0)).abs() < 1e-9).unwrap_or_else(|| panic!("the relief's round: {:#?}", face_report(&r)));
+    assert!((round.0.y - bend.0.y).abs() < 1e-7, "the round at y {} mm, the tangent line at {} mm", round.0.y * 1e3, bend.0.y * 1e3);
+}

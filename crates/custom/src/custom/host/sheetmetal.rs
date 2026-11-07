@@ -602,8 +602,13 @@ fn pulled_face(face: &Shape, l: &Loop, n: DVec3, offset: &[f64], free: impl Fn(u
         let len = a.distance(b);
         let d = (b - a) / len;
         let u = inward(l, n, k);
-        let across = |j: usize| free(j) && (l.curved[j] || (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero().cross(d).length() > 1e-6);
-        let (s0, s1) = (if across((k + m - 1) % m) { -big } else { 0.0 }, if across((k + 1) % m) { len + big } else { len });
+        let in_line = |j: usize| (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero().cross(d).length() <= 1e-6;
+        // A free side across shorter than the pull, to a free side running on in line, doesn't stop the strip: it
+        // ends at the bend's end (c2-sm-louver's Flange 3: a 0.275 mm step to the tab, the tab kept whole).
+        let runs_on = |j: usize, beyond: usize| {
+            free(j) && (l.curved[j] || (!in_line(j) && !(l.pts[(j + 1) % m].distance(l.pts[j]) < off && free(beyond) && !l.curved[beyond] && in_line(beyond))))
+        };
+        let (s0, s1) = (if runs_on((k + m - 1) % m, (k + m - 2) % m) { -big } else { 0.0 }, if runs_on((k + 1) % m, (k + 2) % m) { len + big } else { len });
         let quad = [a + d * s0 - u * big, a + d * s1 - u * big, a + d * s1 + u * off, a + d * s0 + u * off];
         let w = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
         strips.push(k::make_face_from_wire(&w, true).map_err(|e| fe(e.to_string()))?);
@@ -764,10 +769,10 @@ fn relief_tools(def: &Definition, topo: &Topo, fi: usize, l: &Loop, n: DVec3, th
                 if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 || connector > radius + TOL {
                     continue;
                 }
-                // A bend edge moved in (Outer alignment) still gets its
-                // relief's depth past it (live request 1599 (a): y 40 → 32
-                // for an edge moved from 40 to 38, depth 6).
-                (base, (-(base - l.pts[k]).dot(into)).max(0.0))
+                // How far the bend's edge lies in from the free side (a bend edge moved in by Outer alignment: live
+                // request 1599 (a), y 40 → 32 for an edge moved from 40 to 38, depth 6; negative where the free side
+                // steps in to a tab, c2-sm-louver's Flange 3).
+                (base, -(base - l.pts[k]).dot(into))
             };
             // Another joint starting at the bend's end, or within its bend
             // zone (the plate's edge to a Hem's arc, which starts where the
@@ -784,15 +789,26 @@ fn relief_tools(def: &Definition, topo: &Topo, fi: usize, l: &Loop, n: DVec3, th
                 continue;
             }
             let w = relief.width * thickness;
-            let straight = relief.sized_depth.unwrap_or(relief.depth * radius) + moved_in;
+            // A scaled relief's round is centred depth × R × tan(angle / 2) in from the bend's edge (live 2254: d × R
+            // at 90°, on the tangent line at depth 1 for c2-sm-louver's 51.5° Flange 3; past 90° not seen, d × R kept);
+            // a sized one's depth runs from the free side.
+            let straight = match relief.sized_depth {
+                Some(d) => d + moved_in.max(0.0),
+                None => {
+                    let half = bend_angle(def, topo, fi, l.side[k], radius)?.min(std::f64::consts::FRAC_PI_2) * 0.5;
+                    moved_in + relief.depth * radius * half.tan()
+                }
+            };
             let v = v + away * bend_side_back(def, topo, fi, l.side[k], bend_end, away, radius)?;
             let depth = if relief.style.ends_with("RECTANGLE") { straight + w * 0.5 } else { straight };
             // Through the whole thickness and a little more.
             let base = v - n * (def.back + thickness);
-            let quad = [base, base + away * w, base + away * w + into * depth, base + into * depth];
-            let wire = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
-            let face = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
-            out.push((k::extrude(&face, n * thickness * 3.0).map_err(|e| fe(e.to_string()))?.shape, vi));
+            if depth > TOL {
+                let quad = [base, base + away * w, base + away * w + into * depth, base + into * depth];
+                let wire = k::make_polyline(&quad, true).map_err(|e| fe(e.to_string()))?;
+                let face = k::make_face_from_wire(&wire, true).map_err(|e| fe(e.to_string()))?;
+                out.push((k::extrude(&face, n * thickness * 3.0).map_err(|e| fe(e.to_string()))?.shape, vi));
+            }
             if relief.style.ends_with("OBROUND") {
                 let frame = k::Plane::new(base + away * (w * 0.5) + into * depth, n, away);
                 out.push((k::make_cylinder(&frame, w * 0.5, thickness * 3.0, std::f64::consts::TAU).map_err(|e| fe(e.to_string()))?, vi));
@@ -800,6 +816,12 @@ fn relief_tools(def: &Definition, topo: &Topo, fi: usize, l: &Loop, n: DVec3, th
         }
     }
     Ok(out)
+}
+
+/// Bend `bend`'s angle beside wall `fi` (90° when it has no other wall).
+fn bend_angle(def: &Definition, topo: &Topo, fi: usize, bend: usize, radius: f64) -> FResult<f64> {
+    let Some(&other) = topo.edge_faces[bend].iter().find(|&&f| f as usize != fi) else { return Ok(std::f64::consts::FRAC_PI_2) };
+    Ok(bend_geometry(topo, bend, fi, other as usize, radius, def.front, def.back)?.angle)
 }
 
 /// How far the relief at bend `bend`'s end `v` on wall `fi` starts back along the bend (`away`: out of the bend):

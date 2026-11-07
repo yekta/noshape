@@ -45,6 +45,26 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## Resume here (2026-11-07 23:40 UTC, restarted on a pinned account)
+- c2-sm-louver: Flange 4's "Cannot create flange with selected alignment" was fixed before the restart (b933b1d3).
+  Flange 9's same error was std's edge change refusing a wall with holes (edge_change.rs `outer_and_holes`: the
+  holes kept as they are); Part 5 now = live; model suite otherwise unchanged (70/86, 711/934).
+- Flange 3 (live 2254): our tab beside the 0.275 mm step was cut back to the bend's tangent line (the curved-wall
+  fallback `pulled_face` ran the bend's strip on past the flange's end over a short step side; now it stops there:
+  the whole 10.37 mm³). The relief's round is centred d × R × tan(angle / 2) in from the bend's edge (d × R at 90°,
+  as the plain-plate probes and cf-sheet-metal-model-plus; on the tangent line at the louver's 51.5°, d 1), the step
+  counted signed. T2 sheetmetal_std a_bend_reliefs_round_is_centred_on_the_tangent_line (50° Inner flange).
+  c2-sm-louver 11 -> 24/36. Past 90° the relief keeps d × R (live's rule there not probed).
+- louver feature 6 "Louver" (live all-PLANE bends) is the UI-method fetch's artefact (live 2143: a bend of any angle
+  is a cylinder in live); its live.jsonl is still the UI fetch (float32 boxes): a REST refetch is dx's / live's.
+- louver Linear pattern 2: live copies one body (RTDD, Part 3 as after Flange 4) 10 times (5 -> 15 parts); ours copies
+  3 parts (35), its copies 34/96/64 for live's 56/146/92. Next to look at.
+- c2-valve-config Extrude 3 (11 circle / 48 other edges for 9 / 50): not the text. Open Sans Bold's "6" has a straight
+  13-unit segment (356,780)-(369,780) in both; Extrude 3 runs it up to Revolve 1's REVOLVED face, which a plane
+  square to its axis cuts in a circle (Parasolid says so; OCCT's splitter gives a B-spline). Bool's `op_prism_until`.
+- c2-duct-multipart Sketch 6 / 7 frames: live's x on a tilted extruded face isn't core's 1897 normal rule (Sketch 7:
+  live x (0.834, 0, 0.552) = the profile line's direction, the rule's (0, 1, 0)); asked of live (REQUESTS 23:16).
+
 ## Resume here (2026-11-05 03:01 UTC)
 - Landed 11-05: ScopeRule 11 blend finish (b0595b8f; core.md), subassembly "Add to named positions…" + the
   Lock/follow submenu as live (941e629a1), ellipse value boxes (b39029065). The mate dialog's undo pause (4200ad954)

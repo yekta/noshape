@@ -287,12 +287,9 @@ type FaceLoop = (Vec<DVec3>, Vec<Option<Move>>, Vec<Option<usize>>);
 /// A face's outer loop: corners, the move of each side (`pts[k]` to
 /// `pts[k + 1]`) if it moves, and the index of each side's edge in `all`.
 fn face_loop(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<FaceLoop> {
-    let wires = f.wires();
-    if wires.len() != 1 {
-        return err("Edges of faces with holes cannot be changed yet");
-    }
+    let (outer, _) = outer_and_holes(f, moved)?;
     let mut segs = Vec::new();
-    for e in wires[0].edges() {
+    for e in outer.edges() {
         let info = e.edge_info().map_err(fe)?;
         if !matches!(info.curve, k::Curve::Line { .. }) {
             return err("Only straight edges can be changed yet");
@@ -312,6 +309,33 @@ fn face_loop(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<FaceL
     Ok((pts, sides, froms))
 }
 
+/// A planar face's outer wire and its holes, which no moved edge may be on (a hole stays as it is: c2-sm-louver's
+/// Flange 9 aligns a wall with holes).
+fn outer_and_holes(f: &Shape, moved: &[(Shape, Move)]) -> FResult<(Shape, Vec<Shape>)> {
+    let size = |w: &Shape| w.bounding_box(false).map_or(0.0, |b| b.diagonal());
+    let wires = f.wires();
+    let Some(outer) = wires.iter().max_by(|a, b| size(a).total_cmp(&size(b))).cloned() else { return err("A face has no boundary") };
+    let holes: Vec<Shape> = wires.into_iter().filter(|w| !w.is_same(&outer)).collect();
+    if holes.iter().any(|h| h.edges().iter().any(|e| moved.iter().any(|(m, _)| m.is_same(e)))) {
+        return err("Edges of a face's holes cannot be changed yet");
+    }
+    Ok((outer, holes))
+}
+
+/// `f`'s face rebuilt on its plane from the new outer `wire` and its holes, facing as `n`.
+fn rebuilt_face(f: &Shape, wire: &Shape, holes: &[Shape], n: DVec3) -> FResult<Shape> {
+    let mut face = if holes.is_empty() {
+        k::make_face_from_wire(wire, true).map_err(fe)?
+    } else {
+        let Some(pl) = f.face_plane().map_err(fe)? else { return err("Only edges of planar faces can be changed yet") };
+        k::make_face(&k::Plane::new(pl.origin, n, pl.unit_x()), wire, holes).map_err(fe)?
+    };
+    if normal(&face)?.dot(n) < 0.0 {
+        face = face.reversed().map_err(fe)?;
+    }
+    Ok(face)
+}
+
 /// An old edge's index and its new segment (start, end).
 type Segment = (usize, DVec3, DVec3);
 
@@ -319,13 +343,10 @@ type Segment = (usize, DVec3, DVec3);
 /// neighbours run to its new ends (a curved neighbour of a moved edge isn't supported). The face and each old
 /// straight edge's new segment.
 fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FResult<(Shape, Vec<Segment>)> {
-    let wires = f.wires();
-    if wires.len() != 1 {
-        return err("Edges of faces with holes cannot be changed yet");
-    }
+    let (outer, holes) = outer_and_holes(f, moved)?;
     let n = normal(f)?;
     // The loop's edges in order, each with its start and end along the loop.
-    let mut rest: Vec<(Shape, DVec3, DVec3)> = wires[0].edges().into_iter().map(|e| e.edge_info().map(|i| (e, i.start, i.end)).map_err(fe)).collect::<FResult<_>>()?;
+    let mut rest: Vec<(Shape, DVec3, DVec3)> = outer.edges().into_iter().map(|e| e.edge_info().map(|i| (e, i.start, i.end)).map_err(fe)).collect::<FResult<_>>()?;
     let mut order: Vec<(Shape, DVec3, DVec3)> = vec![rest.swap_remove(0)];
     while !rest.is_empty() {
         let at = order[order.len() - 1].2;
@@ -393,10 +414,15 @@ fn change_curved_face(f: &Shape, moved: &[(Shape, Move)], all: &[Shape]) -> FRes
         }
     }
     let wire = k::make_wire(&edges).map_err(fe)?;
-    let mut face = k::make_face_on(f, &wire).map_err(fe)?;
-    if normal(&face)?.dot(n) < 0.0 {
-        face = face.reversed().map_err(fe)?;
-    }
+    let face = if holes.is_empty() {
+        let mut face = k::make_face_on(f, &wire).map_err(fe)?;
+        if normal(&face)?.dot(n) < 0.0 {
+            face = face.reversed().map_err(fe)?;
+        }
+        face
+    } else {
+        rebuilt_face(f, &wire, &holes, n)?
+    };
     Ok((face, segments))
 }
 
@@ -565,11 +591,8 @@ fn change_edges(shape: &Shape, offsets: &BTreeMap<(usize, Option<usize>), Move>,
             continue;
         }
         let wire = k::make_polyline(&new, true).map_err(fe)?;
-        let mut face = k::make_face_from_wire(&wire, true).map_err(fe)?;
-        if normal(&face)?.dot(*n) < 0.0 {
-            face = face.reversed().map_err(fe)?;
-        }
-        rebuilt.push(face);
+        let (_, holes) = outer_and_holes(f, &[])?;
+        rebuilt.push(rebuilt_face(f, &wire, &holes, *n)?);
     }
     // In the faces' order.
     let mut rebuilt = rebuilt.into_iter();
