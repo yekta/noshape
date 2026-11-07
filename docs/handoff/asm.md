@@ -65,7 +65,36 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
   1's Insert scenarios would not have found it). Asked of live: a triad target and configurations in starts (the last
   uncovered menu items: triad Move to origin / Align / Rotate, the configuration items).
 
+- Batch 5 (asm 11-06 23:50, 31 scenarios): the right-hand panels (Exploded views: add, row menus, Show / Hide all
+  explode lines, Duplicate, Reset starting position; Named positions: add, Apply / Edit / Duplicate / Update / Move up
+  / Move down; BOM: Copy table), the assembly's Configuration panel (Add input, Copy input / all inputs, Visibility
+  conditions, Input propagation, Configure suppression), a subassembly's Unlock (locked first) and Add to named
+  positions, Change to version…, Edit named position driver mate…, Switch to Part Studio. New targets: the strip's and
+  panels' buttons by tooltip, `panel_row`, `panel_more`; the assembly's config panel marks psui's `config_more`.
+- Left uncovered (13 menu items): the triad menu (Move to origin, Align / Anti-align with Z, Rotate 90 / 180 deg) and a
+  configured Part Studio's instance items (Change configuration…, Select instances with same configuration ×2, the
+  Insert dialog's Reset to default / Set to last viewed): both asked of live (batch 4); Edit in context ▸ Create new
+  context (needs a feature picking ghost geometry first, as live), Open linked document (another document), Edit
+  standard content instance… (needs standard content inserted).
+
+## Assembly model suite (lead 11-06; docs/PARITY-SUITES.md §4, SCORE.md "Assemblies")
+- T2 `parity_assemblies` (crates/ops/tests/parity.rs) over /root/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES; on
+  vibe3 the copy is ~/agents/asm/parity-asm, rsync it after live adds documents). `rebuild_assembly`
+  (crates/ops/src/parity.rs): Part Studios by dx's translator, then each level (subassemblies first, each its own
+  "Sub <eid>" tab) inserted, fixed and placed as live's occurrences (a nested instance relative to its subassembly's
+  occurrence), mates between the same connectors (root mates reach nested parts by path); top-level instances held at
+  live's places, compared (top-level by placement, nested parts by assembly_list's `occurrences`), freed: our mates
+  mustn't move them; mate status as live's. Not yet: patterns, groups, relations, mate limits, configurations, BOM
+  (waiting on live's corpus to see their JSON).
+- 11-06 23:54: 3/3 assemblies, occurrences 8/8, mates 5/5 (live's three built cases). Corpus of 15–20 public
+  assemblies asked of live (REQUESTS, asm 23:5x).
+- Agent API gaps found and fixed for it: a mate to a part inside a subassembly (assembly_mate / assembly_entities /
+  assembly_connectors take "Sub <1> > Part 1 <1>"; e2e a_mate_reaches_a_part_inside_a_subassembly), assembly_list's
+  `occurrences` (every part occurrence's place).
+
 ### Coverage (tools/ui-parity/coverage_assembly.py)
+- 11-07 00:05 (asm, with batch 5): toolbar 31/31 (Mate relation = the relation tools), panels 3/3, menu items 73/86,
+  shortcuts 5/5 (129 asm-* scenarios).
 - 11-06 22:45 (asm, with batch 4): toolbar 30/31, menu items 51/86, panels 0/3, shortcuts 5/5 (98 asm-* scenarios).
 - 11-06 20:50 (asm, with batch 3): toolbar 30/31, menu items 45/86 (92 scenarios).
 - 11-06 evening (skasm): toolbar 23/31, menu items 18/86, panels 0/3, shortcuts 4/5.
