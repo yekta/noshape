@@ -122,3 +122,4 @@ parity::parity_assemblies -- --ignored --nocapture` (NOSHAPE_PARITY_ASSEMBLIES f
 |---|---|---|---|---|---|---|
 | 2026-11-06 | 0dfa4c2da (23:54) | 3/3 | 8/8 | 5/5 | – | only live's 3 small built cases so far; the public corpus (15–20 assemblies) asked of live |
 | 2026-11-07 | 2cbc4192e (08:00) | 4/24 | 181/1731 | 19/23 | – | live's corpus is in (24); 9 big public ones lose their Part Studios' features in translation (no mates rebuilt, "0/0 mates"): the translator's gaps, next; the suite now names parts from the assembly when live sent `.mass.json` only (it skipped every such studio before) |
+| 2026-11-07 | d987386b5 (08:45) | 4/24 | 530/1731 | 51/58 | – | live's part names map to ours (by name, only part, or `.mass.json` volume band): scissor-lift 167/242, pattern-std 76/162, isaac-ball 71/121; what's left is Part Studio translation (variables, patterns, external references: dx's translator) and xdev-subs' subassemblies (4/286) |
