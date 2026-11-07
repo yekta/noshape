@@ -77,6 +77,20 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
   context (needs a feature picking ghost geometry first, as live), Open linked document (another document), Edit
   standard content instance… (needs standard content inserted).
 
+- 11-07 (lead: settle batches 1-5 from live's captures): every menu our runs record compared with behaviours.md's
+  captures (instance row 1357, viewport instance, top row 1222 / 11150, Origin row, mate row 1361, connector row
+  29018, folder row 1224 + screenshot assembly/537 (its Dynamic suppression ▸ / Expand ▸ / Collapse ▸ are live's: the
+  text list left them out), subassembly row 1226, explode rows 3139 / 1847, named position rows 1345, BOM ⋯ 1280,
+  assembly configuration ⋯ 1298, panel ⋯ 28421, configured instance 6116): all equal. Dialogs settled by the
+  captures and now in our recorded state: Origin of new Part Studio, Dynamic suppression, Driving mate selector,
+  Reference manager, Section view (app-core `section_dialog::state`, shared with the Part Studio: its 6 section
+  scenarios still match), Properties / Instance properties modals (focus "other"). Not captured, left for live2's
+  recordings: Check interference, Display states, Animate, the Folder name dialog.
+- Batch 6 (11-07, 11 scenarios): the triad's menus (`{"triad": "x" | "ring-z" | "origin"}`) and a configured Part
+  Studio's instance items (start `config-blocks`: starts.json `"configuration"`, built by ops ui_parity). Menus
+  81/86; left: Create new context, Open linked document, Edit standard content instance…, the Insert dialog's Reset
+  to default / Set to last viewed (each needs a longer setup).
+
 ## Assembly model suite (lead 11-06; docs/PARITY-SUITES.md §4, SCORE.md "Assemblies")
 - T2 `parity_assemblies` (crates/ops/tests/parity.rs) over /root/parity/models/asm-* (NOSHAPE_PARITY_ASSEMBLIES; on
   vibe3 the copy is ~/agents/asm/parity-asm, rsync it after live adds documents). `rebuild_assembly`
