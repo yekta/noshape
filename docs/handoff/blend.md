@@ -126,3 +126,28 @@ features): those are next, the slowest first (michael's Fillet 2).
   (66 % of the comparable blend time). michael's cut: `fillet_by_tools`, declined by noshape's Boolean ("a non-manifold
   result"), OCCT ~600 ms: what the Boolean would need is in bool.md ("From blend 23:10").
 - Kernel timers added for the record (not landed): blend.checked.build / .valid / .shrunk, blend.scaled.finish.
+
+## BLEND-DIRECT: blends built with no cut (lead 11-07 23:20: design (b))
+Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
+ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's
+Fillet 1 + Chamfer 1 828 ms, live 53; michael's Fillet 2 629 ms, live 46). The rounds themselves are cheap (OCCT's
+lone-rim fillet ~9 ms); the cut has to rediscover what we know: which face each touch curve lies on.
+
+Design (stages, each through bool's gate and the before / after suite):
+1. **Rims: a plane x a cylinder, round or chamfer** (ring_blend's cases). Per rim, exactly: the spine (where the
+   offset plane meets the offset cylinder: an ellipse), the touch curves (the spine moved onto the plane and radially
+   onto the cylinder: both ellipses, sharing the spine's angle as parameter), the blend (a chamfer: the ruled surface
+   between the touch ellipses, exact as a rational NURBS in that shared parameter; a round: the ball's pipe round the
+   spine, a NURBS fitted to it within 1e-7 x size). Trims, all between surfaces we know: a touch curve leaving its
+   face (where it crosses that face's other edges: a curve on a plane or cylinder against edges, 2D), two rims' blends
+   meeting (one curve; on the mirror plane when the rims mirror each other, else marched in the two rims' angles), a
+   blend running out onto another face (marched on the blend against that plane / cylinder). Then the faces: the
+   plane and cylinder re-bounded by the touch curves (2D splits of their parameter domains), the blends bounded by
+   their curves, the run-out faces split by theirs; sewn, every new edge with exact pcurves. Built in crates/brep
+   (geometry + topology in its arenas) and handed to OCCT shapes by the blend bridge (rust_blend.cpp), names and
+   history as ring_blend's.
+2. **michael's Fillet 2** (fillet_by_tools' cases: lines between planes, arcs between a plane and the cylinder they
+   bound, balls at mitres): the same scheme with cylinders, tori and sphere octants as the blends (all exact), the
+   mitres where two rounds' axes cross.
+Each stage falls back to today's route where its checks fail (a budget only as a hang guard). T1s: rings-loft's ring
+(data/rings-loft-ring.brep) against live's numbers, and michael's part.
