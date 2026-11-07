@@ -1,0 +1,33 @@
+{
+  "name": "drw-asm-view-display-show-all",
+  "about": "An assembly view's menu › Display state ▸ Show all (greyed while no display state is chosen)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Display state"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Show all"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

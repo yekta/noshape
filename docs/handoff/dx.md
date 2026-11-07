@@ -57,6 +57,34 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
   click that drw-hide-inspection-items records adding one) is worth a re-record too.
 
+## 11-07 20:04 UTC: paused until 11-10 (lead: Claude quota). Where everything stands
+- **Ownership change (lead 11-07):** the Feature Studio editor's UI and its scenarios belong to the new `studios` agent;
+  dx keeps the FeatureScript language and host and answers studios' questions about them.
+- **Drawing menus: 93/105 covered** (scenarios written, run clean on ours, filed with live2 in REQUESTS: batches 12-21
+  and the single ones after). Live2 still has to record them: everything from batch 12 on is unrecorded, plus 12
+  re-records (REQUESTS 15:45) and the detail view re-record with export. Their panels' texts (section / aux / detail
+  edit, Show/hide parts, revision table dialogs, Replace's chooser) get records once live's wording is in.
+  - Uncovered (12): Change configuration... (needs a configured drawing source), Cut list table properties... (needs a
+    frame start), Edit section (angular cut), Hide dimension (a datum target with an origin), Image properties... (a
+    file in the start), Merge with cell below (a revision table with a data row), Open Feature Studio in linked
+    document (a linked document), Remove foreshorten (only on a radius foreshortened before: no UI makes one, live's
+    radial menu has none), None (Edit hatch section's General ▾: its tabs show only after a hatch is picked in the
+    dialog; the hatch tabs and pattern ▾ need runner marks), Show (the model annotations panel: a Part Studio with MBD),
+    Unpin view reference (a pinned reference: a version in the start).
+  - Revision table rows: all scenarios wait on an account whose plan has the tool (REQUESTS); if none, mark them
+    unrecordable in coverage_drawing.py.
+  - Runner targets added today: hole_axis, sheet_ref, sheet_table, leader, panel_row (Inspection table), panel_more
+    (Inspection table), marks on several dialogs (README "### Drawings"); start key feature_studio.
+- **Drawing interaction fixes today:** the selection as live's; 13 panels recorded; the table scenarios 1 -> 10/10
+  (merging no longer moves columns, so Unmerge is under the merged cell; the Cell panel only for one plain cell; Remove
+  keeps a cell; the cell's Note panel); a broken-out section's menu from its hatch; the Detail tool snaps its radius;
+  the Sheets panel row is sheet_tab while open; an aligned section recorded as Section; Inspection item as live (nine
+  shapes, Number, per-item shape and width); Sheet properties' Reference with Unassigned.
+- **Drawing export: 19/24 files** match live's (all 8 DWG). Waiting on live: a section's Auto hatch spacing (REQUESTS;
+  section view PDF), the BOM table's layout and pen (REQUESTS; BOM PDF and DXF), the detail view re-record (its
+  clicks are now two vertices; detail PDF and DXF).
+- **Landing:** check `tools/tiers/land.sh --status` first on resume; a failed land is the first task.
+
 ## 11-07 18:35 UTC: drawing menu coverage 46 -> 92/105 (lead: the rest, adding starts and targets)
 - Runner targets added (README "### Drawings"): `hole_axis`, `sheet_ref`, `sheet_table`, `leader` {annotation, at},
   `panel_more: Inspection table`; marks on the Datum dialog's tabs, Drawing properties' tabs (`tab:<tooltip>`) and
