@@ -772,6 +772,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   **Also (lead): a feature that ends up failing shouldn't spend 5–7 s getting there**: the failure paths (Shell's
   offset → planes → quadrics → slabs, a fillet's retries and fallbacks) are to be checked for fallbacks tried after it's
   already clear none will work.
+  core 11-07 03:19, measured: in the corpus, features failing after > 300 ms are c2-impeller-loft's Shell (3.1 s) and
+  its cascade (Delete face 1, Fillets 0.65-2 s), c2-rings-loft's Shell 1 (6.6 s) and cf-part-draft's Part Draft 3
+  (0.4 s). In the shell corpus (211 cases, 84 failing, 98.6 s failing): 91.5 s of it is the slab route, 63 s of that its
+  fuse; the slabs fail late (an invalid or wrong-volume result after fuse and common), and the fuse work of failing
+  cases (1.4-3.3 M steps) overlaps the successful ones' (up to 1.7 M; slabs win 55 cases), so a work bound would cut
+  successes too. The levers: a faster fuse (bool), or building more walls directly (core: the parked walls path,
+  branch core-walls-wip) so fewer shells reach the slabs.
 - [x] P0 RELEASE-BUILD-FILLET-HANG (core + lead: release-build only) **a saved document hangs every release build on open,
   while green (dev) builds of the same code open it in 7–8 s**: /root/qa-scratch/tickets/hang4539/step98.noshape (+ -wal; CLI
   fuzz seed 4539 on the v0.4.30 release; 74 features, the last Fillet 6, radius 0.5 mm). `qa-fstat.py <cli> <doc>` (open +
