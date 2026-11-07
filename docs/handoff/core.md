@@ -50,7 +50,7 @@ What blend takes over:
   scope, so its overloaded operators and functions see `#t`; ours goes through the units evaluator.
 - cf-curved-text and cf-torus-dome-and-sphere unscored: their imports are 403 (no longer public).
 - cf-part-draft's Spur Gear: our gear is an exact prism with live's faces and area but 0.36% less volume; live's own
-  cap x depth gives ours, so live's volume looks inconsistent: asked live (REQUESTS core 21:02).
+  cap x depth gives ours, so live's volume looks inconsistent: asked live (REQUESTS core 20:11).
 
 **State 11-07 19:56 UTC: seam pieces shown as one edge; c2-housing-draft to the end.**
 - A section OCCT approximates on each side of a periodic face's seam (two B-splines, tangent, curvatures within 2%)
