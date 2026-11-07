@@ -172,10 +172,15 @@ impl PointSprite {
     /// With [`Self::HOLLOW`]: the white inside 0.45 of the radius instead of
     /// 0.55 (pattern instance points).
     pub const THICK: u32 = 32;
-    /// A spline's handle tip (Onshape's handle): at rest a hollow point, white inside 0.7 of the radius; hovered or
-    /// selected a 14 px disc in the state colour drawn at 90 % over the handle at rest (live: the hovered tip a light
-    /// orange disc with a lighter centre, a faint ring where the handle's edge lies under it).
+    /// A spline's handle tip (Onshape's handle): at rest a 9 px hollow point, white inside 0.7 of the radius; hovered
+    /// a 14 px disc, selected a 15 px one, in the state colour at 90 % over the handle at rest (live 2221: the hovered
+    /// tip a light orange disc with a lighter centre, a faint ring where the handle's edge lies under it).
     pub const HANDLE_TIP: u32 = 64;
+    /// A sketch's point (live 2221): hovered or selected, a disc in the state colour (selected wins over hovered)
+    /// with the point's own colour 30 % through its middle.
+    pub const SKETCH_POINT: u32 = 128;
+    /// With [`Self::SKETCH_POINT`]: a centre, its colour 10 % through.
+    pub const CENTER: u32 = 256;
 }
 
 /// The axis-aligned bounds of `it` (`None` when empty).

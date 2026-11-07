@@ -985,11 +985,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // the edited sketch are 6.7 px dots while under-defined (blue),
                 // 6 px once defined.
                 let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
-                // (A spline's handle tip: Onshape's 10 px hollow handle, on top; lit, its 14 px disc.)
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.tip { 10.0 } else if p.handle { 5.0 } else { vertex };
+                // (A spline's handle tip: Onshape's 9 px hollow handle in the point's colour, on top; lit, its disc.)
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.tip { 9.0 } else if p.handle { 5.0 } else { vertex };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
                 let style = if p.tip { PointSprite::HANDLE_TIP | LineSegment::ON_TOP } else if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
-                let color = if p.tip { theme::rgb8(theme::viewport::SKETCH_HANDLE) } else { color };
+                let style = style | PointSprite::SKETCH_POINT | if p.center { PointSprite::CENTER } else { 0 };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {

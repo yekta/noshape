@@ -195,6 +195,9 @@ pub struct SketchPointDisplay {
     pub handle: bool,
     /// A fit spline's end handle tip (drawn as Onshape's handle).
     pub tip: bool,
+    /// A circle's, arc's or ellipse's centre (lit, its colour shows less through the highlight).
+    #[serde(default)]
+    pub center: bool,
     /// Projected outside geometry (the origin a point was inferred from,
     /// Use): not one of the sketch's own vertices.
     pub external: bool,

@@ -2298,9 +2298,44 @@ fn ambient_occlusion_darkens_a_corner_unless_the_scene_has_none() {
     assert_eq!(lum(&scene, 0.375), off, "no occlusion when the scene has none");
 }
 
-/// A spline handle tip (PointSprite::HANDLE_TIP), as live draws it: at rest a 10 px hollow handle (white inside a
-/// grey ring); hovered or selected a 14 px disc in the highlight colour with a slightly lighter centre where the
-/// handle lies under it; sizes in CSS pixels at any device pixel ratio.
+/// One sketch point drawn alone in each state, the middle row of pixels (RGB) and its pixel ratio.
+fn sketch_point_rows(r: &mut Renderer, sprite: PointSprite, dpr: f32, st: u32) -> Vec<[u8; 3]> {
+    let pts = r.upload_points(&PointData { points: vec![sprite] });
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.01, 1.0);
+    let style = Style { msaa: 1, ..Style::default() };
+    let n = (64.0 * dpr) as u32;
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Points(pts)).per_primitive_color());
+    if st != 0 {
+        scene.set_state(1, st);
+    }
+    let f = r.render(RenderParams { scene: &scene, camera: &cam, width: n, height: n, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap();
+    let y = n / 2;
+    (0..n).map(|x| { let i = ((y * n + x) * 4) as usize; [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]] }).collect()
+}
+
+/// Drawn width in CSS px (first to last pixel that isn't white) and the colour `css` px from the centre.
+fn row_width(row: &[[u8; 3]], dpr: f32) -> f32 {
+    let ink = |p: &&[u8; 3]| p.iter().any(|c| *c < 250);
+    let first = row.iter().position(|p| ink(&p)).unwrap_or(0);
+    let last = row.iter().rposition(|p| ink(&p)).unwrap_or(0);
+    (last + 1 - first) as f32 / dpr
+}
+
+fn row_at(row: &[[u8; 3]], dpr: f32, css: f32) -> [u8; 3] {
+    row[(row.len() as f32 / 2.0 + css * dpr) as usize]
+}
+
+fn rgb_near(p: [u8; 3], want: [u8; 3], tol: i32) -> bool {
+    p.iter().zip(want).all(|(a, b)| (*a as i32 - b as i32).abs() <= tol)
+}
+
+const UNDER_DEFINED: [u8; 4] = [0, 0, 208, 255];
+
+/// A spline handle tip as live draws it (live 2221, at 1x): at rest a 9 px hollow handle, a ring in the point's
+/// colour round a white middle; hovered a 14 px light orange disc, selected a 15 px orange one, each a little lighter
+/// in the middle where the handle lies under it; hovered while selected, as selected. Sizes in CSS px at any ratio.
 #[test]
 fn a_handle_tip_is_drawn_as_lives_in_each_state() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -2311,44 +2346,55 @@ fn a_handle_tip_is_drawn_as_lives_in_each_state() {
             return;
         }
     };
-    let pts = r.upload_points(&PointData { points: vec![PointSprite { position: [0.0; 3], color: [0x60, 0x60, 0x60, 255], pick_id: 1, size: 10.0, style: PointSprite::HANDLE_TIP | 2, _pad: 0 }] });
-    let mut cam = Camera::default();
-    cam.fit_sphere(glam::DVec3::ZERO, 0.01, 1.0);
-    let style = Style { msaa: 1, ..Style::default() };
+    let tip = PointSprite { position: [0.0; 3], color: UNDER_DEFINED, pick_id: 1, size: 9.0, style: PointSprite::HANDLE_TIP | PointSprite::SKETCH_POINT | 2, _pad: 0 };
     for dpr in [1.0f32, 2.0] {
-        let n = (64.0 * dpr) as u32;
-        let shot = |r: &mut Renderer, st: u32| -> Vec<[u8; 3]> {
-            let mut scene = Scene::default();
-            scene.instances.push(Instance::new(Drawable::Points(pts.clone())).per_primitive_color());
-            if st != 0 {
-                scene.set_state(1, st);
-            }
-            let f = r.render(RenderParams { scene: &scene, camera: &cam, width: n, height: n, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap();
-            // The middle row, left to right (BGRA → RGB).
-            let y = n / 2;
-            (0..n).map(|x| { let i = ((y * n + x) * 4) as usize; [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]] }).collect()
-        };
-        // Drawn width (pixels not white) in CSS px, and the colour at `css` px from the centre.
-        // (From the first to the last pixel that isn't white: the hollow handle is white inside.)
-        let width = |row: &[[u8; 3]]| {
-            let ink = |p: &&[u8; 3]| p.iter().any(|c| *c < 250);
-            let first = row.iter().position(|p| ink(&p)).unwrap_or(0);
-            let last = row.iter().rposition(|p| ink(&p)).unwrap_or(0);
-            (last + 1 - first) as f32 / dpr
-        };
-        let at = |row: &[[u8; 3]], css: f32| row[(n as f32 / 2.0 + css * dpr) as usize];
-        let near = |p: [u8; 3], want: [u8; 3], tol: i32| p.iter().zip(want).all(|(a, b)| (*a as i32 - b as i32).abs() <= tol);
-        let rest = shot(&mut r, 0);
-        assert!((width(&rest) - 10.0).abs() <= 1.0, "dpr {dpr}: at rest {} px", width(&rest));
-        assert!(near(at(&rest, 0.5), [255, 255, 255], 6), "dpr {dpr}: white inside {:?}", at(&rest, 0.5));
-        assert!(at(&rest, 4.2).iter().all(|c| *c < 160), "dpr {dpr}: grey ring {:?}", at(&rest, 4.2));
-        for (st, colour) in [(state::HOVER, [255, 198, 133]), (state::SELECTED, [255, 169, 10])] {
-            let lit = shot(&mut r, st);
-            assert!((width(&lit) - 14.0).abs() <= 1.0, "dpr {dpr} state {st}: {} px", width(&lit));
-            assert!(near(at(&lit, 6.0), colour, 6), "dpr {dpr} state {st}: disc {:?}", at(&lit, 6.0));
-            // (The centre a little lighter: the handle's white under 90 % of the colour.)
-            let c = at(&lit, 0.5);
-            assert!(c[1] > colour[1] && c[2] > colour[2] && near(c, colour, 40), "dpr {dpr} state {st}: centre {c:?}");
+        let rest = sketch_point_rows(&mut r, tip, dpr, 0);
+        assert!((row_width(&rest, dpr) - 9.0).abs() <= 1.0, "dpr {dpr}: at rest {} px", row_width(&rest, dpr));
+        assert!(rgb_near(row_at(&rest, dpr, 0.5), [255, 255, 255], 8), "dpr {dpr}: white inside {:?}", row_at(&rest, dpr, 0.5));
+        let ring = row_at(&rest, dpr, 4.0);
+        assert!(ring[2] > ring[0] + 60, "dpr {dpr}: a blue ring {ring:?}");
+        for (st, width, colour) in [(state::HOVER, 14.0, [255, 198, 133]), (state::SELECTED, 15.0, [255, 169, 10]), (state::HOVER | state::SELECTED, 15.0, [255, 169, 10])] {
+            let lit = sketch_point_rows(&mut r, tip, dpr, st);
+            assert!((row_width(&lit, dpr) - width).abs() <= 1.0, "dpr {dpr} state {st}: {} px", row_width(&lit, dpr));
+            assert!(rgb_near(row_at(&lit, dpr, 6.0), colour, 6), "dpr {dpr} state {st}: disc {:?}", row_at(&lit, dpr, 6.0));
+            // (The middle a little lighter: the handle's white under 90 % of the colour.)
+            let c = row_at(&lit, dpr, 0.5);
+            assert!(c[1] > colour[1] && c[2] > colour[2] && rgb_near(c, colour, 40), "dpr {dpr} state {st}: centre {c:?}");
+        }
+    }
+}
+
+/// A sketch's end point and a centre as live draws them (live 2221, at 1x): at rest a 7 px dot; hovered or selected
+/// an 11 px disc in the state colour with the point 30 % through its middle (a centre 10 %): hovered #b38b9b over a
+/// blue point, selected #b37745; hovered while selected, as selected.
+#[test]
+fn a_sketch_point_is_drawn_as_lives_in_each_state() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let point = PointSprite { position: [0.0; 3], color: UNDER_DEFINED, pick_id: 1, size: 6.7, style: PointSprite::SKETCH_POINT | 2, _pad: 0 };
+    let centre = PointSprite { style: point.style | PointSprite::CENTER, ..point };
+    for dpr in [1.0f32, 2.0] {
+        let rest = sketch_point_rows(&mut r, point, dpr, 0);
+        assert!((row_width(&rest, dpr) - 7.0).abs() <= 1.0, "dpr {dpr}: at rest {} px", row_width(&rest, dpr));
+        assert!(rgb_near(row_at(&rest, dpr, 0.0), [0, 0, 208], 6), "dpr {dpr}: {:?}", row_at(&rest, dpr, 0.0));
+        for (sprite, st, middle) in [
+            (point, state::HOVER, [179, 139, 155]),
+            (point, state::SELECTED, [179, 119, 69]),
+            (point, state::HOVER | state::SELECTED, [179, 119, 69]),
+            (centre, state::HOVER, [229, 178, 140]),
+            (centre, state::SELECTED, [229, 152, 30]),
+        ] {
+            let lit = sketch_point_rows(&mut r, sprite, dpr, st);
+            assert!((row_width(&lit, dpr) - 11.0).abs() <= 1.0, "dpr {dpr} state {st}: {} px", row_width(&lit, dpr));
+            let disc = if st & state::SELECTED != 0 { [255, 169, 10] } else { [255, 198, 133] };
+            assert!(rgb_near(row_at(&lit, dpr, 4.0), disc, 8), "dpr {dpr} state {st}: disc {:?}", row_at(&lit, dpr, 4.0));
+            assert!(rgb_near(row_at(&lit, dpr, 0.0), middle, 8), "dpr {dpr} state {st}: middle {:?}, live {middle:?}", row_at(&lit, dpr, 0.0));
         }
     }
 }

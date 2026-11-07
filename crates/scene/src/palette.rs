@@ -19,9 +19,7 @@ pub mod viewport {
     /// A dialog chip's entity while the chip is hovered (live qa4 round 5
     /// s7, CHIP-HOVER: the query-hover yellow-green).
     pub const QUERY_HOVER: u32 = 0xf2ff80;
-    /// A spline handle tip's ring at rest (white inside) and the handle line (live sketch/100–101; the shader's
-    /// HANDLE_GREY is the tip's in linear light).
-    pub const SKETCH_HANDLE: u32 = 0x606060;
+    /// A spline's handle line (live sketch/100–101); its tip is drawn in the point's colour (live 2221).
     pub const SKETCH_HANDLE_LINE: u32 = 0x808080;
     /// Selection (`ENTITY_HIGHLIGHT_COLOR_BORDER`).
     pub const SELECTION: u32 = 0xffa90a;
