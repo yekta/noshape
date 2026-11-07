@@ -373,7 +373,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Copy", Op("drawing_copy")),
     ("drawing:Custom table properties...", Op("drawing_custom_table")),
     ("drawing:Cut list table properties...", Op("drawing_table_properties")),
-    ("drawing:Delete break", Op("drawing_delete")),
     ("drawing:Delete table", Op("drawing_delete")),
     ("drawing:Delete", Op("drawing_delete")),
     ("drawing:Detach from geometry", Op("drawing_annotation_edit")),
