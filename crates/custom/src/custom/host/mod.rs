@@ -278,6 +278,7 @@ impl FsContext {
         let hidden: HashSet<BodyId> = hidden_bodies.iter().map(|b| b.id.clone()).collect();
         ctx.bodies.extend(hidden_bodies);
         let attributes = std::mem::take(&mut ctx.fs_attributes);
+        let fs_variables = std::mem::take(&mut ctx.fs_variables);
         let persistent = std::mem::take(&mut ctx.fs_transients);
         let transient_base = ctx.fs_transient_next;
         let cx = Arc::new(FsContext {
@@ -316,7 +317,7 @@ impl FsContext {
                 status: HashMap::new(),
                 started: Vec::new(),
                 start_order: Vec::new(),
-                variables: BTreeMap::new(),
+                variables: fs_variables,
                 attrs: attributes,
                 attr_index: Mutex::new(None),
                 attr_filters: Mutex::new(HashMap::new()),
@@ -376,6 +377,7 @@ impl FsContext {
         ctx.bodies = (shown).into();
         ctx.fs_hidden_bodies = hidden;
         ctx.fs_attributes = st.attributes().to_vec();
+        ctx.fs_variables = st.variables.clone();
         ctx.fs_transients = st.persistent.clone();
         ctx.fs_transient_next = st.transient_base + st.transient_ids.len();
         ctx

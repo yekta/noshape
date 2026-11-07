@@ -616,6 +616,9 @@ pub struct Context {
     /// FeatureScript attributes (`setAttribute`), kept from feature to
     /// feature (custom/host loads and saves them around each custom feature).
     pub fs_attributes: Vec<(crate::reference::Reference, noshape_featurescript::Value)>,
+    /// FeatureScript variables that aren't quantities (`setVariable(context, "t", <function>)`: cf-parametric-curve's
+    /// Define Parameter), kept from feature to feature like the attributes.
+    pub fs_variables: BTreeMap<String, noshape_featurescript::Value>,
     /// Bodies FeatureScript keeps out of the Part Studio (std sheet metal's
     /// definition sheets): no part, no display; custom features see them
     /// through attribute queries only.
@@ -764,6 +767,7 @@ impl Context {
             part_appearance,
             face_appearance,
             fs_attributes,
+            fs_variables,
             fs_hidden_bodies,
             fs_transients,
             fs_transient_next,
@@ -801,6 +805,8 @@ impl Context {
             && *face_appearance == o.face_appearance
             && fs_attributes.is_empty()
             && o.fs_attributes.is_empty()
+            && fs_variables.is_empty()
+            && o.fs_variables.is_empty()
             && same_arcs(fs_hidden_bodies, &o.fs_hidden_bodies)
             && *fs_transients == o.fs_transients
             && *fs_transient_next == o.fs_transient_next

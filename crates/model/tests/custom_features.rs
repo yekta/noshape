@@ -3482,6 +3482,53 @@ export const sumCube = defineFeature(function(context is Context, id is Id, defi
     assert!((total_volume(&r) - 0.01f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
 }
 
+/// cf-parametric-curve's symbolic parameter: one feature sets a variable to a function (`as Expression`), a later one's
+/// isAnything parameter (`2 * #t + 1 mm`) is FeatureScript in its studio's scope, so the studio's operators on
+/// Expression make it a function of t; at t = 3 mm the cube is 7 mm (live OK).
+#[test]
+fn an_anything_parameter_uses_a_studios_operators_on_a_variable() {
+    let src = studio(
+        r#"
+export type Expression typecheck canBeExpression;
+predicate canBeExpression(value) { value is function; }
+const t_ = function(t) { return t; } as Expression;
+export operator*(lhs, rhs is Expression) returns Expression { return function(t) { return lhs * rhs(t); } as Expression; }
+export operator+(lhs is Expression, rhs) returns Expression { return function(t) { return lhs(t) + rhs; } as Expression; }
+
+annotation { "Feature Type Name" : "Define t" }
+export const defineT = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        setVariable(context, "t", t_);
+    });
+
+annotation { "Feature Type Name" : "Cube of t" }
+export const cubeOfT = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Size" }
+        isAnything(definition.size);
+    }
+    {
+        if (!(definition.size is Expression))
+            throw regenError("size is " ~ toString(definition.size));
+        const d = definition.size(3 * millimeter);
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * meter, "corner2" : vector(d, d, d) });
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let t = ps.new_feature(&fx.ty("defineT"), &fx.units).unwrap();
+    ps.features.push(t);
+    let mut f = ps.new_feature(&fx.ty("cubeOfT"), &fx.units).unwrap();
+    f.params.set("size", ParamValue::Text("2 * #t + 1 mm".into()));
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+    assert!((total_volume(&r) - 0.007f64.powi(3)).abs() < 1e-12, "{}", total_volume(&r));
+}
+
 /// FS-FEATURE-LIST-RERUN (dx's FeatureScript corpus, cf-parameter-pattern): a FeatureList parameter's functions re-run
 /// the picked features under std applyPattern, with the variables set at the time and each instance's transform;
 /// the picked sketch is solved again for each instance. FS-FEATURE-LIST-NONDETERMINISTIC: in the feature list's order

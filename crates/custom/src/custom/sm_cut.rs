@@ -55,7 +55,7 @@ pub fn cut(ev: &mut EvalCtx, parts: &[BodyId], tools: &[BodyId]) -> FResult<()> 
     p.set("tools", ParamValue::Query(tools.iter().cloned().map(Reference::Body).collect()));
     let mut sub = EvalCtx::new(ev.feature, ev.name, &p, ev.units, std::mem::take(&mut ev.ctx), ev.outer_vars);
     sub.cancel = ev.cancel.clone();
-    let res = super::run::run_feature(&mut sub, &def.cell, &def.params, &def.feature_type.params, "smCut".into(), None);
+    let res = super::run::run_feature(&mut sub, &def.cell, &def.params, &def.feature_type.params, "smCut".into(), None, None);
     ev.ctx = sub.ctx;
     ev.warnings.extend(sub.warnings);
     ev.infos.extend(sub.infos);

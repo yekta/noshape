@@ -12,6 +12,7 @@ use crate::params::{NumKind, ParamValue, ParamValues, ReferenceKind, fill_defaul
 use crate::reference::FeatureId;
 use crate::regen::eval::{EvalCtx, FResult, FeatureError, err};
 use noshape_featurescript::interp::{Interp, LineProfile, Notice};
+use noshape_featurescript::compile::{CompiledModule, Resolver, compile_module};
 use noshape_featurescript::ir::GlobalCell;
 use noshape_featurescript::value::{Map, Value, type_info};
 use parking_lot::Mutex;
@@ -201,7 +202,7 @@ pub fn evaluate(ev: &mut EvalCtx) -> FResult<()> {
         return err(format!("The Feature Studio no longer defines \"{name}\""));
     };
 
-    run_feature(ev, &def.cell, &def.params, &def.feature_type.params, type_id, Some(&*provider))
+    run_feature(ev, &def.cell, &def.params, &def.feature_type.params, type_id, Some(&*provider), studio.module.clone())
 }
 
 /// `debug()` entities for the display: faces as meshes, else edges as
@@ -224,7 +225,8 @@ fn add_debug(out: &mut crate::display::DebugGeometry, entities: Vec<(noshape_ker
 /// Studio context, its definition built from `params` (the precondition's
 /// parameters) and the feature's values (`specs` fill the defaults); used for
 /// custom features and for built-in features run by the standard library.
-pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[ParamDecl], specs: &[crate::params::ParamSpec], type_id: String, provider: Option<&dyn super::CustomFeatureProvider>) -> FResult<()> {
+/// `module`: the Feature Studio's, for the isAnything parameters only FeatureScript evaluates in its scope.
+pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[ParamDecl], specs: &[crate::params::ParamSpec], type_id: String, provider: Option<&dyn super::CustomFeatureProvider>, module: Option<Arc<CompiledModule>>) -> FResult<()> {
     let mut values: ParamValues = ev.params.clone();
     fill_defaults(specs, &mut values, ev.units);
     // Live (FS probe at Size 0.5 mm): "A parameter value is not valid.",
@@ -243,6 +245,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
             return Err(e);
         }
     };
+    let fs_expressions = if module.is_some() { fs_expressions(ev, params, &values) } else { Vec::new() };
     let feature_id = vec![Arc::<str>::from(ev.feature.to_string())];
     let ctx_value = cx.value();
     let cell = cell.clone();
@@ -277,6 +280,7 @@ pub(crate) fn run_feature(ev: &mut EvalCtx, cell: &Arc<GlobalCell>, params: &[Pa
                     let print = print.is_some();
                     let t = Instant::now();
                     let f = i.global(&cell);
+                    let definition = with_fs_expressions(&mut i, module.as_ref(), &fs_expressions, definition, &ctx_value);
                     let r = f.and_then(|f| i.call_value(&f, vec![ctx_value, host::id_value(&feature_id), definition]));
                     let dead = i.take_stopped_frames();
                     if !dead.is_empty() {
@@ -571,6 +575,107 @@ fn editing_value(i: &mut Interp, cx: &Arc<FsContext>, d: &ParamDecl, v: &Value, 
         }
         _ => return None,
     })
+}
+
+/// isAnything parameters whose expression the units can't evaluate but FeatureScript can (a studio's own operators
+/// and functions on a variable it set: cf-parametric-curve's `100*#t*cos(#t*200*180*degree)*inch`, `#t` a function):
+/// (parameter, the expression as FeatureScript).
+fn fs_expressions(ev: &EvalCtx, params: &[ParamDecl], values: &ParamValues) -> Vec<(String, String)> {
+    params
+        .iter()
+        .filter(|d| matches!(d.kind, ParamKindFs::Anything))
+        .filter_map(|d| match values.get(&d.id) {
+            Some(ParamValue::Text(s)) if !s.starts_with("fs:") && expression_value(ev, s).is_none() => noshape_units::parse(s).ok().and_then(|e| fs_source(&e)).map(|src| (d.id.clone(), src)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// An Onshape expression as FeatureScript (`#t` its variable, `300 in` a product with std's unit).
+fn fs_source(e: &noshape_units::Expr) -> Option<String> {
+    use noshape_units::{AngleUnit, BinaryOp, Constant, Expr, LengthUnit, Unit, UnaryOp};
+    let unit = |u: &Unit| -> &'static str {
+        match u {
+            Unit::Length(LengthUnit::Micrometer) => "(0.001 * millimeter)",
+            Unit::Length(LengthUnit::Millimeter) => "millimeter",
+            Unit::Length(LengthUnit::Centimeter) => "centimeter",
+            Unit::Length(LengthUnit::Meter) => "meter",
+            Unit::Length(LengthUnit::Inch) => "inch",
+            Unit::Length(LengthUnit::Foot) => "foot",
+            Unit::Length(LengthUnit::Yard) => "yard",
+            Unit::Angle(AngleUnit::Degree) => "degree",
+            Unit::Angle(AngleUnit::Radian) => "radian",
+        }
+    };
+    Some(match e {
+        Expr::Number(n) => format!("{n:?}"),
+        Expr::WithUnit { expr, unit: u, power } => format!("({} * {}^{power})", fs_source(expr)?, unit(u)),
+        Expr::Unit(u) => unit(u).to_string(),
+        Expr::Constant(Constant::Pi) => "PI".into(),
+        Expr::Constant(Constant::True) => "true".into(),
+        Expr::Constant(Constant::False) => "false".into(),
+        Expr::Var(name) => format!("getVariable(context, \"{name}\")"),
+        Expr::Unary(UnaryOp::Neg, x) => format!("(-{})", fs_source(x)?),
+        Expr::Unary(UnaryOp::Not, x) => format!("(!{})", fs_source(x)?),
+        Expr::Binary(op, a, b) => {
+            let o = match op {
+                BinaryOp::Add => "+",
+                BinaryOp::Sub => "-",
+                BinaryOp::Mul => "*",
+                BinaryOp::Div => "/",
+                BinaryOp::Rem => "%",
+                BinaryOp::Pow => "^",
+                BinaryOp::Lt => "<",
+                BinaryOp::Le => "<=",
+                BinaryOp::Gt => ">",
+                BinaryOp::Ge => ">=",
+                BinaryOp::Eq => "==",
+                BinaryOp::Ne => "!=",
+                BinaryOp::And => "&&",
+                BinaryOp::Or => "||",
+            };
+            format!("({} {o} {})", fs_source(a)?, fs_source(b)?)
+        }
+        Expr::Ternary(c, a, b) => format!("({} ? {} : {})", fs_source(c)?, fs_source(a)?, fs_source(b)?),
+        Expr::Call(f, args) => {
+            let name = match f.name() {
+                "ln" => "log",
+                n => n,
+            };
+            format!("{name}({})", args.iter().map(fs_source).collect::<Option<Vec<_>>>()?.join(", "))
+        }
+    })
+}
+
+/// `definition` with each of `exprs` evaluated as FeatureScript in the studio's scope (its exported operators and
+/// functions), the context as `context`; one that fails stays out, as before.
+fn with_fs_expressions(i: &mut Interp, module: Option<&Arc<CompiledModule>>, exprs: &[(String, String)], definition: Value, ctx: &Value) -> Value {
+    let Some(m) = module.filter(|_| !exprs.is_empty()) else { return definition };
+    struct Studio<'a>(&'a Arc<CompiledModule>);
+    impl Resolver for Studio<'_> {
+        fn resolve(&self, path: &str) -> Option<(Arc<str>, Arc<str>)> {
+            (path == &*self.0.path).then(|| (self.0.path.clone(), Arc::from("")))
+        }
+        fn cached(&self, path: &str) -> Option<Arc<CompiledModule>> {
+            (path == &*self.0.path).then(|| self.0.clone())
+        }
+    }
+    let v = m.version.unwrap_or(noshape_featurescript::STD_VERSION);
+    let mut src = format!("FeatureScript {v};\nimport(path : \"onshape/std/geometry.fs\", version : \"{v}.0\");\nimport(path : \"{}\", version : \"\");\n", m.path);
+    for (k, (_, e)) in exprs.iter().enumerate() {
+        src += &format!("export function anything{k}(context) {{ return {e}; }}\n");
+    }
+    let Ok(compiled) = compile_module(&format!("{}#parameters", m.path), &src, &Studio(m)) else { return definition };
+    let Value::Map(map, tag) = definition else { return definition };
+    let mut map = Arc::unwrap_or_clone(map);
+    for (k, (id, _)) in exprs.iter().enumerate() {
+        if let Some(f) = compiled.functions(&format!("anything{k}"))
+            && let Ok(v) = i.call_set(&f, vec![ctx.clone()])
+        {
+            map.insert(Value::str(id.as_str()), v);
+        }
+    }
+    Value::Map(Arc::new(map), tag)
 }
 
 /// An `isAnything` parameter's value as stored (numbers, booleans, strings and arrays of them, as "fs:" and JSON);
