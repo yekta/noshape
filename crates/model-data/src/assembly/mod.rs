@@ -1061,6 +1061,9 @@ pub struct DisplayState {
     /// (later ones keep their defaults when the state is applied).
     #[serde(default)]
     pub known: Vec<u64>,
+    /// Occurrences hidden inside subassemblies (paths from a top-level instance).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_occurrences: Vec<Vec<InstanceId>>,
 }
 
 impl Assembly {
