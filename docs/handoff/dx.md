@@ -29,6 +29,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   as many (`parts_by_count`).
 - 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
   profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+## 11-07 15:01 UTC: 2132 rerun (c2 by REST, sketch bodies in): 59/88 documents, 638/936 features
+Run on vibe5 at the merge of 46e48dc6 (report: vibe5 ~/parity/report.json, copy /root/dx-scratch/report-c2.json).
+c2 matching to the end: bottle-split, lofted-basic, sm-exhaust-clamp, steak-mold-draft. First differences, by owner:
+- skasm (waiting on these):
+  - c2-duct-multipart: feature 10 "Extrude 3" ERROR "Boolean operation would result in non-manifold body", live OK
+    (Part 2 10/24/16 for 14/30/18, 128993195 mm³ for 92868196); Plane 4 / Split 1 then fail on it.
+  - c2-sm-louver: feature 6 "Louver" (sheetMetalStart): Part 2 has 4 cylinder faces / 8 circle edges where live has
+    planes and lines (22 plane, 44 line). Feature 11 "Sheet metal model 1": Part 3 10/24/16, 26654 mm³ for live's
+    22/60/40, 138034 mm³; then Flange 3, Flange 4 (ERROR "Cannot create flange on an edge that is a joint…"), Flange 9.
+- core: c2-extension-spring Fillet 1 (15/39/26 for 11/27/18), c2-helical-sweep Sweep 1 (14/25/21 for 6/10/6),
+  c2-rings-loft Shell 1 (ERROR "Could not shell part with selections"), c2-tpd-fillet-variable Fillet 1 (ERROR "Failed
+  to fillet selections"), c2-valve-config Extrude 3 (11 circle / 48 other edges for 9 / 50), c2-impeller-loft
+  "Loft Gehäuse" (251071 mm³ for 257078: the loft's vertex matching, LOFT-VERTEX-MATCH), c2-variable-fillet-faceblend
+  Face blend 1 (tangent hold lines unsupported).
+- dx (translation): c2-fan-blade-sweep and c2-hex-bookcase-derived (Derived NOT BUILT), c2-gamma-imported and
+  c2-wire-clip-imported (Import NOT BUILT: the same model twice), c2-housing-draft "Bohrung 1" (hole: "Cannot resolve
+  entities"), c2-hunting-knife "Bridging curve 1" (its lines 24-51 refetched after the 11-08 reset), c2-sm-corner-break
+  "Corner break 1" ("Selected entities should be from active sheet metal models").
+
 ## 11-06 23:31 UTC: drawing menus (lead: the biggest gap)
 - drw-* batches 6-10 written and filed (REQUESTS 22:47 onward): 108 scenarios; tools 44/58, menus 47/108 (the 14 rows
   of the view menu's unreachable Crop / Break / More section views submenus and Insert BOM / hole table removed with
