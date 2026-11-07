@@ -12,9 +12,9 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
 
 ## Paused (2026-11-07 20:08 UTC; lead: Claude quota, resume Monday 11-10)
 Where everything stands:
-- Landing: the batch below (translator for the corpus, open-composite mesh fix, same-connector pick, Edit dynamic
-  suppression submenu, pin-block-apart start + asm-revolute-pin-hole-flip scenario) queued with land.sh at pause time;
-  check `tools/tiers/land.sh --status` first thing and fix forward if it failed.
+- Landed 11-07 20:23 UTC as 9cd86358: the batch below (translator for the corpus, open-composite mesh fix,
+  same-connector pick, Edit dynamic suppression submenu, pin-block-apart start + asm-revolute-pin-hole-flip
+  scenario). Nothing of asm's is queued or uncommitted.
 - Assembly corpus (corpus7, SCORE.md row 11-07 20:08): 827/1291 occurrences on the 20 documents measured, mates
   90/182. Not measured: **suspension ran 35 min without finishing** (stopped; the next slow case: trace it with
   NOSHAPE_PARITY_TRACE=1 on a copy in parity-one, profile with gdb on vibe5, which allows ptrace of a child: see
