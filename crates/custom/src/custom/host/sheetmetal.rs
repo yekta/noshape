@@ -1418,6 +1418,19 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         let along = (l.pts[(j + 1) % m] - l.pts[j]).normalize_or_zero();
         (!def.bends.contains_key(&l.side[j]) && !l.curved[j] && along.cross(dir).length() > 1e-6).then_some(along)
     };
+    // Wall `f`'s side next to edge `e` at its end near `v` is a short connector (no longer than `reach`) to a free side
+    // running on along the bend: the bend edge moved in (INNER flange alignment), its end relieved (as
+    // [`relief_tools`]), not a slanted end.
+    let moved_in_end = |f: usize, e: usize, v: DVec3, dir: DVec3, reach: f64| -> bool {
+        let Some((l, _, _)) = outlines[f].as_ref() else { return false };
+        let Some(k) = l.side.iter().position(|x| *x == e) else { return false };
+        let m = l.pts.len();
+        let at_start = l.pts[k].distance(v) < l.pts[(k + 1) % m].distance(v);
+        let (j, next) = if at_start { ((k + m - 1) % m, (k + m - 2) % m) } else { ((k + 1) % m, (k + 2) % m) };
+        let connector = (l.pts[(j + 1) % m] - l.pts[j]).length();
+        let along = (l.pts[(next + 1) % m] - l.pts[next]).normalize_or_zero();
+        connector <= reach + TOL && along.cross(dir).length() <= 1e-9 && !def.bends.contains_key(&l.side[next]) && !def.rips.contains(&l.side[next])
+    };
     let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
         // The bend runs where both walls do (a simple corner ends it where
@@ -1439,6 +1452,11 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             let end = b.start + b.dir * b.len;
             for (i, v, (ta, tb)) in [(0, b.start, (ea.0, eb.0)), (1, end, (ea.1, eb.1))] {
                 if (ta - tb).abs() <= TOL || !none_at(v) {
+                    continue;
+                }
+                // (A moved-in bend edge's end: c2-sm-louver's Flange 3 at its tab, live's bend ends with the flange.)
+                let reach = def.bends.get(&e).copied().unwrap_or(0.0) + front + back;
+                if moved_in_end(fa, e, v, b.dir, reach) || moved_in_end(fb, e, v, b.dir, reach) {
                     continue;
                 }
                 let (Some(da), Some(db)) = (free_end(fa, e, v, b.dir), free_end(fb, e, v, b.dir)) else { continue };

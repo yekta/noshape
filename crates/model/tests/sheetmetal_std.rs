@@ -1818,3 +1818,39 @@ fn collinear_walls_keep_the_ends_in_pieces() {
     let faces = r.context.bodies[part(&r)].shape.faces().len();
     assert!((volume_mm3(&r) - 3211.3274).abs() < 1e-3 && faces == 14, "{} mm³, {faces} faces: {:#?}", volume_mm3(&r), face_report(&r));
 }
+
+/// An Inner flange on a plate's top edge that steps 0.275 mm to a tab at its end (c2-sm-louver's Flange 3: the tab's
+/// edge just off the flange's): the bend ends with the flange at the step, relieved there, not run on past the tab
+/// (ours ran it 32 mm out past the plate's end, a second flange).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (12.7, 40.0), (12.7, 39.725), (0.0, 39.725)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    for i in 0..p.len() {
+        sk.add_line_between(p[i], p[(i + 1) % p.len()]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("THICKEN"));
+        pv.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        pv.set("thickness", expr("1.628 mm"));
+        pv.set("radius", expr("1.628 mm"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(36.0, 40.0, 1.628));
+    s.add("sheetMetalFlange", |pv| {
+        pv.set("edges", ParamValue::Query(vec![edge]));
+        pv.set("distance", expr("20 mm"));
+        pv.set("flangeAlignment", en("INNER"));
+    });
+    let r = s.ok();
+    let bb = r.context.bodies[part(&r)].shape.bounding_box(true).unwrap();
+    assert!(bb.min.x > -1e-9, "the part reaches x {} mm: {:#?}", bb.min.x * 1e3, face_report(&r));
+}
