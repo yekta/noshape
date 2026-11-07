@@ -26,9 +26,11 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   the end and trimmed by the far side (one face, 1.9357 mm²); the 3 mm end's two meet in its middle. Our section route
   refused a section wider than its face ("Onshape fails too": no live case behind it); now it runs on and the cut
   trims it. Topology as live; "DON'T USE!"'s area 206.398 vs live 206.371 (just out of band) because every Curvature
-  round of this document comes out 0.22 % longer than live's (0.8131 / 0.8113, 1.9362 / 1.9357, 2.4393 / 2.4341). The
-  section's poles are live's (G11, m 0.5), so the setback differs: how `#gap` / `#depth` evaluate there, or Onshape's
-  setback for a Curvature R. T1 features_a::a_round_wider_than_the_end_beside_it_runs_across_it.
+  round of this document reports 0.22 % less area in live than ours (0.8131 / 0.8113, 2.4393 / 2.4341). Ours is exact:
+  the arc length of live's own G11 section (m 0.5: 1.62622 per unit setback) x R x depth gives 0.8131 and 2.4393 to
+  four digits, and live's boxes show the 1.5 mm setbacks. So it's live's area of these OTHER (procedural) blend faces,
+  measured low: a parity-harness question (the area band for parts with such faces), not geometry.
+  T1 features_a::a_round_wider_than_the_end_beside_it_runs_across_it.
 
 **State 11-07 16:42 UTC: c2-extension-spring's Fillet 1, the translator side (for asm too).**
 - Its edges aren't resolved from the sketch queries: Fillet 1's (configured, default True) queries carry live ids,
