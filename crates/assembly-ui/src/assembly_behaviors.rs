@@ -499,6 +499,9 @@ pub struct AsmUi {
     /// The graphics menu being built was opened off the part (empty space, the selection's menu): no Section view…,
     /// Find in instance list or View normal to (live asm-empty-menu-clear-selection).
     pub menu_off_part: bool,
+    /// The graphics menu being built was opened on the triad (its handle's items first): no Find in instance list;
+    /// View normal to the selected face under it (live asm-face-menu-clear-selection).
+    pub menu_on_triad: bool,
     pub ds_name: Option<Entity<InputState>>,
     pub ds_selected: Option<usize>,
     pub ds_renaming: Option<Entity<InputState>>,
@@ -1067,6 +1070,9 @@ impl AssemblyView {
         let isolating = self.isolate.is_some() || self.ui.transparent.is_some();
         let name = inst.name.clone();
         let off_part = graphics && self.ui.menu_off_part;
+        let on_triad = graphics && self.ui.menu_on_triad;
+        // The face, edge or vertex under the pointer as the menu opens (the menu's items run after it moved).
+        let pick = self.hover.clone().filter(|t| graphics && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex));
         let mut m: Vec<MenuEntry> = Vec::new();
         // Properties (list only): the part's metadata and the instance's own.
         if !graphics && !multi {
@@ -1196,9 +1202,17 @@ impl AssemblyView {
                 }
             }
         }
-        if graphics && !off_part {
+        // Live (asm-face-menu-find-in-instance-list): the right-clicked face is selected, its row shown.
+        if graphics && !off_part && !on_triad {
+            let pick = pick.clone();
             edit.push(item("Find in instance list", move |t, _, cx| {
-                t.selected = vec![top];
+                match pick.clone() {
+                    Some(p) => {
+                        t.clear_selection();
+                        t.select_entity(p, false);
+                    }
+                    None => t.selected = vec![top],
+                }
                 t.ui.scroll_to_selection = true;
                 t.refresh_scene(false, cx);
             }));
@@ -1268,13 +1282,16 @@ impl AssemblyView {
                     t.refresh_scene(false, cx);
                 }));
             }
-            m.push(item("Select other…", |t, _, cx| t.select_other(false, cx)));
+            let at = pick.clone();
+            m.push(item("Select other…", move |t, _, cx| t.select_other_at(at.clone(), cx)));
             m.push(MenuEntry::Sep);
             // Live (menus/rmb-asm-two-instances-selected): the view items have no icons.
             m.push(item("Zoom to fit", |t, _, cx| t.viewport.update(cx, |vp, cx| vp.zoom_to_fit(true, cx))));
             let tg = targets.clone();
             m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
-            if let Some((forward, up)) = self.hovered_face_normal(cx) {
+            // On the triad: the selected face under it.
+            let normal = self.hovered_face_normal(cx).or_else(|| on_triad.then(|| self.selected_face_normal(cx)).flatten());
+            if let Some((forward, up)) = normal {
                 m.push(item("View normal to", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
             }
             m.push(MenuEntry::Sep);
@@ -1461,6 +1478,16 @@ impl AssemblyView {
     }
 
     /// View normal to: camera direction into the hovered planar face (and an up vector).
+    /// The last selected face's View normal to direction.
+    fn selected_face_normal(&self, cx: &App) -> Option<(DVec3, DVec3)> {
+        let (path, r) = self.ui.entity_sel.iter().rev().find(|(_, r)| matches!(r, Reference::Face(_)))?;
+        let o = self.result.occurrences.iter().find(|o| &o.path == path && o.face_refs.contains(r))?;
+        let at = Reference::Implicit { on: Box::new(r.clone()), inference: Inference::Centroid };
+        let f = noshape_model::assembly::eval::resolve_connector_in(&o.context, Some(&o.body), &at, &self.units(cx))?;
+        let n = noshape_model::assembly::eval::matrix_frame(&o.transform).mul(&f).z();
+        Some((-n, noshape_scene::camera_ops::face_normal_up(n)))
+    }
+
     fn hovered_face_normal(&self, cx: &App) -> Option<(DVec3, DVec3)> {
         let t = self.hover.as_ref().filter(|t| t.kind == PickKind::Face)?;
         let o = self.result.occurrences.get(t.occ)?;
@@ -2708,7 +2735,9 @@ impl AssemblyView {
                     Some(ManipHandle::Center) => vec![item("Move to origin", |t, _, cx| t.triad_action(TriadAction::MoveToOrigin, cx))],
                     _ => Vec::new(),
                 };
+                self.ui.menu_on_triad = true;
                 m.extend(self.instance_menu(t, true, cx));
+                self.ui.menu_on_triad = false;
                 m
             }
             Some(t) => self.instance_menu(t, true, cx),
@@ -4084,6 +4113,16 @@ impl AssemblyView {
     /// ("Face of Part 2 <1>") and the instances under it; the instance (what
     /// a click selects) is bold. ` again (Shift+` backwards) moves the bold
     /// row; hovering a row pre-highlights it, a click selects it.
+    /// Select other… from a menu: the face, edge or vertex under the pointer as the menu opened first, then the
+    /// instances there (live asm-face-menu-select-other).
+    pub(super) fn select_other_at(&mut self, pick: Option<AsmPickTarget>, cx: &mut Context<Self>) {
+        self.ui.select_other = None;
+        if pick.is_some() {
+            self.hover = pick;
+        }
+        self.select_other(false, cx);
+    }
+
     pub(super) fn select_other(&mut self, backwards: bool, cx: &mut Context<Self>) {
         let (rows, ix, at) = match self.ui.select_other.take() {
             Some((rows, ix, at)) if !rows.is_empty() => {

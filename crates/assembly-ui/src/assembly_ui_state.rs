@@ -198,7 +198,18 @@ impl AssemblyView {
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
         let mut items: Vec<Value> = mates_selected.filter_map(|id| asm.mates.iter().find(|m| m.id == id)).map(|m| json!({ "kind": "FEATURE", "owner": m.name })).collect();
-        items.extend(asm.instances.iter().filter(|i| self.selected.contains(&i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
+        // A clicked face, edge or vertex is selected itself, owned by its part (live asm-face-menu-clear-selection: FACE of
+        // "Part 2"; the instance's row highlights); an instance only when picked whole.
+        items.extend(self.ui.entity_sel.iter().map(|(path, r)| {
+            let kind = match r {
+                Reference::Edge(_) => "EDGE",
+                Reference::Vertex(_) => "VERTEX",
+                _ => "FACE",
+            };
+            let owner = self.result.occurrences.iter().find(|o| &o.path == path).map(|o| o.body_name.clone());
+            json!({ "kind": kind, "owner": owner })
+        }));
+        items.extend(asm.instances.iter().filter(|i| self.selected.contains(&i.id) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
             items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
