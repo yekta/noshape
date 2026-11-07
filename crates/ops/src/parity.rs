@@ -1451,6 +1451,7 @@ impl<'a> Translator<'a> {
         if sketch_only && !q["queryString"].as_str().unwrap_or("").is_empty()
             && let Ok(found) = self.query_with(k, q, false)
             && !found.is_empty()
+            && !self.names_stale_curves(q["queryString"].as_str().unwrap_or(""))
         {
             return Ok(found);
         }
@@ -1460,6 +1461,30 @@ impl<'a> Translator<'a> {
             return Ok(vec![e]);
         }
         self.query_with(k, q, true)
+    }
+
+    /// Whether a query's text names sketch curves its sketch doesn't have (written when the sketch held others: c2-duct-
+    /// multipart's Extrude 3 names Sketch 5's side triangles by curves since redrawn), so its ids place it better.
+    fn names_stale_curves(&self, text: &str) -> bool {
+        let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|t| t.split('"').next()) else { return false };
+        let Ok(tree) = noshape_model::custom::host::packed::unpack(packed) else { return false };
+        let mut strings = Vec::new();
+        packed_strings(&tree, &mut strings);
+        let mut sketch: Option<String> = None;
+        let mut stale = false;
+        for w in strings.windows(2) {
+            if let Some(sk) = w[0].strip_suffix(".wireOp") {
+                sketch = Some(sk.to_string());
+            }
+            if w[0] == "sketchEntityId"
+                && let Some(sk) = sketch.as_ref().filter(|sk| self.feature_ids.contains_key(*sk))
+                && self.curve_of(sk, &w[1]).is_none()
+                && !self.sketch_entities.contains_key(&(sk.clone(), w[1].clone()))
+            {
+                stale = true;
+            }
+        }
+        stale
     }
 
     fn query_with(&mut self, k: usize, q: &Value, use_ids: bool) -> Result<Vec<String>, String> {
@@ -2441,7 +2466,23 @@ impl<'a> Translator<'a> {
         // (start) or farthest (end) along the extrude (cf-transform-pattern's Transform pattern 2).
         if name == "CAP_VERTEX" {
             let (a, b) = (curves.first().ok_or("CAP_VERTEX: no curves")?, curves.get(1).ok_or("CAP_VERTEX: one curve")?);
-            let corner = [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7)).ok_or("CAP_VERTEX: its curves share no vertex")?;
+            // The end they share, else one's end on the other (c2-duct-multipart's Plane 4: a diagonal ending on a
+            // line's middle), else where they cross.
+            let on = |p: [f64; 2], c: &[[f64; 2]]| {
+                c.windows(2).any(|w| {
+                    let (d, e) = ([w[1][0] - w[0][0], w[1][1] - w[0][1]], [p[0] - w[0][0], p[1] - w[0][1]]);
+                    let t = ((e[0] * d[0] + e[1] * d[1]) / (d[0] * d[0] + d[1] * d[1]).max(1e-30)).clamp(0.0, 1.0);
+                    (e[0] - t * d[0]).hypot(e[1] - t * d[1]) < 1e-7
+                })
+            };
+            let ends = |c: &Vec<[f64; 2]>| [c[0], c[c.len() - 1]];
+            let corner = ends(a)
+                .into_iter()
+                .find(|p| ends(b).iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7))
+                .or_else(|| ends(a).into_iter().find(|p| on(*p, b)))
+                .or_else(|| ends(b).into_iter().find(|p| on(*p, a)))
+                .or_else(|| crossings(a, b).first().copied())
+                .ok_or("CAP_VERTEX: its curves share no vertex")?;
             let at = world(corner);
             let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 }))?;
             let parts: Vec<String> = made["faces"].as_array().into_iter().flatten().filter_map(|f| f["part"].as_str().map(str::to_string)).collect();

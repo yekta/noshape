@@ -201,8 +201,8 @@ fn text_style_edit_regenerates_with_a_cached_regenerator() {
 
 /// A sketch on a face imprints the face's edges, as live 11-03 (core's probe in "live 1812 drawing scale", a 60 x 40 x
 /// 10 mm block from (0, 0) on Top, sketches on its top face): the face's pieces are sketch faces, the sketch's own
-/// regions are split by the face's edges, and only those are qSketchRegion's; Disable imprinting leaves the sketch's
-/// own. A region picked before it was split still extrudes whole.
+/// regions are split by the face's edges, and only those are qSketchRegion's; off the face, what the sketch's curves
+/// close with its edges is a sketch face too; Disable imprinting leaves the sketch's own. A region picked before it was split still extrudes whole.
 #[test]
 fn a_sketch_on_a_face_imprints_the_faces_edges() {
     let units = UnitPrefs::default();
@@ -224,8 +224,10 @@ fn a_sketch_on_a_face_imprints_the_faces_edges() {
     let mm = |x: f64, y: f64| DVec2::new(x, y) * 1e-3;
     // (live: sketch faces' areas, mm², and how many are qSketchRegion's)
     type Case = (&'static str, fn(&mut noshape_sketch::Sketch, &dyn Fn(f64, f64) -> DVec2), bool, &'static [f64], usize);
-    let cases: [Case; 7] = [
+    let cases: [Case; 8] = [
         ("circle inside", |s, mm| { s.add_circle(mm(20.0, 20.0), 0.005); }, false, &[78.5398, 2321.4602], 1),
+        // Off the face, two lines closing a triangle with its edge (live: c2-duct-multipart's Sketch 5, JVC / JVG).
+        ("lines closed by an edge", |s, mm| { s.add_line(mm(0.0, 40.0), mm(0.0, 60.0)); s.add_line(mm(0.0, 60.0), mm(20.0, 40.0)); }, false, &[200.0, 2400.0], 0),
         ("line across", |s, mm| { s.add_line(mm(30.0, -10.0), mm(30.0, 50.0)); }, false, &[1200.0, 1200.0], 0),
         ("line from edge to edge", |s, mm| { s.add_line(mm(30.0, 0.0), mm(30.0, 40.0)); }, false, &[1200.0, 1200.0], 0),
         ("circle over an edge", |s, mm| { s.add_circle(mm(0.0, 20.0), 0.008); }, false, &[100.531, 100.531, 2299.469], 2),

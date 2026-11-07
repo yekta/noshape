@@ -293,7 +293,11 @@ fn imprint(ev: &EvalCtx, frame: &crate::display::PlaneFrame, sk: &noshape_sketch
     for r in sk.regions_with(&extra) {
         let p = (!ids.contains(&r.id)).then(|| r.interior_point());
         let inside = p.is_none_or(|p| own.iter().zip(&boxes).any(|(o, b)| b.contains(p) && o.contains(p)));
-        if inside || p.is_some_and(on_face) {
+        // Off the face and outside the sketch's loops, a region the sketch's curves help close is one too (live: c2-duct-
+        // multipart's Sketch 5 triangles between a dangling line, a diagonal and the face's edge); one of the face's
+        // edges alone (its hole) isn't.
+        let closed_by_sketch = || r.id.entities().iter().any(|e| !is_imprint_entity(e.0));
+        if inside || p.is_some_and(on_face) || closed_by_sketch() {
             regions.push(r);
             imprinted.push(!inside);
         }
