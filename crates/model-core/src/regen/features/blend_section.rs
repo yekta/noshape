@@ -959,3 +959,219 @@ pub fn gap_faces(shape: &Shape, f1: usize, f2: usize) -> FResult<Option<Vec<usiz
     }
     Ok(Some(out))
 }
+
+/// A closed edge where a plane meets a cylinder (a hole's or a boss's rim on a slanted face).
+struct Rim {
+    plane: Shape,
+    wall: Shape,
+    origin: DVec3,
+    axis: DVec3,
+    x_dir: DVec3,
+    rc: f64,
+    /// A point of the rim, the plane's outward normal.
+    p: DVec3,
+    np: DVec3,
+    /// Into the material from the plane.
+    wp: DVec3,
+    /// +1 when the material is outside the cylinder (a hole), -1 inside (a boss).
+    out: f64,
+}
+
+impl Rim {
+    /// The rim's point at angle `a` about the axis from `x` (`y` = axis × `x`).
+    fn at(&self, x: DVec3, y: DVec3, a: f64) -> (DVec3, DVec3) {
+        let radial = x * a.cos() + y * a.sin();
+        let on_cyl = self.origin + radial * self.rc;
+        (on_cyl + self.axis * ((self.p - on_cyl).dot(self.np) / self.axis.dot(self.np)), radial)
+    }
+
+    /// The point of the cylinder nearest `q`.
+    fn onto_wall(&self, q: DVec3) -> DVec3 {
+        let along = self.axis * (q - self.origin).dot(self.axis);
+        self.origin + along + (q - self.origin - along).normalize() * self.rc
+    }
+
+    fn frame(&self) -> (DVec3, DVec3) {
+        let x = (self.x_dir - self.axis * self.x_dir.dot(self.axis)).normalize();
+        (x, self.axis.cross(x))
+    }
+}
+
+/// The rims these edges make: each group of edges between one plane and one cylinder, all the edges between them
+/// (pieces of a rim a seam split), as a rim and the first of its edges (an index in `edges`).
+fn rims_of(shape: &Shape, edges: &[usize], scale: f64) -> FResult<Vec<(Rim, usize)>> {
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let mut groups: Vec<([u32; 2], Vec<usize>)> = Vec::new();
+    for (i, &e) in edges.iter().enumerate() {
+        let fs = ef.get(e).filter(|f| f.len() == 2).ok_or_else(|| fail("the edge doesn't have two faces"))?;
+        let pair = match (faces[fs[0] as usize].face_surface()?, faces[fs[1] as usize].face_surface()?) {
+            (k::Surface::Plane(_), k::Surface::Cylinder { .. }) => [fs[0], fs[1]],
+            (k::Surface::Cylinder { .. }, k::Surface::Plane(_)) => [fs[1], fs[0]],
+            _ => return Err(fail("not a plane and a cylinder")),
+        };
+        match groups.iter_mut().find(|g| g.0 == pair) {
+            Some(g) => g.1.push(i),
+            None => groups.push((pair, vec![i])),
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(pair, members)| {
+            let between = ef.iter().filter(|f| f.len() == 2 && (f[0] == pair[0] && f[1] == pair[1] || f[0] == pair[1] && f[1] == pair[0])).count();
+            // All of them, round a closed loop (each vertex ending two of its pieces, or one closed piece twice).
+            let mut ends: Vec<Shape> = Vec::new();
+            for &m in &members {
+                let vs = shape.sub_shape(ShapeType::Edge, edges[m])?.vertices();
+                if vs.len() == 1 {
+                    ends.push(vs[0].clone());
+                }
+                ends.extend(vs);
+            }
+            let closed = ends.iter().all(|v| ends.iter().filter(|w| w.is_same(v)).count() % 2 == 0);
+            if between != members.len() || !closed {
+                return Err(fail("not a whole rim"));
+            }
+            Ok((rim_of(shape, [&faces[pair[0] as usize], &faces[pair[1] as usize]], edges[members[0]], scale)?, members[0]))
+        })
+        .collect()
+}
+
+fn rim_of(shape: &Shape, [plane, wall]: [&Shape; 2], e: usize, scale: f64) -> FResult<Rim> {
+    let edge = shape.sub_shape(ShapeType::Edge, e)?;
+    let info = edge.edge_info()?;
+    let k::Surface::Cylinder { origin, axis, x_dir, radius: rc } = wall.face_surface()? else { return Err(fail("not a cylinder")) };
+    let axis = axis.normalize();
+    let p = info.start;
+    let np = plane.normal_at_point(p)?.normalize();
+    if axis.dot(np).abs() < 0.05 {
+        return Err(fail("a cylinder along its plane"));
+    }
+    let fr = frame_at(shape, [plane, wall], p, edge.tangent_at(info.first_param)?.normalize(), scale)?;
+    // (A concave rim's round would be added the same way, from the air's wedge: not checked against live yet.)
+    if fr.u[0].dot(fr.m[1]) <= 0.0 {
+        return Err(fail("a concave rim"));
+    }
+    let radial = (p - origin - axis * (p - origin).dot(axis)).normalize();
+    Ok(Rim { plane: plane.clone(), wall: wall.clone(), origin, axis, x_dir, rc, p, np, wp: fr.m[0], out: fr.m[1].dot(radial).signum() })
+}
+
+/// Whether rounds of these rims (all closed edges where a plane meets a cylinder) run off their plane or into each
+/// other somewhere: there live trims each round by what it meets (OCCT's rolls on, or fails), [`ring_blend`]'s way.
+/// The ball's touch points at 32 angles round each rim must lie on the plane, and on a cylinder another rim shares,
+/// with room for that rim's round too.
+pub fn rims_overflow(shape: &Shape, edges: &[usize], radii: &[f64]) -> bool {
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let Ok(rims) = rims_of(shape, edges, scale) else { return false };
+    let radius = |i: usize| radii.get(i).or(radii.first()).copied().unwrap_or(0.0);
+    let r_max = rims.iter().map(|(_, i)| radius(*i)).fold(0.0, f64::max);
+    const N: usize = 32;
+    for (i, (rim, first)) in rims.iter().enumerate() {
+        let r = radius(*first);
+        let shared = rims.iter().enumerate().any(|(j, (o, _))| j != i && o.wall.is_same(&rim.wall));
+        // (A hair short of the touch line: a round that just consumes a face, its touch line on the face's far edge,
+        // stays OCCT's, as live's.)
+        let reach = (1.0 - 1e-6) * (1.0 + r_max / r);
+        let (x, y) = rim.frame();
+        for k in 0..N {
+            let (p, radial) = rim.at(x, y, k as f64 * std::f64::consts::TAU / N as f64);
+            // Outward normals there; the ball's centre r inside both.
+            let n_w = radial * -rim.out;
+            let c = p + (rim.np + n_w) * (-r / (1.0 + rim.np.dot(n_w)));
+            let (tp, tw) = (c + rim.np * r, c + n_w * r);
+            let on_plane = rim.plane.contains_point(p + (tp - p) * (1.0 - 1e-6), scale * 1e-9).unwrap_or(false);
+            // (A lone rim's round meeting something cut in its wall is OCCT's, as live's: motor-mount-jack's Fillet 1.)
+            let on_wall = !shared || rim.wall.contains_point(rim.onto_wall(p + (tw - p) * reach), scale * 1e-9).unwrap_or(false);
+            if !on_plane || !on_wall {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Fillets of convex closed edges where a plane meets a cylinder whose rounds run off the plane or into each other
+/// ([`rims_overflow`]), or where OCCT's chain fails: each rim rounded on its own on a wedge of its plane and
+/// cylinder (OCCT's fillet of a lone rim), the region between the rim and its round cut away, so each round ends
+/// where it meets another face or round, as live's (c2-rings-loft's Fillet 1: a ring's two R2 rims meet at its narrow
+/// bottom and run out onto its outside).
+pub fn ring_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], radii: &[f64]) -> FResult<()> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let feature = ev.feature;
+    let mut cuts = Vec::new();
+    for (rim, i) in rims_of(shape, edges, scale)? {
+        let r = radii.get(i).or(radii.first()).copied().ok_or_else(|| fail("no radius"))?;
+        let e = edges[i];
+        let (axis, np, p) = (rim.axis, rim.np, rim.p);
+        let cos = axis.dot(np);
+        // The wedge: a slab on the plane around the rim, with the cylinder's inside or outside.
+        let q = rim.origin + axis * ((p - rim.origin).dot(np) / cos);
+        let half = rim.rc / cos.abs() + 4.0 * r;
+        let depth = 4.0 * r + rim.rc;
+        let down = if rim.wp.dot(np) < 0.0 { -np } else { np };
+        let x = (axis - np * cos).try_normalize().unwrap_or_else(|| np.any_orthonormal_vector());
+        let y = down.cross(x);
+        let slab = k::make_box(&k::Plane::new(q - x * half - y * half, down, x), 2.0 * half, 2.0 * half, depth)?;
+        let long = 2.0 * (half + depth);
+        let cyl = k::make_cylinder(&k::Plane::new(rim.origin + axis * ((q - rim.origin).dot(axis) - long), axis, seam_where_whole(&rim, r)?), rim.rc, 2.0 * long, std::f64::consts::TAU)?;
+        let wedge = if rim.out < 0.0 { k::common(&slab, &cyl)? } else { k::cut(&slab, &cyl)? }.shape;
+        let at = k::make_vertex(p)?;
+        let edge = wedge
+            .edges()
+            .into_iter()
+            .filter(|c| c.edge_info().is_ok_and(|i| i.closed))
+            .map(|c| (k::distance(&c, &at).map_or(f64::INFINITY, |d| d.distance), c))
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+            .filter(|(d, _)| *d < scale * 1e-6)
+            .ok_or_else(|| fail("no rim on the wedge"))?
+            .1;
+        let rounded = k::fillet(&wedge, std::slice::from_ref(&edge), r)?;
+        let tool = k::cut(&wedge, &rounded.shape)?;
+        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+            return Err(fail("the rim's round left no one solid to cut"));
+        }
+        // Its round: the face on neither the plane nor the cylinder.
+        let ename = body.edges[e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool
+            .shape
+            .faces()
+            .iter()
+            .map(|f| if matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. })) { generated.clone() } else { blend.clone() })
+            .collect();
+        cuts.push(NamedShape::new(tool.shape, names));
+    }
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &cuts)?;
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(())
+}
+
+/// Where a rim's round can have its seam (the wedge's cylinder's x direction): an angle about the axis at which
+/// its touch lines on the plane and the cylinder stay (a point a little past each lies on its face), from the
+/// cylinder's own seam round; the seam's ends then split only pieces of one curve (one edge, as live's, which has no
+/// seam), never a curve where the round meets another face or round.
+fn seam_where_whole(rim: &Rim, r: f64) -> FResult<DVec3> {
+    let (x, y) = rim.frame();
+    let along_w = rim.axis * rim.axis.dot(rim.wp).signum();
+    const N: usize = 16;
+    for k in 0..N {
+        // 0, +1, -1, +2, ... steps from the cylinder's seam.
+        let step = (k as f64 / 2.0).ceil() * if k % 2 == 1 { 1.0 } else { -1.0 };
+        let (p, radial) = rim.at(x, y, step * std::f64::consts::TAU / N as f64);
+        let into_p = (radial - rim.np * radial.dot(rim.np)).normalize() * rim.out;
+        if rim.plane.contains_point(p + into_p * (1.2 * r), r * 1e-3)? && rim.wall.contains_point(rim.onto_wall(p + along_w * (2.2 * r)), r * 1e-3)? {
+            return Ok(radial);
+        }
+    }
+    Ok(x)
+}

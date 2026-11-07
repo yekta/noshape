@@ -2332,3 +2332,52 @@ fn the_touched_parts_probe_runs_only_when_asked() {
     assert_eq!(touched(&mut t, None), Vec::<FeatureId>::new());
     assert_eq!(touched(&mut t, Some(bx)), vec![a]);
 }
+
+/// c2-rings-loft's Fillet 1: a ring with sides slanted 5.4° (3.35 mm of bore at its bottom, 1 mm of side) rounded
+/// R2 on both rims, where OCCT's chain fails: each rim's round as if alone, the two meeting at the bottom and running
+/// out onto its bottom face, the bore left above where they meet (live's topology there, 7/14/8 to 9/21/14).
+#[test]
+fn rounds_of_slanted_rims_meet_and_run_out_as_live() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(3.25, -20.0), (4.75, -20.0), (8.546, 20.0), (-0.546, 20.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y) * 1e-3)).collect();
+    for i in 0..4 {
+        sk.add_line_between(p[i], p[(i + 1) % 4]).unwrap();
+    }
+    let s = t.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "40 mm", "NEW");
+    t.set(x, "symmetric", b(true));
+    let mut sk = rect(-0.013, -0.01125, 0.013, 0.015);
+    sk.add_circle(DVec2::ZERO, 0.01025);
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), sk);
+    let ring = t.regions(s)[0].clone();
+    let i = t.extrude(ring, "30 mm", "INTERSECT");
+    t.set(i, "symmetric", b(true));
+    let res = t.ok();
+    let body = solids(&res.context)[0].clone();
+    let shown = body.shape.shown_topology().unwrap();
+    assert_eq!((body.shape.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (7, 14, 8));
+    let rim_at = |p: DVec3| {
+        let v = noshape_kernel::make_vertex(p).unwrap();
+        let es = body.shape.edges();
+        let i = (0..es.len()).min_by(|&a, &b| noshape_kernel::distance(&es[a], &v).unwrap().distance.total_cmp(&noshape_kernel::distance(&es[b], &v).unwrap().distance)).unwrap();
+        Reference::Edge((*body.edges[i]).clone())
+    };
+    let rims = vec![rim_at(DVec3::new(7.621e-3, 0.0, 10.25e-3)), rim_at(DVec3::new(0.379e-3, 0.0, 10.25e-3))];
+    t.add("fillet", &[("entities", q(rims)), ("radius", e("2 mm"))]);
+    let res = t.ok();
+    let after = solids(&res.context);
+    assert_eq!(after.len(), 1);
+    let s = &after[0].shape;
+    assert!(s.is_valid());
+    let shown = s.shown_topology().unwrap();
+    assert_eq!((s.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count()), (9, 21, 14));
+    // The bore: only above where the rounds meet.
+    let bore = s.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 0.01025).abs() < 1e-9)).expect("the bore");
+    let bb = bore.bounding_box(true).unwrap();
+    assert!(bb.min.z > -0.009 && bb.max.z > 0.0102, "{bb:?}");
+    // Both rounds are faces of the fillet, named for their rims.
+    let blends = after[0].faces.iter().filter(|n| format!("{n:?}").contains("Blend")).count();
+    assert_eq!(blends, 2, "{:?}", after[0].faces);
+}

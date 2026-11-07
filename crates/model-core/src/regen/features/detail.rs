@@ -404,6 +404,11 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             Some(Overrun::PastUnselected) => return err("Failed to fillet selections."),
             None => {}
         }
+        // Rims whose rounds run off their plane or into each other: each round trimmed by what it meets, as live's.
+        let overflow = super::blend_section::rims_overflow(&body.shape, &edges, &radii);
+        if overflow && super::blend_section::ring_blend(ev, bi, &edges, &radii).is_ok() {
+            continue;
+        }
         // noshape's blend takes some of the edge groups but not all (knob-jason's Fillet 1: arcs it rounds exactly,
         // hole rims on cones it doesn't): those first, OCCT's for the rest on that result, each named in turn.
         if let Some((first, rest)) = rust_groups(&body.shape, &shapes, &radii)
@@ -421,6 +426,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // Without propagation a single straight edge whose ball fits its faces
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
             Err(_) if !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
+            Err(_) if !overflow && super::blend_section::ring_blend(ev, bi, &edges, &radii).is_ok() => continue,
             Err(e) => return Err(fillet_failed(e)),
         };
         let t1 = std::time::Instant::now();

@@ -16,6 +16,23 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 05:47 UTC: c2-rings-loft's Fillet 1 as live (7 -> 8 of 32).**
+- Live's two R2 rounds (slanted side planes / Ø20.5 bore) are each the lone rim's round, trimmed by what it meets: at
+  the ring's bottom (3.35 mm of bore, 1 mm of side) they meet each other (edge JQB, 20.34 mm at x = 4) and run out onto
+  its outside (JQZ / JQN, 40.88 mm); the planes keep 32.5 mm² at the top. OCCT's chain fails. blend_section.rs
+  `ring_blend`: each convex closed plane / cylinder rim (pieces a seam split included) rounded on a wedge (a slab on
+  the plane with the cylinder's outside or inside) by OCCT's fillet, the wedge minus its round cut from the body;
+  used before OCCT where `rims_overflow` finds a round leaving its plane or meeting another rim's round on its
+  cylinder (the ball's touch points at 32 angles), and where OCCT's chain fails. Convex rims only (a concave one's
+  round would be added the same way: unchecked; pipeflange-steven's Fillet 2 went wrong that way). A lone rim whose
+  round meets a cut in its wall stays OCCT's (motor-mount-jack's Fillet 1: the same shape, but the Boolean's names
+  differ from the fillet's and Fillet 2 lost its edges). The wedge's cylinder seam goes where both touch lines stay
+  (`seam_where_whole`), so the seam's ends only split pieces of one contact curve, which shown_topology joins: 9/21/14,
+  719.39 mm³ (live 719.45). T1 model features_a::rounds_of_slanted_rims_meet_and_run_out_as_live. Speed:
+  RING-BLEND-SPEED (354 ms, live 23).
+- Next difference there: Chamfer 1 (4 notch arcs, tangent propagation on): live 17 faces (one chamfer per notch arc,
+  each splitting its plane), ours 31.
+
 **State 11-07 05:01 UTC.**
 - Queued / landed since 03:40: a loft's added vertices spread evenly along their edge (LOFT-VERTEX-MATCH: the
   impeller's circle split now live's, 46.155 + 3 x 52.683 mm; its surface still -2.3 %, the Normal-to-profile

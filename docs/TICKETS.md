@@ -768,6 +768,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   the left strip missing, which shows the inside as a black wedge from below. Live's model has two faces there (or none
   bridging); the regeneration should leave two faces.
 
+- [ ] P2 RING-BLEND-SPEED (core 2026-11-07) **c2-rings-loft's Fillet 1 takes 354 ms (live 23 ms).** Its two R2 rims'
+  rounds meet each other at the ring's narrow bottom and run out onto its outside, which OCCT's chain can't build
+  (it failed in 200 ms); blend_section.rs `ring_blend` rounds each rim alone on a wedge of its plane and cylinder and
+  cuts the regions between rims and rounds away (30 ms for both tools). The cut is the rest: 240 ms of it is OCCT
+  intersecting the two blend surfaces, whose meeting curve ends where both touch the bore (tangent there); fuzzy
+  1e-7 / 1e-6 and fusing the tools first don't help. The lever: the rounds and their meeting curve built directly from
+  the rims' geometry (BLEND-RUST), not through OCCT's surface intersection.
+
 - [ ] P1 OPEN-SLOW-SHELL-FILLET (core; psui's open-speed table, lead 11-06) **c2-rings-loft opens in 5.1 s (live
   regenerates it in 1.6 s): Shell 1 takes 4.6 s; c2-impeller-loft 9.4 s (live 2.8): Shell Gehäuse 2.4 s, Fillet
   Ansaugflansch zum Gehaeuse 1.3 s, Fillet 4 1.2 s, Delete face 1 0.6 s.** Repro: /root/psui-scratch/open-slow/
