@@ -745,6 +745,22 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
+  the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
+  (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
+  - blend: learning-center-michael 7/7 → 5/7, Fillet 2 now "Failed to fillet selections.", and 2.4 → 139.7 s (×57).
+    core's handoff already names 2e49088a9 (an arc's round run on past tangent edges) for it.
+  - core / blend: c2-hunting-knife Fillet 5 "Select edges or faces to fillet.", Fillet 7 "Select vertices on fillet chain."
+    (built before). Range's fillet changes: 2e49088a9, ff282daaa, c61acdcab, 35d037cab / 44368ecdd.
+  - skasm: c2-sm-louver Extrude 3 "Select face or sketch region to extrude." (built before); 0efa22d0b (a sketch on a
+    face's regions) is in the range.
+  - core: cf-t-slot-joint's T-Slot Joint 1–3 "Error regenerating." (built before); e90cfb885 (evRaycast, after this green)
+    names cf-t-slot-joint: check it's fixed there.
+  - speed (core, blend): c2-rings-loft 18.8 → 35.6 s, c2-tpd-fillet-variable 0.3 → 0.9 s (the exact variable round,
+    35d037cab / 44368ecdd), cf-wave-spring 2.0 → 3.6 s, c2-housing-draft 0.9 → 1.7 s.
+  - dx: drw-sheet-duplicate / drw-sheet-properties now differ because live2 re-recorded them through the Sheets panel
+    (1eb7a579d): step 1 `.dialog.text[4]` live "Right" / ours "Top". A newly measured difference, not a regression.
+  (qa 2026-11-07 22:56)
 - [ ] P2 MCP-QUOTED-VALUE (ops) **a real agent's first sketch_dimension calls fail on a quoted value**: the release agent
   check (bin/agent-session.sh, `claude -p` on Haiku, v0.4.35's MCP server, the fixed block-with-hole task) sent
   `"value": "\"60 mm\""` (the expression in quotes) twice and got `expected a value, found `\"` at 0..1` (param value)
