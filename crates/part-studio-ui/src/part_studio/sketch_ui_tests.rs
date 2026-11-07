@@ -3016,6 +3016,9 @@ fn a_plane_behind_the_sketch_gets_its_menu(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAppContext) {
     let (window, view, _top, _) = block_part(cx, "display-cache");
+    // The block's regeneration done, its refined display too (it would end the stand-in below).
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!(!cx.update(|cx| view.read(cx).ui_busy()), "the block's regeneration finished");
     let real = cx.update(|cx| view.read(cx).display.clone());
     type Meshes = Vec<(String, Vec<[f32; 3]>, Vec<u32>, Vec<(u32, u32)>, usize)>;
     let meshes = |d: &noshape_model::display::StudioDisplay| -> Meshes {
@@ -3064,6 +3067,8 @@ fn the_swap_from_the_cached_display_to_the_real_one_changes_no_frame(cx: &mut Te
     }
     RENDERING.set(true);
     let (window, view, _top, _) = block_part(cx, "display-cache-frames");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!(!cx.update(|cx| view.read(cx).ui_busy()), "the block's regeneration finished");
     let real = cx.update(|cx| view.read(cx).display.clone());
     let dir = std::env::temp_dir().join(format!("noshape-display-cache-frames-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);

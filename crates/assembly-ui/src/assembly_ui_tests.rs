@@ -399,6 +399,16 @@ fn enter_in_the_graphics_accepts_the_open_dialog(cx: &mut TestAppContext) {
 #[gpui::test]
 fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext) {
     let (window, view) = pattern_assembly(cx, "display-cache");
+    // The opened assembly's evaluation (on a background thread) in.
+    for _ in 0..600 {
+        if cx.update(|cx| view.read(cx).ui.real_result_in) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+    }
+    assert!(cx.update(|cx| view.read(cx).ui.real_result_in), "the assembly evaluated");
     let real = cx.update(|cx| view.read(cx).result.clone());
     assert_eq!(real.occurrences.len(), 3, "the block, the pin and its copy");
     type Occ = (Vec<InstanceId>, String, Vec<[f32; 3]>, Vec<u32>, glam::DMat4);
@@ -429,12 +439,13 @@ fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext)
     assert_eq!(said.as_deref(), Some(crate::display_cache::WAITING));
     // The real evaluation lands: the same occurrences, the mate dialog opens.
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_eval(w, cx))).unwrap();
-    for _ in 0..100 {
-        cx.executor().advance_clock(std::time::Duration::from_millis(50));
-        cx.run_until_parked();
+    for _ in 0..600 {
         if cx.update(|cx| view.read(cx).mate.is_some()) {
             break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
     }
     let after = cx.update(|cx| view.read(cx).result.clone());
     assert!(!cx.update(|cx| view.read(cx).ui.cached_view), "the model's own again");

@@ -125,10 +125,12 @@ fn export_drawing_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
 fn a_cached_sheet_stands_in_until_the_real_one_is_complete(cx: &mut TestAppContext) {
     SUGGESTED.set(true);
     let (window, editor) = drawing(cx, "display-cache");
-    for _ in 0..200 {
+    // The source's regeneration and the views' geometry run on background threads.
+    for _ in 0..1500 {
         if cx.update(|cx| editor.read(cx).real_sheet_in()) {
             break;
         }
+        std::thread::sleep(std::time::Duration::from_millis(10));
         cx.executor().advance_clock(std::time::Duration::from_millis(50));
         draw(cx, window);
     }
