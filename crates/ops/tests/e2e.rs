@@ -6557,6 +6557,13 @@ fn an_assembly_configuration_variable_drives_a_mate_offset() {
     assert!((gap(&mut ctx) - 12.0).abs() < 1e-6, "12 mm: {}", gap(&mut ctx));
     call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "reset": true }));
     assert!((gap(&mut ctx) - 5.0).abs() < 1e-6, "back to the default: {}", gap(&mut ctx));
+    // The second connector moved 4 mm along its own Z (the mate dialog's connector Move): the part shifts 4 mm more.
+    call(&mut ctx, "assembly_delete", json!({ "tab": "Assembly 1", "mates": ["Fastened 1"] }));
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part Studio 1 <1>", "entity": top }, "b": { "instance": "Part Studio 1 <2>", "entity": bottom, "move": { "z": "4 mm" } }, "offset": { "z": "#gap" } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    assert!(((gap(&mut ctx) - 5.0).abs() - 4.0).abs() < 1e-6, "moved 4 mm: {}", gap(&mut ctx));
+    let e = try_call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part Studio 1 <1>", "entity": top }, "b": { "instance": "Part Studio 1 <2>", "entity": bottom, "move": { "rotation_axis": "w" } } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("b.move.rotation_axis"), "{e:?}");
 }
 
 /// ASM-API-GAPS: the Properties dialog's Exclude from all BOMs, Unit of measure and Not revision managed through

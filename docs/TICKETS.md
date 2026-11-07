@@ -3581,10 +3581,10 @@ were checked in code by asm; "(verify)" ones need a live check first.
   relation's default direction against live. Fixed 2026-11-07 (live 2204: every relation's follower goes the opposite
   way, B = −ratio·A; Linear, Rack and pinion and Screw went the same way; T1
   a_linear_relation_moves_its_follower_the_opposite_way).
-- [ ] P1 ASM-API-GAPS (asm) agent API: (done 11-07: `assembly_properties`; `part_set_properties` takes Exclude from
+- [x] P1 ASM-API-GAPS (asm) agent API: (done 11-07: `assembly_properties`; `part_set_properties` takes Exclude from
   all BOMs / Unit of measure / Not revision managed (State is the releases'); `assembly_exploded_view` duplicate;
   mate / group Show / Hide; `assembly_measure`, `assembly_mass_properties`; `assembly_replace` takes several
-  instances, sketches and other documents' versions; `assembly_update_references`. `assembly_mate_value`, `assembly_reorder`. Left: a connector's move from the mate dialog.) Was: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
+  instances, sketches and other documents' versions; `assembly_update_references`. `assembly_mate_value`, `assembly_reorder`; a mate's connector `move` / `reorient`.) Was: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
   number); `part_set_properties` lacks Exclude from all BOMs / Unit of measure / Not revision managed / State; no
   assembly mass or measure op; `assembly_replace` takes one instance and current-document sources only (no sketch,
   other document, standard content; its text still says mates are re-pointed); no op updates references to other

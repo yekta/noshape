@@ -23,7 +23,7 @@ mod positions;
 mod standard;
 mod structure;
 
-const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis.";
+const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis, \"reorient\": 0–3 quarter turns of its secondary axis, \"move\": {\"x\", \"y\", \"z\", \"rotation_axis\": \"x\"|\"y\"|\"z\", \"rotation\"} moves it (the mate dialog's connector Move; expressions).";
 
 pub fn ops() -> Vec<Op> {
     let connector = json!({ "type": "object" });
@@ -724,6 +724,27 @@ fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &st
     if o.get("flip").and_then(Value::as_bool) == Some(true) {
         c.flip = true;
     }
+    // The mate dialog's connector Reorient secondary axis (quarter turns) and Move (an implicit connector's offset).
+    if let Some(q) = o.get("reorient") {
+        c.rotate_quarters = q.as_u64().filter(|q| *q < 4).ok_or_else(|| OpError::param(&format!("{field}.reorient"), "0 to 3 quarter turns"))? as u8;
+    }
+    if let Some(m) = o.get("move") {
+        let m = m.as_object().ok_or_else(|| OpError::param(&format!("{field}.move"), "{\"x\", \"y\", \"z\", \"rotation_axis\", \"rotation\"}"))?;
+        let text = |k: &str| -> Option<noshape_units::ExprValue> {
+            match m.get(k)? {
+                Value::String(t) => Some(noshape_units::ExprValue::new(t.clone())),
+                Value::Number(n) => Some(noshape_units::ExprValue::new(n.to_string())),
+                _ => None,
+            }
+        };
+        let rotation_axis = match m.get("rotation_axis").and_then(Value::as_str) {
+            None | Some("z") => 2,
+            Some("x") => 0,
+            Some("y") => 1,
+            Some(_) => return Err(OpError::param(&format!("{field}.move.rotation_axis"), "x, y or z")),
+        };
+        c.moved = Some(Box::new(noshape_model::assembly::ConnectorMove { translation: [text("x"), text("y"), text("z")], rotation_axis, rotation: text("rotation"), off: false }));
+    }
     Ok(c)
 }
 
@@ -739,6 +760,8 @@ fn resolve_entity(r: &AssemblyResult, c: MateConnectorRef, units: &noshape_units
         Some(p) => {
             let mut n = p.connector(&o.path);
             n.flip = c.flip;
+            n.rotate_quarters = c.rotate_quarters;
+            n.moved = c.moved;
             n
         }
         None => c,
