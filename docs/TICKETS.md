@@ -16,7 +16,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   regions::a_splines_handle_arms_are_lines, e2e a_splines_handle_arms_take_constraints_and_dimensions, parity
   lives_ellipse_mirror_and_handle_constraints_translate; ui-parity sketch-spline-handle-arm. Waiting on live
   (REQUESTS 23:20): which constraints the arm accepts, its selection name, interior handles, Bezier / conic control
-  polygons.
+  polygons. skasm 11-07 (live 2187): the arm takes what a line takes (ours already); a selected arm shows
+  Construction active (ours didn't); only end points carry arms (as ours). A Bezier's control polygon is lines pole
+  to pole that select and constrain the same way (`<id>.cppolygon.<n>`): ours now (the Bezier's handle lines,
+  sketch_get's `handle_arms` / `polygon_index`, the translator's names; e2e a_beziers_control_polygon_takes_constraints,
+  ui-parity sketch-bezier-polygon from live2's recording); a conic has none (as ours). Left: live's refusal messages
+  when a selection can't take a constraint (Concentric on an arm: "A concentric constraint can only be added to
+  circles, arcs, ellipses and points."; std's errorstringenum has them all): ours switches to the tool silently.
 - [x] (skasm 11-07: solid sweeps mitre at sharp path corners (OCCT RightCorner, the Transformed sections as fallback); Sweep 1 as live, cf-box-dovetail-joint 5 -> 14/18, next: Box Joint 1 (custom); suite 622 -> 631/924, nothing else moved; skasm 11-07: Box Joint's drafts took the boards' and pin copies' faces left where the offset pin face was: a moved face's transient query keeps to its bodies, cf-box-dovetail-joint 18/18, suite 640 -> 644/936) P1 DOVETAIL-SWEEP-CORNERS (skasm, lead 11-06 23:15; parity suite) cf-box-dovetail-joint's Sweep 1 (feature 5,
   REMOVE): a dovetail profile (Sketch 2 on the base's end face, two lines and two arcs) swept round the base board's
   top rim, a closed path of four straight edges with sharp corners (two CAP_EDGEs, two SWEPT_EDGEs of Extrude 3): ours

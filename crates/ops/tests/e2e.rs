@@ -1336,6 +1336,36 @@ fn a_splines_handle_arms_take_constraints_and_dimensions() {
     assert!(!g["entities"].as_array().unwrap().iter().any(|e| e["id"] == arms[0] || e["id"] == arms[1]), "{g}");
 }
 
+/// A Bezier's control polygon is lines pole to pole that take constraints, as its arm is a spline's (live 2187: the
+/// first segment of (0,0) (30,20) (60,0) selects alone and h makes it horizontal); a conic has none.
+#[test]
+fn a_beziers_control_polygon_takes_constraints() {
+    let mut ctx = Ctx::new();
+    let path = scratch("bezier-polygon.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "bezier", "points": [[0, 0], [30, 20], [60, 0]] }, { "tool": "conic", "points": [[0, -40], [60, -40], [30, -20]] }] }));
+    let drawn: Vec<&str> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] != "point").filter_map(|e| e["type"].as_str()).collect();
+    assert_eq!(drawn, ["bspline", "conic"], "{r}");
+    let bezier = created(&r, "bspline")[0].clone();
+    let polygon = bezier["handle_arms"].as_array().cloned().unwrap_or_default();
+    assert_eq!(polygon.len(), 2, "{bezier}");
+    assert!(created(&r, "conic")[0].get("handle_arms").is_none());
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let entity = |g: &Value, id: &Value| g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *id).cloned().unwrap();
+    let first = entity(&g, &polygon[0]);
+    assert_eq!((first["type"].as_str(), first["handle_of"].as_str(), first["polygon_index"].as_u64(), first["construction"].as_bool()), (Some("line"), bezier["id"].as_str(), Some(0), Some(true)), "{first}");
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "horizontal", "entities": [polygon[0]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let (a, b) = { let e = entity(&g, &polygon[0]); (e["start"][1].as_f64().unwrap(), e["end"][1].as_f64().unwrap()) };
+    assert!((a - b).abs() < 1e-6, "{a} {b}");
+    let bezier = g["entities"].as_array().unwrap().iter().find(|e| e["id"] == bezier["id"]).cloned().unwrap();
+    assert!((bezier["control_points"][1][1].as_f64().unwrap() - bezier["control_points"][0][1].as_f64().unwrap()).abs() < 1e-6, "the second pole level with the first: {bezier}");
+    call(&mut ctx, "sketch_delete", json!({ "sketch": sk, "entities": [bezier["id"]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    assert!(!g["entities"].as_array().unwrap().iter().any(|e| polygon.contains(&e["id"])), "{g}");
+}
+
 /// Live's template documents: ANSI A–D (no E), ISO A0–A4 and A4 Portrait,
 /// JIS the same sizes; a JIS drawing's title block in Japanese, third angle,
 /// its texts in Onshape-Standard-JapaneseFields (live tpl-JIS_A3.dxf).

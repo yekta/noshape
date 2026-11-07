@@ -465,7 +465,15 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
         Geometry::Arc { center, start, end } => json!({ "type": "arc", "center": p(*center), "start": p(*start), "end": p(*end), "center_point": eid(*center), "start_point": eid(*start), "end_point": eid(*end) }),
         Geometry::Ellipse { center, major, minor } => json!({ "type": "ellipse", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k) }),
         Geometry::EllipticalArc { center, major, minor, start, end } => json!({ "type": "elliptical_arc", "center": p(*center), "major": [r9(major.x * k), r9(major.y * k)], "minor_radius": r9(minor * k), "start_point": eid(*start), "end_point": eid(*end) }),
-        Geometry::BSpline { control, degree, knots, .. } => json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) }),
+        Geometry::BSpline { control, degree, knots, .. } => {
+            let mut v = json!({ "type": "bspline", "degree": degree, "control_points": control.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": control.iter().map(|c| eid(*c)).collect::<Vec<_>>(), "knots": knots, "start_point": control.first().map(|c| eid(*c)), "end_point": control.last().map(|c| eid(*c)) });
+            // A Bezier's control polygon: lines pole to pole that take constraints and dimensions.
+            let arms = data.sketch.handle_arms(e.id);
+            if !arms.is_empty() {
+                v["handle_arms"] = json!(arms.into_iter().map(|a| a.map(eid)).collect::<Vec<_>>());
+            }
+            v
+        }
         Geometry::FitSpline { points, handles } => {
             let mut v = json!({ "type": "spline", "points": points.iter().map(|c| p(*c)).collect::<Vec<_>>(), "point_ids": points.iter().map(|c| eid(*c)).collect::<Vec<_>>() });
             // Closed on its first point: periodic (its last point is its first).
@@ -476,17 +484,21 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
             // take constraints and dimensions).
             if let Some((h0, h1)) = handles {
                 v["handles"] = json!([eid(*h0), eid(*h1)]);
-                v["handle_arms"] = json!(data.sketch.handle_arms(e.id).map(|a| a.map(eid)));
+                v["handle_arms"] = json!(data.sketch.handle_arms(e.id).into_iter().map(|a| a.map(eid)).collect::<Vec<_>>());
             }
             v
         }
         Geometry::Conic { start, control, end, rho } => json!({ "type": "conic", "start": p(*start), "control": p(*control), "end": p(*end), "rho": rho, "start_point": eid(*start), "control_point": eid(*control), "end_point": eid(*end) }),
     };
     v["id"] = json!(entity_id(sketch, e.id));
-    // A spline's handle arm: the spline and its end.
-    if let Some((spline, k)) = data.sketch.arm_of(e.id) {
-        v["handle_of"] = json!(entity_id(sketch, spline));
-        v["handle_end"] = json!(if k == 0 { "start" } else { "end" });
+    // A spline's handle arm: the spline and its end; a Bezier's control polygon line: the Bezier and its place.
+    if let Some((curve, k)) = data.sketch.arm_of(e.id) {
+        v["handle_of"] = json!(entity_id(sketch, curve));
+        if data.sketch.is_spline_arm(e.id) {
+            v["handle_end"] = json!(if k == 0 { "start" } else { "end" });
+        } else {
+            v["polygon_index"] = json!(k);
+        }
     }
     if e.construction {
         v["construction"] = json!(true);

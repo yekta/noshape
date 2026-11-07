@@ -245,7 +245,7 @@ fn regions_unite_across_a_whole_loop_not_an_arc() {
 fn a_splines_handle_arms_are_lines() {
     let mut sk = Sketch::new();
     let s = sk.add_fit_spline_with_handles(&[v(0.0, 0.0), v(30.0, 20.0), v(60.0, 0.0)]).unwrap();
-    let [Some(a0), Some(a1)] = sk.handle_arms(s) else { panic!("no arms") };
+    let [Some(a0), Some(a1)] = sk.handle_arms(s)[..] else { panic!("no arms") };
     assert_eq!((sk.kind(a0), sk.arm_of(a0), sk.arm_of(a1)), (Some(EntityKind::Line), Some((s, 0)), Some((s, 1))));
     assert!(sk.entity(a0).unwrap().construction);
     // (Construction: no region.)

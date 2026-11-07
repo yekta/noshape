@@ -257,42 +257,71 @@ impl Sketch {
         Ok(id)
     }
 
-    /// A fit spline's handle arms, at its start and its end (None where it has no handles, or no arm there).
-    pub fn handle_arms(&self, spline: EntityId) -> [Option<EntityId>; 2] {
-        let Some(Geometry::FitSpline { points, handles: Some(_) }) = self.entity(spline).map(|e| &e.geometry) else { return [None, None] };
-        let arm = |at: EntityId| self.entities.values().find(|e| e.handle_of == Some(spline) && matches!(e.geometry, Geometry::Line { start, .. } if start == at)).map(|e| e.id);
-        [points.first().and_then(|p| arm(*p)), points.last().and_then(|p| arm(*p))]
+    /// A Bezier's poles: a control-point spline of one span (its degree one less than its poles, unweighted), not
+    /// another's (a Use's).
+    fn bezier_poles(&self, curve: EntityId) -> Option<&[EntityId]> {
+        let e = self.entity(curve).filter(|e| !e.external)?;
+        match &e.geometry {
+            Geometry::BSpline { control, degree, weights: None, .. } if control.len() > 2 && *degree + 1 == control.len() => Some(control),
+            _ => None,
+        }
     }
 
-    /// The spline and end (0 its start, 1 its end) a handle arm belongs to.
+    /// The lines that take constraints and dimensions for a curve's handles (None where one is missing): a fit
+    /// spline's handle arms at its start and its end (none without handles), a Bezier's control polygon, pole to pole
+    /// (live's `<id>.startHandle` / `.endHandle` and `<id>.cppolygon.<n>`).
+    pub fn handle_arms(&self, curve: EntityId) -> Vec<Option<EntityId>> {
+        let line = |a: EntityId, b: Option<EntityId>| {
+            self.entities.values().find(|e| e.handle_of == Some(curve) && matches!(e.geometry, Geometry::Line { start, end } if start == a && b.is_none_or(|b| end == b))).map(|e| e.id)
+        };
+        if let Some(poles) = self.bezier_poles(curve) {
+            return poles.windows(2).map(|w| line(w[0], Some(w[1]))).collect();
+        }
+        let Some(Geometry::FitSpline { points, handles: Some(_) }) = self.entity(curve).map(|e| &e.geometry) else { return Vec::new() };
+        vec![points.first().and_then(|p| line(*p, None)), points.last().and_then(|p| line(*p, None))]
+    }
+
+    /// The curve a handle line belongs to and its place in [`Self::handle_arms`] (a fit spline's: 0 its start, 1 its
+    /// end).
     pub fn arm_of(&self, arm: EntityId) -> Option<(EntityId, usize)> {
-        let spline = self.entity(arm)?.handle_of?;
-        let k = self.handle_arms(spline).iter().position(|a| *a == Some(arm))?;
-        Some((spline, k))
+        let curve = self.entity(arm)?.handle_of?;
+        let k = self.handle_arms(curve).iter().position(|a| *a == Some(arm))?;
+        Some((curve, k))
     }
 
-    /// Gives a fit spline with handles its missing handle arms (construction lines from its end points to the handle
-    /// tips; a spline saved before arms existed gets them too).
-    pub fn add_handle_arms(&mut self, spline: EntityId) {
-        let Some(Geometry::FitSpline { points, handles: Some((h0, h1)) }) = self.entity(spline).map(|e| e.geometry.clone()) else { return };
-        let (Some(&first), Some(&last)) = (points.first(), points.last()) else { return };
-        let have = self.handle_arms(spline);
-        for (k, (at, tip)) in [(first, h0), (last, h1)].into_iter().enumerate() {
-            if have[k].is_some() {
+    /// Whether `arm` is a fit spline's handle arm (dragging it moves the handle's tip).
+    pub fn is_spline_arm(&self, arm: EntityId) -> bool {
+        self.entity(arm).and_then(|e| e.handle_of).is_some_and(|c| matches!(self.entity(c).map(|e| &e.geometry), Some(Geometry::FitSpline { .. })))
+    }
+
+    /// Gives a curve its missing handle lines ([`Self::handle_arms`]: construction lines from a fit spline's end
+    /// points to its handle tips, a Bezier's from pole to pole; one saved before they existed gets them too).
+    pub fn add_handle_arms(&mut self, curve: EntityId) {
+        let have = self.handle_arms(curve);
+        let ends: Vec<(EntityId, EntityId)> = match (self.bezier_poles(curve), self.entity(curve).map(|e| &e.geometry)) {
+            (Some(poles), _) => poles.windows(2).map(|w| (w[0], w[1])).collect(),
+            (None, Some(Geometry::FitSpline { points, handles: Some((h0, h1)) })) => match (points.first(), points.last()) {
+                (Some(&first), Some(&last)) => vec![(first, *h0), (last, *h1)],
+                _ => return,
+            },
+            _ => return,
+        };
+        for (k, (at, tip)) in ends.into_iter().enumerate() {
+            if have.get(k).is_some_and(Option::is_some) {
                 continue;
             }
             let id = self.alloc_entity();
-            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(spline) });
+            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(curve) });
         }
         self.touch();
     }
 
-    /// Every fit spline's missing handle arms ([`Self::add_handle_arms`]).
+    /// Every curve's missing handle lines ([`Self::add_handle_arms`]).
     pub fn add_all_handle_arms(&mut self) {
-        let splines: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. })).map(|e| e.id).collect();
-        for s in splines {
-            if self.handle_arms(s).iter().any(Option::is_none) {
-                self.add_handle_arms(s);
+        let curves: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. } | Geometry::BSpline { .. })).map(|e| e.id).collect();
+        for c in curves {
+            if self.handle_arms(c).iter().any(Option::is_none) {
+                self.add_handle_arms(c);
             }
         }
     }
@@ -383,7 +412,7 @@ impl Sketch {
         for e in other.entities.values().filter(|e| e.handle_of.is_some()) {
             if let Some((spline, k)) = other.arm_of(e.id)
                 && let Some(new_spline) = map.get(&spline).copied()
-                && let Some(new_arm) = self.handle_arms(new_spline)[k]
+                && let Some(Some(new_arm)) = self.handle_arms(new_spline).get(k).copied()
             {
                 map.insert(e.id, new_arm);
             }
@@ -557,6 +586,10 @@ impl Sketch {
         }
         if let Some(e) = self.entity_mut_silent(id) {
             e.geometry = Geometry::BSpline { control, degree, knots, weights };
+        }
+        // No longer a Bezier (weighted, or of several spans): no control polygon.
+        if self.bezier_poles(id).is_none() {
+            self.entities.retain(|_, e| e.handle_of != Some(id));
         }
         self.touch();
         Ok(())

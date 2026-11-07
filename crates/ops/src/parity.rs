@@ -1033,6 +1033,20 @@ impl<'a> Translator<'a> {
                 self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
             }
         }
+        // A Bezier's control polygon: live's `<id>.cppolygon.<n>` lines, pole to pole.
+        if let (Some(arms), Some(pts)) = (c["handle_arms"].as_array().filter(|_| c["type"] == "bspline"), c["point_ids"].as_array()) {
+            for (n, arm) in arms.iter().enumerate() {
+                let name = format!("{eid}.cppolygon.{n}");
+                for (end, pole) in [("start", pts.get(n)), ("end", pts.get(n + 1))] {
+                    if let Some(pole) = pole.and_then(Value::as_str) {
+                        self.sketch_entities.insert((oid.clone(), format!("{name}.{end}")), pole.to_string());
+                    }
+                }
+                if let Some(arm) = arm.as_str() {
+                    self.sketch_entities.insert((oid.clone(), name), arm.to_string());
+                }
+            }
+        }
         let keys = if reversed { [("start", "end_point"), ("end", "start_point"), ("center", "center_point")] } else { [("start", "start_point"), ("end", "end_point"), ("center", "center_point")] };
         for (end, key) in keys {
             if let Some(pid) = c[key].as_str() {

@@ -3540,7 +3540,7 @@ impl SketchEditor {
                     return EditOutcome::none();
                 }
                 // (A spline's handle arm drags its handle: the tip follows, the spline's end stays.)
-                let tip = data.sketch.entity(entity).filter(|e| e.handle_of.is_some()).and_then(|e| e.endpoints()).map(|(_, tip)| tip);
+                let tip = data.sketch.entity(entity).filter(|e| data.sketch.is_spline_arm(e.id)).and_then(|e| e.endpoints()).map(|(_, tip)| tip);
                 let handle = match tip {
                     Some(t) => DragHandle::Point(t),
                     None if is_point(&data.sketch, entity) => DragHandle::Point(entity),
@@ -4840,8 +4840,8 @@ impl SketchEditor {
     /// The Construction button's state (live 1853 addendum): construction
     /// mode, or a selection of construction curves only.
     pub fn construction_shown(&self, sk: &Sketch) -> bool {
-        // (A spline's handle arm isn't the user's construction geometry.)
-        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id) && sk.entity(*id).is_none_or(|e| e.handle_of.is_none())).collect();
+        // (A handle line selected shows it too: live's ui-parity sketch-spline-handle-arm.)
+        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id)).collect();
         self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
     }
 
@@ -5646,8 +5646,11 @@ impl SketchEditor {
                 }
             }
         }
-        // Control polygons of selected/hovered B-splines (Bezier editing).
+        // Control polygons of selected/hovered B-splines (a Bezier's is its handle lines, drawn as the sketch's).
         for e in self.selection.iter().chain(self.hover.iter()) {
+            if data.sketch.handle_arms(*e).iter().any(Option::is_some) {
+                continue;
+            }
             if let Some(noshape_sketch::Entity { geometry: noshape_sketch::Geometry::BSpline { control, .. }, .. }) = data.sketch.entity(*e) {
                 let pts3: Vec<[f32; 3]> = control.iter().filter_map(|c| data.sketch.point(*c)).map(w).collect();
                 lines.push_polyline(&pts3, [0x90, 0x90, 0x90, 255], 0, 1.0, on_top | LineSegment::DASHED);
@@ -9232,7 +9235,7 @@ mod tests {
     fn a_spline_handle_arm_picks_and_takes_horizontal() {
         let (mut ed, mut d) = editor(Tool::Select);
         let s = d.sketch.add_fit_spline_with_handles(&[v(0.0, 0.0), v(0.03, 0.02), v(0.06, 0.0)]).unwrap();
-        let [Some(arm), _] = d.sketch.handle_arms(s) else { panic!("arms") };
+        let Some(arm) = d.sketch.handle_arms(s)[0] else { panic!("arms") };
         let (start, tip) = d.sketch.endpoints(arm).unwrap();
         let (a, b) = (d.sketch.point(start).unwrap(), d.sketch.point(tip).unwrap());
         let near_tip = a + (b - a) * 0.85;
