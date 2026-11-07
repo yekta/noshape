@@ -219,6 +219,11 @@ impl PartStudioView {
                 let cell = noshape_model::configured_properties::table(s, b).and_then(|t| t.rows.get(*row)).and_then(|r| r.values.get("Appearance")).and_then(|v| noshape_model::configured_properties::parse_color(v));
                 (cell.or_else(|| self.display.body(b).map(|d| d.color)).unwrap_or([0.7, 0.7, 0.7, 1.0]), TessQuality::Auto)
             }
+            // A new face appearance starts from the face's colour: its part's (live appearance-face-row-remove: R 157).
+            (EditTarget::Faces(faces, None), _) => {
+                let body = faces.iter().find_map(|r| self.display.bodies.iter().find(|b| b.face_refs.contains(r)));
+                (body.map(|b| b.color).unwrap_or([0.831, 0.44, 0.007, 1.0]), TessQuality::Auto)
+            }
             _ => ([0.831, 0.44, 0.007, 1.0], TessQuality::Auto),
         };
         let rgb = [lin_to_srgb(color[0]), lin_to_srgb(color[1]), lin_to_srgb(color[2])];

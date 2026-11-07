@@ -4416,8 +4416,7 @@ impl PartStudioView {
                 }
                 m = m.separator();
             }
-            m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
-            m = m.separator();
+            // A spline being drawn: Confirm spline / bezier first, then Confirm <sketch> (live sketch-spline-menu-confirm).
             if drawing_spline {
                 let confirm = || -> SketchMenuAction {
                     Box::new(|this, w, cx| {
@@ -4427,8 +4426,9 @@ impl PartStudioView {
                     })
                 };
                 m = if tool == Tool::Spline { m.item(item("Confirm spline", confirm())) } else { m.item(item("Confirm bezier", confirm())) };
-                m = m.separator();
             }
+            m = m.item(item(&format!("Confirm {sketch_name}"), Box::new(|this, window, cx| this.accept_edit(false, window, cx))));
+            m = m.separator();
             // Live Onshape order (sketch/31, 37, 204): Confirm | Use | copy &
             // transform | analysis | selection | zoom & view | delete.
             if model_edge && tool != Tool::Use {

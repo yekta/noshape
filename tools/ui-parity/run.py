@@ -175,6 +175,8 @@ def normalize_live(state):
     for f in ((state or {}).get("dialog") or {}).get("fields") or []:
         if f.get("kind") == "toggle" and str(f.get("label", "")).startswith("icon:"):
             f["checked"] = not str(f["label"]).endswith("-opposite")
+            # (Its recorders before 2026-11-07 named it "toggle", as ours does.)
+            f["label"] = "toggle"
     # Live's runner opens a copy of the start's Assembly, whose root row can read "<name> Copy 1" while it opens.
     for r in (((state or {}).get("features") or {}).get("rows") or []):
         if "is-instance" in str(r.get("cls", "")) and isinstance(r.get("name"), str):
