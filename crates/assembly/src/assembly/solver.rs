@@ -338,6 +338,10 @@ pub struct SolverRelation {
     /// 0 = rotation about Z, 1..3 = translation X/Y/Z).
     pub value_a: usize,
     pub value_b: usize,
+    /// Set by each solve from where it starts (a pose holds an angle, not whole turns): the driver's rotation then,
+    /// and its whole turns since the base, so the solve counts the driver's angle on from there.
+    pub a_start: f64,
+    pub turns: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -681,13 +685,41 @@ fn relation_residual(bodies: &[Frame], mates: &[SolverMate], r: &SolverRelation)
     let va = mate_values(bodies, &mates[r.mate_a]);
     let vb = mate_values(bodies, &mates[r.mate_b]);
     let sign = if r.reverse { -1.0 } else { 1.0 };
-    let delta = |v: &[f64; 4], i: usize, base: f64| if i == 0 { wrap_angle(v[0] - base) } else { v[i.min(3)] - base };
-    let da = delta(&va, r.value_a, r.base_a);
-    let db = delta(&vb, r.value_b, r.base_b);
+    let da = if r.value_a == 0 { wrap_angle(r.a_start - r.base_a) + std::f64::consts::TAU * r.turns + wrap_angle(va[0] - r.a_start) } else { va[r.value_a.min(3)] - r.base_a };
+    let db = if r.value_b == 0 { wrap_angle(vb[0] - r.base_b) } else { vb[r.value_b.min(3)] - r.base_b };
     match r.kind {
         RelationKind::Gear => wrap_angle(db + sign * r.ratio * da),
         RelationKind::Linear | RelationKind::RackAndPinion | RelationKind::Screw => db - sign * r.ratio * da,
     }
+}
+
+/// The relations as a solve from `bodies` takes them: each rotational driver's whole turns read from where the driven
+/// side is (a screw's or rack's travel holds them; a gear's driven angle, nearest), so the solve carries the driver on
+/// past ±180° (a drag starts each solve from the last positions).
+fn started(bodies: &[SolverBody], mates: &[SolverMate], relations: &[SolverRelation]) -> Vec<SolverRelation> {
+    let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+    let turn = std::f64::consts::TAU;
+    relations
+        .iter()
+        .map(|r| {
+            let mut r = r.clone();
+            if r.value_a != 0 || r.mate_a >= mates.len() || r.mate_b >= mates.len() {
+                return r;
+            }
+            let a = mate_values(&poses, &mates[r.mate_a])[0];
+            let vb = mate_values(&poses, &mates[r.mate_b]);
+            let sign = if r.reverse { -1.0 } else { 1.0 };
+            let da = wrap_angle(a - r.base_a);
+            let db = if r.value_b == 0 { wrap_angle(vb[0] - r.base_b) } else { vb[r.value_b.min(3)] - r.base_b };
+            r.a_start = a;
+            r.turns = match r.kind {
+                RelationKind::Gear => (-8..=8).map(f64::from).min_by(|x, y| wrap_angle(db + sign * r.ratio * (da + turn * x)).abs().total_cmp(&wrap_angle(db + sign * r.ratio * (da + turn * y)).abs())).unwrap_or(0.0),
+                RelationKind::RackAndPinion | RelationKind::Screw if r.ratio.abs() > 1e-12 => ((db / (sign * r.ratio) - da) / turn).round(),
+                _ => 0.0,
+            };
+            r
+        })
+        .collect()
 }
 
 pub struct Problem<'a> {
@@ -1034,6 +1066,7 @@ pub fn solve_with(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[
 /// [`solve_with`] reusing (and keeping) mates' residuals in `memo`; `mates`
 /// must be the list the memo was kept for.
 pub fn solve_with_memo(bodies: &mut [SolverBody], mates: &[SolverMate], relations: &[SolverRelation], drags: &[DragTarget], dof: bool, memo: Option<&std::cell::RefCell<MateMemo>>) -> SolveResult {
+    let relations = &started(bodies, mates, relations);
     // A group in conflict moves nothing, not even the orientation pass's
     // half-turns below (live 1764 (3)).
     let given: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
@@ -2616,7 +2649,7 @@ mod tests {
         let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
         let base_a = mate_values(&poses0, &mates[0])[0];
         let base_b = mate_values(&poses0, &mates[1])[0];
-        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0 }];
+        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 2.0, reverse: false, base_a, base_b, value_a: 0, value_b: 0, a_start: 0.0, turns: 0.0 }];
         // Drag body 1 to rotate it by pulling a point.
         let drags = vec![DragTarget { body: 1, local_point: DVec3::new(0.01, 0.0, 0.0), target: DVec3::new(0.0, 0.01, 0.0), along: None }];
         let r = solve(&mut bodies, &mates, &rel, &drags);
@@ -2626,5 +2659,64 @@ mod tests {
         let b = wrap_angle(mate_values(&poses, &mates[1])[0] - base_b);
         assert!(a.abs() > 0.5, "driver should rotate: {a}");
         assert!((b + 2.0 * a).abs() < 1e-4 || (wrap_angle(b + 2.0 * a)).abs() < 1e-4, "a={a} b={b}");
+    }
+
+    /// Turns `body` about the world Z axis by about `step` with a drag (its point 10 mm out on X pulled round), `n`
+    /// times, each solve from the last positions as the app's drag steps; returns the angle turned in all.
+    fn turn_by_drags(bodies: &mut [SolverBody], mates: &[SolverMate], rel: &[SolverRelation], body: usize, step: f64, n: usize) -> f64 {
+        let angle = |b: &[SolverBody]| {
+            let x = b[body].pose.rotation * DVec3::X;
+            x.y.atan2(x.x)
+        };
+        let mut turned = 0.0;
+        for _ in 0..n {
+            let p = bodies[body].pose;
+            let at = p.origin + p.rotation * DVec3::new(0.01, 0.0, 0.0);
+            let target = p.origin + DQuat::from_rotation_z(step) * (at - p.origin);
+            let drags = vec![DragTarget { body, local_point: DVec3::new(0.01, 0.0, 0.0), target, along: None }];
+            let before = angle(bodies);
+            let r = solve(bodies, mates, rel, &drags);
+            assert!(r.converged, "{r:?}");
+            turned += wrap_angle(angle(bodies) - before);
+        }
+        turned
+    }
+
+    /// Onshape's Screw relation holds over many turns (live: Animate up to 36000°): a 2 mm pitch screw dragged round
+    /// more than a turn and a half travels 2 mm a turn (the turns used to be lost past ±180°, the travel stopping at
+    /// ±1 mm).
+    #[test]
+    fn a_screw_relation_keeps_its_turns() {
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false)];
+        let z = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let mates = vec![mate(MateType::Cylindrical, 0, z, 1, z)];
+        let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let v0 = mate_values(&poses0, &mates[0]);
+        let pitch = 0.002;
+        let rel = vec![SolverRelation { kind: RelationKind::Screw, mate_a: 0, mate_b: 0, ratio: pitch / std::f64::consts::TAU, reverse: false, base_a: v0[0], base_b: v0[3], value_a: 0, value_b: 3, a_start: 0.0, turns: 0.0 }];
+        let turned = turn_by_drags(&mut bodies, &mates, &rel, 1, 30f64.to_radians(), 40);
+        let turns = turned.abs() / std::f64::consts::TAU;
+        let travel = (bodies[1].pose.origin.z - poses0[1].origin.z).abs();
+        assert!(turns > 1.5, "{turns} turns");
+        assert!((travel - turns * pitch).abs() < 1e-6, "travel {} mm after {turns} turns", travel * 1e3);
+    }
+
+    /// A 1:2 gear (ratio 0.5) driven most of a turn has turned half as far, not back to where it started.
+    #[test]
+    fn a_half_ratio_gear_follows_its_driver_round() {
+        let mut bodies = vec![body(DVec3::ZERO, true), body(DVec3::ZERO, false), body(DVec3::new(0.03, 0.0, 0.0), false)];
+        let za = Frame::from_axes(DVec3::ZERO, DVec3::Z, DVec3::X);
+        let zb = Frame::from_axes(DVec3::new(0.03, 0.0, 0.0), DVec3::Z, DVec3::X);
+        let down = Frame::from_axes(DVec3::ZERO, DVec3::NEG_Z, DVec3::X);
+        let mates = vec![mate(MateType::Revolute, 0, za, 1, down), mate(MateType::Revolute, 0, zb, 2, down)];
+        let poses0: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let (base_a, base_b) = (mate_values(&poses0, &mates[0])[0], mate_values(&poses0, &mates[1])[0]);
+        let rel = vec![SolverRelation { kind: RelationKind::Gear, mate_a: 0, mate_b: 1, ratio: 0.5, reverse: false, base_a, base_b, value_a: 0, value_b: 0, a_start: 0.0, turns: 0.0 }];
+        let turned = turn_by_drags(&mut bodies, &mates, &rel, 1, 15f64.to_radians(), 24);
+        let poses: Vec<Frame> = bodies.iter().map(|b| b.pose).collect();
+        let b = wrap_angle(mate_values(&poses, &mates[1])[0] - base_b);
+        let want = wrap_angle(0.5 * turned);
+        assert!(turned.abs() > std::f64::consts::PI * 1.5, "the driver turned {}°", turned.to_degrees());
+        assert!(wrap_angle(b.abs() - want.abs()).abs() < 1e-3, "the driver turned {}°, the driven gear is at {}°", turned.to_degrees(), b.to_degrees());
     }
 }

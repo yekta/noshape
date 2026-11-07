@@ -38,7 +38,7 @@ pub fn ops() -> Vec<Op> {
                 asm_field(),
                 req("type", json!({ "type": "string", "enum": RELATIONS.iter().map(|r| r.0).collect::<Vec<_>>() }), "Relation type."),
                 req("mates", strings(), "The two mates (ids or names); screw: one cylindrical mate."),
-                opt("ratio", json!({ "type": ["string", "number"] }), "Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 10 mm / 1 mm)."),
+                opt("ratio", json!({ "type": ["string", "number"] }), "Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 25 mm). An expression in the assembly's variables (#name)."),
                 opt("reverse", json!({ "type": "boolean" }), "Reverse direction."),
                 opt("edit", s(), "An existing relation to edit (id or name)."),
             ],
@@ -185,6 +185,13 @@ fn relation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         _ => editing.and_then(|id| asm.relations.iter().find(|r| r.id == id)).map(|r| r.ratio.text.clone()).unwrap_or_else(|| sa::relation_default_ratio(kind).into()),
     };
     let reverse = a.bool_or("reverse", editing.and_then(|id| asm.relations.iter().find(|r| r.id == id)).is_some_and(|r| r.reverse))?;
+    // As the regeneration reads it: in the assembly's variables, a length per revolution or a plain ratio.
+    let vars = noshape_model::variables::refs_variables(od.doc(), &asm.variable_studios);
+    let units = od.doc().settings.units;
+    let dim = if matches!(kind, RelationType::Screw | RelationType::RackAndPinion) { noshape_units::Dim::LENGTH } else { noshape_units::Dim::UNITLESS };
+    if noshape_units::evaluate_as(&ratio, dim, &units, &vars).or_else(|_| noshape_units::evaluate_as(&ratio, noshape_units::Dim::UNITLESS, &units, &vars)).is_err() {
+        return Err(OpError::param("ratio", "Enter a valid expression."));
+    }
     let result = solve(od, tab, &SolveOptions::default())?;
     let base = result.relation_base(&asm, kind, mates);
     let id = commit(od, tab, &sa::relation_description(kind), &result, |a| sa::commit_relation(a, editing, kind, mates, ExprValue::new(ratio), reverse, base))?;

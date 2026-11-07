@@ -1737,6 +1737,9 @@ fn assembly_groups_relations_connectors() {
     assert_eq!(g["mates"], json!([m1["mate"], m2["mate"]]), "{g} {m1}");
     let e = try_call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", "Revolute 1"] })).unwrap_err();
     assert!(e.message.contains("two different mates"), "{e:?}");
+    // A ratio that doesn't evaluate is refused, naming the field (it used to become 1 silently).
+    let e = try_call(&mut ctx, "assembly_relation", json!({ "edit": "Gear 1", "type": "gear", "mates": ["Revolute 1", "Revolute 2"], "ratio": "#nowhere" })).unwrap_err().to_json();
+    assert_eq!((e["param"].as_str(), e["message"].as_str()), (Some("ratio"), Some("Enter a valid expression.")), "{e}");
 
     // Rename, suppress, hide.
     call(&mut ctx, "assembly_rename", json!({ "instance": p2, "name": "Pin B" }));

@@ -2363,7 +2363,7 @@ Examples:
 | `flip_primary` | boolean |  | Flip primary axis: true flips it, as the dialog's button (Onshape's primaryAxisAlignment; default: keep the moving instance's current orientation, like the dialog). |
 | `reorient_secondary` | integer |  | Reorient secondary axis: quarter turns about the primary axis (the dialog's button clicks, 0-3). |
 | `offset` | object |  | Offset: {"x", "y", "z": length, "rotation": angle} expressions where the mate type allows them. |
-| `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset. |
+| `rotation_axis` | one of `x`, `y`, `z` |  | Axis of the rotation offset (a new mate's: x, as the dialog's "Rotate about X"). |
 | `limits` | object |  | Limits: {"<axis>": {"min": expr, "max": expr}} for the mate type's axes (Revolute rz; Slider z; Cylindrical z, rz; Pin slot x, rz; Planar x, y, rz; Parallel z; Ball cone). |
 | `tangent_propagation` | boolean |  | Tangent mates: Tangent propagation. |
 | `simulation_connection` | boolean |  | Simulation connection (stored; every mate but Pin slot, Parallel, Tangent and Width). |
@@ -2626,7 +2626,7 @@ Examples:
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `type` | one of `gear`, `rack_and_pinion`, `screw`, `linear` | required | Relation type. |
 | `mates` | array of string | required | The two mates (ids or names); screw: one cylindrical mate. |
-| `ratio` | string or number |  | Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 10 mm / 1 mm). |
+| `ratio` | string or number |  | Gear / linear: the ratio (default 1); rack and pinion / screw: the distance per revolution (default 25 mm). An expression in the assembly's variables (#name). |
 | `reverse` | boolean |  | Reverse direction. |
 | `edit` | string |  | An existing relation to edit (id or name). |
 
