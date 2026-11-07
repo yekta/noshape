@@ -16,6 +16,16 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 17:01 UTC: c2-extension-spring 9 -> 10 (Fillet 1 as live).**
+- Not the translator after all: live's ids resolve to the right edges (our geometry before Fillet 1 is live's). The
+  Curvature section of a concave corner went into the material: `frame_at`'s on-face probes (a step d either side
+  of the edge) both came back the same at a vertical face's corner, the first was taken; undecided, the face's
+  centroid now gives the side. 51.8817 mm³ (live 51.8821). T1 model features_a::
+  a_curvature_fillet_of_a_concave_corner_adds_material (a Curvature fillet's size is `nonCircularRadius`).
+- Next there: Fillet 2 (Curvature, R gap/2 + depth = 1.5 mm, the arms' outer end corners) fails ("wider than a
+  face"): live rounds a 1 mm arm end's two corners into one face across it (1.9357 mm², x 11.2-12.66) and the 3 mm end's
+  two meet in its middle (2.4341 mm² each). Needs two rounds wider than the face between them.
+
 **State 11-07 16:42 UTC: c2-extension-spring's Fillet 1, the translator side (for asm too).**
 - Its edges aren't resolved from the sketch queries: Fillet 1's (configured, default True) queries carry live ids,
   so `query_with` takes them by live's geometry at line 9 (`by_geometry`): JKJ / JKR at (-11.7, -0.5 / -1.5, 0.5),
