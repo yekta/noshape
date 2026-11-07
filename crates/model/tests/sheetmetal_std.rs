@@ -1821,13 +1821,14 @@ fn collinear_walls_keep_the_ends_in_pieces() {
 
 /// An Inner flange on a plate's top edge that steps 0.275 mm to a tab at its end (c2-sm-louver's Flange 3: the tab's
 /// edge just off the flange's): the bend ends with the flange at the step, relieved there, not run on past the tab
-/// (ours ran it 32 mm out past the plate's end, a second flange); a flange on the opposite edge then regenerates.
+/// (ours ran it 32 mm out past the plate's end, a second flange); a flange on the opposite edge then regenerates, the
+/// tab's side 2.286 mm off it unrelieved.
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
     let mut s = Studio::new();
     let mut sk = noshape_sketch::Sketch::new();
-    let p: Vec<_> = [(0.0, 0.0), (60.0, 0.0), (60.0, 40.0), (12.7, 40.0), (12.7, 39.725), (0.0, 39.725)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    let p: Vec<_> = [(0.0, 2.286), (12.7, 2.286), (12.7, 0.0), (60.0, 0.0), (60.0, 40.0), (12.7, 40.0), (12.7, 39.725), (0.0, 39.725)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
     for i in 0..p.len() {
         sk.add_line_between(p[i], p[(i + 1) % p.len()]).unwrap();
     }
@@ -1861,5 +1862,11 @@ fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
         pv.set("distance", expr("20 mm"));
         pv.set("flangeAlignment", en("INNER"));
     });
-    s.ok();
+    let r = s.ok();
+    // The tab's bottom 2.286 mm off that edge is a side of its own, not a moved-in edge: no relief trims it (live's
+    // Flange 4 keeps the tab's 20.676 mm² strip).
+    let b = &r.context.bodies[part(&r)].shape;
+    let strip = b.faces().into_iter().find(|f| f.face_plane().ok().flatten().is_some_and(|pl| pl.unit_normal().y < -0.999 && (pl.origin.y * 1e3 - 2.286).abs() < 1e-6));
+    let area = strip.and_then(|f| f.area().ok()).unwrap_or(0.0) * 1e6;
+    assert!((area - 12.7 * 1.628).abs() < 1e-3, "the tab's bottom strip: {area} mm²: {:#?}", face_report(&r));
 }

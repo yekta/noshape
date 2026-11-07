@@ -759,7 +759,9 @@ fn relief_tools(def: &Definition, topo: &Topo, fi: usize, l: &Loop, n: DVec3, th
                 // Only a connector as short as the move (not a wall's side
                 // to a tab running parallel to the bend: qa5 Tab on G34).
                 let connector = (l.pts[(j + 1) % m] - l.pts[j]).length();
-                if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 || connector > radius + thickness + TOL {
+                // (No longer than the bend radius: c2-sm-louver's Flange 3 step of 0.275 mm is relieved, Flange 4's 2.286 mm
+                // one to the narrower tab isn't, R 1.628.)
+                if def.bends.contains_key(&e2) || def.rips.contains(&e2) || along2.cross(dir).length() > 1e-9 || connector > radius + TOL {
                     continue;
                 }
                 // A bend edge moved in (Outer alignment) still gets its
@@ -1455,7 +1457,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     continue;
                 }
                 // (A moved-in bend edge's end: c2-sm-louver's Flange 3 at its tab, live's bend ends with the flange.)
-                let reach = def.bends.get(&e).copied().unwrap_or(0.0) + front + back;
+                let reach = def.bends.get(&e).copied().unwrap_or(0.0);
                 if moved_in_end(fa, e, v, b.dir, reach) || moved_in_end(fb, e, v, b.dir, reach) {
                     continue;
                 }
