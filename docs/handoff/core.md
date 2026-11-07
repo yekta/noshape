@@ -16,6 +16,19 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 06:18 UTC: c2-rings-loft's Chamfer 1 as live (8 -> 9 of 32).**
+- Fillet 1's ring route landed (f57807bd). Chamfer 1 (1 mm on the four notch arcs, plane / notch cylinder): live
+  chamfers each arc as if alone, through the strip of side beside it (the side splits in three) and on past the arc's
+  ends until the chamfer leaves the part (9.823 mm² a face); OCCT's went round the corners onto the top and outer
+  edges (4-5 pieces a chamfer, 31 faces). The ring route now takes arcs too (the rest of the plane / cylinder
+  intersection off the body: 64 points classified outside; the blend's seam in the middle of the longest way round off
+  the arc) and chamfers (`RimBlend::Chamfer`: the wedge's rim chamfered; tried first where a chamfer's touch line on
+  the plane leaves it). 17/45/30, 705.29 mm³ (live 705.85). T1 model features_c::
+  ring_rims_round_and_notch_arcs_chamfer_as_live (the ring as imported, data/rings-loft-ring.brep: both features
+  against live's numbers).
+- Next there: Shell 1 (bool's, handoff/bool.md) now fails on the live-shaped body ("Could not shell part with
+  selections."; live 44/117/78, 475.14 mm³), where before it ran 12-16 s on our wrong chamfer.
+
 **State 11-07 05:47 UTC: c2-rings-loft's Fillet 1 as live (7 -> 8 of 32).**
 - Live's two R2 rounds (slanted side planes / Ø20.5 bore) are each the lone rim's round, trimmed by what it meets: at
   the ring's bottom (3.35 mm of bore, 1 mm of side) they meet each other (edge JQB, 20.34 mm at x = 4) and run out onto

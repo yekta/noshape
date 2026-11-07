@@ -3340,3 +3340,50 @@ fn mate_connector_at_the_mid_point_of_a_secondary_edge() {
     let c = s.ok().context.connectors[0].clone();
     assert!(c.origin.distance(DVec3::new(mm(40.0), mm(15.0), mm(10.0))) < 1e-9 && c.z.x.abs() > 1.0 - 1e-9, "{:?} z {:?}", c.origin, c.z);
 }
+
+/// c2-rings-loft's Fillet 1 and Chamfer 1 on its ring as imported (live's numbers): R2 on the two rims where the
+/// slanted sides cut the bore (the rounds meet at the ring's narrow bottom and run out onto its outside), then 1 mm
+/// on the four notch arcs (each chamfer through the strip of side beside it and on past the arc's ends until it
+/// leaves the part), where OCCT's chain fails, and its chamfer goes round the corners.
+#[test]
+fn ring_rims_round_and_notch_arcs_chamfer_as_live() {
+    let counts = |r: &RegenResult| {
+        let s = &r.context.bodies[0].shape;
+        let shown = s.shown_topology().unwrap();
+        (s.faces().len(), shown.edge_count(), shown.vertices.iter().filter(|v| **v).count())
+    };
+    let ellipses = |r: &RegenResult, major_mm: f64| -> Vec<Reference> {
+        let b = &r.context.bodies[0];
+        b.shape
+            .edges()
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| matches!(e.edge_info().unwrap().curve, noshape_kernel::Curve::Ellipse { major_radius, .. } if near(major_radius, mm(major_mm), 1e-6)))
+            .map(|(i, _)| Reference::Edge((*b.edges[i]).clone()))
+            .collect()
+    };
+    let brep = include_str!("data/rings-loft-ring.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let rims = ellipses(&r, 10.296052);
+    assert_eq!(rims.len(), 2);
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(rims));
+        p.set("radius", expr("2 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(counts(&r), (9, 21, 14));
+    let v = volume(&r, 0) * 1e9;
+    assert!((716.426..722.479).contains(&v), "{v} (live 719.453)");
+    let arcs = ellipses(&r, 3.151490);
+    assert_eq!(arcs.len(), 4);
+    s.add("chamfer", move |p| {
+        p.set("entities", ParamValue::Query(arcs));
+        p.set("width", expr("1 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(counts(&r), (17, 45, 30));
+    let v = volume(&r, 0) * 1e9;
+    assert!((703.105..708.601).contains(&v), "{v} (live 705.853)");
+}
