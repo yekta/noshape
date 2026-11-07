@@ -900,8 +900,10 @@ pub fn part_densities(doc: &crate::document::Document, asm: &Assembly, result: &
         }
         None
     };
+    // A part occurrence; its volume and own density.
+    type Weighed = ((InstancePath, BodyId), f64, Option<f64>);
     let mut out: HashMap<(InstancePath, BodyId), Option<f64>> = HashMap::new();
-    let mut groups: HashMap<InstancePath, (f64, Vec<((InstancePath, BodyId), f64, Option<f64>)>)> = HashMap::new();
+    let mut groups: HashMap<InstancePath, (f64, Vec<Weighed>)> = HashMap::new();
     for o in result.occurrences.iter().filter(|o| matches!(o.kind, BodyKind::Solid)) {
         let key = (o.path.clone(), o.body.clone());
         let v = volume(o);
