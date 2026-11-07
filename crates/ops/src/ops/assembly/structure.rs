@@ -369,7 +369,7 @@ fn lock(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             SubassemblyLock::Named(p.clone())
         }
     };
-    let (desc, message) = sa::lock_description(&inst.name, &lock);
+    let (desc, message) = sa::lock_description(&inst.name, &lock, &inst.lock);
     let r = solve(od, tab, &SolveOptions::default())?;
     commit(od, tab, &desc, &r, |x| sa::set_lock(x, id, lock))?;
     let mut v = describe(od, tab)?;

@@ -2674,7 +2674,8 @@ impl AssemblyView {
                     let top = ids[0];
                     let axes = [f.x(), f.y(), f.z()];
                     let axis = match h {
-                        ManipHandle::Axis(k) | ManipHandle::Ring(k) | ManipHandle::Plane(k) => axes[k],
+                        ManipHandle::Axis(k) | ManipHandle::Plane(k) => axes[k],
+                        ManipHandle::Ring(k) => axes[ManipHandle::ring_axis(k)],
                         ManipHandle::Center => self.viewport.read(cx).camera.forward(),
                     };
                     let pose = self.result.solved.placement(top).map(|p| placement_to_frame(&p)).unwrap_or_default();
@@ -6302,6 +6303,8 @@ impl AssemblyView {
         if self.message.as_ref().is_some_and(|(err, _)| !*err) {
             self.message = None;
         }
+        // And the Named positions toast (live asm-menu-add-to-named-positions).
+        self.ui.np_toast = None;
         if self.cancel_bom_cell(cx) {
             window.focus(&self.focus, cx);
         } else if self.step_edit.is_some() {

@@ -506,6 +506,8 @@ pub struct AsmUi {
     /// The graphics menu being built was opened on the triad (its handle's items first): no Find in instance list;
     /// View normal to the selected face under it (live asm-face-menu-clear-selection).
     pub menu_on_triad: bool,
+    /// …on one of its rings (live asm-triad-rotate-90: Find in instance list, no View normal to).
+    pub menu_on_ring: bool,
     pub ds_name: Option<Entity<InputState>>,
     pub ds_selected: Option<usize>,
     pub ds_renaming: Option<Entity<InputState>>,
@@ -1000,6 +1002,13 @@ impl AssemblyView {
             return;
         }
         let solved = self.result.prepared.solve(&SolveOptions { locks: vec![(id, [0.0; 4])], ..Default::default() });
+        // Already at its home position: nothing moves, no history step (live asm-mate-menu-reset).
+        let moved = solved.placements.iter().any(|(i, p)| self.result.solved.placement(*i).is_none_or(|q| (0..3).any(|k| (p.translation[k] - q.translation[k]).abs() > 1e-9) || (0..4).any(|k| (p.rotation[k] - q.rotation[k]).abs() > 1e-9)));
+        if !moved {
+            self.message = Some((false, "Resetting mates had no effect.".into()));
+            cx.notify();
+            return;
+        }
         self.apply_solved(solved, cx);
         self.edit(&format!("Reset : {}", m.name), cx, |_| {});
     }
@@ -1078,6 +1087,7 @@ impl AssemblyView {
         let name = inst.name.clone();
         let off_part = graphics && self.ui.menu_off_part;
         let on_triad = graphics && self.ui.menu_on_triad;
+        let on_ring = on_triad && self.ui.menu_on_ring;
         // The face, edge or vertex under the pointer as the menu opens (the menu's items run after it moved).
         let pick = self.hover.clone().filter(|t| graphics && matches!(t.kind, PickKind::Face | PickKind::Edge | PickKind::Vertex));
         let mut m: Vec<MenuEntry> = Vec::new();
@@ -1210,7 +1220,7 @@ impl AssemblyView {
             }
         }
         // Live (asm-face-menu-find-in-instance-list): the right-clicked face is selected, its row shown.
-        if graphics && !off_part && !on_triad {
+        if graphics && !off_part && (!on_triad || on_ring) {
             let pick = pick.clone();
             edit.push(item("Find in instance list", move |t, _, cx| {
                 match pick.clone() {
@@ -1297,7 +1307,7 @@ impl AssemblyView {
             let tg = targets.clone();
             m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
             // On the triad: the selected face under it.
-            let normal = self.hovered_face_normal(cx).or_else(|| on_triad.then(|| self.selected_face_normal(cx)).flatten());
+            let normal = if on_ring { None } else { self.hovered_face_normal(cx).or_else(|| on_triad.then(|| self.selected_face_normal(cx)).flatten()) };
             if let Some((forward, up)) = normal {
                 m.push(item("View normal to", move |t, _, cx| t.viewport.update(cx, |vp, cx| vp.animate_to_direction(forward, up, cx))));
             }
@@ -1888,8 +1898,8 @@ impl AssemblyView {
     /// Lock/follow position to: lock a subassembly at its current position or
     /// a named position (rigid), or unlock it (flexible).
     pub(super) fn set_sub_lock(&mut self, id: InstanceId, lock: SubassemblyLock, cx: &mut Context<Self>) {
-        let name = self.assembly(cx).and_then(|a| a.instance(id).map(|i| i.name.clone())).unwrap_or_default();
-        let (desc, message) = noshape_ops::assembly::lock_description(&name, &lock);
+        let Some((name, was)) = self.assembly(cx).and_then(|a| a.instance(id).map(|i| (i.name.clone(), i.lock.clone()))) else { return };
+        let (desc, message) = noshape_ops::assembly::lock_description(&name, &lock, &was);
         self.message = Some((false, message));
         self.edit(&desc, cx, |a| noshape_ops::assembly::set_lock(a, id, lock));
     }
@@ -2740,7 +2750,9 @@ impl AssemblyView {
     pub(super) fn open_graphics_menu(&mut self, top: Option<InstanceId>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let entries = match top {
             Some(t) if self.ui.menu_handle.is_some() => {
-                let mut m = match self.ui.menu_handle.take() {
+                let handle = self.ui.menu_handle.take();
+                let ring = matches!(handle, Some(ManipHandle::Ring(_)));
+                let mut m = match handle {
                     Some(ManipHandle::Axis(k)) => vec![
                         item("Align with Z", move |t, _, cx| t.triad_action(TriadAction::AlignZ(k, false), cx)),
                         item("Anti-align with Z", move |t, _, cx| t.triad_action(TriadAction::AlignZ(k, true), cx)),
@@ -2753,8 +2765,10 @@ impl AssemblyView {
                     _ => Vec::new(),
                 };
                 self.ui.menu_on_triad = true;
+                self.ui.menu_on_ring = ring;
                 m.extend(self.instance_menu(t, true, cx));
                 self.ui.menu_on_triad = false;
+                self.ui.menu_on_ring = false;
                 m
             }
             Some(t) => self.instance_menu(t, true, cx),

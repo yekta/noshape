@@ -546,6 +546,14 @@ pub enum ManipHandle {
     Center,
 }
 
+impl ManipHandle {
+    /// The axis a triad ring turns about: the ring at axis k's tip lies in the plane of axes k and k+1 and turns
+    /// about axis k+2 (live asm-triad-rotate-90: the ring at Z's tip turns about Y).
+    pub fn ring_axis(k: usize) -> usize {
+        (k + 2) % 3
+    }
+}
+
 /// The section manipulator's handles (live assembly/2368): the base circle
 /// (moves the manipulator over the plane), the arrow (offset) and the two
 /// rings at its tip (turn the plane about its Y, ring 0, and X, ring 1).
@@ -894,12 +902,12 @@ pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights
             let w = size * 0.07;
             stroke(&mut ol, &[f.origin + axis * base + side * w, f.origin + axis * tip, f.origin + axis * base - side * w], true, id, hl);
             scene.set_state(id, 0);
-            // Rotation handle at the tip: a small ring around the axis and a
-            // tick across it.
+            // Rotation handle at the tip: a small ring in the plane of this axis and the next (it turns about the third,
+            // ManipHandle::ring_axis) and a tick across it.
             let rid = overlay_id(built, OverlayPick::Manip(ManipHandle::Ring(k)));
             let rhl = *hovered == Some(ManipHandle::Ring(k));
             let rc = f.origin + axis * (tip + size * 0.07);
-            stroke(&mut ol, &circle(rc, side, other, size * 0.07), true, rid, rhl);
+            stroke(&mut ol, &circle(rc, axis, side, size * 0.07), true, rid, rhl);
             stroke(&mut ol, &[rc - side * (size * 0.17), rc + side * (size * 0.17)], false, rid, rhl);
             scene.set_state(rid, 0);
             // Plane handle for the plane normal to axis k: a parallelogram

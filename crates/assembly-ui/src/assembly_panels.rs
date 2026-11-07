@@ -3364,8 +3364,9 @@ impl AssemblyView {
                 let r = glam::DQuat::from_rotation_arc(axes[k].normalize(), if anti { DVec3::NEG_Z } else { DVec3::Z });
                 Frame::new(f.origin - r * f.origin, r)
             }
+            // `k`: the ring right-clicked (it turns about ManipHandle::ring_axis).
             TriadAction::Rotate(k, a) => {
-                let r = glam::DQuat::from_axis_angle(axes[k].normalize(), a);
+                let r = glam::DQuat::from_axis_angle(axes[ManipHandle::ring_axis(k)].normalize(), a);
                 Frame::new(f.origin - r * f.origin, r)
             }
         };

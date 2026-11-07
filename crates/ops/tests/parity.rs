@@ -1670,14 +1670,26 @@ fn parity_assemblies() {
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
-            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts")) else { continue };
+            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass")) else { continue };
             // Its parts: <element>.parts.json, else the last state of live's
             // <element>.live.jsonl (live's layout, 1842).
             let last_state = || {
                 let lines = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).ok()?;
                 lines.lines().rev().filter_map(|l| serde_json::from_str::<Value>(l).ok()).find(|l| l.get("index").is_some()).map(|l| l["parts"].clone())
             };
-            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state)) else { continue };
+            // Else (live's later fetches: <element>.mass.json only) the parts the assembly's instances name ("Part 1 <2>"
+            // → "Part 1"), at every level.
+            let from_instances = || {
+                let levels = std::iter::once(&asm["rootAssembly"]).chain(asm["subAssemblies"].as_array().into_iter().flatten());
+                let mut seen = std::collections::BTreeMap::new();
+                for i in levels.flat_map(|l| l["instances"].as_array().into_iter().flatten()).filter(|i| i["elementId"] == element) {
+                    if let (Some(pid), Some(name)) = (i["partId"].as_str(), i["name"].as_str()) {
+                        seen.entry(pid.to_string()).or_insert_with(|| name.rsplit_once(" <").map_or(name, |(n, _)| n).to_string());
+                    }
+                }
+                (!seen.is_empty()).then(|| Value::Array(seen.into_iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n })).collect()))
+            };
+            let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
             studios.push((element.to_string(), features, parts));
         }
         studios.sort_by(|a, b| a.0.cmp(&b.0));

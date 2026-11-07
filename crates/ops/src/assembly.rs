@@ -912,10 +912,12 @@ pub fn set_reference_designator(a: &mut Assembly, id: InstanceId, value: &str) {
     }
 }
 
-/// Lock / follow position: the history entry and the message the view shows.
-pub fn lock_description(name: &str, lock: &SubassemblyLock) -> (String, String) {
+/// Lock / follow position: the history entry and the message the view shows (`was`: the lock before).
+pub fn lock_description(name: &str, lock: &SubassemblyLock, was: &SubassemblyLock) -> (String, String) {
     let message = match lock {
-        SubassemblyLock::Flexible => "Assembly is unlocked from named position.".to_string(),
+        SubassemblyLock::Flexible if matches!(was, SubassemblyLock::Named(_)) => "Assembly is unlocked from named position.".to_string(),
+        // Live asm-menu-unlock: unlocking a subassembly locked at its current position.
+        SubassemblyLock::Flexible => format!("{name} position unlocked."),
         SubassemblyLock::Current => format!("{name} locked at current position."),
         SubassemblyLock::Named(n) => format!("{name} locked at named position {n}."),
     };
