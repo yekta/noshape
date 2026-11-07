@@ -1892,7 +1892,7 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   37.2 / 74.3 mm² at x 407, end faces 3.573 mm² at 394.31 and 1515.08; live's bend ends at 426.06): look at the bend
   solid's length in host sheetmetal.rs (update_sheet_metal_geometry's bends, `bend_side_back` / the wall's pulled
   sides) where the bend's wall edge ends at the INNER-alignment step (0.275 mm connector) to the tab.
-- 11-07 22:40: Flange 3's bend fixed (landed fcddbf18; 32/82/52 vs live 31/79/50: what's left is the relief's depth,
+- 11-07 22:10: Flange 3's bend fixed (landed fcddbf18; 32/82/52 vs live 31/79/50: what's left is the relief's depth,
   ours 1.82 mm² slot walls at x 425.85 and 426.06, live one 0.83 mm² wall at 425.85 and the tab's end face 8.243 mm²,
   ours 7.413: live's OBROUND depth reference differs; ask live if it matters). Flange 4 ("Cannot create flange with
   selected alignment", live OK) is on SNCNB, the main wall's bottom edge (1089 mm, mid (970.6, -111.1, 19.5)). std's

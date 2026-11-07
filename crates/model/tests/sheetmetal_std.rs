@@ -1821,7 +1821,7 @@ fn collinear_walls_keep_the_ends_in_pieces() {
 
 /// An Inner flange on a plate's top edge that steps 0.275 mm to a tab at its end (c2-sm-louver's Flange 3: the tab's
 /// edge just off the flange's): the bend ends with the flange at the step, relieved there, not run on past the tab
-/// (ours ran it 32 mm out past the plate's end, a second flange).
+/// (ours ran it 32 mm out past the plate's end, a second flange); a flange on the opposite edge then regenerates.
 #[test]
 #[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
 fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
@@ -1853,4 +1853,13 @@ fn an_inner_flange_beside_a_stepped_tab_ends_at_the_step() {
     let r = s.ok();
     let bb = r.context.bodies[part(&r)].shape.bounding_box(true).unwrap();
     assert!(bb.min.x > -1e-9, "the part reaches x {} mm: {:#?}", bb.min.x * 1e3, face_report(&r));
+    // A second Inner flange on the plate's opposite edge (the louver's Flange 4): the part's end faces at the step stay
+    // that edge's, not the step's, so std moves that edge alone ("Cannot create flange with selected alignment").
+    let edge = edge_at(&r, DVec3::new(36.0, 0.0, 1.628));
+    s.add("sheetMetalFlange", |pv| {
+        pv.set("edges", ParamValue::Query(vec![edge]));
+        pv.set("distance", expr("20 mm"));
+        pv.set("flangeAlignment", en("INNER"));
+    });
+    s.ok();
 }

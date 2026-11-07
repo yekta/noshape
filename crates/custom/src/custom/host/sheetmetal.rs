@@ -1781,15 +1781,18 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             let from = match f.face_surface() {
                 Ok(k::Surface::Plane(pl)) if pl.unit_normal().cross(n).length() < 1e-9 => Def::Face(fi),
                 _ => {
-                    // A side face: the loop side it was swept from.
+                    // A side face: the loop side it was swept from (the nearest side itself, not its line: a short
+                    // step's line runs across the wall, past every end face on its plane: c2-sm-louver's Flange 4).
                     let c = face_normal(&f).map(|x| x.0).unwrap_or_default();
                     let k = (0..l.pts.len())
                         .min_by(|a, b| {
                             let d = |k: usize| {
                                 let (p, q) = (pulled[k].0 - n * back, pulled[k].1 - n * back);
-                                let dq = (q - p).normalize();
+                                let len = (q - p).length();
+                                let dq = (q - p) / len.max(1e-300);
                                 let r = c - p - n * (c - p).dot(n);
-                                (r - dq * r.dot(dq)).length()
+                                let t = r.dot(dq).clamp(0.0, len);
+                                (r - dq * t).length()
                             };
                             d(*a).total_cmp(&d(*b))
                         })
