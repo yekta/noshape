@@ -680,3 +680,27 @@ fn a_curve_up_to_a_cylinder_ends_in_one_edge_across_its_seam() {
     let low = r.bounding_box(false).unwrap().min.z;
     assert!(low > 0.0099 && low < 0.02, "{low}");
 }
+
+/// cf-lighten's Lighten offsets its pocket tool's sides (a prism: two caps, planes and cylinders along y, its corners
+/// rounded 0.01 mm) by 2.54 mm: the 0.79 mm strip between two of its rounds keeps its ends on the caps (live: 0.8 mm
+/// edges), where OCCT's offset put both of the strip's corners at one point of its tangent faces' offsets.
+#[test]
+fn offset_prism_sides_keep_a_short_face_between_tangent_rounds() {
+    let s = Shape::from_brep_bytes(include_bytes!("data/offset/lighten-tool.brep")).unwrap();
+    let all = s.faces();
+    let sides: Vec<Shape> = [0, 2, 4, 5, 6, 7, 8, 9].iter().map(|&i| all[i].clone()).collect();
+    let r = offset_faces(&s, &sides, 0.00254).unwrap();
+    assert!(r.shape.is_valid());
+    let counts = |x: &Shape| (x.faces().len(), x.edges().len(), x.vertices().len());
+    assert_eq!(counts(&r.shape), counts(&s));
+    let strip: Vec<f64> = r.shape.edges().iter().map(|e| e.edge_info().unwrap().length * 1e3).filter(|l| (l - 0.7907).abs() < 1e-3).collect();
+    assert_eq!(strip.len(), 2, "the strip's ends on the two caps");
+    // Every face Modified to its offset: the rounds 0.01 -> 2.55 mm about the same axes.
+    for (i, f) in all.iter().enumerate() {
+        let out = r.history.modified(0, ShapeType::Face, i as u32);
+        assert_eq!(out.len(), 1, "face {i}");
+        if let (Surface::Cylinder { radius: a, .. }, Surface::Cylinder { radius: b, .. }) = (f.face_surface().unwrap(), r.shape.faces()[out[0] as usize].face_surface().unwrap()) {
+            assert!(((b - a).abs() - 0.00254).abs() < 1e-9, "{a} -> {b}");
+        }
+    }
+}

@@ -98,6 +98,7 @@
 #include <ShapeUpgrade_UnifySameDomain.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_ReShape.hxx>
@@ -8112,6 +8113,131 @@ OpOut op_defeature(const OcShape& s, const OcShapeList& faces)
   return out;
 }
 
+// A prism's side faces offset by one distance: two plane caps square to one direction, kept, every other face (a
+// plane along it, a cylinder about an axis along it) offset. The cap's outline offset in its plane (lines and arcs
+// stay lines and arcs, tangent ones tangent), extruded to the other cap; each face Modified to its offset. OCCT's
+// MakeOffset puts a vertex where two tangent faces meet a kept one at its tangent offsets' ill-conditioned
+// crossing, and a short face between tangent rounds lost its ends there (cf-lighten's tool: a 0.79 mm strip
+// between two rounds, live's 0.8 mm edges); false where the shape isn't such a prism.
+static bool offset_prism_sides(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& offset, double d, TopoDS_Shape& out,
+                               HHist& hist)
+{
+  ShapeIMap fm;
+  TopExp::MapShapes(solid, TopAbs_FACE, fm);
+  std::vector<TopoDS_Face> caps;
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    const bool moved = std::any_of(offset.begin(), offset.end(), [&](const TopoDS_Shape& f) { return f.IsSame(fm(i)); });
+    if (!moved)
+      caps.push_back(TopoDS::Face(fm(i)));
+  }
+  if (caps.size() != 2 || (int)offset.size() + 2 != fm.Extent())
+    return false;
+  BRepAdaptor_Surface c0(caps[0]), c1(caps[1]);
+  if (c0.GetType() != GeomAbs_Plane || c1.GetType() != GeomAbs_Plane)
+    return false;
+  const gp_Pln p0 = c0.Plane(), p1 = c1.Plane();
+  const gp_Dir dir = p0.Axis().Direction();
+  if (!dir.IsParallel(p1.Axis().Direction(), 1e-9))
+    return false;
+  // The sides: planes along the direction, cylinders about axes along it.
+  for (const TopoDS_Shape& f : offset)
+  {
+    BRepAdaptor_Surface a(TopoDS::Face(f));
+    if (a.GetType() == GeomAbs_Plane && std::abs(a.Plane().Axis().Direction().Dot(dir)) < 1e-9)
+      continue;
+    if (a.GetType() == GeomAbs_Cylinder && a.Cylinder().Axis().Direction().IsParallel(dir, 1e-9))
+      continue;
+    return false;
+  }
+  // One outline (no holes in the cap).
+  int wires = 0;
+  for (TopExp_Explorer w(caps[0], TopAbs_WIRE); w.More(); w.Next())
+    ++wires;
+  if (wires != 1)
+    return false;
+  GProp_GProps g0;
+  BRepGProp::SurfaceProperties(caps[0], g0);
+  BRepOffsetAPI_MakeOffset mo(caps[0], GeomAbs_Intersection);
+  mo.Perform(d);
+  if (!mo.IsDone())
+    return false;
+  TopoDS_Wire wire;
+  int n = 0;
+  for (TopExp_Explorer w(mo.Shape(), TopAbs_WIRE); w.More(); w.Next(), ++n)
+    wire = TopoDS::Wire(w.Current());
+  if (n != 1)
+    return false;
+  BRepBuilderAPI_MakeFace mf(p0, wire, true);
+  if (!mf.IsDone())
+    return false;
+  TopoDS_Face base = mf.Face();
+  // (The outline grows outwards for a positive offset: the face's area says which way it went.)
+  GProp_GProps g;
+  BRepGProp::SurfaceProperties(base, g);
+  if ((g.Mass() - g0.Mass()) * d < 0)
+    return false;
+  const gp_Vec along(dir.XYZ() * (gp_Vec(p0.Location(), p1.Location()).Dot(gp_Vec(dir))));
+  BRepPrimAPI_MakePrism prism(base, along);
+  if (!prism.IsDone())
+    return false;
+  TopoDS_Shape result = prism.Shape();
+  ShapeIMap rm;
+  TopExp::MapShapes(result, TopAbs_FACE, rm);
+  if (rm.Extent() != fm.Extent() || !BRepCheck_Analyzer(result).IsValid())
+    return false;
+  // Each face to its image: a cap to the face on its plane, a side to the face on its offset surface.
+  const double tol = 1e-7 + 1e-9 * std::abs(d);
+  auto image = [&](const TopoDS_Face& f) -> TopoDS_Shape {
+    BRepAdaptor_Surface a(f);
+    const bool cap = f.IsSame(caps[0]) || f.IsSame(caps[1]);
+    for (int i = 1; i <= rm.Extent(); ++i)
+    {
+      BRepAdaptor_Surface b(TopoDS::Face(rm(i)));
+      if (a.GetType() != b.GetType())
+        continue;
+      if (a.GetType() == GeomAbs_Plane)
+      {
+        const gp_Pln pa = a.Plane(), pb = b.Plane();
+        if (!pa.Axis().Direction().IsParallel(pb.Axis().Direction(), 1e-9))
+          continue;
+        const double gap = std::abs(pa.Distance(pb.Location()));
+        if (std::abs(gap - (cap ? 0.0 : std::abs(d))) <= tol)
+        {
+          // (A side's image lies on its outward side for a positive offset: two parallel sides d apart are told
+          // apart by the cap-plane point of the image.)
+          if (!cap)
+          {
+            gp_Dir nf = pa.Axis().Direction();
+            if (f.Orientation() == TopAbs_REVERSED)
+              nf.Reverse();
+            if (gp_Vec(pa.Location(), pb.Location()).Dot(gp_Vec(nf)) * d < 0)
+              continue;
+          }
+          return rm(i);
+        }
+      }
+      else if (a.GetType() == GeomAbs_Cylinder)
+      {
+        const gp_Cylinder ca = a.Cylinder(), cb = b.Cylinder();
+        if (gp_Lin(ca.Axis()).Distance(cb.Location()) <= tol && std::abs(std::abs(cb.Radius() - ca.Radius()) - std::abs(d)) <= tol)
+          return rm(i);
+      }
+    }
+    return TopoDS_Shape();
+  };
+  hist = new BRepTools_History();
+  for (int i = 1; i <= fm.Extent(); ++i)
+  {
+    TopoDS_Shape img = image(TopoDS::Face(fm(i)));
+    if (img.IsNull())
+      return false;
+    hist->AddModified(fm(i), img);
+  }
+  out = result;
+  return true;
+}
+
 OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
                       rust::Slice<const double> offsets)
 {
@@ -8139,6 +8265,17 @@ OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
   mo.MakeOffsetShape();
   if (!mo.IsDone())
     fail_op("offset face failed (error " + std::to_string((int)mo.Error()) + ")");
+  // Every face kept but edges lost (a short face's ends between tangent faces): a prism's sides built directly.
+  const bool same = std::all_of(offsets.begin(), offsets.end(), [&](double o) { return o == offsets[0]; });
+  ShapeIMap ein, eout, fin, fout;
+  TopExp::MapShapes(s.shape, TopAbs_EDGE, ein);
+  TopExp::MapShapes(mo.Shape(), TopAbs_EDGE, eout);
+  TopExp::MapShapes(s.shape, TopAbs_FACE, fin);
+  TopExp::MapShapes(mo.Shape(), TopAbs_FACE, fout);
+  TopoDS_Shape prism;
+  HHist ph;
+  if (same && fout.Extent() == fin.Extent() && eout.Extent() < ein.Extent() && offset_prism_sides(s.shape, faces.items, offsets[0], prism, ph))
+    return make_result(args, prism, ph.get());
   HHist h = history_of(args, mo);
   return make_result(args, mo.Shape(), h.get());
 }
