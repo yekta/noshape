@@ -1716,6 +1716,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.hole_face_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.fit_spline_vertex_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         // sketchEntityQuery(id+"F….wireOp", EntityType.EDGE, "<entity>").
         if let Some(rest) = text.split("sketchEntityQuery(id+\"").nth(1)
             && let Some((sk, after)) = rest.split_once(".wireOp\"")
@@ -2359,22 +2362,36 @@ impl<'a> Translator<'a> {
             }
         }
         // Which of the curves' crossings an edge swept from one is (ORDER).
-        fn order(p: &Packed) -> Option<usize> {
-            match p {
-                Packed::Map(m) if m.iter().any(|(k, v)| matches!((k, v), (Packed::Str(k), Packed::Str(v)) if k == "disambiguationType" && v == "ORDER")) => {
-                    m.iter().find_map(|(k, v)| match (k, v) {
-                        (Packed::Str(k), Packed::Num(n)) if k == "order" => Some(*n as usize),
-                        _ => None,
-                    })
-                }
-                Packed::Map(m) => m.iter().find_map(|(_, v)| order(v)),
-                Packed::Array(a) => a.iter().find_map(order),
-                Packed::Tagged(_, v) => order(v),
-                _ => None,
-            }
-        }
-        let crossing = order(&Packed::Map(m.clone()));
+        let crossing = packed_order(&Packed::Map(m.clone()));
         Some(if revolve { self.revolve_entity(name, &op, &sk, &curves) } else { self.extrude_entity(name, is_start, crossing, &op, &sk, &curves) })
+    }
+
+    /// An end of a curve a custom feature fit (`VERTEX` created by `<feature>.….opFitSpline`, ORDER 0 its start, 1 its
+    /// end: cf-extrude-vertex's Symmetric on the end of Extruded vertex along line): our vertex there.
+    fn fit_spline_vertex_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        let strings = packed_strings_of(text);
+        if !strings.iter().any(|s| s == "VERTEX") {
+            return None;
+        }
+        let feature = strings.iter().find(|s| s.ends_with(".opFitSpline")).and_then(|s| s.split('.').next())?.to_string();
+        let packed = text.split("qCompressed(1.0,\"").nth(1).and_then(|t| t.split('"').next())?;
+        let order = packed_order(&noshape_model::custom::host::packed::unpack(packed).ok()?)?;
+        let Some(ours) = self.feature_ids.get(&feature).cloned() else { return Some(Err(format!("opFitSpline vertex: feature {feature} was not built"))) };
+        let found = (|| -> Result<String, String> {
+            let edges = self.call("query_entities", json!({ "kind": "edges", "created_by": ours, "limit": 2 }))?;
+            let [edge] = edges["edges"].as_array().map(Vec::as_slice).unwrap_or_default() else { return Err(format!("opFitSpline vertex: {feature} made no single curve of ours")) };
+            let at = f3(&edge[if order == 0 { "start" } else { "end" }]).ok_or("opFitSpline vertex: the curve has no ends")?;
+            let vertices = self.call("query_entities", json!({ "kind": "vertices", "limit": 5000 }))?;
+            vertices["vertices"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| Some((v["id"].as_str()?, f3(&v["position"])?)))
+                .find(|(_, p)| (0..3).all(|i| (p[i] - at[i]).abs() < 1e-6))
+                .map(|(id, _)| id.to_string())
+                .ok_or_else(|| format!("opFitSpline vertex: no vertex of ours at the end {order} of {feature}'s curve"))
+        })();
+        Some(found)
     }
 
     /// A Hole's face by Onshape's name (`HOLE_FACE` of `….opHole`): its
@@ -3837,6 +3854,21 @@ fn lookup_path_in_level_order(ty: &str, id: &str, v: Value) -> Result<Value, Str
         return Err(format!("lookup path {v} only partly in its table ({})", path.join(" › ")));
     }
     Ok(json!(path))
+}
+
+/// A packed query's ORDER disambiguation (`{ "disambiguationType" : "ORDER", "order" : n }`, anywhere in it).
+fn packed_order(p: &noshape_model::custom::host::packed::Packed) -> Option<usize> {
+    use noshape_model::custom::host::packed::Packed;
+    match p {
+        Packed::Map(m) if m.iter().any(|(k, v)| matches!((k, v), (Packed::Str(k), Packed::Str(v)) if k == "disambiguationType" && v == "ORDER")) => m.iter().find_map(|(k, v)| match (k, v) {
+            (Packed::Str(k), Packed::Num(n)) if k == "order" => Some(*n as usize),
+            _ => None,
+        }),
+        Packed::Map(m) => m.iter().find_map(|(_, v)| packed_order(v)),
+        Packed::Array(a) => a.iter().find_map(packed_order),
+        Packed::Tagged(_, v) => packed_order(v),
+        _ => None,
+    }
 }
 
 fn packed_strings_of(text: &str) -> Vec<String> {

@@ -1137,6 +1137,50 @@ export const sizedCube = defineFeature(function(context is Context, id is Id, de
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A vertex live names as created by a custom feature's opFitSpline, by ORDER (cf-extrude-vertex's Symmetric on the end
+/// of Extruded vertex along line): ORDER 1 is the curve's end, so the cube there is 11 mm (at its start, 1 mm).
+#[test]
+fn a_custom_curves_end_by_order_is_its_end_vertex() {
+    let source = r#"FeatureScript 3095;
+import(path : "onshape/std/common.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "Line up" }
+export const lineUp = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        opFitSpline(context, id + "extrude", { "points" : [vector(0, 0, 0) * millimeter, vector(0, 0, 10) * millimeter] });
+    });
+
+annotation { "Feature Type Name" : "Cube at" }
+export const cubeAt = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Vertex", "Filter" : EntityType.VERTEX, "MaxNumberOfPicks" : 1 }
+        definition.vertex is Query;
+    }
+    {
+        const p = evVertexPoint(context, { "vertex" : definition.vertex });
+        const d = 1 * millimeter + p[2];
+        fCuboid(context, id + "cuboid", { "corner1" : p, "corner2" : p + vector(d, d, d) });
+    });
+"#;
+    let end = "query=qCompressed(1.0,\"%B5$QueryM5S12$disambiguationDataA1M2S12$disambiguationTypeS5$ORDERS5$orderD1Sa$entityTypeBa$EntityTypeS6$VERTEXSb$historyTypeS8$CREATIONSb$operationIdB2$IdA1S11.7.b$FkfB7VnZVw8lAua_1extrudeopFitSplineS9$queryTypeS5$DUMMY\",id);";
+    let features = json!({
+        "featureStudios": { "0123": { "name": "Curves", "source": source } },
+        "features": [
+            { "btType": "BTMFeature-134", "featureType": "lineUp", "namespace": "e0123::m4567", "featureId": "FkfB7VnZVw8lAua_1", "name": "Line up 1", "parameters": [] },
+            { "btType": "BTMFeature-134", "featureType": "cubeAt", "namespace": "e0123::m4567", "featureId": "FC", "name": "Cube at 1",
+              "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "vertex", "queries": [{ "btType": "BTMIndividualQuery-138", "queryString": end, "deterministicIds": ["JKE"] }] }] }]
+    });
+    let curve = json!({ "name": "Curve 1", "bodyType": "wire", "faces": 0, "edges": 1, "vertices": 2, "volume": null });
+    let live = vec![
+        json!({ "index": 0, "status": "OK", "parts": [curve.clone()] }),
+        json!({ "index": 1, "status": "OK", "parts": [{ "name": "Part 1", "bodyType": "solid", "faces": 6, "edges": 12, "vertices": 8, "volume": 1331e-9 }, curve] }),
+    ];
+    let r = run_model("custom-curve-end", &features, &live, "");
+    assert_eq!((r.matching, r.compared), (2, 2), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// Custom features are counted apart, and their failures reported apart
 /// from geometry: a Feature Studio that doesn't compile, a feature that
 /// throws where live's built; a studio pinned to std 1963 is served at 1963.
