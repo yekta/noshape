@@ -379,6 +379,7 @@ impl DrawingEditor {
             _ => None,
         });
         crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
+            .map(|d| crate::ui_script::mark(d, || format!("sheet_table:{label}")))
             .on_drag(ItemDrag { view: None, table: Some(id) }, |d, _, _, cx| cx.new(|_| d.clone()))
             .pl(px(indent))
             .text_color(rgb(0x666666))

@@ -147,7 +147,8 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"hole_axis": "X"}` (or `"Y"`): the middle of the X (Y) arrow of the sheet's first hole table's origin indicator
   (the indicator is one item: its menu has the flips);
 - `{"sheet_ref": "Part 1"}`: a reference row of the open Sheets panel (Ctrl+S), by the name it shows (its menu:
-  Switch to reference, Replace..., Pin view reference…);
+  Switch to reference, Replace..., Pin view reference…); `{"sheet_table": "Bill of materials"}` (or "Cut list"): a table
+  row of the open Sheets panel (its menu: Properties ▸, Switch to BOM, Delete);
 - `"export": ["PDF", "DXF", "DWG"]` (a scenario key): after the last step each runner exports the drawing in those
   formats with the Export dialog's defaults (an entry `{"format": "DWG", "version": "2018"}` sets the Version, as
   live's dialog shows its account's last one), beside its recording as `<scenario>.pdf` / `.dxf` / `.dwg`;
