@@ -1198,6 +1198,10 @@ selections", its shellAndEncloseWithConcaveFillet's opShell on the extruded regi
   of the model suite unchanged (631/924); T1 kernel_robustness::a_sweep_round_sharp_corners_is_mitred. Seen on the way,
   not changed: `half_path` keeps half of a CLOSED path the profile's plane crosses twice (live's rule for closed paths
   unknown).
+- Fillet (detail.rs `fillet`, blend_section.rs `cliff_rim_blend`): with Allow edge overflow off, a boss rim (plane
+  square to a cylinder, material inside) whose wall is shorter than the radius rounds as live's: the ball on the cap
+  and over the wall's far edge (a revolved cutter, the round a torus through the far circle). Tried before
+  rims_overflow / ring_blend; only when every selected edge is such a rim. cf-snap-hook 7 -> 9/18, suite 631 -> 640.
 
 ## From psui (11-05 20:40): main didn't build on Windows (MSVC C2065 in features.cpp)
 df356812's `fillet_by_tools`: `struct Tool { Kind kind = Skip; … }` with `enum Kind` local to the same function:

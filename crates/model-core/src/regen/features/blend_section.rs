@@ -1208,6 +1208,86 @@ pub fn ring_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], sizes: &[f64], k
     Ok(())
 }
 
+/// Rounds of boss rims (closed edges where a plane meets a cylinder square to it, the material inside) whose wall is
+/// shorter than the round needs, with Allow edge overflow off: as Onshape's, the ball rolls on the cap and over the
+/// wall's far edge, the round replacing the wall (cf-snap-hook's Fillet 4: R5 on Ø12 bosses 2 mm tall, live 18
+/// faces and 76.32 mm³ off each): a torus of the radius tangent to the cap at R - √(h(2r - h)) from the axis,
+/// through the far circle; what lies between it and the corner cut away. `Ok(false)` (nothing done) unless every
+/// edge is such a rim.
+pub fn cliff_rim_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], sizes: &[f64]) -> FResult<bool> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let Ok(rims) = rims_of(shape, edges, scale) else { return Ok(false) };
+    let feature = ev.feature;
+    let mut cuts = Vec::new();
+    for (rim, i) in rims {
+        let r = sizes.get(i).or(sizes.first()).copied().unwrap_or(0.0);
+        // A whole boss rim, its plane square to the axis.
+        if !rim.arc.is_empty() || rim.out > 0.0 || rim.axis.dot(rim.np).abs() < 1.0 - 1e-9 || r <= 0.0 {
+            return Ok(false);
+        }
+        let (x, y) = rim.frame();
+        let (p0, radial) = rim.at(x, y, 0.0);
+        let along = rim.axis * rim.axis.dot(rim.wp).signum();
+        let tol = scale * 1e-7;
+        // The wall's depth from the cap: its edges round the axis (not its seam) all at 0 or at one far depth h.
+        let mut depths: Vec<f64> = Vec::new();
+        for e in rim.wall.edges() {
+            let Ok(info) = e.edge_info() else { return Ok(false) };
+            if let (Ok(a), Ok(b)) = (e.point_at(info.first_param), e.point_at(info.last_param))
+                && ((b - a).cross(along).length() < tol && (b - a).length() > tol)
+            {
+                continue;
+            }
+            for t in [info.first_param, 0.5 * (info.first_param + info.last_param), info.last_param] {
+                let q = e.point_at(t)?;
+                depths.push((q - p0).dot(along));
+            }
+        }
+        let h = depths.iter().copied().fold(0.0, f64::max);
+        if depths.iter().any(|d| d.abs() > tol && (d - h).abs() > tol) || h <= tol || h >= r * (1.0 - 1e-9) {
+            return Ok(false);
+        }
+        let big = rim.rc;
+        let c = big - (h * (2.0 * r - h)).sqrt();
+        if c <= tol {
+            return Ok(false);
+        }
+        // In the half-plane through the axis and p0: (s from the axis, t into the boss).
+        let cap = p0 - radial * big;
+        let at = |s: f64, t: f64| cap + radial * s + along * t;
+        let o = (c, r);
+        let a_c = (h - r).atan2(big - c);
+        let mid = 0.5 * (a_c - std::f64::consts::FRAC_PI_2);
+        let profile = k::make_wire(&[
+            k::make_line(at(c, 0.0), at(big, 0.0))?,
+            k::make_line(at(big, 0.0), at(big, h))?,
+            k::make_arc_3pts(at(big, h), at(o.0 + r * mid.cos(), o.1 + r * mid.sin()), at(c, 0.0))?,
+        ])?;
+        let face = k::make_face_from_wire(&profile, true)?;
+        let tool = k::revolve(&face, cap, rim.axis, std::f64::consts::TAU)?;
+        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+            return Ok(false);
+        }
+        let ename = body.edges[edges[i]].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool.shape.faces().iter().map(|f| if matches!(f.face_surface(), Ok(k::Surface::Plane(_) | k::Surface::Cylinder { .. })) { generated.clone() } else { blend.clone() }).collect();
+        cuts.push(NamedShape::new(tool.shape, names));
+    }
+    let (cut, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &cuts)?;
+    let cut = NamedShape::new(cut, names);
+    let un = k::unify_same_domain(&cut.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&cut.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(true)
+}
+
 /// Where a rim's round can have its seam (the wedge's cylinder's x direction): an angle about the axis at which
 /// its touch lines on the plane and the cylinder stay (a point a little past each lies on its face), from the
 /// cylinder's own seam round; the seam's ends then split only pieces of one curve (one edge, as live's, which has no

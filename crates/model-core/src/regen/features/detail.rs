@@ -404,6 +404,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             Some(Overrun::PastUnselected) => return err("Failed to fillet selections."),
             None => {}
         }
+        // Boss rims whose wall is shorter than the round, overflow off: the ball rolls over the wall's far edge.
+        if !ev.bool("allowEdgeOverflow") && super::blend_section::cliff_rim_blend(ev, bi, &edges, &radii)? {
+            continue;
+        }
         // Rims whose rounds run off their plane or into each other: each round trimmed by what it meets, as live's.
         let overflow = super::blend_section::rims_overflow(&body.shape, &edges, &radii, super::blend_section::RimBlend::Round);
         if overflow && super::blend_section::ring_blend(ev, bi, &edges, &radii, super::blend_section::RimBlend::Round).is_ok() {

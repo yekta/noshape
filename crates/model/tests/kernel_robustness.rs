@@ -631,6 +631,26 @@ fn a_splines_handle_tips_are_marked_in_the_display() {
     assert_eq!(tips, vec![h0.0, h1.0]);
 }
 
+/// A round larger than the wall beside it (cf-snap-hook's Fillet 4: R5 on the caps of Ø12 bosses 2 mm tall): as
+/// Onshape's, the ball rolls on the cap and over the wall's far edge, the round replacing the wall: tangent to the cap
+/// at r 2 (6 - sqrt(5² - 3²)), through the boss's base circle; 76.35 mm³ off each boss (live 76.32).
+#[test]
+fn a_round_past_its_wall_rolls_over_the_far_edge() {
+    let mut t = T::new();
+    let b = t.block(60.0, 60.0, 10.0);
+    t.ok(b);
+    let (_, regions) = t.sketch(&[], &[((30.0, 30.0), 6.0)]);
+    let boss = t.add("extrude", &[("entities", q(regions)), ("depth", e("2 mm")), ("operationType", en("ADD")), ("oppositeDirection", ParamValue::Bool(true)), ("defaultScope", ParamValue::Bool(true))]);
+    let before = volume(&t.ok(boss));
+    let cap = t.faces_where(|c| (c.z + 2.0).abs() < 1e-6);
+    assert_eq!(cap.len(), 1);
+    let f = t.add("fillet", &[("entities", q(cap)), ("radius", e("5 mm")), ("tangentPropagation", ParamValue::Bool(true)), ("allowEdgeOverflow", ParamValue::Bool(false))]);
+    let r = t.ok(f);
+    let faces = r.context.bodies[0].shape.faces();
+    assert!((before - volume(&r) - 76.35).abs() < 0.05, "removed {}", before - volume(&r));
+    assert_eq!(faces.len(), 8, "block 6, cap, round: the wall gone");
+}
+
 /// A profile swept round a closed path with sharp corners (a rectangle, cf-box-dovetail-joint's dovetail round a
 /// board's rim): the pieces meet mitred at the corners, as Onshape's: one valid solid, its volume the profile's area
 /// times the path's length (centred on the path, the mitres add what they take; OCCT's transformed sections made it
