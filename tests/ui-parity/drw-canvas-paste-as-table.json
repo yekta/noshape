@@ -1,0 +1,30 @@
+{
+  "name": "drw-canvas-paste-as-table",
+  "about": "The empty sheet's menu › Paste as table with nothing to paste",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          150,
+          40
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Paste as table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    }
+  ]
+}

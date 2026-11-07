@@ -1,0 +1,105 @@
+{
+  "name": "drw-leader-remove-node",
+  "about": "A note's leader: Add node in its middle, then the node › Remove node",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Note"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          60,
+          40
+        ]
+      }
+    },
+    {
+      "do": "type",
+      "text": "TEMP"
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          240,
+          190
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "TEMP"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Add leader"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Front",
+          "at": [
+            20,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "leader": {
+          "annotation": "TEMP",
+          "at": 0.5
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Add node"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "leader": {
+          "annotation": "TEMP",
+          "at": 0.5
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Remove node"
+      }
+    }
+  ]
+}

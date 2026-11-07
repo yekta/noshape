@@ -30,7 +30,7 @@ impl DrawingEditor {
 
     /// Where target `t` shows now, in window coordinates: `sheet_point` [x, y] (sheet mm), `view` (its middle),
     /// `view_point` / `view_edge` {view, at: [x, y, z] mm}, `break_line` {view, index}, `hole_axis` ("X" / "Y"),
-    /// `annotation` (by its text).
+    /// `leader` {annotation, at} (a point along its first leader), `annotation` (by its text).
     pub fn ui_target_point(&self, t: &Value, _cx: &App) -> Result<Point<Pixels>, String> {
         let pair = |v: &Value| -> Option<[f64; 2]> { Some([v.get(0)?.as_f64()?, v.get(1)?.as_f64()?]) };
         let at = if let Some(p) = t.get("sheet_point") {
@@ -69,6 +69,27 @@ impl DrawingEditor {
             let line = built.geometry.lines.iter().filter(|l| l.pick == pick).nth(k).ok_or("the origin indicator isn't drawn")?;
             let (a, b) = (line.points[0], *line.points.last().ok_or("an empty line")?);
             [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
+        } else if let Some(l) = t.get("leader") {
+            // The point `at` (0..1, by length) along the first leader of the annotation shown as `annotation`.
+            let text = l.get("annotation").and_then(Value::as_str).ok_or("leader: an annotation's text")?;
+            let f = l.get("at").and_then(Value::as_f64).unwrap_or(0.5).clamp(0.0, 1.0);
+            let id = self.ui_annotations().into_iter().find(|(_, _, s)| s == text).ok_or_else(|| format!("no annotation {text}"))?.0;
+            let a = self.current_sheet().annotations.iter().find(|x| x.id == id).ok_or("no annotation")?;
+            let path = self.leader_paths_of(a).into_iter().next().ok_or_else(|| format!("{text} has no leader"))?.1;
+            let seg = |w: &[[f64; 2]]| (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]);
+            let total: f64 = path.points.windows(2).map(seg).sum();
+            let mut left = total * f;
+            let mut at = *path.points.last().ok_or("an empty leader")?;
+            for w in path.points.windows(2) {
+                let d = seg(w);
+                if left <= d && d > 0.0 {
+                    let k = left / d;
+                    at = [w[0][0] + (w[1][0] - w[0][0]) * k, w[0][1] + (w[1][1] - w[0][1]) * k];
+                    break;
+                }
+                left -= d;
+            }
+            at
         } else if let Some(text) = t.get("annotation").and_then(Value::as_str) {
             let a = self.ui_annotations().into_iter().find(|(_, _, s)| s == text).ok_or_else(|| format!("no annotation {text}"))?;
             self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?
