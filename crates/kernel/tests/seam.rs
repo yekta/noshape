@@ -38,7 +38,7 @@ fn a_section_across_a_tori_seam_is_one_edge() {
     let notch = make_box_corners(DVec3::new(22.0, -3.0, -10.0), DVec3::new(30.0, 3.0, 10.0)).unwrap();
     for rust in [true, false] {
         set_rust_boolean(Some(rust));
-        let r = unify_same_domain(&boolean(BooleanOp::Cut, &[torus.clone()], &[notch.clone()], &BooleanOptions::default()).unwrap().shape).unwrap().shape;
+        let r = unify_same_domain(&boolean(BooleanOp::Cut, std::slice::from_ref(&torus), std::slice::from_ref(&notch), &BooleanOptions::default()).unwrap().shape).unwrap().shape;
         set_rust_boolean(None);
         assert!(r.is_valid());
         assert_eq!(counts(&r), (4, 6, 4), "rust {rust}");
