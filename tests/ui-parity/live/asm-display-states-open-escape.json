@@ -1,18 +1,19 @@
 {
  "scenario": "asm-display-states-open-escape",
- "recorded": "2026-11-07T00:36:08.796Z",
+ "recorded": "2026-11-07T01:35:59.964Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "e180444c88c105362d4bdd8e",
+  "document": "d434fb734585b9e3f85b1cca",
+  "workspace": "e46def584afd02d0b1b2ea03",
+  "element": "b635cc945abc0c3dd727a9cc",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3"
+  "startElement": "17925cad4a23714ccd49b367",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -160,7 +161,14 @@
      ],
      "all": false
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "panel",
+     "title": "Display states",
+     "text": [
+      "(New display state name)",
+      "No display states created"
+     ]
+    },
     "dialogs": [],
     "list": null,
     "selection": {
@@ -276,7 +284,7 @@
     },
     "drawing": null
    },
-   "t": 41037
+   "t": 27834
   },
   {
    "step": 2,
@@ -405,7 +413,7 @@
     },
     "drawing": null
    },
-   "t": 44798
+   "t": 31514
   }
  ]
 }
