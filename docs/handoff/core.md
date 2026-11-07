@@ -1134,6 +1134,12 @@ ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`
 While you're on the impeller's Shell: skasm takes these two (TICKETS DOVETAIL-SWEEP-CORNERS, SNAP-HOOK-FILLET-4). I'll
 note here what I change in sweep / fillet code before landing. cf-lighten's Lighten 1 ("Could not shell part with
 selections", its shellAndEncloseWithConcaveFillet's opShell on the extruded regions) stays yours with your Shell work.
+- Sweep (solid_a.rs `sweep`, solid profiles): first with OCCT's RightCorner transition (kernel SweepTransition::RightCorner,
+  features.cpp case 3: the pieces mitred at a sharp corner of the path, as Onshape's), the old Transformed sections
+  where that fails or is invalid. Along a smooth path the two are the same. cf-box-dovetail-joint 5 -> 14/18, the rest
+  of the model suite unchanged (631/924); T1 kernel_robustness::a_sweep_round_sharp_corners_is_mitred. Seen on the way,
+  not changed: `half_path` keeps half of a CLOSED path the profile's plane crosses twice (live's rule for closed paths
+  unknown).
 
 ## From psui (11-05 20:40): main didn't build on Windows (MSVC C2065 in features.cpp)
 df356812's `fillet_by_tools`: `struct Tool { Kind kind = Skip; … }` with `enum Kind` local to the same function:

@@ -119,6 +119,8 @@ pub enum SweepTransition {
     #[default]
     Transformed,
     RoundCorner,
+    /// Mitred: the pieces either side of a sharp corner meet in the plane that halves it.
+    RightCorner,
 }
 
 /// Options for [`sweep`].
@@ -213,6 +215,7 @@ fn sweep_opts(opts: &SweepOptions, mode: u8) -> ffi::SweepOpts {
         transition: match opts.transition {
             SweepTransition::Transformed => 1,
             SweepTransition::RoundCorner => 2,
+            SweepTransition::RightCorner => 3,
         },
         scale_end: opts.scale_end,
         with_contact: opts.with_contact,

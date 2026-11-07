@@ -615,6 +615,31 @@ fn sweep_round_tight_bend() {
     }
 }
 
+/// A profile swept round a closed path with sharp corners (a rectangle, cf-box-dovetail-joint's dovetail round a
+/// board's rim): the pieces meet mitred at the corners, as Onshape's: one valid solid, its volume the profile's area
+/// times the path's length (centred on the path, the mitres add what they take; OCCT's transformed sections made it
+/// invalid).
+#[test]
+fn a_sweep_round_sharp_corners_is_mitred() {
+    let mut t = T::new();
+    let mut prof = noshape_sketch::Sketch::new();
+    let p = [(19.0, -1.0), (21.0, -1.0), (21.0, 1.0), (19.0, 1.0)].map(|(x, y)| prof.add_point(DVec2::new(x * 1e-3, y * 1e-3)));
+    for k in 0..4 {
+        prof.add_line_between(p[k], p[(k + 1) % 4]).unwrap();
+    }
+    let pf = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Front)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: prof, ..Default::default() })))]);
+    let mut path = noshape_sketch::Sketch::new();
+    let c = [(-20.0, -10.0), (20.0, -10.0), (20.0, 10.0), (-20.0, 10.0)].map(|(x, y)| path.add_point(DVec2::new(x * 1e-3, y * 1e-3)));
+    let sides: Vec<_> = (0..4).map(|k| path.add_line_between(c[k], c[(k + 1) % 4]).unwrap()).collect();
+    let pp = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: path, ..Default::default() })))]);
+    let r = t.regen();
+    let key = r.display.sketches.iter().find(|x| x.feature == pf).unwrap().regions[0].key.clone();
+    let sw = t.add("sweep", &[("profiles", q(vec![Reference::SketchRegion { sketch: pf, key }])), ("path", q(sides.iter().map(|l| Reference::SketchEntity { sketch: pp, entity: l.0 }).collect())), ("extendToFullPath", ParamValue::Bool(true))]);
+    let r = t.ok(sw);
+    assert!(r.context.bodies[0].shape.is_valid());
+    assert!((volume(&r) - 480.0).abs() < 1e-6, "{}", volume(&r));
+}
+
 /// Draft over fillets (live capture G1): D1 sides + R3 corner fillets drafted
 /// 5°/30° both ways (the drafted fillets vanish at 30° narrowing: OCCT's draft
 /// builds an invalid solid, the boolean construction takes over); D3 with a

@@ -1243,6 +1243,9 @@ OpOut op_pipe_shell(const OcShapeList& profiles, const OcShape& spine, const Swe
     case 2:
       mk.SetTransitionMode(BRepBuilderAPI_RoundCorner);
       break;
+    case 3:
+      mk.SetTransitionMode(BRepBuilderAPI_RightCorner);
+      break;
     default:
       mk.SetTransitionMode(BRepBuilderAPI_Transformed);
       break;

@@ -503,13 +503,25 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
         } else if let Some(d) = lock_dir {
             opts.mode = k::SweepMode::Binormal(d);
         }
-        let res = sweep(&p.shape, Some(&p.frame), &opts).map_err(|_| fe(SWEEP_FAILED))?;
+        // Round a sharp corner of the path the pieces meet mitred, in the plane that halves it, as Onshape's
+        // (cf-box-dovetail-joint's dovetail swept round a board's rim: OCCT's transformed sections made an invalid
+        // solid there); where that fails, the transformed sections as before. (Only at corners: along a smooth path
+        // both are the same.)
+        let mitred = k::SweepOptions { transition: k::SweepTransition::RightCorner, ..opts.clone() };
+        let (res, valid) = match sweep(&p.shape, Some(&p.frame), &mitred) {
+            Ok(r) if r.shape.count(ShapeType::Solid) > 0 && r.shape.is_valid() => (r, true),
+            _ => {
+                let r = sweep(&p.shape, Some(&p.frame), &opts).map_err(|_| fe(SWEEP_FAILED))?;
+                let valid = r.shape.count(ShapeType::Solid) > 0 && r.shape.is_valid();
+                (r, valid)
+            }
+        };
         if res.shape.count(ShapeType::Solid) == 0 {
             return err(SWEEP_FAILED);
         }
         // OCCT sweeps a profile round a bend tighter than the profile into a
         // self-intersecting solid; Onshape refuses it.
-        if !res.shape.is_valid() || may_self_intersect(&p.shape, &path, &res.shape, opts.scale_end) && res.shape.self_intersects() {
+        if !valid || may_self_intersect(&p.shape, &path, &res.shape, opts.scale_end) && res.shape.self_intersects() {
             return err(tight_bend_message(&p.shape, &path));
         }
         let names = sweep_names(ev, p, &res, true, true);
