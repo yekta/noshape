@@ -1,18 +1,18 @@
 {
  "scenario": "sketch-tool-flow",
- "recorded": "2026-11-07T00:54:02.804Z",
+ "recorded": "2026-11-07T10:34:41.124Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.6 ade395e0"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "7bc66c5a8a8d3c21e47d1b14",
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "8dc8200a347896d29a8ef291",
   "start": "empty",
-  "startElement": "81fdc27e2aba0b3a105a0788"
+  "startElement": "16c3ef729d456774c1da81b8"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -106,6 +107,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -142,7 +144,7 @@
     },
     "drawing": null
    },
-   "t": 140496
+   "t": 79632
   },
   {
    "step": 2,
@@ -155,7 +157,7 @@
    "ok": true,
    "at": [
     1083,
-    568
+    667
    ],
    "state": {
     "focus": {
@@ -213,6 +215,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -249,7 +252,7 @@
     },
     "drawing": null
    },
-   "t": 152370
+   "t": 90228
   },
   {
    "step": 3,
@@ -260,9 +263,8 @@
     }
    },
    "ok": true,
-   "via": "search tools",
    "at": [
-    1525,
+    1484,
     58
    ],
    "state": {
@@ -321,6 +323,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -349,7 +352,7 @@
     "message": null,
     "tooltip": null,
     "sketch": {
-     "tool": null,
+     "tool": "Flow",
      "entities": null,
      "constraints": null,
      "dimensions": null,
@@ -357,7 +360,7 @@
     },
     "drawing": null
    },
-   "t": 158260
+   "t": 96767
   },
   {
    "step": 4,
@@ -422,6 +425,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -458,7 +462,7 @@
     },
     "drawing": null
    },
-   "t": 162272
+   "t": 100475
   }
  ]
 }
