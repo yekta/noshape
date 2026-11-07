@@ -104,7 +104,7 @@ pub(crate) fn units_json(u: &UnitPrefs) -> Value {
     json!({ "length": u.length.to_string(), "angle": u.angle.to_string() })
 }
 
-fn r6(x: f64) -> f64 {
+pub(crate) fn r6(x: f64) -> f64 {
     (x * 1e6).round() / 1e6
 }
 
@@ -607,30 +607,31 @@ fn parse_refs(a: &Args, name: &str) -> Result<Vec<Reference>, OpError> {
 }
 
 fn measure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    use noshape_model::regen::measure::{Measurement, measure};
+    use noshape_model::regen::measure::measure;
     let (od, tab) = studio_target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
     let sel = parse_refs(a, "entities")?;
     let r = od.regenerate(tab, None)?;
-    let out: Vec<Value> = measure(&r.context, &sel)
-        .into_iter()
-        .map(|(label, m)| {
-            let v = match m {
-                Measurement::Length(x) => json!({ "length": r6(x * k) }),
-                Measurement::Area(x) => json!({ "area": r6(x * k * k) }),
-                Measurement::Radius(x) => json!({ "radius": r6(x * k) }),
-                Measurement::Diameter(x) => json!({ "diameter": r6(x * k) }),
-                Measurement::Distance { distance, a, b, dx, dy, dz } => json!({ "distance": r6(distance * k), "from": pt(a, k), "to": pt(b, k), "dx": r6(dx * k), "dy": r6(dy * k), "dz": r6(dz * k) }),
-                Measurement::Angle(x) => json!({ "angle_deg": r6(x.to_degrees()) }),
-                Measurement::Percent(x) => json!({ "percent": r6(x) }),
-                Measurement::Point(p) => json!({ "point": pt(p, k) }),
-                Measurement::Volume(x) => json!({ "volume": r6(x * k * k * k) }),
-            };
-            json!({ "label": label, "value": v })
-        })
-        .collect();
+    let out: Vec<Value> = measure(&r.context, &sel).into_iter().map(|(label, m)| measurement_json(label, m, k)).collect();
     Ok(json!({ "units": units_json(&units), "measurements": out }).into())
+}
+
+/// A Measure tool reading in workspace units (`k`: length unit per meter).
+pub(crate) fn measurement_json(label: String, m: noshape_model::regen::measure::Measurement, k: f64) -> Value {
+    use noshape_model::regen::measure::Measurement;
+    let v = match m {
+        Measurement::Length(x) => json!({ "length": r6(x * k) }),
+        Measurement::Area(x) => json!({ "area": r6(x * k * k) }),
+        Measurement::Radius(x) => json!({ "radius": r6(x * k) }),
+        Measurement::Diameter(x) => json!({ "diameter": r6(x * k) }),
+        Measurement::Distance { distance, a, b, dx, dy, dz } => json!({ "distance": r6(distance * k), "from": pt(a, k), "to": pt(b, k), "dx": r6(dx * k), "dy": r6(dy * k), "dz": r6(dz * k) }),
+        Measurement::Angle(x) => json!({ "angle_deg": r6(x.to_degrees()) }),
+        Measurement::Percent(x) => json!({ "percent": r6(x) }),
+        Measurement::Point(p) => json!({ "point": pt(p, k) }),
+        Measurement::Volume(x) => json!({ "volume": r6(x * k * k * k) }),
+    };
+    json!({ "label": label, "value": v })
 }
 
 fn mass(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

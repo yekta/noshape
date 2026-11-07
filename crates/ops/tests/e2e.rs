@@ -6570,3 +6570,37 @@ fn assembly_properties_set_the_subassemblys_bom_row() {
     let e = try_call(&mut ctx, "assembly_properties", json!({ "tab": "Frame", "bom_behavior": "nope" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("bom_behavior"));
 }
+
+/// ASM-API-GAPS: Measure and Mass and section properties in an assembly.
+#[test]
+fn assembly_measure_and_mass_properties() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm-measure-mass.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm" } }));
+    call(&mut ctx, "part_set_properties", json!({ "tab": "Part Studio 1", "part": "Part 1", "mass_override": 2.0 }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0]["id"].clone();
+    let (top, bottom) = (face(&mut ctx, "Part 1 <1>", 1.0), face(&mut ctx, "Part 1 <2>", -1.0));
+    call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part 1 <1>", "entity": top }, "b": { "instance": "Part 1 <2>", "entity": bottom }, "offset": { "z": "5 mm" } }));
+    let m = call(&mut ctx, "assembly_measure", json!({ "tab": "Assembly 1", "entities": [{ "instance": "Part 1 <1>", "entity": top }] }));
+    assert!((num(&m["measurements"][0]["value"]["area"]) - 800.0).abs() < 1e-6, "{m}");
+    let m = call(&mut ctx, "assembly_measure", json!({ "tab": "Assembly 1", "entities": [{ "instance": "Part 1 <1>", "entity": top }, { "instance": "Part 1 <2>", "entity": bottom }] }));
+    let gap = m["measurements"].as_array().unwrap().iter().find_map(|x| x["value"]["distance"].as_f64()).unwrap_or_else(|| panic!("{m}"));
+    assert!((gap.abs() - 5.0).abs() < 1e-6, "the fastened offset: {m}");
+    let e = try_call(&mut ctx, "assembly_measure", json!({ "tab": "Assembly 1", "entities": [{ "instance": "Part 1 <1>", "entity": "face:nope" }] })).unwrap_err();
+    assert!(e.param.as_deref().is_some_and(|p| p.starts_with("entities[0]")), "{e:?}");
+    // Two 2 kg blocks (mass overrides), centered between them; then the assembly's own override.
+    let mp = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
+    assert!((num(&mp["mass_kg"]) - 4.0).abs() < 1e-9, "{mp}");
+    assert!((num(&mp["volume"]) - 16000.0).abs() < 1e-6, "{mp}");
+    let one = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"] }));
+    assert!((num(&one["mass_kg"]) - 2.0).abs() < 1e-9, "{one}");
+    call(&mut ctx, "assembly_properties", json!({ "tab": "Assembly 1", "mass_override": 7.5 }));
+    let mp = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
+    assert!((num(&mp["mass_kg"]) - 7.5).abs() < 1e-9 && mp["mass_overridden"] == true, "{mp}");
+}

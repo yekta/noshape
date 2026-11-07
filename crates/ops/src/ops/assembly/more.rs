@@ -30,6 +30,26 @@ pub fn ops() -> Vec<Op> {
     vec![
         Op {
             group: "assembly",
+            verb: "measure",
+            summary: "Measure entities in an assembly (lengths, areas, radii, distances, angles)",
+            description: "The Measure tool in an assembly: one entity gives its length / area / radius...; two give the minimum distance (with dx, dy, dz) and the angle between them, where the parts sit. Values in workspace units.",
+            fields: vec![doc_field(), asm_field(), req("entities", json!({ "type": "array", "items": { "type": "object" } }), "Picks: {\"instance\": name, id or \"Sub <1> > Part 1 <1>\", \"entity\": a face / edge / vertex id (assembly_entities)}.")],
+            mutates: false,
+            destructive: false,
+            run: measure,
+        },
+        Op {
+            group: "assembly",
+            verb: "mass_properties",
+            summary: "Mass and section properties of an assembly or some of its instances",
+            description: "Volume, surface area, and with a material (or density, or a mass override) on every part: mass, center of mass and inertia about the center of mass, as the Mass and section properties tool shows them. Parts' and subassemblies' mass overrides count; the whole assembly's own override replaces its mass (`mass_overridden`). Lengths in workspace units.",
+            fields: vec![doc_field(), asm_field(), opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Top-level instances (name or id); default the whole assembly.")],
+            mutates: false,
+            destructive: false,
+            run: mass_properties,
+        },
+        Op {
+            group: "assembly",
             verb: "properties",
             summary: "An assembly's Properties (its top row's Properties…, Tab › Properties…)",
             description: "Without fields, replies with the assembly's properties. Name (the tab's), description, part number, revision, Subassembly BOM behavior, a mass override (kg), vendor, project, product line, titles, Not revision managed, Exclude from all BOMs, Unit of measure and custom properties; State is set by releases. Fields not given keep their value; an empty text clears it. One edit (\"Properties : <name>\").",
@@ -692,4 +712,66 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         })?;
     }
     Ok(json!({ "properties": properties_json(&name, &p) }).into())
+}
+
+fn measure(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let k = crate::ops::query::len_scale(&units);
+    let asm = assembly(od, tab)?.clone();
+    let mut keys = Vec::new();
+    for (i, e) in a.array("entities")?.iter().enumerate() {
+        let field = format!("entities[{i}]");
+        let inst = e.get("instance").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{field}.instance"), "an instance name or id"))?;
+        let path = super::find_occurrence(od.doc(), &asm, inst, &format!("{field}.instance"))?;
+        let r = crate::refs::parse(e.get("entity").ok_or_else(|| OpError::param(&format!("{field}.entity"), "a face, edge or vertex id"))?).map_err(|err| err.with_param(format!("{field}.entity")))?;
+        keys.push((field, path, r));
+    }
+    if keys.is_empty() {
+        return Err(OpError::param("entities", "pick one or more entities"));
+    }
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let mut picks = Vec::new();
+    for (field, path, r) in keys {
+        // The part under that instance that has the entity.
+        let o = result.occurrences.iter().find(|o| o.path.starts_with(&path) && noshape_model::assembly::analysis::pick_exists(&result, &(o.path.clone(), r.clone()))).ok_or_else(|| OpError::param(&format!("{field}.entity"), "not an entity of that instance"))?;
+        picks.push((o.path.clone(), r));
+    }
+    let out: Vec<Value> = noshape_model::assembly::analysis::measure_entities(&result, &picks).into_iter().map(|(label, m)| crate::ops::query::measurement_json(label, m, k)).collect();
+    Ok(json!({ "units": crate::ops::query::units_json(&units), "measurements": out }).into())
+}
+
+fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::ops::query::{pt, r6};
+    let (od, tab) = target(ctx, a)?;
+    let units = od.doc().settings.units;
+    let k = crate::ops::query::len_scale(&units);
+    let asm = assembly(od, tab)?.clone();
+    let tops: Vec<InstanceId> = match a.opt_array("instances")? {
+        Some(list) => list.iter().enumerate().map(|(i, v)| find_instance(&asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<_, _>>()?,
+        None => Vec::new(),
+    };
+    let result = solve(od, tab, &SolveOptions::default())?;
+    let densities = noshape_model::assembly::analysis::part_densities(od.doc(), &asm, &result);
+    let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
+    let m = noshape_model::assembly::analysis::assembly_mass_properties(&result, &tops, &density).ok_or_else(|| OpError::invalid("nothing to measure: no solid parts"))?;
+    let mut v = json!({ "units": crate::ops::query::units_json(&units), "volume": r6(m.props.volume * k * k * k), "surface_area": r6(m.props.surface_area * k * k) });
+    let whole = tops.is_empty() || asm.instances.iter().all(|i| tops.contains(&i.id));
+    let overridden = asm.properties.mass_override.filter(|_| whole);
+    match m.props.mass.or(overridden) {
+        Some(mass) => {
+            let (c, i, f) = (m.props.center_of_mass, m.props.inertia, k * k);
+            v["mass_kg"] = json!(r6(overridden.unwrap_or(mass)));
+            v["mass_overridden"] = json!(overridden.is_some());
+            v["center_of_mass"] = pt(c, k);
+            v["inertia"] = json!([[r6(i.x_axis.x * f), r6(i.y_axis.x * f), r6(i.z_axis.x * f)], [r6(i.x_axis.y * f), r6(i.y_axis.y * f), r6(i.z_axis.y * f)], [r6(i.x_axis.z * f), r6(i.y_axis.z * f), r6(i.z_axis.z * f)]]);
+            v["inertia_unit"] = json!(format!("kg·{}²", units.length));
+        }
+        None => {
+            let names: Vec<String> = m.without_material.iter().filter_map(|p| result.node(p).map(|n| n.name.clone())).collect();
+            v["without_material"] = json!(names);
+            v["note"] = json!("Assign a material (or density) to every part to get mass, center of mass and inertia.");
+        }
+    }
+    Ok(v.into())
 }
