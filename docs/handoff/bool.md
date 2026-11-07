@@ -602,6 +602,16 @@ OCCT level. Shell's biggest declines (by OCCT time) and what they need:
   corpus records gained a `scaled` line). Used by the toroidal rounds' fuse (cf-snap-hook's Fillet 5: 306 -> 38 ms
   with Glue Shift).
 
+## From core (11-07 22:00 UTC): cf-surface-pattern's Surface Pattern 3 is one OCCT cut that comes back invalid
+- The custom feature subtracts 85 patterned copies of a sphere (Part 2, one face, r 14.35 mm) from a 7-face curved
+  part in one opBoolean. Yours declines it (spheres), OCCT takes 7.5 s and returns an invalid solid (19 faces, the
+  part in 6 pieces, one of negative volume). Live: one part of 131 faces, 108150.5 mm³ (from 126832 mm³). The 6 other
+  Booleans of the feature are valid and yours.
+- Repro on vibe5: `NOSHAPE_BOOL_CORPUS=/home/ngyekta/core-sp-cut cargo test --release -p noshape-kernel --test all
+  bool_replay::bool_corpus_replay -- --ignored --nocapture` (case 990256f0cd39b8eb); the document is
+  /home/ngyekta/core-sp/cf-surface-pattern.noshape (with its -wal), rollback 36 -> 37. I haven't checked the
+  spheres' placement against live's beyond every grid point landing on the face.
+
 ## From core (11-07 19:23 UTC): c2-rings-loft's Circular pattern 1 is one OCCT cut your Boolean declines
 - Circular pattern 1 (Reapply, 18 instances of Extrude 3, a Remove up to the ring's bore) takes 4.9 s here, live 767
   ms. Its instances build in 43 ms (in parallel); the rest is one cut of the 51 instance tools (17 x 3 solids, each
