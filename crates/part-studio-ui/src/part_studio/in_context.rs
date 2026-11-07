@@ -299,6 +299,9 @@ impl PartStudioView {
         let split_label = c.split_go_to_assembly;
         let insert_pending = c.ctx.insert_at.is_some() && !studio_in_assembly(&self.doc.read(cx).session.doc, assembly, self.tab);
         let mut banner = v_flex()
+            .id("ctx-banner")
+            // Over the graphics: its clicks never reach the view under it (a press on ▾ selected the plane behind).
+            .occlude()
             .w(px(if amber.is_some() { 420. } else { 490. }))
             .bg(if amber.is_some() { rgb(0xfab601) } else { rgb(0xd0dbe5) })
             .child(
@@ -792,6 +795,39 @@ impl PartStudioView {
         });
         // The Part Studio regenerates on its own tab's change event.
         self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::TabChanged(tab)));
+    }
+
+    /// A regeneration is in: a context a feature (or the open dialog) now references for the first time exists for
+    /// the user from now on, and live says so ('New assembly context "Context 1" created.', ui-parity
+    /// in-context-context-none). The contexts referenced when the studio opened don't count.
+    pub(super) fn note_new_contexts(&mut self, cx: &mut Context<Self>) {
+        let Some(studio) = self.studio(cx) else { return };
+        let mut now: HashSet<u32> = noshape_model::in_context::referenced_contexts(&studio.features).into_iter().collect();
+        // An open dialog picking the shown context's geometry makes it (live: the message at the pick, before ✓).
+        let pending = self.ui.in_context.as_ref().and_then(|c| c.ctx.context).filter(|id| self.edit.as_ref().is_some_and(|e| noshape_model::in_context::params_use_context(&e.dialog.read(cx).feature.params, Some(*id))));
+        now.extend(pending);
+        let Some(known) = self.ui.known_contexts.replace(now.clone()) else { return };
+        let mut new: Vec<u32> = now.difference(&known).copied().collect();
+        new.sort_unstable();
+        // (Its snapshot may not be in the studio yet: new contexts are named "Context <n>", `next_context`.)
+        if let Some(&id) = new.first() {
+            let name = studio.contexts.iter().find(|c| c.id == id).map_or_else(|| format!("Context {id}"), |c| c.name.clone());
+            let text = format!("New assembly context \"{name}\" created.");
+            // Made by an open dialog's pick: gone once the dialog closes (live: none after ✓).
+            if self.edit.is_some() {
+                self.ui.context_note = Some(text.clone());
+            }
+            self.flash_info(text, cx);
+        }
+    }
+
+    /// The dialog closed (✓ or cancel): the note its pick made goes with it.
+    pub(super) fn clear_context_note(&mut self) {
+        if let Some(n) = self.ui.context_note.take()
+            && self.message.as_ref().is_some_and(|(_, m)| *m == n)
+        {
+            self.message = None;
+        }
     }
 
     /// "Assembly contexts" above the feature filter (live 504–508,

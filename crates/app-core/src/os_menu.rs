@@ -792,7 +792,7 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
         return menu_state(sub, cx);
     }
     let mut rows = Vec::new();
-    let (mut highlighted, mut disabled) = (None, Vec::new());
+    let (mut highlighted, mut disabled, mut flags) = (None, Vec::new(), Vec::new());
     for (ix, item) in m.items.iter().enumerate() {
         let (label, off) = match item {
             OsMenuItem::Item { label, disabled, .. } | OsMenuItem::Submenu { label, disabled, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled),
@@ -804,11 +804,14 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
         if off {
             disabled.push(rows.len());
         }
+        flags.push(off);
         rows.push(label);
     }
-    // Live's recorder names the view cube's menu apart (ui-parity camera-menu-*).
-    let kind = if m.camera { "camera-menu" } else { "context-menu" };
-    Some(serde_json::json!({ "kind": kind, "rows": rows, "highlighted": highlighted, "disabled": disabled }))
+    // Live's recorder names the view cube's menu apart, its disabled rows one flag per row (ui-parity camera-menu-*).
+    if m.camera {
+        return Some(serde_json::json!({ "kind": "camera-menu", "rows": rows, "highlighted": highlighted, "disabled": flags }));
+    }
+    Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
 }
 
 /// Where a press outside the open menu last closed it.

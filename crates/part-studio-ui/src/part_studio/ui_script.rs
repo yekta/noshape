@@ -28,6 +28,15 @@ impl PartStudioView {
             let mut f = crate::feature_dialog::field_focus("", st);
             f["label"] = Value::Null;
             f
+        } else if let Some(st) = self.ui.dyn_suppression.as_ref().map(|d| d.1.read(cx)).filter(|st| st.focus_handle(cx).is_focused(window)) {
+            // Dynamic suppression's box (live feature-menu-dynamic-suppression-add: its field).
+            crate::feature_dialog::field_focus("Unsuppressed if", st)
+        } else if let Some(st) = self.panel_inputs.values().map(|(e, _)| e.read(cx)).find(|st| st.focus_handle(cx).is_focused(window)) {
+            // A right panel's table cell (a configuration's Name row, a variable): live "other".
+            let mut f = crate::feature_dialog::field_focus("", st);
+            f["kind"] = "other".into();
+            f["label"] = Value::Null;
+            f
         } else if let Some(st) = self.palette.as_ref().map(|p| p.0.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window)) {
             let mut f = crate::feature_dialog::field_focus("", st);
             f["kind"] = "search-tools".into();
@@ -174,6 +183,15 @@ impl PartStudioView {
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
         // A sketch tool's prompt at the bottom of the view is live's message too.
         let message = message.or_else(|| self.sketch.as_ref().and_then(|ed| ed.message.clone()));
+        // The Configuration panel's info box under an input nothing configures yet (live config-*).
+        // (With a toast too, live reads both: "<note> / <toast>".)
+        let note = (self.right_panel == Some(super::config_panel::RightPanel::Configurations) && self.ui.cfg_note_shown)
+            .then_some("No features are configured Right click sketch dimensions, features, or feature parameters to configure them.");
+        let message = match (note, message) {
+            (Some(n), Some(m)) => Some(format!("{n} / {m}")),
+            (Some(n), None) => Some(n.to_string()),
+            (None, m) => m,
+        };
         // The canceled-sketch toast's Restore link is part of its text in live.
         let message = message.map(|m| if self.canceled_edit.as_ref().is_some_and(|c| c.3 == m) { format!("{m} Restore") } else { m });
         // The parts list's heading, as drawn (render_parts_list).

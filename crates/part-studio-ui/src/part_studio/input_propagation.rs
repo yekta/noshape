@@ -132,9 +132,10 @@ impl PartStudioView {
     pub(super) fn copy_config_inputs(&mut self, input: Option<&str>, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         let inputs: Vec<ConfigInput> = studio.configuration.inputs.iter().filter(|i| input.is_none_or(|id| i.id == id)).cloned().collect();
-        // Live: "Size copied." / "Inputs copied." (Onshape's own clipboard).
-        let toast = match (input, inputs.as_slice()) {
-            (Some(_), [one]) => format!("{} copied.", one.name),
+        // Live: "Size copied." / "Inputs copied." (Onshape's own clipboard); Copy all inputs of one input names it
+        // (ui-parity config-panel-menu-copy-all-inputs: "Configuration copied.").
+        let toast = match inputs.as_slice() {
+            [one] => format!("{} copied.", one.name),
             _ => "Inputs copied.".to_string(),
         };
         crate::config_visibility::copy_inputs(inputs);

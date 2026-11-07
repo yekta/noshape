@@ -64,6 +64,11 @@ fn opens_on_tab() -> Option<String> {
     let name = scenario["start"].as_str().unwrap_or("empty");
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let start = read_json(&starts).ok()?[name].clone();
+    // A scenario that first clicks a document tab opens on it (live's runner: appearance-part-row-configure's start is
+    // config-blocks' Part Studio).
+    if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()) {
+        return Some(tab.to_string());
+    }
     if let Some(d) = start.get("drawing") {
         // (A drawing of the start's assembly is named after its tab.)
         let of = if d["assembly"] == true { format!("start {name} asm") } else { d["part"].as_str().unwrap_or("Part 1").to_string() };

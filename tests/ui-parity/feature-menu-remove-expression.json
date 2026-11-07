@@ -1,6 +1,6 @@
 {
  "name": "feature-menu-remove-expression",
- "about": "block: Extrude 1's Dynamic suppression › Add expression… true + Enter (suppressed); right-click it, Edit dynamic suppression › Remove expression",
+ "about": "block: Extrude 1's Dynamic suppression › Add expression… true, ✓ (suppressed); right-click it, Edit dynamic suppression › Remove expression",
  "area": "psui",
  "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
  "start": "block",
@@ -29,8 +29,10 @@
    "text": "true"
   },
   {
-   "do": "key",
-   "key": "Enter"
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
   },
   {
    "do": "rclick",

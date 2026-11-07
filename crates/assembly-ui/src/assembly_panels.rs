@@ -707,6 +707,7 @@ impl AssemblyView {
 
     pub(super) fn origin_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let origin_picked = self.ui.ps_in_context == Some(behaviors::PsOrigin::Origin);
         h_flex()
             .id("asm-origin-row")
             .map(|d| crate::ui_script::mark(d, || "instance:Origin".into()))
@@ -717,7 +718,9 @@ impl AssemblyView {
             .gap(px(3.))
             .text_size(px(crate::ui::ROW_TEXT))
             .text_color(pal.text)
-            .hover(|d| d.bg(pal.row_hover))
+            // Origin of new Part Studio's pick: the row selected (live in-context-*).
+            .when(origin_picked, |d| d.bg(pal.accent_soft))
+            .when(!origin_picked, |d| d.hover(|d| d.bg(pal.row_hover)))
             .child(crate::ui::tree_icon("origin", self.ui.origin_hidden, cx))
             .child(div().flex_1().when(self.ui.origin_hidden, |d| d.text_color(pal.text_faint)).child(crate::ui::user_text("Origin")))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {

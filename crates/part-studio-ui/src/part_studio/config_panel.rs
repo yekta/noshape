@@ -215,7 +215,10 @@ impl PartStudioView {
         let body = match panel {
             RightPanel::Appearance => self.render_appearance_panel(cx),
             RightPanel::Variables => self.render_variables(window, cx),
-            RightPanel::Configurations => self.render_configurations(window, cx),
+            RightPanel::Configurations => {
+                self.ui.cfg_note_shown = false;
+                self.render_configurations(window, cx)
+            }
             RightPanel::CustomTables => self.render_custom_tables(cx),
             RightPanel::HoleTable => self.render_hole_table(cx),
             RightPanel::Inspection => self.render_inspection(cx),
@@ -1006,9 +1009,14 @@ impl PartStudioView {
 
     /// Add a configuration input of one of Onshape's kinds (List, Checkbox, Variable).
     pub(super) fn add_config_input(&mut self, label: &'static str, cx: &mut Context<Self>) {
+        let mut added = None;
         self.edit_config(noshape_ops::config::ADD_INPUT, cx, |ps| {
-            noshape_ops::config::add_input(ps, label);
-        })
+            added = Some(noshape_ops::config::add_input(ps, label));
+        });
+        // Live: a new List input's italic "Name" row takes the keyboard (ui-parity config-*).
+        if label == "List" {
+            self.ui.cfg_focus_new_row = added;
+        }
     }
 
     /// Onshape's Configurations panel before any input exists (live,
@@ -1684,6 +1692,10 @@ impl PartStudioView {
                             noshape_ops::config::add_option(ps, &a, name);
                         });
                     });
+                    if self.ui.cfg_focus_new_row.as_ref() == Some(&iid) {
+                        self.ui.cfg_focus_new_row = None;
+                        st.update(cx, |s, cx| s.focus(window, cx));
+                    }
                     section = section.child(
                         h_flex().border_l_1().border_color(grid).child(
                             cell(name_w)
@@ -1693,6 +1705,7 @@ impl PartStudioView {
                     );
                 }
                 if columns.is_empty() {
+                    self.ui.cfg_note_shown = true;
                     section = section.child(
                         div().pt(px(5.)).pr(px(5.)).child(
                             v_flex()

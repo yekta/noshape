@@ -318,6 +318,14 @@ pub struct UiState {
     pub cache_task: Option<Task<()>>,
     pub cache_save_task: Option<Task<()>>,
     pub cache_key: Option<String>,
+    /// A List input just added: its italic "Name" row takes the keyboard when next drawn (its id).
+    pub cfg_focus_new_row: Option<String>,
+    /// The Configuration panel's last draw showed "No features are configured" under an input.
+    pub cfg_note_shown: bool,
+    /// The contexts features referenced at the last regeneration (None until the first).
+    pub known_contexts: Option<std::collections::HashSet<u32>>,
+    /// 'New assembly context … created.' shown for the open dialog's pick (cleared when it closes).
+    pub context_note: Option<String>,
     /// The regeneration's coarse (preview) display and its sequence number, cached with its full one.
     pub preview_for_cache: Option<(u64, std::sync::Arc<noshape_model::display::StudioDisplay>)>,
     pub after_regen: Option<super::cached_open::Deferred>,
@@ -702,6 +710,10 @@ impl UiState {
             cache_task: None,
             cache_save_task: None,
             cache_key: None,
+            cfg_focus_new_row: None,
+            cfg_note_shown: false,
+            known_contexts: None,
+            context_note: None,
             preview_for_cache: None,
             after_regen: None,
             cad_export_file: None,
@@ -1634,7 +1646,21 @@ impl PartStudioView {
             }
         });
         st.update(cx, |s, cx| s.focus(window, cx));
+        // Live (ui-parity feature-menu-edit-expression): the feature is selected while its box is open.
+        if let DynTarget::Feature(id) = target {
+            self.selected_features = vec![id];
+            self.refresh_scene(false, cx);
+        }
         self.ui.dyn_suppression = Some((target, st, sub));
+        cx.notify();
+    }
+
+    /// The Dynamic suppression box closed without applying (Esc, ✕): its feature no longer selected.
+    fn cancel_dynamic_suppression(&mut self, cx: &mut Context<Self>) {
+        if let Some((DynTarget::Feature(id), _, _)) = self.ui.dyn_suppression.take() {
+            self.selected_features.retain(|f| *f != id);
+            self.refresh_scene(false, cx);
+        }
         cx.notify();
     }
 
@@ -1675,9 +1701,8 @@ impl PartStudioView {
                 .text_color(pal.text)
                 .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                     if ev.keystroke.key == "escape" {
-                        this.ui.dyn_suppression = None;
+                        this.cancel_dynamic_suppression(cx);
                         window.focus(&this.focus, cx);
-                        cx.notify();
                     }
                 }))
                 .child(
@@ -1709,10 +1734,7 @@ impl PartStudioView {
                                 .cursor_pointer()
                                 .hover(|d| d.bg(pal.panel_hover))
                                 .child(crate::assets::icon("dialog-cancel", 24., cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.ui.dyn_suppression = None;
-                                    cx.notify();
-                                })),
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_dynamic_suppression(cx))),
                         ),
                 )
                 .child(

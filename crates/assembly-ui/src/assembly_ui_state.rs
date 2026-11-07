@@ -126,7 +126,8 @@ impl AssemblyView {
         let tab = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         // The root row is selected while the whole assembly is checked for interference (live asm-root-menu-check-interference).
         let root = self.ui.interference.as_ref().is_some_and(|d| d.whole);
-        let mut rows: Vec<Value> = vec![row(&tab, "ok", root, false, false, false), row("Origin", "ok", false, false, false, false)];
+        let origin_picked = self.ui.ps_in_context == Some(behaviors::PsOrigin::Origin);
+        let mut rows: Vec<Value> = vec![row(&tab, "ok", root, false, false, false), row("Origin", "ok", origin_picked, false, false, false)];
         let mut placed_groups: HashSet<MateId> = HashSet::new();
         for i in &asm.instances {
             if let Some(p) = asm.generated_by(i.id) {
@@ -247,6 +248,12 @@ impl AssemblyView {
         // The Group dialog's members are selected (live asm-group-two-instances).
         let group: &[InstanceId] = self.ui.group.as_ref().map_or(&[], |(_, ids)| ids.as_slice());
         items.extend(asm.instances.iter().filter(|i| (self.selected.contains(&i.id) || group.contains(&i.id)) && !self.ui.entity_sel.iter().any(|(p, _)| p[0] == i.id)).map(|i| json!({ "kind": "INSTANCE", "owner": i.name })));
+        // Origin of new Part Studio's pick is selected (live in-context-*: the Origin a FEATURE with its id).
+        match self.ui.ps_in_context {
+            Some(behaviors::PsOrigin::Origin) => items.push(json!({ "kind": "FEATURE", "owner": null, "id": "Origin" })),
+            Some(behaviors::PsOrigin::Connector(_)) => items.push(json!({ "kind": "FEATURE", "owner": null })),
+            _ => {}
+        }
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
             items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));

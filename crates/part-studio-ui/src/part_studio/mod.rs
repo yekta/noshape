@@ -2643,6 +2643,7 @@ impl PartStudioView {
         self.restore_after_sketch(cx);
         let Some(e) = self.edit.take() else { return };
         self.ui.sub_dialog = None;
+        self.clear_context_note();
         // Nothing stays selected after a feature is accepted (Onshape).
         self.selected_features.clear();
         self.ui.query_hover = None;
@@ -2664,6 +2665,8 @@ impl PartStudioView {
                 }
             });
         });
+        // The feature may be the first on a context's geometry (its regeneration can reuse the dialog's preview).
+        self.note_new_contexts(cx);
         window.focus(&self.focus, cx);
         if repeat {
             self.start_feature(&type_id, window, cx);
@@ -2691,6 +2694,7 @@ impl PartStudioView {
         self.restore_after_sketch(cx);
         self.ui.query_hover = None;
         self.ui.sub_dialog = None;
+        self.clear_context_note();
         if self.edit.take().is_some() {
             // The dialog's own background work goes with it: nothing it delivers late is applied, and std's editing
             // logic doesn't start a held preview (user P1 11-05: the spinner kept on after Esc).

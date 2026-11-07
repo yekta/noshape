@@ -75,6 +75,7 @@ impl PartStudioView {
     /// display is cached once the studio is idle.
     pub(super) fn note_real_display(&mut self, full: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.ui.real_display_in = true;
+        self.note_new_contexts(cx);
         self.ui.cache_task = None;
         if std::mem::take(&mut self.ui.cached_view) {
             if self.message.as_ref().is_some_and(|(_, m)| m == WAITING) {
