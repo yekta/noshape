@@ -101,8 +101,8 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "set_feature_state",
             summary: "Suppress or unsuppress mates, relations, groups, patterns and mate connectors; show or hide mate connectors",
-            description: "The list's Suppress / Unsuppress (\"Suppress mate\", \"Suppress pattern\", \"Suppress mate connector\"; a configured mate changes in the default configuration) and the mate connectors' eye (\"Hide mate connector\"). Features already in the asked state are left alone.",
-            fields: vec![doc_field(), asm_field(), req("features", strings(), "Feature ids or names."), opt("suppressed", json!({ "type": "boolean" }), "Suppress or unsuppress."), opt("hidden", json!({ "type": "boolean" }), "Mate connectors: hide or show.")],
+            description: "The list's Suppress / Unsuppress (\"Suppress mate\", \"Suppress pattern\", \"Suppress mate connector\"; a configured mate changes in the default configuration) and Hide / Show of mates, groups (their row menu's \"Hide\" / \"Show\") and mate connectors (\"Hide mate connector\"). Features already in the asked state are left alone.",
+            fields: vec![doc_field(), asm_field(), req("features", strings(), "Feature ids or names."), opt("suppressed", json!({ "type": "boolean" }), "Suppress or unsuppress."), opt("hidden", json!({ "type": "boolean" }), "Mates, groups and mate connectors: hide or show.")],
             mutates: true,
             destructive: false,
             run: set_feature_state,
@@ -357,16 +357,21 @@ fn set_feature_state(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
         if let Some(want) = hid {
-            let Some(now) = asm.connectors.iter().find(|c| c.id == id).map(|c| c.hidden) else {
-                return Err(OpError::param("features", "only assembly mate connectors are hidden here (instances: assembly_set_state)"));
+            // A mate connector's Hide / Show (its own label), a mate's or a group's ("Hide" / "Show", as the row menu).
+            let connector = asm.connectors.iter().find(|c| c.id == id).map(|c| c.hidden);
+            let now = connector.or_else(|| asm.mates.iter().find(|m| m.id == id).map(|m| m.hidden)).or_else(|| asm.groups.iter().find(|g| g.id == id).map(|g| g.hidden));
+            let Some(now) = now else {
+                return Err(OpError::param("features", "only mates, groups and assembly mate connectors are hidden here (instances: assembly_set_state)"));
             };
             if now != want {
                 let result = solve(od, tab, &SolveOptions::default())?;
-                commit(od, tab, if now { "Show mate connector" } else { "Hide mate connector" }, &result, |a| {
-                    if let Some(c) = a.connectors.iter_mut().find(|c| c.id == id) {
-                        c.hidden = want;
-                    }
-                })?;
+                let desc = match (connector.is_some(), want) {
+                    (true, true) => "Hide mate connector",
+                    (true, false) => "Show mate connector",
+                    (false, true) => "Hide",
+                    (false, false) => "Show",
+                };
+                commit(od, tab, desc, &result, |a| a.set_mates_hidden(&[id], want))?;
             }
         }
     }

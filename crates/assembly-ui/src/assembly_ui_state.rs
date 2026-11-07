@@ -188,12 +188,27 @@ impl AssemblyView {
         // Live reads them over REST: a mate dialog's preview isn't stored yet.
         let previewing = self.mate.is_some();
         let instances: Vec<Value> = asm.instances.iter().map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
-        // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK").
-        // As live's REST gives them: a suppressed mate's status stays OK (asm-mate-menu-suppress).
+        // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK"; a suppressed mate's
+        // too, asm-mate-menu-suppress).
         let rest_status = |m: &Mate| match mate_state(m) {
             "suppressed" => "OK".to_string(),
             s => s.to_uppercase(),
         };
+        // Occurrences inside subassemblies, as live's REST lists them ("Sub <1> > Part 2 <1>"), placed in the world.
+        // (A part occurrence's transform takes its Part Studio coordinates to the world: its instance's place.)
+        let mut nested: Vec<Value> = Vec::new();
+        fn walk(r: &noshape_model::assembly::eval::AssemblyResult, n: &InstanceNode, prefix: &str, out: &mut Vec<Value>, transform: &dyn Fn(&Placement) -> Vec<f64>) {
+            for c in &n.children {
+                let name = format!("{prefix} > {}", c.name);
+                if let Some(o) = r.occurrences.iter().find(|o| o.path == c.path) {
+                    out.push(json!({ "name": name, "fixed": c.fixed, "transform": transform(&Placement::from_dmat4(&o.transform)) }));
+                }
+                walk(r, c, &name, out, transform);
+            }
+        }
+        for n in self.result.nodes.iter().filter(|n| n.path.len() == 1 && !n.children.is_empty()) {
+            walk(&self.result, n, &n.name, &mut nested, &transform);
+        }
         let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": rest_status(m) })).collect();
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
@@ -274,15 +289,34 @@ impl AssemblyView {
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
-            "message": self.message.as_ref().map(|(_, m)| m.clone()),
+            "message": self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.ui.cfg_toast.clone()).or_else(|| self.panel_info(cx)),
             "undo": { "undo": history.0, "redo": history.1 },
             "sketch": null,
-            "assembly": { "instances": instances, "mates": mates }
+            "assembly": { "instances": instances.into_iter().chain(nested).collect::<Vec<_>>(), "mates": mates }
         })
     }
 }
 
 impl AssemblyView {
+    /// The blue how-to box a right-hand panel shows, as live's recorder reads it into the message (its bold title,
+    /// then its text): Exploded views with one view and no step, Named positions without driving mates, the
+    /// Configuration panel with inputs and nothing configured.
+    fn panel_info(&self, cx: &App) -> Option<String> {
+        let asm = self.assembly(cx)?;
+        match self.panel {
+            Some(SidePanel::Explode) if asm.exploded_views.len() == 1 && asm.exploded_views[0].steps.is_empty() => {
+                Some("Build steps by dragging components Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.".into())
+            }
+            Some(SidePanel::Positions) if asm.position_drivers.is_empty() && !asm.named_positions.is_empty() => {
+                Some("Capture variants of the assembly as named positions Position instances in the graphics area and define driving mates.".into())
+            }
+            Some(SidePanel::Configurations) if !asm.configuration.inputs.is_empty() && asm.configuration.configured.is_empty() => {
+                Some("No assembly features are configured Right click patterns, mates, or instances to configure them.".into())
+            }
+            _ => None,
+        }
+    }
+
     /// An expanded subassembly's rows as the list draws them (`push_children`): its instances, its patterns (their
     /// copies when open) and its own "Mate features (n)" with its mates (when open).
     fn nested_state_rows(&self, node: &InstanceNode, rows: &mut Vec<Value>, cx: &App) {

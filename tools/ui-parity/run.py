@@ -208,6 +208,13 @@ def normalize_live(state):
         hl = lst.get("highlighted")
         hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
         lst["rows"] = [r for r in rows if r not in CLOUD_ONLY]
+        # A panel's ⋯ menu: live's recorder names it "menu" (ours "context-menu": the same rows to a user), and in the
+        # assembly's panels reads each row twice (asm-bom-copy-table: "Copy table", "Copy table", …).
+        if lst.get("kind") == "menu":
+            lst["kind"] = "context-menu"
+            r = lst["rows"]
+            if r and len(r) % 2 == 0 and all(r[i] == r[i + 1] for i in range(0, len(r), 2)):
+                lst["rows"] = r[::2]
         # An assembly start's names in menu rows: live's Part Studio is "start <name>" (ours "Part Studio 1") and its
         # runner works in a copy of the assembly ("start <name> asm Copy 2").
         lst["rows"] = [re.sub(r" asm Copy \d+…$", " asm…", re.sub(r"^Switch to start \S+$", "Switch to Part Studio 1", r)) if isinstance(r, str) else r for r in lst["rows"]]

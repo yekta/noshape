@@ -313,7 +313,7 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
         .iter()
         .map(|m| {
             let st = r.mates.iter().find(|s| s.id == m.id);
-            let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed });
+            let mut v = json!({ "id": format!("mate:{}", m.id.0), "name": m.name, "type": mate_type_id(m.mate_type), "a": format!("inst:{}", m.a.instance.0), "b": format!("inst:{}", m.b.instance.0), "ok": st.map(|s| s.ok), "message": st.and_then(|s| s.message.clone()), "suppressed": m.suppressed, "hidden": m.hidden });
             // The dialog's settings (as assembly_mate takes them).
             v["flip_primary"] = json!(!m.flip_primary);
             if m.reorient_secondary != 0 {

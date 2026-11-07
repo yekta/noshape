@@ -1748,6 +1748,11 @@ fn assembly_groups_relations_connectors() {
     assert_eq!(last(&mut ctx), "Assembly 1 :: Suppress mate");
     call(&mut ctx, "assembly_set_feature_state", json!({ "features": ["Mate connector 1"], "hidden": true }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Hide mate connector");
+    // A mate's Hide / Show (its row menu's), as the app labels it.
+    call(&mut ctx, "assembly_set_feature_state", json!({ "features": ["Revolute 1"], "hidden": false }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Show");
+    let shown = call(&mut ctx, "assembly_list", json!({}));
+    assert_eq!(shown["mates"].as_array().unwrap().iter().find(|m| m["name"] == "Revolute 1").map(|m| m["hidden"].clone()), Some(json!(false)), "{shown}");
 
     // Replace the second block with a pin.
     let rp = call(&mut ctx, "assembly_replace", json!({ "instance": b2, "source": "Part Studio 1", "part": pin }));

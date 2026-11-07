@@ -2704,7 +2704,7 @@ Examples:
 
 Suppress or unsuppress mates, relations, groups, patterns and mate connectors; show or hide mate connectors (edits the document (one undoable history entry)).
 
-The list's Suppress / Unsuppress ("Suppress mate", "Suppress pattern", "Suppress mate connector"; a configured mate changes in the default configuration) and the mate connectors' eye ("Hide mate connector"). Features already in the asked state are left alone.
+The list's Suppress / Unsuppress ("Suppress mate", "Suppress pattern", "Suppress mate connector"; a configured mate changes in the default configuration) and Hide / Show of mates, groups (their row menu's "Hide" / "Show") and mate connectors ("Hide mate connector"). Features already in the asked state are left alone.
 
 Examples:
 
@@ -2718,7 +2718,7 @@ Examples:
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
 | `features` | array of string | required | Feature ids or names. |
 | `suppressed` | boolean |  | Suppress or unsuppress. |
-| `hidden` | boolean |  | Mate connectors: hide or show. |
+| `hidden` | boolean |  | Mates, groups and mate connectors: hide or show. |
 
 #### assembly_named_position
 
