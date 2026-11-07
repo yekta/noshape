@@ -16,6 +16,21 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 05:01 UTC.**
+- Queued / landed since 03:40: a loft's added vertices spread evenly along their edge (LOFT-VERTEX-MATCH: the
+  impeller's circle split now live's, 46.155 + 3 x 52.683 mm; its surface still -2.3 %, the Normal-to-profile
+  magnitude for perpendicular sections waits on live's next captures, ~15:25 UTC); a circle lofted to a polygon cut
+  from the polygon's first corner's angle about the circle's own centre (live 2162); parity: a centroid within live's
+  volume-band uncertainty (c2-rings-loft 2 -> 4) and a sketch entity named by id before what lies at live's id
+  (c2-rings-loft's Revolve 1 axis, 4 -> 7). vibe4 ran out of disk at 04:05 (a land failed "checks exited 1"): freed my
+  old builds there (~/agents/core-asan, ~/agents/core/target*: 35 GB).
+- c2-rings-loft's Fillet 1 (7/32): two closed ellipses where the ring's slanted sides cut its Ø20.5 bore, R 2. Each
+  alone builds through the checked path (the side plane 137.4 -> 32.36 mm², live 32.50) but its blend comes out as
+  three B-spline pieces (44.6 + 44.6 + 89.8 mm²; live one face, ~172 mm²), and the second then fails; both at once
+  fail ("fillet gave an invalid solid"). OCCT's blend round a bore whose fillet nearly eats the plane beside it.
+- c2-duct-multipart's Extrude 3: the translator reads its four region queries as one region twice (the 343,500 mm²
+  one; live cuts about a fifth as much): region queries (the translator's / skasm's).
+
 **State 11-07 03:40 UTC: cf-surface-pattern's Fillet 1 (live capture in: behaviours.md "core (2202)").**
 - Queued: a fillet of a picked face blends its sharp edges only (its 0° edge to a neighbour is left; live: "live
   fillets the picked face's sharp edges and leaves its smooth ones"; tangent propagation off gives the same).
