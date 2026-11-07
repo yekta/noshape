@@ -3440,6 +3440,143 @@ bool valid_shape(const TopoDS_Shape& s)
   return BRepCheck_Analyzer(s, true, true).IsValid();
 }
 
+// valid_shape of `s` back at the part's own scale (a blend runs at the working scale, where a tolerance is a thousandth
+// of the part's).
+bool valid_unscaled(const TopoDS_Shape& s)
+{
+  const double k = working_scale();
+  if (k == 1.0)
+    return valid_shape(s);
+  gp_Trsf t;
+  t.SetScale(gp_Pnt(0, 0, 0), 1.0 / k);
+  return valid_shape(BRepBuilderAPI_Transform(s, t, true).Shape());
+}
+
+// A planar face pinched to a strip narrower than `width` between two parallel line edges of its loops (a blend made a
+// hair smaller than a face it consumes leaves one: c2-fan-blade-sweep's Fillet 3, the bottom bar's last 2e-10 m): the
+// strip cut out of the face and the faces sewn again (the strip's two sides one edge), so the face is its pieces, as
+// live's. The shape as it was where there is none or the repair doesn't come out a valid solid.
+TopoDS_Shape without_necks(const TopoDS_Shape& s, double width, HHist& h)
+{
+  // (A blend's result is often a compound of its one solid.)
+  TopoDS_Shape one;
+  for (TopExp_Explorer e(s, TopAbs_SOLID); e.More(); e.Next())
+  {
+    if (!one.IsNull())
+      return s;
+    one = e.Current();
+  }
+  if (one.IsNull())
+    return s;
+  ShapeIMap faces;
+  TopExp::MapShapes(one, TopAbs_FACE, faces);
+  std::vector<TopoDS_Shape> pieces;
+  HHist                     cutH;
+  bool                      changed = false;
+  for (int i = 1; i <= faces.Extent(); ++i)
+  {
+    const TopoDS_Face& f = TopoDS::Face(faces(i));
+    BRepAdaptor_Surface fs(f, false);
+    if (fs.GetType() != GeomAbs_Plane)
+    {
+      pieces.push_back(f);
+      continue;
+    }
+    std::vector<std::pair<gp_Pnt, gp_Pnt>> lines;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+    {
+      BRepAdaptor_Curve c(TopoDS::Edge(e.Current()));
+      if (c.GetType() == GeomAbs_Line)
+        lines.push_back({c.Value(c.FirstParameter()), c.Value(c.LastParameter())});
+    }
+    TopoDS_Shape cutter;
+    for (size_t a = 0; a < lines.size() && cutter.IsNull(); ++a)
+      for (size_t b = a + 1; b < lines.size() && cutter.IsNull(); ++b)
+      {
+        const gp_Vec da(lines[a].first, lines[a].second), db(lines[b].first, lines[b].second);
+        if (da.Magnitude() < 100 * width || db.Magnitude() < 100 * width || !da.IsParallel(db, 1e-9))
+          continue;
+        const gp_Dir d(da);
+        const gp_Vec off = gp_Vec(lines[a].first, lines[b].first) - gp_Vec(d) * gp_Vec(lines[a].first, lines[b].first).Dot(gp_Vec(d));
+        if (off.Magnitude() > width || off.Magnitude() < Precision::Confusion() * 1e-6)
+          continue;
+        auto along = [&](const gp_Pnt& p) { return gp_Vec(lines[a].first, p).Dot(gp_Vec(d)); };
+        const double lo = std::max(std::min(along(lines[a].first), along(lines[a].second)), std::min(along(lines[b].first), along(lines[b].second)));
+        const double hi = std::min(std::max(along(lines[a].first), along(lines[a].second)), std::max(along(lines[b].first), along(lines[b].second)));
+        if (hi - lo < 100 * width)
+          continue;
+        // A neck leaves faces on either side; a face that is all strip is a sliver (without_slivers').
+        GProp_GProps fp;
+        BRepGProp::SurfaceProperties(f, fp);
+        if (fp.Mass() < (hi - lo) * off.Magnitude() * 2 + 100 * width * width)
+          continue;
+        // The strip's rectangle, a little wider than it across (both its sides inside), exactly its length along.
+        const gp_Dir across(off);
+        const double pad = 2 * width;
+        auto at = [&](double t, double u) { return lines[a].first.Translated(gp_Vec(d) * t + gp_Vec(across) * u); };
+        BRepBuilderAPI_MakePolygon poly(at(lo, -pad), at(hi, -pad), at(hi, off.Magnitude() + pad), at(lo, off.Magnitude() + pad), true);
+        BRepBuilderAPI_MakeFace rf(poly.Wire(), true);
+        if (rf.IsDone())
+          cutter = rf.Face();
+      }
+    if (cutter.IsNull())
+    {
+      pieces.push_back(f);
+      continue;
+    }
+    BRepAlgoAPI_Cut cut(f, cutter);
+    if (!cut.IsDone() || cut.HasErrors())
+    {
+      pieces.push_back(f);
+      continue;
+    }
+    int n = 0;
+    for (TopExp_Explorer e(cut.Shape(), TopAbs_FACE); e.More(); e.Next(), ++n)
+      pieces.push_back(e.Current());
+    merge_into(cutH, history_of({f, cutter}, cut));
+    changed = changed || n > 0;
+  }
+  if (!changed)
+    return s;
+  BRepBuilderAPI_Sewing sew(std::max(10 * width, 1e-7));
+  for (const TopoDS_Shape& f : pieces)
+    sew.Add(f);
+  sew.Perform();
+  TopoDS_Shape shell;
+  for (TopExp_Explorer e(sew.SewedShape(), TopAbs_SHELL); e.More(); e.Next())
+  {
+    if (!shell.IsNull())
+      return s;
+    shell = e.Current();
+  }
+  if (shell.IsNull() || !BRep_Tool::IsClosed(shell))
+    return s;
+  BRepBuilderAPI_MakeSolid ms(TopoDS::Shell(shell));
+  if (!ms.IsDone())
+    return s;
+  TopoDS_Solid solid = ms.Solid();
+  BRepLib::OrientClosedSolid(solid);
+  if (!valid_shape(solid))
+    return s;
+  HHist sewH = new BRepTools_History();
+  for (const TopoDS_Shape& f : pieces)
+    for (TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap m;
+      TopExp::MapShapes(f, k, m);
+      for (int i = 1; i <= m.Extent(); ++i)
+        if (sew.IsModifiedSubShape(m(i)))
+        {
+          const TopoDS_Shape r = sew.ModifiedSubShape(m(i));
+          if (!r.IsNull() && !r.IsSame(m(i)) && BRepTools_History::IsSupportedType(r))
+            sewH->AddModified(m(i), r);
+        }
+    }
+  merge_into(h, cutH);
+  merge_into(h, sewH);
+  return s.ShapeType() == TopAbs_SOLID ? TopoDS_Shape(solid) : compound_of({solid});
+}
+
 // Remove faces narrower than `width` (slivers left by a blend that almost
 // consumes a face), composing the history.
 TopoDS_Shape without_slivers(const TopoDS_Shape& s, double width, HHist& h)
@@ -3494,9 +3631,20 @@ std::pair<TopoDS_Shape, HHist> checked_blend(const TopoDS_Shape& input, const Bl
       HHist        h2;
       if (build(1.0 - eps, r2, h2))
       {
-        TopoDS_Shape r3 = without_slivers(r2, std::max(size * eps * 50, 1e-9), h2);
+        const double width = std::max(size * eps * 50, 1e-9);
+        TopoDS_Shape r3    = without_slivers(r2, width, h2);
+        // A face this retry pinched to a neck valid here but not at the part's own scale (a self-overlapping face
+        // once scaled back: c2-fan-blade-sweep's 2e-10 m bridge), or not even here: the neck cut out.
         if (valid_shape(r3))
-          return {r3, h2};
+        {
+          if (valid_unscaled(r3))
+            return {r3, h2};
+          const TopoDS_Shape r4 = without_necks(r3, width, h2);
+          return {r4.IsSame(r3) || !valid_unscaled(r4) ? r3 : r4, h2};
+        }
+        const TopoDS_Shape r4 = without_necks(r3, width, h2);
+        if (!r4.IsSame(r3))
+          return {r4, h2};
         if (valid_shape(r2))
           return {r2, h2};
       }

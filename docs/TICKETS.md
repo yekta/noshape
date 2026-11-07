@@ -810,7 +810,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
-- [ ] P2 SELF-OVERLAPPING-FACE (blend, cause found by core; psui 2026-11-07) **c2-fan-blade-sweep's Part 2 bottom face (z -5) is one face of two 2 mm
+- [x] P2 SELF-OVERLAPPING-FACE (core, fixed 11-07; psui 2026-11-07) **c2-fan-blade-sweep's Part 2 bottom face (z -5) is one face of two 2 mm
   strips joined by a zero-width bridge** (its single loop runs along y -95 twice, overlapping): area 120 mm², but its
   mesh (BRepMesh: noshape's declines it) covers 717 mm², one triangle across the 21 mm gap between the strips and half of
   the left strip missing, which shows the inside as a black wedge from below. Live's model has two faces there (or none
@@ -824,6 +824,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   faces. The fix: after a hair-smaller blend, cut a face at a neck narrower than the hair (or remove the neck), and
   never return `r2` unchecked by BRepCheck. Repro: the document's Fillet 3 (vibe5 ~/core-fan/fan.noshape, rollback
   index 21 -> 22); its Boolean corpus ~/core-fan/bool.
+  core 11-07 22:31, fixed: the result of the hair-smaller retry is valid at the working scale (the bridge is 2e-7 mm
+  there) and only invalid back at the part's scale (2e-10 m, under the confusion tolerance). `checked_blend` now checks
+  a retry's result at the part's scale too (`valid_unscaled`) and, where it fails there, cuts the strip out of the face
+  and sews the faces again (`without_necks`): the bottom is two faces, the round meets the bar's inner wall (22 faces,
+  live's volume). Valid results stay as they were (the blend corpus as before). T1 kernel
+  blend::a_round_consuming_a_bar_leaves_no_bridge (tests/data/blend/fan-fillet3-neck).
 
 - [ ] P2 RING-BLEND-SPEED (core 2026-11-07) **c2-rings-loft's Fillet 1 takes 354 ms (live 23 ms).** Its two R2 rims'
   rounds meet each other at the ring's narrow bottom and run out onto its outside, which OCCT's chain can't build

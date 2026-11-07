@@ -1663,3 +1663,19 @@ fn a_fillet_trimming_countersinks_keeps_their_rims_whole() {
     assert_eq!(corners.len(), 8, "{areas:?}");
     assert!(corners.iter().all(|a| (a - 30.0).abs() < 0.01), "{areas:?}");
 }
+
+/// SELF-OVERLAPPING-FACE (c2-fan-blade-sweep's Fillet 3): R2 rounds consume a U channel's 2 mm bottom bar exactly;
+/// OCCT builds them only a hair smaller, which left the bottom face one loop through a 2e-10 m bridge (invalid, a black
+/// wedge in its mesh). The bridge is cut out and the faces sewn: the bottom is two faces, the round meets the bar's
+/// inner wall, as live's (22 faces, the volume as before).
+#[test]
+fn a_round_consuming_a_bar_leaves_no_bridge() {
+    setup();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/blend");
+    let case = blend_corpus::load(&dir, "fan-fillet3-neck").unwrap();
+    let r = blend_corpus::run(&case).unwrap().shape;
+    assert!(r.is_valid());
+    let shown = r.shown_topology().unwrap();
+    assert_eq!((r.count(ShapeType::Face), shown.edge_count(), shown.vertex_count()), (22, 48, 28));
+    assert!((vol_mm3(&r) - 4926.267).abs() < 1e-3, "{}", vol_mm3(&r));
+}

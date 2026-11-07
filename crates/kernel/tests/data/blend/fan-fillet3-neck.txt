@@ -1,0 +1,13 @@
+kind fillet
+radii 2e-3 2e-3 2e-3 2e-3 2e-3 2e-3
+checked 1
+scale 1e3
+edges 6
+shape_faces 13
+valid 0
+volume 4.92626696943330022e-6
+faces 21
+edges_out 49
+vertices 28
+history 117702cd82dfe9f0
+ms 17.302
