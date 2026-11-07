@@ -3195,7 +3195,7 @@ fn assembly_views_display_state_and_follow_parent() {
     let asm = assembly_tab(&doc);
     if let Some(TabContent::Assembly(a)) = doc.tabs.iter_mut().find(|t| t.id == asm).map(|t| &mut t.content) {
         let first = a.instances[0].id;
-        a.display_states.push(crate::assembly::DisplayState { name: "hide1".into(), hidden_instances: vec![first], hidden_features: vec![], known: vec![] });
+        a.display_states.push(crate::assembly::DisplayState { name: "hide1".into(), hidden_instances: vec![first], hidden_features: vec![], known: vec![], hidden_occurrences: vec![] });
         // Hidden in the assembly right now: Show all still shows it.
         a.instances[0].hidden = true;
     }
