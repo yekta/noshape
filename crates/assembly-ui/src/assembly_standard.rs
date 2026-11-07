@@ -168,6 +168,7 @@ impl AssemblyView {
         let units = self.units(cx);
         let toward = self.std_toward(o, cx);
         let holes = standard::hole_connectors(&o.context, Some(&o.body), &t.reference, toward, &units);
+        let context = o.context.clone();
         let spec = self.std_spec();
         let Some(c) = standard::component(&spec) else { return };
         // Existing standard content: its nominal diameter (a nut for a bolt).
@@ -175,12 +176,16 @@ impl AssemblyView {
             let sc = standard::component(s)?;
             Some(sc.diameter_m(sc.size(&s.size)?))
         });
-        let Some(d) = existing.or_else(|| holes.first().map(|h| h.1)) else {
-            self.message = Some((true, "Selection is not valid for auto-sizing. Selection must be a circular edge or cylindrical face or from existing standard content.".into()));
-            cx.notify();
-            return;
+        let size = match (existing, holes.first()) {
+            (Some(d), _) => standard::auto_size(c, d),
+            // A tapped Hole sizes by its thread (live 2204).
+            (None, Some((p, d))) => standard::auto_size_hole(c, &context, p, *d),
+            (None, None) => {
+                self.message = Some((true, "Selection is not valid for auto-sizing. Selection must be a circular edge or cylindrical face or from existing standard content.".into()));
+                cx.notify();
+                return;
+            }
         };
-        let size = standard::auto_size(c, d);
         match size {
             Some(size) => {
                 self.std_edit_spec(cx, |s| s.set_size(size));

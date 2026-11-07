@@ -6654,3 +6654,29 @@ fn assembly_update_references_moves_versions() {
     let e = try_call(&mut ctx, "assembly_update_references", json!({ "doc": tops, "version": "V9" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
 }
+
+/// ASM-STD-AUTOSIZE-HOLE (live 2204): Auto-size into a tapped Hole sizes by its thread: M6 coarse (Ø5 tap drill)
+/// gives M6, not M5; a fine M6x0.75 finds no size of the coarse-only ISO 4762, with live's message.
+#[test]
+fn standard_content_auto_sizes_by_a_tapped_holes_thread() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "std-tapped.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[-20, -15], [20, 15]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": sk }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
+    let s2 = call(&mut ctx, "sketch_create", json!({ "plane": { "query": { "kind": "faces", "normal": [0, 0, 1] } } }))["sketch"].as_str().unwrap().to_string();
+    let p = call(&mut ctx, "sketch_draw", json!({ "sketch": s2, "tool": "point", "points": [[5, 0, 10]] }));
+    let pt: Vec<Value> = p["created"].as_array().unwrap().iter().filter(|x| x["type"] == "point").map(|x| x["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "hole", "params": { "locations": pt, "isoHoleTableEx": ["Tapped", "Straight tap", "M6"], "endStyleV2": "THROUGH" } }));
+    let block = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }))["instance"].as_str().unwrap().to_string();
+    call(&mut ctx, "assembly_set_state", json!({ "instances": [block], "fixed": true }));
+    let hole = |ctx: &mut Ctx| call(ctx, "assembly_entities", json!({ "instance": block, "kind": "faces", "surface": "cylinder" }))["faces"][0]["id"].clone();
+    let h = hole(&mut ctx);
+    let s = call(&mut ctx, "assembly_insert_standard", json!({ "component": "Hex socket head cap screw ISO 4762", "holes": [{ "instance": block, "entity": h }], "auto_size": true }));
+    assert_eq!(s["spec"]["size"], "M6", "the tapped hole's thread, not its Ø5 drill: {s}");
+    call(&mut ctx, "feature_edit", json!({ "tab": "Part Studio 1", "feature": "Hole 1", "params": { "isoHoleTableEx": ["Tapped", "Straight tap", "M6", "0.75 mm (Fine)"] } }));
+    let h = hole(&mut ctx);
+    let e = try_call(&mut ctx, "assembly_insert_standard", json!({ "component": "Hex socket head cap screw ISO 4762", "holes": [{ "instance": block, "entity": h }], "auto_size": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("auto_size"), "{e:?}");
+    assert!(e.message.starts_with("Unable to find matching size for selection."), "{e:?}");
+}

@@ -3523,8 +3523,10 @@ were checked in code by asm; "(verify)" ones need a live check first.
 - [x] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is
   ignored. Fixed 2026-11-07: the result keeps each linked part's pinned document; the BOM reads its properties (in
   its configuration) and its Exclude from all BOMs (T1 assemblies_from_other_documents).
-- [ ] P1 ASM-STD-AUTOSIZE-HOLE (asm, verify) standard content's Auto-size uses the hole's cylinder diameter only:
+- [x] P1 ASM-STD-AUTOSIZE-HOLE (asm, verify) standard content's Auto-size uses the hole's cylinder diameter only:
   no fine / coarse thread from a Hole feature, a tapped hole likely sizes a bolt one size down.
+  Fixed 2026-11-07 (live 2204): a tapped Hole sizes by its thread (M6x1 → M6; a fine M6x0.75 finds no coarse-only
+  size, with live's message); e2e standard_content_auto_sizes_by_a_tapped_holes_thread.
 - [x] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply
   to it; the defaults are 50 mm / 2 (live Part Studio 25 mm / 1); Onshape's help names a third direction.
   Fixed 2026-11-07 (live 2204): every direction has Equal spacing and Centered; a Third direction shows with the

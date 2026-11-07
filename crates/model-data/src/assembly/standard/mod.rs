@@ -437,8 +437,35 @@ pub fn auto_size(c: &'static Component, d: f64) -> Option<&'static str> {
     pick.map(|s| s.name.as_str())
 }
 
+/// A label's thread ("…screw M6x1.00" → "M6x1.00", "Hex bolt 1/4-20" → "1/4-20"), if it names one.
+fn label_thread(label: &str) -> Option<&str> {
+    let w = label.split_whitespace().last()?;
+    let iso = w.strip_prefix('M').and_then(|r| r.split_once('x')).is_some_and(|(d, p)| d.parse::<f64>().is_ok() && p.parse::<f64>().is_ok());
+    let inch = w.split_once('-').is_some_and(|(d, t)| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit() || c == '/' || c == '#') && t.parse::<u32>().is_ok());
+    (iso || inch).then_some(w)
+}
+
+/// The same thread, written either way ("M6x1.0" = "M6x1.00" = "M6x1").
+fn same_thread(a: &str, b: &str) -> bool {
+    let iso = |t: &str| t.strip_prefix('M').and_then(|r| r.split_once('x')).and_then(|(d, p)| Some((d.parse::<f64>().ok()?, p.parse::<f64>().ok()?)));
+    match (iso(a), iso(b)) {
+        (Some((d1, p1)), Some((d2, p2))) => (d1 - d2).abs() < 1e-9 && (p1 - p2).abs() < 1e-9,
+        _ => a == b,
+    }
+}
+
+/// Auto-size into a tapped hole (live 2204): a component whose sizes name their thread takes the size with the hole's
+/// thread, size and pitch ("M6x1.0" → M6; a fine M6x0.75 hole finds no coarse M6), else the size fitting the thread's
+/// major diameter `major` (meters).
+pub fn auto_size_tapped(c: &'static Component, thread: &str, major: f64) -> Option<&'static str> {
+    if c.sizes.iter().any(|s| label_thread(&s.label).is_some()) {
+        return c.sizes.iter().find(|s| label_thread(&s.label).is_some_and(|t| same_thread(t, thread))).map(|s| s.name.as_str());
+    }
+    auto_size(c, major)
+}
+
 /// Message when auto-size finds nothing (Onshape's wording).
-pub const NO_MATCHING_SIZE: &str = "Unable to find matching size for selection. Selection may be too small or large for specific component";
+pub const NO_MATCHING_SIZE: &str = "Unable to find matching size for selection. Selection may be too small or large for specific component.";
 
 
 

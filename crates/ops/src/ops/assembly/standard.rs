@@ -203,6 +203,8 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     // Holes: (connector, diameter m); planar faces give every hole in them.
     let mut holes: Vec<(MateConnectorRef, f64)> = Vec::new();
+    // The first hole's auto-size (by a tapped Hole's thread, else its diameter).
+    let mut first_size: Option<Option<&'static str>> = None;
     let mut planar = true;
     for (i, h) in a.opt_array("holes")?.into_iter().flatten().enumerate() {
         let field = format!("holes[{i}]");
@@ -216,14 +218,16 @@ fn insert(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             return Err(OpError::param(&format!("{field}.entity"), "Selection must be a circular edge or cylindrical face, or a planar face with holes"));
         }
         planar &= standard::planar_face(&occ.context, Some(&occ.body), &on);
+        if first_size.is_none() {
+            first_size = Some(standard::auto_size_hole(c, &occ.context, &found[0].0, found[0].1));
+        }
         holes.extend(found.iter().map(|(p, d)| (p.connector(&occ.path), *d)));
     }
     if mode != sa::Stack::Plain && (holes.is_empty() || !planar) {
         return Err(OpError::param("placement", "closest and furthest take planar faces with holes (`holes`)"));
     }
     if a.bool_or("auto_size", false)? {
-        let (_, d) = holes.first().ok_or_else(|| OpError::param("auto_size", "give `holes`"))?;
-        let size = standard::auto_size(c, *d).ok_or_else(|| OpError::param("auto_size", standard::NO_MATCHING_SIZE))?;
+        let size = first_size.ok_or_else(|| OpError::param("auto_size", "give `holes`"))?.ok_or_else(|| OpError::param("auto_size", standard::NO_MATCHING_SIZE))?;
         if a.get("size").is_some() {
             return Err(OpError::param("size", "give `size` or `auto_size`, not both"));
         }

@@ -81,6 +81,20 @@ pub fn planar_face(ctx: &Arc<crate::regen::context::Context>, body: Option<&Body
     })
 }
 
+/// A tapped Hole feature's hole at `point` (a circle of diameter `d` there): its thread ("M6x1.00") and major
+/// diameter, for auto-size (live 2204).
+pub fn tapped_hole(ctx: &crate::regen::context::Context, point: &super::eval::InferencePoint, d: f64) -> Option<(String, f64)> {
+    ctx.holes.iter().find(|h| h.matches_circle(point.frame.origin, d / 2.0, 1e-6)).and_then(|h| Some((h.thread.clone()?, h.diameter)))
+}
+
+/// Auto-size for a picked hole: by its thread when a tapped Hole made it, else by its diameter.
+pub fn auto_size_hole(c: &'static Component, ctx: &crate::regen::context::Context, point: &super::eval::InferencePoint, d: f64) -> Option<&'static str> {
+    match tapped_hole(ctx, point, d) {
+        Some((thread, major)) => auto_size_tapped(c, &thread, major),
+        None => auto_size(c, d),
+    }
+}
+
 /// Holes to fasten standard content to, from a picked entity (studio
 /// coordinates): a circular edge or cylindrical face gives one hole (the
 /// end whose face points most along `toward`, the viewer), a planar face
