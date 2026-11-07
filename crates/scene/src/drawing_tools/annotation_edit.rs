@@ -232,14 +232,6 @@ pub fn group_annotations(s: &mut Sheet, ids: &[u64], group: bool) {
     s.annotations.iter_mut().filter(|x| ids.contains(&x.id)).for_each(|x| x.ann_group = g);
 }
 
-/// Detach from geometry: the annotation keeps its place, no longer follows
-/// the model.
-pub fn detach(s: &mut Sheet, id: u64) {
-    if let Some(x) = find(s, id) {
-        x.refs.clear();
-    }
-}
-
 /// Align centermark: its arms turn to the straight edge from `a` to `b`
 /// (view coordinates, as `Pick::Line` gives them).
 pub fn align_centermark(s: &mut Sheet, id: u64, a: [f64; 2], b: [f64; 2]) {

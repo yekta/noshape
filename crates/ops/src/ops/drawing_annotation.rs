@@ -15,7 +15,7 @@ use noshape_scene::drawing_tools::Tool;
 use noshape_scene::drawing_tools::annotation_edit as ae;
 use serde_json::{Value, json};
 
-const ACTIONS: [&str; 27] = [
+const ACTIONS: [&str; 26] = [
     "add_jog",
     "remove_jog",
     "add_leader",
@@ -33,7 +33,6 @@ const ACTIONS: [&str; 27] = [
     "remove_from_group",
     "group_annotation",
     "remove_annotation_from_group",
-    "detach",
     "align_centermark",
     "centerline_end",
     "move_centerline",
@@ -50,8 +49,8 @@ pub fn ops() -> Vec<Op> {
     vec![Op {
         group: "drawing",
         verb: "annotation_edit",
-        summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts",
-        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Surface finish symbols on an edge: `flip` (to the edge's other side).\n- Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- `detach` (Detach from geometry: stays put, no longer follows the model).\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).\n- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: \"Dimension orientation\"); dimensions: `flip_arrows` (the flip node: \"Flip arrows\"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: \"Arc condition\").",
+        summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, align centermark, stacked callouts",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Surface finish symbols on an edge: `flip` (to the edge's other side).\n- Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).\n- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: \"Dimension orientation\"); dimensions: `flip_arrows` (the flip node: \"Flip arrows\"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: \"Arc condition\").",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -339,13 +338,6 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let ids = with_ids(&t, a, id)?;
             ae::group_annotations(&mut t.d.sheets[s], &ids, false);
             "Remove annotation from group"
-        }
-        "detach" => {
-            if ann.refs.is_empty() {
-                return refuse("not attached to geometry");
-            }
-            ae::detach(&mut t.d.sheets[s], id);
-            "Detach"
         }
         "align_centermark" => {
             if !matches!(ann.kind, AnnotationKind::Centermark { .. }) {

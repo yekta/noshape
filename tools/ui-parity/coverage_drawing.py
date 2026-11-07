@@ -61,6 +61,8 @@ def formats():
 
 
 def norm(s):
+    # A menu row's tab-separated badge (coverage.rs "Replicate annotations\\tbeta") isn't in the scenarios' labels.
+    s = re.sub(r"(\\+t|\t).*$", "", s)
     return re.sub(r"[\s-]+", " ", re.sub(r"\s*\([^)]*\)$", "", s.strip().rstrip("*"))).lower()
 
 

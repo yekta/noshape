@@ -4686,7 +4686,7 @@ fn use_on_the_context_face_a_sketch_lies_on() {
 }
 
 /// The annotation menus: jogs, break, leaders and note nodes, foreshorten,
-/// groups, detach, align centermark, stacked callouts, add to an ordinate
+/// groups, align centermark, stacked callouts, add to an ordinate
 /// group, and Adjust linestyle.
 #[test]
 fn drawing_annotation_menu_edits() {
@@ -4727,7 +4727,7 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(last(&mut ctx), "Align centermark");
     assert!((num(&ann(&mut ctx, &cm)["angle"]).abs() - 90.0).abs() < 1e-6);
 
-    // A linear dimension: jog, break, detach.
+    // A linear dimension: jog, break.
     let h0 = horizontal[0];
     // Placed outside the part (away from the other horizontal edge).
     let out = if num(&h0["a"][1]) < num(&horizontal[1]["a"][1]) { -20.0 } else { 20.0 };
@@ -4745,9 +4745,6 @@ fn drawing_annotation_menu_edits() {
     assert_eq!(last(&mut ctx), "Unbreak dimension");
     assert_eq!(ann(&mut ctx, &dim)["unbroken"], true);
     assert_eq!(ann(&mut ctx, &dim)["attached"], true);
-    edit(&mut ctx, &dim, json!({ "action": "detach" })).unwrap();
-    assert_eq!(last(&mut ctx), "Detach");
-    assert!(ann(&mut ctx, &dim)["attached"].is_null());
 
     // A note with a leader: another leader, a node on it, then removals.
     let (a0, b0) = (p(h0, "a"), p(h0, "b"));

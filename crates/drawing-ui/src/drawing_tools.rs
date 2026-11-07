@@ -2462,11 +2462,6 @@ impl DrawingEditor {
                     if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. } | AnnotationKind::Gdt { .. } | AnnotationKind::DatumTarget { .. } | AnnotationKind::SurfaceFinish { .. } | AnnotationKind::Weld { .. }) {
                         out.push(Self::move_to_entry(a));
                     }
-                    if !a.refs.is_empty() {
-                        out.push(MenuEntry::item("Detach from geometry", move |t, _, cx| {
-                            t.edit_sheet("Detach", cx, |s| noshape_scene::drawing_tools::annotation_edit::detach(s, id))
-                        }));
-                    }
                     // Paste as table is in every drawing menu (live drawing/290).
                     out.push(MenuEntry::item("Paste as table", |t, _, cx| {
                         t.paste_as_table(cx);

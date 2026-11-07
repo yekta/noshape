@@ -375,7 +375,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Cut list table properties...", Op("drawing_table_properties")),
     ("drawing:Delete table", Op("drawing_delete")),
     ("drawing:Delete", Op("drawing_delete")),
-    ("drawing:Detach from geometry", Op("drawing_annotation_edit")),
     ("drawing:Diameter dimension (shift+d)", Op("drawing_dimension")),
     ("drawing:Dimension (d)", Op("drawing_dimension")),
     ("drawing:Drawing properties...", Op("drawing_properties")),

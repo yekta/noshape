@@ -4996,7 +4996,7 @@ Examples:
 
 #### drawing_annotation_edit
 
-Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, detach, align centermark, stacked callouts (edits the document (one undoable history entry)).
+Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, align centermark, stacked callouts (edits the document (one undoable history entry)).
 
 The annotation context menus, one edit each with the menu's edit text:
 - Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).
@@ -5006,7 +5006,6 @@ The annotation context menus, one edit each with the menu's edit text:
 - Surface finish symbols on an edge: `flip` (to the edge's other side).
 - Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.
 - Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
-- `detach` (Detach from geometry: stays put, no longer follows the model).
 - Centermarks: `align_centermark` to the straight edge at `point`.
 - Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.
 - Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).
@@ -5027,7 +5026,7 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `annotation` | integer | required | Annotation id (drawing_get). |
-| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `flip`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `detach`, `align_centermark`, `centerline_end`, `move_centerline`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
+| `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `flip`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `align_centermark`, `centerline_end`, `move_centerline`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
 | `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
