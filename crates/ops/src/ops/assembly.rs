@@ -51,7 +51,7 @@ pub fn ops() -> Vec<Op> {
             group: "assembly",
             verb: "list",
             summary: "An assembly's instances, mates and degrees of freedom",
-            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF) the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
+            description: "Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF), every part occurrence with nested ones (path \"Sub <1> > Part 1 <1>\", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).",
             fields: vec![doc_field(), asm_field()],
             mutates: false,
             destructive: false,
@@ -342,7 +342,20 @@ fn describe(od: &mut OpenDoc, tab: TabId) -> Result<Value, OpError> {
         })
         .collect();
     let (named_positions, exploded_views) = positions::json(a);
-    Ok(json!({ "units": units_json(&units), "instances": instances, "mates": mates, "relations": features::relations_json(a, &r), "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
+    // Every part occurrence, nested ones too, where it is in the assembly (Onshape's occurrences): its path's names
+    // ("Sub <1> > Part 1 <1>"), its Part Studio coordinates' place.
+    let mut seen: std::collections::HashSet<&[InstanceId]> = std::collections::HashSet::new();
+    let occurrences: Vec<Value> = r
+        .occurrences
+        .iter()
+        .filter(|o| seen.insert(&o.path))
+        .map(|o| {
+            let names: Vec<String> = (1..=o.path.len()).map(|n| r.node(&o.path[..n]).map(|x| x.name.clone()).unwrap_or_default()).collect();
+            let (_, rot, t) = o.transform.to_scale_rotation_translation();
+            json!({ "path": names.join(" > "), "translation": pt(t, k), "rotation": [rot.x, rot.y, rot.z, rot.w], "hidden": o.hidden })
+        })
+        .collect();
+    Ok(json!({ "units": units_json(&units), "instances": instances, "occurrences": occurrences, "mates": mates, "relations": features::relations_json(a, &r), "folders": structure::folders_json(a), "patterns": more::patterns_json(a), "named_positions": named_positions, "exploded_views": exploded_views, "dof": r.solved.dof, "converged": r.solved.converged }))
 }
 
 /// An instance's menu settings, when not the defaults.

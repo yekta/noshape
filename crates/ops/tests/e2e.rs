@@ -6377,6 +6377,12 @@ fn a_mate_reaches_a_part_inside_a_subassembly() {
     assert_eq!(m["mate_ok"], true, "{m}");
     let lifted = face(&mut ctx, nested, -1.0);
     assert!((num(&lifted["centroid"][2]) - 10.0).abs() < 1e-6, "the nested block's bottom on the top block: {lifted}");
+    // assembly_list's occurrences: the nested ones by path, where their Part Studio coordinates are (lifted 10 mm).
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    let occ = |p: &str| list["occurrences"].as_array().unwrap().iter().find(|o| o["path"] == p).cloned().unwrap_or_else(|| panic!("no occurrence {p}: {list}"));
+    assert!((num(&occ(nested)["translation"][2]) - 10.0).abs() < 1e-6, "{}", occ(nested));
+    assert!(num(&occ("Part 1 <1>")["translation"][2]).abs() < 1e-6);
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 3, "{list}");
     let e = try_call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": "Part 1 <1> > Part 2 <1>", "kind": "faces" })).unwrap_err().to_json();
     assert_eq!(e["param"], "instance", "{e}");
 }

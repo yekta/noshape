@@ -2276,7 +2276,7 @@ Examples:
 
 An assembly's instances, mates and degrees of freedom.
 
-Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF) the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).
+Solves the assembly and lists the instances (id, name, source, placement: translation in workspace units and rotation quaternion xyzw, fixed/hidden/suppressed, remaining DOF), every part occurrence with nested ones (path "Sub <1> > Part 1 <1>", where its Part Studio coordinates are in the assembly), the mates (id, name, type, ok, error message) and the mate relations (id, name, type, mates, ratio, reverse, suppressed, ok / inactive / message).
 
 Examples:
 

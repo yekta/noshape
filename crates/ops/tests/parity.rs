@@ -1742,6 +1742,49 @@ fn an_assembly_is_rebuilt_as_lives() {
     assert!(r.differences.iter().any(|d| d.starts_with("Part 1 <2>: freed at live's place, our mates move it 10.000000 mm")), "{r:?}");
 }
 
+/// A subassembly rebuilt from live's definition: "Sub" holds the cylinder (fixed inside it); the root has a fixed
+/// cylinder and Sub's instance, turned 30° and stacked on it by a Revolute from the root cylinder's top edge to the
+/// nested cylinder's bottom edge (its connector's path through Sub). Every occurrence, the nested one too, placed as
+/// live's; the mate as live's.
+#[test]
+fn a_subassembly_is_rebuilt_as_lives() {
+    let studio = json!({ "units": { "lengthUnit": "MILLIMETER" }, "features": [
+        { "btType": "BTMSketch-151", "featureType": "newSketch", "featureId": "FS1", "name": "Sketch 1",
+          "parameters": [{ "btType": "BTMParameterQueryList-148", "parameterId": "sketchPlane", "queries": [{ "btType": "BTMIndividualQuery-138", "deterministicIds": ["JDC"] }] }],
+          "entities": [{ "btType": "BTMSketchCurve-4", "entityId": "c1", "isConstruction": false, "geometry": { "btType": "BTCurveGeometryCircle-115", "radius": 0.004, "xCenter": 0.0, "yCenter": 0.0, "xDir": 1.0, "yDir": 0.0, "clockwise": false } }],
+          "constraints": [] },
+        { "btType": "BTMFeature-134", "featureType": "extrude", "featureId": "FE1", "name": "Extrude 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "bodyType", "value": "SOLID" },
+            { "btType": "BTMParameterQueryList-148", "parameterId": "entities", "queries": [{ "btType": "BTMIndividualCreatedByQuery-137", "featureId": "FS1", "entityType": "FACE" }] },
+            { "btType": "BTMParameterEnum-145", "parameterId": "endBound", "value": "BLIND" },
+            { "btType": "BTMParameterQuantity-147", "parameterId": "depth", "expression": "20 mm" }] }
+    ] });
+    let parts = json!([{ "partId": "JHD", "name": "Part 1" }]);
+    let connector = |id: &str, path: Value, z: f64| json!({ "btType": "BTMMateConnector-66", "featureId": id, "implicit": true, "parameters": [
+        { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "originQuery", "queries": [{ "btType": "BTMInferenceQueryWithOccurrence-1083", "inferenceType": "CENTER", "path": path,
+          "entityQuery": format!("query=qContainsPoint(qEverything(EntityType.EDGE), vector(4, 0, {z}) * millimeter);") }] }] });
+    let (c, s) = (std::f64::consts::FRAC_PI_6.cos(), std::f64::consts::FRAC_PI_6.sin());
+    let turned = json!([c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0.02, 0, 0, 0, 1]);
+    let asm = json!({
+        "rootAssembly": {
+            "instances": [{ "id": "IA", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }, { "id": "IS", "name": "Sub <1>", "type": "Assembly", "elementId": "SUB1" }],
+            "occurrences": [
+                { "path": ["IA"], "fixed": true, "transform": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+                { "path": ["IS"], "fixed": false, "transform": turned },
+                { "path": ["IS", "IC"], "fixed": true, "transform": turned }] },
+        "subAssemblies": [{ "elementId": "SUB1", "instances": [{ "id": "IC", "name": "Part 1 <1>", "type": "Part", "partId": "JHD", "elementId": "E1" }], "features": [] }],
+        "subAssemblyFeatures": { "SUB1": { "features": [] } },
+        "features": { "features": [{ "btType": "BTMMate-64", "featureId": "M1", "name": "Revolute 1", "parameters": [
+            { "btType": "BTMParameterEnum-145", "parameterId": "mateType", "value": "REVOLUTE" },
+            { "btType": "BTMParameterQueryWithOccurrenceList-67", "parameterId": "mateConnectorsQuery", "queries": [{ "featureId": "MA" }, { "featureId": "MB" }] }],
+            "mateConnectors": [connector("MA", json!(["IA"]), 20.0), connector("MB", json!(["IS", "IC"]), 0.0)] }],
+          "featureStates": { "M1": { "featureStatus": "OK" } } } });
+    let mut ctx = Ctx::new();
+    let r = rebuild_assembly(&mut ctx, &scratch("rebuilt-subassembly.noshape"), &asm, &[("E1".into(), studio, parts)]);
+    assert!(r.untranslated.is_empty() && r.differences.is_empty(), "{r:?}");
+    assert_eq!((r.occurrences_matching, r.occurrences, r.mates_matching, r.mates), (3, 3, 1, 1));
+}
+
 /// A sketch on Top of `entities` (Onshape JSON) and one Extrude of `region`
 /// 10 mm, with live's part after it.
 fn one_extrude(sketch: &str, entities: Value, region: Value, live_part: Value) -> (Value, Vec<Value>) {
