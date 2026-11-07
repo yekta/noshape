@@ -290,6 +290,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   ahead on the thread pool walk forever; in every release since v0.4.17, so v0.4.34 is no worse). qa checks on the release:
   smoke, the ticket documents, GUI rows, title bar, memory, and the updater on Linux plus the Release run's Windows / macOS
   update checks.
+- **qa 08:51, after the release checks: still no blocker.** v0.4.34 checked (handoff): smoke = v0.4.33, the 44 ticket documents =
+  6d194fa1, updates verified on all three platforms, no speed or memory regression; one saved loft's volume changed by 0.2 %
+  (P2 SAVED-LOFT-CHANGE, core).
 
 ## Release blockers for the 2026-11-06 17:00 release (qa list 16:47, checked on greens through f471368e; v0.4.33 is being re-run, v0.4.32 is the latest)
 - **qa 16:47: no new blocker in the code.** v0.4.33 (cut from d828008e1) failed to publish only because of its release check
@@ -853,6 +856,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   integral along u from u0 for each Gauss point, capped (20,000 segments a piece), so the time is flat in the size
   but large. Wants an area quadrature over the knot cells inside the trim instead, or inner integrals shared along
   the boundary. Repro: T2 model custom_features::displacement_map_scales (its "volume" column).
+- [ ] P2 SAVED-LOFT-CHANGE (core) **a saved loft regenerates to another volume in v0.4.34, with no ScopeRule**: qa's
+  loftmir-loft.noshape (a loft mirrored; vibe3 ~/qa, qa-scratch/docs on qa's machine) gives 2 × 5916.0072 mm³ / 6 faces on v0.4.34,
+  2 × 5927.7546 on v0.4.33 (−11.75 mm³, −0.2 %; area 1902.623 → 1901.52 mm²; the GUI rows' mass panel shows it too). v0.4.34's
+  loft changes, both for live 2162 (c2-impeller-loft): 8c5b93ba8 (a circle lofted to a polygon cut in equal arcs from the
+  polygon's first corner) and 26d817465 (a section with fewer vertices gets the others' corners spread evenly); neither
+  under legacy_topology or a ScopeRule. If the new loft is live's, documents made from now on are right, but ones saved
+  before change on open. qa's CLI sweeps don't have this document (only the GUI rows): added to qa's watch list. (qa 2026-11-07 08:51, v0.4.34)
 - [ ] P2 SAVED-CHAMFER-CHANGE (core) **saved documents' chamfers regenerate differently since 07384946a / f57807bd0 (after
   v0.4.34's cut), with no ScopeRule** (core.md: a change that alters saved documents goes under legacy_topology or its own
   ScopeRule). Green 6d194fa1 → d973df07, the 44 ticket documents: a chamfer that failed with "Distance of chamfer on face too
