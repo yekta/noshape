@@ -5110,3 +5110,21 @@ fn showcase_hole_table_lists_the_plate_holes() {
         assert!(t.iter().any(|x| x == want), "missing {want}: {t:?}");
     }
 }
+
+/// Live's "Auto centermarks (Parts)": a new drawing of an assembly has no
+/// automatic centermarks or centerlines on its views; a Part Studio's keep them.
+#[test]
+fn an_assembly_drawing_has_no_auto_centermarks() {
+    let (doc, _) = demo();
+    let asm = assembly_tab(&doc);
+    let make = |tab| {
+        let src = create::DrawingSource { tab, part: None, config: Default::default(), sketch: None, flat: false };
+        let mut d = create::create_drawing(&templates::template_by_name("ISO A3").unwrap(), Some(&src), Some((glam::DVec3::ZERO, glam::DVec3::splat(0.05))), true, None);
+        create::assembly_drawing_defaults(&doc, &mut d);
+        d
+    };
+    let d = make(asm);
+    assert!(!d.sheets[0].views.is_empty() && d.sheets[0].views.iter().all(|v| !v.show_centerlines && v.auto_centerlines == Some(false)));
+    let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
+    assert!(make(ps).sheets[0].views.iter().any(|v| v.show_centerlines));
+}

@@ -879,7 +879,8 @@ fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, mut opts: ViewOptions, ext
         let scale = if part.is_some() { noshape_model::drawing::create::first_part_view_scale } else { noshape_model::drawing::create::first_view_scale };
         opts.insert.scale = Some(scale(d.sheets[sheet].size, e));
     }
-    let v = m.pick(&tool, &[], pos).pending_view(&opts).ok_or_else(|| OpError::param("position", "the view can't be placed there (a projected view goes at least 15 mm from its parent)"))?;
+    let mut v = m.pick(&tool, &[], pos).pending_view(&opts).ok_or_else(|| OpError::param("position", "the view can't be placed there (a projected view goes at least 15 mm from its parent)"))?;
+    noshape_model::drawing::create::assembly_view_defaults(od.doc(), &mut v);
     let id = v.id;
     let mut d = d;
     if matches!(tool, Tool::InsertView { .. }) {

@@ -254,6 +254,7 @@ pub fn new_drawing(doc: &Document, template: &DrawingTemplate, source: Option<&D
     let bounds = if suggested { source.and_then(|s| noshape_model::drawing::create::source_bounds(doc, s)) } else { None };
     let frame = source.and_then(|s| noshape_model::drawing::create::source_frame(doc, s));
     let mut d = noshape_model::drawing::create::create_drawing(template, source, bounds, suggested, frame);
+    noshape_model::drawing::create::assembly_drawing_defaults(doc, &mut d);
     // DRAWN: who created it, saved with the drawing.
     d.drawn_by = Some(noshape_store::local_user_name()).filter(|n| !n.is_empty());
     // DRAWN's date: the day it was made (UTC).

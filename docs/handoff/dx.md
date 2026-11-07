@@ -72,9 +72,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Known, waiting on live (REQUESTS): the 2 point centerline's overshoot past its picks (~3/32 in); a section's Auto
   hatch spacing (live 0.1804 in for the block, ours 2.5 mm). The detail view's circle is 3 % bigger in live: its
   clicks, not ours.
-- Next: an assembly view gets no automatic centermarks (live: "Auto centermarks (Parts)"; set it when the view is
-  made: DrawingSource and the Insert view tool don't know the source is an assembly yet); the BOM table's layout and
-  pens (live: a block of 9 LINEs, 0.72 / 1.08 pt; ours 5 LINEs + a POLYLINE, 0.36 / 1.08).
+- An assembly's views get no automatic centermarks or centerlines (live: "Auto centermarks (Parts)"):
+  `create::assembly_drawing_defaults` after Create Drawing (app and ops), and the Insert view tool's pending view.
+  Left in drw-bom-table: the table's layout and pen, asked of live (columns at least 1.0 in, rows 0.32 in, cells
+  left-aligned, empty cells as empty MTEXTs, a block of 9 LINEs; its PDF at 0.72 pt though the property reads 0.13 mm).
 
 ## 11-07 16:05 UTC: export fidelity against live's 8 exports (lead's item 3)
 - Ours rerun at ece74c57's binary, compared with `compare.py --drawn-by "LOOPELF LOOPELF" --drawn-by ROOT` (the

@@ -458,6 +458,13 @@ impl DrawingEditor {
     /// The view the active view tool would create at the cursor.
     pub fn pending_view(&self) -> Option<DrawingView> {
         let mut v = self.pk().pending_view(&self.view_options())?;
+        // An assembly's view: no automatic centermarks / centerlines (live: they're the parts' defaults).
+        if let ViewKind::Base { source, .. } = &v.kind
+            && self.sources.iter().any(|(k, s)| k.tab == *source && s.assembly)
+        {
+            v.show_centerlines = false;
+            v.auto_centerlines = Some(false);
+        }
         // The Aligned section view panel's flip and cut-only show in the preview.
         if let (Tool::AlignedSection { .. }, Some(d)) = (&self.tool, &self.aligned_dlg) {
             v.flip = d.flip;

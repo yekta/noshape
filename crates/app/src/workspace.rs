@@ -2517,6 +2517,7 @@ impl Workspace {
                     // Sketch sources face the sketch plane.
                     let frame = src.as_ref().and_then(|s| noshape_model::drawing::create::source_frame(&doc, s));
                     let mut d = noshape_model::drawing::create::create_drawing(&template, src.as_ref(), bounds, suggested, frame);
+                    noshape_model::drawing::create::assembly_drawing_defaults(&doc, &mut d);
                     // A DWT template: its sheet formats and drawing properties
                     // (live request 1627), the views as laid out.
                     if let Some(t) = &dwt

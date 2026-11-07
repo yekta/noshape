@@ -72,6 +72,36 @@ pub fn push_inserted_view(sheet: &mut super::Sheet, mut v: DrawingView) {
     sheet.views.push(v);
 }
 
+/// A base view of an assembly.
+fn shows_assembly(doc: &Document, v: &DrawingView) -> bool {
+    matches!(&v.kind, ViewKind::Base { source, .. } if matches!(doc.tab(*source).map(|t| &t.content), Some(crate::document::TabContent::Assembly(_))))
+}
+
+/// Drawing properties › Views › Auto centermarks / centerlines are the parts'
+/// defaults (live: "Auto centermarks (Parts)"): a view of an assembly gets
+/// neither until shown from its menu.
+pub fn assembly_view_defaults(doc: &Document, v: &mut DrawingView) {
+    if shows_assembly(doc, v) {
+        v.show_centerlines = false;
+        v.auto_centerlines = Some(false);
+    }
+}
+
+/// [`assembly_view_defaults`] on a new drawing's views: an assembly's base
+/// views and the views projected from them.
+pub fn assembly_drawing_defaults(doc: &Document, d: &mut Drawing) {
+    for sheet in &mut d.sheets {
+        let roots: Vec<ViewId> = sheet.views.iter().filter(|v| shows_assembly(doc, v)).map(|v| v.id).collect();
+        let of: Vec<Option<ViewId>> = sheet.views.iter().map(|v| super::views::root_view(sheet, v.id)).collect();
+        for (v, root) in sheet.views.iter_mut().zip(of) {
+            if root.is_some_and(|r| roots.contains(&r)) {
+                v.show_centerlines = false;
+                v.auto_centerlines = Some(false);
+            }
+        }
+    }
+}
+
 /// Model bounds (meters) of a drawing source, regenerated from the document.
 pub fn source_bounds(doc: &Document, src: &DrawingSource) -> Option<(DVec3, DVec3)> {
     let key = SourceKey { tab: src.tab, config: src.config.clone(), explode: None, version: None, position: None, display: None };
