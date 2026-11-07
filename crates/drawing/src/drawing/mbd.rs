@@ -295,7 +295,9 @@ fn dimension_format(m: &ModelAnnotation, base: &super::DimFormat) -> super::DimF
 pub fn trim_suggested_views(drawing: &mut Drawing, doc: &Document) {
     use super::{Projection, ViewKind, ViewOrientation as O};
     let Some(sheet) = drawing.sheets.first() else { return };
-    if sheet.views.len() != 4 || !sheet.views.iter().map(|v| v.id.0).eq(1..=4) {
+    let mut ids: Vec<u64> = sheet.views.iter().map(|v| v.id.0).collect();
+    ids.sort_unstable();
+    if ids != [1, 2, 3, 4] {
         return;
     }
     let Some(ViewKind::Base { source, config, part, .. }) = sheet.view(ViewId(1)).map(|v| v.kind.clone()) else { return };

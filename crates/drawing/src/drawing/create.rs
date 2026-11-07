@@ -215,8 +215,9 @@ pub fn create_drawing(template: &DrawingTemplate, source: Option<&DrawingSource>
     let sheet = &mut d.sheets[0];
     sheet.views.push(base(1, ViewOrientation::Front, [front_x, front_y]));
     let v = if third { 1.0 } else { -1.0 };
-    sheet.views.push(projected(2, [0.0, v], [front_x, other_y]));
+    // In live's order (its Sheets panel: Front, Right, Top, Isometric); the ids stay Top 2, Right 3.
     sheet.views.push(projected(3, [v, 0.0], [other_x, front_y]));
+    sheet.views.push(projected(2, [0.0, v], [front_x, other_y]));
     // Third angle: the isometric is projected from Front, up and right (live 2063: its parent is Front; the fold gives
     // the standard isometric frame). First angle keeps a base isometric (its diagonal fold is another view).
     if third {
@@ -295,8 +296,8 @@ mod tests {
             (d.sheets[0].scale, d.sheets[0].views.iter().map(|v| v.position).collect::<Vec<_>>())
         };
         let near = |a: [f64; 2], b: [f64; 2], k: f64| (a[0] - b[0] * k).abs() < 1e-3 && (a[1] - b[1] * k).abs() < 1e-3;
-        // (front, top, right, isometric)
-        let ansi = [[3.209, 3.1892], [3.209, 6.3308], [7.829, 3.1892], [7.829, 6.3308]];
+        // (front, right, top, isometric: live's order)
+        let ansi = [[3.209, 3.1892], [7.829, 3.1892], [3.209, 6.3308], [7.829, 6.3308]];
         for (e, scale) in [([20.0, 10.0, 5.0], 3.0), ([100.0, 50.0, 20.0], 0.5), ([60.0, 60.0, 120.0], 1.0 / 3.0)] {
             let (s, p) = at("ANSI A", e);
             assert!((s - scale).abs() < 1e-12, "{e:?}: {s}");
@@ -304,7 +305,7 @@ mod tests {
         }
         let (s, p) = at("ISO A3", [100.0, 50.0, 20.0]);
         assert_eq!(s, 1.0);
-        let iso = [[122.3, 221.2056], [122.3, 111.4344], [298.7, 221.2056], [298.7, 111.4344]];
+        let iso = [[122.3, 221.2056], [298.7, 221.2056], [122.3, 111.4344], [298.7, 111.4344]];
         assert!(p.iter().zip(iso).all(|(a, b)| near(*a, b, 1.0)), "{p:?}");
     }
 
@@ -334,7 +335,8 @@ mod tests {
             // A3 fits the plate at 1:1, A4 needs 1:2... at most 1:1 for this small part.
             assert!(sheet.scale <= 1.0 && sheet.scale >= 0.5, "{name}: {}", sheet.scale);
             // The top view is above the front view in third angle, below in first angle.
-            let (front, top) = (sheet.views[0].position, sheet.views[1].position);
+            let at = |id: u64| sheet.views.iter().find(|v| v.id.0 == id).map(|v| v.position).expect("view");
+            let (front, top) = (at(1), at(2));
             assert_eq!(top[1] > front[1], d.projection == Projection::ThirdAngle, "{name}");
         }
         let empty = create_drawing(&template_by_name("ISO A3").unwrap(), Some(&src), Some(bounds), false, None);

@@ -855,7 +855,9 @@ pub(super) fn view_arg(t: &Target, a: &Args, name: &str) -> Result<ViewId, OpErr
 
 /// "no view 9 on Sheet1; its views: 1, 2, 3": a view id that isn't on the sheet.
 pub(super) fn no_view(sheet: &noshape_model::drawing::Sheet, id: u64) -> String {
-    let ids: Vec<String> = sheet.views.iter().map(|v| v.id.0.to_string()).collect();
+    let mut ids: Vec<u64> = sheet.views.iter().map(|v| v.id.0).collect();
+    ids.sort_unstable();
+    let ids: Vec<String> = ids.iter().map(u64::to_string).collect();
     if ids.is_empty() { format!("no view {id} on {}: it has no views", sheet.name) } else { format!("no view {id} on {}; its views: {}", sheet.name, ids.join(", ")) }
 }
 
