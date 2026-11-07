@@ -896,6 +896,42 @@ fn linear_part_pattern_new_add_and_skip() {
     assert!(near(total_volume(&res.context), 0.02 * 0.01 * 0.01, 1e-6));
 }
 
+/// A part pattern of one instance still takes the seed into the merge scope's other parts (std subfeatureToolsTargets;
+/// live c2-extension-spring's Linear pattern 2: one spring of both halves).
+#[test]
+fn a_part_pattern_of_one_merges_its_seed_as_live() {
+    let mut t = T::new();
+    let (_, a) = t.block(0.0, 0.0, 0.01, 0.01, "10 mm");
+    let (_, b) = t.block(0.005, 0.0, 0.015, 0.01, "10 mm");
+    let (_, c) = t.block(0.05, 0.0, 0.06, 0.01, "10 mm");
+    let lp = t.add(
+        "linearPattern",
+        &[
+            ("entities", q(vec![body_ref(&BodyId { feature: b, index: 0 })])),
+            ("directionOne", q(vec![x_axis_dir()])),
+            ("distance", e("20 mm")),
+            ("instanceCount", e("1")),
+            ("operationType", en("ADD")),
+            ("defaultScope", ParamValue::Bool(true)),
+        ],
+    );
+    let res = t.ok();
+    let ids: Vec<u64> = res.context.bodies.iter().map(|x| x.id.feature.0).collect();
+    assert_eq!(ids, vec![a.0, c.0], "the seed joins the part it meets, which keeps its identity");
+    assert!(near(noshape_kernel::volume_properties(&res.context.bodies[0].shape).unwrap().mass, 0.015 * 0.01 * 0.01, 1e-9));
+    // A seed apart from the other parts stays as it is.
+    t.set(lp, "entities", q(vec![body_ref(&BodyId { feature: c, index: 0 })]));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 3);
+    assert_eq!(res.context.bodies[2].id.feature, c);
+    // Remove: the seed cuts the parts it meets and goes.
+    t.set(lp, "entities", q(vec![body_ref(&BodyId { feature: b, index: 0 })]));
+    t.set(lp, "operationType", en("REMOVE"));
+    let res = t.ok();
+    assert_eq!(res.context.bodies.len(), 2);
+    assert!(near(noshape_kernel::volume_properties(&res.context.bodies[0].shape).unwrap().mass, 0.005 * 0.01 * 0.01, 1e-9));
+}
+
 #[test]
 fn circular_and_mirror_part_pattern() {
     let mut t = T::new();

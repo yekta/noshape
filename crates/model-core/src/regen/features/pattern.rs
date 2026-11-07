@@ -574,7 +574,7 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
         return crate::regen::eval::err_at(&["entities"], "Select parts to pattern.");
     }
     if instances.is_empty() {
-        return Ok(());
+        return seeds_into_scope(ev, &bodies);
     }
     let op = ev.enum_("operationType").to_string();
     let copies = copy_bodies(ev, &bodies, instances)?;
@@ -593,6 +593,30 @@ fn part_pattern(ev: &mut EvalCtx, instances: &[Instance]) -> FResult<()> {
     // std (subfeatureToolsTargets): an Add with nothing in its merge scope unions the instances with the seed.
     let scope = if op == "ADD" && scope.is_none() { Some(bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect()) } else { scope };
     ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+}
+
+/// A pattern of one: std's booleans still take the seeds as tools into the merge scope's other parts
+/// (subfeatureToolsTargets), so an Add joins a seed to the parts it meets (c2-extension-spring's Linear pattern 2).
+fn seeds_into_scope(ev: &mut EvalCtx, bodies: &[usize]) -> FResult<()> {
+    let op = ev.enum_("operationType").to_string();
+    let seeds: Vec<usize> = bodies.iter().copied().filter(|&i| ev.ctx.bodies[i].kind == BodyKind::Solid).collect();
+    if op == "NEW" || seeds.is_empty() {
+        return Ok(());
+    }
+    let targets: Vec<BodyId> = super::extrude::scope(ev).unwrap_or_default().into_iter().filter(|i| !seeds.contains(i)).map(|i| ev.ctx.bodies[i].id.clone()).collect();
+    let mut seeds: Vec<Arc<Body>> = seeds.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
+    // An Add leaves a seed apart from the scope as it is.
+    if op == "ADD" {
+        let target_bodies: Vec<Arc<Body>> = targets.iter().filter_map(|id| index_of_body(ev, id)).map(|i| ev.ctx.bodies[i].clone()).collect();
+        seeds.retain(|s| !crate::regen::eval::touching(&target_bodies, std::slice::from_ref(&s.shape), true).is_empty());
+        if seeds.is_empty() {
+            return Ok(());
+        }
+    }
+    let seed_ids: Vec<BodyId> = seeds.iter().map(|b| b.id.clone()).collect();
+    remove_bodies(ev, &seed_ids);
+    let scope: Vec<usize> = targets.iter().filter_map(|id| index_of_body(ev, id)).collect();
+    ev.apply_operation(seeds.iter().map(|b| body_named(b)).collect(), &op, Some(scope), BodyKind::Solid)
 }
 
 // ------------------------------------------------------------------ face / feature pattern

@@ -33,6 +33,22 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-07 19:18 UTC: part patterns of one; c2-rings-loft's Extrude 3.**
+- An extrude up to a cylindrical face runs to the whole cylinder (c2-rings-loft's Extrude 3, 11 -> 12; T1
+  features_a::up_to_a_cylinder_face_takes_the_whole_cylinder).
+- A part pattern of one instance (count 1) with Add / Remove / Intersect still takes its seed as a tool into the merge
+  scope's other parts, as std's subfeatureToolsTargets does (`seeds_into_scope` in pattern.rs; an Add leaves a seed
+  apart from them as it is). c2-extension-spring's Linear pattern 2 is now one part, live's faces and volume (T1
+  features_a::a_part_pattern_of_one_merges_its_seed_as_live).
+- Its edges stay 54/36, live 56/38: Part 1's end round lies on Part 2's U-turn round from (11.2, -1.5) to
+  (12.656, -2.5). Live keeps a vertex at (12.656, -2.5) on the top and bottom edges of the merged round (0.503 + 1.936
+  mm, ours one 2.439 mm edge). Our same-domain unify joins the pieces, because after OCCT's fuse both lie on one curve.
+  Likely Parasolid's rule: pieces of two different B-spline curves are not joined, even when they coincide. Not
+  changed: it would touch every Boolean's unify, and no other case backs it yet.
+- Next: c2-rings-loft's Circular pattern 1 (a Reapply feature pattern of Extrude 3: 8.0 s here, live's whole studio
+  1.6 s; one edge and vertex more than live), then c2-housing-draft's Bohrung 1 (its in-feature mate connector on the
+  Origin, a packed `Origin…pointOp` query).
+
 **State 11-07 18:03 UTC: faces OCCT splits only at a periodic surface's seam are one face (lead's P1).**
 - As 2e0ec154 for edges: shown_topology groups faces of one surface handle that meet across an edge on its seam (an
   isoline at the period's start; a split line elsewhere stays an edge); those edges are hidden like seams, and edge
