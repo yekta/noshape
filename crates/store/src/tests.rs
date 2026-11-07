@@ -1189,6 +1189,32 @@ fn a_suspended_document_leaves_no_side_files_and_resumes() {
     assert_eq!(alone.read_all(alone.head(main).unwrap()).unwrap()["tab/a"], b"three");
 }
 
+/// The documents page reads a document's details through a read-only handle (qa DOCS-SELECT-LEAVES-WAL): closing it
+/// leaves no `-wal` or `-shm`, while a writer that has the file open keeps its own until it closes.
+#[test]
+fn a_read_only_handle_leaves_no_side_files() {
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    let main = d.default_branch().unwrap();
+    d.commit(main, &[("tab/a", Some(b"two".as_slice()))], "edit").unwrap();
+    drop(d);
+    let gone = || !side(&path, "-wal").exists() && !side(&path, "-shm").exists();
+    assert!(gone(), "the writer's close removed them");
+    let r = Document::open_read_only(&path).unwrap();
+    assert_eq!(r.read_all(r.head(main).unwrap()).unwrap()["tab/a"], b"two");
+    drop(r);
+    assert!(gone(), "a read-only handle's close removes what it made");
+    let mut w = Document::open(&path).unwrap();
+    let r = Document::open_read_only(&path).unwrap();
+    let _ = r.head(main).unwrap();
+    drop(r);
+    w.commit(main, &[("tab/a", Some(b"three".as_slice()))], "edit").unwrap();
+    assert_eq!(w.read_all(w.head(main).unwrap()).unwrap()["tab/a"], b"three", "the writer goes on");
+    drop(w);
+    assert!(gone());
+}
+
 /// Duplicate and Copy workspace… copy a document that is open with edits still in its log (no checkpoint yet): the
 /// copy has every edit (`backup_to` reads through the log).
 #[test]

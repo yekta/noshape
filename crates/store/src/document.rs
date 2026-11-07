@@ -311,6 +311,14 @@ impl IdleCheckpoint {
     }
 }
 
+impl Drop for Document {
+    fn drop(&mut self) {
+        // The checkpointer's connection first, so the document's is the last to close.
+        drop(self._idle_checkpoint.take());
+        self.close_connection();
+    }
+}
+
 impl Drop for IdleCheckpoint {
     fn drop(&mut self) {
         // Its connection is closed before the document's own, so the document's close removes the log.
@@ -723,8 +731,24 @@ impl Document {
     pub fn suspend(&mut self) {
         // The checkpointer's connection first, so the document's is the last to close.
         let checkpointing = self._idle_checkpoint.take().is_some();
-        self.db = None;
+        self.close_connection();
         self.resume_checkpoints = checkpointing;
+    }
+
+    /// Closes the connection. A read-only connection can't remove the -wal / -shm it made (SQLite needs write access
+    /// for that), so an empty log is then read once more over a writable connection, whose close removes both unless
+    /// another connection still has the file open (an empty log has nothing to replay).
+    fn close_connection(&mut self) {
+        if self.db.take().is_none() || !self.read_only {
+            return;
+        }
+        let [wal, _] = side_files(&self.path);
+        if !wal.metadata().is_ok_and(|m| m.len() == 0) {
+            return;
+        }
+        if let Ok(conn) = Connection::open_with_flags(&self.path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX) {
+            let _ = conn.query_row("PRAGMA schema_version", [], |_| Ok(()));
+        }
     }
 
     /// Opens the file again after [`Document::suspend`] (nothing when it is open).
