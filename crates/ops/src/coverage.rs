@@ -358,7 +358,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Add spline point", Op("drawing_crop_view")),
     ("drawing:Add stacked callouts...", Op("drawing_annotation_edit")),
     ("drawing:Add to ordinate dimension group", Op("drawing_ordinate")),
-    ("drawing:Add to ordinate group", Op("drawing_ordinate")),
     ("drawing:Adjust linestyle...", Op("drawing_view_linestyle")),
     ("drawing:Align centermark", Op("drawing_annotation_edit")),
     ("drawing:All targets", Op("drawing_annotation_edit")),

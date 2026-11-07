@@ -149,6 +149,8 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
   2180), or its row in the Sheets panel (Ctrl+S) when that is open (click, double-click, rclick);
 - `{"break_line": {"view": "Front", "index": 0}}`: a break's first line (a model point there moves with the break);
 - `{"panel_more": "Inspection table"}`: the drawing's Inspection table panel's ⋯ (Export to CSV);
+  `{"panel_row": "1.575"}`: an Inspection table Characteristics row's Item cell, by its nominal value (an empty
+  one's menu: Assign number);
 - `{"leader": {"annotation": "TEMP", "at": 0.5}}`: the point that far (0..1, by length) along the first leader of the
   annotation shown as `annotation` (its stroke's menu: Add node; on a node: Remove node);
 - `{"hole_axis": "X"}` (or `"Y"`): the middle of the X (Y) arrow of the sheet's first hole table's origin indicator

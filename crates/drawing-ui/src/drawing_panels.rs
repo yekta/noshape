@@ -205,8 +205,10 @@ impl DrawingEditor {
                     _ => {
                         let empty = number.is_empty();
                         let n2 = number.clone();
+                        let nominal = r.nominal.clone();
                         cell(if empty { "--".into() } else { number.clone().into() }, COLS[0].1, false)
                             .id((key, i))
+                            .map(|d| crate::ui_script::mark(d, move || format!("panel_row:{nominal}")))
                             .font_weight(FontWeight::BOLD)
                             .on_click(cx.listener(move |this, e: &ClickEvent, w, cx| {
                                 if e.click_count() >= 2 && !n2.is_empty() && !n2.contains('.') {

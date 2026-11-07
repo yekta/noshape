@@ -425,13 +425,6 @@ impl DrawingEditor {
                 let label = if direct { "Display as foreshorten diameter" } else { "Display as regular diameter" };
                 out.push(MenuEntry::item(label, move |t, _, cx| set_kind(t, "Foreshortened diameter", AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct: !direct }, cx)));
             }
-            &AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } => {
-                let r = a.refs.iter().find(|x| x.slot == 0).map(|x| x.point.clone());
-                out.push(MenuEntry::item("Add to ordinate group", move |t, _, cx| {
-                    let o = PickedPoint { view, p: origin, r: r.clone() };
-                    t.set_tool(Tool::Ordinate { origin: Some(o), horizontal: Some(horizontal), group: Some(id) }, cx)
-                }));
-            }
             AnnotationKind::MaxMinDimension { ra, rb, .. } => {
                 for (end, r) in [(0usize, *ra), (1, *rb)] {
                     if r <= 0.0 {
