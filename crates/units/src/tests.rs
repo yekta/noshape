@@ -125,6 +125,10 @@ fn arithmetic_and_precedence() {
     assert_mm("2 * #n * 0 mm + 1 mm", 1.0);
     assert_mm("#w * #n - 1 in", 120.0 - 25.4);
     assert_mm("#w * mm / mm", 40.0);
+    // A unit after a variable multiplies it (live c2-impeller-loft's Shell: `#wanddicke mm`).
+    assert_mm("#n mm", 3.0);
+    assert_mm("#n mm + 1 mm", 4.0);
+    assert_mm("2 * #n mm", 6.0);
     assert_mm("#n * mm", 3.0);
     let area = ev("#w * #h");
     assert_eq!(area.dim, Dim::AREA);
@@ -440,6 +444,8 @@ fn display_is_canonical() {
         ("log(2)", "ln(2)"),
         ("2 * mm", "2 * mm"),
         ("(#w + 1 mm) mm", "(#w + 1 mm) mm"),
+        ("#n mm", "#n mm"),
+        ("(#n) mm", "#n mm"),
         ("1e-3", "0.001"),
         ("10 inches", "10 in"),
         ("7 % 2", "7 % 2"),

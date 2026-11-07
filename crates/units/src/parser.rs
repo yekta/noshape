@@ -12,7 +12,7 @@
 //! mul      := unary ( ("*" | "/" | "%") unary )*
 //! unary    := ("-" | "+" | "!" | "not") unary | power
 //! power    := postfix ( "^" unary )?
-//! postfix  := number-literal | "(" expr ")" unit-suffix? | atom
+//! postfix  := number-literal | "(" expr ")" unit-suffix? | variable unit-suffix? | atom
 //! ```
 //!
 //! Number literals absorb units and Onshape-style shorthands: `25 mm`,
@@ -380,8 +380,16 @@ impl Parser {
                 }
                 Ok(e)
             }
+            // A unit after a variable multiplies it, as after a parenthesis (live: `#wanddicke mm`).
             Some(Tok::Var(name)) => {
                 self.bump();
+                if let Some((unit, power)) = self.unit_suffix()? {
+                    return Ok(Expr::WithUnit {
+                        expr: Box::new(Expr::Var(name)),
+                        unit,
+                        power,
+                    });
+                }
                 Ok(Expr::Var(name))
             }
             Some(Tok::Pi) => {

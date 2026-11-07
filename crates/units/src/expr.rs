@@ -585,7 +585,7 @@ impl fmt::Display for Expr {
                 }
             }
             Expr::WithUnit { expr, unit, power } => {
-                let simple = matches!(**expr, Expr::Number(v) if !v.is_sign_negative());
+                let simple = matches!(**expr, Expr::Number(v) if !v.is_sign_negative()) || matches!(**expr, Expr::Var(_));
                 write!(f, "{} {unit}", Paren(expr, !simple))?;
                 if *power != 1 {
                     write!(f, "^{power}")?;
