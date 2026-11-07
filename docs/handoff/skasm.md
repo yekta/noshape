@@ -1875,3 +1875,9 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   pattern count (sketch scenarios 146/147; sketch-row-copy-paste-onto-front's owner null is live's reader, not a
   behaviour). learning-center-michael 7 -> 5 (Fillet 2 "Failed to fillet") came from main between 19:44 and 20:10, not
   from skasm's changes (same without them).
+- 11-07 21:30: the louver's Sheet metal model 1 matched (a stub that bounds no region at a joint of collinear lines no
+  longer keeps them apart; ScopeRule 14, legacy_stub_joints; c2-housing-draft 8 -> 22 with it). Next: Flange 3 (RCCC is
+  the 1.628 mm side face along the main top edge, x 426 -> 1515; live flanges that edge alone, +9 faces). Ours makes a
+  second small flange over the 12.7 mm tab (x 394 -> 426; the tab's top edge sits 0.275 mm off the main edge, a step
+  at x 426.06): std maps the side face to definition edges through our association attributes; look at which edges
+  ours gives that face (host sheetmetal.rs `associations`) and why the tab's edge is among them.
