@@ -1,0 +1,294 @@
+{
+ "scenario": "tag-tool",
+ "recorded": "2026-11-07T01:41:42.738Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.5 ef66d403"
+ },
+ "live": {
+  "document": "ec10b45614d6fd203cecb5bd",
+  "workspace": "c9d6acb584fac8cbb40bad93",
+  "element": "66f658d78f9eeb1f5f64179f",
+  "start": "block",
+  "startElement": "633a37b9892e81fc5b3c1563"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "Tag"
+    }
+   },
+   "ok": true,
+   "at": [
+    1369,
+    58
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "div",
+     "label": "Sketch profile",
+     "dialog": "Tag 1"
+    },
+    "dialog": {
+     "title": "Tag 1",
+     "titleState": "error",
+     "kind": "feature",
+     "tabs": [],
+     "fields": [
+      {
+       "label": null,
+       "kind": "enum",
+       "text": "Frame",
+       "state": "ok"
+      },
+      {
+       "label": "Sketch profile",
+       "kind": "query",
+       "items": [],
+       "active": true,
+       "state": "ok"
+      },
+      {
+       "label": "Standard",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Description",
+       "kind": "text",
+       "text": "",
+       "focused": false,
+       "state": "ok"
+      },
+      {
+       "label": "Additional columns",
+       "kind": "other",
+       "text": "Additional columns Add Column",
+       "state": "ok"
+      },
+      {
+       "label": "Show default points",
+       "kind": "boolean",
+       "checked": true,
+       "state": "ok"
+      }
+     ],
+     "error": null,
+     "ok": "disabled"
+    },
+    "dialogs": [
+     {
+      "title": "Tag 1",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": null,
+        "kind": "enum",
+        "text": "Frame",
+        "state": "ok"
+       },
+       {
+        "label": "Sketch profile",
+        "kind": "query",
+        "items": [],
+        "active": true,
+        "state": "ok"
+       },
+       {
+        "label": "Standard",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Description",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       },
+       {
+        "label": "Additional columns",
+        "kind": "other",
+        "text": "Additional columns Add Column",
+        "state": "ok"
+       },
+       {
+        "label": "Show default points",
+        "kind": "boolean",
+        "checked": true,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Tag 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
+      }
+     ],
+     "rollbackAfter": "Tag 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 74673
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 79750
+  }
+ ]
+}

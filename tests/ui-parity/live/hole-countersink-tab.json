@@ -1,16 +1,16 @@
 {
  "scenario": "hole-countersink-tab",
- "recorded": "2026-11-06T13:04:22.755Z",
+ "recorded": "2026-11-07T01:33:23.781Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.2 7539bca4"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "2bb36358b4152ba496ddb6ce",
+  "element": "a44a732256edb6f7d47b7646",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -328,7 +328,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 31448
+   "t": 82893
   },
   {
    "step": 2,
@@ -621,7 +621,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 34588
+   "t": 88379
   },
   {
    "step": 3,
@@ -677,7 +677,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37895
+   "t": 92129
   }
  ]
 }

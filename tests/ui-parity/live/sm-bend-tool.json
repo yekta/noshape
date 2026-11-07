@@ -1,18 +1,18 @@
 {
  "scenario": "sm-bend-tool",
- "recorded": "2026-11-06T14:47:52.324Z",
+ "recorded": "2026-11-07T01:30:26.894Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.4 c2684ac9"
+  "recorder": "2026-11-06.5 ef66d403"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "295339a0a8e3814433418a74",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "398a999eb5e9713b7fdbaa04",
   "start": "plate",
-  "startElement": "398b1874bd7e80eca1dae624"
+  "startElement": "e2f98faf7ae98a408ef540f4"
  },
  "start": {
   "focus": {
@@ -81,11 +81,11 @@
      "kind": "field",
      "tag": "div",
      "label": "Bend line",
-     "dialog": "Bend"
+     "dialog": "Bend 1"
     },
     "dialog": {
-     "title": "Bend",
-     "titleState": "ok",
+     "title": "Bend 1",
+     "titleState": "error",
      "kind": "feature",
      "tabs": [],
      "fields": [
@@ -94,7 +94,7 @@
        "kind": "query",
        "items": [],
        "active": true,
-       "state": "ok"
+       "state": "error"
       },
       {
        "label": "icon:svg-icon-flip-direction-opposite",
@@ -152,8 +152,8 @@
     },
     "dialogs": [
      {
-      "title": "Bend",
-      "titleState": "ok",
+      "title": "Bend 1",
+      "titleState": "error",
       "kind": "feature",
       "tabs": [],
       "fields": [
@@ -162,7 +162,7 @@
         "kind": "query",
         "items": [],
         "active": true,
-        "state": "ok"
+        "state": "error"
        },
        {
         "label": "icon:svg-icon-flip-direction-opposite",
@@ -243,9 +243,18 @@
        "related": false,
        "hidden": false,
        "cls": ""
+      },
+      {
+       "name": "Bend 1",
+       "state": "error",
+       "selected": true,
+       "editing": true,
+       "related": false,
+       "hidden": false,
+       "cls": "edited selected ns-list-item-error"
       }
      ],
-     "rollbackAfter": "Sheet metal model 1"
+     "rollbackAfter": "Bend 1"
     },
     "parts": [
      "Part 1"
@@ -260,7 +269,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 29637
+   "t": 91429
   },
   {
    "step": 2,
@@ -316,7 +325,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33535
+   "t": 95026
   }
  ]
 }
