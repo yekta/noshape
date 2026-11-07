@@ -9,7 +9,7 @@ use crate::{Ctx, assembly as sa};
 use noshape_model::assembly::analysis::{instance_interferences, matched_targets};
 use noshape_model::assembly::bom::{self, BomColumn, BomType};
 use noshape_model::assembly::eval::SolveOptions;
-use noshape_model::assembly::{Assembly, InstanceId, InstancePattern, LinearDirection, MateId, MirrorPlacement, PatternKind, ReplicateScope, ScopeEntity};
+use noshape_model::assembly::{Assembly, InstanceId, InstancePattern, InstanceSource, LinearDirection, MateId, MirrorPlacement, PatternKind, ReplicateScope, ScopeEntity};
 use noshape_model::document::{TabContent, TabId};
 use noshape_units::ExprValue;
 use serde_json::{Value, json};
@@ -47,6 +47,22 @@ pub fn ops() -> Vec<Op> {
             mutates: false,
             destructive: false,
             run: mass_properties,
+        },
+        Op {
+            group: "assembly",
+            verb: "update_references",
+            summary: "Update references to other documents' versions (the Reference manager)",
+            description: "The toolbar's Update all references and an instance's Change to version…: every instance (or `instances`) referencing another document's version moves to its latest named version, or to `version` (the dialog's Selective update; `document` picks one referenced document by file name). This document's own parts and subassemblies: assembly_change_to_version. One edit per reference (\"Update to V2\").",
+            fields: vec![
+                doc_field(),
+                asm_field(),
+                opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Only these instances (Change to version…), names or ids."),
+                opt("document", s(), "Only this referenced document (file name, with or without .noshape)."),
+                opt("version", s(), "A named version to move to (default: each document's latest)."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: update_references,
         },
         Op {
             group: "assembly",
@@ -601,7 +617,6 @@ struct Old {
 
 fn change_to_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use crate::derived::ExternalRef;
-    use noshape_model::assembly::InstanceSource;
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?.clone();
     let name = a.str("version")?;
@@ -619,22 +634,7 @@ fn change_to_version(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let workspace = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(i.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. } | InstanceSource::Assembly { .. }));
     let mut changed = 0usize;
     if workspace {
-        changed += commit(od, tab, &format!("Change to version : {}", v.name), &result, |x| {
-            let mut n = 0;
-            for i in x.instances.iter_mut().filter(|i| in_scope(i)) {
-                let (t, body, config) = match &i.source {
-                    InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
-                    InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
-                    // A subassembly: that version of the Assembly (evaluated as a linked assembly).
-                    InstanceSource::Assembly { assembly, config } => (*assembly, None, config.clone()),
-                    _ => continue,
-                };
-                let key = ExternalRef { path: path.clone(), microversion: v.microversion, tab: t.to_string() }.key();
-                i.source = InstanceSource::External { key, body, config };
-                n += 1;
-            }
-            n
-        })?;
+        changed += commit(od, tab, &format!("Change to version : {}", v.name), &result, |x| sa::local_to_version(x, &path, v.microversion, scope.as_deref()))?;
     }
     // References to another version of this document: to this one.
     let versioned = asm.instances.iter().filter(|i| in_scope(i)).any(|i| matches!(&i.source, InstanceSource::External { key, .. } if own_version(key).is_some_and(|r| r.microversion != v.microversion)));
@@ -773,5 +773,63 @@ fn mass_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             v["note"] = json!("Assign a material (or density) to every part to get mass, center of mass and inertia.");
         }
     }
+    Ok(v.into())
+}
+
+fn update_references(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::derived::ExternalRef;
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let scope: Option<Vec<InstanceId>> = match a.opt_array("instances")? {
+        Some(list) => Some(list.iter().enumerate().map(|(i, v)| find_instance(&asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<_, _>>()?),
+        None => None,
+    };
+    let in_scope = |id: InstanceId| scope.as_ref().is_none_or(|s| s.contains(&id));
+    let version = a.opt_str("version")?.map(str::trim).filter(|v| !v.is_empty());
+    let document = a.opt_str("document")?.map(|d| d.trim().trim_end_matches(".noshape").to_string());
+    let named = |p: &std::path::Path| document.as_ref().is_none_or(|d| p.file_stem().is_some_and(|s| s.to_string_lossy() == *d));
+    let mut updated = 0;
+    // Other documents' (and this one's pinned) versions.
+    let mut keys: Vec<String> = Vec::new();
+    for i in asm.instances.iter().filter(|i| in_scope(i.id)) {
+        if let Some(k) = i.source.external_key().filter(|k| !keys.iter().any(|x| x == k)) {
+            keys.push(k.to_string());
+        }
+    }
+    let mut unknown_version = None;
+    for k in keys {
+        let Some(r) = ExternalRef::parse(&k) else { continue };
+        if !named(&r.path) {
+            continue;
+        }
+        let Ok(info) = crate::derived::external_doc_info(&r.path) else { continue };
+        let versions: Vec<_> = info.versions.iter().filter(|v| v.label != "Current state").collect();
+        let to = match version {
+            Some(v) => match versions.iter().find(|x| x.label == v) {
+                Some(x) => *x,
+                None => {
+                    unknown_version = Some(info.name.clone());
+                    continue;
+                }
+            },
+            None => match versions.first() {
+                Some(x) => *x,
+                None => continue,
+            },
+        };
+        if to.microversion == r.microversion {
+            continue;
+        }
+        let new_key = ExternalRef { microversion: to.microversion, ..r }.key();
+        let result = solve(od, tab, &SolveOptions::default())?;
+        updated += commit(od, tab, &format!("Update to {}", to.label), &result, |asm| sa::repoint_external(asm, &k, &new_key, scope.as_deref()))?;
+    }
+    if updated == 0
+        && let (Some(v), Some(d)) = (version, unknown_version)
+    {
+        return Err(OpError::param("version", &format!("{d} has no version named {v}")));
+    }
+    let mut v = describe(od, tab)?;
+    v["updated"] = json!(updated);
     Ok(v.into())
 }

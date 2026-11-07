@@ -649,6 +649,39 @@ pub fn duplicate_position_name(a: &Assembly, name: &str) -> String {
     format!("{name} Copy {k}")
 }
 
+/// Reference manager › Update: instances (in `scope`, else all) referencing `key` re-pointed at `new_key`. The count.
+pub fn repoint_external(a: &mut Assembly, key: &str, new_key: &str, scope: Option<&[InstanceId]>) -> usize {
+    let mut n = 0;
+    for i in a.instances.iter_mut().filter(|i| scope.is_none_or(|s| s.contains(&i.id))) {
+        if let InstanceSource::External { key: k, .. } = &mut i.source
+            && k == key
+        {
+            *k = new_key.to_string();
+            n += 1;
+        }
+    }
+    n
+}
+
+/// Change to version… of this document's own parts, Part Studios and subassemblies (in `scope`, else all): they
+/// become references to that version of the document at `path`. The count.
+pub fn local_to_version(a: &mut Assembly, path: &std::path::Path, microversion: noshape_store::MicroversionId, scope: Option<&[InstanceId]>) -> usize {
+    let mut n = 0;
+    for i in a.instances.iter_mut().filter(|i| scope.is_none_or(|s| s.contains(&i.id))) {
+        let (tab, body, config) = match &i.source {
+            InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
+            InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
+            // A subassembly: that version of the Assembly (evaluated as a linked assembly).
+            InstanceSource::Assembly { assembly, config } => (*assembly, None, config.clone()),
+            _ => continue,
+        };
+        let key = crate::derived::ExternalRef { path: path.to_path_buf(), microversion, tab: tab.to_string() }.key();
+        i.source = InstanceSource::External { key, body, config };
+        n += 1;
+    }
+    n
+}
+
 /// Duplicate exploded view's name: "<name> Copy 1", "<name> Copy 2"... (live asm-explode-duplicate).
 pub fn duplicate_exploded_view_name(a: &Assembly, name: &str) -> String {
     let mut k = 1;

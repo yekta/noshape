@@ -3522,7 +3522,9 @@ were checked in code by asm; "(verify)" ones need a live check first.
   relation's default direction against live.
 - [ ] P1 ASM-API-GAPS (asm) agent API: (done 11-07: `assembly_properties`; `part_set_properties` takes Exclude from
   all BOMs / Unit of measure / Not revision managed (State is the releases'); `assembly_exploded_view` duplicate;
-  mate / group Show / Hide; `assembly_measure`, `assembly_mass_properties`.) Was: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
+  mate / group Show / Hide; `assembly_measure`, `assembly_mass_properties`; `assembly_replace` takes several
+  instances, sketches and other documents' versions; `assembly_update_references`. Left: standard content as a
+  replacement, explode-line entities, mate value typing, mate reorder, a connector's move from the mate dialog.) Was: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
   number); `part_set_properties` lacks Exclude from all BOMs / Unit of measure / Not revision managed / State; no
   assembly mass or measure op; `assembly_replace` takes one instance and current-document sources only (no sketch,
   other document, standard content; its text still says mates are re-pointed); no op updates references to other

@@ -7,8 +7,8 @@ use crate::ops::{doc_field, s, strings};
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, assembly as sa, doc, refs};
 use noshape_model::assembly::eval::SolveOptions;
-use noshape_model::assembly::{AsmMateConnector, InstanceSource, MateId, RelationType};
-use noshape_model::document::TabContent;
+use noshape_model::assembly::{AsmMateConnector, InstanceId, InstanceSource, MateId, RelationType};
+use noshape_model::document::{TabContent, TabId};
 use noshape_model::reference::Reference;
 use noshape_units::ExprValue;
 use serde_json::{Value, json};
@@ -72,15 +72,19 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "assembly",
             verb: "replace",
-            summary: "Replace an instance with another part, Part Studio or assembly",
-            description: "Replace instance: the instance (with `all`, every instance of the same source) gets the new source and keeps its position; mates whose faces / edges don't exist on the replacement are re-pointed to the nearest geometry of the same type. One edit (\"Replace instance : Part 2\").",
+            summary: "Replace instances with another part, sketch, Part Studio or assembly",
+            description: "Replace instances: each instance (with `all`, every instance of the same source) gets the new source and keeps its position and its mates' connectors (a connector whose geometry the replacement lacks makes its mate fail). The source: a Part Studio (whole, a `part` or a `sketch`) or an Assembly of this document, or with `document` + `version` one of another document's named versions (the Replace dialog's Other documents). One edit per instance (\"Replace instance : Part 2\").",
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("instance", s(), "Instance id or name."),
-                req("source", s(), "Part Studio or Assembly tab (name or id)."),
+                opt("instance", s(), "Instance id or name."),
+                opt("instances", json!({ "type": "array", "items": { "type": "string" } }), "Several instances (ids or names), as the dialog's Instances to replace."),
+                req("source", s(), "Part Studio or Assembly tab (name or id), in `document` when given."),
                 opt("part", s(), "A part of that Part Studio (`body:…` id or part name); default: the whole Part Studio."),
+                opt("sketch", s(), "A sketch of that Part Studio (feature id or name)."),
                 opt("configuration", json!({ "type": "object" }), "Configuration of the source: {input id: value}."),
+                opt("document", s(), "Another .noshape document (with `version`)."),
+                opt("version", s(), "With `document`: the name of one of its versions."),
                 opt("all", json!({ "type": "boolean" }), "Replace all instances of the same source."),
             ],
             mutates: true,
@@ -275,30 +279,84 @@ fn connector_arg(asm: &noshape_model::assembly::Assembly, od: &crate::OpenDoc, t
 fn replace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let asm = assembly(od, tab)?.clone();
-    let id = find_instance(&asm, a.str("instance")?, "instance")?;
+    let ids: Vec<InstanceId> = match (a.opt_str("instance")?, a.opt_array("instances")?) {
+        (Some(i), None) => vec![find_instance(&asm, i, "instance")?],
+        (None, Some(list)) if !list.is_empty() => list.iter().enumerate().map(|(i, v)| find_instance(&asm, v.as_str().unwrap_or_default(), &format!("instances[{i}]"))).collect::<Result<_, _>>()?,
+        _ => return Err(OpError::invalid("give `instance` or `instances`")),
+    };
+    let (source, base) = match (a.opt_str("document")?, a.opt_str("version")?) {
+        (Some(document), Some(version)) => replacement_from_document(a, document, version)?,
+        (Some(_), None) => return Err(OpError::param("version", "required with `document`: one of its named versions")),
+        (None, Some(_)) => return Err(OpError::param("document", "required with `version`")),
+        (None, None) => replacement_here(od, tab, a)?,
+    };
+    let all = a.bool_or("all", false)?;
+    let mut count = 0;
+    for id in ids {
+        let before = solve(od, tab, &SolveOptions::default())?;
+        count += commit(od, tab, &sa::replace_description(&base), &before, |asm| sa::replace_instance(asm, id, source.clone(), &base, all, &before, None))?.0;
+    }
+    let mut v = describe(od, tab)?;
+    v["message"] = json!(sa::replace_message(count, 0));
+    Ok(v.into())
+}
+
+/// The replacement in this document: a Part Studio (whole, a part or a sketch) or another Assembly.
+fn replacement_here(od: &mut crate::OpenDoc, tab: TabId, a: &Args) -> Result<(InstanceSource, String), OpError> {
     let src = doc::find_tab(od.doc(), a.str("source")?).map_err(|e| e.with_param("source"))?;
     let config = crate::ops::source_config_arg(od, src, a)?;
     let src_name = od.doc().tab(src).map(|t| t.name.clone()).unwrap_or_default();
-    let before = solve(od, tab, &SolveOptions::default())?;
-    let (source, base, studio) = match od.doc().tab(src).map(|t| &t.content) {
-        Some(TabContent::PartStudio(_)) => {
-            let r = od.regenerate(src, Some(&config))?;
-            match a.opt_str("part")? {
-                Some(p) => {
-                    let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", &format!("no part `{p}` in the source Part Studio; its parts: {}", r.display.bodies.iter().map(|b| format!("{} ({})", b.name, crate::refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))))?;
-                    (InstanceSource::Part { studio: src, body: b.id.clone(), config }, b.name.clone(), Some((r.context.clone(), Some(b.id.clone()))))
-                }
-                None => (InstanceSource::PartStudio { studio: src, config }, src_name, Some((r.context.clone(), None))),
+    match od.doc().tab(src).map(|t| &t.content) {
+        Some(TabContent::PartStudio(ps)) if a.get("sketch").is_some() => {
+            if a.get("part").is_some() {
+                return Err(OpError::param("sketch", "give `part` or `sketch`, not both"));
             }
+            let sk = crate::ops::feature_arg(ps, a, "sketch")?;
+            let f = ps.feature(sk).filter(|f| f.type_id == "sketch").ok_or_else(|| OpError::param("sketch", "not a sketch"))?;
+            Ok((InstanceSource::Sketch { studio: src, sketch: sk, config }, f.name.clone()))
         }
-        Some(TabContent::Assembly(_)) if src != tab => (InstanceSource::Assembly { assembly: src, config }, src_name, None),
-        _ => return Err(OpError::param("source", "a Part Studio or another Assembly")),
+        Some(TabContent::PartStudio(_)) => match a.opt_str("part")? {
+            Some(p) => {
+                let r = od.regenerate(src, Some(&config))?;
+                let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", &format!("no part `{p}` in the source Part Studio; its parts: {}", r.display.bodies.iter().map(|b| format!("{} ({})", b.name, crate::refs::body_id(&b.id))).collect::<Vec<_>>().join(", "))))?;
+                Ok((InstanceSource::Part { studio: src, body: b.id.clone(), config }, b.name.clone()))
+            }
+            None => Ok((InstanceSource::PartStudio { studio: src, config }, src_name)),
+        },
+        Some(TabContent::Assembly(_)) if src != tab && !sa::contains_assembly(od.doc(), src, tab, 0) => Ok((InstanceSource::Assembly { assembly: src, config }, src_name)),
+        Some(TabContent::Assembly(_)) => Err(OpError::param("source", "that assembly contains this one")),
+        _ => Err(OpError::param("source", "a Part Studio or another Assembly")),
+    }
+}
+
+/// The replacement from a named version of another document (the default configuration, as Insert takes them).
+fn replacement_from_document(a: &Args, document: &str, version: &str) -> Result<(InstanceSource, String), OpError> {
+    use noshape_model::assembly::eval::AssemblyEvaluator;
+    for k in ["configuration", "sketch"] {
+        if a.get(k).is_some() {
+            return Err(OpError::param(k, "not with `document`: other documents give the default configuration's parts and assemblies"));
+        }
+    }
+    let (path, v, snapshot) = crate::derived::named_version(document, version)?;
+    let src = doc::find_tab(&snapshot, a.str("source")?).map_err(|e| e.with_param("source"))?;
+    let t = snapshot.tab(src).ok_or_else(|| OpError::param("source", "no such tab in that version"))?;
+    let key = crate::derived::ExternalRef { path, microversion: v.microversion, tab: src.to_string() }.key();
+    let (body, label) = match &t.content {
+        TabContent::PartStudio(_) => match a.opt_str("part")? {
+            Some(p) => {
+                let mut ev = AssemblyEvaluator::default();
+                ev.set_external(std::sync::Arc::new(crate::derived::ExternalDocs));
+                let (_, r) = ev.external_studio(&key, &Default::default()).ok_or_else(|| OpError::param("source", "that version's Part Studio could not be read"))?;
+                let b = r.display.bodies.iter().find(|b| matches!(refs::parse_str(p), Some(Reference::Body(id)) if id == b.id) || b.name == p).ok_or_else(|| OpError::param("part", "no such part in that Part Studio"))?;
+                (Some(b.id.clone()), b.name.clone())
+            }
+            None => (None, t.name.clone()),
+        },
+        TabContent::Assembly(_) if a.get("part").is_some() => return Err(OpError::param("part", "only for a Part Studio")),
+        TabContent::Assembly(_) => (None, t.name.clone()),
+        _ => return Err(OpError::param("source", "a Part Studio or Assembly of that document")),
     };
-    let all = a.bool_or("all", false)?;
-    let (count, remapped) = commit(od, tab, &sa::replace_description(&base), &before, |asm| sa::replace_instance(asm, id, source, &base, all, &before, studio.as_ref().map(|(c, b)| (&**c, b.as_ref()))))?;
-    let mut v = describe(od, tab)?;
-    v["message"] = json!(sa::replace_message(count, remapped));
-    Ok(v.into())
+    Ok((InstanceSource::External { key, body, config: Default::default() }, label))
 }
 
 fn rename(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

@@ -221,6 +221,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("assembly_named_position_drivers", &[r##"{"drivers": [{"mate": "Revolute 1", "dof": "rz"}]}"##]),
     ("assembly_measure", &[r##"{"entities": [{"instance": "Part 1 <1>", "entity": "face:…"}, {"instance": "Part 1 <2>", "entity": "face:…"}]}"##]),
     ("assembly_mass_properties", &[r##"{}"##, r##"{"instances": ["Part 1 <1>"]}"##]),
+    ("assembly_update_references", &[r##"{}"##, r##"{"document": "library", "version": "V1"}"##]),
     ("assembly_properties", &[r##"{}"##, r##"{"part_number": "FR-1", "bom_behavior": "Show Assembly only"}"##]),
     ("assembly_exploded_view", &[r##"{"action": "add", "name": "Exploded 1"}"##, r##"{"action": "move", "view": "Exploded 1", "step": 3, "to": 1}"##]),
     ("assembly_explode_step", &[r##"{"view": "Exploded 1", "instances": ["Cover <1>"], "direction": {"instance": "Cover <1>", "entity": "face:…"}, "distance": "40 mm"}"##]),

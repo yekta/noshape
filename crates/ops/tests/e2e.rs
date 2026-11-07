@@ -1758,6 +1758,14 @@ fn assembly_groups_relations_connectors() {
     let rp = call(&mut ctx, "assembly_replace", json!({ "instance": b2, "source": "Part Studio 1", "part": pin }));
     assert!(rp["message"].as_str().unwrap().starts_with("Replaced 1 instance(s)"), "{rp}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Replace instance : Part 2");
+    // Several instances at once, with a sketch (the dialog's Instances to replace; Part Studio sketches).
+    let rp = call(&mut ctx, "assembly_replace", json!({ "instances": [p1, p2], "source": "Part Studio 1", "sketch": "Pin" }));
+    assert!(rp["message"].as_str().unwrap().starts_with("Replaced 2 instance(s)"), "{rp}");
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Replace instance : Pin");
+    let sketches = rp["instances"].as_array().unwrap().iter().filter(|i| i["id"] == p1 || i["id"] == p2).filter(|i| i["source"]["sketch"].is_string()).count();
+    assert_eq!(sketches, 2, "{rp}");
+    let e = try_call(&mut ctx, "assembly_replace", json!({ "source": "Part Studio 1" })).unwrap_err();
+    assert!(e.message.contains("instance"), "{e:?}");
 }
 
 /// A custom feature written in a Feature Studio, committed, then used in a
@@ -6603,4 +6611,37 @@ fn assembly_measure_and_mass_properties() {
     call(&mut ctx, "assembly_properties", json!({ "tab": "Assembly 1", "mass_override": 7.5 }));
     let mp = call(&mut ctx, "assembly_mass_properties", json!({ "tab": "Assembly 1" }));
     assert!((num(&mp["mass_kg"]) - 7.5).abs() < 1e-9 && mp["mass_overridden"] == true, "{mp}");
+}
+
+/// ASM-API-GAPS: the Reference manager through the API: Update all references moves an other-document instance
+/// to its latest version, Selective update to a named one, Change to version pins this document's own parts.
+#[test]
+fn assembly_update_references_moves_versions() {
+    let mut ctx = Ctx::new();
+    two_part_assembly(&mut ctx, "update-refs-lib.noshape");
+    let lib = std::env::temp_dir().join(format!("noshape-ops-e2e-{}", std::process::id())).join("update-refs-lib.noshape");
+    let libs = lib.to_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let top = scratch("update-refs-top.noshape");
+    call(&mut ctx, "document_create", json!({ "path": top.to_str().unwrap() }));
+    let tops = top.to_str().unwrap().to_string();
+    let r = call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1", "part": "Part 2", "document": libs, "version": "V1" }));
+    let inst = r["instance"].clone();
+    let mv = |ctx: &mut Ctx| call(ctx, "assembly_list", json!({ "doc": tops }))["instances"].as_array().unwrap().iter().find(|i| i["id"] == inst).unwrap()["source"]["version_of"]["microversion"].clone();
+    let v1 = mv(&mut ctx);
+    // Nothing newer yet.
+    let u = call(&mut ctx, "assembly_update_references", json!({ "doc": tops }));
+    assert_eq!(u["updated"], 0, "{u}");
+    call(&mut ctx, "sketch_create", json!({ "doc": libs, "plane": "plane:front", "name": "Later" }));
+    call(&mut ctx, "history_create_version", json!({ "doc": libs, "name": "V2" }));
+    let u = call(&mut ctx, "assembly_update_references", json!({ "doc": tops }));
+    assert_eq!(u["updated"], 1, "{u}");
+    assert_ne!(mv(&mut ctx), v1, "moved to V2");
+    let last = call(&mut ctx, "history_list", json!({ "doc": tops, "limit": 1 }))["history"][0]["description"].clone();
+    assert_eq!(last, "Assembly 1 :: Update to V2");
+    let u = call(&mut ctx, "assembly_update_references", json!({ "doc": tops, "document": "update-refs-lib", "version": "V1" }));
+    assert_eq!(u["updated"], 1, "{u}");
+    assert_eq!(mv(&mut ctx), v1, "back to V1");
+    let e = try_call(&mut ctx, "assembly_update_references", json!({ "doc": tops, "version": "V9" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
 }

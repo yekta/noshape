@@ -569,47 +569,16 @@ impl AssemblyView {
     fn update_reference(&mut self, d: &RefDoc, version: usize, scope: Option<&[InstanceId]>, cx: &mut Context<Self>) -> usize {
         let Some(to) = d.versions.get(version).cloned() else { return 0 };
         let scope: Option<Vec<InstanceId>> = scope.map(|s| s.to_vec());
-        let in_scope = move |i: &Instance| scope.as_ref().is_none_or(|s| s.contains(&i.id));
         if d.keys.is_empty() {
             // Workspace references of this document become version references.
             let path = d.path.clone();
-            return self
-                .edit(&format!("Change to version : {}", to.label), cx, |a| {
-                    let mut n = 0;
-                    for i in a.instances.iter_mut().filter(|i| in_scope(i)) {
-                        let (tab, body, config) = match &i.source {
-                            InstanceSource::Part { studio, body, config } => (*studio, Some(body.clone()), config.clone()),
-                            InstanceSource::PartStudio { studio, config } => (*studio, None, config.clone()),
-                            // A subassembly: that version of the Assembly (evaluated as a linked assembly).
-                            InstanceSource::Assembly { assembly, config } => (*assembly, None, config.clone()),
-                            _ => continue,
-                        };
-                        let key = crate::derived::ExternalRef { path: path.clone(), microversion: to.microversion, tab: tab.to_string() }.key();
-                        i.source = InstanceSource::External { key, body, config };
-                        n += 1;
-                    }
-                    n
-                })
-                .unwrap_or(0);
+            return self.edit(&format!("Change to version : {}", to.label), cx, |a| noshape_ops::assembly::local_to_version(a, &path, to.microversion, scope.as_deref())).unwrap_or(0);
         }
         let mut n = 0;
         for k in &d.keys {
             let Some(r) = crate::derived::ExternalRef::parse(k) else { continue };
             let new_key = crate::derived::ExternalRef { microversion: to.microversion, ..r }.key();
-            n += self
-                .edit(&format!("Update to {}", to.label), cx, |a| {
-                    let mut n = 0;
-                    for i in a.instances.iter_mut().filter(|i| in_scope(i)) {
-                        if let InstanceSource::External { key, .. } = &mut i.source
-                            && key == k
-                        {
-                            *key = new_key.clone();
-                            n += 1;
-                        }
-                    }
-                    n
-                })
-                .unwrap_or(0);
+            n += self.edit(&format!("Update to {}", to.label), cx, |a| noshape_ops::assembly::repoint_external(a, k, &new_key, scope.as_deref())).unwrap_or(0);
             self.ext_updates.remove(k);
         }
         n
