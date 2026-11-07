@@ -524,9 +524,29 @@ fn ev_distance(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     };
     let (a0, a1) = (to_shapes(&s0), to_shapes(&s1));
+    // extendSide0 / extendSide1: a side's faces as their whole surfaces (a plane's, or carried far past the edges), so
+    // the closest point may lie off a face (std moveFace's offset up to a vertex beyond the face).
+    let reach = 10.0 * a0.iter().chain(&a1).filter_map(|(_, s)| s.bounding_box(false).ok()).map(|b| b.diagonal()).fold(1e-3, f64::max);
+    let extended = |shapes: &[(usize, k::Shape)], on: bool| -> Vec<(usize, k::Shape)> {
+        if !on {
+            return shapes.to_vec();
+        }
+        shapes
+            .iter()
+            .map(|(j, s)| {
+                let whole = match s.face_plane() {
+                    _ if s.shape_type() != ShapeType::Face => None,
+                    Ok(Some(pl)) => k::make_plane_face(&pl, -1e3, 1e3, -1e3, 1e3).ok(),
+                    _ => k::extend_face(s, reach).ok(),
+                };
+                (*j, whole.unwrap_or_else(|| s.clone()))
+            })
+            .collect()
+    };
+    let (e0, e1) = (extended(&a0, field(&a, "extendSide0").as_bool() == Some(true)), extended(&a1, field(&a, "extendSide1").as_bool() == Some(true)));
     let mut best: Option<(f64, usize, DVec3, usize, DVec3)> = None;
-    for (i0, x) in &a0 {
-        for (i1, y) in &a1 {
+    for (i0, x) in &e0 {
+        for (i1, y) in &e1 {
             if maximum {
                 // Maximum over vertices (exact for polyhedral input).
                 for vx in x.vertices().iter().chain(std::iter::once(x)).filter_map(|v| v.vertex_point().ok()) {

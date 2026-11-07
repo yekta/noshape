@@ -1470,6 +1470,50 @@ export const rayProbe = defineFeature(function(context is Context, id is Id, def
     }
 }
 
+/// Three host operations as std's moveFace and the community Butt Joint use them (cf-butt-joint-with-pin to the end):
+/// evDistance with `extendSide0` measures to the face's whole surface, opReplaceFace honours `oppositeSense`, and a
+/// subtraction's kept tools are not created by it (`qCreatedBy` of the Boolean owns only the target).
+#[test]
+fn distance_to_an_extended_side_replace_face_sense_and_kept_tools_as_live() {
+    let src = studio(
+        r#"
+annotation { "Feature Type Name" : "Host probe" }
+export const hostProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(10, 10, 5) * millimeter });
+        const top = qNthElement(qCreatedBy(id + "box", EntityType.FACE)->qParallelPlanes(vector(0, 0, 1), true), 0);
+        const far = vector(20, 5, 8) * millimeter;
+        const bounded = evDistance(context, { "side0" : top, "side1" : far });
+        const extended = evDistance(context, { "side0" : top, "side1" : far, "extendSide0" : true });
+        if (abs(extended.distance - 3 * millimeter) > 1e-9 * meter || !tolerantEquals(extended.sides[0].point, vector(20, 5, 5) * millimeter))
+            throw regenError("extended: " ~ toString(extended));
+        if (abs(bounded.distance - sqrt(109) * millimeter) > 1e-9 * meter)
+            throw regenError("bounded: " ~ toString(bounded));
+
+        opPlane(context, id + "plane", { "plane" : plane(vector(5, 5, 8) * millimeter, vector(0, 0, -1)), "width" : 40 * millimeter, "height" : 40 * millimeter });
+        opReplaceFace(context, id + "replace", { "replaceFaces" : top, "templateFace" : qCreatedBy(id + "plane", EntityType.FACE), "oppositeSense" : true });
+        if (abs(evVolume(context, { "entities" : qCreatedBy(id + "box", EntityType.BODY) }) - 800 * millimeter ^ 3) > 1e-6 * millimeter ^ 3)
+            throw regenError("replaced: " ~ toString(evVolume(context, { "entities" : qCreatedBy(id + "box", EntityType.BODY) })));
+        opDeleteBodies(context, id + "deletePlane", { "entities" : qCreatedBy(id + "plane", EntityType.BODY) });
+
+        fCuboid(context, id + "tool", { "corner1" : vector(5, -5, -5) * millimeter, "corner2" : vector(15, 15, 15) * millimeter });
+        opBoolean(context, id + "cut", { "tools" : qCreatedBy(id + "tool", EntityType.BODY), "targets" : qCreatedBy(id + "box", EntityType.BODY),
+                                         "operationType" : BooleanOperationType.SUBTRACTION, "keepTools" : true });
+        const owners = evaluateQuery(context, qOwnerBody(qCreatedBy(id + "cut", EntityType.FACE)));
+        if (size(owners) != 1 || size(evaluateQuery(context, qIntersection([qUnion(owners), qCreatedBy(id + "tool", EntityType.BODY)]))) != 0)
+            throw regenError("created by the cut: " ~ size(owners) ~ " bodies");
+    });
+"#,
+    );
+    let fx = Fixture::new(&src);
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("hostProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+}
+
 /// evSurfaceDefinition of a B-spline face: std's BSplineSurface with live's
 /// keys (live "fs (10-25 b)" (2): a loft from a circle to a rectangle).
 #[test]

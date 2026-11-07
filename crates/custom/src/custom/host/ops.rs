@@ -787,7 +787,21 @@ fn op_boolean(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     before = Some((targets.clone(), tool_shapes.iter().flat_map(|t| t.names.faces.iter().map(|n| (**n).clone())).collect()));
                 }
                 let op = if &*kind == "SUBTRACTION" { k::BooleanOp::Cut } else { k::BooleanOp::Common };
+                let tool_names: HashSet<TopoName> = if keep { tool_shapes.iter().flat_map(|t| t.names.faces.iter().map(|n| (**n).clone())).collect() } else { HashSet::new() };
                 ev.boolean_into(&idx, tool_shapes, op)?;
+                // Kept tools keep their faces' names, so the faces they leave in the targets are the Boolean's own
+                // (else a tool face would count as created by it: Butt Joint deleted the kept beam as a sliver).
+                if keep {
+                    let marker = ev.feature;
+                    for bi in 0..ev.ctx.bodies.len() {
+                        let b = ev.ctx.bodies[bi].clone();
+                        if tools.contains(&b.id) || !b.faces.iter().any(|n| tool_names.contains(&**n)) {
+                            continue;
+                        }
+                        let faces: Vec<Name> = b.faces.iter().map(|n| if tool_names.contains(&**n) { Arc::new(TopoName::face(marker, Role::Generated(n.clone()))) } else { n.clone() }).collect();
+                        ev.replace_body(bi, b.shape.clone(), faces);
+                    }
+                }
                 Ok(None)
             }
         }
@@ -2508,6 +2522,7 @@ fn op_replace_face(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     p.set("replaceFaces", ParamValue::Query(faces));
     p.set("templateFace", ParamValue::Query(template));
     p.set("offset", length_param(def_length_opt(&def, "offset").unwrap_or(0.0)));
+    p.set("oppositeSense", ParamValue::Bool(def.get("oppositeSense").as_bool() == Some(true)));
     run_op_with(i, &cx, &id, "DIRECT_EDIT_REPLACE_FACE_FAILED", &p, crate::regen::features::direct::replace_face)?;
     Ok(Value::Undefined)
 }
