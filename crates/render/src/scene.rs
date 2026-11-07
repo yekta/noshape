@@ -1002,3 +1002,72 @@ impl Scene {
         acc
     }
 }
+
+static CONTENT_KEYS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Tests: uploads keep a hash of what they uploaded, for [`Scene::signature`] (off: uploading hashes nothing).
+pub fn keep_content_keys(on: bool) {
+    CONTENT_KEYS.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The hash of an upload's data under [`keep_content_keys`] (else 0).
+pub(crate) fn content_key(parts: &[&[u8]]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    if !CONTENT_KEYS.load(std::sync::atomic::Ordering::Relaxed) {
+        return 0;
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for p in parts {
+        p.hash(&mut h);
+    }
+    h.finish()
+}
+
+impl Scene {
+    /// Tests: what this scene's frames draw, as one number: each instance's geometry (its kind, count, bounds and,
+    /// under [`keep_content_keys`], what was uploaded), placement, colour and every flag, then the highlight states and
+    /// the scene's own settings. Two scenes with one signature draw the same frame whatever uploads they hold (a
+    /// display cached and regenerated: the frame-level checks of the swap, without a GPU).
+    pub fn signature(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        let f = |h: &mut std::collections::hash_map::DefaultHasher, v: &[f32]| v.iter().for_each(|x| x.to_bits().hash(h));
+        let bounds = |h: &mut std::collections::hash_map::DefaultHasher, b: Option<(Vec3, Vec3)>| {
+            if let Some((lo, hi)) = b {
+                f(h, &lo.to_array());
+                f(h, &hi.to_array());
+            }
+        };
+        for i in &self.instances {
+            match &i.drawable {
+                Drawable::Mesh(m) => {
+                    (0u8, m.0.index_count, m.0.max_pick, m.0.content).hash(&mut h);
+                    bounds(&mut h, m.0.bounds);
+                }
+                Drawable::Lines(l) => {
+                    (1u8, l.0.count, l.0.silhouette, l.0.content).hash(&mut h);
+                    bounds(&mut h, l.0.bounds);
+                }
+                Drawable::Points(p) => {
+                    (2u8, p.0.count, p.0.content).hash(&mut h);
+                    bounds(&mut h, p.0.bounds);
+                }
+                Drawable::Image(m) => {
+                    (3u8, m.0.count).hash(&mut h);
+                    bounds(&mut h, m.0.bounds);
+                }
+            }
+            f(&mut h, &i.transform.to_cols_array());
+            f(&mut h, &i.color);
+            f(&mut h, &[i.ghost, i.ambient, i.line_scale]);
+            format!("{:?}{:?}", i.color_mode, i.zebra).hash(&mut h);
+            (i.pickable, i.ignore_clip, i.no_bounds, i.back_silhouette, i.unlit, i.preview, i.selected_only, i.decal_selected, i.layer).hash(&mut h);
+            (i.hidden_only, i.over_transparent, i.over_lines, i.front_only, i.closed, i.on_top, i.pick_only, i.pick_behind, i.pick_solid).hash(&mut h);
+            (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box).hash(&mut h);
+        }
+        self.states.hash(&mut h);
+        (self.hover_outline, self.no_occlusion, self.clip_selected, self.section_interference).hash(&mut h);
+        format!("{:?}{:?}{:?}{:?}", self.clip, self.clip_extra, self.compare, self.preview_mix).hash(&mut h);
+        h.finish()
+    }
+}

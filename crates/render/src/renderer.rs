@@ -102,33 +102,37 @@ pub enum RenderError {
 pub(crate) struct GpuMesh {
     vertices: wgpu::Buffer,
     indices: wgpu::Buffer,
-    index_count: u32,
+    pub(crate) index_count: u32,
     /// `Uint16` when every vertex index fits.
     index_format: wgpu::IndexFormat,
     /// The largest local pick id of its vertices (0: none).
-    max_pick: u32,
+    pub(crate) max_pick: u32,
     /// Fixed-point vertex positions → mesh coordinates (see [`MeshVertex`]),
     /// folded into the instance's model matrix.
     dequant: Mat4,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
+    /// What was uploaded, as a hash ([`crate::scene::keep_content_keys`]; else 0).
+    pub(crate) content: u64,
 }
 pub(crate) struct GpuLines {
     buffer: wgpu::Buffer,
-    count: u32,
+    pub(crate) count: u32,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
     /// [`SilhouetteSegment`]s (drawn where they are silhouettes, never
     /// picked), not [`LineSegment`]s.
-    silhouette: bool,
+    pub(crate) silhouette: bool,
+    pub(crate) content: u64,
 }
 pub(crate) struct GpuPoints {
     buffer: wgpu::Buffer,
-    count: u32,
+    pub(crate) count: u32,
     pub(crate) bounds: Option<(Vec3, Vec3)>,
+    pub(crate) content: u64,
 }
 pub(crate) struct GpuImage {
     /// [`ImageVertex`]es, three per triangle (an image's quad: six).
     vertices: wgpu::Buffer,
-    count: u32,
+    pub(crate) count: u32,
     /// Texture view and sampler (group 2 of the image pipelines); keeps the
     /// texture alive.
     bind_group: wgpu::BindGroup,
@@ -4095,7 +4099,8 @@ impl Uploader {
         });
         let dequant = Mat4::from_translation(lo) * Mat4::from_scale(ext / POS_STEPS);
         let max_pick = pick_ids.iter().copied().max().unwrap_or(0);
-        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, index_format, max_pick, dequant, bounds }))
+        let content = crate::scene::content_key(&[bytemuck::cast_slice(positions), bytemuck::cast_slice(normals), bytemuck::cast_slice(pick_ids), bytemuck::cast_slice(colors), bytemuck::cast_slice(indices)]);
+        MeshHandle(Arc::new(GpuMesh { vertices, indices: indices_buf, index_count: indices.len() as u32, index_format, max_pick, dequant, bounds, content }))
     }
 
     pub fn upload_lines(&self, lines: &LineData) -> LinesHandle {
@@ -4108,7 +4113,8 @@ impl Uploader {
             },
             usage: wgpu::BufferUsages::VERTEX,
         });
-        LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false }))
+        let content = crate::scene::content_key(&[bytemuck::cast_slice(&lines.segments)]);
+        LinesHandle(Arc::new(GpuLines { buffer, count: lines.segments.len() as u32, bounds: lines.bounds(), silhouette: false, content }))
     }
 
     pub fn upload_silhouettes(&self, data: &SilhouetteData) -> LinesHandle {
@@ -4118,7 +4124,8 @@ impl Uploader {
             // Storage too: the silhouette cull reads the candidates (`SilCull`).
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
         });
-        LinesHandle(Arc::new(GpuLines { buffer, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true }))
+        let content = crate::scene::content_key(&[bytemuck::cast_slice(&data.segments)]);
+        LinesHandle(Arc::new(GpuLines { buffer, count: data.segments.len() as u32, bounds: data.bounds(), silhouette: true, content }))
     }
 
     pub fn upload_points(&self, points: &PointData) -> PointsHandle {
@@ -4140,7 +4147,8 @@ impl Uploader {
             }
             (!points.points.is_empty()).then_some((lo, hi))
         };
-        PointsHandle(Arc::new(GpuPoints { buffer, count: points.points.len() as u32, bounds }))
+        let content = crate::scene::content_key(&[bytemuck::cast_slice(&points.points)]);
+        PointsHandle(Arc::new(GpuPoints { buffer, count: points.points.len() as u32, bounds, content }))
     }
 }
 

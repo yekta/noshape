@@ -423,6 +423,8 @@ pub struct Viewport {
     frames_presented: u64,
     /// Tests: every presented image, in order ([`Viewport::record_frames`]).
     frame_log: Option<Vec<Arc<RenderImage>>>,
+    /// Tests: each scene the viewport was given, as what its frames draw ([`Viewport::record_scenes`]).
+    scene_log: Option<Vec<u64>>,
     /// Frames the renderer reported failed.
     frames_failed: u64,
     /// `NOSHAPE_PERF`: when the last frame was presented (paint latency).
@@ -672,6 +674,7 @@ impl Viewport {
             }),
             frames_presented: 0,
             frame_log: None,
+            scene_log: None,
             frames_failed: 0,
             presented_at: None,
             frame_milestones: Default::default(),
@@ -691,6 +694,10 @@ impl Viewport {
         let picks_changed = no_pick(&scene) != no_pick(&self.scene);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
+        if self.scene_log.is_some() {
+            let sig = self.frame_signature();
+            self.scene_log.get_or_insert_default().push(sig);
+        }
         // Pick bench: the next frame submitted shows the click's selection.
         if let Some((_, need @ None)) = self.bench.as_mut().and_then(|b| b.click.as_mut()) {
             *need = Some(self.seq + 1);
@@ -826,6 +833,30 @@ impl Viewport {
                 });
             });
         }
+    }
+
+    /// Tests: keep, from now on, what the frames draw each time the viewport is given a new scene (its scene's
+    /// [`noshape_render::Scene::signature`] with the camera and whether frames are navigation's reduced ones): the
+    /// frame-by-frame checks without a GPU. Uploads hash their data from then on (`keep_content_keys`).
+    pub fn record_scenes(&mut self, on: bool) {
+        // (Left on: another test may be recording.)
+        if on {
+            noshape_render::scene::keep_content_keys(true);
+        }
+        self.scene_log = on.then(Vec::new);
+    }
+
+    /// Tests: the frames recorded since [`Viewport::record_scenes`].
+    pub fn recorded_scenes(&self) -> Vec<u64> {
+        self.scene_log.clone().unwrap_or_default()
+    }
+
+    /// What a frame drawn now draws: the scene, the camera, reduced detail or not.
+    pub fn frame_signature(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (self.scene.signature(), format!("{:?}", self.camera), self.interactive()).hash(&mut h);
+        h.finish()
     }
 
     /// Tests: keep every presented image from now on (frame by frame checks), or stop.

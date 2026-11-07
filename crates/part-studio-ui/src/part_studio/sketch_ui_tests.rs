@@ -3056,10 +3056,55 @@ fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAp
     assert_eq!(meshes(&after), meshes(&real), "the regenerated display is the cached one");
 }
 
+/// Lead 11-07, the display cache frame by frame (T1: no GPU, the scenes the frames are drawn from): from the first
+/// scene that draws the cached display, every scene the viewport is given draws the model's own frame (scene, camera,
+/// full detail), through the real regeneration's arrival and after it: no blank frame, no flash.
+#[gpui::test]
+fn the_swap_from_the_cached_display_to_the_real_one_changes_no_scene(cx: &mut TestAppContext) {
+    // Uploads hash what they hold from the start, the real display's too.
+    noshape_render::scene::keep_content_keys(true);
+    let (window, view, _top, _) = block_part(cx, "display-cache-scenes");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert!(!cx.update(|cx| view.read(cx).ui_busy()), "the block's regeneration finished");
+    let real = cx.update(|cx| view.read(cx).display.clone());
+    let dir = std::env::temp_dir().join(format!("noshape-display-cache-scenes-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    super::super::display_cache::store(&dir, "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    let _ = std::fs::remove_dir_all(&dir);
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    let model = cx.update(|cx| vp.read(cx).frame_signature());
+    cx.update(|cx| vp.update(cx, |v, _| v.record_scenes(true)));
+    // Reopened: nothing drawn yet.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.real_display_in = false;
+            v.apply_display(std::sync::Arc::new(noshape_model::display::StudioDisplay::default()), w, cx);
+        })
+    })
+    .unwrap();
+    draw(cx, window);
+    let blank = cx.update(|cx| vp.read(cx).frame_signature());
+    assert_ne!(blank, model, "the empty view differs from the model");
+    // The cached display (its scene built off the UI thread), then the real regeneration.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.show_cached_display("k".into(), cached, w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy() && view.read(cx).ui.cached_view);
+    assert_eq!(cx.update(|cx| vp.read(cx).frame_signature()), model, "the cached display draws the model's frame");
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui.cached_view && !view.read(cx).ui_busy());
+    assert!(cx.update(|cx| !view.read(cx).ui.cached_view && !view.read(cx).ui_busy()), "the real display landed");
+    let scenes = cx.update(|cx| vp.read(cx).recorded_scenes());
+    let first = scenes.iter().position(|s| *s != blank).expect("a scene of the cached model");
+    for (i, s) in scenes.iter().enumerate().skip(first) {
+        assert_eq!(*s, model, "scene {i} of {} isn't the model's frame", scenes.len());
+    }
+    assert_eq!(cx.update(|cx| vp.read(cx).frame_signature()), model, "the regenerated display draws the model's frame");
+}
+
 /// Lead 11-07, the display cache frame by frame: from the first frame that draws the cached display, every presented
 /// frame is the model's own picture, through the real regeneration's arrival and after it (no blank frame, no flash).
 #[gpui::test]
-#[ignore = "T2: reads rendered frames back; macOS CI's test platform draws them blank (CI 11-07 03:22)"]
+#[ignore = "T2: GPU pixels (macOS CI's readback came out white, run 42333748082); T1: ..._changes_no_scene"]
 fn the_swap_from_the_cached_display_to_the_real_one_changes_no_frame(cx: &mut TestAppContext) {
     let _gpu = noshape_ops::doc::gpu_lock();
     // Rendering needs a GPU adapter; CI's Linux runner has none.
