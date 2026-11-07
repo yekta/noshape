@@ -56,6 +56,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
   click that drw-hide-inspection-items records adding one) is worth a re-record too.
 
+## 11-07 16:05 UTC: export fidelity against live's 8 exports (lead's item 3)
+- Ours rerun at ece74c57's binary, compared with `compare.py --drawn-by "LOOPELF LOOPELF" --drawn-by ROOT` (the
+  title block's drawn-by is each side's user): **14/24 files** (all 8 DWG, drw-note and drw-insert-front-and-right PDF, 4 DXF; /root/dx-scratch/exp2-cmp.txt).
+- Next, PDF pens (most of the PDF differences): live draws a dimension's leader and dimension lines, centerlines and
+  GD&T frames at 0.36 pt (3 plot units, 0.13 mm) where ours uses LineStyle::Thin / Centerline 0.25 mm (0.72 pt), and
+  outlines arrowheads at 0.12 pt (1 unit; ours only fills them); live draws dashed lines as solid segments. Tables are
+  0.72 / 1.08 pt in live. Thin is shared by tables, hatch, break lines and the screen drawing, so split it per element
+  first (drawing props' own thicknesses) rather than changing Thin.
+- DXF left: section cutting line as 1 LINE + 4 SOLIDs (ours 3 + 6); detail border a POLYLINE (ours CIRCLE), the parent
+  border's ONS_PHANTOM, the label as one MTEXT; the BOM drawing's VISIBLE 20 vs 35 lines and TABLES lines; centerline
+  length 1.57 vs 1.75 (live's extends further past the ends).
+
 ## 11-07 15:01 UTC: 2132 rerun (c2 by REST, sketch bodies in): 59/88 documents, 638/936 features
 Run on vibe5 at the merge of 46e48dc6 (report: vibe5 ~/parity/report.json, copy /root/dx-scratch/report-c2.json).
 c2 matching to the end: bottle-split, lofted-basic, sm-exhaust-clamp, steak-mold-draft. First differences, by owner:
