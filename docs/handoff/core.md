@@ -16,6 +16,23 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 00:45 UTC.**
+- Landed: `#var mm` (a unit after a variable) parses; the corpus 594 -> 615 features (cf-multi-plane to the end,
+  cf-snap-hook 1 -> 7, cf-mortise-and-tenon 1 -> 5, cf-3d-spline 1 -> 2). The impeller's Shell is 3 mm again (it was
+  2.5: `#wanddicke mm` didn't parse).
+- Parked on branch `core-walls-wip` (local, not for main): a Shell path `by_cut_walls` for a loft's angled sides (each
+  kept face's offset as a B-spline, approximated piece by piece between C0 knots and joined; corners and edges traced
+  where walls and planes cross, `cross_point`). The impeller's Shell builds (valid, 6 faces, 44,838 mm³ at 3 mm, live
+  45,273; rims 584 / 1353 mm², live 584 / 1357; 134 ms; regen 3.0 s, live 2.8) but BOPAlgo's analyser finds the wall
+  self-intersecting (vertex tolerances 11-41 mm), so Booleans after it go wrong. Cause: an edge's tolerance came from
+  the drift between its 3D fit and its fitted curve on a wall, not checked; with the curves on the walls interpolated
+  through the exact (u, v) instead, some drift is still over 1e-4 of the size. Next: find which edge (the C0 joint's
+  averaged poles, where the wall is 0.026 mm off its offset, are a suspect), then the impeller's Delete face 1.
+- cf-surface-pattern's Fillet 1 (34/39): the picked face's straight edge is smooth (0°) and OCCT fails on the whole
+  tangent chain (ellipse -> B-spline sides -> the 0.693 mm front edges, all 0°), even on the ellipse alone (OCCT adds
+  the chain itself). Live's face areas say it blends the ellipse and the B-spline sides only and stops at the front's
+  bottom corners. Live capture asked (REQUESTS 11-07 00:43); probes in /root/core-scratch/fillet1-probes.diff.
+
 **State 11-06 22:15 UTC: c2-impeller-loft's open (OPEN-SLOW-SHELL-FILLET, P1).**
 - Not slow work: Shell Gehäuse fails ("Could not shell part with selections.", live OK, 6 faces, 45,273 mm³) after
   ~7 s, and 14 later features fail or do nothing behind it (Fillet 4, Move face 2, Delete face 2, Fillet Ansaugflansch
