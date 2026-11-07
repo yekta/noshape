@@ -565,9 +565,18 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   live's control; Constrained surface opens with its Vertices array active, not Tolerance. Left: Frame's Sketch profile
   picker (live: a library pick, 8020 › 10 Series › 1001 by default; our profiles are text names, no 8020 profiles),
   Routing curve's Points array (live shows Point 0 expanded), Offset surface's parts.
+- Sketch (next change): the Conic's second end takes the rubber band's horizontal / vertical between its ends (it was
+  put on the conic and refused); the recorder counts an open spline's / Bezier's / conic's two end Coincidents and a
+  Bezier's BEZIER_DEGREE, as live's model holds them; the right-click
+  menu's Use takes the right-clicked edge (it used whatever was under the cursor at the row's click: nothing). Parts
+  list: Surfaces and Curves start collapsed (live 2176). Asked live (REQUESTS 09:18): the circumscribed polygon's
+  constraints, Flow's toolbar state, a pasted sketch's selection owner, Frame's 1001 default.
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
-  the panel doesn't), the contexts selector does; a right press on a number field focuses it, all selected, on a
-  checkbox leaves the fields; the driver reads a state with the keyboard where the open menu returns it.
+  the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
+  it; Add custom features' search box is recorded, Escape there drops the keyboard. Open: a right press on a number
+  field should focus it all selected (live dialog-number-rclick-menu) and on a checkbox leave the fields (focusing in
+  the menu's build or a capture handler didn't take, and blurring there lost Convert to expression); Mirror's line
+  stays selected while it asks (selecting it in the editor stopped the next pick mirroring in the app).
 
 **Lead 11-02 23:35, top items (milestone 11-03 evening):** (1) P1 VAR-AUTOCOMPLETE-ENTER, (2) the interaction parity
 suite's noshape side (docs/PARITY-SUITES.md §2): the driver (`NOSHAPE_UI_SCRIPT` / `NOSHAPE_UI_STATE_OUT`), the state

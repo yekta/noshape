@@ -736,7 +736,8 @@ impl UiState {
             // Live (part-studio/1158): slowest first.
             regen_sort: (2, true),
             // Live part-studio/470: "Composite parts (N)" starts collapsed.
-            collapsed_sections: HashSet::from(["composites"]),
+            // Live (behaviours 2176, 28516): Composite parts, Surfaces and Curves start collapsed.
+            collapsed_sections: HashSet::from(["composites", "surfaces", "curves"]),
             parts_height: None,
             // Preferences › Part Studio settings › Display parts list properties.
             show_part_props: crate::part_studio_hooks::parts_list_properties(),

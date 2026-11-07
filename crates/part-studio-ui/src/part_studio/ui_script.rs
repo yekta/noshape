@@ -294,6 +294,18 @@ impl PartStudioView {
             }
         }
         let mut constraints: Vec<String> = users.values().filter(|n| **n > 1).flat_map(|n| std::iter::repeat_n("COINCIDENT".to_string(), n - 1)).collect();
+        // Live's model holds an open spline's, Bezier's or conic's ends as points of their own, each Coincident with
+        // it, and a Bezier's degree as a constraint (sketch-spline-menu-confirm, sketch-tool-bezier, sketch-tool-conic).
+        for e in sk.entities().filter(|e| !e.external && e.handle_of.is_none() && matches!(e.kind(), EntityKind::BSpline | EntityKind::FitSpline | EntityKind::Conic)) {
+            if e.endpoints().is_some_and(|(a, b)| a != b) {
+                constraints.extend(["COINCIDENT".to_string(), "COINCIDENT".to_string()]);
+            }
+            if let noshape_sketch::Geometry::BSpline { control, degree, .. } = &e.geometry
+                && control.len() == degree + 1
+            {
+                constraints.push("BEZIER_DEGREE".into());
+            }
+        }
         let mut dimensions: Vec<(String, f64, Option<String>)> = Vec::new();
         let units = self.doc.read(cx).session.doc.settings.units;
         for c in sk.constraints().filter(|c| c.driving) {

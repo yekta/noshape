@@ -964,6 +964,11 @@ impl PartStudioView {
     /// Project the hovered model edge (or all edges of a hovered face, or a vertex).
     fn use_hovered(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(r) = self.hover.clone() else { return };
+        self.use_reference(r, window, cx);
+    }
+
+    /// Use on `r` (the Use tool's click, or the right-clicked edge's menu row).
+    fn use_reference(&mut self, r: Reference, window: &mut Window, cx: &mut Context<Self>) {
         let Some(ed) = self.sketch.as_ref() else { return };
         let (frame, wpp, cursor) = (ed.frame, ed.world_per_px, ed.cursor.unwrap_or_default());
         let changed = match self.context.clone() {
@@ -4432,7 +4437,15 @@ impl PartStudioView {
             // Live Onshape order (sketch/31, 37, 204): Confirm | Use | copy &
             // transform | analysis | selection | zoom & view | delete.
             if model_edge && tool != Tool::Use {
-                m = m.item(item("Use", Box::new(|this, w, cx| this.use_hovered(w, cx)))).separator();
+                // The right-clicked geometry (the cursor is on the menu by the time its row is clicked).
+                let used = model_ref.clone();
+                m = m
+                    .item(item("Use", Box::new(move |this, w, cx| {
+                        if let Some(r) = used.clone() {
+                            this.use_reference(r, w, cx);
+                        }
+                    })))
+                    .separator();
             }
             if model_edge && n == 0 {
                 if let Some((b, name)) = model_body.clone() {

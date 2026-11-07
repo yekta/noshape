@@ -1459,6 +1459,15 @@ impl Render for SelectItemPanel {
         let features = mode == PanelMode::CustomFeatures;
         v_flex()
             .id("select-item-panel")
+            // Add custom features: Escape takes the keyboard out of its search box and leaves the panel open (live
+            // custom-features-menu-empty).
+            .when(features, |d| {
+                d.capture_key_down(|e, window, cx| {
+                    if e.keystroke.key == "escape" {
+                        window.blur(cx);
+                    }
+                })
+            })
             .occlude()
             .w(px(300.))
             .h(px(if features { 581. } else { 559. }))

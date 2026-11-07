@@ -2997,8 +2997,18 @@ impl SketchEditor {
                 match sk.add_conic(c[0].pos, c[2].pos, c[1].pos, self.conic_rho.clamp(0.01, 0.99)) {
                     Ok(id) => {
                         if let Some((s, e)) = sk.endpoints(id) {
-                            attach(sk, s, Some(id), &c[0]);
-                            attach(sk, e, Some(id), &c[1]);
+                            let s = attach(sk, s, Some(id), &c[0]);
+                            let e = attach(sk, e, Some(id), &c[1]);
+                            // A level or plumb rubber band to the second end makes the ends horizontal / vertical (live
+                            // sketch-tool-conic), not the conic.
+                            for a in c[1].inference.iter().flat_map(|i| i.constraints.iter()) {
+                                let kind = match a {
+                                    AutoConstraint::HorizontalLine => ConstraintKind::Horizontal { a: s, b: Some(e) },
+                                    AutoConstraint::VerticalLine => ConstraintKind::Vertical { a: s, b: Some(e) },
+                                    _ => continue,
+                                };
+                                let _ = sk.add_constraint(kind);
+                            }
                         }
                         self.finish_create(data, &[id]);
                         // The rho box opens right away (Onshape).
@@ -9058,6 +9068,19 @@ mod tests {
         ed.commit_otf(&mut d, "0.3", &UnitPrefs::default(), &noshape_units::EmptyScope).unwrap();
         let conic = d.sketch.entities().find(|e| e.kind() == EntityKind::Conic).unwrap();
         assert!(matches!(conic.geometry, noshape_sketch::Geometry::Conic { rho, .. } if (rho - 0.3).abs() < 1e-12));
+    }
+
+    /// Live sketch-tool-conic: a conic from the Origin to a point level with it, then its shoulder: Coincident at the
+    /// Origin and Horizontal between the ends, as a line's would be.
+    #[test]
+    fn a_conics_second_end_takes_its_inferences() {
+        let (mut ed, mut d) = editor(Tool::Conic);
+        for p in [v(0.0, 0.0), v(0.02, 0.0), v(0.01, 0.01)] {
+            click(&mut ed, &mut d, p);
+        }
+        let kinds: Vec<&str> = d.sketch.constraints().map(|c| c.kind.name()).collect();
+        assert!(kinds.contains(&"Coincident"), "{kinds:?}");
+        assert!(kinds.contains(&"Horizontal"), "{kinds:?}");
     }
 
     #[test]
