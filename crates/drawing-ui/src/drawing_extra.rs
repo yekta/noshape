@@ -514,9 +514,11 @@ impl DrawingEditor {
         let pal = p();
         let name = self.drawing.sheets.get(self.sheet).map(|s| s.name.clone()).unwrap_or_default();
         let label = name.clone();
+        // The runner's `sheet_tab` is the Sheets panel's row while the panel is open.
+        let panel_open = self.sheets_open;
         let chip = div()
             .id("dr-sheet-chip")
-            .map(|d| crate::ui_script::mark(d, || format!("sheet_tab:{label}")))
+            .map(|d| if panel_open { d } else { crate::ui_script::mark(d, || format!("sheet_tab:{label}")) })
             .absolute()
             .top(px(4.))
             .left(px(4.))

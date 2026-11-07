@@ -1,0 +1,123 @@
+{
+  "name": "drw-broken-out-remove",
+  "about": "A broken-out section's menu (right-click its hatch, beside the hole) › Remove section",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Broken-out section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            -8,
+            -20,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            8,
+            -20,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            8,
+            -20,
+            15
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            -8,
+            -20,
+            15
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            -8,
+            -20,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            5,
+            0,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            -6.5,
+            -20,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Remove section"
+      }
+    }
+  ]
+}

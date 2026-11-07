@@ -1959,6 +1959,15 @@ impl DrawingEditor {
         // starts with Edit note….
         let field = target.as_ref().and_then(|t| if let PickTarget::TitleField(k) = t { Some(k.clone()) } else { None });
         self.menu_broken_out = target.and_then(|t| if let PickTarget::BrokenOut { view, index } = t { Some((view, index)) } else { None });
+        // Live: a broken-out section's hatch has its menu too (anywhere inside its profile).
+        if self.menu_broken_out.is_none() {
+            let at = self.cursor;
+            self.menu_broken_out = self.current_sheet().views.iter().find_map(|v| {
+                let q = self.placement(v.id)?.to_view(at);
+                let index = v.broken_out.iter().position(|b| noshape_model::drawing::views::point_in_polygon(q, &noshape_model::drawing::views::broken_out_outline(b)))?;
+                Some((v.id, index))
+            });
+        }
         let entries = match (self.leader_hit(self.cursor), circle, cut_line, field) {
             (Some(hit), ..) => self.leader_entries(hit, cx),
             (None, Some(v), ..) => self.detail_circle_entries(v, cx),
