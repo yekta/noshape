@@ -1,19 +1,19 @@
 {
  "scenario": "drw-sheet-move-down",
- "recorded": "2026-11-07T01:02:28.628Z",
+ "recorded": "2026-11-07T17:52:27.984Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.8"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "fd9fb096dc70af6dd4a5466b",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "a8f3a5bd51a4a9d3a689d0ef",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -22,6 +22,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -84,23 +85,30 @@
   {
    "step": 1,
    "do": {
-    "do": "rclick",
-    "on": {
-     "sheet_tab": "Sheet1"
-    }
+    "do": "key",
+    "key": "ctrl+s"
    },
    "ok": true,
-   "at": [
-    71,
-    92
-   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -159,25 +167,36 @@
      "selection": []
     }
    },
-   "t": 221984
+   "t": 217308
   },
   {
    "step": 2,
    "do": {
-    "do": "click",
-    "on": {
-     "menu": "Duplicate"
-    }
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Duplicate\"}",
+   "ok": true,
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -236,7 +255,7 @@
      "selection": []
     }
    },
-   "t": 236003
+   "t": 231055
   },
   {
    "step": 3,
@@ -248,16 +267,29 @@
    },
    "ok": true,
    "at": [
-    71,
-    92
+    124,
+    158
    ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -316,25 +348,48 @@
      "selection": []
     }
    },
-   "t": 250994
+   "t": 244704
   },
   {
    "step": 4,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Move down"
+     "menu": "Duplicate"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Move down\"}",
+   "ok": true,
+   "at": [
+    165,
+    220
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "Sheet1 Copy 1 (2)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -354,8 +409,965 @@
     "sketch": null,
     "drawing": {
      "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
+     "sheet": "Sheet1 Copy 1",
      "sheets": [
+      "Sheet1",
+      "Sheet1 Copy 1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "note",
+       "text": "-"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": ".XX = ±.0- .XXX = ±.00- .XXXX = ±.000-"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "11/07/2026"
+      },
+      {
+       "kind": "note",
+       "text": "1:1"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "2 of 2"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "ANGULAR = ± ° FRACTIONAL = ±"
+      },
+      {
+       "kind": "note",
+       "text": "APPROVED"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "BREAK ALL SHARP EDGES AND REMOVE BURRS"
+      },
+      {
+       "kind": "note",
+       "text": "CHECKED"
+      },
+      {
+       "kind": "note",
+       "text": "DATE"
+      },
+      {
+       "kind": "note",
+       "text": "DO NOT SCALE DRAWING"
+      },
+      {
+       "kind": "note",
+       "text": "DRAWN"
+      },
+      {
+       "kind": "note",
+       "text": "DWG NO."
+      },
+      {
+       "kind": "note",
+       "text": "FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "LOOPELF LOOPELF"
+      },
+      {
+       "kind": "note",
+       "text": "MATERIAL"
+      },
+      {
+       "kind": "note",
+       "text": "NAME"
+      },
+      {
+       "kind": "note",
+       "text": "REV."
+      },
+      {
+       "kind": "note",
+       "text": "SCALE"
+      },
+      {
+       "kind": "note",
+       "text": "SHEET"
+      },
+      {
+       "kind": "note",
+       "text": "SIZE"
+      },
+      {
+       "kind": "note",
+       "text": "SURFACE FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "THIRD ANGLE PROJECTION"
+      },
+      {
+       "kind": "note",
+       "text": "TITLE"
+      },
+      {
+       "kind": "note",
+       "text": "UNLESS OTHERWISE SPECIFIED, DIMENSIONS ARE IN INCHES"
+      },
+      {
+       "kind": "note",
+       "text": "WEIGHT"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 267643
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_tab": "Sheet1"
+    }
+   },
+   "ok": true,
+   "at": [
+    123,
+    157
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "Sheet1 Copy 1 (2)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1 Copy 1",
+     "sheets": [
+      "Sheet1",
+      "Sheet1 Copy 1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "note",
+       "text": "-"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": ".XX = ±.0- .XXX = ±.00- .XXXX = ±.000-"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "11/07/2026"
+      },
+      {
+       "kind": "note",
+       "text": "1:1"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "2 of 2"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "ANGULAR = ± ° FRACTIONAL = ±"
+      },
+      {
+       "kind": "note",
+       "text": "APPROVED"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "BREAK ALL SHARP EDGES AND REMOVE BURRS"
+      },
+      {
+       "kind": "note",
+       "text": "CHECKED"
+      },
+      {
+       "kind": "note",
+       "text": "DATE"
+      },
+      {
+       "kind": "note",
+       "text": "DO NOT SCALE DRAWING"
+      },
+      {
+       "kind": "note",
+       "text": "DRAWN"
+      },
+      {
+       "kind": "note",
+       "text": "DWG NO."
+      },
+      {
+       "kind": "note",
+       "text": "FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "LOOPELF LOOPELF"
+      },
+      {
+       "kind": "note",
+       "text": "MATERIAL"
+      },
+      {
+       "kind": "note",
+       "text": "NAME"
+      },
+      {
+       "kind": "note",
+       "text": "REV."
+      },
+      {
+       "kind": "note",
+       "text": "SCALE"
+      },
+      {
+       "kind": "note",
+       "text": "SHEET"
+      },
+      {
+       "kind": "note",
+       "text": "SIZE"
+      },
+      {
+       "kind": "note",
+       "text": "SURFACE FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "THIRD ANGLE PROJECTION"
+      },
+      {
+       "kind": "note",
+       "text": "TITLE"
+      },
+      {
+       "kind": "note",
+       "text": "UNLESS OTHERWISE SPECIFIED, DIMENSIONS ARE IN INCHES"
+      },
+      {
+       "kind": "note",
+       "text": "WEIGHT"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 281791
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Move down"
+    }
+   },
+   "ok": true,
+   "at": [
+    164,
+    245
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 Copy 1 (1)",
+     "text": [
+      "Sheet1 Copy 1 (1)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "Sheet1 (2)",
+      "In progress",
+      "Part 1",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1 Copy 1",
+     "sheets": [
+      "Sheet1 Copy 1",
       "Sheet1"
      ],
      "tool": null,
@@ -389,11 +1401,388 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "circle",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "line",
+       "text": null
+      },
+      {
+       "kind": "note",
+       "text": "-"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": "----"
+      },
+      {
+       "kind": "note",
+       "text": ".XX = ±.0- .XXX = ±.00- .XXXX = ±.000-"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "1"
+      },
+      {
+       "kind": "note",
+       "text": "1 of 2"
+      },
+      {
+       "kind": "note",
+       "text": "11/07/2026"
+      },
+      {
+       "kind": "note",
+       "text": "1:1"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "2"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "A"
+      },
+      {
+       "kind": "note",
+       "text": "ANGULAR = ± ° FRACTIONAL = ±"
+      },
+      {
+       "kind": "note",
+       "text": "APPROVED"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "B"
+      },
+      {
+       "kind": "note",
+       "text": "BREAK ALL SHARP EDGES AND REMOVE BURRS"
+      },
+      {
+       "kind": "note",
+       "text": "CHECKED"
+      },
+      {
+       "kind": "note",
+       "text": "DATE"
+      },
+      {
+       "kind": "note",
+       "text": "DO NOT SCALE DRAWING"
+      },
+      {
+       "kind": "note",
+       "text": "DRAWN"
+      },
+      {
+       "kind": "note",
+       "text": "DWG NO."
+      },
+      {
+       "kind": "note",
+       "text": "FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "LOOPELF LOOPELF"
+      },
+      {
+       "kind": "note",
+       "text": "MATERIAL"
+      },
+      {
+       "kind": "note",
+       "text": "NAME"
+      },
+      {
+       "kind": "note",
+       "text": "REV."
+      },
+      {
+       "kind": "note",
+       "text": "SCALE"
+      },
+      {
+       "kind": "note",
+       "text": "SHEET"
+      },
+      {
+       "kind": "note",
+       "text": "SIZE"
+      },
+      {
+       "kind": "note",
+       "text": "SURFACE FINISH"
+      },
+      {
+       "kind": "note",
+       "text": "THIRD ANGLE PROJECTION"
+      },
+      {
+       "kind": "note",
+       "text": "TITLE"
+      },
+      {
+       "kind": "note",
+       "text": "UNLESS OTHERWISE SPECIFIED, DIMENSIONS ARE IN INCHES"
+      },
+      {
+       "kind": "note",
+       "text": "WEIGHT"
+      }
+     ],
      "selection": []
     }
    },
-   "t": 265609
+   "t": 296337
   }
  ]
 }
