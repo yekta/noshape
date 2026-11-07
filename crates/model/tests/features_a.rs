@@ -2381,3 +2381,26 @@ fn rounds_of_slanted_rims_meet_and_run_out_as_live() {
     let blends = after[0].faces.iter().filter(|n| format!("{n:?}").contains("Blend")).count();
     assert_eq!(blends, 2, "{:?}", after[0].faces);
 }
+
+/// A Curvature fillet of a concave corner adds material (c2-extension-spring's Fillet 1: R 0.5, magnitude 0.5, its
+/// slot's two inner corners, 1 mm deep: live 51.800 -> 51.882 mm³, 0.041 mm³ a corner; a circular R 0.5 adds 0.054).
+#[test]
+fn a_curvature_fillet_of_a_concave_corner_adds_material() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 0.0), (10.0, 0.0), (10.0, 5.0), (5.0, 5.0), (5.0, 10.0), (0.0, 10.0)].iter().map(|&(x, y)| sk.add_point(DVec2::new(x, y) * 1e-3)).collect();
+    for i in 0..6 {
+        sk.add_line_between(p[i], p[(i + 1) % 6]).unwrap();
+    }
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "1 mm", "NEW");
+    let res = t.ok();
+    let before = total_volume(&res.context);
+    let body = solids(&res.context)[0].clone();
+    let corner = edge_near(&body, DVec3::new(5e-3, 5e-3, 0.5e-3));
+    t.add("fillet", &[("entities", q(vec![corner])), ("radius", e("0.5 mm")), ("nonCircularRadius", e("0.5 mm")), ("crossSection", en("CURVATURE")), ("magnitude", e("0.5"))]);
+    let res = t.ok();
+    let added = (total_volume(&res.context) - before) * 1e9;
+    assert!(added > 0.03 && added < 0.054, "{added} mm³ added (live about 0.041)");
+}

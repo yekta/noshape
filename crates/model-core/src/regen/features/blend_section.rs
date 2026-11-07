@@ -211,7 +211,15 @@ fn frame_at(body: &Shape, faces: [&Shape; 2], p: DVec3, tangent: DVec3, scale: f
             Ok(k::distance(&q, faces[i])?.distance < d * 1e-3)
         };
         let sides: Vec<f64> = [1.0, -1.0].into_iter().filter(|su| on_face(*su).unwrap_or(false)).collect();
-        let sides = if sides.is_empty() { vec![1.0, -1.0] } else { sides };
+        // (Undecided, both a step from a face's corner or both on it: the side its centroid is on. A concave corner's
+        // section went into the material otherwise: c2-extension-spring's Curvature fillet.)
+        let sides = match sides.as_slice() {
+            [_] => sides,
+            _ => match faces[i].centroid() {
+                Ok(c) if (c - p).dot(dir).abs() > d => vec![(c - p).dot(dir).signum()],
+                _ => vec![1.0, -1.0],
+            },
+        };
         'search: for su in sides {
             for sn in [-1.0, 1.0] {
                 let q = p + dir * (su * d) + n * (sn * d);
