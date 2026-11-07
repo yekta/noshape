@@ -1773,7 +1773,8 @@ impl Ctx<'_> {
             for y in &ib {
                 let lo = x[0].0.max(y[0].0);
                 let hi = x[1].0.min(y[1].0);
-                if near(lo, hi) {
+                // (Apart (prize-wheel-tim's sphere's section by a tool's flat outside the sphere's face), or touching.)
+                if lo >= hi || near(lo, hi) {
                     continue;
                 }
                 let vlo = pick(self, x[0], y[0], true)?;

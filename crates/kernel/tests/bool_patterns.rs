@@ -636,6 +636,15 @@ fn a_sphere_knob_fused_onto_a_wheel_as_occt() {
     as_recorded("b2a1c0a5aff95e9f");
 }
 
+/// prize-wheel-tim's fuse of three tools with flats at x ±1.2 mm into the hub under its sphere knob (recorded): OCCT's
+/// result. The sphere's sections by the flats lie outside the sphere's face: the two faces' parts of a section were
+/// apart, and an edge was made backwards between their ends (a 0.2 mm arc splitting a flat; "no point inside a face
+/// piece" after ~17 ms, then OCCT's).
+#[test]
+fn tools_under_a_sphere_knob_fused_as_occt() {
+    as_recorded("1b25a77bc927a450");
+}
+
 /// cf-fix-pcb's fuse of imported boards (recorded, five of its 51 tools: two of them the same board): their flat faces
 /// are B-spline surfaces, read as the planes they are, so the boards' faces lying on each other are found as planes'
 /// (one face's piece on the other's was "a piece's point on another solid's face"; OCCT's tree of fuses, 4.3 s).

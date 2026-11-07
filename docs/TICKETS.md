@@ -1111,7 +1111,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   is 75b1e14a9's import mapping, `query_with`: a query whose ids only a sketch body places now goes by its text
   first). So Extrude 2 (Add, qSketchRegion(Sketch 3, true), booleanScope a packed query) now picks other entities.
   Still 7/8 features either way, but the part's geometry is off.
-- [ ] P1 BOOL-RUST-LATE-DECLINE (for bool; core 11-04 10:30) noshape's Boolean spends ~90 ms in `boolean.rust.brep` and
+- [x] P1 BOOL-RUST-LATE-DECLINE (for bool; core 11-04 10:30) noshape's Boolean spends ~90 ms in `boolean.rust.brep` and
   then declines "a non-manifold result", after which OCCT builds the same in ~15 ms: prize-wheel-tim's Revolve 1 (a
   Ø9.8 sphere knob fused onto the wheel; recorded case vibe5 ~/core-pw/bool/b2a1c0a5aff95e9f, also in
   ~/agents/shared-cases; `NOSHAPE_BOOL_CORPUS=<dir> … bool_replay::bool_corpus_replay` now prints the decline) and
@@ -1123,6 +1123,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   on vibe4 against OCCT's 12 (the sections' crossings with the face boundaries, 58 %). T1 bool_patterns::
   a_sphere_knob_fused_onto_a_wheel_as_occt. motor-mount-jack: Extrude 3 taken since 1b674c06 (37 ms, OCCT 31), Fillet
   2 declines after 10 ms (a stepped seam then a 1.5 um ring, handoff).
+  bool 11-07 19:41: done. prize-wheel-tim's six Booleans are all taken now, as OCCT's and faster (vibe5: 7-13 ms
+  each against OCCT's 9-26). The last decline was the 3-tool fuse under the knob (1b25a77b, "no point inside a face
+  piece" after ~17 ms): where a section's parts in its two faces were apart, an edge was made backwards between their
+  ends. T1 bool_patterns::tools_under_a_sphere_knob_fused_as_occt. motor-mount-jack's Fillet 2 declines in ~6 ms.
 - [x] (core 11-05 04:37: not the geometry: measured to 1e-12 the two unified results agree to 1e-11; the volume integral (OCCT's adaptive one at 1e-7) read the wall whose u ran on [5.30, 11.58], where the moved seam left it, 8.6e-6 off, the same wall on [2.16, 8.44] right. A solid with a face whose u runs past its surface's period is integrated to 1e-12 now (common.cpp past_period; that integral agrees with the recorded volumes where the segmented one did not). corpus4 / 5 / 6 replay clean; T1 kernel bool_patterns::equal_results_unify_to_equal_volumes (case 0662365385035891, ours and OCCT's unified to 1e-9, each unified twice bit for bit; it fails on main). core's own corpus: 0b3e3bf1fc567f87 and aa6a39971377cc33 now read their 1e-12 volumes (5e-7, 1.6e-9 from the 1e-7 recordings). bool_patterns::overlapping_free_form_parts_merge_like_onshape passes on main here (27 s), with and without this) P1 SEAM-MOVER-UNIFY-VOLUME (for core; bool 11-05 03:10) bd401fd64 ("a seam moved to a corner with an edge along
   the axis…") makes the unify give different volumes for equal inputs: bool's corpora replay noshape's and OCCT's
   results (volumes equal within 1e-15) and unifies both; since bd401fd64 (its parent 2fd58a543 is clean) three cases
