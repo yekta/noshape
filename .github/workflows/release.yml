@@ -554,9 +554,9 @@ jobs:
       # This installer updating installs across UAC, as for a user with UAC on (.github/release/uac): the helper of an
       # older release's Restart at Medium integrity, the installer elevated by UAC, a copy running from the install
       # folder (v0.4.28's helper with one met exit code 5 and ended in silence, 11-06). The old helpers (v0.4.28-29,
-      # v0.4.30-33: they run every user's next update) and today's. A dry run only.
+      # v0.4.30-33: they run every user's next update) and today's. On releases too: it gates the installer.
       - name: Windows update across UAC
-        if: runner.os == 'Windows' && github.ref_type != 'tag'
+        if: runner.os == 'Windows'
         timeout-minutes: 30
         shell: powershell
         env:
