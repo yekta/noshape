@@ -3842,3 +3842,43 @@ fn a_seam_split_arc_is_one_edge() {
     let r = t.ok(f);
     assert_eq!(r.context.bodies[0].shape.count(noshape_kernel::ShapeType::Face), faces + 1, "one round face");
 }
+
+/// qa RUST-MIRROR-SPLIT-FACES (holemir.py): a half plate with a counterbored through hole (Ø6, Ø10 x 3) centred on
+/// Right, Part mirror Add across Right: live's 9 faces (6 planes, the counterbore's floor, its wall and the hole's), the
+/// halves merged on both Boolean paths (noshape's gave 16, then 10), 5566.4602 mm³.
+#[test]
+fn part_mirror_of_a_half_counterbored_hole_merges_across_the_plane() {
+    for rust in [false, true] {
+        noshape_kernel::set_rust_boolean(Some(rust));
+        let mut t = T::new();
+        let (_, regions) = t.sketch(&[&[(0.0, -10.0), (15.0, -10.0), (15.0, 10.0), (0.0, 10.0)]], &[]);
+        t.add("extrude", &[("entities", q(regions)), ("depth", e("10 mm")), ("operationType", en("NEW"))]);
+        let pl = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("10 mm"))]);
+        let mut sk = noshape_sketch::Sketch::new();
+        let p = sk.add_point(DVec2::new(0.0, 0.0));
+        let s = t.add("sketch", &[("sketchPlane", q(vec![Reference::FeaturePlane(pl)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+        let body = t.regen().context.bodies[0].id.clone();
+        let h = t.add(
+            "hole",
+            &[
+                ("scope", q(vec![Reference::Body(body.clone())])),
+                ("locations", q(vec![Reference::SketchEntity { sketch: s, entity: p.0 }])),
+                ("unitsSystem", en("METRIC")),
+                ("styleV2", en("C_BORE")),
+                ("startStyle", en("SKETCH")),
+                ("holeDiameterV3", e("6 mm")),
+                ("endStyleV2", en("THROUGH")),
+                ("cBoreDiameterV3", e("10 mm")),
+                ("cBoreDepthV3", e("3 mm")),
+            ],
+        );
+        t.ok(h);
+        let m = t.add("mirror", &[("patternType", en("PART")), ("operationType", en("ADD")), ("entities", q(vec![Reference::Body(body)])), ("mirrorPlane", q(vec![Reference::Plane(DatumPlane::Right)])), ("defaultScope", ParamValue::Bool(true))]);
+        let r = t.ok(m);
+        noshape_kernel::set_rust_boolean(None);
+        let b = &r.context.bodies[0].shape;
+        assert_eq!(b.count(noshape_kernel::ShapeType::Face), 9, "rust {rust}");
+        assert!((volume(&r) - 5566.4602).abs() < 1e-3, "rust {rust}: {} mm³", volume(&r));
+        assert!(b.is_valid(), "rust {rust}");
+    }
+}
