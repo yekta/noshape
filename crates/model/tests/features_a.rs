@@ -722,6 +722,28 @@ fn face_blend_adjacent_faces() {
     assert!(near(removed, (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04, 1e-3));
 }
 
+/// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
+/// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
+/// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).
+#[test]
+fn a_picked_faces_fillet_leaves_its_tangent_edges() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.04, "20 mm");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.04, 0.02, 0.02));
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("3 mm"))]);
+    let res = t.ok();
+    let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    t.add("fillet", &[("entities", q(vec![top])), ("radius", e("1 mm")), ("tangentPropagation", b(false))]);
+    let res = t.ok();
+    let rounds: Vec<f64> = res.context.bodies[0].shape.faces().iter().filter_map(|f| match f.face_surface() {
+        Ok(noshape_kernel::Surface::Cylinder { radius, .. }) => Some(radius),
+        _ => None,
+    }).collect();
+    assert!(rounds.iter().any(|r| (r - 0.003).abs() < 1e-9), "{rounds:?}");
+    assert!(rounds.iter().any(|r| (r - 0.001).abs() < 1e-9), "{rounds:?}");
+}
+
 #[test]
 fn modify_fillet_radius_and_remove() {
     let mut t = T::new();
