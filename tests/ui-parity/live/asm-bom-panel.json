@@ -1,0 +1,424 @@
+{
+ "scenario": "asm-bom-panel",
+ "recorded": "2026-11-07T01:56:43.789Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "e3ffeb395c5c6ac4759c788c",
+  "start": "two-blocks",
+  "startElement": "593cbc316fd295523e79fef3",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start two-blocks asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "BOM Table"
+    }
+   },
+   "ok": true,
+   "at": [
+    1904,
+    428
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "panel": {
+     "title": "Bill of materials",
+     "rows": [
+      {
+       "name": "1 | 1 |  | ",
+       "active": false
+      },
+      {
+       "name": "2 | 1 |  | ",
+       "active": false
+      }
+     ],
+     "banner": null
+    }
+   },
+   "t": 33275
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "BOM Table"
+    }
+   },
+   "ok": true,
+   "at": [
+    1186,
+    428
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null
+   },
+   "t": 36051
+  }
+ ]
+}

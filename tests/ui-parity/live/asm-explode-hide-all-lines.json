@@ -1,0 +1,726 @@
+{
+ "scenario": "asm-explode-hide-all-lines",
+ "recorded": "2026-11-07T01:41:58.799Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+ },
+ "live": {
+  "document": "d434fb734585b9e3f85b1cca",
+  "workspace": "e46def584afd02d0b1b2ea03",
+  "element": "82b16fbf2a349f2f14b5d7c4",
+  "start": "two-blocks",
+  "startElement": "17925cad4a23714ccd49b367",
+  "runner": "live2 .nstate-uip-3.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "start two-blocks asm",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Origin",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Part 1 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Part 2 <1>",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-instance"
+    },
+    {
+     "name": "Mate features (0)",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": "is-folder"
+    }
+   ],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": []
+  },
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Exploded views"
+    }
+   },
+   "ok": true,
+   "at": [
+    1904,
+    494
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "panel": {
+     "title": "Exploded views",
+     "rows": [],
+     "banner": null
+    }
+   },
+   "t": 35932
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Add exploded view"
+    }
+   },
+   "ok": true,
+   "at": [
+    1564,
+    126
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm Copy 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Build steps by dragging components Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.",
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "panel": {
+     "title": "Exploded views",
+     "rows": [
+      {
+       "name": "Explode 1",
+       "active": true
+      }
+     ],
+     "banner": "Editing Explode 1"
+    }
+   },
+   "t": 39250
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "panel_row": "Explode 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    1272,
+    120
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Collapse Explode 1",
+      "Rename",
+      "Show all explode lines",
+      "Hide all explode lines",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm Copy 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Build steps by dragging components Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.",
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "panel": {
+     "title": "Exploded views",
+     "rows": [
+      {
+       "name": "Explode 1",
+       "active": true
+      }
+     ],
+     "banner": "Editing Explode 1"
+    }
+   },
+   "t": 41884
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Hide all explode lines"
+    }
+   },
+   "ok": true,
+   "at": [
+    1364,
+    211
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "start two-blocks asm Copy 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (0)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      }
+     ],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "Build steps by dragging components Select components in the graphics area or the instance list, then drag or rotate them using the triad manipulator.",
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": []
+    },
+    "drawing": null,
+    "panel": {
+     "title": "Exploded views",
+     "rows": [
+      {
+       "name": "Explode 1",
+       "active": true
+      }
+     ],
+     "banner": "Editing Explode 1"
+    }
+   },
+   "t": 44615
+  }
+ ]
+}
