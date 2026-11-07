@@ -138,7 +138,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "sheet",
             summary: "Add, rename, duplicate, copy, move or delete a sheet, or change its Sheet properties",
-            description: "The Sheets panel's sheet menu and the Sheet properties dialog, on sheet `sheet` (default: the one shown):\n- `add`: Insert sheet after it (same size, scale and title block; \"Add sheet\").\n- `rename`: Rename… to `name` (\"Rename sheet\").\n- `duplicate`: Duplicate, right after it, \"<name> copy\" (\"Duplicate sheet\").\n- `copy`: Copy then Paste: appended at the end, \"<name> (1)\" (\"Paste sheet\").\n- `move`: Move up / Move down to position `to` (1 = first; \"Move sheet\").\n- `delete`: Delete (never the last sheet; \"Delete sheet\").\n- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale (\"1:2\"), size (\"A3\", \"A Portrait\"…, \"Custom\"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom); one edit each (\"Select a DWT\", \"Format\", \"Sheet scale\", \"Sheet size\", \"Sheet zones\", \"Sheet border\").\nReplies with the sheet acted on (`sheet`, 1 = first) and the sheet list.",
+            description: "The Sheets panel's sheet menu and the Sheet properties dialog, on sheet `sheet` (default: the one shown):\n- `add`: Insert sheet after it (same size, scale and title block; \"Add sheet\").\n- `rename`: Rename… to `name` (\"Rename sheet\").\n- `duplicate`: Duplicate, right after it, \"<name> copy\" (\"Duplicate sheet\").\n- `copy`: Copy then Paste: appended at the end, \"<name> (1)\" (\"Paste sheet\").\n- `move`: Move up / Move down to position `to` (1 = first; \"Move sheet\").\n- `delete`: Delete (never the last sheet; \"Delete sheet\").\n- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale (\"1:2\"), size (\"A3\", \"A Portrait\"…, \"Custom\"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom), reference (\"Unassigned\": the title block's part properties empty; null: the sheet's part); one edit each (\"Select a DWT\", \"Format\", \"Sheet scale\", \"Sheet size\", \"Sheet zones\", \"Sheet border\", \"Sheet reference\").\nReplies with the sheet acted on (`sheet`, 1 = first) and the sheet list.",
             fields: vec![
                 doc_field(),
                 drawing_field(),
@@ -746,6 +746,8 @@ fn sheet_props_json(d: &noshape_model::drawing::Drawing, i: usize) -> Value {
         "width": (w * 1000.0).round() / 1000.0,
         "height": (h * 1000.0).round() / 1000.0,
         "dwt": s.dwt,
+        // Reference: "Unassigned", or null for the sheet's first base view's part.
+        "reference": s.reference_unassigned.then_some("Unassigned"),
     });
     if matches!(s.size, noshape_model::drawing::SheetSize::Custom { .. }) && s.dwt.is_none() {
         j["zones"] = json!(s.format.zone_counts(s.size));
@@ -762,7 +764,7 @@ type SheetStep = (&'static str, Box<dyn Fn(&mut noshape_model::drawing::Drawing)
 fn sheet_prop_steps(od: &OpenDoc, d: &noshape_model::drawing::Drawing, i: usize, set: &serde_json::Map<String, Value>) -> Result<Vec<SheetStep>, OpError> {
     use noshape_model::drawing::{SheetSize, ZoneStart};
     let err = |k: &str, m: &str| OpError::param(&format!("set.{k}"), m);
-    let order = ["dwt", "scale", "size", "width", "height", "zones", "zone_start", "border"];
+    let order = ["dwt", "scale", "size", "width", "height", "zones", "zone_start", "border", "reference"];
     if set.contains_key("name") {
         return Err(err("name", "use action rename"));
     }
@@ -830,6 +832,16 @@ fn sheet_prop_steps(od: &OpenDoc, d: &noshape_model::drawing::Drawing, i: usize,
                 let s = x.as_str().and_then(size_by_name).filter(|s| list.contains(&s.list_name()) || *s == size).ok_or_else(|| err(k, &format!("one of {}", list.join(", "))))?;
                 steps.push(("Sheet size", Box::new(move |d| d.sheets[i].size = s)));
                 size = s;
+            }
+            "reference" => {
+                let unassigned = match x.as_str() {
+                    Some("Unassigned") => true,
+                    None if x.is_null() => false,
+                    _ => return Err(err(k, "\"Unassigned\", or null for the sheet's part")),
+                };
+                if d.sheets[i].reference_unassigned != unassigned {
+                    steps.push(("Sheet reference", Box::new(move |d| d.sheets[i].reference_unassigned = unassigned)));
+                }
             }
             _ if !matches!(size, SheetSize::Custom { .. }) || dwt.is_some() => return Err(err(k, "Custom size only (set size: \"Custom\")")),
             "width" | "height" => {

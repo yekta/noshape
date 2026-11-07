@@ -702,19 +702,22 @@ fn pdf_content(g: &SheetGeometry, ocgs: &mut Vec<super::cad_layers::CadLayer>, f
             Some(p) => (centered_dashes(polyline_length(l), &p).unwrap_or_default(), 0.0),
             None => (dash, g.line_dash_phase(li)),
         };
-        if dash.is_empty() {
-            content.push_str("[] 0 d\n");
-        } else {
-            let d: Vec<String> = dash.iter().map(|x| format!("{:.3}", x * pt)).collect();
-            let _ = writeln!(content, "[{}] {:.3} d", d.join(" "), phase * pt);
-        }
         let _ = writeln!(content, "{:.3} w", plot_width(width_mm) * pt);
-        for (i, p) in l.points.iter().enumerate() {
-            path_point(&mut content, p, pt, i == 0);
+        if dash.is_empty() {
+            for (i, p) in l.points.iter().enumerate() {
+                path_point(&mut content, p, pt, i == 0);
+            }
+            content.push_str(if l.closed { "s\n" } else { "S\n" });
+            continue;
         }
-        content.push_str(if l.closed { "s\n" } else { "S\n" });
+        // Live's PDF: a dashed line is its dashes, each a solid stroke.
+        for piece in super::sheet::dash(&l.points, l.closed, &dash, phase) {
+            for (i, p) in piece.iter().enumerate() {
+                path_point(&mut content, p, pt, i == 0);
+            }
+            content.push_str("S\n");
+        }
     }
-    content.push_str("[] 0 d\n");
     // Consecutive fills of one layer and colour (an exploded text's
     // triangles, arrowheads) are one path: the triangles don't overlap, so
     // the nonzero rule fills their union, and a renderer's antialiasing

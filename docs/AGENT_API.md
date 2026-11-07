@@ -4926,7 +4926,7 @@ The Sheets panel's sheet menu and the Sheet properties dialog, on sheet `sheet` 
 - `copy`: Copy then Paste: appended at the end, "<name> (1)" ("Paste sheet").
 - `move`: Move up / Move down to position `to` (1 = first; "Move sheet").
 - `delete`: Delete (never the last sheet; "Delete sheet").
-- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale ("1:2"), size ("A3", "A Portrait"…, "Custom"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom); one edit each ("Select a DWT", "Format", "Sheet scale", "Sheet size", "Sheet zones", "Sheet border").
+- `properties`: without `set`, replies with the dialog's fields (`properties`); `set` changes scale ("1:2"), size ("A3", "A Portrait"…, "Custom"), width / height (mm; Custom), zones ([horizontal, vertical], 0–20 even; Custom), zone_start (bottom_right | top_left), border (Custom), dwt (a DWT file tab: Select a DWT) or dwt: null (Format › Custom), reference ("Unassigned": the title block's part properties empty; null: the sheet's part); one edit each ("Select a DWT", "Format", "Sheet scale", "Sheet size", "Sheet zones", "Sheet border", "Sheet reference").
 Replies with the sheet acted on (`sheet`, 1 = first) and the sheet list.
 
 Examples:

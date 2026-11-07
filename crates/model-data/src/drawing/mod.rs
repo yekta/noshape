@@ -2852,6 +2852,10 @@ pub struct Sheet {
     /// before the first view, live 820).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub scale_shown: bool,
+    /// Sheet properties › Reference: Unassigned (the title block's part
+    /// properties stay empty); else the sheet's first base view's part.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reference_unassigned: bool,
     /// The scale as typed (see `DrawingView::scale_text`): the title
     /// block's SCALE shows it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3159,7 +3163,7 @@ impl Sheet {
 
 impl Default for Sheet {
     fn default() -> Self {
-        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false, scale_text: None, format_edits: vec![] }
+        Self { name: "Sheet1".into(), size: SheetSize::A3, scale: 1.0, views: vec![], annotations: vec![], title_block: TitleBlock::default(), tables: vec![], title_style: TitleBlockStyle::Simple, sketch: Default::default(), images: vec![], format: SheetFormat::default(), title_language: Default::default(), imported: None, sketch_dim_constraints: vec![], uid: 0, dwt: None, scale_shown: false, reference_unassigned: false, scale_text: None, format_edits: vec![] }
     }
 }
 

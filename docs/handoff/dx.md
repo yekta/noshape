@@ -50,8 +50,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     own shape / width selects with the drawing's entry repeated as "… (Drawing)"; each item keeps its shape and width
     (`inspection_shape` / `inspection_chars`, ops `shape` / `border_size` on add). Asked live what the dialog's size
     field ("2.0000 ▾") sets (REQUESTS, with the re-records).
-- Left from the recordings: Sheet properties › Reference lists "Unassigned" (needs a settable sheet reference; ours
-  is derived from the views); the Sheets panel's view order (live Front, Right, Top, Isometric: creation order of its
+- Sheet properties › Reference lists the sheet's part and "Unassigned" (Sheet::reference_unassigned: the title block's
+  part fields read "----"; ops `set.reference`: "Unassigned" / null). Left from the recordings: the Sheets panel's view
+  order (live Front, Right, Top, Isometric: creation order of its
   start, ours Front, Top, Right, Isometric); 12 scenarios to re-record (REQUESTS 15:45: sheets through the panel,
   cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
   click that drw-hide-inspection-items records adding one) is worth a re-record too.
@@ -59,7 +60,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 ## 11-07 16:05 UTC: export fidelity against live's 8 exports (lead's item 3)
 - Ours rerun at ece74c57's binary, compared with `compare.py --drawn-by "LOOPELF LOOPELF" --drawn-by ROOT` (the
   title block's drawn-by is each side's user): **14/24 files** (all 8 DWG, drw-note and drw-insert-front-and-right PDF, 4 DXF; /root/dx-scratch/exp2-cmp.txt).
-- Next, PDF pens (most of the PDF differences): live draws a dimension's leader and dimension lines, centerlines and
+- Annotation lines now take their own pen (`annotation_pens`: thin lines 0.13 mm, drawn centerlines Construction
+  geometry › Centerlines' thickness), under the annotations' own pens, and the PDF writes a dashed line as its dashes
+  (solid strokes, as live; `sheet::dash`, moved down from drawing-ui). Still 14/24 files, but the PDF differences
+  shrank to lengths: arrowhead outlines at 0.12 pt (live strokes 0.12 pt in the detail view too, which has no arrows:
+  look before copying), the GD&T sheet's small circle-and-cross marks and the section line's two end strokes at
+  0.72 pt (view-drawn, not annotations), the detail circle's 0.36 pt length (272 vs 123.5), centerline length (live's
+  runs further past its ends), the BOM drawing's table pens (live 0.72 / 1.08). Before (the PDF differences): live draws a dimension's leader and dimension lines, centerlines and
   GD&T frames at 0.36 pt (3 plot units, 0.13 mm) where ours uses LineStyle::Thin / Centerline 0.25 mm (0.72 pt), and
   outlines arrowheads at 0.12 pt (1 unit; ours only fills them); live draws dashed lines as solid segments. Tables are
   0.72 / 1.08 pt in live. Thin is shared by tables, hatch, break lines and the screen drawing, so split it per element

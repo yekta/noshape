@@ -4249,6 +4249,13 @@ fn drawing_sheet_menu_and_properties() {
     // Sheet properties: read, then scale, size, Custom with zones.
     let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties" }));
     assert_eq!(p["properties"]["size"], "A3", "{p}");
+    assert_eq!(p["properties"]["reference"], Value::Null, "{p}");
+    let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "reference": "Unassigned" } }));
+    assert_eq!(last(&mut ctx), "Sheet reference");
+    assert_eq!(p["properties"]["reference"], "Unassigned", "{p}");
+    let e = try_call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "reference": "Part 1" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.reference"), "{e:?}");
+    call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "reference": null } }));
     let p = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "properties", "set": { "scale": "1:2", "size": "A2" } }));
     assert_eq!(last(&mut ctx), "Sheet size");
     assert_eq!(p["properties"]["scale"], "1:2", "{p}");

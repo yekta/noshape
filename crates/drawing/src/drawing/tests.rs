@@ -3452,6 +3452,9 @@ fn assembly_drawing_fields_are_the_assemblys_own() {
         a.properties.part_number = Some("ASM-9".into());
     }
     assert_eq!(note(&doc, &drawing), format!("N[ASM-9] M[{asm_name}]"));
+    // Sheet properties › Reference › Unassigned: no part to describe.
+    drawing.sheets[0].reference_unassigned = true;
+    assert_eq!(note(&doc, &drawing), "N[----] M[----]");
 }
 
 #[test]

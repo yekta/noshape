@@ -919,7 +919,7 @@ fn map_polyline(pl: &ViewPlacement, pts: &[[f64; 2]]) -> Vec<Vec<[f64; 2]>> {
 /// Mass (kg) of the part the sheet's first base view shows: its override,
 /// else from its material's density.
 fn part_mass(drawing: &Drawing, sheet: &Sheet, sources: &Sources) -> Option<f64> {
-    let base = sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))?;
+    let base = reference_view(drawing, sheet)?;
     let (k, body) = views::SourceKey::of_view(base)?;
     let src = sources.get(&k)?;
     // An assembly: its override, else the sum of its parts.
@@ -941,6 +941,36 @@ fn part_mass(drawing: &Drawing, sheet: &Sheet, sources: &Sources) -> Option<f64>
     let id = info.body.clone()?;
     let rho = info.density;
     crate::regen::measure::mass_properties(&src.context, std::slice::from_ref(&id), &|_| rho).and_then(|m| m.mass)
+}
+
+/// The view whose part the sheet's title block describes: its first base view
+/// (else the drawing's); none when Sheet properties › Reference is Unassigned.
+fn reference_view<'a>(drawing: &'a Drawing, sheet: &'a Sheet) -> Option<&'a super::DrawingView> {
+    if sheet.reference_unassigned {
+        return None;
+    }
+    sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))
+}
+
+/// Annotation lines' pens (live's PDF: dimension and leader lines, GD&T
+/// frames and drawn centerlines at 0.13 mm, 3 plot units), placed before the
+/// annotations' own pens so those still win.
+fn annotation_pens(g: &mut SheetGeometry, from: usize, at: usize, p: &super::DrawingProps) {
+    const ANNOTATION_PEN_MM: f64 = 0.13;
+    let pen = |style: LineStyle| match style {
+        LineStyle::Thin => Some((ANNOTATION_PEN_MM, Vec::new())),
+        LineStyle::Centerline => Some((p.view_tab.centerline_thickness, style.dashes().iter().map(|d| d * p.view_tab.centerline_dashes.max(0.01)).collect())),
+        _ => None,
+    };
+    let mut spans: Vec<super::sheet::PenSpan> = Vec::new();
+    for i in from..g.lines.len() {
+        let Some((width_mm, dashes)) = pen(g.lines[i].style) else { continue };
+        match spans.last_mut() {
+            Some(s) if s.lines.end == i && s.width_mm == width_mm && s.dashes == dashes => s.lines.end = i + 1,
+            _ => spans.push(super::sheet::PenSpan { centered: false, lines: i..i + 1, width_mm, dashes }),
+        }
+    }
+    g.pens.splice(at..at, spans);
 }
 
 /// Lines moved to a format layer take its thickness too (Drawing properties ›
@@ -971,9 +1001,9 @@ fn annotation_cad_layers(k: &AnnotationKind) -> (CadLayer, CadLayer) {
 /// Lookup of property fields for a sheet.
 pub fn field_value(drawing: &Drawing, si: usize, info: &SheetInfo, sources: &Sources, key: &str) -> Option<String> {
     let sheet = drawing.sheets.get(si)?;
-    // Part shown by the first base view of this sheet (else of the drawing).
+    // Part shown by the sheet's reference view.
     let part = || {
-        let base = sheet.views.iter().chain(drawing.sheets.iter().flat_map(|s| s.views.iter())).find(|v| matches!(v.kind, ViewKind::Base { .. }))?;
+        let base = reference_view(drawing, sheet)?;
         let (k, part) = views::SourceKey::of_view(base)?;
         let src = sources.get(&k)?;
         // An assembly view shows the assembly's own Properties (its part
@@ -2522,7 +2552,9 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
     let used_notes = std::cell::RefCell::new(Vec::<String>::new());
     let unresolved = std::cell::RefCell::new(Vec::<u64>::new());
     let env = Env { drawing, sheet, placements: &placements, views, sources, fields: &fields, revisions: &info.revisions, used: &used_notes, unresolved: &unresolved };
+    let pens_before = g.pens.len();
     g.add_annotations(&resolved, &env);
+    annotation_pens(&mut g, ml, pens_before, &drawing.props);
     for id in unresolved.into_inner() {
         if !dangling.contains(&id) {
             dangling.push(id);

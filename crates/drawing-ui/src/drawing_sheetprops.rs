@@ -356,11 +356,19 @@ impl DrawingEditor {
         } else {
             Vec::new()
         };
-        let reference = self.sheet_reference(&sheet, cx);
-        // Live 124: "Unassigned" in grey when the sheet has no reference.
+        // Live 124 / 2184: the sheet's part and "Unassigned" (grey when chosen, or with no view to reference).
+        let reference = self.sheet_reference(&sheet, cx).filter(|_| !sheet.reference_unassigned);
         let unassigned = reference.is_none();
         let ref_label = reference.as_ref().map(|r| r.1.clone()).unwrap_or_else(|| "Unassigned".into());
-        let ref_items: Vec<(String, bool, Act)> = vec![(ref_label.clone(), true, std::rc::Rc::new(|_: &mut DrawingEditor, _: &mut Window, _: &mut Context<DrawingEditor>| {}) as Act)];
+        let set_ref = |unassigned: bool| -> Act {
+            std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
+                if t.drawing.sheets.get(si).is_some_and(|s| s.reference_unassigned != unassigned) {
+                    t.edit("Sheet reference", cx, |d| d.sheets[si].reference_unassigned = unassigned);
+                }
+            })
+        };
+        let mut ref_items: Vec<(String, bool, Act)> = self.sheet_reference(&sheet, cx).map(|r| (r.1, !unassigned, set_ref(false))).into_iter().collect();
+        ref_items.push(("Unassigned".into(), unassigned, set_ref(true)));
         let link = Some(match reference {
             None => div()
                 .size(px(26.))

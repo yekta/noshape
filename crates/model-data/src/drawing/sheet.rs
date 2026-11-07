@@ -499,6 +499,72 @@ fn callout_extent(border: super::CalloutBorder, w: f64, h: f64) -> (f64, f64) {
 }
 
 /// A callout border's outlines (polyline, closed) centred on `ck`.
+/// Split a polyline into dashes following `pattern` (on, off, on, off...),
+/// starting `phase` mm into it.
+pub fn dash(points: &[[f64; 2]], closed: bool, pattern: &[f64], phase: f64) -> Vec<Vec<[f64; 2]>> {
+    let mut pts: Vec<[f64; 2]> = points.to_vec();
+    if closed && pts.len() > 2 {
+        pts.push(pts[0]);
+    }
+    if pattern.is_empty() {
+        return vec![pts];
+    }
+    let total: f64 = pattern.iter().sum();
+    if total <= 0.0 {
+        return vec![pts];
+    }
+    let mut out: Vec<Vec<[f64; 2]>> = Vec::new();
+    let mut cur: Vec<[f64; 2]> = Vec::new();
+    let mut k = 0usize;
+    let mut left = pattern[0];
+    let mut on = true;
+    let mut skip = phase.rem_euclid(total);
+    while skip > 1e-12 {
+        let step = left.min(skip);
+        skip -= step;
+        left -= step;
+        if left <= 1e-12 {
+            k = (k + 1) % pattern.len();
+            left = pattern[k];
+            on = k.is_multiple_of(2);
+        }
+    }
+    for w in pts.windows(2) {
+        let (mut a, b) = (w[0], w[1]);
+        let mut seg = ((b[0] - a[0]).powi(2) + (b[1] - a[1]).powi(2)).sqrt();
+        if seg <= 1e-12 {
+            continue;
+        }
+        let dir = [(b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
+        while seg > 1e-12 {
+            let step = left.min(seg);
+            let p = [a[0] + dir[0] * step, a[1] + dir[1] * step];
+            if on {
+                if cur.is_empty() {
+                    cur.push(a);
+                }
+                cur.push(p);
+            }
+            a = p;
+            seg -= step;
+            left -= step;
+            if left <= 1e-12 {
+                if on && cur.len() >= 2 {
+                    out.push(std::mem::take(&mut cur));
+                }
+                cur.clear();
+                k = (k + 1) % pattern.len();
+                left = pattern[k];
+                on = k.is_multiple_of(2);
+            }
+        }
+    }
+    if cur.len() >= 2 {
+        out.push(cur);
+    }
+    out
+}
+
 fn callout_outlines(border: super::CalloutBorder, ck: [f64; 2], rx: f64, ry: f64) -> Vec<(Vec<[f64; 2]>, bool)> {
     use super::CalloutBorder as B;
     let ring = |r: f64, n: usize, a0: f64| -> Vec<[f64; 2]> { (0..n).map(|i| a0 + i as f64 / n as f64 * std::f64::consts::TAU).map(|t| [ck[0] + r * t.cos(), ck[1] + r * t.sin()]).collect() };
