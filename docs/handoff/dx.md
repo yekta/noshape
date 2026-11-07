@@ -42,6 +42,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## 11-07 23:25 UTC: live2's drawing batches 13-21 (lead's item 1)
+- **Add stacked callouts... kept**: live2 2240's callout menu without it was the menu of two selected annotations
+  (it has Group annotation and no Edit...: the zone label "1" the run had right-clicked was still selected); on one
+  callout live has it (drawing/191). drw-callout-stacked-add right-clicks `{"annotation": "1", "kind": "callout"}`.
+- Detach from geometry: ours never showed it on a GD&T frame (as live); drw-gdt-detach removed. The menu item stays in
+  coverage.rs (other annotations with references) but has no scenario.
+- Runner: `{"annotation": …, "kind": …}` takes only annotations of that record kind (live's zone labels "1" are notes);
+  the inspection scenarios right-click `{"annotation": "1", "kind": "inspectionsymbol"}`, the bubble, whose menu is
+  live's (Edit..., Reorder inspection items..., Remove inspection item, Remove all inspection items, Clear selection,
+  Zoom to fit); the inspected dimension's menu has none of them. The record lists a bubble with its number.
+- The Sheets panel's BOM row is named after its assembly (`sheet_table: "start asm"`), menu Properties..., Replace...,
+  Switch to BOM, Delete.
+- Section hatch Auto spacing = the cut's on-sheet bounding-box diagonal ÷ 9 (live 2231; the 2.5 mm `hatch_spacing`
+  view property is gone). T1 auto_hatch_spacing_follows_the_regions_size_on_paper.
+- Waiting on live2's re-records: drw-callout-stacked-add, drw-inspection-edit / -reorder / -remove / -remove-all,
+  drw-bom-switch-to-bom, drw-bom-row-replace.
+
 ## 11-07 15:50 UTC: live's drawing recordings of batches 4-11 (lead's item 2)
 - Landed cc0b2c4d (the batch 4-10 fixes, Break view, tabs, the export fidelity first fixes). In this change:
   - Selection as live's recorder reads it: no ANNOTATION items (it can't read them); a menu action in Select mode with

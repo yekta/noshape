@@ -144,7 +144,9 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"view": "Front"}`: a view (its middle), by the name its properties show;
 - `{"view_point": {"view": "Top", "at": [x, y, z]}}`: model point (mm) where it shows in that view;
   `{"view_edge": {…}}` the same picking the model edge drawn there;
-- `{"annotation": "1.575"}`: an annotation by its shown text; `{"doc_tab": "Part 1 Drawing 1"}`: a document tab;
+- `{"annotation": "1.575"}`: an annotation by its shown text (an inspection bubble by its number); with `"kind"` (the
+  record's: `"callout"`, `"inspectionsymbol"`, …) only one of that kind (live's zone labels "1" are notes);
+  `{"doc_tab": "Part 1 Drawing 1"}`: a document tab;
 - `{"sheet_tab": "Sheet2"}`: a sheet by its name: the active sheet's label at the drawing's top left (inert, live2
   2180), or its row in the Sheets panel (Ctrl+S) when that is open (click, double-click, rclick);
 - `{"break_line": {"view": "Front", "index": 0}}`: a break's first line (a model point there moves with the break);
@@ -156,8 +158,8 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"hole_axis": "X"}` (or `"Y"`): the middle of the X (Y) arrow of the sheet's first hole table's origin indicator
   (the indicator is one item: its menu has the flips);
 - `{"sheet_ref": "Part 1"}`: a reference row of the open Sheets panel (Ctrl+S), by the name it shows (its menu:
-  Switch to reference, Replace..., Pin view reference…); `{"sheet_table": "Bill of materials"}` (or "Cut list"): a table
-  row of the open Sheets panel (its menu: Properties ▸, Switch to BOM, Delete);
+  Switch to reference, Replace..., Pin view reference…); `{"sheet_table": "start asm"}` (a BOM's row is named after its
+  assembly; or "Cut list"): a table row of the open Sheets panel (its menu: Properties..., Replace..., Switch to BOM, Delete);
 - `"export": ["PDF", "DXF", "DWG"]` (a scenario key): after the last step each runner exports the drawing in those
   formats with the Export dialog's defaults (an entry `{"format": "DWG", "version": "2018"}` sets the Version, as
   live's dialog shows its account's last one), beside its recording as `<scenario>.pdf` / `.dxf` / `.dwg`;

@@ -213,19 +213,21 @@ impl DrawingEditor {
         self.edit(if hide { "Hide inspection items" } else { "Show inspection items" }, cx, |d| d.props.hide_inspection = hide);
     }
 
-    /// Context menu entries of an annotation with an inspection item.
+    /// The context menu of an inspection bubble (live 2226).
     pub fn inspection_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
         let Some(n) = a.inspection else { return vec![] };
         let id = a.id;
-        vec![
-            MenuEntry::item("Edit", move |t, w, cx| t.edit_inspection(id, w, cx)),
-            MenuEntry::item("Reorder inspection items", move |t, w, cx| t.start_reorder_inspection(n, w, cx)),
+        let mut out = vec![
+            MenuEntry::item("Edit...", move |t, w, cx| t.edit_inspection(id, w, cx)),
+            MenuEntry::item("Reorder inspection items...", move |t, w, cx| t.start_reorder_inspection(n, w, cx)),
             MenuEntry::item("Remove inspection item", move |t, _, cx| {
                 t.edit_sheet("Remove inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, None))
             }),
             MenuEntry::item("Remove all inspection items", |t, _, cx| t.edit("Remove all inspection items", cx, |d| d.remove_all_inspection())),
-            MenuEntry::Separator,
-        ]
+        ];
+        // Clear selection · Zoom to fit, no Delete.
+        out.extend(Self::selection_tail().into_iter().take(3));
+        out
     }
 
     /// Inspection rows with hole callout texts from the model; `all` = the

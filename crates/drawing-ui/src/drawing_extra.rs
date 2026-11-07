@@ -369,45 +369,51 @@ impl DrawingEditor {
     /// Properties, Switch to BOM, Delete, Replace.
     fn sheet_table_row(&self, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
         let id = t.id;
-        let (label, icon) = match t.kind {
-            TableKind::CutList { .. } => ("Cut list", "cut-list"),
-            _ => ("Bill of materials", "drawing-bom"),
-        };
-        // The assembly the BOM lists (its view's root source).
+        // The assembly (Part Studio) the table lists: its view's root source.
         let source = t.view().and_then(|v| views::root_view(self.current_sheet(), v)).and_then(|r| match &self.current_sheet().view(r)?.kind {
             ViewKind::Base { source, .. } => Some(*source),
             _ => None,
         });
+        // Live 2240: a BOM's row is named after its assembly.
+        let source_name = source.and_then(|tab| self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()));
+        let (label, icon) = match t.kind {
+            TableKind::CutList { .. } => ("Cut list".to_string(), "cut-list"),
+            _ => (source_name.unwrap_or_else(|| "Bill of materials".into()), "drawing-bom"),
+        };
+        // The runner's target: a start's assembly as "start asm" (each runner's start has its own name).
+        let mark = if label.starts_with("start ") && label.contains(" asm") { "start asm".to_string() } else { label.clone() };
+        let is_bom = matches!(t.kind, TableKind::Bom { .. });
         crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
-            .map(|d| crate::ui_script::mark(d, || format!("sheet_table:{label}")))
+            .map(|d| crate::ui_script::mark(d, move || format!("sheet_table:{mark}")))
             .on_drag(ItemDrag { view: None, table: Some(id) }, |d, _, _, cx| cx.new(|_| d.clone()))
             .pl(px(indent))
             .text_color(rgb(0x666666))
             .child(sheets_icon(icon, cx))
-            .child(div().flex_1().truncate().child(label))
+            .child(div().flex_1().truncate().child(crate::ui::user_text(label)))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 this.selection = vec![Sel::Table(id)];
                 this.redraw(cx);
             }))
             .on_mouse_down(
                 MouseButton::Right,
-                cx.listener(move |this, e: &MouseDownEvent, window, cx| {
+                cx.listener(move |_, e: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
-                    let mut entries = vec![MenuEntry::Submenu("Properties".into(), this.table_entries(id, cx).into_iter().filter(|x| !matches!(x, MenuEntry::Separator)).collect())];
+                    // Live 2240: Properties..., Replace..., Switch to BOM, Delete.
+                    let mut entries = vec![MenuEntry::item("Properties...", move |t, _, cx| t.open_table_props(id, cx))];
                     if let Some(tab) = source {
-                        entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
+                        entries.push(MenuEntry::item("Replace...", move |t, _, cx| {
+                            t.insert.replace = Some(tab);
+                            t.insert.chooser = Some(1);
+                            cx.notify();
+                        }));
+                        if is_bom {
+                            entries.push(MenuEntry::item("Switch to BOM", move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)));
+                        }
                     }
                     entries.push(MenuEntry::item("Delete", move |t, _, cx| {
                         t.selection.clear();
                         t.edit_sheet("Delete table", cx, |s| s.tables.retain(|x| x.id != id));
                     }));
-                    if let Some(tab) = source {
-                        entries.push(MenuEntry::item("Replace", move |t, _, cx| {
-                            t.insert.replace = Some(tab);
-                            t.insert.chooser = Some(1);
-                            cx.notify();
-                        }));
-                    }
                     let ed = cx.entity();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
                     crate::os_menu::open(e.position, menu, window, cx);

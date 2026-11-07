@@ -1,6 +1,6 @@
 {
   "name": "drw-inspection-reorder",
-  "about": "An inspection item's menu › Reorder inspection items",
+  "about": "An inspection bubble's menu \u203a Reorder inspection items",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
@@ -66,13 +66,14 @@
     {
       "do": "rclick",
       "on": {
-        "annotation": "1.575"
+        "annotation": "1",
+        "kind": "inspectionsymbol"
       }
     },
     {
       "do": "click",
       "on": {
-        "menu": "Reorder inspection items"
+        "menu": "Reorder inspection items..."
       }
     },
     {

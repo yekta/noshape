@@ -1,6 +1,6 @@
 {
   "name": "drw-inspection-edit",
-  "about": "An inspection item's menu › Edit: its dialog with the Number",
+  "about": "An inspection bubble's menu \u203a Edit: its dialog with the Number",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
@@ -66,13 +66,14 @@
     {
       "do": "rclick",
       "on": {
-        "annotation": "1.575"
+        "annotation": "1",
+        "kind": "inspectionsymbol"
       }
     },
     {
       "do": "click",
       "on": {
-        "menu": "Edit"
+        "menu": "Edit..."
       }
     },
     {

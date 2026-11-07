@@ -1,6 +1,6 @@
 {
   "name": "drw-bom-row-replace",
-  "about": "The Sheets panel's Bill of materials row › Replace",
+  "about": "The Sheets panel's BOM row (named after its assembly) › Replace...",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items)",
@@ -37,13 +37,13 @@
     {
       "do": "rclick",
       "on": {
-        "sheet_table": "Bill of materials"
+        "sheet_table": "start asm"
       }
     },
     {
       "do": "click",
       "on": {
-        "menu": "Replace"
+        "menu": "Replace..."
       }
     },
     {

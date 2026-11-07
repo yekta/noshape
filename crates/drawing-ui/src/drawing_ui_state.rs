@@ -91,7 +91,14 @@ impl DrawingEditor {
             }
             at
         } else if let Some(text) = t.get("annotation").and_then(Value::as_str) {
-            let a = self.ui_annotations().into_iter().find(|(_, _, s)| s == text).ok_or_else(|| format!("no annotation {text}"))?;
+            // `kind` (the record's): only annotations of that kind (live's zone labels "1" are notes, live2 2240).
+            let kind = t.get("kind").and_then(Value::as_str);
+            // An inspection bubble by its number (live2 2226).
+            let bubble = self.built.as_ref().and_then(|b| b.geometry.texts.iter().find(|x| x.text == text && matches!(b.picks.get(x.pick as usize), Some(PickTarget::Inspection(_)))));
+            if let Some(x) = bubble.filter(|_| kind.is_none_or(|k| k == "inspectionsymbol")) {
+                return Ok(self.sheet_to_window(x.pos));
+            }
+            let a = self.ui_annotations().into_iter().find(|(_, k, s)| s == text && kind.is_none_or(|x| x == *k)).ok_or_else(|| format!("no annotation {text}"))?;
             self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?
         } else {
             return Err(format!("not a drawing target: {t}"));
@@ -225,8 +232,8 @@ impl DrawingEditor {
                 }
             }
         }
-        // An inspection item is an annotation of its own in live (an "inspectionsymbol" without text, hidden or not).
-        annotations.extend(sheet.annotations.iter().filter(|a| a.inspection.is_some()).map(|_| ("inspectionsymbol", String::new())));
+        // An inspection item is an annotation of its own in live, read as its number (live2 2226), hidden or not.
+        annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string())));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it.
@@ -287,7 +294,7 @@ impl DrawingEditor {
             "tool": ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name()),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "inspectionsymbol")).then_some(t) })).collect::<Vec<_>>(),
+            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp")).then_some(t) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }

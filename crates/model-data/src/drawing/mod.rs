@@ -3486,8 +3486,7 @@ pub struct ViewTabProps {
     pub hidden_color: Option<[u8; 3]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tangent_color: Option<[u8; 3]>,
-    /// Section views: hatch line spacing (mm) and label prefix.
-    pub hatch_spacing: f64,
+    /// Section views: the label prefix.
     pub section_prefix: String,
     /// Detail views: profile lines (0 Phantom, 1 Dashed, 2 Solid), label
     /// prefix, and the defaults of new detail views (style 0 In line,
@@ -3819,7 +3818,6 @@ impl Default for ViewTabProps {
         Self {
             hidden_color: None,
             tangent_color: None,
-            hatch_spacing: 2.5,
             section_prefix: "SECTION".into(),
             // Live dom/drawing-properties-views.txt: Phantom.
             detail_line: 0,

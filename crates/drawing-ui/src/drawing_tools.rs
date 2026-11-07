@@ -1958,6 +1958,9 @@ impl DrawingEditor {
         // A title block field is a note (live qa4 round 5 s11 (2)): its menu
         // starts with Edit note….
         let field = target.as_ref().and_then(|t| if let PickTarget::TitleField(k) = t { Some(k.clone()) } else { None });
+        // Live 2226: an inspection bubble has its own menu; the inspected annotation's has none of its rows.
+        let bubble = target.as_ref().and_then(|t| if let PickTarget::Inspection(id) = t { Some(*id) } else { None });
+        let bubble = bubble.and_then(|id| self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).cloned());
         self.menu_broken_out = target.and_then(|t| if let PickTarget::BrokenOut { view, index } = t { Some((view, index)) } else { None });
         // Live: a broken-out section's hatch has its menu too (anywhere inside its profile).
         if self.menu_broken_out.is_none() {
@@ -1969,6 +1972,7 @@ impl DrawingEditor {
             });
         }
         let entries = match (self.leader_hit(self.cursor), circle, cut_line, field) {
+            _ if bubble.is_some() => bubble.map(|a| self.inspection_entries(&a)).unwrap_or_default(),
             (Some(hit), ..) => self.leader_entries(hit, cx),
             (None, Some(v), ..) => self.detail_circle_entries(v, cx),
             (None, None, Some(v), _) => self.section_line_entries(v, cx),
@@ -2143,7 +2147,7 @@ impl DrawingEditor {
 
     /// | Clear selection · Zoom to fit · Delete: the end of every
     /// annotation menu.
-    fn selection_tail() -> [MenuEntry; 4] {
+    pub(crate) fn selection_tail() -> [MenuEntry; 4] {
         [
             MenuEntry::Separator,
             MenuEntry::item("Clear selection", |t, _, cx| {
@@ -2322,8 +2326,8 @@ impl DrawingEditor {
                     if a.ann_group.is_some() {
                         own.push(MenuEntry::item("Remove from grouped annotation", move |t, _, cx| t.edit_sheet("Remove from grouped annotation", cx, |s| group_annotations(s, &[id], false))));
                     }
-                    // With a BOM table in the drawing: Add stacked callouts…
-                    // (live drawing/191).
+                    // With a BOM table in the drawing: Add stacked callouts... (live drawing/191; live2 2240's menu without
+                    // it was of two selected annotations).
                     if self.drawing.sheets.iter().flat_map(|s| &s.tables).any(|t| matches!(t.kind, TableKind::Bom { .. })) {
                         own.push(MenuEntry::item("Add stacked callouts...", move |t, _, cx| t.open_stack_dlg(id, cx)));
                     }
@@ -2393,12 +2397,11 @@ impl DrawingEditor {
                 }
                 // Notes: their own menu in live's order (drawing_leaders).
                 if let Some(a) = a.as_ref().filter(|a| matches!(a.kind, AnnotationKind::Note { .. })) {
-                    let mut out = self.inspection_entries(a);
+                    let mut out = Vec::new();
                     out.extend(self.note_entries(a, cx));
                     return out;
                 }
                 if let Some(a) = &a {
-                    out.extend(self.inspection_entries(a));
                     if let AnnotationKind::Note { .. } = a.kind {
                         let pos = a.position;
                         out.push(MenuEntry::item("Edit note...", move |t, w, cx| t.open_note_panel(Some(id), pos, w, cx)));

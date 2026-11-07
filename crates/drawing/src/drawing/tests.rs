@@ -286,6 +286,17 @@ fn section_regions_nest_and_find_styles() {
     assert!(views::section_regions(&segs[..3]).is_none());
 }
 
+/// Live 2231: a section's Auto hatch spacing is its region's on-sheet bounding-box diagonal ÷ 9 (DXF ANSI31 scales).
+#[test]
+fn auto_hatch_spacing_follows_the_regions_size_on_paper() {
+    let rect = |w: f64, h: f64| vec![[[0.0, 0.0], [w, 0.0]], [[w, 0.0], [w, h]], [[w, h], [0.0, h]], [[0.0, h], [0.0, 0.0]]];
+    // (region on paper mm, live's ANSI31 scale; its base spacing is 0.125 in)
+    for ((w, h), scale) in [((40.0, 10.0), 1.442907), ((49.88, 12.5), 1.799505), ((39.56, 50.0), 2.231351)] {
+        let s = super::build::auto_hatch_spacing(&rect(w, h));
+        assert!((s - scale * 0.125 * 25.4).abs() < 1e-3, "{w} x {h}: {s}");
+    }
+}
+
 /// Live asb 10-23 views (4): Edit hatch section restyles one region of the
 /// cut; the others keep the drawing's hatch.
 #[test]

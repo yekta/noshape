@@ -707,6 +707,16 @@ pub fn resolve_annotations(drawing: &Drawing, sheet: &Sheet, views: &HashMap<Vie
     (out, dangling, lost)
 }
 
+/// A section's automatic hatch spacing (mm): its cut's bounding-box diagonal on the sheet ÷ 9 (live 2231).
+pub fn auto_hatch_spacing(segments: &[[[f64; 2]; 2]]) -> f64 {
+    let (mut lo, mut hi) = ([f64::INFINITY; 2], [f64::NEG_INFINITY; 2]);
+    for p in segments.iter().flatten() {
+        lo = [lo[0].min(p[0]), lo[1].min(p[1])];
+        hi = [hi[0].max(p[0]), hi[1].max(p[1])];
+    }
+    ((hi[0] - lo[0]).hypot(hi[1] - lo[1]) / 9.0).max(0.3)
+}
+
 /// 45-degree hatch lines (sheet coordinates) inside the region bounded by
 /// `segments` (even-odd rule), `spacing` mm apart.
 pub fn hatch(segments: &[[[f64; 2]; 2]], spacing: f64) -> Vec<[[f64; 2]; 2]> {
@@ -1817,6 +1827,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 let ub = pl.unbroken();
                 let segs: Vec<[[f64; 2]; 2]> = geo.section_segments.iter().map(|s| [ub.to_sheet(s[0]), ub.to_sheet(s[1])]).collect();
                 let hatch_l0 = g.lines.len();
+                let spacing = auto_hatch_spacing(&segs);
                 let whole = geo.clip_poly.is_none() && geo.clip.is_none() && geo.crop.is_none() && pl.breaks().is_empty();
                 // Edit hatch section...: restyled regions (the rest keep the
                 // drawing's hatch; a cut that doesn't close keeps it all).
@@ -1838,12 +1849,12 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                 match regions {
                     None if patterned.is_some() => {}
                     None => {
-                        for l in hatch(&segs, vt.hatch_spacing.max(0.3)) {
+                        for l in hatch(&segs, spacing) {
                             push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                         }
                         // An uncut, unbroken section: the boundary for the HATCH entity.
                         if whole && let Some(loops) = super::cad_layers::chain_loops(&segs, 1e-6) {
-                            g.hatches.push(super::cad_layers::HatchRegion { loops, spacing: vt.hatch_spacing.max(0.3), lines: hatch_l0..g.lines.len() });
+                            g.hatches.push(super::cad_layers::HatchRegion { loops, spacing, lines: hatch_l0..g.lines.len() });
                         }
                     }
                     Some(regions) => {
@@ -1873,7 +1884,7 @@ pub fn assemble_sheet(drawing: &Drawing, si: usize, views: &HashMap<ViewId, Arc<
                                 g.color_since(mark, c);
                             }
                         }
-                        for l in hatch(&plain, vt.hatch_spacing.max(0.3)) {
+                        for l in hatch(&plain, spacing) {
                             push_hatch_line(&mut g, &pl, geo, l, view_pick, &hatch_clear);
                         }
                     }
