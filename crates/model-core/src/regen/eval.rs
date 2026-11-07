@@ -1536,8 +1536,12 @@ pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region
         let inside = |e: noshape_sketch::EntityId| {
             region.joined.contains(&e) || matches!(s.sketch.curve(e), Some(noshape_sketch::Curve2::Line { a, b }) if joined.iter().any(|j| j.distance(a) < 1e-9 && j.distance(b) < 1e-9))
         };
+        // (A curve no region of the sketch is bounded by, a stub ending in the open, splits nothing: c2-sm-louver's
+        // Sketch 5 has one at the joint of a long side's two lines, one side face in live; not in a studio saved before.)
+        let stubs_count = super::std_route::legacy_stub_joints();
+        let bounding: std::collections::HashSet<noshape_sketch::EntityId> = s.regions.iter().flat_map(|r| r.entities()).collect();
         let alone = |p: DVec2, a: u32, b: u32| {
-            s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b && !inside(e.id)).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
+            s.sketch.entities().filter(|e| !e.construction && e.kind() != noshape_sketch::EntityKind::Point && e.id.0 != a && e.id.0 != b && !inside(e.id) && (stubs_count || bounding.contains(&e.id))).all(|e| s.sketch.curve(e.id).is_none_or(|c| c.distance(p) > 1e-9))
         };
         // (Pieces of one line though the region credits a stretch to another line lying over it: cf-box-dovetail-joint's
         // base board, its top edge under the upper board's.)

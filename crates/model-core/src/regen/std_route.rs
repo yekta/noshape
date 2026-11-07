@@ -131,6 +131,32 @@ impl Drop for LegacyBlendPairs {
 }
 
 thread_local! {
+    static LEGACY_STUB_JOINTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Whether a stub at a joint of collinear sketch lines keeps them two edges on this thread
+/// ([`crate::partstudio::PartStudio::legacy_stub_joints`]).
+pub fn legacy_stub_joints() -> bool {
+    LEGACY_STUB_JOINTS.with(|c| c.get())
+}
+
+/// [`legacy_stub_joints`] as a studio saved before asks while it regenerates on this thread; the setting before comes
+/// back when dropped.
+pub struct LegacyStubJoints(bool);
+
+impl LegacyStubJoints {
+    pub fn set(on: bool) -> Self {
+        Self(LEGACY_STUB_JOINTS.with(|c| c.replace(on)))
+    }
+}
+
+impl Drop for LegacyStubJoints {
+    fn drop(&mut self) {
+        LEGACY_STUB_JOINTS.with(|c| c.set(self.0));
+    }
+}
+
+thread_local! {
     /// Core features (Extrude, Fillet, ...) run natively; [`set_std_route`]
     /// makes std run them instead, the oracle the native ones are tested
     /// against (tests/std_oracle.rs). Per thread (a regeneration evaluates its

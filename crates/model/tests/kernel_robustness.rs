@@ -3510,7 +3510,8 @@ fn a_boss_on_a_drafted_blocks_top_adds_to_it() {
 
 /// SKETCH-COLLINEAR-EDGES-MERGE (dx's parity suite, learning-center-frank, exercise-martinl, clamp-guillem): two
 /// collinear lines meeting end to end, where no other curve of the sketch ends but a construction one, are one side
-/// face of the extrude (live 18/48/32); a third line ending there keeps them apart.
+/// face of the extrude (live 18/48/32); so too with a stub ending there that bounds no region (c2-sm-louver's Sheet
+/// metal model 1 and c2-housing-draft as live only so; a line splitting the region is live 1904's case (d)).
 #[test]
 fn collinear_lines_meeting_alone_extrude_as_one_face() {
     use noshape_kernel::ShapeType::Face;
@@ -3535,7 +3536,14 @@ fn collinear_lines_meeting_alone_extrude_as_one_face() {
         assert_eq!(regions.len(), 1);
         let x = t.add("extrude", &[("entities", q(regions)), ("depth", e("5 mm")), ("operationType", en("NEW"))]);
         let r = t.ok(x);
-        assert_eq!(r.context.bodies[0].shape.count(Face), if dangling { 7 } else { 6 }, "dangling {dangling}");
+        assert_eq!(r.context.bodies[0].shape.count(Face), 6, "dangling {dangling}");
+        // A studio saved before (ScopeRule < 14) keeps the stub's two faces.
+        if dangling {
+            let mut t = t.fork();
+            t.ps.legacy_stub_joints = true;
+            let r = t.ok(x);
+            assert_eq!(r.context.bodies[0].shape.count(Face), 7, "saved before");
+        }
     }
 }
 

@@ -352,6 +352,7 @@ impl Regenerator {
         let _blend_finish = std_route::LegacyBlendFinish::set(studio.legacy_blend_finish);
         let _rim_seams = std_route::LegacyRimSeams::set(studio.legacy_rim_seams);
         let _blend_pairs = std_route::LegacyBlendPairs::set(studio.legacy_blend_pairs);
+        let _stub_joints = std_route::LegacyStubJoints::set(studio.legacy_stub_joints);
         // Model lengths are metres; OCCT's blends are tuned for millimetre-sized parts.
         let _ = noshape_kernel::set_working_scale(1000.0);
         let upto = opts.upto.unwrap_or_else(|| studio.rollback_index()).min(studio.features.len());

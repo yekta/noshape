@@ -150,13 +150,14 @@ impl Feature {
 /// ([`PartStudio::legacy_plane_sketch_frames`]); 10, a sketch region's edges along their sketch curves
 /// ([`PartStudio::legacy_edge_directions`]); 11, blends finished as live ([`PartStudio::legacy_blend_finish`]);
 /// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 13, noshape's full rounds,
-/// ridges and rounds rolling over a narrow face ([`PartStudio::legacy_blend_pairs`]); 0, older studios.
+/// ridges and rounds rolling over a narrow face ([`PartStudio::legacy_blend_pairs`]); 14, collinear sketch lines one
+/// edge though a stub bounding no region ends at their joint ([`PartStudio::legacy_stub_joints`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(13)
+        ScopeRule(14)
     }
 }
 
@@ -379,6 +380,11 @@ pub struct PartStudio {
     /// find what they found.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_blend_pairs: bool,
+    /// Saved with features before collinear sketch lines meeting end to end were one edge where a stub that bounds no
+    /// region ends at their joint (ScopeRule < 14: c2-sm-louver, c2-housing-draft): its regions keep the two edges,
+    /// so later features find the faces they found.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_stub_joints: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -608,6 +614,10 @@ impl PartStudio {
         // And with a full round's or a ridge's two blends OCCT's.
         if self.scope_rule.0 < 13 && !self.features.is_empty() {
             self.legacy_blend_pairs = true;
+        }
+        // And with a stub at a joint of collinear lines keeping them apart.
+        if self.scope_rule.0 < 14 && !self.features.is_empty() {
+            self.legacy_stub_joints = true;
         }
         self.scope_rule = ScopeRule::default();
     }
