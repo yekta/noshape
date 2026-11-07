@@ -354,6 +354,7 @@ impl PartStudioView {
             };
             driven.push(kind);
         }
+        let mut pattern_seeds = Vec::new();
         for c in sk.constraints().filter(|c| c.driving) {
             let mm = |v: f64| (v * 1e3 * 1e6).round() / 1e6;
             let typed = |unit: &str| data.dimension_exprs.get(&c.id.0).map(|e| onshape_dimension_expression(&e.text, unit));
@@ -366,6 +367,14 @@ impl PartStudioView {
                 // A conic's Rho is one of its constraints in live's model (sketch-tool-conic: "RHO").
                 K::Rho { .. } => constraints.push("RHO".into()),
                 k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0), length)),
+                // Live's model lists a pattern by its seed's points (a polygon's: two, ui-parity sketch-circumscribed-polygon),
+                // not one link per instance point.
+                K::CircularPatternLink { seed, center, .. } => {
+                    if !pattern_seeds.contains(&(*seed, *center)) {
+                        pattern_seeds.push((*seed, *center));
+                        constraints.push("CIRCULAR_PATTERN".into());
+                    }
+                }
                 k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
             }
         }

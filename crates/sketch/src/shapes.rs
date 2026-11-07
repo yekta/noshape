@@ -137,8 +137,8 @@ impl Sketch {
     /// "skasm (2026-10-26) Sketch polygon commits"): a construction circle
     /// about the centre, one seed edge at the click and a circular pattern
     /// of it about the circle's centre (each copy's ends linked to the
-    /// seed's; the first copy's start Coincident with the seed's end, the
-    /// pattern holds the other joints). `on_vertex` (Circumscribed polygon):
+    /// seed's; the first copy's start Coincident with the seed's end and the
+    /// second's with the first's, the pattern holds the other joints). `on_vertex` (Circumscribed polygon):
     /// `click` is a vertex, the seed ends there and lies on the circle.
     /// Otherwise (Inscribed polygon) `click` is the middle of the seed, a
     /// construction point there is its Midpoint and the circle is Tangent to
@@ -174,8 +174,11 @@ impl Sketch {
             out.curves.push(self.add_line_between(q0, q1)?);
             self.c(&mut out, ConstraintKind::CircularPatternLink { seed: p0, inst: q0, center: cp, angle });
             self.c(&mut out, ConstraintKind::CircularPatternLink { seed: p1, inst: q1, center: cp, angle });
-            if k == 1 {
-                self.c(&mut out, ConstraintKind::Coincident { a: q0, b: p1 });
+            // The first two joints explicit, the pattern holds the rest (live: snap1, snap2).
+            match k {
+                1 => self.c(&mut out, ConstraintKind::Coincident { a: q0, b: p1 }),
+                2 => self.c(&mut out, ConstraintKind::Coincident { a: q0, b: corners[corners.len() - 1] }),
+                _ => {}
             }
             corners.extend([q0, q1]);
         }
