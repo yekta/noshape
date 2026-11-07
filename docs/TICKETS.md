@@ -278,6 +278,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-07 17:00 release (qa list 16:14, checked on green 5baedbe4; the latest release is v0.4.34)
+- **qa 16:14: no new blocker.** On green 5baedbe4 (vibe3): the full CLI smoke = v0.4.34's except the change below; the volume
+  sweep, dx's cf corpus and the 47 ticket documents = the greens since v0.4.34 (b3f393b8, 0adb0644, d973df07 …); GUI rows
+  pixel-identical to v0.4.34. Parity suites (13:32 on 1c5e1be5): models 59/88, features 638/936, scenarios 648/762 (4145/4358
+  states), up from the morning; the scenarios that got worse are load flakes (UIP-DRW-START-FLAKY dx, UIP-ASM-FACE-MENU-FLAKY
+  asm). Fuzz since v0.4.34: v0.4.34 and greens, no deaths. **New in this cut, not a blocker: P2 SAVED-CHAMFER-CHANGE** (core's
+  07384946a / f57807bd0: four saved fuzz documents' chamfers now succeed and the Shells after them change, with no ScopeRule)
+  — after v0.4.34's cut, so this release ships it. Open, not new: **P0 SECTIONS-AHEAD-HANG** (since v0.4.17), P2
+  SAVED-LOFT-CHANGE (in v0.4.34), P2 UPDATE-HELPER-LINUX-PARITY (Linux only now). On the release: smoke, ticket documents,
+  GUI rows, title bar, memory, the CI timing and budget tables, and the updater on all three (Windows' UAC step, macOS's
+  bundle check, Linux on vibe3); the Windows installer no longer uses Restart Manager (1c5e1be5): the UAC step shows it.
+
 ## Release blockers for v0.4.34 (cut 11-07 ~07:10 from c373da6e3; qa list 07:16; the latest release is v0.4.33)
 - **qa 07:16: no new blocker.** (qa missed the 11-07 05:00 list: none was written; from now on one per cut, "no blocker" too.)
   Greens since v0.4.33 swept on vibe3 through 6d194fa1 / 0dfa4c2d: the volume sweep, dx's cf corpus and the 44 ticket
