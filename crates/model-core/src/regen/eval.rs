@@ -642,7 +642,7 @@ impl<'a> EvalCtx<'a> {
         }
         let f = self.raw_plane(&base)?;
         let n = f.normal;
-        let x = PlaneFrame::face_x(n);
+        let x = construction_sketch_x(n);
         let canonical = PlaneFrame { origin: n * f.origin.dot(n), x, y: n.cross(x), normal: n };
         Some(match &self.xform {
             Some(m) => transform_frame(&canonical, m),
@@ -1866,4 +1866,44 @@ fn non_manifold(shape: &Shape) -> bool {
             f.len() > 2
         })
     })
+}
+
+/// A sketch's x on a construction plane of normal `n`, by n's largest component (live's sketch frames): facing mostly
+/// x, world Y projected onto it, signed as n's x (cf-3d-spline's Sketch 2 on a Curve point plane, c2-hunting-knife's
+/// Sketch 14, Right; cf-surface-pattern's Sketch 11 on a -x plane: -Y); facing mostly z, world X projected
+/// (c2-fan-blade-sweep's threadprofile, c2-duct-multipart's Sketch 2 on a -z plane: +X); facing mostly y, Z x n (Front,
+/// cf-fill-pattern's).
+fn construction_sketch_x(n: DVec3) -> DVec3 {
+    let a = n.abs();
+    let x = if a.x >= a.y && a.x >= a.z {
+        (DVec3::Y - n * n.y) * n.x.signum()
+    } else if a.z >= a.y {
+        DVec3::X - n * n.x
+    } else {
+        DVec3::Z.cross(n)
+    };
+    if x.length() < 1e-9 { PlaneFrame::face_x(n) } else { x.normalize() }
+}
+
+#[cfg(test)]
+mod sketch_x_tests {
+    use super::construction_sketch_x;
+    use glam::DVec3;
+
+    /// Live's frames of sketches on construction planes (the parity corpus' sketches' transform matrices: normal, x).
+    #[test]
+    fn a_sketch_on_a_construction_plane_takes_lives_x() {
+        let live: [(&str, [f64; 3], [f64; 3]); 6] = [
+            ("cf-3d-spline Sketch 2", [0.7189781793680351, -0.19971616093556532, -0.6657205364518847], [0.14654386486040158, 0.9798537926962163, -0.13568876375963115]),
+            ("c2-duct-multipart Sketch 2", [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]),
+            ("cf-surface-pattern Sketch 11", [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]),
+            ("c2-fan-blade-sweep threadprofile", [0.08605943162653644, 2.3187243649438927e-14, 0.9962900050829163], [0.9962900050829163, -2.002911802061747e-15, -0.08605943162653644]),
+            ("cf-fill-pattern Sketch 1", [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]),
+            ("c2-hunting-knife Sketch 14", [0.8974203707289625, 6.123233995736766e-17, -0.4411764705882348], [-5.495114922514275e-17, 1.0000000000000002, 2.7014267628250408e-17]),
+        ];
+        for (name, n, x) in live {
+            let ours = construction_sketch_x(DVec3::from(n).normalize());
+            assert!((ours - DVec3::from(x)).length() < 1e-9, "{name}: {ours} vs live {x:?}");
+        }
+    }
 }
