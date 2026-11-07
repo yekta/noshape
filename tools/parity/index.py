@@ -13,8 +13,9 @@ says so):
     open-times.json      tools/perf/open-times.py of the documents live timed (open → model frame)
 The coverage of the interaction areas comes from tools/ui-parity/coverage*.py, run here (at this checkout).
 
-Weights are read from INDEX.md's table, so they can't drift from the definition. Interaction areas: scenarios named
-asm-* are the assembly's, drw-* the drawing's, every other recorded scenario the Part Studio's and sketch's. Speed:
+Weights are read from INDEX.md's table, so they can't drift from the definition. Interaction areas by scenario name:
+asm-* assembly, drw-* drawing, fs-* Feature Studio, vs-* Variable Studio, ver-* versions, doc-* / docs-* / prefs-*
+documents, every other recorded scenario the Part Studio's and sketch's; each area's coverage from its coverage script. Speed:
 each case scores 1 if ours <= live, else live / ours; a case without a live time is left out.
 """
 import argparse
@@ -47,14 +48,18 @@ def frac(a, b):
     return a / b if b else None
 
 
+PREFIXES = (("asm-", "asm"), ("drw-", "drw"), ("doc-", "doc"), ("docs-", "doc"), ("prefs-", "doc"), ("fs-", "fs"),
+            ("vs-", "vs"), ("ver-", "ver"))
+
+
 def states(score_log):
     """matched / recorded states by area, from run.py's per-scenario lines"""
-    acc = {"ps": [0, 0], "asm": [0, 0], "drw": [0, 0]}
+    acc = {k: [0, 0] for k in ("ps", "asm", "drw", "doc", "fs", "vs", "ver")}
     for line in score_log.splitlines():
         m = re.match(r"^([A-Za-z0-9._-]+): (match \((\d+) states\)|.* \((\d+)/(\d+) states\))", line)
         if not m or m[1] == "score":
             continue
-        area = "asm" if m[1].startswith("asm-") else "drw" if m[1].startswith("drw-") else "ps"
+        area = next((a for p, a in PREFIXES if m[1].startswith(p)), "ps")
         ok, n = (int(m[3]), int(m[3])) if m[3] else (int(m[4]), int(m[5]))
         acc[area][0] += ok
         acc[area][1] += n
@@ -67,6 +72,9 @@ def coverage(script):
         out = subprocess.run([sys.executable, str(ROOT / "tools/ui-parity" / script)], capture_output=True, text=True, timeout=300, cwd=ROOT).stdout
     except subprocess.TimeoutExpired:
         return None, "timed out"
+    total = re.search(r"^coverage [^:]+: (\d+)/(\d+) items", out, re.M)
+    if total:
+        return frac(int(total[1]), int(total[2])), f"{total[1]}/{total[2]}"
     pairs = re.findall(r"^[a-z][a-z /]*: (\d+)/(\d+) covered", out, re.M)
     if not pairs:
         return None, "no totals"
@@ -109,14 +117,22 @@ def main():
     st = states(log) if log else None
     for area, prefix, script in (("Part Studio and sketch interaction", "ps", "coverage.py"),
                                  ("Assembly interaction", "asm", "coverage_assembly.py"),
-                                 ("Drawing interaction", "drw", "coverage_drawing.py")):
+                                 ("Drawing interaction", "drw", "coverage_drawing.py"),
+                                 ("Feature Studio and FeatureScript editor", "fs", "coverage_feature_studio.py"),
+                                 ("Variable Studio", "vs", "coverage_variable_studio.py"),
+                                 ("Versions, branches, history, release", "ver", "coverage_versions.py"),
+                                 ("Documents, tabs, start page, preferences", "doc", "coverage_documents.py")):
         if not st:
+            continue
+        if not (ROOT / "tools/ui-parity" / script).exists():
             continue
         m = frac(*st[prefix])
         cov, ctext = coverage(script)
         if m is not None and cov is not None:
             score[area] = m * cov
-        note[area] = f"states {st[prefix][0]}/{st[prefix][1]} × coverage {ctext}"
+            note[area] = f"states {st[prefix][0]}/{st[prefix][1]} × coverage {ctext}"
+        else:
+            note[area] = f"no live recordings yet (coverage {ctext})"
 
     asm = read(run / "assemblies.log")
     mm = asm and re.search(r"^assemblies: .*occurrences (\d+)/(\d+)", asm, re.M)
@@ -149,7 +165,7 @@ def main():
     for area in w:
         if area not in score:
             score[area] = 0.0
-            note[area] = note[area] + " (incomplete)" if area in note else "not measured in this run" if table[area][1] else "no suite yet"
+            note[area] = note.get(area) or ("not measured in this run" if table[area][1] else "no suite yet")
     index = sum(w[k] * score[k] for k in w) / sum(w.values()) * 100
     stamp = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
     parts = " ".join(f"{re.sub(r'[^A-Za-z]+', '-', k).strip('-').lower()}={score[k] * 100:.1f}" for k in w)
