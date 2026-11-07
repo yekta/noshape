@@ -27,8 +27,19 @@ no second route). Landed together (lead: A, with stage 1):
   edges against faces (OCCT's face-face pairs were most of it). Core's review: a repaired wall must hold a point half
   a wall in from each kept face (no wall too thin), make_edge refuses one point. Still 7x live (235 ms): the rest is
   the base build's B-spline offsets (edges ~0.4 s) and the repair's traces.
-- cf-snap-hook's Shell 1 (30 s now on main): its input changed upstream (Fillet 4 matches now, first difference
-  Fillet 5): OCCT's offset 3.7 s then slabs 26 s and fail; quadrics declines at once on a degenerate edge between two
+- 11-07 18:43 UTC: rings-loft's Shell 1 1.26 s (parity run; the kernel op ~1.3 s: base edges 0.33, crossing check
+  0.19-0.29, repair 0.46 of which traces 0.29, faces 0.09, corners 0.07). A traced edge's crossing of an edge found from
+  the edge's polyline and refined locally (OCCT's curve-curve extremum was most of the traces). Tried and dropped:
+  marching free-form edges before OCCT's intersection (slower, and a marched point on another sheet of the offset);
+  the wall test by the face's foot (no gain). What is left is OCCT on B-spline offsets (IntSS, the check).
+- Stage 2, the impeller (core's input, the C0 loft; patch /root/bool-scratch/wip/stage2-impeller-1107c.patch): split at
+  its C0 knots it gets through corners and edges; then the inlet face, tangent to the removed top plane at the circle,
+  has an offset that never reaches the plane in the middle (extended 3t / 6t / 10t, the march only gets further:
+  x 14.1 -> 14.9 mm at y 24 -> 20): a topology change, the inlet's wall ending on the side's offset instead, which
+  needs the repair to take an edge whose offset is there only part of its way. Our impeller's input isn't live's (an
+  extra inlet face; live's loft has two side faces).
+- cf-snap-hook's Shell 1 (30 s now on main): blocked on Fillet 5 (core: 55 B-spline slivers where live adds 4 faces;
+  its input changed upstream (Fillet 4 matches now, first difference Fillet 5): OCCT's offset 3.7 s then slabs 26 s and fail; quadrics declines at once on a degenerate edge between two
   B-spline faces (the input's 55 extra B-spline slivers, live's part has 30 faces before Shell). Not the repair's.
   Kernel tests: shell::a_ring_thinner_than_its_wall_shells_as_live and the pinch / strip cases in shell.rs.
 
