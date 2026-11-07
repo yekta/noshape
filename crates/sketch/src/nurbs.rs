@@ -635,11 +635,15 @@ pub(crate) struct Seam {
 
 impl Seam {
     pub(crate) fn new(pts: &[DVec2]) -> Option<Seam> {
+        Self::with_weights(pts, pts.windows(2).map(|q| span_weight(q[1] - q[0])).collect())
+    }
+
+    /// [`Seam::new`] with the spans' weights given (a 3D curve's, for one or two of its coordinates).
+    fn with_weights(pts: &[DVec2], w: Vec<f64>) -> Option<Seam> {
         let n = pts.len().checked_sub(1)?;
-        if n < 3 {
+        if n < 3 || w.len() != n {
             return None;
         }
-        let w: Vec<f64> = pts.windows(2).map(|q| span_weight(q[1] - q[0])).collect();
         let total: f64 = w.iter().sum();
         if total <= 1e-300 || w.iter().any(|x| *x <= 1e-300 * total) {
             return None;
@@ -773,6 +777,21 @@ pub(crate) fn fit_params(pts: &[DVec2]) -> (Vec<f64>, f64) {
     }
     ub[n - 1] = 1.0;
     (ub, total)
+}
+
+/// The closed cubic through 3D `pts` (the last point the first) as Onshape's closed opFitSpline: periodic, at the
+/// centripetal parameters, as a closed sketch spline (live 1836): [`fit_3d`] with the seam's derivative at both ends.
+pub fn fit_3d_closed(pts: &[DVec3]) -> Option<(Vec<f64>, Vec<DVec3>)> {
+    let n = pts.len().checked_sub(1)?;
+    if n < 3 || (pts[n] - pts[0]).length() > 1e-12 * (1.0 + pts[0].length()) {
+        return None;
+    }
+    let w: Vec<f64> = pts.windows(2).map(|q| (q[1] - q[0]).length().sqrt()).collect();
+    let xy: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.x, p.y)).collect();
+    let z: Vec<DVec2> = pts.iter().map(|p| DVec2::new(p.z, 0.0)).collect();
+    let (a, b) = (Seam::with_weights(&xy, w.clone())?, Seam::with_weights(&z, w)?);
+    let d = DVec3::new(a.d.x, a.d.y, b.d.x);
+    fit_3d(pts, Some((d, d)))
 }
 
 /// The cubic through 3D `pts` as Onshape's opFitSpline (live 2052): knots at the centripetal parameters on [0, 1],

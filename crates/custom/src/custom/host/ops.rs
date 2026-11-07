@@ -1534,14 +1534,16 @@ fn op_fit_spline(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             return add_wire(ev, k::make_line(pts[0], pts[1])?);
         }
         let closed = pts.len() > 2 && (pts[0] - pts[pts.len() - 1]).length() < 1e-9;
-        if closed {
+        // Closed: periodic at the centripetal parameters, as a closed sketch spline (cf-3d-spline's box as live's).
+        let fit = if closed && ends.is_none() { noshape_sketch::nurbs::fit_3d_closed(&pts) } else { None };
+        if closed && fit.is_none() {
             // (OCCT's periodic interpolation runs over the chord length.)
             let chord: f64 = pts.windows(2).map(|w| (w[1] - w[0]).length()).sum::<f64>().max(1e-300);
             let tangents: Vec<DVec3> = ends.map(|(s, e)| vec![s / chord, e / chord]).unwrap_or_default();
             return add_wire(ev, k::make_interpolated_spline(&pts[..pts.len() - 1], &tangents, true)?);
         }
         // Live 2052: knots at the centripetal parameters on [0, 1], natural ends without derivatives.
-        let (knots, poles) = noshape_sketch::nurbs::fit_3d(&pts, ends).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
+        let (knots, poles) = fit.or_else(|| noshape_sketch::nurbs::fit_3d(&pts, ends)).ok_or_else(|| FeatureError::new("The spline could not be fitted"))?;
         let mut unique: Vec<f64> = Vec::new();
         let mut mults: Vec<u32> = Vec::new();
         for k in knots {

@@ -371,6 +371,27 @@ fn fit_splines_are_centripetal_and_closed_ones_periodic() {
     assert!((c.tangent(a).normalize() - c.tangent(b).normalize()).length() < 1e-9);
 }
 
+/// A closed 3D fit (Onshape's opFitSpline through points whose last is the first) is the closed sketch spline's
+/// periodic cubic at the centripetal parameters (live 1836 above; cf-3d-spline's Curve 1 then has live's box): on a
+/// plane its control points are the sketch's, and tilting the points tilts the curve.
+#[test]
+fn a_closed_3d_fit_is_the_closed_sketch_splines() {
+    let mm = |x: f64, y: f64| v(x * 1e-3, y * 1e-3);
+    let ring = [mm(0.0, 0.0), mm(30.0, -10.0), mm(50.0, 15.0), mm(25.0, 35.0), mm(-5.0, 20.0), mm(0.0, 0.0)];
+    let flat = Nurbs::interpolate_periodic(&ring).unwrap();
+    let (knots, poles) = noshape_sketch::nurbs::fit_3d_closed(&ring.map(|p| glam::DVec3::new(p.x, p.y, 0.0))).unwrap();
+    assert_eq!(poles.len(), flat.ctrl.len());
+    assert!(knots.iter().zip(&flat.knots).all(|(a, b)| (a - b).abs() < 1e-12), "{knots:?} vs {:?}", flat.knots);
+    for (p, c) in poles.iter().zip(&flat.ctrl) {
+        assert!((p.truncate() - *c).length() < 1e-12 && p.z.abs() < 1e-15, "{p} vs {c}");
+    }
+    let tilt = glam::DQuat::from_axis_angle(glam::DVec3::new(1.0, 2.0, 0.5).normalize(), 0.7);
+    let (_, tilted) = noshape_sketch::nurbs::fit_3d_closed(&ring.map(|p| tilt * glam::DVec3::new(p.x, p.y, 0.0))).unwrap();
+    for (p, c) in tilted.iter().zip(&flat.ctrl) {
+        assert!((*p - tilt * glam::DVec3::new(c.x, c.y, 0.0)).length() < 1e-12, "{p}");
+    }
+}
+
 /// Live (behaviours "psb (10-24 j) sketch offset constraints", qa4
 /// OFF-CONSTR): the first pair gets the offset DISTANCE, every other pair an
 /// OFFSET tied to it, so the copies follow their sources when those move and
