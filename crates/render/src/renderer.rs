@@ -615,6 +615,11 @@ pub(crate) fn record_pass_times() {
             }
         };
         perf::record_ms(name, ms as f32);
+        // The first frames' passes one by one (a document open's first frames: which pass of which frame is slow).
+        static LOGGED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        if LOGGED.fetch_add(1, std::sync::atomic::Ordering::Relaxed) < 40 {
+            perf::milestone(&format!("gpu pass {pass} {ms:.1} ms"));
+        }
         if pass.starts_with("pick") || pass == "depth-samples" {
             continue;
         }
