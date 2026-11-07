@@ -930,6 +930,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   polygon's first corner) and 26d817465 (a section with fewer vertices gets the others' corners spread evenly); neither
   under legacy_topology or a ScopeRule. If the new loft is live's, documents made from now on are right, but ones saved
   before change on open. qa's CLI sweeps don't have this document (only the GUI rows): added to qa's watch list. (qa 2026-11-07 08:51, v0.4.34)
+- [ ] P3 SAVED-BRIDGE-FACE-CHANGE (core) **b113528b (a blend that consumes a face a hair smaller: the zero-width bridge cut
+  out and the faces sewn) changes a saved document's faces**: qa-scratch/tickets/cli-fillet-segv.noshape Part 4 33 → 34 faces,
+  volume the same (43710.5082 mm³). Likely right (live has no zero-width bridge), but saved documents change on open with
+  no ScopeRule (core.md). (qa 2026-11-07 22:59, green b113528b)
 - [ ] P2 SAVED-CHAMFER-CHANGE (core) **saved documents' chamfers regenerate differently since 07384946a / f57807bd0 (after
   v0.4.34's cut), with no ScopeRule** (core.md: a change that alters saved documents goes under legacy_topology or its own
   ScopeRule). Green 6d194fa1 → d973df07, the 44 ticket documents: a chamfer that failed with "Distance of chamfer on face too
