@@ -1,0 +1,76 @@
+{
+  "name": "drw-detail-edit",
+  "about": "A detail view's menu › Edit detail...: the Detail view panel on it",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            -20,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            20,
+            -20,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          70,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Detail"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit detail..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

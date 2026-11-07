@@ -71,8 +71,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     order): now region 0, the block; the start test checks Part 1's volume. Every pin-block scenario ran on it.
 - A centerline annotation runs past each picked point by the standard's extension (live 2230: 0.09 in ANSI, 2.5 mm
   ISO; live stores first / second extension lengths per centerline, nothing edits them yet): drw-centerline-2-point
-  3/3, so 19/24. Known, waiting on live (REQUESTS): a section's Auto hatch spacing (live 0.1804 in for the block, ours 2.5 mm). The detail view's circle is 3 % bigger in live: its
-  clicks, not ours.
+  3/3, so 19/24. Known, waiting on live (REQUESTS): a section's Auto hatch spacing (live 0.1804 in for the block, ours 2.5 mm). drw-detail-view now picks two vertices (centre (20, -20, 0), radius at
+  (20, -20, 20): exactly 20 mm) and our Detail tool snaps its radius pick as it does its centre; re-record asked of live2.
+  Drawing batch 13 (4 menu rows: Edit section..., Edit auxiliary view..., Edit detail..., Show/hide parts...) filed;
+  their panels get records once live's text is in.
 - An assembly's views get no automatic centermarks or centerlines (live: "Auto centermarks (Parts)"):
   `create::assembly_drawing_defaults` after Create Drawing (app and ops), and the Insert view tool's pending view.
   Left in drw-bom-table: the table's layout and pen, asked of live (columns at least 1.0 in, rows 0.32 in, cells

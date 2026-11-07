@@ -1,0 +1,38 @@
+{
+  "name": "drw-view-show-hide-parts",
+  "about": "An assembly view's menu › Show/hide ▸ Show/hide parts...",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
+  "start": "pin-block-asm-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Front"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show/hide"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Show/hide parts..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

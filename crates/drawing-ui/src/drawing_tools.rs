@@ -489,7 +489,7 @@ impl DrawingEditor {
             | Tool::CircleCenterline { .. }
             | Tool::Balloon { anchor: None }
             | Tool::Section { p0: None, .. }
-            | Tool::Detail { center: None, .. }
+            | Tool::Detail { radius: None, .. }
             | Tool::JoggedSection { done: false, .. }
             | Tool::AlignedSection { b: None, .. }
             | Tool::Ordinate { .. }
@@ -661,7 +661,8 @@ impl DrawingEditor {
             Tool::Detail { parent: Some(pid), center: Some(ctr), radius: None } => {
                 if let Some(pl) = self.placement(*pid) {
                     let cs = pl.to_sheet(*ctr);
-                    overlay.circle(cs, len(sub(c, cs)), true);
+                    let at = self.snap_at(c).filter(|pp| pp.view == *pid).map(|pp| pl.to_sheet(pp.p)).unwrap_or(c);
+                    overlay.circle(cs, len(sub(at, cs)), true);
                 }
             }
             Tool::Sketch { .. } => self.sketch_overlay(&mut overlay),
@@ -926,7 +927,9 @@ impl DrawingEditor {
             }
             Tool::Detail { parent: Some(pid), center: Some(ctr), radius: None } => {
                 if let Some(pl) = self.placement(pid) {
-                    let r = len(sub(c, pl.to_sheet(ctr))) / (pl.scale * 1000.0);
+                    // The radius to a snapped point of the view (a vertex, an edge), else to the click.
+                    let at = self.snap_at(c).filter(|pp| pp.view == pid).map(|pp| pl.to_sheet(pp.p)).unwrap_or(c);
+                    let r = len(sub(at, pl.to_sheet(ctr))) / (pl.scale * 1000.0);
                     if r > 1e-6 {
                         self.tool = Tool::Detail { parent: Some(pid), center: Some(ctr), radius: Some(r) };
                     }
