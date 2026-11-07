@@ -1,0 +1,19 @@
+{
+ "name": "doc-tab-drag-reorder",
+ "about": "drag a tab to the left of the first: it moves there",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "doc_tab": "Variable Studio 1"
+   },
+   "to": {
+    "doc_tab": "Part Studio 1",
+    "edge": "left"
+   }
+  }
+ ]
+}

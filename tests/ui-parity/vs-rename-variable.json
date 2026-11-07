@@ -1,0 +1,33 @@
+{
+ "name": "vs-rename-variable",
+ "about": "a Name cell: select all, a new name, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Name"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "plate_width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

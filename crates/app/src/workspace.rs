@@ -164,7 +164,11 @@ impl Workspace {
             crate::smoke::start(window, cx);
         }
         if crate::ui_script::enabled() {
-            crate::ui_script::start(window, cx);
+            let weak = cx.entity().downgrade();
+            noshape_app_core::ui_script::register_page(window.window_handle().window_id(), move |window, cx| weak.update(cx, |w, cx| crate::ui_script::window_state(w, window, cx)).unwrap_or(serde_json::Value::Null));
+            if crate::ui_script::page_start().is_none() {
+                crate::ui_script::start(window, cx);
+            }
         }
         // Live mode: agents' calls see this window's tab, cameras, selection
         // and, in a Part Studio, its dialog, lists and feature list.
@@ -418,6 +422,121 @@ impl Workspace {
         let Some(tab) = self.doc.read(cx).session.doc.tabs.iter().find(|t| t.name == name).map(|t| t.id) else { return false };
         self.activate(tab, window, cx);
         true
+    }
+
+    /// The ui-parity state's `document` (tests/ui-parity/README.md "Documents, tabs and preferences"): the tab bar as
+    /// shown, the open tab folder, the tab being renamed and the open left panel.
+    pub(crate) fn ui_document_state(&self, cx: &App) -> serde_json::Value {
+        let d = &self.doc.read(cx).session.doc;
+        let open = self.open_folder.filter(|f| d.is_folder(*f));
+        let tabs: Vec<serde_json::Value> = d
+            .children(open)
+            .into_iter()
+            .filter_map(|id| {
+                let (name, kind) = match (d.tab(id), d.folder(id)) {
+                    (Some(t), _) => (t.name.clone(), ui_tab_kind(&t.content)),
+                    (None, Some(f)) => (f.name.clone(), "folder"),
+                    _ => return None,
+                };
+                Some(serde_json::json!({ "name": name, "kind": kind, "active": self.active == Some(id) }))
+            })
+            .collect();
+        let renaming = self.renaming_tab.as_ref().and_then(|(id, ..)| d.tab(*id).map(|t| t.name.clone()).or_else(|| d.folder(*id).map(|f| f.name.clone())));
+        let panel = if self.tab_manager.is_some() {
+            Some("Tab manager")
+        } else if self.history.is_some() {
+            Some("Versions and history")
+        } else if self.units_panel.is_some() {
+            Some("Workspace units")
+        } else {
+            match &self.doc_panel {
+                Some((DocPanel::Notes(_), _)) => Some("Document notes"),
+                Some((DocPanel::Performance(_), _)) => Some("Performance"),
+                Some((DocPanel::WhereUsed(_), _)) => Some("Where used"),
+                None => None,
+            }
+        };
+        // The navbar's label after the name: the version viewed, "History" (a history entry), else the workspace.
+        let session = &self.doc.read(cx).session;
+        let workspace = match (session.viewing_version(), session.read_only()) {
+            (Some(v), _) => v,
+            (None, true) => "History".to_string(),
+            (None, false) => session.store.branch(session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()),
+        };
+        let history = self.history.as_ref().map(|h| h.read(cx).ui_rows(cx));
+        serde_json::json!({
+            "workspace": workspace,
+            "history": history,
+            "tabs": tabs,
+            "folder": open.and_then(|f| d.folder(f).map(|x| x.name.clone())),
+            "renaming": renaming,
+            "panel": panel,
+            "switcher": self.switcher.as_ref().map(|(ids, sel)| serde_json::json!({ "rows": ids.iter().filter_map(|i| d.tab(*i).map(|t| t.name.clone())).collect::<Vec<_>>(), "selected": sel })),
+        })
+    }
+
+    /// The active tab's Variable Studio state (ui-parity driver), if it is one.
+    pub(crate) fn ui_variables_state(&self, cx: &App) -> Option<serde_json::Value> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::Variables(v)) => Some(v.read(cx).ui_state(cx)),
+            _ => None,
+        }
+    }
+
+    /// The active Feature Studio's editor state (ui-parity driver), if it is one.
+    pub(crate) fn ui_feature_studio_state(&self, cx: &App) -> Option<serde_json::Value> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::FeatureStudio(v)) => {
+                let st = v.read(cx).ui_state(cx);
+                let list = st.completion.map(|rows| serde_json::json!({ "kind": "autocomplete", "rows": rows, "highlighted": null, "disabled": [] }));
+                Some(serde_json::json!({
+                    "featurestudio": { "caret": [st.caret.0, st.caret.1], "line": st.line, "lines": st.lines, "committed": st.committed, "notices": st.notices },
+                    "list": list,
+                }))
+            }
+            _ => None,
+        }
+    }
+
+    /// Repaints the active tab's view and the chrome (the ui-parity driver's marks; cached slices too).
+    pub(crate) fn ui_redraw(&mut self, cx: &mut Context<Self>) {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::FeatureStudio(v)) => v.update(cx, |v, cx| v.ui_redraw(cx)),
+            Some(TabView::Variables(v)) => v.update(cx, |_, cx| cx.notify()),
+            _ => {}
+        }
+        if let Some(s) = &self.slices {
+            for slice in [&s.title, &s.rail, &s.tabs] {
+                slice.update(cx, |_, cx| cx.notify());
+            }
+        }
+        if let Some((tm, _)) = &self.tab_manager {
+            tm.update(cx, |_, cx| cx.notify());
+        }
+        if let Some(h) = &self.history {
+            h.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
+    }
+
+    /// The active tab is a Part Studio, Assembly or Drawing whose view isn't made yet (the ui-parity driver waits).
+    pub(crate) fn ui_view_pending(&self, cx: &App) -> bool {
+        let Some(id) = self.active else { return false };
+        let studio = self.doc.read(cx).session.doc.tab(id).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_) | TabContent::Drawing(_)));
+        studio && !self.views.contains_key(&id)
+    }
+
+    /// The active tab's text field with the keyboard (the inline tab rename): `state.focus` for the ui-parity driver
+    /// when no studio reads it.
+    pub(crate) fn ui_rename_focus(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
+        let (_, st, _) = self.renaming_tab.as_ref()?;
+        let st = st.read(cx);
+        st.focus_handle(cx).is_focused(window).then(|| {
+            let mut f = noshape_app_core::ui_script::field_focus("", st);
+            f["kind"] = serde_json::json!("other");
+            f.as_object_mut().map(|o| o.remove("label"));
+            f
+        })
     }
 
     /// A key no binding took while a navbar or tab bar control has the focus
@@ -681,14 +800,14 @@ impl Workspace {
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(crate::theme::themed(0x4a4a4a, 0xffffff)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(crate::ui::user_text(name)))
+                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(crate::ui::user_text(name)).map(|d| noshape_app_core::ui_script::mark(d, || "navbar:name".into())))
                     // Live: on the name's baseline, 11 px after it. The name and this
                     // label show the I-beam (dom/cursors-controls.json).
                     // Live (navigation/301): a version shows its name ("V1", #999) in the
                     // branch's place and no banner (its view-only bar is in the toolbar row).
                     // A protected workspace: a lock before its name (live wp-929).
                     .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
-                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().child(match (&viewing_version, read_only) {
+                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match (&viewing_version, read_only) {
                         // Version and workspace names are the user's.
                         (Some(v), _) => crate::ui::user_text(v.clone()).into_any_element(),
                         (None, true) => "History".into_any_element(),
@@ -774,6 +893,7 @@ impl Workspace {
             // Live: the ☰ ink spans y 13–27.
             .child(div().mt(px(1.)).child(crate::assets::icon("menu", 20., cx)))
             .tooltip("Document menu")
+            .map(|d| noshape_app_core::ui_script::mark(d, || "button:Document menu".into()))
             .w(px(32.))
             .h(px(crate::ui::NAVBAR_H))
             .p_0()
@@ -1146,13 +1266,14 @@ impl Workspace {
             .when(tm_open, |c| c.child(div().absolute().left_0().top_0().bottom_0().w(px(4.)).bg(pal.accent)).child(crate::ui::glyph("tab-search", 20., pal.accent)))
             .when(!tm_open, |c| c.child(crate::assets::icon("tab-search", 20., cx)))
             .tooltip("Tab manager (Alt+T)")
+            .map(|d| noshape_app_core::ui_script::mark(d, || "button:Tab manager".into()))
             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_tab_manager(window, cx)));
         // Onshape's "+" menu (live, document/01): a Bootstrap dropdown opening
         // upward from the cell. Cloud items (Applications, CAM / PCB /
         // Render Studio) are not part of noshape.
         // A protected workspace takes no new tabs: "+" greyed, inert (live wp-932).
         let protected = self.doc.read(cx).session.is_protected();
-        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., if protected { gpui_kit::rgb(0xc0c0c0) } else { crate::theme::themed(0x555555, 0xcccccc) })).tooltip("Insert new tab").on_click(move |_, window, cx| {
+        let add = cell("add-tab", cx).w(px(34.)).child(crate::ui::glyph("plus", 20., if protected { gpui_kit::rgb(0xc0c0c0) } else { crate::theme::themed(0x555555, 0xcccccc) })).tooltip("Insert new tab").map(|d| noshape_app_core::ui_script::mark(d, || "button:Insert new tab".into())).on_click(move |_, window, cx| {
             if protected {
                 return;
             }
@@ -1224,6 +1345,7 @@ impl Workspace {
                     .pr(px(5.))
                     .child(div().size(px(20.)).flex().items_center().justify_center().child(os::glyph(os::GLYPH_HOME, 18., pal.text_muted)))
                     .tooltip(crate::ui::tooltip("All tabs"))
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:All tabs".into()))
                     .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
                     .on_drop(cx.listener(|this, drag: &TabDrag, _, cx| this.move_into(drag.id, None, cx)))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -1623,6 +1745,7 @@ impl Workspace {
             .child(
                 crate::ui::rail_button("rail-history", "history", history_open, true, cx).pl(px(1.))
                     .tip("Versions and history", TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Versions and history".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_history(window, cx))),
             )
             // Live 10-27: paused regeneration drops Create version… (and
@@ -1630,6 +1753,7 @@ impl Workspace {
             .when(!paused, |d| d.child(
                 crate::ui::rail_button("rail-version", "version", false, true, cx).pl(px(1.))
                     .tip("Create version…", TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Create version…".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx))),
             ))
             // Live order: Versions and history, Create version…, (Comments),
@@ -1637,11 +1761,13 @@ impl Workspace {
             .child(
                 crate::ui::rail_button("rail-notes", "doc-notes", notes_open, true, cx).pl(px(1.))
                     .tip("Document notes", TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Document notes".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(true, cx))),
             )
             .child(
                 crate::ui::rail_button("rail-where-used", "where-used", where_open, true, cx).pl(px(1.))
                     .tip("Where used", TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Where used".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_where_used(window, cx))),
             )
             .child(
@@ -1655,6 +1781,7 @@ impl Workspace {
             .child(
                 crate::ui::rail_button("rail-release-drafts", "release-drafts", self.release_drafts.is_some(), true, cx).pl(px(1.))
                     .tip("Release drafts", TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Release drafts".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_release_drafts(cx))),
             );
         // The Tab manager cell ends the rail, beside the tab bar.
@@ -1782,6 +1909,19 @@ fn kind_of(c: &TabContent) -> &'static str {
         TabContent::FeatureStudio(_) => "featurestudio",
         TabContent::MaterialLibrary(_) => "materiallibrary",
         TabContent::File(f) => crate::file_tab_view::file_icon(f),
+    }
+}
+
+/// A tab's kind as the ui-parity state names it (live's element types).
+fn ui_tab_kind(c: &TabContent) -> &'static str {
+    match c {
+        TabContent::PartStudio(_) => "partstudio",
+        TabContent::Assembly(_) => "assembly",
+        TabContent::Drawing(_) => "drawing",
+        TabContent::VariableStudio(_) => "variablestudio",
+        TabContent::FeatureStudio(_) => "featurestudio",
+        TabContent::MaterialLibrary(_) => "materiallibrary",
+        TabContent::File(_) => "file",
     }
 }
 
@@ -2272,6 +2412,7 @@ impl Workspace {
     fn folder_tab(&self, id: TabId, name: String, cx: &mut Context<Self>) -> Stateful<Div> {
         let pal = p();
         tab_chip(SharedString::from(format!("folder-{id}")), false)
+            .map(|d| noshape_app_core::ui_script::mark(d, || format!("doc_tab:{name}")))
             .min_w(px(60.))
             .max_w(px(200.))
             .px(px(10.))

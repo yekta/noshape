@@ -1,0 +1,38 @@
+{
+ "name": "doc-tab-click",
+ "about": "click other tabs: each becomes the active one (a wait first: a first doc_tab step would open the run on that tab)",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  }
+ ]
+}

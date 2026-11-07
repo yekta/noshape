@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-time-24",
+ "about": "Preferences › Units: Time format › 24 hour, Save",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Time format",
+    "pick": "24 hour"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

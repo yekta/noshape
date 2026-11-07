@@ -1,0 +1,17 @@
+{
+ "name": "ver-create-version-key",
+ "about": "Ctrl+Alt+V: the Create version dialog, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "key",
+   "key": "mod+alt+v"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

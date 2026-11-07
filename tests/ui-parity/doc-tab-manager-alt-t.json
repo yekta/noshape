@@ -1,0 +1,17 @@
+{
+ "name": "doc-tab-manager-alt-t",
+ "about": "Alt+T opens the Tab manager, Alt+T again closes it",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "key",
+   "key": "alt+t"
+  },
+  {
+   "do": "key",
+   "key": "alt+t"
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "doc-menu-units",
+ "about": "☰ › Workspace units…: the units panel, then its ✕",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

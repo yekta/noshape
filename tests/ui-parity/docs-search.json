@@ -1,0 +1,23 @@
+{
+ "name": "docs-search",
+ "about": "the search box: type, Enter: Search results in Owned by me",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Search"
+   }
+  },
+  {
+   "do": "type",
+   "text": "uip Brack"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

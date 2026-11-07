@@ -1,0 +1,7782 @@
+{
+ "area": "documents",
+ "generated": "Sat Nov  7 07:36:18 PM UTC 2026",
+ "items": [
+  {
+   "id": "documents-page-owned-by-me",
+   "category": "documents page",
+   "name": "Owned by me",
+   "where": "documents page › left nav",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:13",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Owned by me"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-recently-opened",
+   "category": "documents page",
+   "name": "Recently opened",
+   "where": "documents page › left nav",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:22",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Recently opened"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-created-by-me",
+   "category": "documents page",
+   "name": "Created by me",
+   "where": "documents page › left nav",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:13",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Created by me"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-shared-with-me",
+   "category": "documents page",
+   "name": "Shared with me",
+   "where": "documents page › left nav",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:13"
+  },
+  {
+   "id": "documents-page-labels",
+   "category": "documents page",
+   "name": "Labels",
+   "where": "documents page › left nav (list documents by label)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Labels"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-public",
+   "category": "documents page",
+   "name": "Public",
+   "where": "documents page › left nav",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:13"
+  },
+  {
+   "id": "documents-page-trash",
+   "category": "documents page",
+   "name": "Trash",
+   "where": "documents page › left nav",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:13",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-explore-onshape",
+   "category": "documents page",
+   "name": "Explore Onshape",
+   "where": "documents page › left nav",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:13"
+  },
+  {
+   "id": "documents-page-subscription-free-try-professional-plans-and-pricing",
+   "category": "documents page",
+   "name": "Subscription: Free / Try Professional / Plans and pricing",
+   "where": "documents page › left nav bottom",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:13"
+  },
+  {
+   "id": "documents-page-your-free-subscription-only-allows-public-data-try-professional-b",
+   "category": "documents page",
+   "name": "Your Free subscription only allows public data… [Try Professional] banner",
+   "where": "documents page top",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:12"
+  },
+  {
+   "id": "documents-page-getting-started-with-onshape-banner-upgrade-now-learning-center-f",
+   "category": "documents page",
+   "name": "Getting started with Onshape banner (Upgrade now, Learning Center, Forum, Help Documentation)",
+   "where": "documents page › Owned by me, above the list",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:21"
+  },
+  {
+   "id": "documents-page-last-opened-by-me-cards-click-to-open",
+   "category": "documents page",
+   "name": "Last opened by me cards (click to open)",
+   "where": "documents page › Owned by me, above the list",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20"
+  },
+  {
+   "id": "documents-page-create",
+   "category": "documents page",
+   "name": "Create ▾",
+   "where": "documents page › top of left column (button; Esc leaves it focused/ringed)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:27055",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-create-document",
+   "category": "documents page",
+   "name": "Create › Document…",
+   "where": "documents page › Create ▾",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:27",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-create-folder",
+   "category": "documents page",
+   "name": "Create › Folder…",
+   "where": "documents page › Create ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Folder…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-create-import-files",
+   "category": "documents page",
+   "name": "Create › Import files…",
+   "where": "documents page › Create ▾ (opens the OS file picker, multiple files)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import files…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-create-import-from-connect-service",
+   "category": "documents page",
+   "name": "Create › Import from › Connect service…",
+   "where": "documents page › Create ▾ › Import from ▸",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:27"
+  },
+  {
+   "id": "documents-page-create-label",
+   "category": "documents page",
+   "name": "Create › Label…",
+   "where": "documents page › Create ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:27",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Label…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-new-document-document-name",
+   "category": "dialog",
+   "name": "New document › Document name",
+   "where": "documents page › Create › Document… (prefilled \"Untitled document\", selected)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:17",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document…"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-new-document-document-labels",
+   "category": "dialog",
+   "name": "New document › Document labels",
+   "where": "documents page › Create › Document… (\"Search labels\")",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17"
+  },
+  {
+   "id": "dialog-new-document-document-location-folder-browser-home-back-breadcrumb-folder",
+   "category": "dialog",
+   "name": "New document › Document location (folder browser: Home, ‹ back, breadcrumb, folder rows)",
+   "where": "documents page › Create › Document…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:17"
+  },
+  {
+   "id": "dialog-document-location-sort-name-a-z-name-z-a-last-modified",
+   "category": "dialog",
+   "name": "Document location › Sort (Name: A → Z / Name: Z → A / Last modified)",
+   "where": "New document or New folder dialog › location box ↓≡",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2470"
+  },
+  {
+   "id": "dialog-new-document-create-public-document",
+   "category": "dialog",
+   "name": "New document › Create public document",
+   "where": "documents page › Create › Document… (opens the new document on Part Studio 1 + Assembly 1)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:17",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document…"
+      }
+     },
+     {
+      "on": {
+       "button": "Create"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-new-document-cancel",
+   "category": "dialog",
+   "name": "New document › Cancel",
+   "where": "documents page › Create › Document…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:17",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document…"
+      }
+     },
+     {
+      "on": {
+       "button": "Cancel"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-new-folder-folder-name-folder-location-create-cancel",
+   "category": "dialog",
+   "name": "New folder › Folder name / Folder location / Create / Cancel",
+   "where": "documents page › Create › Folder… (toast \"Folder created.\")",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create"
+      }
+     },
+     {
+      "on": {
+       "menu": "Folder…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-import-to-onshape-import-to-a-single-document",
+   "category": "dialog",
+   "name": "Import to Onshape › Import to a single document",
+   "where": "documents page › Create › Import files… › pick a CAD file",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-split-into-multiple-documents",
+   "category": "dialog",
+   "name": "Import to Onshape › Split into multiple documents",
+   "where": "documents page › Create › Import files… › pick an assembly",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-combine-to-a-single-part-studio",
+   "category": "dialog",
+   "name": "Import to Onshape › Combine to a single Part Studio",
+   "where": "documents page Import files… or tab bar + › Import…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-import-appearances",
+   "category": "dialog",
+   "name": "Import to Onshape › Import appearances",
+   "where": "Import to Onshape modal (checkbox, on by default)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-orient-imported-models-with-y-axis-up",
+   "category": "dialog",
+   "name": "Import to Onshape › Orient imported models with Y Axis Up",
+   "where": "Import to Onshape modal (checkbox)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-create-a-composite-part-when-importing-multiple-or-non-",
+   "category": "dialog",
+   "name": "Import to Onshape › Create a composite part when importing multiple or non-solid bodies",
+   "where": "Import to Onshape modal (checkbox)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-join-adjacent-surfaces",
+   "category": "dialog",
+   "name": "Import to Onshape › Join adjacent surfaces",
+   "where": "Import to Onshape modal (checkbox)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "dialog-import-to-onshape-import-cancel",
+   "category": "dialog",
+   "name": "Import to Onshape › Import / Cancel",
+   "where": "Import to Onshape modal",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:31"
+  },
+  {
+   "id": "documents-page-import-progress-in-notifications-uploaded-translated-post-process",
+   "category": "documents page",
+   "name": "Import progress in Notifications (Uploaded, Translated, Post-processing done, Created link to …)",
+   "where": "navbar bell after an import from the documents page",
+   "freq": 2,
+   "cloud": true,
+   "source": "behaviours.md:32"
+  },
+  {
+   "id": "documents-page-open-a-document-double-click-a-row-open",
+   "category": "documents page",
+   "name": "Open a document (double-click a row / Open)",
+   "where": "documents page › list row",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:24",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      },
+      "do": "dblclick"
+     }
+    ],
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-select-a-row-hover-def1fb-selected-b2ddf6",
+   "category": "documents page",
+   "name": "Select a row (hover #def1fb, selected #b2ddf6)",
+   "where": "documents page › list row",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-row-inline-icons-on-the-selected-row-share-trash-labels",
+   "category": "documents page",
+   "name": "Row inline icons on the selected row: share, trash, labels",
+   "where": "documents page › selected row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:50"
+  },
+  {
+   "id": "documents-page-sort-the-list-by-a-column-header",
+   "category": "documents page",
+   "name": "Sort the list by a column header",
+   "where": "documents page › list header (Name / Modified / …)",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-list.txt"
+  },
+  {
+   "id": "documents-page-add-column-chooser",
+   "category": "documents page",
+   "name": "+ Add (column chooser)",
+   "where": "documents page › right above the table",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-select-all-tri-state",
+   "category": "documents page",
+   "name": "Column chooser › select all (tri-state)",
+   "where": "documents page › + Add panel header",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-search",
+   "category": "documents page",
+   "name": "Column chooser › Search…",
+   "where": "documents page › + Add panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-modified",
+   "category": "documents page",
+   "name": "Column chooser › Modified",
+   "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-modified-by",
+   "category": "documents page",
+   "name": "Column chooser › Modified by",
+   "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-owned-by",
+   "category": "documents page",
+   "name": "Column chooser › Owned by",
+   "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-type",
+   "category": "documents page",
+   "name": "Column chooser › Type",
+   "where": "documents page › + Add panel (checkbox, off by default; global, persists)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-description",
+   "category": "documents page",
+   "name": "Column chooser › Description",
+   "where": "documents page › + Add panel (checkbox, off by default; global, persists)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-column-chooser-drag-a-column-s-grip-to-reorder",
+   "category": "documents page",
+   "name": "Column chooser › drag a column's grip to reorder",
+   "where": "documents page › + Add panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:38"
+  },
+  {
+   "id": "documents-page-search-in-location-box-type-enter",
+   "category": "documents page",
+   "name": "Search in <location> box (type + Enter)",
+   "where": "documents page › top search box",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:63",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Search"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-advanced-search",
+   "category": "documents page",
+   "name": "Advanced search ▾",
+   "where": "documents page › caret in the search box",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:45"
+  },
+  {
+   "id": "documents-page-advanced-search-type-multi-select-chips-document-part-part-studio",
+   "category": "documents page",
+   "name": "Advanced search › Type (multi-select chips: Document, Part, Part Studio, Assembly, Drawing, Feature Studio, Variable Studio, Folder)",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-name",
+   "category": "documents page",
+   "name": "Advanced search › Name",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-description",
+   "category": "documents page",
+   "name": "Advanced search › Description",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-part-number",
+   "category": "documents page",
+   "name": "Advanced search › Part number",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-state",
+   "category": "documents page",
+   "name": "Advanced search › State",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-revision",
+   "category": "documents page",
+   "name": "Advanced search › Revision",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-add-criteria-creator-published-featurescript-vend",
+   "category": "documents page",
+   "name": "Advanced search › Add criteria ▾ (Creator, Published FeatureScript, Vendor, Project, Product line, Title 1–3, Drawn by, Approver, Date drawn, Date approved, Not revision managed, Exclude from all BOMs, Revision description, Library label)",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-results-from-workspaces-versions-all",
+   "category": "documents page",
+   "name": "Advanced search › Results from ▾ (Workspaces / Versions / All)",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-latest",
+   "category": "documents page",
+   "name": "Advanced search › Latest ▾",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-reset",
+   "category": "documents page",
+   "name": "Advanced search › Reset",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-search",
+   "category": "documents page",
+   "name": "Advanced search › Search",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-advanced-search-help",
+   "category": "documents page",
+   "name": "Advanced search › ? help",
+   "where": "documents page › search ▾ panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:46"
+  },
+  {
+   "id": "documents-page-search-results-view-search-results-in-location-part-number-revisi",
+   "category": "documents page",
+   "name": "Search results view (Search results in <location>; Part number, Revision columns; one row per part; empty state)",
+   "where": "documents page after a search",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:64"
+  },
+  {
+   "id": "documents-page-folders-section-collapse-expand",
+   "category": "documents page",
+   "name": "Folders section collapse/expand (⌃/⌄)",
+   "where": "documents page › Folders row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:42"
+  },
+  {
+   "id": "documents-page-open-a-folder-double-click-its-tile",
+   "category": "documents page",
+   "name": "Open a folder (double-click its tile)",
+   "where": "documents page › Folders section",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:42",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "dblclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-folder-breadcrumb-owned-by-me-a-b-navigation",
+   "category": "documents page",
+   "name": "Folder breadcrumb (Owned by me › A › B) navigation",
+   "where": "documents page header inside a folder",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:42"
+  },
+  {
+   "id": "documents-page-folders-sort-name-a-z-name-z-a-last-modified",
+   "category": "documents page",
+   "name": "Folders sort (Name: A → Z / Name: Z → A / Last modified)",
+   "where": "documents page › Folders row ↓≡",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:42"
+  },
+  {
+   "id": "documents-page-folders-grid-view-list-view-toggle",
+   "category": "documents page",
+   "name": "Folders grid view / list view toggle",
+   "where": "documents page › Folders row (remembered)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:42"
+  },
+  {
+   "id": "documents-page-empty-states-no-documents-owned-by-you-nothing-in-trash-get-start",
+   "category": "documents page",
+   "name": "Empty states (No documents owned by you / Nothing in trash / Get started by clicking Create / No documents in <folder>)",
+   "where": "documents page, empty views",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:41"
+  },
+  {
+   "id": "dp-doc-menu-open",
+   "category": "documents page",
+   "name": "Document row menu › Open",
+   "where": "documents page › right-click a document row",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-open-in-new-browser-tab",
+   "category": "documents page",
+   "name": "Document row menu › Open in new browser tab",
+   "where": "documents page › right-click a document row",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-rename",
+   "category": "documents page",
+   "name": "Document row menu › Rename",
+   "where": "documents page › right-click a document row",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-copy-workspace",
+   "category": "documents page",
+   "name": "Document row menu › Copy workspace…",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-details",
+   "category": "documents page",
+   "name": "Document row menu › Details",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Details"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-versions-and-history",
+   "category": "documents page",
+   "name": "Document row menu › Versions and history",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Versions and history"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-labels",
+   "category": "documents page",
+   "name": "Document row menu › Labels…",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Labels…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-share",
+   "category": "documents page",
+   "name": "Document row menu › Share…",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": true,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Share…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-move-to",
+   "category": "documents page",
+   "name": "Document row menu › Move to…",
+   "where": "documents page › right-click a document row",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-transfer-ownership",
+   "category": "documents page",
+   "name": "Document row menu › Transfer ownership…",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": true,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Transfer ownership…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-remove-from-recently-opened",
+   "category": "documents page",
+   "name": "Document row menu › Remove from recently opened",
+   "where": "documents page › right-click a document row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Remove from recently opened"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-doc-menu-send-to-trash",
+   "category": "documents page",
+   "name": "Document row menu › Send to trash",
+   "where": "documents page › right-click a document row",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-row-context-menu.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:(?!.*Folder).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Send to trash"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-open",
+   "category": "documents page",
+   "name": "Folder menu › Open",
+   "where": "documents page › right-click a folder tile",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-open-in-new-browser-tab",
+   "category": "documents page",
+   "name": "Folder menu › Open in new browser tab",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-rename",
+   "category": "documents page",
+   "name": "Folder menu › Rename",
+   "where": "documents page › right-click a folder tile",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-details",
+   "category": "documents page",
+   "name": "Folder menu › Details",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Details"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-share",
+   "category": "documents page",
+   "name": "Folder menu › Share…",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Share…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-move-to",
+   "category": "documents page",
+   "name": "Folder menu › Move to…",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-transfer-ownership",
+   "category": "documents page",
+   "name": "Folder menu › Transfer ownership…",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Transfer ownership…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-send-to-trash",
+   "category": "documents page",
+   "name": "Folder menu › Send to trash",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Send to trash"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dp-folder-menu-set-library",
+   "category": "documents page",
+   "name": "Folder menu › Set library",
+   "where": "documents page › right-click a folder tile",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "re:.*Folder.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Set library"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-send-to-trash-confirm-1-selection-will-be-sent-to-the-trash-show-details-",
+   "category": "dialog",
+   "name": "Send to trash confirm (1 selection will be sent to the trash. Show details [Send to trash] [Cancel]) + Restore toast",
+   "where": "documents page › row menu › Send to trash",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Send to trash"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "documents-page-trash-row-menu-details",
+   "category": "documents page",
+   "name": "Trash row menu › Details",
+   "where": "documents page › Trash › right-click a row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:40"
+  },
+  {
+   "id": "documents-page-trash-row-menu-restore",
+   "category": "documents page",
+   "name": "Trash row menu › Restore",
+   "where": "documents page › Trash › right-click a row (toast \"… has been restored.\")",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:40"
+  },
+  {
+   "id": "documents-page-trash-row-menu-delete",
+   "category": "documents page",
+   "name": "Trash row menu › Delete",
+   "where": "documents page › Trash › right-click a row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:35"
+  },
+  {
+   "id": "dialog-delete-forever-delete-forever-cancel",
+   "category": "dialog",
+   "name": "Delete forever? [Delete forever] [Cancel]",
+   "where": "documents page › Trash › row › Delete",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:35"
+  },
+  {
+   "id": "documents-page-empty-trash",
+   "category": "documents page",
+   "name": "Empty trash…",
+   "where": "documents page › Trash (button by the 30-day note)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:39"
+  },
+  {
+   "id": "dialog-empty-trash-empty-trash-cancel",
+   "category": "dialog",
+   "name": "Empty trash? [Empty trash] [Cancel]",
+   "where": "documents page › Trash › Empty trash…",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-empty-trash-modal.txt"
+  },
+  {
+   "id": "documents-page-details-panel-name-owner-description-labels-create-new-label-crea",
+   "category": "documents page",
+   "name": "Details panel (ⓘ): name, Owner, Description, Labels, Create new label, Created/Last modified",
+   "where": "documents page › right strip (empty state when nothing selected)",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/documents-details-panel.txt"
+  },
+  {
+   "id": "documents-page-share-panel",
+   "category": "documents page",
+   "name": "Share panel",
+   "where": "documents page › right strip",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:50"
+  },
+  {
+   "id": "documents-page-properties-panel-name-description-category-library-label",
+   "category": "documents page",
+   "name": "Properties panel › Name / Description / Category / Library label",
+   "where": "documents page › right strip › Properties",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-right-panel-properties.txt"
+  },
+  {
+   "id": "documents-page-properties-panel-undo-redo-apply",
+   "category": "documents page",
+   "name": "Properties panel › Undo / Redo / Apply",
+   "where": "documents page › right strip › Properties footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:51"
+  },
+  {
+   "id": "documents-page-notes-panel-read-only-no-notes-available",
+   "category": "documents page",
+   "name": "Notes panel (read-only, \"No notes available\")",
+   "where": "documents page › right strip › Document notes",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-right-panel-notes.txt"
+  },
+  {
+   "id": "documents-page-versions-and-history-panel",
+   "category": "documents page",
+   "name": "Versions and history panel",
+   "where": "documents page › right strip (internals belong to the versions area)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:53"
+  },
+  {
+   "id": "navbar-notifications-bell-only-show-unread",
+   "category": "navbar",
+   "name": "Notifications bell (Only show unread, ⋯)",
+   "where": "navbar, documents page and documents",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:32"
+  },
+  {
+   "id": "navbar-go-to-app-store",
+   "category": "navbar",
+   "name": "Go to App Store",
+   "where": "navbar right",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34796"
+  },
+  {
+   "id": "navbar-go-to-learning-center",
+   "category": "navbar",
+   "name": "Go to Learning Center",
+   "where": "navbar right",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34796"
+  },
+  {
+   "id": "navbar-explore-onshape-button",
+   "category": "navbar",
+   "name": "Explore Onshape button",
+   "where": "navbar in a document",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:91"
+  },
+  {
+   "id": "navbar-help-menu",
+   "category": "navbar",
+   "name": "? Help menu",
+   "where": "navbar right (documents page and documents, identical)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:34801",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-help",
+   "category": "navbar",
+   "name": "Help menu › Help",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "Help"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-explore-onshape",
+   "category": "navbar",
+   "name": "Help menu › Explore Onshape",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "Explore Onshape"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-featurescript-documentation",
+   "category": "navbar",
+   "name": "Help menu › FeatureScript documentation",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "FeatureScript documentation"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-keyboard-shortcuts",
+   "category": "navbar",
+   "name": "Help menu › Keyboard shortcuts",
+   "where": "navbar › ? ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "Keyboard shortcuts"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-what-s-new",
+   "category": "navbar",
+   "name": "Help menu › What's new",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "What's new"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-forums",
+   "category": "navbar",
+   "name": "Help menu › Forums",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "Forums"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-report-a-bug",
+   "category": "navbar",
+   "name": "Help menu › Report a bug",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "Report a bug"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-system-check",
+   "category": "navbar",
+   "name": "Help menu › System check",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "System check"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "help-menu-about",
+   "category": "navbar",
+   "name": "Help menu › About",
+   "where": "navbar › ? ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34806",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Help"
+      }
+     },
+     {
+      "on": {
+       "menu": "About"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "navbar-account-menu-avatar-name",
+   "category": "navbar",
+   "name": "Account menu (avatar + name ▾)",
+   "where": "navbar right end",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "account-menu-my-account",
+   "category": "navbar",
+   "name": "Account menu › My account",
+   "where": "navbar › avatar ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "account-menu-view-support-tickets",
+   "category": "navbar",
+   "name": "Account menu › View support tickets",
+   "where": "navbar › avatar ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "account-menu-app-store-dev-portal",
+   "category": "navbar",
+   "name": "Account menu › App Store dev portal",
+   "where": "navbar › avatar ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "account-menu-view-in-dark-mode-beta",
+   "category": "navbar",
+   "name": "Account menu › View in dark mode beta",
+   "where": "navbar › avatar ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "account-menu-sign-out",
+   "category": "navbar",
+   "name": "Account menu › Sign out",
+   "where": "navbar › avatar ▾",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:28974"
+  },
+  {
+   "id": "preferences-my-account-profile-emails-notifications-security-devices-application",
+   "category": "preferences",
+   "name": "My account › Profile / Emails / Notifications / Security / Devices / Applications / Integrations / Developer / Subscription / Payment options / Payment history / Teams / Delete my Onshape account",
+   "where": "My account left nav",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:2660",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "My account › Profile / Emails / Notifications / Security / Devices / Applications / Integrations / Developer / Subscription / Payment options / Payment history / Teams / Delete my Onshape account"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "My account › Profile / Emails / Notifications / Security / Devices / Applications / Integrations / Developer / Subscription / Payment options / Payment history / Teams / Delete my Onshape account"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "My account › Profile / Emails / Notifications / Security / Devices / Applications / Integrations / Developer / Subscription / Payment options / Payment history / Teams / Delete my Onshape account"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "navbar-document-name-click-to-rename-inline-enter-commits-esc-cancels",
+   "category": "navbar",
+   "name": "Document name: click to rename inline (Enter commits, Esc cancels)",
+   "where": "document navbar › name",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1916",
+   "via": [
+    [
+     {
+      "on": {
+       "navbar": "name"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "navbar-document-name-double-click-same-inline-rename",
+   "category": "navbar",
+   "name": "Document name: double-click (same inline rename)",
+   "where": "document navbar › name",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1916",
+   "via": [
+    [
+     {
+      "on": {
+       "navbar": "name"
+      },
+      "do": "dblclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "navbar-workspace-label-main-version-v1-no-action-on-click",
+   "category": "navbar",
+   "name": "Workspace label \"Main\" / version \"V1\" (no action on click)",
+   "where": "document navbar after the name",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1917",
+   "via": [
+    [
+     {
+      "on": {
+       "navbar": "workspace"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "navbar-copy-document-url-link-icon",
+   "category": "navbar",
+   "name": "Copy document URL… (link icon)",
+   "where": "document navbar after Main",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:7713"
+  },
+  {
+   "id": "navbar-public-globe-icon-copies-versions-likes-counters",
+   "category": "navbar",
+   "name": "Public globe icon / copies, versions, likes counters",
+   "where": "document navbar",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:91"
+  },
+  {
+   "id": "navbar-share",
+   "category": "navbar",
+   "name": "Share",
+   "where": "document navbar right",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:91"
+  },
+  {
+   "id": "navbar-featurescript-notices",
+   "category": "navbar",
+   "name": "FeatureScript notices { } / {!}",
+   "where": "document navbar right (opens the notices bottom panel)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1923"
+  },
+  {
+   "id": "navbar-left-rail-document-notes-refresh-notes-edit-notes-apply-cancel-show-previ",
+   "category": "navbar",
+   "name": "Left rail › Document notes (Refresh notes, Edit notes, Apply / Cancel, Show preview)",
+   "where": "document left rail",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1560"
+  },
+  {
+   "id": "navbar-left-rail-comments",
+   "category": "navbar",
+   "name": "Left rail › Comments",
+   "where": "document left rail",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:1559"
+  },
+  {
+   "id": "navbar-left-rail-where-used",
+   "category": "navbar",
+   "name": "Left rail › Where used",
+   "where": "document left rail (Upgrade)",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:1561"
+  },
+  {
+   "id": "navbar-left-rail-performance-tab-performance-tab-graphics-document-performance-s",
+   "category": "navbar",
+   "name": "Left rail › Performance (Tab performance, Tab graphics, Document performance, System)",
+   "where": "document left rail",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1562"
+  },
+  {
+   "id": "navbar-left-rail-ai-advisor",
+   "category": "navbar",
+   "name": "Left rail › AI Advisor",
+   "where": "document left rail",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:1559"
+  },
+  {
+   "id": "navbar-viewer-bar-this-document-is-view-only-make-a-copy-to-edit",
+   "category": "navbar",
+   "name": "Viewer bar \"This document is view only. [Make a copy to edit]\"",
+   "where": "a document you can't edit / view-only mode",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5576"
+  },
+  {
+   "id": "doc-menu-rename-document",
+   "category": "document menu",
+   "name": "☰ › Rename document",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Rename document"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-move-to",
+   "category": "document menu",
+   "name": "☰ › Move to…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Move to…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-document-details",
+   "category": "document menu",
+   "name": "☰ › Document details…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document details…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-restore-deleted-workspaces",
+   "category": "document menu",
+   "name": "☰ › Restore deleted workspaces…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Restore deleted workspaces…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-copy-workspace",
+   "category": "document menu",
+   "name": "☰ › Copy workspace…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-update-workspace",
+   "category": "document menu",
+   "name": "☰ › Update workspace…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Update workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-workspace-units",
+   "category": "document menu",
+   "name": "☰ › Workspace units…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6755",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-workspace-properties",
+   "category": "document menu",
+   "name": "☰ › Workspace properties…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-switch-to-view-only-mode",
+   "category": "document menu",
+   "name": "☰ › Switch to view only mode",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Switch to view only mode"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-print",
+   "category": "document menu",
+   "name": "☰ › Print…",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1494",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Print…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "doc-menu-close-document",
+   "category": "document menu",
+   "name": "☰ › Close document",
+   "where": "document navbar ☰ (in a workspace)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:29658",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Close document"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "document-menu-copy-version",
+   "category": "document menu",
+   "name": "☰ › Copy version…",
+   "where": "document navbar ☰ while viewing a version (reduced menu)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29697",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy version…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-document-details-description-textarea-not-revision-managed-update-cancel",
+   "category": "dialog",
+   "name": "Document details › description textarea, Not revision managed, Update / Cancel",
+   "where": "☰ › Document details…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29660",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Document details…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-copy-workspace-document-name-name-copy-selected",
+   "category": "dialog",
+   "name": "Copy workspace › Document name (\"<name> - Copy\", selected)",
+   "where": "☰ › Copy workspace… / documents page row › Copy workspace…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29687",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-copy-workspace-copy-document-to-home-back-breadcrumb-new-folder-sort-fold",
+   "category": "dialog",
+   "name": "Copy workspace › Copy document to (Home, Back, breadcrumb, New folder, Sort, folder list)",
+   "where": "☰ › Copy workspace…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29689"
+  },
+  {
+   "id": "dialog-copy-workspace-create-public-document-cancel",
+   "category": "dialog",
+   "name": "Copy workspace › Create public document / Cancel",
+   "where": "☰ › Copy workspace…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29693"
+  },
+  {
+   "id": "dialog-copy-version-same-dialog-titled-copy-the-active-version-to-a-new-document",
+   "category": "dialog",
+   "name": "Copy version › same dialog titled \"Copy the active version to a new document\"",
+   "where": "☰ › Copy version… (viewing a version)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29699"
+  },
+  {
+   "id": "dialog-print-pop-up-toast-when-pop-ups-are-blocked",
+   "category": "dialog",
+   "name": "Print… pop-up (toast when pop-ups are blocked)",
+   "where": "☰ › Print…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1494"
+  },
+  {
+   "id": "units-workspace-units-length-unit",
+   "category": "units",
+   "name": "Workspace units › Length unit",
+   "where": "☰ › Workspace units… panel (Centimeter, Foot, Inch, Meter, Millimeter, Yard)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Length default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Length default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-length-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Length Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Length display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Length display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-linear-acceleration-unit",
+   "category": "units",
+   "name": "Workspace units › Linear acceleration unit",
+   "where": "☰ › Workspace units… panel (Foot/Inch/Meter/Millimeter per second squared)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Linear acceleration default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Linear acceleration default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-linear-acceleration-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Linear acceleration Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Linear acceleration display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Linear acceleration display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-angle-unit",
+   "category": "units",
+   "name": "Workspace units › Angle unit",
+   "where": "☰ › Workspace units… panel (Degree, Radian)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Angle default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Angle default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-angle-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Angle Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Angle display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Angle display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-angular-velocity-unit",
+   "category": "units",
+   "name": "Workspace units › Angular velocity unit",
+   "where": "☰ › Workspace units… panel (Degree per second, Radian per second, Revolutions per minute)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Angular velocity default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Angular velocity default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-angular-velocity-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Angular velocity Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Angular velocity display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Angular velocity display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-mass-unit",
+   "category": "units",
+   "name": "Workspace units › Mass unit",
+   "where": "☰ › Workspace units… panel (Gram, Kilogram, Ounce, Pound)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Mass default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Mass default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-mass-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Mass Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Mass display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Mass display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-density-unit",
+   "category": "units",
+   "name": "Workspace units › Density unit",
+   "where": "☰ › Workspace units… panel (g/cm³, g/L, g/mL, kg/m³, lb/ft³, lb/in³)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Density default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Density default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-density-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Density Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Density display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Density display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-force-unit",
+   "category": "units",
+   "name": "Workspace units › Force unit",
+   "where": "☰ › Workspace units… panel (Kilonewton, Newton, Pound-force)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Force default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Force default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-force-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Force Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Force display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Force display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-frequency-unit",
+   "category": "units",
+   "name": "Workspace units › Frequency unit",
+   "where": "☰ › Workspace units… panel (Hertz)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Frequency default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Frequency default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-frequency-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Frequency Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Frequency display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Frequency display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-moment-unit",
+   "category": "units",
+   "name": "Workspace units › Moment unit",
+   "where": "☰ › Workspace units… panel (Foot-pound, Inch-pound, Newton-meter, Newton-millimeter)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Moment default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Moment default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-moment-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Moment Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Moment display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Moment display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-pressure-unit",
+   "category": "units",
+   "name": "Workspace units › Pressure unit",
+   "where": "☰ › Workspace units… panel (GPa, kPa, ksi, MPa, Pa, psi)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Pressure default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Pressure default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-pressure-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Pressure Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Pressure display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Pressure display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-energy-unit",
+   "category": "units",
+   "name": "Workspace units › Energy unit",
+   "where": "☰ › Workspace units… panel (Foot-pound force, Joule)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Energy default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Energy default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-energy-display-decimals",
+   "category": "units",
+   "name": "Workspace units › Energy Display decimals",
+   "where": "☰ › Workspace units… panel (0 … 0.1234567)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Energy display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "dropdown": "*",
+       "field": "Energy display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-workspace-units-apply",
+   "category": "units",
+   "name": "Workspace units › ✓ (apply) / ✕",
+   "where": "☰ › Workspace units… panel (changes apply only on ✓)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6770",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "button": "ok"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "button": "cancel"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "units-unit-switch-re-displays-values-fields-variables-sketch-dimensions-mass-pro",
+   "category": "units",
+   "name": "Unit switch re-displays values (fields, variables, sketch dimensions, mass properties) in the new unit",
+   "where": "after ✓ in Workspace units",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6773"
+  },
+  {
+   "id": "tab-bar-click-a-tab-to-switch-to-it",
+   "category": "tab bar",
+   "name": "Click a tab to switch to it",
+   "where": "document tab bar",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1564",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-ctrl-cmd-click-a-tab-open-in-new-browser-tab",
+   "category": "tab bar",
+   "name": "Ctrl/Cmd+click a tab: open in new browser tab",
+   "where": "document tab bar",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "tab-bar-shift-click-a-tab-open-in-new-window",
+   "category": "tab bar",
+   "name": "Shift+click a tab: open in new window",
+   "where": "document tab bar",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "tab-bar-double-click-a-tab-to-rename-inline",
+   "category": "tab bar",
+   "name": "Double-click a tab to rename inline",
+   "where": "document tab bar",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5582",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "dblclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-drag-a-tab-to-reorder-ghost-gap-persists-not-undoable",
+   "category": "tab bar",
+   "name": "Drag a tab to reorder (ghost + gap; persists; not undoable)",
+   "where": "document tab bar",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6564",
+   "via": [
+    [
+     {
+      "do": "drag",
+      "on": {
+       "doc_tab": "*"
+      },
+      "to": {
+       "doc_tab": "*",
+       "edge": "*"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-drag-a-tab-onto-a-folder-tab-to-move-it-in",
+   "category": "tab bar",
+   "name": "Drag a tab onto a folder tab to move it in",
+   "where": "document tab bar",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6576",
+   "via": [
+    [
+     {
+      "do": "drag",
+      "on": {
+       "doc_tab": "*"
+      },
+      "to": {
+       "doc_tab": "re:Folder.*"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-click-a-folder-tab-to-open-it-breadcrumbs-folder",
+   "category": "tab bar",
+   "name": "Click a folder tab to open it (breadcrumbs 🏠 › Folder ›)",
+   "where": "document tab bar",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6578",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Folder.*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-breadcrumb-returns-to-the-full-tab-bar",
+   "category": "tab bar",
+   "name": "Breadcrumb 🏠 returns to the full tab bar",
+   "where": "document tab bar inside a folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6579",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "All tabs"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-breadcrumb-folder-crumb-navigates-to-that-folder",
+   "category": "tab bar",
+   "name": "Breadcrumb folder crumb navigates to that folder",
+   "where": "document tab bar inside nested folders",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13335"
+  },
+  {
+   "id": "tab-bar-breadcrumb-dropdown-of-hidden-parent-folders",
+   "category": "tab bar",
+   "name": "Breadcrumb \"…\" dropdown of hidden parent folders",
+   "where": "document tab bar, nested folders",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13355"
+  },
+  {
+   "id": "tab-bar-scroll-left-rmb-to-first",
+   "category": "tab bar",
+   "name": "Scroll left (RMB: to first)",
+   "where": "document tab bar right end ‹ (only on overflow)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1958"
+  },
+  {
+   "id": "tab-bar-scroll-right-rmb-to-last",
+   "category": "tab bar",
+   "name": "Scroll right (RMB: to last)",
+   "where": "document tab bar right end › (only on overflow)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1958"
+  },
+  {
+   "id": "tab-bar-tab-hover-card-thumbnail-after-1-s",
+   "category": "tab bar",
+   "name": "Tab hover card (thumbnail after ~1 s)",
+   "where": "hover an inactive tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1735"
+  },
+  {
+   "id": "tab-bar-insert-new-tab-menu",
+   "category": "tab bar",
+   "name": "+ (Insert new tab) menu",
+   "where": "document tab bar left end",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:281",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-applications-go-to-app-store",
+   "category": "tab bar",
+   "name": "+ › Applications ▸ (Go to App Store)",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Applications ▸ (Go to App Store)"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-material-library",
+   "category": "tab bar",
+   "name": "+ › Create Material Library",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Material Library"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-feature-studio",
+   "category": "tab bar",
+   "name": "+ › Create Feature Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Feature Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-cam-studio",
+   "category": "tab bar",
+   "name": "+ › Create CAM Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create CAM Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-pcb-studio",
+   "category": "tab bar",
+   "name": "+ › Create PCB Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create PCB Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-render-studio",
+   "category": "tab bar",
+   "name": "+ › Create Render Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Render Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-part-studio",
+   "category": "tab bar",
+   "name": "+ › Create Part Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Part Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-assembly",
+   "category": "tab bar",
+   "name": "+ › Create Assembly",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Assembly"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-variable-studio",
+   "category": "tab bar",
+   "name": "+ › Create Variable Studio",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Variable Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-drawing",
+   "category": "tab bar",
+   "name": "+ › Create Drawing…",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Drawing…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-create-folder",
+   "category": "tab bar",
+   "name": "+ › Create folder",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create folder"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "plus-import",
+   "category": "tab bar",
+   "name": "+ › Import…",
+   "where": "document tab bar › + (new tab inserted right after the active tab)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-create-folder-new-folder-tab-in-inline-rename-inside-the-open-folder-if-",
+   "category": "tab bar",
+   "name": "+ › Create folder: new folder tab in inline rename (inside the open folder if one is open)",
+   "where": "document tab bar › + › Create folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13330",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create folder"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-bar-import-of-png-pdf-txt-csv-json-dxf-file-tab-no-options-modal",
+   "category": "tab bar",
+   "name": "+ › Import… of PNG / PDF / TXT / CSV / JSON / DXF: file tab, no options modal",
+   "where": "document tab bar › + › Import…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:30199"
+  },
+  {
+   "id": "tab-bar-import-of-cad-import-to-onshape-import-to-this-document-combine-to-a-sin",
+   "category": "tab bar",
+   "name": "+ › Import… of CAD: Import to Onshape (Import to this document / Combine to a single Part Studio + 4 checkboxes); CAD Imports folder",
+   "where": "document tab bar › + › Import…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1722"
+  },
+  {
+   "id": "tab-bar-imported-image-tab-viewer-actual-size-top-left",
+   "category": "tab bar",
+   "name": "Imported image tab viewer (actual size, top-left)",
+   "where": "open a PNG/JPG tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:30206"
+  },
+  {
+   "id": "tab-bar-imported-pdf-tab-viewer-browser-pdf-viewer",
+   "category": "tab bar",
+   "name": "Imported PDF tab viewer (browser PDF viewer)",
+   "where": "open a PDF tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1726"
+  },
+  {
+   "id": "tab-bar-imported-txt-md-tab-viewer-raw-monospace",
+   "category": "tab bar",
+   "name": "Imported TXT / MD tab viewer (raw monospace)",
+   "where": "open a TXT/MD tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:30209"
+  },
+  {
+   "id": "tab-bar-imported-csv-tab-viewer-numbered-grid",
+   "category": "tab bar",
+   "name": "Imported CSV tab viewer (numbered grid)",
+   "where": "open a CSV tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:30211"
+  },
+  {
+   "id": "tab-bar-imported-json-tab-viewer-read-only-one-line-editor",
+   "category": "tab bar",
+   "name": "Imported JSON tab viewer (read-only one-line editor)",
+   "where": "open a JSON tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:30215"
+  },
+  {
+   "id": "tab-bar-imported-cad-file-tab-card-icon-name-size-uploaded-update-download",
+   "category": "tab bar",
+   "name": "Imported CAD file tab card (icon, name, size, Uploaded …, [Update…] [Download])",
+   "where": "open a STEP/other CAD file tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34"
+  },
+  {
+   "id": "tab-bar-imported-file-tab-icons-per-format",
+   "category": "tab bar",
+   "name": "Imported-file tab icons per format",
+   "where": "tab bar / Tab manager",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5513"
+  },
+  {
+   "id": "tab-bar-material-library-tab-create-material-library",
+   "category": "tab bar",
+   "name": "Material Library tab (Create Material Library)",
+   "where": "document tab bar",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:224"
+  },
+  {
+   "id": "tabmenu-delete",
+   "category": "tab menu",
+   "name": "Delete",
+   "where": "right-click a tab: Part Studio, Assembly, Drawing, Variable Studio, Feature Studio, imported file (immediate, no undo)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6591",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-open-in-new-browser-tab",
+   "category": "tab menu",
+   "name": "Open in new browser tab",
+   "where": "right-click a tab: every tab kind except folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13311",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-rename",
+   "category": "tab menu",
+   "name": "Rename",
+   "where": "right-click a tab: every tab kind incl. folder (inline input, Enter; duplicates allowed)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:26408",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-properties",
+   "category": "tab menu",
+   "name": "Properties…",
+   "where": "right-click a tab: every tab kind except folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29609",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-show-code",
+   "category": "tab menu",
+   "name": "Show code",
+   "where": "right-click a tab: Part Studio only (read-only FeatureScript panel)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1870",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Show code"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Show code"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-duplicate",
+   "category": "tab menu",
+   "name": "Duplicate",
+   "where": "right-click a tab: Part Studio, Assembly, Drawing, Variable Studio, Feature Studio (\"<name> Copy 1\" after the source, not activated)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6570",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Duplicate"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Duplicate"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-copy-to-clipboard",
+   "category": "tab menu",
+   "name": "Copy to clipboard",
+   "where": "right-click a tab: Part Studio, Assembly, Drawing, Variable Studio, Feature Studio",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13311",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy to clipboard"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy to clipboard"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-create-drawing-of-assembly",
+   "category": "tab menu",
+   "name": "Create Drawing of <assembly>…",
+   "where": "right-click a tab: Assembly only",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:13313",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "re:Create\\ Drawing\\ of\\ .*…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "re:Create\\ Drawing\\ of\\ .*…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-change-to-version",
+   "category": "tab menu",
+   "name": "Change to version…",
+   "where": "right-click a tab: Drawing, active only (opens Reference manager)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13317",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Change to version…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Change to version…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-select-as-document-thumbnail",
+   "category": "tab menu",
+   "name": "Select as document thumbnail",
+   "where": "right-click a tab: Part Studio, Assembly, Drawing, PNG file",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13311",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Select as document thumbnail"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Select as document thumbnail"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-move-to-document",
+   "category": "tab menu",
+   "name": "Move to document…",
+   "where": "right-click a tab: every tab kind incl. folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13311",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to document…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to document…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-export",
+   "category": "tab menu",
+   "name": "Export…",
+   "where": "right-click a tab: Part Studio (last), Assembly (before Release…), Drawing, imported CAD file",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:21459",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Export…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Export…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-release",
+   "category": "tab menu",
+   "name": "Release…",
+   "where": "right-click a tab: Assembly, Drawing, Variable Studio, imported file [Upgrade]",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:13313",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-update",
+   "category": "tab menu",
+   "name": "Update…",
+   "where": "right-click a tab: imported file tabs (replace the file)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29616",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Update…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Update…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-download",
+   "category": "tab menu",
+   "name": "Download",
+   "where": "right-click a tab: imported file tabs",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1727",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Download"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Download"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-import",
+   "category": "tab menu",
+   "name": "Import…",
+   "where": "right-click a tab: imported CAD file tab (re-opens Import to Onshape)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1727",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Import…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-move-to-parent-folder",
+   "category": "tab menu",
+   "name": "Move to parent folder",
+   "where": "right-click a tab: a tab or folder inside a folder",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13330",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to parent folder"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to parent folder"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-unpack",
+   "category": "tab menu",
+   "name": "Unpack",
+   "where": "right-click a tab: folder tab only (tabs move to the end; no Delete on folders)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6582",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Unpack"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Unpack"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tabmenu-material-library-tab-menu-open-in-new-browser-tab-properties-export-csv-download",
+   "category": "tab menu",
+   "name": "Material Library tab menu: Open in new browser tab · Properties… · Export (CSV download)",
+   "where": "right-click a tab: Material Library tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:224"
+  },
+  {
+   "id": "dialog-delete-tabs-warning-failed-or-missing-features-in-n-tabs-list-delete-canc",
+   "category": "dialog",
+   "name": "Delete tabs (warning: failed or missing features in N tabs + list) [Delete] [Cancel]",
+   "where": "tab menu › Delete on a tab used by another tab",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:18637"
+  },
+  {
+   "id": "dialog-properties-part-studio-tree-card-name-description-category-title-1-3-not-",
+   "category": "dialog",
+   "name": "Properties › Part Studio (tree card; Name*, Description, Category, Title 1–3, Not revision managed)",
+   "where": "Part Studio tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29639",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-properties-assembly-name-description-category-part-number-revision-state-",
+   "category": "dialog",
+   "name": "Properties › Assembly (Name*, Description, Category, Part number, Revision, State*, Vendor, Project, Product line, Title 1–3, Not revision managed, Exclude from all BOMs, Unit of measure, Mass, Subassembly BOM behavior*)",
+   "where": "Assembly tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29640",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Assembly.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-properties-drawing-drawn-by-approver-date-drawn-date-approved-last-change",
+   "category": "dialog",
+   "name": "Properties › Drawing (… Drawn by, Approver, Date drawn, Date approved, Last changed date/by, Revision description, Inspection count)",
+   "where": "Drawing tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29641"
+  },
+  {
+   "id": "dialog-properties-variable-studio-name-description-category-part-number-revision",
+   "category": "dialog",
+   "name": "Properties › Variable Studio (Name*, Description, Category, Part number, Revision, State*, Title 1–3, Not revision managed)",
+   "where": "Variable Studio tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29642",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-properties-feature-studio-name-description-category",
+   "category": "dialog",
+   "name": "Properties › Feature Studio (Name*, Description, Category)",
+   "where": "Feature Studio tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29643",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-properties-imported-file-name-description-category-part-number-revision-s",
+   "category": "dialog",
+   "name": "Properties › imported file (Name*, Description, Category, Part number, Revision, State*, Vendor, Project, Product line, Title 1–3, Not revision managed)",
+   "where": "imported file tab › Properties…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29644"
+  },
+  {
+   "id": "dialog-properties-undo-redo-apply-save-close",
+   "category": "dialog",
+   "name": "Properties › Undo / Redo / Apply / Save / Close",
+   "where": "tab › Properties… footer (Apply renames the tab, stays open)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29628"
+  },
+  {
+   "id": "dialog-export-tab-file-name-view-export-rules-format-options-download-download-a",
+   "category": "dialog",
+   "name": "Export (tab): File name, View export rules, Format, Options (Download / Download and store file in a new tab / Store file in a new tab), Y axis up, unique parts, hidden instances",
+   "where": "Part Studio / Assembly / imported CAD tab › Export…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1730"
+  },
+  {
+   "id": "dialog-export-drawing-tab-format-pdf-dwg-dxf-dwt-svg-png-jpeg-tiff-options-incl-",
+   "category": "dialog",
+   "name": "Export Drawing (tab): Format PDF/DWG/DXF/DWT/SVG/PNG/JPEG/TIFF/…, Options incl. Store file in a new tab",
+   "where": "Drawing tab › Export…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1556"
+  },
+  {
+   "id": "tab-manager-open-close-tabs-panel-alt-t-toggles",
+   "category": "tab manager",
+   "name": "Open / close Tabs panel (Alt+T toggles; ✕)",
+   "where": "left rail bottom button \"Tab manager (alt/⌥+t)\" or Alt+T",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:21955",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Tab manager"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "alt+t"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-search-toggle-no-tooltip",
+   "category": "tab manager",
+   "name": "Search toggle (no tooltip)",
+   "where": "Tabs panel header",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1742",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search tabs"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-search-tabs-field-not-focused-on-open",
+   "category": "tab manager",
+   "name": "Search tabs field (not focused on open)",
+   "where": "Tabs panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:21959"
+  },
+  {
+   "id": "tab-manager-sort-tabs-tab-order-name-a-z-name-z-a-type",
+   "category": "tab manager",
+   "name": "Sort tabs › Tab order / Name: A → Z / Name: Z → A / Type",
+   "where": "Tabs panel header ↓≡",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1744",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Sort tabs"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-filter-tabs-toggle",
+   "category": "tab manager",
+   "name": "Filter tabs toggle",
+   "where": "Tabs panel header funnel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1747",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Filter tabs"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-type-filters-part-studio-assembly-drawing-feature-studio-image-file-",
+   "category": "tab manager",
+   "name": "Type filters: Part Studio, Assembly, Drawing, Feature Studio, Image, File + Clear",
+   "where": "Tabs panel filter row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1748"
+  },
+  {
+   "id": "tab-manager-list-view-detail-view",
+   "category": "tab manager",
+   "name": "List view / Detail view",
+   "where": "Tabs panel header",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1751",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "List view"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Detail view"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-toggle-preview",
+   "category": "tab manager",
+   "name": "Toggle preview",
+   "where": "Tabs panel footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1755"
+  },
+  {
+   "id": "tab-manager-help-document-tabs-help-page",
+   "category": "tab manager",
+   "name": "Help ? (Document Tabs help page)",
+   "where": "Tabs panel footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1740"
+  },
+  {
+   "id": "tab-manager-click-a-row-to-open-the-tab",
+   "category": "tab manager",
+   "name": "Click a row to open the tab",
+   "where": "Tabs panel list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1739",
+   "via": [
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-keyboard-tab-or-to-navigate-to-open",
+   "category": "tab manager",
+   "name": "Keyboard: tab or ↑↓ to navigate, ↵ to open",
+   "where": "Tabs panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1739"
+  },
+  {
+   "id": "tab-manager-row-right-click-menus-same-as-the-tab-bar-s-folder-rename-unpack-mov",
+   "category": "tab manager",
+   "name": "Row right-click menus (same as the tab bar's; folder: Rename, Unpack, Move to document…)",
+   "where": "Tabs panel row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6577",
+   "via": [
+    [
+     {
+      "on": {
+       "panel_row": "*"
+      },
+      "do": "rclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "tab-manager-esc-does-not-close-the-panel-other-shortcuts-keep-working",
+   "category": "tab manager",
+   "name": "Esc does not close the panel; other shortcuts keep working",
+   "where": "Tabs panel open",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:21961",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Tab manager"
+      },
+      "do": "click"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-shift-keyboard-shortcuts-sheet-shift-again-or-esc-closes",
+   "category": "shortcut",
+   "name": "shift+/ (Keyboard shortcuts sheet; shift+/ again or Esc closes)",
+   "where": "anywhere in a document or the documents page",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:21097",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "shift+/"
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "?"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dialog-keyboard-shortcuts-sheet-tabs-general-part-studio-assembly-3d-view-sketch",
+   "category": "dialog",
+   "name": "Keyboard shortcuts sheet › tabs General / Part Studio / Assembly / 3D view / Sketch / Feature Studio / Drawing",
+   "where": "shift+/",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1189"
+  },
+  {
+   "id": "dialog-keyboard-shortcuts-sheet-search-shortcuts",
+   "category": "dialog",
+   "name": "Keyboard shortcuts sheet › Search shortcuts",
+   "where": "shift+/",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1189"
+  },
+  {
+   "id": "dialog-keyboard-shortcuts-sheet-pop-out-onshape-keyboard-shortcuts-page",
+   "category": "dialog",
+   "name": "Keyboard shortcuts sheet › ↗ pop out (/onshape-keyboard-shortcuts page)",
+   "where": "shift+/",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:12530"
+  },
+  {
+   "id": "dialog-keyboard-shortcuts-sheet-customize-keyboard-shortcuts-opens-preferences-k",
+   "category": "dialog",
+   "name": "Keyboard shortcuts sheet › Customize keyboard shortcuts (opens Preferences › Keyboard shortcuts)",
+   "where": "shift+/",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1190"
+  },
+  {
+   "id": "shortcut-ctrl-space-hold-quick-tab-switching-space-cycles-mru-tabs-release-ctrl-",
+   "category": "shortcut",
+   "name": "ctrl space (hold): Quick tab switching; Space cycles MRU tabs, release Ctrl switches",
+   "where": "in a document",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20857"
+  },
+  {
+   "id": "shortcut-quick-tab-switcher-hover-a-thumbnail-mouse-up-switches",
+   "category": "shortcut",
+   "name": "Quick tab switcher: hover a thumbnail + mouse-up switches",
+   "where": "Ctrl held + Space card",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:20869"
+  },
+  {
+   "id": "shortcut-alt-t-tab-manager",
+   "category": "shortcut",
+   "name": "alt/⌥ t: Tab manager",
+   "where": "in a document",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "alt+t"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-ctrl-cmd-z-undo-per-tab-per-page-session-tab-operations-not-undoable",
+   "category": "shortcut",
+   "name": "ctrl/cmd z: Undo (per tab, per page session; tab operations not undoable)",
+   "where": "in a document",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6538",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+z"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-ctrl-y-shift-cmd-z-redo",
+   "category": "shortcut",
+   "name": "ctrl y / shift cmd z: Redo",
+   "where": "in a document",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6542",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+y"
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "mod+shift+z"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-ctrl-cmd-c-copy",
+   "category": "shortcut",
+   "name": "ctrl/cmd c: Copy",
+   "where": "in a document",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+c"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-ctrl-cmd-v-paste",
+   "category": "shortcut",
+   "name": "ctrl/cmd v: Paste",
+   "where": "in a document",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+v"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-delete-backspace-delete-selection",
+   "category": "shortcut",
+   "name": "delete / backspace: Delete selection",
+   "where": "in a document",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "Delete"
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "Backspace"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-alt-c-search-tools",
+   "category": "shortcut",
+   "name": "alt/⌥ c: Search tools",
+   "where": "in a document",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "alt+c"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "shortcut-ctrl-cmd-click-open-in-new-tab",
+   "category": "shortcut",
+   "name": "ctrl/cmd click: Open in new tab",
+   "where": "tabs / links",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "shortcut-shift-click-open-in-new-window",
+   "category": "shortcut",
+   "name": "shift click: Open in new window",
+   "where": "tabs / links",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "shortcut-ctrl-u-feedback-report-a-bug",
+   "category": "shortcut",
+   "name": "ctrl u: Feedback/Report a bug",
+   "where": "in a document",
+   "freq": 3,
+   "cloud": true,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "shortcut-shortcuts-still-fire-with-focus-on-the-top-bar-tab-past-a-dialog-onto-s",
+   "category": "shortcut",
+   "name": "Shortcuts still fire with focus on the top bar (Tab past a dialog onto Share)",
+   "where": "in a document",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7366"
+  },
+  {
+   "id": "shortcut-undo-redo-toolbar-buttons-tooltip-fixed-enabled-state-only",
+   "category": "shortcut",
+   "name": "Undo / Redo toolbar buttons (tooltip fixed, enabled state only)",
+   "where": "document toolbar",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6550"
+  },
+  {
+   "id": "pref-open-preferences-my-account-preferences",
+   "category": "preferences",
+   "name": "Open Preferences (My account › Preferences)",
+   "where": "navbar avatar ▾ › My account › left nav Preferences",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2660",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Open Preferences"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Open Preferences"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Open Preferences"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-language-display-language-fran-ais-english-deutsch-espa-ol-italiano",
+   "category": "preferences",
+   "name": "Language › Display language (繁體中文, Français, English, Deutsch, 简体中文, 日本語, 한국어, Español, Italiano)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7706",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Language › Display language"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Language › Display language"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Language › Display language"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-language-save-language-re-renders-in-place-toast",
+   "category": "preferences",
+   "name": "Language › Save language (re-renders in place, toast)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7708",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Language › Save language"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Language › Save language"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Language › Save language"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-theming-light-mode",
+   "category": "preferences",
+   "name": "Theming › Light mode",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Theming › Light mode"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Theming › Light mode"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Theming › Light mode"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-theming-dark-mode-beta",
+   "category": "preferences",
+   "name": "Theming › Dark mode (beta)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:12976",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Theming › Dark mode"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Theming › Dark mode"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Theming › Dark mode"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-theming-save-theme",
+   "category": "preferences",
+   "name": "Theming › Save theme",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Theming › Save theme"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Theming › Save theme"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Theming › Save theme"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-decimal-format-use-comma-as-decimal-separator",
+   "category": "preferences",
+   "name": "Decimal format › Use comma as decimal separator",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Decimal format › Use comma as decimal separator"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Decimal format › Use comma as decimal separator"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Decimal format › Use comma as decimal separator"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-decimal-format-save-decimal-format",
+   "category": "preferences",
+   "name": "Decimal format › Save decimal format",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Decimal format › Save decimal format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Decimal format › Save decimal format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Decimal format › Save decimal format"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-length-default-unit",
+   "category": "preferences",
+   "name": "Units › Length default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Length default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Length default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Length default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-length-display-decimals",
+   "category": "preferences",
+   "name": "Units › Length Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Length default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Length default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Length default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-linear-acceleration-default-unit",
+   "category": "preferences",
+   "name": "Units › Linear acceleration default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Linear acceleration default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Linear acceleration default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Linear acceleration default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-linear-acceleration-display-decimals",
+   "category": "preferences",
+   "name": "Units › Linear acceleration Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Linear acceleration default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Linear acceleration default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Linear acceleration default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-angle-default-unit",
+   "category": "preferences",
+   "name": "Units › Angle default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Angle default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Angle default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Angle default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-angle-display-decimals",
+   "category": "preferences",
+   "name": "Units › Angle Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Angle default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Angle default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Angle default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-angular-velocity-default-unit",
+   "category": "preferences",
+   "name": "Units › Angular velocity default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Angular velocity default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Angular velocity default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Angular velocity default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-angular-velocity-display-decimals",
+   "category": "preferences",
+   "name": "Units › Angular velocity Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Angular velocity default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Angular velocity default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Angular velocity default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-mass-default-unit",
+   "category": "preferences",
+   "name": "Units › Mass default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Mass default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Mass default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Mass default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-mass-display-decimals",
+   "category": "preferences",
+   "name": "Units › Mass Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Mass default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Mass default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Mass default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-density-default-unit",
+   "category": "preferences",
+   "name": "Units › Density default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Density default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Density default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Density default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-density-display-decimals",
+   "category": "preferences",
+   "name": "Units › Density Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Density default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Density default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Density default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-force-default-unit",
+   "category": "preferences",
+   "name": "Units › Force default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Force default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Force default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Force default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-force-display-decimals",
+   "category": "preferences",
+   "name": "Units › Force Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Force default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Force default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Force default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-frequency-default-unit",
+   "category": "preferences",
+   "name": "Units › Frequency default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Frequency default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Frequency default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Frequency default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-frequency-display-decimals",
+   "category": "preferences",
+   "name": "Units › Frequency Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Frequency default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Frequency default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Frequency default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-moment-default-unit",
+   "category": "preferences",
+   "name": "Units › Moment default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Moment default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Moment default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Moment default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-moment-display-decimals",
+   "category": "preferences",
+   "name": "Units › Moment Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Moment default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Moment default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Moment default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-pressure-default-unit",
+   "category": "preferences",
+   "name": "Units › Pressure default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Pressure default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Pressure default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Pressure default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-pressure-display-decimals",
+   "category": "preferences",
+   "name": "Units › Pressure Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Pressure default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Pressure default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Pressure default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-energy-default-unit",
+   "category": "preferences",
+   "name": "Units › Energy default unit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Energy default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Energy default unit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Energy default unit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-energy-display-decimals",
+   "category": "preferences",
+   "name": "Units › Energy Display decimals",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Energy default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Energy default unit › Display decimals"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Energy default unit › Display decimals"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-time-format-12-hour-24-hour",
+   "category": "preferences",
+   "name": "Units › Time format (12 hour / 24 hour)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Time format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Time format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Time format"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-save-changes",
+   "category": "preferences",
+   "name": "Units › Save changes",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Save changes"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Save changes"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Save changes"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-units-learn-more-about-default-units",
+   "category": "preferences",
+   "name": "Units › Learn more about default units.",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Units › Learn more about default units."
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Units › Learn more about default units."
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Units › Learn more about default units."
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-mouse-controls-view-settings-onshape-solidworks-nx-10-creo-autocad",
+   "category": "preferences",
+   "name": "Mouse controls › View settings (Onshape, SOLIDWORKS, NX 10, Creo, AutoCAD)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2666",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Mouse controls › View settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Mouse controls › View settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Mouse controls › View settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-mouse-controls-reverse-scroll-wheel-zoom-direction",
+   "category": "preferences",
+   "name": "Mouse controls › Reverse scroll wheel zoom direction",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Mouse controls › Reverse scroll wheel zoom direction"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Mouse controls › Reverse scroll wheel zoom direction"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Mouse controls › Reverse scroll wheel zoom direction"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-mouse-controls-set-default-rotation-behavior-to-constrained-rotate",
+   "category": "preferences",
+   "name": "Mouse controls › Set default rotation behavior to constrained rotate",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Mouse controls › Set default rotation behavior to constrained rotate"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Mouse controls › Set default rotation behavior to constrained rotate"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Mouse controls › Set default rotation behavior to constrained rotate"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-mouse-controls-use-pen-input-as-mouse",
+   "category": "preferences",
+   "name": "Mouse controls › Use pen input as mouse",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Mouse controls › Use pen input as mouse"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Mouse controls › Use pen input as mouse"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Mouse controls › Use pen input as mouse"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-mouse-controls-save-mouse-controls",
+   "category": "preferences",
+   "name": "Mouse controls › Save mouse controls",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Mouse controls › Save mouse controls"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Mouse controls › Save mouse controls"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Mouse controls › Save mouse controls"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-environment-profile-settings-environment-profile-select-applies-at-onc",
+   "category": "preferences",
+   "name": "Environment profile settings › Environment profile select (applies at once)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7686",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Environment profile settings › Environment profile select"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Environment profile settings › Environment profile select"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Environment profile settings › Environment profile select"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-environment-profile-settings-create-profile-new-environment-profile-di",
+   "category": "preferences",
+   "name": "Environment profile settings › Create profile (New environment profile dialog, validation)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7689",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Environment profile settings › Create profile"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Environment profile settings › Create profile"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Environment profile settings › Create profile"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-environment-profile-settings-delete-profile-delete-profile-ok-cancel",
+   "category": "preferences",
+   "name": "Environment profile settings › Delete profile (Delete profile? [OK] [Cancel])",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7701",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Environment profile settings › Delete profile"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Environment profile settings › Delete profile"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Environment profile settings › Delete profile"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-environment-profile-settings-match-pixel-density-on-high-resolution-di",
+   "category": "preferences",
+   "name": "Environment profile settings › Match pixel density on high resolution displays (Automatic / On / Off)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7687",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Environment profile settings › Match pixel density on high resolution displays"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Environment profile settings › Match pixel density on high resolution displays"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Environment profile settings › Match pixel density on high resolution displays"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-environment-profile-settings-save-profile-settings",
+   "category": "preferences",
+   "name": "Environment profile settings › Save profile settings",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7688",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Environment profile settings › Save profile settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Environment profile settings › Save profile settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Environment profile settings › Save profile settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-part-studio-settings-display-parts-list-properties",
+   "category": "preferences",
+   "name": "Part Studio settings › Display parts list properties",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Part Studio settings › Display parts list properties"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Part Studio settings › Display parts list properties"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Part Studio settings › Display parts list properties"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-part-studio-settings-save-part-studio-settings",
+   "category": "preferences",
+   "name": "Part Studio settings › Save Part Studio settings",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Part Studio settings › Save Part Studio settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Part Studio settings › Save Part Studio settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Part Studio settings › Save Part Studio settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-assembly-settings-display-instance-list-properties",
+   "category": "preferences",
+   "name": "Assembly settings › Display instance list properties",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Assembly settings › Display instance list properties"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Assembly settings › Display instance list properties"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Assembly settings › Display instance list properties"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-assembly-settings-save-assembly-settings",
+   "category": "preferences",
+   "name": "Assembly settings › Save assembly settings",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Assembly settings › Save assembly settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Assembly settings › Save assembly settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Assembly settings › Save assembly settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-tabs-general-part-studio-assembly-3d-view-sketch-dr",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1191",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-row-edit-pencil-edit-shortcut-popup-press-keys-ente",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1192",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-edit-shortcut-conflict-alert-already-in-use-by",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › Edit shortcut › conflict alert (\"already in use by …\")",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1192",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › Edit shortcut › conflict alert"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › Edit shortcut › conflict alert"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › Edit shortcut › conflict alert"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-edit-shortcut-disable-shortcut",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › Edit shortcut › Disable shortcut",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1192",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-edit-shortcut-reset-to-default",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › Edit shortcut › Reset to default",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1192",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › Edit shortcut › Reset to default"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › Edit shortcut › Reset to default"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › Edit shortcut › Reset to default"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-row-reset-customized-rows",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › row Reset ⟲ (customized rows)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1190",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › row Reset ⟲"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › row Reset ⟲"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › row Reset ⟲"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-keyboard-shortcuts-reset-all-reset-shortcuts-to-defaults-reset-cancel",
+   "category": "preferences",
+   "name": "Keyboard shortcuts › Reset all (Reset shortcuts to defaults? [Reset] [Cancel])",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1193",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Keyboard shortcuts › Reset all"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Keyboard shortcuts › Reset all"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Keyboard shortcuts › Reset all"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-toolbar-select-sketch-part-studio-assembly-drawing",
+   "category": "preferences",
+   "name": "Shortcut toolbars › toolbar select (Sketch / Part Studio / Assembly / Drawing)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3247",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › toolbar select"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › toolbar select"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › toolbar select"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-sketch-tool-checkboxes-56-tools-5-column-preview",
+   "category": "preferences",
+   "name": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3252",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-part-studio-tool-checkboxes-80-tools-5-column-previe",
+   "category": "preferences",
+   "name": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3252",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-assembly-tool-checkboxes-30-tools-5-column-preview",
+   "category": "preferences",
+   "name": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3252",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-drawing-tool-checkboxes-64-tools-5-column-preview",
+   "category": "preferences",
+   "name": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3252",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-shortcut-toolbars-save-shortcut-toolbar-settings",
+   "category": "preferences",
+   "name": "Shortcut toolbars › Save shortcut toolbar settings",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3250",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Shortcut toolbars › Save shortcut toolbar settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Shortcut toolbars › Save shortcut toolbar settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Shortcut toolbars › Save shortcut toolbar settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-toolbars-reset-to-defaults",
+   "category": "preferences",
+   "name": "Toolbars › Reset to defaults",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Toolbars › Reset to defaults"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Toolbars › Reset to defaults"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Toolbars › Reset to defaults"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-drawings-background-color-of-model-space-dark-view-light-view",
+   "category": "preferences",
+   "name": "Drawings › Background color of model space (Dark view / Light view)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-drawings.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Drawings › Background color of model space"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Drawings › Background color of model space"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Drawings › Background color of model space"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-drawings-save-drawing-settings",
+   "category": "preferences",
+   "name": "Drawings › Save drawing settings",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/preferences-full.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Drawings › Save drawing settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Drawings › Save drawing settings"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Drawings › Save drawing settings"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-material-libraries-remove",
+   "category": "preferences",
+   "name": "Material libraries › Remove",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:224",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Material libraries › Remove"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Material libraries › Remove"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Material libraries › Remove"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-material-libraries-add-material-library-picker-onshape-owned-by-me-rec",
+   "category": "preferences",
+   "name": "Material libraries › Add material library… (picker: Onshape, Owned by me, Recently opened, Created by me, Shared with me, Public)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:224",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Material libraries › Add material library…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Material libraries › Add material library…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Material libraries › Add material library…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-add-export-rule",
+   "category": "preferences",
+   "name": "User export rules › Add export rule…",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3203",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › Add export rule…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › Add export rule…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › Add export rule…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-dialog-scope-part-assembly-drawing-part-studio-file",
+   "category": "preferences",
+   "name": "User export rules › dialog Scope (Part, Assembly, Drawing, Part Studio, File)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3205",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › dialog Scope"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › dialog Scope"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › dialog Scope"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-dialog-format-per-scope",
+   "category": "preferences",
+   "name": "User export rules › dialog Format (per scope)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3206",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › dialog Format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › dialog Format"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › dialog Format"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-dialog-convention-autocomplete-validation-256-chars",
+   "category": "preferences",
+   "name": "User export rules › dialog Convention (${…} autocomplete, validation, 256 chars)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3212",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › dialog Convention"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › dialog Convention"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › dialog Convention"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-dialog-add-save-changes-cancel",
+   "category": "preferences",
+   "name": "User export rules › dialog Add / Save changes / Cancel",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3223",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › dialog Add / Save changes / Cancel"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › dialog Add / Save changes / Cancel"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › dialog Add / Save changes / Cancel"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-edit",
+   "category": "preferences",
+   "name": "User export rules › Edit",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3232",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › Edit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › Edit"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › Edit"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-remove-immediate",
+   "category": "preferences",
+   "name": "User export rules › Remove (immediate)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3234",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › Remove"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › Remove"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › Remove"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-user-export-rules-effect-on-export-file-name-view-export-rules-link",
+   "category": "preferences",
+   "name": "User export rules › effect on Export… file name; View export rules link",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7731",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "User export rules › effect on Export… file name; View export rules link"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "User export rules › effect on Export… file name; View export rules link"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "User export rules › effect on Export… file name; View export rules link"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-onshape-labs-enable-users-to-access-experimental-proof-of-concept-feat",
+   "category": "preferences",
+   "name": "Onshape Labs › Enable users to access experimental, proof of concept features (consent modal)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:7723",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Onshape Labs › Enable users to access experimental, proof of concept features"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Onshape Labs › Enable users to access experimental, proof of concept features"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Onshape Labs › Enable users to access experimental, proof of concept features"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-onshape-labs-featurescript-co-complete",
+   "category": "preferences",
+   "name": "Onshape Labs › FeatureScript Co-complete",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:7755",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Onshape Labs › FeatureScript Co-complete"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Onshape Labs › FeatureScript Co-complete"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Onshape Labs › FeatureScript Co-complete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-onshape-labs-descriptive-image-search-public-documents-only",
+   "category": "preferences",
+   "name": "Onshape Labs › Descriptive image search (public documents only)",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:7756",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Onshape Labs › Descriptive image search"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "checkbox": "Onshape Labs › Descriptive image search"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Onshape Labs › Descriptive image search"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "pref-dark-mode-applied-across-documents-page-documents-and-preferences",
+   "category": "preferences",
+   "name": "Dark mode applied across documents page, documents and preferences",
+   "where": "My account › Preferences",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:12976"
+  }
+ ],
+ "gaps": [
+  "Document row double-click vs single-click on the documents page (does a single click only select?)",
+  "Documents page column-header sort (which columns sort, indicator, persistence)",
+  "Documents page multi-select (Ctrl/Shift+click rows) and the bulk row menu / bulk trash",
+  "Documents page Rename (inline in the row or a dialog?) and Move to… dialog",
+  "Create › Label… dialog, Labels… on a row, Labels left-nav view, Create new label in Details",
+  "Folder Set library: what it does",
+  "Drag a document row onto a folder tile / breadcrumb",
+  "Documents page keyboard: Enter / Delete / F2 on a selected row; search box focus key",
+  "☰ Move to… (document) dialog",
+  "☰ Rename document (inline navbar box or a dialog?)",
+  "☰ Restore deleted workspaces… dialog and ☰ Update workspace… dialog",
+  "☰ Workspace properties… modal fields",
+  "☰ Switch to view only mode: what changes and how to leave it",
+  "☰ Close document: where it lands (documents page view, selection)",
+  "Tab › Move to document… dialog (target picker, what moves, references)",
+  "Tab › Copy to clipboard then paste: where Paste appears (tab menu, + menu, Ctrl+V on the tab bar), naming, across documents",
+  "Tab › Select as document thumbnail: effect on the documents page thumbnail",
+  "Tab › Update… on an imported file (picker, what re-imports)",
+  "Double-click a tab to rename in a normal (unprotected) workspace (only the protected case is recorded)",
+  "Tab rename: Esc cancels, click-away commits, empty name refused?",
+  "Multi-select tabs (Ctrl/Shift+click) and bulk Delete / Move to folder (\"Delete tabs\" title implies several)",
+  "Tab drag between tab bar and an open folder (moving out of a folder by drag); drag in the Tab manager list",
+  "Tab manager search: matching rules, Enter on a single result",
+  "Tab bar keyboard navigation (Ctrl+PageUp/PageDown or similar) — confirm live has none",
+  "+ › Create Variable Studio / Feature Studio / Material Library: tab name and whether activated",
+  "+ › Create Drawing… from a non-studio tab (dialog defaults)",
+  "+ › Applications ▸ submenu contents beyond Go to App Store",
+  "Help › About dialog content; Help › System check page",
+  "Keyboard shortcuts customization on the Feature Studio tab (absent in Preferences) and import/export of shortcut maps",
+  "Preferences › Material libraries › Add material library… pick and the Remove confirmation",
+  "Preferences › Mouse controls per-preset rows (Rotate / Constrained rotate / Pan / Zoom for 3D vs 2D Drawing) per preset",
+  "Preferences › Decimal format effect (comma) in fields and exports",
+  "Preferences › Units › Time format effect (documents page Modified column)",
+  "Preferences › leaving with unsaved section changes (any prompt?)",
+  "Workspace units panel: Esc / click-away, and units in a new document from Preferences defaults",
+  "Undo/Redo after a tab switch in the Assembly and Drawing (toolbar state per tab) on page reload",
+  "Document opened in two browser tabs: live updates of tab list / rename"
+ ],
+ "about": "Documents, tabs, start page, preferences: what live has (behaviours.md, live/dom), studios 2026-11-07; coverage: tools/ui-parity/coverage_documents.py"
+}

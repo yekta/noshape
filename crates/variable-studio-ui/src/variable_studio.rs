@@ -49,6 +49,8 @@ pub struct VariableStudioView {
     value_focus: HashMap<usize, FocusHandle>,
     value_selected: Option<usize>,
     value_editing: Option<usize>,
+    /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
+    ui_drawn: Vec<serde_json::Value>,
     /// The right edge's Configuration panel (variable_config.rs).
     config_open: bool,
     cfg_cell: Option<variable_config::CfgEdit>,
@@ -86,6 +88,16 @@ impl Focusable for VariableStudioView {
 }
 
 impl VariableStudioView {
+    /// The variables as last drawn (the ui-parity state's `variables`): `{"name", "type", "value", "description"}`,
+    /// the inserted studios' tables first, then this one's (`"title"`: its tab's name).
+    pub fn ui_state(&self, cx: &App) -> serde_json::Value {
+        let title = |t: TabId| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default();
+        let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "rows": v.read(cx).ui_drawn })).collect();
+        tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
+        tables.push(serde_json::json!({ "title": title(self.tab), "rows": self.ui_drawn }));
+        serde_json::json!({ "tables": tables })
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |_: &mut Self, _, _: &DocEvent, _, cx| cx.notify())];
         Self {
@@ -105,6 +117,7 @@ impl VariableStudioView {
             value_focus: HashMap::new(),
             value_selected: None,
             value_editing: None,
+            ui_drawn: Vec::new(),
             config_open: false,
             cfg_cell: None,
             cfg_folded: HashSet::new(),
@@ -575,6 +588,7 @@ impl Render for VariableStudioView {
             Some(crate::variable_insert::InsertTarget::Element(host)) => noshape_model::variables::overwritten(&self.doc.read(cx).session.doc, *host, self.tab),
             _ => Default::default(),
         };
+        let mut drawn: Vec<serde_json::Value> = Vec::new();
         for (i, v) in studio.variables.iter().enumerate() {
             if only.as_ref().is_some_and(|o| !o.contains(&v.name)) {
                 continue;
@@ -615,6 +629,10 @@ impl Render for VariableStudioView {
                 let unit = expression_unit(&studio, &v.expr.text, 0).unwrap_or(units.length);
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
+            if crate::ui_script::active() {
+                let value = shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text));
+                drawn.push(serde_json::json!({ "name": v.name, "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": value, "description": desc_text }));
+            }
             let from_import = v.kind == Some(VarKind::FromImport);
             let cfg_value = studio.configuration.configured_cell(&v.name, VsField::Value).is_some();
             let cfg_desc = studio.configuration.configured_cell(&v.name, VsField::Description).is_some();
@@ -712,6 +730,7 @@ impl Render for VariableStudioView {
                             .child(gpui_kit::base::input::input_frame(
                                 cell_div(0)
                                     .relative()
+                                    .map(|d| crate::ui_script::mark(d, || format!("var_cell:{}:Name", v.name)))
                                     .child(cell_input(&name))
                                     .when(overwritten.contains(&v.name), |d| d.child(div().id(("vs-over", i)).absolute().right(px(8.)).top(px(12.)).tooltip(crate::ui::tooltip("Overwritten in another variable table.")).child(crate::ui::glyph("info", 10., rgb(0x666666))))),
                             ))
@@ -719,7 +738,8 @@ impl Render for VariableStudioView {
                                 // Onshape's types (behaviours.md, Variable Studio).
                                 const KINDS: [VarKind; 5] = [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport];
                                 let current = KINDS.iter().position(|k| *k == kind).unwrap_or(0);
-                                type_cell(("vs-kind", i), KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
+                                let var_name = v.name.clone();
+                                let cell = type_cell(("vs-kind", i), KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
                                     let k = KINDS[k];
                                     kinds.update(cx, |this, cx| {
                                         this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k));
@@ -728,7 +748,8 @@ impl Render for VariableStudioView {
                                             crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
                                         }
                                     })
-                                })
+                                });
+                                crate::ui_script::mark(cell, || format!("var_cell:{var_name}:Variable type"))
                             }),
                     )
                     // Value: the row menu plus Configure… (help config-rmb-configure-01),
@@ -738,6 +759,7 @@ impl Render for VariableStudioView {
                         div()
                             .id(("vs-valcell", i))
                             .relative()
+                            .map(|d| crate::ui_script::mark(d, || format!("var_cell:{var}:Value")))
                             .child(value_cell)
                             .when(cfg_value, |d| d.child(variable_config::configured_outline()))
                             .os_context_menu_over_inputs(move |m, _, _| {
@@ -753,6 +775,7 @@ impl Render for VariableStudioView {
                         div()
                             .id(("vs-desc", i))
                             .relative()
+                            .map(|d| crate::ui_script::mark(d, || format!("var_cell:{var}:Description")))
                             .child(gpui_kit::base::input::input_frame(cell_div(3).child(cell_input(&desc))))
                             .when(cfg_desc, |d| d.child(variable_config::configured_outline()))
                             .when_some(desc_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
@@ -791,6 +814,7 @@ impl Render for VariableStudioView {
             let st = new_name.clone();
             window.defer(cx, move |window, cx| st.update(cx, |s, cx| s.focus(window, cx)));
         }
+        self.ui_drawn = drawn;
         let collapsed = self.collapsed;
         let more_view = view.clone();
         let host_menu = host_refs.map(|(target, list)| {
@@ -889,7 +913,7 @@ impl Render for VariableStudioView {
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band
                     // (live dark/dk-961: `#1c1c1c` across them).
-                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div(0).border_l_1().child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
+                    t.child(h_flex().child(gpui_kit::base::input::input_frame(cell_div(0).border_l_1().map(|d| crate::ui_script::mark(d, || "var_cell:Name".into())).child(cell_input(&new_name)))).child(div().w(px(col_w(1) + col_w(2) + col_w(3))).h(px(ROW_H)).flex_none().bg(p().bg_senary)))
                 })
             });
         if self.host.is_some() {

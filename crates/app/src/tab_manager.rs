@@ -257,6 +257,7 @@ impl TabManager {
         let view = cx.entity();
         h_flex()
             .id(SharedString::from(format!("tm-f-{id}")))
+            .map(|d| noshape_app_core::ui_script::mark(d, || format!("panel_row:{name}")))
             .h(px(40.))
             .flex_none()
             .pl(px(8. + depth as f32 * 20.))
@@ -410,6 +411,7 @@ impl Render for TabManager {
                 Some(h_flex()
                     .id(SharedString::from(format!("tm-{id}")))
                     .relative()
+                    .map(|d| noshape_app_core::ui_script::mark(d, || format!("panel_row:{name}")))
                     .h(px(if compact { 30. } else { 54. }))
                     .flex_none()
                     .pl(px(if compact { 16. } else { 22. } + depth as f32 * 20.))
@@ -523,7 +525,7 @@ impl Render for TabManager {
                     // Live dom/panel-tab-manager-header: 30x30 search / Sort tabs / Filter tabs
                     // 6 px apart, then the bare 20 px List view / Detail view pair (inactive at
                     // 0.2), then the 20 px ×, 5 px from the edge.
-                    .child(tm_toggle("tm-search", "search", self.show_search, cx).mr(px(6.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(tm_toggle("tm-search", "search", self.show_search, cx).mr(px(6.)).map(|d| noshape_app_core::ui_script::mark(d, || "button:Search tabs".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_search = !this.show_search;
                         cx.notify();
                     })))
@@ -532,25 +534,25 @@ impl Render for TabManager {
                         div()
                             .relative()
                             .mr(px(6.))
-                            .child(tm_toggle("tm-sort", "tm-sort", false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip(crate::ui::tooltip("Sort tabs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            .child(tm_toggle("tm-sort", "tm-sort", false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip(crate::ui::tooltip("Sort tabs")).map(|d| noshape_app_core::ui_script::mark(d, || "button:Sort tabs".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.sort_open = !this.sort_open;
                                 cx.notify();
                             })))
                             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     })
-                    .child(tm_toggle("tm-filter", "tm-filter", self.show_filters, cx).mr(px(9.)).tooltip(crate::ui::tooltip("Filter tabs")).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(tm_toggle("tm-filter", "tm-filter", self.show_filters, cx).mr(px(9.)).tooltip(crate::ui::tooltip("Filter tabs")).map(|d| noshape_app_core::ui_script::mark(d, || "button:Filter tabs".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_filters = !this.show_filters;
                         cx.notify();
                     })))
-                    .child(div().id("tm-list").cursor_pointer().mr(px(3.)).when(!self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("List view")).child(crate::assets::icon("tm-list", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("tm-list").cursor_pointer().mr(px(3.)).when(!self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("List view")).map(|d| noshape_app_core::ui_script::mark(d, || "button:List view".into())).child(crate::assets::icon("tm-list", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.compact = true;
                         cx.notify();
                     })))
-                    .child(div().id("tm-detailed").cursor_pointer().mr(px(9.)).when(self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("Detail view")).child(crate::assets::icon("tm-detailed", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("tm-detailed").cursor_pointer().mr(px(9.)).when(self.compact, |d| d.opacity(0.2)).tooltip(crate::ui::tooltip("Detail view")).map(|d| noshape_app_core::ui_script::mark(d, || "button:Detail view".into())).child(crate::assets::icon("tm-detailed", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.compact = false;
                         cx.notify();
                     })))
-                    .child(div().id("tm-close").cursor_pointer().mr(px(5.)).child(crate::assets::icon("close", 20., cx)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TabManagerEvent::Close)))),
+                    .child(div().id("tm-close").cursor_pointer().mr(px(5.)).map(|d| noshape_app_core::ui_script::mark(d, || "button:Close tab manager".into())).child(crate::assets::icon("close", 20., cx)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(TabManagerEvent::Close)))),
             )
             // Live document/30: the search box 6 px under the header, the filter row
             // 40 px, rows from y 154.

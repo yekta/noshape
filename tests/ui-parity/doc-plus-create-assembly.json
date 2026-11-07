@@ -1,0 +1,21 @@
+{
+ "name": "doc-plus-create-assembly",
+ "about": "+ › Create Assembly",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-new",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Assembly"
+   }
+  }
+ ]
+}

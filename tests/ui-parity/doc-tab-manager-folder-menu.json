@@ -1,0 +1,25 @@
+{
+ "name": "doc-tab-manager-folder-menu",
+ "about": "Tab manager: right-click a folder's row",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Folder 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

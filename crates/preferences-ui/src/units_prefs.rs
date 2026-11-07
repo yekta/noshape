@@ -96,15 +96,17 @@ impl UnitsPrefsView {
 
     /// A browser `<select>` (live: 34 px, 1 px `#aaa`, radius 5.25, `#777` arrow) whose
     /// list is the native-select menu right under it.
-    fn select(&mut self, c: Choice, cx: &mut Context<Self>) -> AnyElement {
+    fn select(&mut self, c: Choice, field: String, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         let bounds = self.bounds.entry(c.id).or_default().clone();
         let open = self.open.as_ref().is_some_and(|(id, _)| *id == c.id);
         let label = c.options.get(c.at).cloned().unwrap_or_default();
+        crate::ui_script::note_field(|| serde_json::json!({ "label": field, "kind": "select", "value": label }));
         let (id, width, options, at, set) = (c.id, c.width, c.options, c.at, c.set);
         let b2 = bounds.clone();
         div()
             .id(id)
+            .map(|d| crate::ui_script::mark(d, || format!("field:{field}")))
             .relative()
             .w(px(width))
             .h(px(34.))
@@ -167,7 +169,7 @@ impl Render for UnitsPrefsView {
         let label = |t: String| div().h(px(21.)).text_size(px(14.)).line_height(px(21.)).text_color(pal.text).child(t);
         let mut rows: Vec<AnyElement> = Vec::new();
         for (i, (name, unit, dec)) in self.rows().into_iter().enumerate() {
-            let (unit, dec) = (self.select(unit, cx), self.select(dec, cx));
+            let (unit, dec) = (self.select(unit, format!("Units › {name}"), cx), self.select(dec, format!("Units › {name} › Display decimals"), cx));
             rows.push(
                 h_flex()
                     .id(("units-row", i))
@@ -181,6 +183,7 @@ impl Render for UnitsPrefsView {
         }
         let time = self.select(
             Choice { id: "u-time", width: DEC_W, options: vec!["12 hour".into(), "24 hour".into()], at: usize::from(self.edited.time_24h), set: Rc::new(|e, i| e.time_24h = i == 1) },
+            "Units › Time format".into(),
             cx,
         );
         v_flex()
@@ -220,6 +223,10 @@ impl Render for UnitsPrefsView {
                         h_flex().mt(px(24.)).child(
                             div()
                                 .id("units-save")
+                                .map(|d| {
+                                    crate::ui_script::note_field(|| serde_json::json!({ "label": "Units › Save changes", "kind": "button", "value": changed }));
+                                    crate::ui_script::mark(d, || "button:Units › Save changes".into())
+                                })
                                 .h(px(34.))
                                 .px(px(10.5))
                                 .flex()
@@ -285,6 +292,10 @@ impl Render for DecimalPrefsView {
                         // A browser checkbox: 13 px box, the label 3 px after it (live 686).
                         h_flex()
                             .id("decimal-comma")
+                            .map(|d| {
+                                crate::ui_script::note_field(|| serde_json::json!({ "label": "Decimal format › Use comma as decimal separator", "kind": "checkbox", "value": on }));
+                                crate::ui_script::mark(d, || "checkbox:Decimal format › Use comma as decimal separator".into())
+                            })
                             .h(px(21.))
                             .gap(px(3.))
                             .cursor_pointer()
@@ -313,6 +324,10 @@ impl Render for DecimalPrefsView {
                         h_flex().mt(px(30.)).child(
                             div()
                                 .id("decimal-save")
+                                .map(|d| {
+                                    crate::ui_script::note_field(|| serde_json::json!({ "label": "Decimal format › Save decimal format", "kind": "button", "value": changed }));
+                                    crate::ui_script::mark(d, || "button:Decimal format › Save decimal format".into())
+                                })
                                 .h(px(34.))
                                 .px(px(10.5))
                                 .flex()

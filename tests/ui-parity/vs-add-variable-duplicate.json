@@ -1,0 +1,29 @@
+{
+ "name": "vs-add-variable-duplicate",
+ "about": "the Name row: a name already there, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "Name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "name": "docs-create-document",
+ "about": "Create › Document…, a name, Create: the new document opens on Part Studio 1",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Document…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "uip New doc"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  }
+ ]
+}

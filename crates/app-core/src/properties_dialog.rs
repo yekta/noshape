@@ -491,6 +491,7 @@ fn check_row(id: impl Into<ElementId>, text: impl Into<SharedString>, on: bool) 
 pub fn footer_button(id: &'static str, text: &'static str, primary: bool, enabled: bool) -> Stateful<Div> {
     div()
         .id(id)
+        .map(|d| crate::ui_script::mark(d, || format!("button:{text}")))
         .h(px(34.))
         .px(px(10.5))
         .flex()

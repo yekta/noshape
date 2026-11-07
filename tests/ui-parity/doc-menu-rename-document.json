@@ -1,0 +1,27 @@
+{
+ "name": "doc-menu-rename-document",
+ "about": "☰ › Rename document: the modal, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename document"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

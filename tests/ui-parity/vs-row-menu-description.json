@@ -1,0 +1,25 @@
+{
+ "name": "vs-row-menu-description",
+ "about": "right-click a Description cell: the row menu with Copy, Convert to expression",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "height:Description"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

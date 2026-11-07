@@ -1,0 +1,29 @@
+{
+ "name": "vs-value-escape",
+ "about": "a Value cell: type, Escape: the old value",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "55"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

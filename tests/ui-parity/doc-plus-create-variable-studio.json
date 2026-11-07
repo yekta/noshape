@@ -1,0 +1,21 @@
+{
+ "name": "doc-plus-create-variable-studio",
+ "about": "+ › Create Variable Studio",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-new",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Variable Studio"
+   }
+  }
+ ]
+}

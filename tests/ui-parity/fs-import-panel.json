@@ -1,0 +1,25 @@
+{
+ "name": "fs-import-panel",
+ "about": "the toolbar's Import: its panel, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 1)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Import"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

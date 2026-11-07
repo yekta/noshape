@@ -1,0 +1,29 @@
+{
+ "name": "vs-edit-description",
+ "about": "a Description cell: type, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Description"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Plate width"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

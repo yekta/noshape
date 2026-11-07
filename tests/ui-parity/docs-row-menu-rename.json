@@ -1,0 +1,27 @@
+{
+ "name": "docs-row-menu-rename",
+ "about": "a document's row › Rename: the modal, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

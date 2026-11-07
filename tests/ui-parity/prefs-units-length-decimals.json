@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-length-decimals",
+ "about": "Preferences › Units: the length's Display decimals › 0.1234, Save",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Length default unit › Display decimals",
+    "pick": "0.1234"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

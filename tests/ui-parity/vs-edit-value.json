@@ -1,0 +1,29 @@
+{
+ "name": "vs-edit-value",
+ "about": "a Value cell: type 50, Enter: 50 mm",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "50"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

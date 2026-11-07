@@ -1,0 +1,25 @@
+{
+ "name": "fs-module-outline",
+ "about": "the toolbar's Module outline: its popover, Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 1)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Module outline"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

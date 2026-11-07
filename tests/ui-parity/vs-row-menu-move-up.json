@@ -1,0 +1,27 @@
+{
+ "name": "vs-row-menu-move-up",
+ "about": "a row › Move up",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "count:Name"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move up"
+   }
+  }
+ ]
+}

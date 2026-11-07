@@ -1,0 +1,18 @@
+{
+ "name": "doc-tab-drag-into-folder",
+ "about": "drag a tab onto a folder: it moves in",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "drag",
+   "from": {
+    "doc_tab": "Part Studio 2"
+   },
+   "to": {
+    "doc_tab": "Folder 1"
+   }
+  }
+ ]
+}

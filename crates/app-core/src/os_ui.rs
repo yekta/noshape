@@ -174,6 +174,7 @@ pub fn modal_doc_page(dialog: Dialog, title: impl Into<SharedString>, width: f32
 fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: bool, help: bool) -> Dialog {
     let pal = p();
     let title: SharedString = title.into();
+    crate::ui_script::note_modal(&title);
     dialog
         .w(px(width))
         .margin_top(px(26.))
@@ -198,6 +199,7 @@ fn modal_with(dialog: Dialog, title: impl Into<SharedString>, width: f32, dark: 
                 .child(div().flex_none().child(DialogClose::new().child(
                     div()
                         .id("modal-close")
+                        .map(|d| crate::ui_script::mark(d, || "button:close".into()))
                         .size(px(22.))
                         .flex()
                         .items_center()

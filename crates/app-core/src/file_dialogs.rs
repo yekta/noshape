@@ -4,7 +4,14 @@
 use gpui_kit::*;
 use std::path::{Path, PathBuf};
 
+/// Where new documents go ("Owned by me"): `NOSHAPE_DOCUMENTS_DIR` (a ui-parity run's own), else the user's
+/// Documents/noshape.
 pub fn documents_dir() -> PathBuf {
+    if let Some(d) = std::env::var_os("NOSHAPE_DOCUMENTS_DIR") {
+        let dir = PathBuf::from(d);
+        let _ = std::fs::create_dir_all(&dir);
+        return dir;
+    }
     let base = dirs::document_dir().or_else(|| dirs::home_dir().map(|h| h.join("Documents"))).unwrap_or_else(|| PathBuf::from("."));
     let dir = base.join("noshape");
     let _ = std::fs::create_dir_all(&dir);

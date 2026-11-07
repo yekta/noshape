@@ -199,6 +199,99 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   "start asm" in tab names and panel texts on both sides ("start pin-block asm Copy 2" / "start
   pin-block-asm-drawing asm").
 
+### Documents, tabs and preferences (studios, 11-07)
+The document's own chrome: the tab bar, the ☰ Document menu, the navbar, the Tab manager, the Ctrl+Space switcher, the
+document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Variable Studio, Feature Studio).
+
+- **A whole document.** A start with a `"tabs"` key (even `[]`) is a new document, as the documents page's Create ›
+  Document makes it (live: "Part Studio 1" and "Assembly 1", in that order; the start's features in Part Studio 1),
+  then the listed tabs appended in order: `{"kind": "partstudio" | "assembly" | "variablestudio" | "featurestudio",
+  "name": "Part Studio 2"}`, a folder `{"kind": "folder", "name": "Folder 1", "tabs": [...]}` holding its tabs. Live's
+  runner makes a fresh document for it (not a lane copy), so every tab of the bar is the start's. The run opens on
+  Part Studio 1 (or on the tab a first `doc_tab` step clicks, as before).
+- Targets:
+  - `{"doc_tab": "Part Studio 2"}`: a tab of the bar by its name (click, dblclick: inline rename, rclick: its menu,
+    drag: `"to": {"doc_tab": …}` drops it on the target's middle (a folder takes it), with `"edge": "left" |
+    "right"` beside it);
+  - `{"button": "Insert new tab"}` (the bar's +), `{"button": "Tab manager"}` (the cell left of +), `{"button":
+    "Document menu"}` (☰), `{"navbar": "name"}` (the document's name), `{"navbar": "workspace"}` (the workspace /
+    version label after it);
+  - in the Tab manager: `{"panel_row": "Part Studio 1"}` a tab's or folder's row, its header's buttons by tooltip
+    (`"Search tabs"`, `"Sort tabs"`, `"Filter tabs"`, `"List view"`, `"Detail view"`, `"Close tab manager"`: the ×);
+  - a modal's (Properties, Delete tabs, Rename document, Copy workspace, Workspace units…) fields `{"field":
+    "<label>"}`, its buttons by their text (`{"button": "OK"}`, `{"button": "Cancel"}`), its `×` `{"button": "close"}`.
+- State: every state has `"document"` (`null` on the documents page):
+  ```json
+  "document": { "tabs": [{"name": "Part Studio 1", "kind": "partstudio", "active": true},
+                         {"name": "Folder 1", "kind": "folder", "active": false}],
+                "folder": null, "renaming": null, "panel": null, "switcher": null }
+  ```
+  `tabs`: the bar as shown, left to right (with a folder open, the folder's tabs), `kind` one of `partstudio`,
+  `assembly`, `drawing`, `variablestudio`, `featurestudio`, `materiallibrary`, `file` (an imported or stored file),
+  `folder`; `folder`: the open folder's name (the crumbs), `null` at the top; `renaming`: the tab or folder whose name
+  is an inline field, by its name before the edit; `panel`: the open left panel, `"Tab manager"`, `"Versions and
+  history"`, `"Workspace units"` (☰ › Workspace units…'s panel), `"Document notes"`, `null`; `switcher`: the Ctrl+Space
+  switcher while Ctrl is held, `{"rows": [names, most recent first], "selected": n}`.
+  The tab's inline rename field with the keyboard is `focus` `{"kind": "other", "text", "selection", "all"}`.
+  A modal is `dialog` in the drawing modals' form (`{"kind": "modal", "title", "fields": [{"label", "kind": "input" |
+  "select" | "checkbox", "value"}], "buttons"}`). On a Variable or Feature Studio tab the Part Studio keys
+  (`features`, `parts`, `selection`, `sketch`, `drawing`) are `null` / empty; `focus`, `dialog`, `list` and `tooltip`
+  are read as everywhere.
+
+### Variable Studio and Versions (studios, 11-07)
+- A start's Variable Studio tab may hold variables: `{"kind": "variablestudio", "name": "Variable Studio 1",
+  "variables": [{"name": "width", "value": "40 mm"}, {"name": "count", "kind": "NUMBER", "value": "4"}]}` (kind
+  LENGTH by default; start `vs-vars`).
+- `{"var_cell": "width:Value"}`: a variable's cell by its name and column (`Name`, `Variable type`, `Value`,
+  `Description`); `{"var_cell": "Name"}` the italic Name cell of the add row; `{"var_cell": "count:Variable type",
+  "pick": "Any"}` picks a type.
+- On a Variable Studio tab the state has `"variables": {"tables": [{"title": "Variable Studio 1", "rows": [{"name",
+  "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
+  (an expression's result while the cell isn't being edited).
+- A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
+  `features` in Main (start `doc-versions`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
+  panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
+  (`"Versions and history"`, `"Create version…"`).
+
+### Feature Studio (studios, 11-07)
+- Start `fs-studio`: a whole document with a new "Feature Studio 1" (its own new-studio text).
+- `{"editor": "code"}`: the code editor (a click there, then keys: `mod+End` puts the caret at the end); the toolbar's
+  buttons by tooltip without their key (`"Commit Feature Studio"`, `"New feature"`, `"Format Feature Studio"`,
+  `"Import"`, `"Module outline"`, `"Undo"`, `"Redo"`).
+- State on a Feature Studio tab: `"featurestudio": {"caret": [line, column], "line": "<the caret's line>", "lines":
+  n, "committed": true, "notices": n}` (from 0; `committed`: the text is what was last committed; `notices`: the
+  studio's notices after the last commit); the autocomplete is `list` (`"kind": "autocomplete"`, its rows' names).
+
+### Documents page and Preferences (studios, 11-07)
+A start with `"page"` opens on a page instead of a document: `"documents"` (the documents page, on Owned by me) or
+`"preferences"` (My account › Preferences). Its `"documents"` are made first: `{"name": "uip Bracket", "start":
+"block"}` (a document built from that start; without one, a new document), `{"name": "uip Folder", "documents":
+[...]}` a folder holding its own. Live's runner keeps them in its account under those names (made once); ours makes
+them in the run's own documents folder (`NOSHAPE_DOCUMENTS_DIR`, run.py sets it). The steps go to the window in
+front: a step that opens a document (a row's double-click, Create › Document…) carries on in it, with the document
+states above.
+
+- Targets on the documents page: `{"nav": "Owned by me"}` (the left column's places: "Recently opened", "Created by
+  me", "Labels", "Trash"), `{"button": "Create"}`, `{"doc_row": "uip Bracket"}` a document's row or a folder's tile
+  by its name, `{"field": "Search"}` the search box; menus and modals as everywhere.
+- Targets on Preferences: a control by its section and label, `{"field": "Units › Length default unit", "pick":
+  "Inch"}` (a select), `{"field": "Units › Length default unit › Display decimals"}` (the select after it),
+  `{"checkbox": "Decimal format › Use comma as decimal separator"}`, a section's button `{"button": "Units › Save
+  changes"}`.
+- State: on the documents page `"document"` is `null` and
+  ```json
+  "documents": { "place": "Owned by me", "selected": "uip Bracket", "search": "", "panel": "Details",
+                 "advanced": false, "columns": false }
+  ```
+  (`place`: the page's title, a folder's name inside it; `selected`: the selected row's or tile's name; `search`: the
+  search box's text; `panel`: the right strip's open panel, `"Details"`, `"Versions and history"`, `"Properties"`,
+  `"Document notes"`, `null`; `advanced`: the search's ▾ panel open; `columns`: the "+ Add" column chooser open).
+  The account's other documents aren't recorded: only the names a scenario names. On Preferences:
+  `"preferences": {"fields": [{"label": "Units › Length default unit", "kind": "select", "value": "Millimeter"},
+  {"label": "Units › Save changes", "kind": "button", "value": false}]}`: every control of the sections in page
+  order, a checkbox's `value` true / false, a button's whether it is enabled.
+
 ## Recording (both sides write this)
 
 ```json

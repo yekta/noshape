@@ -1,0 +1,21 @@
+{
+ "name": "ver-show-changes",
+ "about": "Main's Show changes…: its history entries",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  }
+ ]
+}

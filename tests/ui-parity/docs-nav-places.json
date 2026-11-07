@@ -1,0 +1,33 @@
+{
+ "name": "docs-nav-places",
+ "about": "the left column: Recently opened, Created by me, Trash, Owned by me",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "nav": "Recently opened"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Created by me"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Owned by me"
+   }
+  }
+ ]
+}

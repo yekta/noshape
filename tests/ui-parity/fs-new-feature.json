@@ -1,0 +1,39 @@
+{
+ "name": "fs-new-feature",
+ "about": "the toolbar's New feature: the feature's template at the caret",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 1)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New feature"
+   }
+  }
+ ]
+}

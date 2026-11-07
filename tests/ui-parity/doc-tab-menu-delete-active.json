@@ -1,0 +1,21 @@
+{
+ "name": "doc-tab-menu-delete-active",
+ "about": "the active tab › Delete: which tab becomes active",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  }
+ ]
+}

@@ -58,6 +58,8 @@ def run_one(app, scenario, out, display, timeout):
         "NOSHAPE_UI_SCRIPT": str(scenario),
         "NOSHAPE_UI_STATE_OUT": str(out),
         "NOSHAPE_CONFIG_DIR": config,
+        # The documents page's "Owned by me" (a page start's documents; new documents), never the user's.
+        "NOSHAPE_DOCUMENTS_DIR": str(Path(config, "documents")),
         "NOSHAPE_NO_NATIVE_DIALOGS": "1",
         "DISPLAY": display,
     })

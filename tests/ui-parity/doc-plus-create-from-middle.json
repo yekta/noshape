@@ -1,0 +1,32 @@
+{
+ "name": "doc-plus-create-from-middle",
+ "about": "+ › Create Part Studio while a middle tab is active: right after it",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Part Studio"
+   }
+  }
+ ]
+}

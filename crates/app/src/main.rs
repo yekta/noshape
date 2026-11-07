@@ -451,7 +451,7 @@ fn main() {
     let demo = args.iter().any(|a| a == "--demo");
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
     // A ui-parity scenario opens its own start document.
-    let path = if ui_script::enabled() { Some(ui_script::prepare()) } else { path };
+    let path = if ui_script::enabled() { ui_script::prepare() } else { path };
 
     let app = gpui_kit::application().with_assets(assets::AppAssets);
     noshape_render::perf::milestone("GPUI application created");
@@ -523,6 +523,13 @@ fn main() {
             }
         } else {
             files::show_start_window(cx);
+        }
+        // A page scenario (the documents page, Preferences) runs from the app, across its windows.
+        if ui_script::enabled() && let Some(page) = ui_script::page_start() {
+            if page == "preferences" {
+                noshape_preferences_ui::preferences_window::show(noshape_preferences_ui::preferences_window::Page::Preferences, cx);
+            }
+            ui_script::start_page(cx);
         }
         agent_setup::first_launch(cx);
         let g2 = gpu.clone();

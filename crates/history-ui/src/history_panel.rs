@@ -99,11 +99,19 @@ pub struct HistoryPanel {
     date_to: Entity<InputState>,
     /// Tabs each microversion changed (store diffs, for the Tab filters).
     changed_tabs: HashMap<MicroversionId, Vec<TabId>>,
+    /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
+    ui_drawn: std::cell::RefCell<Vec<serde_json::Value>>,
     /// Result of "Compare": (description of the older point, diff).
     _subs: Vec<Subscription>,
 }
 
 impl HistoryPanel {
+    /// The rows as last drawn (the ui-parity state's `document.history`): `{"name", "kind": "workspace" | "version" |
+    /// "start" | "change", "selected"}`, top to bottom.
+    pub fn ui_rows(&self, _cx: &App) -> Vec<serde_json::Value> {
+        self.ui_drawn.borrow().clone()
+    }
+
     pub fn new(doc: Entity<DocModel>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search history"));
         let subs = vec![
@@ -134,6 +142,7 @@ impl HistoryPanel {
             date_from,
             date_to,
             changed_tabs: HashMap::new(),
+            ui_drawn: Default::default(),
             _subs: subs,
         }
     }
@@ -1107,6 +1116,7 @@ impl Render for HistoryPanel {
             s.active_tab.and_then(|t| s.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_)))
         };
         let mut list: Vec<AnyElement> = Vec::new();
+        let mut drawn: Vec<serde_json::Value> = Vec::new();
         // A version made with no change since the row before it shares its
         // microversion (V1 right after Start): the version row is the one meant.
         let version_at = |mv: MicroversionId| placed.iter().any(|p| p.row.kind == RowKind::Version && p.row.mv == mv);
@@ -1126,6 +1136,15 @@ impl Render for HistoryPanel {
                     _ => viewing == Some(r.mv),
                 };
             let (mv, kind, name) = (r.mv, r.kind, r.name.clone());
+            if crate::ui_script::active() {
+                let k = match kind {
+                    RowKind::Workspace(_) => "workspace",
+                    RowKind::Version => "version",
+                    RowKind::Start => "start",
+                    RowKind::Change => "change",
+                };
+                drawn.push(serde_json::json!({ "name": name, "kind": k, "selected": selected || picked }));
+            }
             // Clicking a row leaves compare mode and opens it (live 954).
             let repair_label = if kind == RowKind::Change { format!("{current_name} :: {name}") } else { name.clone() };
             let repair_label2 = repair_label.clone();
@@ -1168,6 +1187,7 @@ impl Render for HistoryPanel {
             let row = if pl.change {
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
+                    .map(|d| crate::ui_script::mark(d, || format!("history_row:{}", r.name)))
                     .h(px(CHANGE_H))
                     .flex_none()
                     .cursor_pointer()
@@ -1208,6 +1228,7 @@ impl Render for HistoryPanel {
                 };
                 h_flex()
                     .id(SharedString::from(format!("hist-{}", r.key)))
+                    .map(|d| crate::ui_script::mark(d, || format!("history_row:{}", r.name)))
                     .h(px(ROW_H))
                     .flex_none()
                     .items_start()
@@ -1238,6 +1259,7 @@ impl Render for HistoryPanel {
                                 d.child(
                                     h_flex()
                                         .id(SharedString::from(format!("chg-{key}")))
+                                        .map(|d| crate::ui_script::mark(d, || format!("button:Show changes:{}", r.name)))
                                         .gap(px(3.))
                                         .child(crate::ui::glyph(if open_changes { "ui-chevron-down" } else { "ui-chevron-right" }, 10., pal.text_muted))
                                         .child(div().truncate().child(if open_changes { "Hide changes…" } else { "Show changes…" }))
@@ -1353,6 +1375,7 @@ impl Render for HistoryPanel {
             });
             list.push(row.into_any_element());
         }
+        *self.ui_drawn.borrow_mut() = drawn;
 
         let doc2 = self.doc.clone();
         let legend_item = |icon: AnyElement, label: &'static str, faint: bool| {
@@ -1375,7 +1398,7 @@ impl Render for HistoryPanel {
                     // Live order (document/22): release, create version, compare, ×.
                     // Release management: a candidate with the active tab's objects
                     // (Release__typical_release_workflow).
-                    .child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").on_click({
+                    .child(crate::ui::icon_button("hist-release", "release-create", 30., false, cx).tooltip("Create release candidate").map(|d| crate::ui_script::mark(d, || "button:Create release candidate".into())).on_click({
                         let doc = self.doc.clone();
                         move |_, window, cx| {
                             let tab = doc.read(cx).session.active_tab;
@@ -1383,9 +1406,9 @@ impl Render for HistoryPanel {
                             crate::release_dialog::open_release_candidate(doc.clone(), items, window, cx)
                         }
                     }))
-                    .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
+                    .child(crate::ui::icon_button("hist-create-version", "version", 30., false, cx).tooltip("Create version…").map(|d| crate::ui_script::mark(d, || "button:Create version…".into())).on_click(move |_, window, cx| open_create_version(doc2.clone(), window, cx)))
                     // Help "Comparing": pick two history entries (blue, then red).
-                    .child(crate::ui::icon_button("hist-compare", "compare", 30., crate::compare_mode::picking(&self.doc, cx), cx).tooltip("Compare history entries").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .child(crate::ui::icon_button("hist-compare", "compare", 30., crate::compare_mode::picking(&self.doc, cx), cx).tooltip("Compare history entries").map(|d| crate::ui_script::mark(d, || "button:Compare history entries".into())).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         if crate::repair_mode::picking(&this.doc, cx) {
                             crate::repair_mode::toggle_picking(&this.doc, cx);
                         }
@@ -1395,14 +1418,14 @@ impl Render for HistoryPanel {
                     // Live rp-900/901: "Repair" (Part Studios): pick a history entry to repair from.
                     .when(repair_here, |d| {
                         let doc = self.doc.clone();
-                        d.child(crate::ui::icon_button("hist-repair", "repair", 30., repair_picking, cx).tooltip("Repair").on_click(move |_, _, cx| {
+                        d.child(crate::ui::icon_button("hist-repair", "repair", 30., repair_picking, cx).tooltip("Repair").map(|d| crate::ui_script::mark(d, || "button:Repair".into())).on_click(move |_, _, cx| {
                             if crate::compare_mode::picking(&doc, cx) {
                                 crate::compare_mode::toggle_picking(&doc, cx);
                             }
                             crate::repair_mode::toggle_picking(&doc, cx)
                         }))
                     })
-                    .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
+                    .child(crate::ui::icon_button("hist-close", "close", 30., false, cx).tooltip("Close").map(|d| crate::ui_script::mark(d, || "button:Close".into())).on_click(|_, window, cx| window.dispatch_action(Box::new(crate::actions::ToggleVersionGraph), cx))),
             )
             // Live cmp2-901: "Select two history entries to compare."
             .when(crate::compare_mode::picking(&self.doc, cx), |d| {

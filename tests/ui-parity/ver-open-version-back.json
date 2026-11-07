@@ -1,0 +1,27 @@
+{
+ "name": "ver-open-version-back",
+ "about": "open V1, then the workspace row Main: back to the workspace",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Main"
+   }
+  }
+ ]
+}

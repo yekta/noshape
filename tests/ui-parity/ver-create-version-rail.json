@@ -1,0 +1,21 @@
+{
+ "name": "ver-create-version-rail",
+ "about": "the left rail's Create version…: the dialog (Name V2), Create",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  }
+ ]
+}

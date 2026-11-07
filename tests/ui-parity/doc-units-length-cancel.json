@@ -1,0 +1,34 @@
+{
+ "name": "doc-units-length-cancel",
+ "about": "Workspace units: pick Inch, then ✕: nothing changes",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Length default unit",
+    "pick": "Inch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

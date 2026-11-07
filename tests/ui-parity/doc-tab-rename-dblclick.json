@@ -1,0 +1,28 @@
+{
+ "name": "doc-tab-rename-dblclick",
+ "about": "double-click a tab, type a new name, Enter: renamed in place",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Housing"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "docs-row-menu",
+ "about": "right-click a document's row: its menu",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

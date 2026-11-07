@@ -1,0 +1,15 @@
+{
+ "name": "fs-open",
+ "about": "open the Feature Studio tab: the editor with the new studio's text",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Feature Studio batch 1)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  }
+ ]
+}

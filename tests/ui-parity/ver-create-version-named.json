@@ -1,0 +1,35 @@
+{
+ "name": "ver-create-version-named",
+ "about": "Create version…, a name of one's own, Create: the row in Versions and history",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Prototype"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

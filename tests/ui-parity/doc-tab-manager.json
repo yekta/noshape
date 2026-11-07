@@ -1,0 +1,27 @@
+{
+ "name": "doc-tab-manager",
+ "about": "the Tab manager button: the panel; a row opens its tab; × closes it",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close tab manager"
+   }
+  }
+ ]
+}

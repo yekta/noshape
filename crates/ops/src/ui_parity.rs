@@ -50,7 +50,103 @@ fn feature_index(ctx: &mut Ctx, name: &str) -> Result<usize, String> {
 pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), String> {
     let _ = std::fs::remove_file(path);
     call(ctx, "document_create", json!({ "path": path.to_str().ok_or("path")?, "length_unit": start["units"].as_str().unwrap_or("mm") }))?;
-    for (k, f) in start["features"].as_array().into_iter().flatten().enumerate() {
+    add_features(ctx, &start["features"])?;
+    // The Part Studio's configuration inputs (README "### start"): a List's rows, the first its default.
+    for (k, input) in start["configuration"].as_array().into_iter().flatten().enumerate() {
+        let what = |e: String| format!("configuration input {k}: {e}");
+        if input["type"] != "list" {
+            return Err(what("only List inputs".into()));
+        }
+        let name = input["name"].as_str().ok_or_else(|| what("no name".into()))?;
+        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": name })).map_err(what)?;
+        for (r, row) in input["rows"].as_array().into_iter().flatten().filter_map(Value::as_str).enumerate() {
+            if r == 0 {
+                call(ctx, "config_edit_option", json!({ "tab": "Part Studio 1", "input": name, "option": "Default", "name": row })).map_err(what)?;
+            } else {
+                call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": name, "name": row })).map_err(what)?;
+            }
+        }
+    }
+    // Live's runner names an assembly after the start ("start pin-block asm").
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
+    let asm_tab = format!("start {stem} asm");
+    if let Some(asm) = start.get("assembly") {
+        build_assembly(ctx, asm)?;
+        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": asm_tab }))?;
+    }
+    // A Feature Studio (README "### start": a custom table's defineTable, a custom feature), committed.
+    if let Some(fs) = start.get("feature_studio") {
+        let name = fs["name"].as_str().unwrap_or("Feature Studio 1");
+        let source = fs["source"].as_str().ok_or("feature_studio: its source")?;
+        call(ctx, "tab_create", json!({ "kind": "featurestudio", "name": name }))?;
+        call(ctx, "featurestudio_edit", json!({ "tab": name, "source": source }))?;
+        call(ctx, "featurestudio_commit", json!({ "tab": name }))?;
+    }
+    // A whole document's tabs after Part Studio 1 and Assembly 1 (README "Documents, tabs and preferences"): tabs by
+    // kind and name, a folder with the tabs in it.
+    for t in start["tabs"].as_array().into_iter().flatten() {
+        build_tab(ctx, t, None)?;
+    }
+    // (The run opens on Part Studio 1, where the versions' features go too.)
+    if start["tabs"].as_array().is_some_and(|t| !t.is_empty()) {
+        call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
+    }
+    // Versions (README "Versions and history"): each made after what comes before it, then its own `features` in Main.
+    for v in start["versions"].as_array().into_iter().flatten() {
+        let name = v["name"].as_str().ok_or_else(|| format!("a start version without a name: {v}"))?;
+        call(ctx, "history_create_version", json!({ "name": name })).map_err(|e| format!("start version {name}: {e}"))?;
+        add_features(ctx, &v["features"])?;
+    }
+    // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
+    if let Some(d) = start.get("drawing") {
+        let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
+        let suggested = d["views"].as_str() == Some("suggested");
+        // A part's drawing, or (`"assembly": true`) the start's assembly's.
+        let made = if d["assembly"] == true {
+            call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
+        } else {
+            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
+        };
+        made.map_err(|e| format!("start drawing: {e}"))?;
+    }
+    Ok(())
+}
+
+/// A start's tab (`{"kind": "partstudio" | "assembly" | "variablestudio" | "featurestudio" | "folder", "name"}`, a
+/// folder's own `tabs` inside it), at the end of the tab bar or of `folder`.
+fn build_tab(ctx: &mut Ctx, t: &Value, folder: Option<&str>) -> Result<(), String> {
+    let name = t["name"].as_str().ok_or_else(|| format!("a start tab without a name: {t}"))?;
+    let what = |e: String| format!("start tab {name}: {e}");
+    match t["kind"].as_str().unwrap_or("partstudio") {
+        "folder" => {
+            let mut args = json!({ "name": name });
+            if let Some(f) = folder {
+                args["folder"] = json!(f);
+            }
+            call(ctx, "tab_folder_create", args).map_err(what)?;
+            for inner in t["tabs"].as_array().into_iter().flatten() {
+                build_tab(ctx, inner, Some(name))?;
+            }
+        }
+        kind => {
+            call(ctx, "tab_create", json!({ "kind": kind, "name": name })).map_err(what)?;
+            // A Variable Studio's variables: `{"name", "value", "kind"?, "description"?}`.
+            for v in t["variables"].as_array().into_iter().flatten() {
+                let mut args = v.clone();
+                args["tab"] = json!(name);
+                call(ctx, "variable_create", args).map_err(what)?;
+            }
+            if let Some(f) = folder {
+                call(ctx, "tab_move", json!({ "tab": name, "folder": f })).map_err(what)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A start's features (README "### start"), in Part Studio 1 at the end of its list.
+fn add_features(ctx: &mut Ctx, features: &Value) -> Result<(), String> {
+    for (k, f) in features.as_array().into_iter().flatten().enumerate() {
         let what = |e: String| format!("feature {k}: {e}");
         if f["op"] == "reorder" {
             let to = feature_index(ctx, f["before"].as_str().unwrap_or_default()).map_err(what)?;
@@ -88,49 +184,6 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
             }
             call(ctx, "feature_add", args).map_err(what)?;
         }
-    }
-    // The Part Studio's configuration inputs (README "### start"): a List's rows, the first its default.
-    for (k, input) in start["configuration"].as_array().into_iter().flatten().enumerate() {
-        let what = |e: String| format!("configuration input {k}: {e}");
-        if input["type"] != "list" {
-            return Err(what("only List inputs".into()));
-        }
-        let name = input["name"].as_str().ok_or_else(|| what("no name".into()))?;
-        call(ctx, "config_add_input", json!({ "tab": "Part Studio 1", "kind": "list", "name": name })).map_err(what)?;
-        for (r, row) in input["rows"].as_array().into_iter().flatten().filter_map(Value::as_str).enumerate() {
-            if r == 0 {
-                call(ctx, "config_edit_option", json!({ "tab": "Part Studio 1", "input": name, "option": "Default", "name": row })).map_err(what)?;
-            } else {
-                call(ctx, "config_add_option", json!({ "tab": "Part Studio 1", "input": name, "name": row })).map_err(what)?;
-            }
-        }
-    }
-    // Live's runner names an assembly after the start ("start pin-block asm").
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("start");
-    let asm_tab = format!("start {stem} asm");
-    if let Some(asm) = start.get("assembly") {
-        build_assembly(ctx, asm)?;
-        call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": asm_tab }))?;
-    }
-    // A Feature Studio (README "### start": a custom table's defineTable, a custom feature), committed.
-    if let Some(fs) = start.get("feature_studio") {
-        let name = fs["name"].as_str().unwrap_or("Feature Studio 1");
-        let source = fs["source"].as_str().ok_or("feature_studio: its source")?;
-        call(ctx, "tab_create", json!({ "kind": "featurestudio", "name": name }))?;
-        call(ctx, "featurestudio_edit", json!({ "tab": name, "source": source }))?;
-        call(ctx, "featurestudio_commit", json!({ "tab": name }))?;
-    }
-    // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
-    if let Some(d) = start.get("drawing") {
-        let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
-        let suggested = d["views"].as_str() == Some("suggested");
-        // A part's drawing, or (`"assembly": true`) the start's assembly's.
-        let made = if d["assembly"] == true {
-            call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
-        } else {
-            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
-        };
-        made.map_err(|e| format!("start drawing: {e}"))?;
     }
     Ok(())
 }
@@ -222,6 +275,29 @@ mod tests {
         let v = 40.0 * 40.0 * 20.0 - std::f64::consts::PI * 25.0 * 20.0;
         assert!((mp["volume"].as_f64().unwrap() - v).abs() < 1.0, "{mp}");
         call(&mut ctx, "tab_activate", json!({ "tab": "start pin asm" })).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A whole document's start (README "Documents, tabs and preferences"): Part Studio 1 and Assembly 1, then the
+    /// start's tabs in order, a folder holding its own.
+    #[test]
+    fn a_whole_document_start_builds() {
+        let start = json!({ "units": "mm", "features": [], "tabs": [
+            { "kind": "partstudio", "name": "Part Studio 2" },
+            { "kind": "variablestudio", "name": "Variable Studio 1" },
+            { "kind": "featurestudio", "name": "Feature Studio 1" },
+            { "kind": "folder", "name": "Folder 1", "tabs": [{ "kind": "partstudio", "name": "Part Studio 3" }] }
+        ] });
+        let dir = std::env::temp_dir().join(format!("noshape-uip-tabs-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("tabs.noshape"), &start).unwrap();
+        let info = call(&mut ctx, "document_info", json!({})).unwrap();
+        let tab = |name: &str| info["tabs"].as_array().unwrap().iter().find(|t| t["name"] == name).cloned().unwrap_or_else(|| panic!("no {name} in {info}"));
+        let names: Vec<&str> = info["tabs"].as_array().unwrap().iter().filter_map(|t| t["name"].as_str()).collect();
+        let at = |n: &str| names.iter().position(|x| *x == n).unwrap_or_else(|| panic!("no {n} in {names:?}"));
+        assert!(at("Part Studio 1") < at("Assembly 1") && at("Assembly 1") < at("Part Studio 2") && at("Part Studio 2") < at("Variable Studio 1") && at("Variable Studio 1") < at("Feature Studio 1"), "{names:?}");
+        assert_eq!(tab("Variable Studio 1")["kind"], "Variable Studio", "{info}");
+        assert_eq!(tab("Part Studio 3")["folder"], "Folder 1", "{info}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

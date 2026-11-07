@@ -1,0 +1,27 @@
+{
+ "name": "docs-row-menu-trash-cancel",
+ "about": "a document's row › Send to trash: the confirmation, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

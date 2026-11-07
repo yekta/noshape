@@ -461,6 +461,17 @@ fn definition_of(src: &str, name: &str) -> Option<Position> {
     None
 }
 
+/// The editor as the ui-parity state records it: the caret (line, column from 0), its line, the line count, whether
+/// the text is the committed one, the notices, the autocomplete list's rows while it is open.
+pub struct FsUiState {
+    pub caret: (u32, u32),
+    pub line: String,
+    pub lines: usize,
+    pub committed: bool,
+    pub notices: usize,
+    pub completion: Option<Vec<String>>,
+}
+
 pub struct FeatureStudioView {
     tab: TabId,
     doc: Entity<DocModel>,
@@ -507,6 +518,30 @@ impl Focusable for FeatureStudioView {
 }
 
 impl FeatureStudioView {
+    /// The ui-parity state of the editor (tests/ui-parity/README.md "Feature Studio").
+    pub fn ui_state(&self, cx: &App) -> FsUiState {
+        let ed = self.editor.read(cx);
+        let text = ed.value().to_string();
+        let caret = ed.cursor_position();
+        let menu = ed.completion_menu_state();
+        FsUiState {
+            caret: (caret.line, caret.character),
+            line: text.lines().nth(caret.line as usize).unwrap_or("").to_string(),
+            lines: text.lines().count(),
+            committed: text == self.synced,
+            notices: self.notices.len(),
+            completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
+        }
+    }
+
+    /// Every toolbar control repainted (a cached slice): the ui-parity driver's marks.
+    pub fn ui_redraw(&mut self, cx: &mut Context<Self>) {
+        if let Some(t) = &self.toolbar {
+            t.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
+    }
+
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let source = text_of(&doc, tab, cx).unwrap_or_default();
         let editor = cx.new(|cx| {
@@ -1126,7 +1161,7 @@ impl FeatureStudioView {
                     .child(div().text_size(px(14.)).child("Commit"))
                     // Live document/70: #8aa8d7 = the primary blue at 50%.
                     .when(clean, |b| b.opacity(0.5))
-                    .tooltip("Commit Feature Studio (cmd+s/ctrl+s)")
+                    .tooltip("Commit Feature Studio (cmd+s/ctrl+s)").map(|d| crate::ui_script::mark(d, || "button:Commit Feature Studio".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit(cx))),
             )
             .child(div().w(px(1.)).h(px(30.)).bg(rgb(0x0e3f8c)).when(clean, |d| d.opacity(0.5)))
@@ -1409,7 +1444,7 @@ impl FeatureStudioView {
                 crate::ui::split_tool_button("fs-undo", "undo", false, cx)
                     .opacity(if can_undo { 1. } else { 0.4 })
                     .when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed))
-                    .tooltip("Undo (cmd+z/ctrl+z)")
+                    .tooltip("Undo (cmd+z/ctrl+z)").map(|d| crate::ui_script::mark(d, || "button:Undo".into()))
                     .on_click(move |_, _, cx| {
                         if can_undo {
                             d.update(cx, |d, cx| d.undo(cx));
@@ -1433,7 +1468,7 @@ impl FeatureStudioView {
                 area = area.child(
                     cell(SharedString::from(format!("fs-snip-{i}")))
                         .w(px(50.))
-                        .tooltip(crate::ui::tooltip(*tip))
+                        .tooltip(crate::ui::tooltip(*tip)).map(|d| crate::ui_script::mark(d, || format!("button:{}", tip.split(" (").next().unwrap_or(tip))))
                         // Live document/70: Onshape's 20 px menu icon (letter / glyph and
                         // the ▸≡ list), then the chevron.
                         .child(crate::assets::icon(letter, 20., cx))
@@ -1450,7 +1485,7 @@ impl FeatureStudioView {
                     cell("fs-import".into())
                         .w(px(32.))
                         .when(self.import_panel.is_some(), |d| d.bg(pal.border))
-                        .tooltip(crate::ui::tooltip("Import"))
+                        .tooltip(crate::ui::tooltip("Import")).map(|d| crate::ui_script::mark(d, || "button:Import".into()))
                         .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
                         .child(probe(&self.import_anchor))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
@@ -1458,7 +1493,7 @@ impl FeatureStudioView {
                 .child(
                     cell("fs-format".into())
                         .w(px(32.))
-                        .tooltip(crate::ui::tooltip("Format Feature Studio"))
+                        .tooltip(crate::ui::tooltip("Format Feature Studio")).map(|d| crate::ui_script::mark(d, || "button:Format Feature Studio".into()))
                         .child(os::glyph(os::GLYPH_BRUSH, 20., pal.text))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.format(window, cx))),
                 )
@@ -1497,7 +1532,7 @@ impl FeatureStudioView {
                         cell("fs-import".into())
                             .w(px(32.))
                             .when(self.import_panel.is_some(), |d| d.bg(pal.border))
-                            .tooltip(crate::ui::tooltip("Import"))
+                            .tooltip(crate::ui::tooltip("Import")).map(|d| crate::ui_script::mark(d, || "button:Import".into()))
                             .child(os::glyph(os::GLYPH_FS_IMPORT, 20., pal.text))
                             .child(probe(&self.import_anchor))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.toggle_import(window, cx))),
@@ -1533,7 +1568,7 @@ impl FeatureStudioView {
             .child(crate::ui::tool_separator())
             .child(
                 cell("fs-new".into())
-                    .tooltip(crate::ui::tooltip("New feature"))
+                    .tooltip(crate::ui::tooltip("New feature")).map(|d| crate::ui_script::mark(d, || "button:New feature".into()))
                     .child(os::glyph(os::GLYPH_NEW_FEATURE, 20., pal.text))
                     .when(stage >= 2, |d| d.child(div().relative().text_size(px(14.)).text_color(pal.text).child("New feature").child(probe(&self.tb.new_label))))
                     .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_snippet(NEW_FEATURE, window, cx))),
@@ -1611,7 +1646,7 @@ impl FeatureStudioView {
                 cell("fs-outline-btn".into())
                     .w(px(149.))
                     .when(self.outline.is_some(), |d| d.bg(pal.border))
-                    .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)"))
+                    .tooltip(crate::ui::tooltip("Module outline (cmd+shift+O / ctrl+shift+O)")).map(|d| crate::ui_script::mark(d, || "button:Module outline".into()))
                     .child(os::glyph(os::GLYPH_OUTLINE, 20., pal.text))
                     .child(div().flex_1().min_w_0().truncate().text_size(px(14.)).text_color(pal.text).child(current.unwrap_or_else(|| "Module outline".into())))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., pal.text))
@@ -1622,7 +1657,7 @@ impl FeatureStudioView {
             .child(
                 cell("fs-back".into())
                     .opacity(if can_back { 1. } else { 0.4 })
-                    .tooltip(crate::ui::tooltip("Back reference (ctrl+[/cmd+[)"))
+                    .tooltip(crate::ui::tooltip("Back reference (ctrl+[/cmd+[)")).map(|d| crate::ui_script::mark(d, || "button:Back reference".into()))
                     .child(os::glyph(os::GLYPH_ARROW_LEFT, 20., pal.text_muted))
                     .child(
                         div().id("fs-back-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
@@ -1635,7 +1670,7 @@ impl FeatureStudioView {
             .child(
                 cell("fs-forward".into())
                     .opacity(if can_fwd { 1. } else { 0.4 })
-                    .tooltip(crate::ui::tooltip("Forward reference (ctrl+]/cmd+])"))
+                    .tooltip(crate::ui::tooltip("Forward reference (ctrl+]/cmd+])")).map(|d| crate::ui_script::mark(d, || "button:Forward reference".into()))
                     .child(os::glyph(os::GLYPH_ARROW_RIGHT, 20., pal.text_muted))
                     .child(
                         div().id("fs-forward-list").child(os::glyph(os::GLYPH_CHEVRON_DOWN, 12., pal.text_muted)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| {
@@ -1696,7 +1731,7 @@ impl Render for FeatureStudioView {
                         // Live document/70 (Ace): 13 px monospace on 16 px lines, the first
                         // line right under the toolbar. The kit editor keeps an 8 px top
                         // padding (its size's), clipped off here.
-                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
+                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().map(|d| crate::ui_script::mark(d, || "editor:code".into())).child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
                     )
                     .children(self.render_profile(cx))
                     // The diagnostic tooltip follows the pointer (re-render only

@@ -1,0 +1,33 @@
+{
+ "name": "ver-version-menu-branch",
+ "about": "V1 › Branch to create workspace…: the dialog (B1), Create: the new workspace opens",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Branch to create workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  }
+ ]
+}

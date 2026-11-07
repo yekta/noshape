@@ -1,0 +1,15 @@
+{
+ "name": "docs-row-open-dblclick",
+ "about": "double-click a document's row: it opens",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  }
+ ]
+}

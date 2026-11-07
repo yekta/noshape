@@ -1,0 +1,1580 @@
+{
+ "area": "feature-studio",
+ "generated": "Sat Nov  7 07:36:38 PM UTC 2026",
+ "items": [
+  {
+   "id": "fs-create-tab",
+   "category": "entry point",
+   "name": "Create Feature Studio",
+   "where": "tab bar + menu",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:281",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Feature Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-default-template",
+   "category": "editor",
+   "name": "New studio template (FeatureScript <ver>; import common.fs) with caret on line 4",
+   "where": "new Feature Studio",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1572",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-rename",
+   "category": "menu",
+   "name": "Rename",
+   "where": "Feature Studio tab right-click",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-delete",
+   "category": "menu",
+   "name": "Delete",
+   "where": "Feature Studio tab right-click",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-open-new-browser-tab",
+   "category": "menu",
+   "name": "Open in new browser tab",
+   "where": "Feature Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-properties",
+   "category": "menu",
+   "name": "Properties… (Name, Description, Category)",
+   "where": "Feature Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29643",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-duplicate",
+   "category": "menu",
+   "name": "Duplicate",
+   "where": "Feature Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Duplicate"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-copy-to-clipboard",
+   "category": "menu",
+   "name": "Copy to clipboard",
+   "where": "Feature Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy to clipboard"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tab-move-to-document",
+   "category": "menu",
+   "name": "Move to document…",
+   "where": "Feature Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1721",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to document…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-versions-history",
+   "category": "toolbar",
+   "name": "Versions and history",
+   "where": "Feature Studio toolbar, first button",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt"
+  },
+  {
+   "id": "fs-tb-undo",
+   "category": "toolbar",
+   "name": "Undo (cmd+z/ctrl+z)",
+   "where": "Feature Studio toolbar",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Undo"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-redo",
+   "category": "toolbar",
+   "name": "Redo (ctrl+y/shift+cmd+z)",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Redo"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-undo-compact",
+   "category": "toolbar",
+   "name": "Undo ▾ (Undo / Redo rows with key chips)",
+   "where": "toolbar at ≤1480 px",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2352"
+  },
+  {
+   "id": "fs-tb-new-feature",
+   "category": "toolbar",
+   "name": "New feature (inserts defineFeature template with placeholders)",
+   "where": "Feature Studio toolbar",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1573",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "New feature"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-feature-parameters",
+   "category": "toolbar",
+   "name": "Feature parameters ▾ (Length … JSON reference parameter, Parameter group)",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-query-functions",
+   "category": "toolbar",
+   "name": "Query functions ▾",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-evaluate-functions",
+   "category": "toolbar",
+   "name": "Evaluate functions ▾",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-math-functions",
+   "category": "toolbar",
+   "name": "Math functions ▾",
+   "where": "Feature Studio toolbar",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-sketch-functions",
+   "category": "toolbar",
+   "name": "Sketch functions ▾",
+   "where": "Feature Studio toolbar",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-operation-functions",
+   "category": "toolbar",
+   "name": "Operation functions ▾",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-snippet-insert-at-caret",
+   "category": "toolbar",
+   "name": "Snippet item inserts at the caret (one undo step)",
+   "where": "any snippet menu item",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2363"
+  },
+  {
+   "id": "fs-tb-snippet-compact",
+   "category": "toolbar",
+   "name": "Compact snippet split button (flat 70-item list, face = last used, remembered)",
+   "where": "toolbar below 1760 px",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2356"
+  },
+  {
+   "id": "fs-tb-import",
+   "category": "toolbar",
+   "name": "Import (opens Import panel)",
+   "where": "Feature Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1599",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-format",
+   "category": "toolbar",
+   "name": "Format Feature Studio (one undo step)",
+   "where": "Feature Studio toolbar brush",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Format Feature Studio"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-import-compact",
+   "category": "toolbar",
+   "name": "Import ▾ (Import, Format Studio)",
+   "where": "toolbar below 1760 px",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2365"
+  },
+  {
+   "id": "fs-tb-commit",
+   "category": "toolbar",
+   "name": "Commit (pale with nothing to commit, blue when dirty)",
+   "where": "Feature Studio toolbar",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1572",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-commit-menu",
+   "category": "toolbar",
+   "name": "Commit ▾ split menu",
+   "where": "Feature Studio toolbar",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/feature-studio-toolbar-menus.txt"
+  },
+  {
+   "id": "fs-tb-search-tools",
+   "category": "toolbar",
+   "name": "Search tools… (alt/⌥ c)",
+   "where": "Feature Studio toolbar",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2093"
+  },
+  {
+   "id": "fs-tb-co-complete",
+   "category": "toolbar",
+   "name": "Co-complete toggle (Onshape Labs, AI)",
+   "where": "Feature Studio toolbar",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:7761"
+  },
+  {
+   "id": "fs-tb-monitor",
+   "category": "toolbar",
+   "name": "Monitor <studio> ▾ split button (Monitor / Profile per Part Studio and Variable Studio)",
+   "where": "Feature Studio toolbar right",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3172"
+  },
+  {
+   "id": "fs-tb-module-outline",
+   "category": "toolbar",
+   "name": "Module outline ▾ (current symbol; Search symbols…; click jumps)",
+   "where": "Feature Studio toolbar right",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Module outline"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-back-reference",
+   "category": "toolbar",
+   "name": "Back reference ← (and ▾ history list, most recent first)",
+   "where": "Feature Studio toolbar right",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Back reference"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-forward-reference",
+   "category": "toolbar",
+   "name": "Forward reference → (and ▾)",
+   "where": "Feature Studio toolbar right",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Forward reference"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-tb-line-column",
+   "category": "toolbar",
+   "name": "Line N , Column N readout",
+   "where": "Feature Studio toolbar right",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1572"
+  },
+  {
+   "id": "fs-tb-collapse-breakpoints",
+   "category": "toolbar",
+   "name": "Toolbar fit-to-width collapse (1500/1580/1760 steps), clipped not wrapped",
+   "where": "narrow window",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2351"
+  },
+  {
+   "id": "fs-ed-typing",
+   "category": "editor",
+   "name": "Type / edit code in the Ace editor (14 px mono, active line, token colours)",
+   "where": "Feature Studio editor",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1572",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ed-gutter-line-numbers",
+   "category": "editor",
+   "name": "Gutter with line numbers, active line cell",
+   "where": "editor gutter",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/feature-studio-editor.txt"
+  },
+  {
+   "id": "fs-ed-fold-arrows",
+   "category": "editor",
+   "name": "Fold arrows ▾ on foldable lines (fold / unfold)",
+   "where": "editor gutter",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1572"
+  },
+  {
+   "id": "fs-ed-error-gutter",
+   "category": "editor",
+   "name": "Error ✕ / warning ⚠ marker in the gutter with tooltip",
+   "where": "editor gutter after Commit",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1574",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "this is not featurescript"
+     },
+     {
+      "do": "key",
+      "key": "mod+s"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ed-error-squiggle",
+   "category": "editor",
+   "name": "Red / orange wavy underline with hover tooltip",
+   "where": "editor text",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6668"
+  },
+  {
+   "id": "fs-ed-parse-notices",
+   "category": "editor",
+   "name": "Parse / compile notice texts and positions",
+   "where": "after Commit",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1575",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "this is not featurescript"
+     },
+     {
+      "do": "key",
+      "key": "mod+s"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ed-new-feature-placeholders",
+   "category": "editor",
+   "name": "Boxed placeholders in the New feature template",
+   "where": "editor after New feature",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1573"
+  },
+  {
+   "id": "fs-ed-ctrl-click-definition",
+   "category": "editor",
+   "name": "Ctrl/⌘+click a symbol: go to definition (same studio)",
+   "where": "editor",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt"
+  },
+  {
+   "id": "fs-ed-hold-ctrl-hover",
+   "category": "editor",
+   "name": "Hold Ctrl/⌘ over identifier/import: pointer cursor (Go to definition)",
+   "where": "editor",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:34759"
+  },
+  {
+   "id": "fs-ed-ctrl-click-std",
+   "category": "editor",
+   "name": "Ctrl+click a std symbol opens std source read-only in a new browser tab",
+   "where": "editor",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt"
+  },
+  {
+   "id": "fs-ed-undo-granularity",
+   "category": "editor",
+   "name": "Undo steps: New feature / snippet / Format each one step; typing one step",
+   "where": "editor Ctrl+Z",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "New feature"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+z"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Format Feature Studio"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+z"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ed-dark-theme",
+   "category": "editor",
+   "name": "Dark theme: Ace twilight colours",
+   "where": "Preferences dark theme",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3601"
+  },
+  {
+   "id": "fs-ed-profile-stale",
+   "category": "editor",
+   "name": "Uncommitted edits grey out profile bars",
+   "where": "editor while profiling",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3192"
+  },
+  {
+   "id": "fs-ac-open-first-letter",
+   "category": "autocomplete",
+   "name": "List opens on the first identifier letter",
+   "where": "editor typing",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20373",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ac-fuzzy-ranking",
+   "category": "autocomplete",
+   "name": "Fuzzy subsequence match, prefix first, matched letters highlighted",
+   "where": "autocomplete list",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20376",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ac-tie-order",
+   "category": "autocomplete",
+   "name": "Equal-score rows keep source order",
+   "where": "autocomplete list",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:23725"
+  },
+  {
+   "id": "fs-ac-list-look",
+   "category": "autocomplete",
+   "name": "9 rows × 20 px, 300 px wide, kind column (function/enum/predicate)",
+   "where": "autocomplete list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20374"
+  },
+  {
+   "id": "fs-ac-doc-tooltip",
+   "category": "autocomplete",
+   "name": "Doc tooltip for highlighted row (signature, description, PARAMETER INFO)",
+   "where": "right of the list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20380"
+  },
+  {
+   "id": "fs-ac-enter-accepts",
+   "category": "autocomplete",
+   "name": "Enter inserts the full call snippet",
+   "where": "autocomplete list",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20381",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ac-click-accepts",
+   "category": "autocomplete",
+   "name": "Click a row inserts it",
+   "where": "autocomplete list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20388"
+  },
+  {
+   "id": "fs-ac-tab-not-accept",
+   "category": "autocomplete",
+   "name": "Tab does not accept (closes list, indents)",
+   "where": "autocomplete list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20389"
+  },
+  {
+   "id": "fs-ac-esc",
+   "category": "autocomplete",
+   "name": "Esc closes the list only (Dismiss autocomplete)",
+   "where": "autocomplete list",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20403",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-ac-ctrl-space-unbound",
+   "category": "autocomplete",
+   "name": "Ctrl+Space does nothing",
+   "where": "editor",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:20391"
+  },
+  {
+   "id": "fs-ac-backspace-refilter",
+   "category": "autocomplete",
+   "name": "Backspace refilters; empty word closes the list",
+   "where": "autocomplete list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:22379"
+  },
+  {
+   "id": "fs-ac-enum-members",
+   "category": "autocomplete",
+   "name": "Enum. lists members in declaration order; map. lists nothing",
+   "where": "after a dot",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:20397"
+  },
+  {
+   "id": "fs-ac-enum-name-insert",
+   "category": "autocomplete",
+   "name": "Enum name inserts just the name",
+   "where": "autocomplete",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:22372"
+  },
+  {
+   "id": "fs-ac-overloads",
+   "category": "autocomplete",
+   "name": "One row per overload",
+   "where": "autocomplete list",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:22325"
+  },
+  {
+   "id": "fs-ac-no-list-in-string-comment",
+   "category": "autocomplete",
+   "name": "No list inside strings or comments",
+   "where": "editor",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:22391"
+  },
+  {
+   "id": "fs-ac-placeholder-tab",
+   "category": "autocomplete",
+   "name": "Tab to next placeholder; after last, caret after ';'",
+   "where": "inserted snippet",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:22315"
+  },
+  {
+   "id": "fs-ac-placeholder-shift-tab",
+   "category": "autocomplete",
+   "name": "Shift+Tab to previous placeholder; outdent after session",
+   "where": "inserted snippet",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:23716"
+  },
+  {
+   "id": "fs-ac-reindent",
+   "category": "autocomplete",
+   "name": "Multi-line snippets re-indented to the current line",
+   "where": "inserted snippet",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:22318"
+  },
+  {
+   "id": "fs-imp-panel",
+   "category": "dialog",
+   "name": "Import panel (300×530, Current document | Other documents)",
+   "where": "toolbar Import",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1599",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Import"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-imp-subtabs",
+   "category": "dialog",
+   "name": "Sub-tabs Part Studios | Files | Feature Studios | Variable Studios + search",
+   "where": "Import panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1602"
+  },
+  {
+   "id": "fs-imp-pick-inserts",
+   "category": "dialog",
+   "name": "Pick inserts an import line after the last import (path, version id)",
+   "where": "Import panel row click",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1599"
+  },
+  {
+   "id": "fs-imp-stays-open",
+   "category": "dialog",
+   "name": "Panel stays open for several picks",
+   "where": "Import panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1599"
+  },
+  {
+   "id": "fs-imp-other-doc-version",
+   "category": "dialog",
+   "name": "Other documents: categories, document at its latest version, Create version… / Version graph",
+   "where": "Import panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1654"
+  },
+  {
+   "id": "fs-imp-close",
+   "category": "dialog",
+   "name": "✕ closes; Esc only with focus inside; re-click doesn't toggle",
+   "where": "Import panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1924"
+  },
+  {
+   "id": "fs-notices-navbar-icon",
+   "category": "panel",
+   "name": "{ } / red {!} FeatureScript notices navbar toggle",
+   "where": "document navbar",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1574"
+  },
+  {
+   "id": "fs-notices-panel",
+   "category": "panel",
+   "name": "FeatureScript notices bottom panel (sections per studio, ⌄ collapse, stack rows)",
+   "where": "{!} click",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1574"
+  },
+  {
+   "id": "fs-notices-filter",
+   "category": "panel",
+   "name": "Filter notices box",
+   "where": "notices panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/featurescript-notices-panel.txt"
+  },
+  {
+   "id": "fs-notices-filter-button",
+   "category": "panel",
+   "name": "Filter FeatureScript notices (filter icon)",
+   "where": "notices panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/featurescript-notices-panel.txt"
+  },
+  {
+   "id": "fs-notices-expand-stack",
+   "category": "panel",
+   "name": "Expand a notice to its stack (line:col + module)",
+   "where": "notices panel row",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-notices-panel-style.txt"
+  },
+  {
+   "id": "fs-notices-monitor-dropdown",
+   "category": "panel",
+   "name": "Monitor ▾ per Part Studio section",
+   "where": "notices panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:15679"
+  },
+  {
+   "id": "fs-notices-println",
+   "category": "panel",
+   "name": "println / debug output and Result: Regeneration complete",
+   "where": "notices panel (monitored)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:15679"
+  },
+  {
+   "id": "fs-notices-close",
+   "category": "panel",
+   "name": "✕ / {!} closes; Esc and outside clicks do not",
+   "where": "notices panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1923"
+  },
+  {
+   "id": "fs-monitor-start",
+   "category": "menu",
+   "name": "Monitor <Part Studio>",
+   "where": "Monitor ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3172"
+  },
+  {
+   "id": "fs-profile-start",
+   "category": "menu",
+   "name": "Profile <Part Studio / Variable Studio>",
+   "where": "Monitor ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3172"
+  },
+  {
+   "id": "fs-profile-stop",
+   "category": "toolbar",
+   "name": "Click active Profiling/Monitoring button to stop",
+   "where": "Monitor split button",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3180"
+  },
+  {
+   "id": "fs-profile-total-badge",
+   "category": "editor",
+   "name": "Total time badge with hover detail",
+   "where": "editor top-left while profiling",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3182"
+  },
+  {
+   "id": "fs-profile-line-bars",
+   "category": "editor",
+   "name": "Per-line heat bars, hover shows ms",
+   "where": "editor gutter while profiling",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3186"
+  },
+  {
+   "id": "fs-profile-refresh-on-commit",
+   "category": "other",
+   "name": "Commit refreshes the profile",
+   "where": "while profiling",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3193"
+  },
+  {
+   "id": "fs-commit-regenerates",
+   "category": "other",
+   "name": "Commit regenerates Part Studios using the features (errors reach feature rows)",
+   "where": "Commit",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6667"
+  },
+  {
+   "id": "fs-module-outline-search",
+   "category": "dialog",
+   "name": "Module outline search: typing filters, click jumps (adds back entry), Esc closes",
+   "where": "Module outline ▾",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt"
+  },
+  {
+   "id": "fs-key-commit",
+   "category": "shortcut",
+   "name": "ctrl/cmd s — Commit",
+   "where": "editor",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+s"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-commit-all",
+   "category": "shortcut",
+   "name": "ctrl/cmd shift s — Commit all",
+   "where": "editor",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "fs-key-dismiss-autocomplete",
+   "category": "shortcut",
+   "name": "escape — Dismiss autocomplete",
+   "where": "editor",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-back-reference",
+   "category": "shortcut",
+   "name": "ctrl/cmd [ — Back reference",
+   "where": "editor",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+["
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-forward-reference",
+   "category": "shortcut",
+   "name": "ctrl/cmd ] — Forward reference",
+   "where": "editor",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt"
+  },
+  {
+   "id": "fs-key-top-level-symbols",
+   "category": "shortcut",
+   "name": "ctrl/cmd shift o — Top level symbols dropdown",
+   "where": "editor",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+shift+o"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-undo-redo",
+   "category": "shortcut",
+   "name": "ctrl/cmd z, ctrl y / shift cmd z — Undo / Redo",
+   "where": "editor",
+   "freq": 1,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+z"
+     }
+    ],
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+y"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-fs-search",
+   "category": "shortcut",
+   "name": "ctrl/cmd shift f — FeatureScript search pane",
+   "where": "any tab",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:34751",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+shift+f"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "fs-key-shortcuts-modal-tab",
+   "category": "shortcut",
+   "name": "Feature Studio tab in Shift+/ Keyboard shortcuts modal",
+   "where": "Shift+/",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:12286"
+  },
+  {
+   "id": "fs-search-pane",
+   "category": "panel",
+   "name": "FeatureScript Find pane: Find text, Match case, Regex, Feature Studio name filter, Find; Esc closes",
+   "where": "Ctrl+Shift+F / navbar Search Feature Studios",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:36977"
+  },
+  {
+   "id": "fs-search-navbar-button",
+   "category": "entry point",
+   "name": "Search Feature Studios (Ctrl-Shift-f / ⌘-Shift+f)",
+   "where": "document navbar",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:34755"
+  },
+  {
+   "id": "fs-compare",
+   "category": "other",
+   "name": "Feature Studio compare: two Ace editors side by side with diff colours",
+   "where": "Versions and history › Compare",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4723"
+  },
+  {
+   "id": "fs-view-version-readonly",
+   "category": "other",
+   "name": "Viewing a version: read-only editor with banner",
+   "where": "Versions and history / std tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/fs-nav-shortcuts.txt"
+  },
+  {
+   "id": "fs-publish-featurescript",
+   "category": "dialog",
+   "name": "Publish FeatureScript… (Publish custom features and tables)",
+   "where": "Versions and history version menu",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:70"
+  },
+  {
+   "id": "fs-tables-panel",
+   "category": "panel",
+   "name": "Custom tables panel (right strip): collapsible table sections, grid",
+   "where": "Part Studio right strip › Custom tables",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1626"
+  },
+  {
+   "id": "fs-tables-selector",
+   "category": "panel",
+   "name": "Table selector ▾ (My custom tables / Workspace custom tables)",
+   "where": "Custom tables panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1643"
+  },
+  {
+   "id": "fs-tables-switch-to-studio",
+   "category": "menu",
+   "name": "Switch to <Feature Studio>",
+   "where": "Custom tables panel ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1628"
+  },
+  {
+   "id": "fs-tables-copy-table",
+   "category": "menu",
+   "name": "Copy table",
+   "where": "table section ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1629"
+  },
+  {
+   "id": "fs-tables-row-hover",
+   "category": "panel",
+   "name": "Row hover pre-highlights its entity",
+   "where": "Custom tables row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1642"
+  },
+  {
+   "id": "fs-tables-cell-tooltips",
+   "category": "panel",
+   "name": "Error cell / info icon tooltips; table errors message",
+   "where": "Custom tables cells",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1638"
+  },
+  {
+   "id": "fs-tables-add",
+   "category": "dialog",
+   "name": "Add custom tables popup (Current document at a version, Other documents)",
+   "where": "Custom tables footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1644"
+  },
+  {
+   "id": "fs-ps-ws-custom-features-menu",
+   "category": "entry point",
+   "name": "Custom features in this workspace ▾ (initials badge + name)",
+   "where": "Part Studio toolbar right end",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:20960"
+  },
+  {
+   "id": "fs-ps-ws-feature-tooltip",
+   "category": "entry point",
+   "name": "Entry tooltip: name + \"Feature from current workspace\"",
+   "where": "Custom features in this workspace ▾ row hover",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6659"
+  },
+  {
+   "id": "fs-ps-insert-custom-feature",
+   "category": "entry point",
+   "name": "Insert a custom feature (dialog with its parameters)",
+   "where": "Custom features in this workspace ▾ item",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:6662"
+  },
+  {
+   "id": "fs-ps-custom-feature-error",
+   "category": "entry point",
+   "name": "Custom feature row red + tooltip after a broken commit",
+   "where": "Part Studio feature list",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:6672"
+  },
+  {
+   "id": "fs-ps-add-custom-features",
+   "category": "entry point",
+   "name": "Add custom features (⊞) dialog",
+   "where": "Part Studio toolbar",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:37225"
+  },
+  {
+   "id": "fs-ps-acf-current-document",
+   "category": "dialog",
+   "name": "Current document tab: versions only, Create a version link, Search features, sort",
+   "where": "Add custom features dialog",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:37248"
+  },
+  {
+   "id": "fs-ps-acf-click-adds",
+   "category": "dialog",
+   "name": "Click a feature row adds it to the toolbar (split button ▾)",
+   "where": "Add custom features dialog",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:37255"
+  },
+  {
+   "id": "fs-ps-acf-other-documents",
+   "category": "dialog",
+   "name": "Other documents: Owned by me, Recently opened, Created by me",
+   "where": "Add custom features dialog",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:37232"
+  },
+  {
+   "id": "fs-ps-acf-public-samples",
+   "category": "dialog",
+   "name": "FeatureScript samples, Community spotlight, Shared with me, Public",
+   "where": "Add custom features dialog",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:37234"
+  },
+  {
+   "id": "fs-ps-acf-search-url",
+   "category": "dialog",
+   "name": "Search or paste URL (Enter runs)",
+   "where": "Add custom features dialog",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:37243"
+  },
+  {
+   "id": "fs-ps-acf-close",
+   "category": "dialog",
+   "name": "✕ closes; Esc and graphics click don't",
+   "where": "Add custom features dialog",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:37262"
+  },
+  {
+   "id": "fs-ps-acf-learn",
+   "category": "dialog",
+   "name": "Learn about FeatureScript + ?",
+   "where": "Add custom features dialog footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:37230"
+  },
+  {
+   "id": "fs-ps-added-tool-menu",
+   "category": "menu",
+   "name": "Sort custom features · Update… · Update all… · Open linked document · Remove · Customize toolbar… · Hide \"Search tools\"",
+   "where": "added custom feature toolbar button right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:37258"
+  },
+  {
+   "id": "fs-ps-show-code",
+   "category": "entry point",
+   "name": "Show code (read-only FeatureScript of the Part Studio)",
+   "where": "Part Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1870"
+  }
+ ],
+ "gaps": [
+  "Up / Down / PageUp / PageDown in the autocomplete list (not exercised).",
+  "Commit ▾ dropdown contents (Commit all? other items) — the dump's 'commit' menu was empty.",
+  "Ace find / replace in the editor (Ctrl+F, Ctrl+H, F3/Shift+F3, the search box look, regex/case toggles).",
+  "Go to line (Ctrl+L) and other Ace default keys: toggle comment (Ctrl+/), duplicate line, move line Alt+Up/Down, select next occurrence, multi-cursor.",
+  "Auto-closing brackets/quotes and auto-indent on Enter (and outdent on '}').",
+  "Folding behaviour: click a fold arrow, folded-line placeholder, fold-all keys.",
+  "Editor right-click context menu (Onshape menu or browser native?).",
+  "Clicking a notice row / location in the FeatureScript notices panel: does it jump to the line?",
+  "Notices filter icon dropdown options (Filter FeatureScript notices).",
+  "Notices panel resize (drag the split) and persistence.",
+  "Search tools… inside a Feature Studio: what it lists and does.",
+  "FeatureScript Find pane results: list look, click-to-open, Feature Studio name filter behaviour.",
+  "Leaving a Feature Studio tab or reloading with uncommitted changes (auto-commit, prompt, or lost?).",
+  "Commit with a compile error: does it still commit; Part Studio feature list when the studio fails.",
+  "Monitor: typed-value typecheck errors shown in a monitored Part Studio (look and texts).",
+  "Part Studio custom feature row right-click (e.g. Open Feature Studio / Edit in Feature Studio) and the custom feature dialog's help/? link.",
+  "Hover tooltips on identifiers in the editor (doc tooltip outside autocomplete).",
+  "Bracket matching highlight and selected-word occurrence highlight.",
+  "Undo after Commit (does undo cross the commit) and Versions and history entries for commits.",
+  "Feature Studio tab with a very large file: scrolling, minimap (none?), horizontal scroll.",
+  "Copy / paste / drag-and-drop text behaviours and indentation on paste.",
+  "Co-complete suggestion UI (cloud; not observed even when enabled)."
+ ],
+ "about": "Feature Studio and the FeatureScript editor: what live has (behaviours.md, live/dom), studios 2026-11-07; coverage: tools/ui-parity/coverage_feature_studio.py"
+}

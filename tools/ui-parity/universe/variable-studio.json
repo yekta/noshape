@@ -1,0 +1,1334 @@
+{
+ "area": "variable-studio",
+ "generated": "Sat Nov  7 07:36:38 PM UTC 2026",
+ "items": [
+  {
+   "id": "vs-create-tab",
+   "category": "entry point",
+   "name": "Create Variable Studio",
+   "where": "tab bar + menu › Create Variable Studio",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:281",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert new tab"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Variable Studio"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-create-from-panel",
+   "category": "entry point",
+   "name": "Create Variable Studio",
+   "where": "Part Studio/Assembly Variable table footer split ▴ › Create Variable Studio",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-tab-rename",
+   "category": "menu",
+   "name": "Rename",
+   "where": "Variable Studio tab right-click",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29615",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-delete",
+   "category": "menu",
+   "name": "Delete",
+   "where": "Variable Studio tab right-click (immediate, no confirm)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1565",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-open-new-browser-tab",
+   "category": "menu",
+   "name": "Open in new browser tab",
+   "where": "Variable Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29615",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-properties",
+   "category": "menu",
+   "name": "Properties…",
+   "where": "Variable Studio tab right-click (Name, Description, Category, Part number, Revision, State, Title 1–3, Not revision managed)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29643",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-duplicate",
+   "category": "menu",
+   "name": "Duplicate",
+   "where": "Variable Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29615",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Duplicate"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-copy-to-clipboard",
+   "category": "menu",
+   "name": "Copy to clipboard",
+   "where": "Variable Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29615",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy to clipboard"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-move-to-document",
+   "category": "menu",
+   "name": "Move to document…",
+   "where": "Variable Studio tab right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29615",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move to document…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-tab-release",
+   "category": "menu",
+   "name": "Release…",
+   "where": "Variable Studio tab right-click (Upgrade pill on Free)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:13315",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-add-variable",
+   "category": "table",
+   "name": "Add a variable (type a name in the italic Name row)",
+   "where": "Variable Studio table, last row; Enter creates Length 0 row",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "Name"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-add-row-focus-next",
+   "category": "table",
+   "name": "Focus moves to the next empty Name row after adding",
+   "where": "Variable Studio / Variable table add row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1761",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "Name"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-invalid-name",
+   "category": "table",
+   "name": "Invalid name: pink cell + tooltip \"Variable name must be a letter followed by a string of letters or numbers.\"; Enter does nothing",
+   "where": "Name cell",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1762",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "Name"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:[0-9].*"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-duplicate-name-add",
+   "category": "table",
+   "name": "Duplicate name on add: auto-renamed name_0 + bubble \"Renamed some new variables to avoid name conflicts.\"",
+   "where": "Name add row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1763",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "Name"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:width|height|count"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-duplicate-name-rename",
+   "category": "table",
+   "name": "Rename to a duplicate silently reverts",
+   "where": "Name cell edit",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1764"
+  },
+  {
+   "id": "vs-rename-variable",
+   "category": "table",
+   "name": "Edit a variable's name",
+   "where": "Name cell",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1874",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Name"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-type-select",
+   "category": "table",
+   "name": "Variable type ▾ (Length, Angle, Number, Any, From import)",
+   "where": "Variable type cell select",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Variable type",
+       "pick": "*"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-type-keeps-value-per-type",
+   "category": "table",
+   "name": "Switching type keeps the value per type (back to Length restores 5 mm)",
+   "where": "Variable type cell",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1766"
+  },
+  {
+   "id": "vs-type-from-import",
+   "category": "table",
+   "name": "From import variable type",
+   "where": "Variable type ▾ › From import",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1567"
+  },
+  {
+   "id": "vs-edit-value",
+   "category": "table",
+   "name": "Edit value",
+   "where": "Value cell",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-value-expression",
+   "category": "table",
+   "name": "Value as expression referencing #variables (shows result)",
+   "where": "Value cell (e.g. #width * 2 → 4 in)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*#.*"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-value-bare-number-unit",
+   "category": "table",
+   "name": "Bare number gets the workspace unit on Enter (5 → 5 mm)",
+   "where": "Value cell",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:2104",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:[0-9.]+"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-value-evaluated-chip",
+   "category": "table",
+   "name": "Evaluated-value chip while typing",
+   "where": "Value cell while focused",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2105"
+  },
+  {
+   "id": "vs-value-decimals-tooltip",
+   "category": "table",
+   "name": "Display rounded to workspace precision; tooltip shows full stored value",
+   "where": "Value cell hover",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:4282"
+  },
+  {
+   "id": "vs-value-expression-refocus",
+   "category": "table",
+   "name": "Refocusing an expression shows (10+5) mm",
+   "where": "Value cell focus",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4285"
+  },
+  {
+   "id": "vs-value-autocomplete",
+   "category": "autocomplete",
+   "name": "Expression autocomplete in Value cell (units, functions, #variables)",
+   "where": "Value cell typing",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:7040"
+  },
+  {
+   "id": "vs-edit-description",
+   "category": "table",
+   "name": "Edit description",
+   "where": "Description cell",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Description"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-enter-commits-cell",
+   "category": "shortcut",
+   "name": "Enter commits a cell and keeps it selected",
+   "where": "any Value/Name cell",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:2106",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "*"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-esc-clears-add-row",
+   "category": "shortcut",
+   "name": "Esc clears the add row",
+   "where": "Name add row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1762",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "Name"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-collapse-table",
+   "category": "table",
+   "name": "Collapse / expand a table (⌄ chevron)",
+   "where": "table header",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1874"
+  },
+  {
+   "id": "vs-rename-table-title",
+   "category": "table",
+   "name": "Rename table via its title field",
+   "where": "table header title (editable)",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/variable-studio.txt"
+  },
+  {
+   "id": "vs-column-resize",
+   "category": "table",
+   "name": "Resize a column (header drag handle)",
+   "where": "table header",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/variable-studio.txt"
+  },
+  {
+   "id": "vs-header-no-menu",
+   "category": "table",
+   "name": "Right-click on header / blank space: no menu",
+   "where": "table header",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1772"
+  },
+  {
+   "id": "vs-row-delete",
+   "category": "menu",
+   "name": "Delete",
+   "where": "row right-click (Name/Value/Description cell)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1878",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-row-move-up",
+   "category": "menu",
+   "name": "Move up",
+   "where": "row right-click (not first row)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move up"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-row-move-down",
+   "category": "menu",
+   "name": "Move down",
+   "where": "row right-click (not last row)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Move down"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-row-copy",
+   "category": "menu",
+   "name": "Copy",
+   "where": "Description cell right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1879",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Description"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-row-convert-to-expression",
+   "category": "menu",
+   "name": "Convert to expression / Convert to text",
+   "where": "Description cell right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2234",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Description"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "re:Convert to (expression|text)"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-rclick-keeps-selection",
+   "category": "menu",
+   "name": "Right-click always shows Onshape's menu, even with caret in an input",
+   "where": "any cell",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1876",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "*"
+      },
+      "do": "rclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vs-table-copy-table",
+   "category": "menu",
+   "name": "Copy table",
+   "where": "table ⋯",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567"
+  },
+  {
+   "id": "vs-table-rename",
+   "category": "menu",
+   "name": "Rename",
+   "where": "table ⋯",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567"
+  },
+  {
+   "id": "vs-table-create-task",
+   "category": "menu",
+   "name": "Create task…",
+   "where": "table ⋯",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:1567"
+  },
+  {
+   "id": "vs-table-collapse-all",
+   "category": "menu",
+   "name": "Collapse all tables",
+   "where": "table ⋯ (only with more than one table)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:37264"
+  },
+  {
+   "id": "vs-insert-vs-button",
+   "category": "toolbar",
+   "name": "Insert Variable Studio",
+   "where": "Variable Studio tab, centred button above tables",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1571"
+  },
+  {
+   "id": "vs-auto-insert-checkbox",
+   "category": "toolbar",
+   "name": "Insert into all Part Studios and Assemblies (checkbox)",
+   "where": "Variable Studio footer",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1567"
+  },
+  {
+   "id": "vs-auto-insert-default",
+   "category": "other",
+   "name": "Checkbox ticked only for the first Variable Studio of the workspace",
+   "where": "new Variable Studio",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7043"
+  },
+  {
+   "id": "vs-auto-insert-help",
+   "category": "toolbar",
+   "name": "? ▴ info popover (checked / unchecked texts, Learn more about Variable Studios)",
+   "where": "Variable Studio footer ?",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1568"
+  },
+  {
+   "id": "vs-auto-insert-disabled-with-config",
+   "category": "other",
+   "name": "Checkbox disabled while the studio has configuration inputs",
+   "where": "Variable Studio footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17670"
+  },
+  {
+   "id": "vs-learn-more-link",
+   "category": "other",
+   "name": "Learn more about Variable Studios (help link)",
+   "where": "footer ? popover",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1568"
+  },
+  {
+   "id": "vs-inserted-table-editable",
+   "category": "table",
+   "name": "Edit an inserted Variable Studio's values (writes back to the source studio)",
+   "where": "inserted table in a Variable Studio / Variable table",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1571"
+  },
+  {
+   "id": "vs-inserted-switch-to",
+   "category": "menu",
+   "name": "Switch to <Variable Studio>",
+   "where": "inserted table ⋯",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1571"
+  },
+  {
+   "id": "vs-inserted-edit-reference",
+   "category": "menu",
+   "name": "Edit reference…",
+   "where": "inserted table ⋯",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-inserted-remove-reference",
+   "category": "menu",
+   "name": "Remove reference",
+   "where": "inserted table ⋯",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-inserted-move-up",
+   "category": "menu",
+   "name": "Move up",
+   "where": "inserted table ⋯ (not first)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2782"
+  },
+  {
+   "id": "vs-inserted-move-down",
+   "category": "menu",
+   "name": "Move down",
+   "where": "inserted table ⋯ (not last)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2782"
+  },
+  {
+   "id": "vs-inserted-rename",
+   "category": "menu",
+   "name": "Rename",
+   "where": "inserted table ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-inserted-copy-table",
+   "category": "menu",
+   "name": "Copy table",
+   "where": "inserted table ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-inserted-create-task",
+   "category": "menu",
+   "name": "Create task…",
+   "where": "inserted table ⋯ in a Variable Studio",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:1571"
+  },
+  {
+   "id": "vs-inserted-drag-reorder",
+   "category": "table",
+   "name": "Drag an inserted table header to reorder (ghost pill, blue drop line; refused below own table)",
+   "where": "Variable table / Variable Studio",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2777"
+  },
+  {
+   "id": "vs-shadowed-warning",
+   "category": "table",
+   "name": "ⓘ \"Overwritten in another variable table.\" on shadowed rows; lowest inserted table wins",
+   "where": "Name cell of a shadowed variable",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2759"
+  },
+  {
+   "id": "vs-auto-ref-icon",
+   "category": "panel",
+   "name": "Automatically referenced Variable Studio icon on its table",
+   "where": "Variable table header",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/assembly-panel-variable-table.txt"
+  },
+  {
+   "id": "vs-insert-dialog",
+   "category": "dialog",
+   "name": "Insert Variable Studio dialog (✓ ✕, red title until a pick)",
+   "where": "Variable table footer / Variable Studio button",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-insert-current-document",
+   "category": "dialog",
+   "name": "Current document tab: studio tree with variable child rows",
+   "where": "Insert Variable Studio dialog",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-insert-other-documents",
+   "category": "dialog",
+   "name": "Other documents tab (categories, document at a version)",
+   "where": "Insert Variable Studio dialog",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5487"
+  },
+  {
+   "id": "vs-insert-search",
+   "category": "dialog",
+   "name": "Search Variable Studios",
+   "where": "Insert Variable Studio dialog",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/dialog-insert-variable-studio.txt"
+  },
+  {
+   "id": "vs-insert-create-version",
+   "category": "dialog",
+   "name": "Create version…",
+   "where": "Insert Variable Studio dialog document header",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/dialog-insert-variable-studio.txt"
+  },
+  {
+   "id": "vs-insert-version-graph",
+   "category": "dialog",
+   "name": "Version graph",
+   "where": "Insert Variable Studio dialog document header",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/dialog-insert-variable-studio.txt"
+  },
+  {
+   "id": "vs-insert-pick-preview",
+   "category": "dialog",
+   "name": "Clicking a studio row selects it and previews the table; ✓ commits",
+   "where": "Insert Variable Studio dialog",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-insert-order",
+   "category": "other",
+   "name": "New insert goes below already inserted tables, above the own table",
+   "where": "Variable table",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2760"
+  },
+  {
+   "id": "vs-insert-config-expand",
+   "category": "dialog",
+   "name": "Configured studio row: [▦] expands configuration inputs + Generate",
+   "where": "Insert Variable Studio dialog row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5490"
+  },
+  {
+   "id": "vs-insert-set-to-last-viewed",
+   "category": "dialog",
+   "name": "Set to last viewed",
+   "where": "Insert Variable Studio dialog row ▾ next to ▦",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5493"
+  },
+  {
+   "id": "vs-insert-reset-to-default",
+   "category": "dialog",
+   "name": "Reset to default",
+   "where": "Insert Variable Studio dialog row ▾ next to ▦",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5493"
+  },
+  {
+   "id": "vs-insert-help",
+   "category": "dialog",
+   "name": "? help link (cshid=variable_studios)",
+   "where": "Insert Variable Studio dialog footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7528"
+  },
+  {
+   "id": "vs-ps-variable-table-panel",
+   "category": "panel",
+   "name": "Variable table panel lists inserted studios above own table",
+   "where": "Part Studio right strip › Variable table",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1570"
+  },
+  {
+   "id": "vs-ps-insert-split",
+   "category": "panel",
+   "name": "[Insert Variable Studio][▴] split button",
+   "where": "Variable table footer",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:28442"
+  },
+  {
+   "id": "vs-ps-empty-state",
+   "category": "panel",
+   "name": "Empty state text + Learn more about variable tables",
+   "where": "Variable table with nothing inserted",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1569"
+  },
+  {
+   "id": "vs-ps-own-table-menu",
+   "category": "menu",
+   "name": "Copy table · Collapse all tables (own table ⋯)",
+   "where": "Variable table own table ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28438"
+  },
+  {
+   "id": "vs-asm-variable-table",
+   "category": "panel",
+   "name": "Variable table in an Assembly (inserted Variable Studio)",
+   "where": "Assembly right strip › Variable table",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1269"
+  },
+  {
+   "id": "vs-ps-new-variable-from-hash",
+   "category": "autocomplete",
+   "name": "#name not found → \"(x) New variable…\" → Create variable popup",
+   "where": "feature field typing #name",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1569"
+  },
+  {
+   "id": "vs-ps-shadow-by-feature",
+   "category": "other",
+   "name": "A Part Studio Variable feature shadows a studio variable only for later features",
+   "where": "Part Studio",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:7027"
+  },
+  {
+   "id": "vs-fs-monitor-profile",
+   "category": "other",
+   "name": "Monitor / Profile a Variable Studio",
+   "where": "Feature Studio Monitor ▾",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3185"
+  },
+  {
+   "id": "vs-config-panel",
+   "category": "panel",
+   "name": "Configuration panel (single right rail button)",
+   "where": "Variable Studio right rail",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5455"
+  },
+  {
+   "id": "vs-config-blocked-notice",
+   "category": "panel",
+   "name": "Notice: configurations need \"Insert into all…\" off",
+   "where": "Configuration panel while auto-inserted",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17661"
+  },
+  {
+   "id": "vs-configure-studio",
+   "category": "panel",
+   "name": "[▦ Configure Variable Studio][▾] (List, Checkbox, Configuration variable, Paste inputs)",
+   "where": "Configuration panel empty state",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5458"
+  },
+  {
+   "id": "vs-config-add-input",
+   "category": "panel",
+   "name": "[▦ Add configuration input][▲] List / Checkbox / Configuration variable / Paste inputs",
+   "where": "Configuration panel footer",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5477"
+  },
+  {
+   "id": "vs-config-list-names",
+   "category": "panel",
+   "name": "List naming: Configuration, List input 1, 2…",
+   "where": "Add configuration input › List",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17677"
+  },
+  {
+   "id": "vs-config-checkbox-dialog",
+   "category": "dialog",
+   "name": "Checkbox input dialog (Name, Default)",
+   "where": "Add configuration input › Checkbox",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5481"
+  },
+  {
+   "id": "vs-config-variable-dialog",
+   "category": "dialog",
+   "name": "Variable input dialog (Name, Length/Angle/Integer/Real/Text, Default/Min/Max)",
+   "where": "Add configuration input › Configuration variable",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5482"
+  },
+  {
+   "id": "vs-config-row-menu",
+   "category": "table",
+   "name": "List rows: add Name row, select current configuration",
+   "where": "configuration input table",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5465"
+  },
+  {
+   "id": "vs-value-configure",
+   "category": "menu",
+   "name": "Configure / Configure with <input>",
+   "where": "Value cell right-click (inputs present)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5470"
+  },
+  {
+   "id": "vs-value-unconfigure",
+   "category": "menu",
+   "name": "Unconfigure from <input>",
+   "where": "configured Value cell right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5470"
+  },
+  {
+   "id": "vs-value-set-to-cv",
+   "category": "menu",
+   "name": "Set to #CV",
+   "where": "Value cell right-click (matching config variable)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5471"
+  },
+  {
+   "id": "vs-configured-cell-look",
+   "category": "table",
+   "name": "Configured cell dotted outline + toast \"… Value added to Configuration\"",
+   "where": "Value cell",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5473"
+  },
+  {
+   "id": "vs-config-input-menu",
+   "category": "menu",
+   "name": "Input ⋯: Copy table, Copy input, Move up/down, Rename, Edit internal IDs…, Visibility conditions…, Input propagation…, Delete",
+   "where": "configuration input ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5910"
+  },
+  {
+   "id": "vs-config-edit-internal-ids",
+   "category": "dialog",
+   "name": "Edit internal IDs (validation, Break references and change IDs)",
+   "where": "input ⋯ › Edit internal IDs…",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5914"
+  },
+  {
+   "id": "vs-config-input-propagation",
+   "category": "menu",
+   "name": "Input propagation… → toast \"No references in the tab.\"",
+   "where": "input ⋯",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5929"
+  },
+  {
+   "id": "vs-config-table-cell-menu",
+   "category": "menu",
+   "name": "Switch to \"<row>\", Set as default, Duplicate row, Move up, Delete row, Delete column",
+   "where": "configuration table cell right-click",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5478"
+  },
+  {
+   "id": "vs-config-left-panel",
+   "category": "panel",
+   "name": "Left Configurations panel with a picker per input",
+   "where": "Variable Studio left side once configured",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5468"
+  },
+  {
+   "id": "vs-config-filter-inputs",
+   "category": "panel",
+   "name": "Filter inputs box (:name, :internalid, :variablename, :hasvisibilitycondition) + type filters",
+   "where": "Configuration panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17673"
+  },
+  {
+   "id": "vs-config-delete-all-restores",
+   "category": "other",
+   "name": "Deleting every input restores empty state + re-enables checkbox",
+   "where": "Configuration panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:17671"
+  }
+ ],
+ "gaps": [
+  "Undo / redo inside a Variable Studio (toolbar? Ctrl+Z steps per cell edit?) — no capture.",
+  "Keyboard navigation between cells: Tab / Shift+Tab / arrow keys / Enter-to-next-row in the Variable Studio table.",
+  "Row drag-and-drop reorder inside a Variable Studio table (DOM has supports-drag-and-drop; not exercised).",
+  "Copy table in a Variable Studio: clipboard TSV content and toast text.",
+  "Copy (Description cell): what is copied and any toast.",
+  "Edit reference… : which dialog opens and how changing the version/studio behaves.",
+  "Update / out-of-date reference to another document's Variable Studio (newer version available indicator, Update menu item).",
+  "'From import' variable type in a Variable Studio: fields and behaviour.",
+  "Invalid / circular expression in a Variable Studio Value cell (error look, message, effect on referencing Part Studios).",
+  "A variable referencing a variable from an inserted studio (chained #refs across studios).",
+  "Deleting or renaming a Variable Studio tab that Part Studios reference (warning dialog? broken refs?).",
+  "Deleting a variable used by a Part Studio feature: effect and message.",
+  "Variable Studio with mixed-unit / Any-type values (strings, booleans, maps) display.",
+  "Versions and history compare for a Variable Studio tab.",
+  "Rename table via title click (is the header title the studio tab name, does it rename the tab?).",
+  "Remove reference undo / confirmation.",
+  "Insert Variable Studio: picking a single child variable row (does it insert only that variable?).",
+  "Assembly: inserting a Variable Studio, using #vars in mates, auto-insert effect in assemblies.",
+  "Drawings using Variable Studio variables (if any).",
+  "Context menu on multiple selected rows (multi-select Delete)."
+ ],
+ "about": "Variable Studio: what live has (behaviours.md, live/dom), studios 2026-11-07; coverage: tools/ui-parity/coverage_variable_studio.py"
+}

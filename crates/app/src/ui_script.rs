@@ -45,16 +45,50 @@ fn fail(msg: &str) -> ! {
 }
 
 /// The start document of the scenario, built in a scratch file (before the window opens).
-pub fn prepare() -> PathBuf {
+pub fn prepare() -> Option<PathBuf> {
     let path = scenario_path();
     let scenario = read_json(&path).unwrap_or_else(|e| fail(&e));
     let name = scenario["start"].as_str().unwrap_or("empty").to_string();
-    let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
-    let start = if name == "empty" { json!({ "units": "mm", "features": [] }) } else { read_json(&starts).unwrap_or_else(|e| fail(&e)).get(&name).cloned().unwrap_or_else(|| fail(&format!("no start {name} in {}", starts.display()))) };
+    let starts_path = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
+    let starts = if name == "empty" { json!({}) } else { read_json(&starts_path).unwrap_or_else(|e| fail(&e)) };
+    let start = if name == "empty" { json!({ "units": "mm", "features": [] }) } else { starts.get(&name).cloned().unwrap_or_else(|| fail(&format!("no start {name} in {}", starts_path.display()))) };
+    // A page start (README "Documents page and Preferences"): its documents in the run's own documents folder.
+    if start.get("page").is_some() {
+        let Some(docs) = std::env::var_os("NOSHAPE_DOCUMENTS_DIR").map(PathBuf::from) else { fail("a page start needs NOSHAPE_DOCUMENTS_DIR (the run's own documents folder)") };
+        build_documents(&docs, &start["documents"], &starts);
+        return None;
+    }
     let dir = std::env::temp_dir().join(format!("noshape-uip-{}", std::process::id()));
     let doc = dir.join(format!("{name}.noshape"));
     noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &doc, &start).unwrap_or_else(|e| fail(&format!("start {name}: {e}")));
-    doc
+    Some(doc)
+}
+
+/// A page start's documents (`{"name", "start"}`, a start of starts.json; `"folder"` with its own `documents`) in `dir`.
+fn build_documents(dir: &Path, docs: &Value, starts: &Value) {
+    for d in docs.as_array().into_iter().flatten() {
+        let name = d["name"].as_str().unwrap_or_else(|| fail(&format!("a start document without a name: {d}")));
+        if d.get("documents").is_some() {
+            let sub = dir.join(name);
+            let _ = std::fs::create_dir_all(&sub);
+            build_documents(&sub, &d["documents"], starts);
+            continue;
+        }
+        let start = match d["start"].as_str() {
+            Some(s) => starts.get(s).cloned().unwrap_or_else(|| fail(&format!("no start {s}"))),
+            None => json!({ "units": "mm", "features": [], "tabs": [] }),
+        };
+        noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &dir.join(format!("{name}.noshape")), &start).unwrap_or_else(|e| fail(&format!("start document {name}: {e}")));
+    }
+}
+
+/// The page a page start opens on ("documents", "preferences"), if the scenario's start is one.
+pub fn page_start() -> Option<String> {
+    let path = scenario_path();
+    let scenario = read_json(&path).ok()?;
+    let name = scenario["start"].as_str()?;
+    let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
+    read_json(&starts).ok()?[name]["page"].as_str().map(str::to_string)
 }
 
 /// The tab the scenario start opens on: its assembly ("start <name> asm") or its drawing ("<part> Drawing 1").
@@ -174,7 +208,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "editor"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
@@ -190,6 +224,8 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
             return Ok(match t.get("edge").and_then(Value::as_str) {
                 Some("top") => point(b.center().x, b.top() + px(3.)),
                 Some("bottom") => point(b.center().x, b.bottom() - px(3.)),
+                Some("left") => point(b.left() + px(3.), b.center().y),
+                Some("right") => point(b.right() - px(3.), b.center().y),
                 _ => b.center(),
             });
         }
@@ -270,7 +306,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 let busy = match (studio(cx), drawing) {
                     (Some(ps), _) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
                     (None, Some(d)) => cx.update(|_, cx| d.read(cx).computing).unwrap_or(false),
-                    (None, None) => ws.update(cx, |w, _| w.active_assembly()).ok().flatten().is_none(),
+                    (None, None) => ws.update(cx, |w, cx| w.ui_view_pending(cx)).unwrap_or(false),
                 };
                 if !busy || t.elapsed() > Duration::from_secs(30) {
                     break;
@@ -280,40 +316,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         };
         // (An assembly tab's state when no Part Studio is shown: skasm's
         // assembly scenarios.)
-        let state = |cx: &mut AsyncWindowContext| -> Value {
-            if let Some(ps) = studio(cx) {
-                // A menu takes our keyboard but not a browser's: read the state with the focus the menu returns to.
-                let mut s = cx
-                    .update(|window, cx| {
-                        let ret = noshape_app_core::os_menu::open_return_focus(cx)
-                            .or_else(|| ps.read(cx).context_menu_return_focus(cx))
-                            .or_else(|| gpui_kit::component::native_menu::NativeMenu::open_fallback_context(window, cx));
-                        let Some(ret) = ret else { return ps.read(cx).ui_state(window, cx) };
-                        let menu = window.focused(cx);
-                        window.focus(&ret, cx);
-                        let s = ps.read(cx).ui_state(window, cx);
-                        if let Some(m) = menu {
-                            window.focus(&m, cx);
-                        }
-                        s
-                    })
-                    .unwrap_or(Value::Null);
-                // Edit in context: the assembly's instances as live reads them (asm-menu-edit-in-context).
-                if s.is_object()
-                    && let Some(a) = ws.update(cx, |w, _| w.any_assembly()).ok().flatten()
-                {
-                    s["assembly"] = cx.update(|_, cx| a.read(cx).ui_state(cx)["assembly"].clone()).unwrap_or(Value::Null);
-                }
-                return s;
-            }
-            if let Some(d) = ws.update(cx, |w, _| w.active_drawing()).ok().flatten() {
-                return cx.update(|_, cx| d.read(cx).ui_state(cx)).unwrap_or(Value::Null);
-            }
-            match ws.update(cx, |w, _| w.active_assembly()).ok().flatten() {
-                Some(a) => cx.update(|_, cx| a.read(cx).ui_state(cx)).unwrap_or(Value::Null),
-                None => json!({ "error": "no Part Studio, Assembly or Drawing shown" }),
-            }
-        };
+        let state = |cx: &mut AsyncWindowContext| -> Value { ws.update_in(cx, |w, window, cx| window_state(w, window, cx)).unwrap_or(Value::Null) };
         // The state with the tooltip drawn now (a redraw notes it).
         let read = async |cx: &mut AsyncWindowContext| -> Value {
             noshape_app_core::ui_script::clear_tooltip();
@@ -333,6 +336,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // Every named control painted where it is now.
         let redraw = async |cx: &mut AsyncWindowContext| {
             noshape_app_core::ui_script::clear();
+            // The chrome (tab bar, navbar, left panels) is cached: repainted too.
+            let _ = ws.update(cx, |w, cx| w.ui_redraw(cx));
             if let Some(ps) = studio(cx) {
                 let _ = cx.update(|window, cx| {
                     ps.update(cx, |p, cx| p.ui_redraw(cx));
@@ -348,6 +353,8 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                     d.update(cx, |d, cx| d.ui_redraw(cx));
                     window.refresh();
                 });
+            } else {
+                let _ = cx.update(|window, _| window.refresh());
             }
             sleep(cx, 150).await;
         };
@@ -587,6 +594,239 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         let _ = cx.update(|_, cx| cx.quit());
     })
     .detach();
+}
+
+/// Runs a page scenario (README "Documents page and Preferences"): the steps go to the window in front (the page it
+/// starts on, then any window a step opened: a document, Preferences), whose registered reader gives the state.
+pub fn start_page(cx: &mut App) {
+    let scenario = read_json(&scenario_path()).unwrap_or_else(|e| fail(&e));
+    std::thread::spawn(|| {
+        std::thread::sleep(WATCHDOG);
+        eprintln!("UI-SCRIPT FAIL: not done after {}s", WATCHDOG.as_secs());
+        std::process::exit(3);
+    });
+    cx.spawn(async move |cx| {
+        let sleep = async |cx: &mut AsyncApp, ms: u64| cx.background_executor().timer(Duration::from_millis(ms)).await;
+        // The window in front: the newest one a step opened, else the active one.
+        let mut known: Vec<AnyWindowHandle> = Vec::new();
+        let mut front: Option<AnyWindowHandle> = None;
+        let mut follow = |cx: &mut AsyncApp| -> Option<AnyWindowHandle> {
+            let now = cx.update(|cx| cx.windows());
+            if let Some(new) = now.iter().rev().find(|w| !known.contains(w)) {
+                front = Some(*new);
+            }
+            if front.is_none_or(|f| !now.contains(&f)) {
+                front = cx.update(|cx| cx.active_window()).or_else(|| now.last().copied());
+            }
+            known = now;
+            front
+        };
+        // The page's window up and drawn.
+        let mut win = None;
+        for _ in 0..100 {
+            win = follow(cx);
+            if win.is_some() {
+                break;
+            }
+            sleep(cx, 100).await;
+        }
+        let Some(first) = win else { fail("no window opened") };
+        let _ = first.update(cx, |_, window, _| {
+            window.resize(size(px(1919.), px(992.)));
+            window.activate_window();
+        });
+        sleep(cx, 1500).await;
+        let redraw = async |w: AnyWindowHandle, cx: &mut AsyncApp| {
+            noshape_app_core::ui_script::clear();
+            let _ = w.update(cx, |_, window, _| window.refresh());
+            sleep(cx, 150).await;
+        };
+        let read = async |w: AnyWindowHandle, cx: &mut AsyncApp| -> Value {
+            noshape_app_core::ui_script::clear_tooltip();
+            noshape_app_core::ui_script::clear_dialog();
+            let _ = w.update(cx, |_, window, _| window.refresh());
+            sleep(cx, 150).await;
+            let mut s = w.update(cx, |_, window, cx| noshape_app_core::ui_script::page_state(window, cx)).ok().flatten().unwrap_or_else(|| json!({ "error": "a window without a ui-parity state" }));
+            if s.is_object() {
+                s["tooltip"] = json!(noshape_app_core::ui_script::shown_tooltip());
+                if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
+                    s["focus"] = json!({ "kind": "other" });
+                }
+            }
+            s
+        };
+        let start = read(first, cx).await;
+        let mut steps = Vec::new();
+        let mut pointer: Option<Point<Pixels>> = None;
+        for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
+            let Some(w) = follow(cx) else { break };
+            let what = step["do"].as_str().unwrap_or("");
+            let mods = modifiers(&step);
+            let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
+            redraw(w, cx).await;
+            let find = |t: &Value, cx: &mut AsyncApp| cx.update(|cx| locate(t, &None, &None, &None, cx));
+            let result: Result<(), String> = match what {
+                "click" | "dblclick" | "rclick" | "hover" => match find(&target, cx) {
+                    Ok(at) => {
+                        let from = pointer.unwrap_or(at);
+                        for k in 1..=3 {
+                            let p = from + (at - from) * (k as f32 / 3.0);
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                            sleep(cx, 20).await;
+                        }
+                        pointer = Some(at);
+                        sleep(cx, if what == "hover" { step["ms"].as_u64().unwrap_or(1500) } else { 300 }).await;
+                        let (button, clicks) = match what {
+                            "rclick" => (MouseButton::Right, 1),
+                            "dblclick" => (MouseButton::Left, 2),
+                            "hover" => (MouseButton::Left, 0),
+                            _ => (MouseButton::Left, 1),
+                        };
+                        let _ = w.update(cx, |_, window, cx| mouse(window, cx, at, button, mods, clicks));
+                        // A select's pick: its entry from the list it opened.
+                        match step["on"].get("pick").and_then(Value::as_str) {
+                            Some(pick) => {
+                                sleep(cx, 300).await;
+                                redraw(w, cx).await;
+                                match find(&json!({ "list_row": pick }), cx).or_else(|_| find(&json!({ "menu": pick }), cx)) {
+                                    Ok(at) => {
+                                        let _ = w.update(cx, |_, window, cx| {
+                                            window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: at, pressed_button: None, modifiers: Modifiers::default() }), cx);
+                                            mouse(window, cx, at, MouseButton::Left, Modifiers::default(), 1)
+                                        });
+                                        pointer = Some(at);
+                                        Ok(())
+                                    }
+                                    Err(e) => Err(e),
+                                }
+                            }
+                            None => Ok(()),
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                "type" => {
+                    for ch in step["text"].as_str().unwrap_or("").chars() {
+                        let key = if ch == ' ' { "Space".to_string() } else { ch.to_string() };
+                        if let Some(ks) = keystroke(&key) {
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_keystroke(ks, cx));
+                        }
+                        sleep(cx, 40).await;
+                    }
+                    Ok(())
+                }
+                "key" => match keystroke(step["key"].as_str().unwrap_or("")) {
+                    Some(ks) => {
+                        let _ = w.update(cx, |_, window, cx| window.dispatch_keystroke(ks, cx));
+                        Ok(())
+                    }
+                    None => Err(format!("unknown key {}", step["key"])),
+                },
+                "wait" => {
+                    sleep(cx, step["ms"].as_u64().unwrap_or(500)).await;
+                    Ok(())
+                }
+                other => Err(format!("unknown step {other} on a page")),
+            };
+            // A document a step opened is built and drawn before its state is read.
+            sleep(cx, 900).await;
+            let Some(w) = follow(cx) else { break };
+            let state_now = read(w, cx).await;
+            let mut rec = json!({ "step": i + 1, "do": step, "ok": result.is_ok(), "state": state_now });
+            if let Err(e) = result {
+                eprintln!("UI-SCRIPT step {}: {e}", i + 1);
+                rec["error"] = json!(e);
+            }
+            steps.push(rec);
+        }
+        let recording = json!({
+            "scenario": scenario["name"],
+            "recorded": utc_now(),
+            "app": { "name": "noshape", "version": noshape_ops::VERSION, "platform": std::env::consts::OS, "active": true },
+            "start": start,
+            "steps": steps,
+        });
+        write(&recording);
+        eprintln!("UI-SCRIPT done: {}", out_path().display());
+        cx.update(|cx| cx.quit());
+    })
+    .detach();
+}
+
+/// A document window's state after a step (README "state"): its active tab's, with the document's tab bar.
+pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) -> Value {
+    let mut s = if let Some(ps) = w.active_part_studio() {
+        // A menu takes our keyboard but not a browser's: read the state with the focus the menu returns to.
+        let ret = noshape_app_core::os_menu::open_return_focus(cx)
+            .or_else(|| ps.read(cx).context_menu_return_focus(cx))
+            .or_else(|| gpui_kit::component::native_menu::NativeMenu::open_fallback_context(window, cx));
+        let mut s = match ret {
+            None => ps.read(cx).ui_state(window, cx),
+            Some(ret) => {
+                let menu = window.focused(cx);
+                window.focus(&ret, cx);
+                let s = ps.read(cx).ui_state(window, cx);
+                if let Some(m) = menu {
+                    window.focus(&m, cx);
+                }
+                s
+            }
+        };
+        // Edit in context: the assembly's instances as live reads them (asm-menu-edit-in-context).
+        if s.is_object()
+            && let Some(a) = w.any_assembly()
+        {
+            s["assembly"] = a.read(cx).ui_state(cx)["assembly"].clone();
+        }
+        s
+    } else if let Some(d) = w.active_drawing() {
+        d.read(cx).ui_state(cx)
+    } else if let Some(a) = w.active_assembly() {
+        a.read(cx).ui_state(cx)
+    } else {
+        other_tab_state(w, window, cx)
+    };
+    // Every state also has the document's tab bar (README "Documents, tabs and preferences").
+    if s.is_object() {
+        s["document"] = w.ui_document_state(cx);
+        if let Some(f) = w.ui_rename_focus(window, cx) {
+            s["focus"] = f;
+        }
+    }
+    s
+}
+
+/// The state of a tab that is no Part Studio, Assembly or Drawing (a Variable or Feature Studio, a file): the
+/// window's open menu, modal and dropdown, the tab rename's field.
+fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) -> Value {
+    let focus = match ws.ui_rename_focus(window, cx) {
+        Some(f) => f,
+        None if window.focused(cx).is_some() => json!({ "kind": "other" }),
+        None => json!({ "kind": "none" }),
+    };
+    let list = noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list);
+    let mut s = json!({
+        "focus": focus,
+        "dialog": noshape_app_core::ui_script::open_dialog(),
+        "list": list,
+        "selection": { "count": 0, "items": [] },
+        "features": null,
+        "parts": [],
+        "message": null,
+        "tooltip": null,
+        "undo": null,
+        "sketch": null,
+        "drawing": null,
+        "variables": ws.ui_variables_state(cx),
+    });
+    // A Feature Studio: its editor, and its autocomplete as the list.
+    if let Some(fs) = ws.ui_feature_studio_state(cx) {
+        s["featurestudio"] = fs["featurestudio"].clone();
+        if !fs["list"].is_null() {
+            s["list"] = fs["list"].clone();
+        }
+    }
+    s
 }
 
 fn studio_has_dialog(ps: &Studio, window: &Window, cx: &App) -> bool {

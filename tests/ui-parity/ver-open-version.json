@@ -1,0 +1,21 @@
+{
+ "name": "ver-open-version",
+ "about": "Versions and history: click V1: view only, the navbar says V1",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  }
+ ]
+}

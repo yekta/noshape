@@ -1,0 +1,19 @@
+{
+ "name": "doc-tab-menu-partstudio-active",
+ "about": "right-click the active Part Studio tab: its menu",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

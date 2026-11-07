@@ -1,0 +1,29 @@
+{
+ "name": "vs-value-expression",
+ "about": "a Value cell: #width / 2, Enter: shows the result",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "height:Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "#width / 2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

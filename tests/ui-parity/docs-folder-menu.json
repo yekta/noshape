@@ -1,0 +1,19 @@
+{
+ "name": "docs-folder-menu",
+ "about": "right-click a folder's tile: its menu",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Folder"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

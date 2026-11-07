@@ -157,6 +157,14 @@ pub fn show(page: Page, cx: &mut App) {
     match crate::os_menu::open_window(options, cx, |window, cx| {
         window.set_window_title("My account — noshape");
         let view = cx.new(|cx| PreferencesView::new(page, window, cx));
+        // The ui-parity driver's Preferences page (tests/ui-parity/README.md "Documents page and Preferences").
+        let weak = view.downgrade();
+        crate::ui_script::register_page(window.window_handle().window_id(), move |window, cx| {
+            weak.upgrade().map(|v| {
+                v.update(cx, |_, cx| cx.notify());
+                v.read(cx).ui_state(window, cx)
+            }).unwrap_or(serde_json::Value::Null)
+        });
         let fh = view.read(cx).focus.clone();
         window.defer(cx, move |window, cx| fh.focus(window, cx));
         view
@@ -275,6 +283,27 @@ impl Focusable for PreferencesView {
 }
 
 impl PreferencesView {
+    /// The ui-parity state of the Preferences page: the fields its sections noted as they were drawn.
+    fn ui_state(&self, window: &Window, cx: &App) -> serde_json::Value {
+        let focus = if window.focused(cx).is_some() { serde_json::json!({ "kind": "other" }) } else { serde_json::json!({ "kind": "none" }) };
+        let fields = crate::ui_script::take_fields();
+        serde_json::json!({
+            "focus": focus,
+            "dialog": crate::ui_script::open_dialog(),
+            "list": crate::os_menu::ui_state(cx).or_else(crate::ui_script::open_list),
+            "selection": { "count": 0, "items": [] },
+            "features": null,
+            "parts": [],
+            "message": null,
+            "tooltip": null,
+            "undo": null,
+            "sketch": null,
+            "drawing": null,
+            "document": null,
+            "preferences": { "fields": fields },
+        })
+    }
+
     fn new(page: Page, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let name_saved = crate::doc_files::user_name_pref().unwrap_or_default();
         let name = cx.new(|cx| InputState::new(window, cx).placeholder(noshape_store::os_login()).default_value(name_saved.clone()));

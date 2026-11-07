@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-angle-radian",
+ "about": "Preferences › Units: Angle default unit › Radian, Save",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Angle default unit",
+    "pick": "Radian"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

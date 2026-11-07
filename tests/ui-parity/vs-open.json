@@ -1,0 +1,15 @@
+{
+ "name": "vs-open",
+ "about": "open the Variable Studio tab: its table",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  }
+ ]
+}

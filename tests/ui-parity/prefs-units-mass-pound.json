@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-mass-pound",
+ "about": "Preferences › Units: Mass default unit › Pound, Save",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Mass default unit",
+    "pick": "Pound"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

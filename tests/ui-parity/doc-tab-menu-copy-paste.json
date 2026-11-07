@@ -1,0 +1,38 @@
+{
+ "name": "doc-tab-menu-copy-paste",
+ "about": "tab › Copy to clipboard, then + › Paste <name>",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy to clipboard"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Paste Part Studio 2"
+   }
+  }
+ ]
+}

@@ -1,0 +1,23 @@
+{
+ "name": "doc-tab-rename-active-dblclick",
+ "about": "double-click the active tab: its name becomes a field, all selected",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Base plate"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

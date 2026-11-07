@@ -1,0 +1,22 @@
+{
+ "name": "vs-type-angle",
+ "about": "Variable type ▾ › Angle",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "height:Variable type",
+    "pick": "Angle"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "ver-panel-open-close",
+ "about": "the left rail's Versions and history: the panel and its rows; its ✕ closes it",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

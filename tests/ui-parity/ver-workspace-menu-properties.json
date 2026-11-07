@@ -1,0 +1,33 @@
+{
+ "name": "ver-workspace-menu-properties",
+ "about": "Main › Properties…: the modal, then its ×",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Versions batch 1)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

@@ -1,0 +1,2433 @@
+{
+ "area": "versions",
+ "generated": "Sat Nov  7 07:33:00 PM UTC 2026",
+ "items": [
+  {
+   "id": "vh-open-panel",
+   "category": "history panel",
+   "name": "Versions and history",
+   "where": "left rail, top button (tooltip \"Versions and history\")",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1559",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-close-panel",
+   "category": "history panel",
+   "name": "Close (✕)",
+   "where": "Versions and history header ✕",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:54",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     },
+     {
+      "on": {
+       "button": "Close"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-left-rail-create-version",
+   "category": "history panel",
+   "name": "Create version…",
+   "where": "left rail, 2nd button (tooltip \"Create version…\")",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1559",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create version…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-header-create-version",
+   "category": "history panel",
+   "name": "Create version…",
+   "where": "Versions and history header icon",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:3352",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     },
+     {
+      "on": {
+       "button": "Create version…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-header-release",
+   "category": "history panel",
+   "name": "Release…",
+   "where": "Versions and history header icon (Create release candidate)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3352",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     },
+     {
+      "on": {
+       "button": "Create release candidate"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-header-compare-entries",
+   "category": "history panel",
+   "name": "Compare history entries",
+   "where": "Versions and history header icon: banner \"Select two history entries to compare.\", pick two rows",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:4709",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     },
+     {
+      "on": {
+       "button": "Compare history entries"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-header-repair",
+   "category": "history panel",
+   "name": "Repair",
+   "where": "Versions and history header wrench: banner \"Select a history entry to repair this Part Studio\", then click an entry; click again to leave",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3312",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     },
+     {
+      "on": {
+       "button": "Repair"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-search-history",
+   "category": "history panel",
+   "name": "Search history",
+   "where": "Versions and history search box, type text + 🔍",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:54"
+  },
+  {
+   "id": "vh-search-filter-open",
+   "category": "history panel",
+   "name": "Search history ▾ (advanced filter)",
+   "where": "caret in the Search history box opens the 260×372 filter panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:73"
+  },
+  {
+   "id": "vh-filter-tab",
+   "category": "history panel",
+   "name": "Tab",
+   "where": "filter panel › Tab select (Any + every tab incl. deleted)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:74"
+  },
+  {
+   "id": "vh-filter-tab-types",
+   "category": "history panel",
+   "name": "Tab types",
+   "where": "filter panel › Part Studio / Assembly / Drawing / Feature Studio / File toggles",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:75"
+  },
+  {
+   "id": "vh-filter-tab-types-clear",
+   "category": "history panel",
+   "name": "Clear",
+   "where": "filter panel › Tab types › Clear (disabled until a type is picked)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:75"
+  },
+  {
+   "id": "vh-filter-modified-by",
+   "category": "history panel",
+   "name": "Modified by",
+   "where": "filter panel › Any / Only me / Not me",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:76"
+  },
+  {
+   "id": "vh-filter-date-modified",
+   "category": "history panel",
+   "name": "Date modified",
+   "where": "filter panel › Start date / End date datetime inputs",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:77"
+  },
+  {
+   "id": "vh-filter-reset",
+   "category": "history panel",
+   "name": "Reset",
+   "where": "filter panel footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:78"
+  },
+  {
+   "id": "vh-filter-search",
+   "category": "history panel",
+   "name": "Search",
+   "where": "filter panel footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:78"
+  },
+  {
+   "id": "vh-toggle-merges",
+   "category": "history panel",
+   "name": "Hide merges / Show merges",
+   "where": "toggle under the search box (on by default)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:83"
+  },
+  {
+   "id": "vh-toggle-auto-versions",
+   "category": "history panel",
+   "name": "Hide automatic versions / Show automatic versions",
+   "where": "toggle under the search box (on by default)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:84"
+  },
+  {
+   "id": "vh-click-version-row",
+   "category": "history panel",
+   "name": "open version (row click)",
+   "where": "single click on a version row: opens it view-only in the same browser tab",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:58",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-click-workspace-row",
+   "category": "history panel",
+   "name": "open workspace (row click)",
+   "where": "click a workspace row (back to the workspace; also leaves compare)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:3518",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-dblclick-workspace-row",
+   "category": "history panel",
+   "name": "switch workspace (double-click)",
+   "where": "double-click a workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1734",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:Main|B\\d+"
+      },
+      "do": "dblclick"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-show-changes",
+   "category": "history panel",
+   "name": "Show changes…",
+   "where": "row link › expands the row's history entries (\"Showing 50 …\")",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3316",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Show changes:.*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-show-more-changes",
+   "category": "history panel",
+   "name": "Show more changes…",
+   "where": "end of an expanded change list",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3316"
+  },
+  {
+   "id": "vh-click-change-row",
+   "category": "history panel",
+   "name": "open history entry (row click)",
+   "where": "click a change row under Show changes…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3316",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vh-row-tooltip-description",
+   "category": "history panel",
+   "name": "row tooltip (Description: … / No description)",
+   "where": "hover a version/workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/documents-versions-history-panel.txt"
+  },
+  {
+   "id": "vh-graph-branches",
+   "category": "history panel",
+   "name": "version graph (branch lines, colours, legend)",
+   "where": "graph column: Main blue, branches amber/teal; legend Workspace / Version / Change / Release candidate / Release / Contains obsoletion / Automatic version",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1732"
+  },
+  {
+   "id": "vh-history-entry-granularity",
+   "category": "history panel",
+   "name": "history entries per edit",
+   "where": "every edit (each drag, each Undo : 1 step) is its own entry \"<tab> :: <action> : <target>\"; no merging",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:16770"
+  },
+  {
+   "id": "docs-page-vh-panel",
+   "category": "history panel",
+   "name": "Versions and history (documents page)",
+   "where": "Documents page › select a document › right strip versions icon",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:53"
+  },
+  {
+   "id": "docs-page-adv-search-versions",
+   "category": "history panel",
+   "name": "Results from: Workspaces / Versions / All",
+   "where": "Documents page › search ▾ advanced search (also State / Revision fields)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:47"
+  },
+  {
+   "id": "vrow-open",
+   "category": "row menu",
+   "name": "Open",
+   "where": "right-click a version row",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-open-new-tab",
+   "category": "row menu",
+   "name": "Open in new browser tab",
+   "where": "right-click a version row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-branch",
+   "category": "row menu",
+   "name": "Branch to create workspace…",
+   "where": "right-click a version row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Branch to create workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-copy-link",
+   "category": "row menu",
+   "name": "Copy link",
+   "where": "right-click a version row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy link"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-compare",
+   "category": "row menu",
+   "name": "Compare",
+   "where": "right-click a version row (base = current workspace/version, target = row)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2625",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-view-in-repair",
+   "category": "row menu",
+   "name": "View in repair",
+   "where": "right-click a version row: Repair panel \"Viewing V2\"",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3329",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "View in repair"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-restore",
+   "category": "row menu",
+   "name": "Restore to Main…",
+   "where": "right-click a version row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Restore to Main…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-properties",
+   "category": "row menu",
+   "name": "Properties…",
+   "where": "right-click a version row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-releases",
+   "category": "row menu",
+   "name": "Releases",
+   "where": "right-click a version row (Upgrade badge in live's Free plan)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Releases"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "vrow-publish-fs",
+   "category": "row menu",
+   "name": "Publish FeatureScript…",
+   "where": "right-click a version row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:68",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Publish FeatureScript…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-cur-open-new-tab",
+   "category": "row menu",
+   "name": "Open in new browser tab",
+   "where": "right-click the current workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5571",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-cur-copy-link",
+   "category": "row menu",
+   "name": "Copy link",
+   "where": "right-click the current workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5571",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy link"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-cur-protection",
+   "category": "row menu",
+   "name": "Workspace protection…",
+   "where": "right-click the current workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5571",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Workspace protection…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-cur-properties",
+   "category": "row menu",
+   "name": "Properties…",
+   "where": "right-click the current workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5571",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-cur-delete",
+   "category": "row menu",
+   "name": "Delete",
+   "where": "right-click the current workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5571",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-open",
+   "category": "row menu",
+   "name": "Open",
+   "where": "right-click another workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-open-new-tab",
+   "category": "row menu",
+   "name": "Open in new browser tab",
+   "where": "right-click another workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-copy-link",
+   "category": "row menu",
+   "name": "Copy link",
+   "where": "right-click another workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy link"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-compare",
+   "category": "row menu",
+   "name": "Compare",
+   "where": "right-click another workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-merge",
+   "category": "row menu",
+   "name": "Merge into current workspace…",
+   "where": "right-click another workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-protection",
+   "category": "row menu",
+   "name": "Workspace protection…",
+   "where": "right-click another workspace row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3336",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Workspace protection…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-properties",
+   "category": "row menu",
+   "name": "Properties…",
+   "where": "right-click another workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "wrow-delete",
+   "category": "row menu",
+   "name": "Delete",
+   "where": "right-click another workspace row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:B\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-open",
+   "category": "row menu",
+   "name": "Open",
+   "where": "right-click a history (change) row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-open-new-tab",
+   "category": "row menu",
+   "name": "Open in new browser tab",
+   "where": "right-click a history (change) row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-copy-link",
+   "category": "row menu",
+   "name": "Copy link",
+   "where": "right-click a history (change) row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Copy link"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-compare",
+   "category": "row menu",
+   "name": "Compare",
+   "where": "right-click a history (change) row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-view-in-repair",
+   "category": "row menu",
+   "name": "View in repair",
+   "where": "right-click a history (change) row",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "View in repair"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-restore",
+   "category": "row menu",
+   "name": "Restore to Main…",
+   "where": "right-click a history (change) row (how a deleted tab comes back)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Restore to Main…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "crow-create-version-here",
+   "category": "row menu",
+   "name": "Create version here…",
+   "where": "right-click a history (change) row",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3317",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Create version here…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-cv-create",
+   "category": "dialog",
+   "name": "Create",
+   "where": "Create version dialog \"Create version from Main\" (Name prefilled Vn, Description)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1731",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create version…"
+      }
+     },
+     {
+      "on": {
+       "button": "Create"
+      }
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "mod+alt+v"
+     },
+     {
+      "on": {
+       "button": "Create"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-cv-create-edit-props",
+   "category": "dialog",
+   "name": "Create version and edit properties",
+   "where": "Create version dialog: creates, then opens the new version's Properties",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:71"
+  },
+  {
+   "id": "dlg-cv-cancel",
+   "category": "dialog",
+   "name": "Cancel",
+   "where": "Create version dialog (also ✕)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:1731",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create version…"
+      }
+     },
+     {
+      "on": {
+       "button": "Cancel"
+      }
+     }
+    ],
+    [
+     {
+      "do": "key",
+      "key": "mod+alt+v"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-cv-publish-fs",
+   "category": "dialog",
+   "name": "Publish custom features and tables",
+   "where": "Create version dialog checkbox (only when the document has a Feature Studio)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1665"
+  },
+  {
+   "id": "dlg-cv-outdated-drawings",
+   "category": "dialog",
+   "name": "These drawings should be updated before creating a version",
+   "where": "Create version dialog warning; each drawing link opens it in a new browser tab; Create stays enabled",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29675"
+  },
+  {
+   "id": "dlg-cv-update-drawings",
+   "category": "dialog",
+   "name": "Update drawings.",
+   "where": "Create version dialog warning › refresh icon button",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29676"
+  },
+  {
+   "id": "dlg-cv-from-picker",
+   "category": "dialog",
+   "name": "Create version… (from an insert/reference picker)",
+   "where": "Insert / Select a Part Studio / reference pickers: header icon \"Create version…\" or link \"Create a version in <doc>.\" (\"N changes since the last version.\")",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1661"
+  },
+  {
+   "id": "dlg-br-create",
+   "category": "dialog",
+   "name": "Create",
+   "where": "Branch dialog \"Create workspace from V1\" (Name prefilled B1, Description)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1734",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Branch to create workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Create"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-br-create-edit-props",
+   "category": "dialog",
+   "name": "Create workspace and edit properties",
+   "where": "Branch dialog: creates, switches to it, opens workspace Properties",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:72"
+  },
+  {
+   "id": "dlg-br-open-new-ws",
+   "category": "dialog",
+   "name": "Open new workspace",
+   "where": "Branch dialog checkbox (on by default)",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/dialog-branch.txt"
+  },
+  {
+   "id": "dlg-br-cancel",
+   "category": "dialog",
+   "name": "Cancel",
+   "where": "Branch dialog",
+   "freq": 2,
+   "cloud": false,
+   "source": "dom/dialog-branch.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Branch to create workspace…"
+      }
+     },
+     {
+      "on": {
+       "button": "Cancel"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-vprops-edit",
+   "category": "dialog",
+   "name": "Version Properties (Name, Description)",
+   "where": "version row › Properties…: 800 px Properties modal; Category greyed \"Onshape Version\"",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:69",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-vprops-tree",
+   "category": "dialog",
+   "name": "Properties tree (tabs at that version)",
+   "where": "version Properties modal › expand the version row ▶",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:69"
+  },
+  {
+   "id": "dlg-vprops-apply-save-close",
+   "category": "dialog",
+   "name": "Apply / Save / Close (and ↶ ↷)",
+   "where": "version / workspace Properties modal footer",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:69"
+  },
+  {
+   "id": "dlg-wsprops-edit",
+   "category": "dialog",
+   "name": "Workspace Properties (Name, Description)",
+   "where": "workspace row › Properties…, or ☰ › Workspace properties…; Category \"Onshape Workspace\"",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:72",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "Main"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Workspace properties…"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "dlg-publish-fs",
+   "category": "dialog",
+   "name": "Publish custom features and tables",
+   "where": "version row › Publish FeatureScript…: modal with the Requirements checklist; button disabled while any line is ✗; Cancel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:70"
+  },
+  {
+   "id": "dlg-wp-enable",
+   "category": "dialog",
+   "name": "Enable workspace protection",
+   "where": "Workspace protection dialog checkbox (disabled while drawings need updating)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5565"
+  },
+  {
+   "id": "dlg-wp-apply-cancel",
+   "category": "dialog",
+   "name": "Apply / Cancel",
+   "where": "Workspace protection dialog footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5570"
+  },
+  {
+   "id": "dlg-wp-outdated-tab-links",
+   "category": "dialog",
+   "name": "These tabs should be updated: …",
+   "where": "Workspace protection dialog notice; names open those drawings",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3339"
+  },
+  {
+   "id": "dlg-wp-learn-more",
+   "category": "dialog",
+   "name": "Learn more about workspace protection",
+   "where": "Workspace protection dialog link (help)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3347"
+  },
+  {
+   "id": "wp-protected-state",
+   "category": "other",
+   "name": "protected workspace (view-only bars, lock chip, greyed +)",
+   "where": "after enabling: Part Studio shows \"This document is view only.\", drawing shows \"Workspace protection enabled. …\", tab + greyed",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5573"
+  },
+  {
+   "id": "wp-blocked-actions",
+   "category": "other",
+   "name": "blocked edits in a protected workspace",
+   "where": "rename/duplicate/delete tabs gone, feature dialogs read-only, feature menu View… only",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5579"
+  },
+  {
+   "id": "wp-disable",
+   "category": "dialog",
+   "name": "turn protection off",
+   "where": "Workspace protection dialog › untick › Apply",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5590"
+  },
+  {
+   "id": "dlg-delete-workspace",
+   "category": "dialog",
+   "name": "Delete workspace",
+   "where": "workspace row › Delete (confirmation not captured)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3336"
+  },
+  {
+   "id": "dlg-restore-to",
+   "category": "dialog",
+   "name": "Restore to Main…",
+   "where": "version / change row › Restore to Main… (dialog not captured)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3317"
+  },
+  {
+   "id": "dlg-restore-deleted-workspaces",
+   "category": "dialog",
+   "name": "Restore deleted workspaces…",
+   "where": "☰ document menu (also while viewing a version)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1566"
+  },
+  {
+   "id": "dlg-copy-workspace",
+   "category": "dialog",
+   "name": "Copy workspace…",
+   "where": "☰ › \"Copy the active workspace to a new document\": Document name, Copy document to folder browser, Create / Cancel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29685"
+  },
+  {
+   "id": "dlg-copy-version",
+   "category": "dialog",
+   "name": "Copy version…",
+   "where": "☰ while viewing a version › \"Copy the active version to a new document\"",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29695"
+  },
+  {
+   "id": "dlg-update-workspace",
+   "category": "dialog",
+   "name": "Update workspace…",
+   "where": "☰ document menu (dialog not captured)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1566"
+  },
+  {
+   "id": "nav-version-label",
+   "category": "navbar",
+   "name": "workspace / version name after the document name",
+   "where": "navbar: grey \"Main\" / \"V1\" / branch name (with 🔒 when protected)",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:59",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "click"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "nav-copy-link",
+   "category": "navbar",
+   "name": "Copy document URL at this tab and workspace or version",
+   "where": "navbar link icon after the name",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/navbar-version-v1.txt"
+  },
+  {
+   "id": "nav-hamburger-in-version",
+   "category": "navbar",
+   "name": "☰ while viewing a version",
+   "where": "☰ reduced to Rename document · Move to… · Restore deleted workspaces… · Copy version… · Version properties… · Print… · Close document",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29697"
+  },
+  {
+   "id": "nav-version-properties",
+   "category": "navbar",
+   "name": "Version properties…",
+   "where": "☰ while viewing a version",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:29697"
+  },
+  {
+   "id": "nav-workspace-properties",
+   "category": "navbar",
+   "name": "Workspace properties…",
+   "where": "☰ in a workspace",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1566"
+  },
+  {
+   "id": "view-only-bar",
+   "category": "navbar",
+   "name": "Versions are view only. Viewing V1.",
+   "where": "bar under the navbar while viewing a version; toolbar editing tools gone",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:60",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Open"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "view-only-return",
+   "category": "navbar",
+   "name": "Return to Main",
+   "where": "view-only bar button",
+   "freq": 1,
+   "cloud": false,
+   "source": "behaviours.md:60"
+  },
+  {
+   "id": "view-only-custom-features",
+   "category": "navbar",
+   "name": "Add custom features in this version to your toolbar",
+   "where": "view-only bar ⊞ button",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/version-view-only-bar.txt"
+  },
+  {
+   "id": "view-only-help",
+   "category": "navbar",
+   "name": "(?) help",
+   "where": "view-only bar ? icon (help versionshistorymanager)",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/version-view-only-bar.txt"
+  },
+  {
+   "id": "open-version-missing-tab",
+   "category": "navbar",
+   "name": "Can't open tab. The tab does not exist in this document version.",
+   "where": "opening a version that lacks the current tab: first tab opens + info toast",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:58"
+  },
+  {
+   "id": "cmp-bar",
+   "category": "compare",
+   "name": "Comparing Main and V3",
+   "where": "top-centre compare bar replacing the toolbar; URL /w/<ws>/and/v/<v>",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2629",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "*"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
+  },
+  {
+   "id": "cmp-reverse",
+   "category": "compare",
+   "name": "Reverse compare",
+   "where": "compare bar button: swaps base and target",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2629"
+  },
+  {
+   "id": "cmp-help",
+   "category": "compare",
+   "name": "(?) help",
+   "where": "compare bar ? icon",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:2629"
+  },
+  {
+   "id": "cmp-tab-dots",
+   "category": "compare",
+   "name": "tab compare dots",
+   "where": "tab bar dots: yellow \"Compare has found differences.\", white \"no differences\" / \"not supported\", red \"Tab only exists in 'Main'.\"; disabled tabs can't open",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2630"
+  },
+  {
+   "id": "cmp-not-comparable",
+   "category": "compare",
+   "name": "NOT COMPARABLE",
+   "where": "open an Assembly (or tab only on one side) in compare",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3515"
+  },
+  {
+   "id": "cmp-features-list",
+   "category": "compare",
+   "name": "Features",
+   "where": "compare panel list: ≠ changed, > / < only on one side",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3503"
+  },
+  {
+   "id": "cmp-feature-params",
+   "category": "compare",
+   "name": "Select a feature to compare its parameters.",
+   "where": "click a feature: two read-only dialogs side by side, changed values outlined",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3509"
+  },
+  {
+   "id": "cmp-only-differences",
+   "category": "compare",
+   "name": "Only show differences",
+   "where": "compare panel checkbox (on by default)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3512"
+  },
+  {
+   "id": "cmp-slider",
+   "category": "compare",
+   "name": "blend slider Main ○—— V3",
+   "where": "slider at the top of the graphics; base-only blue, target-only red, alpha blend",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3456"
+  },
+  {
+   "id": "cmp-moved-marker",
+   "category": "compare",
+   "name": "moved feature marker",
+   "where": "reordered feature shows amber ⬇ / ⬆ circle arrows in two rows",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5383"
+  },
+  {
+   "id": "cmp-sketch-eye",
+   "category": "compare",
+   "name": "show sketch (eye)",
+   "where": "hover a sketch row in the compare list › eye toggle",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4746"
+  },
+  {
+   "id": "cmp-graphics-pick",
+   "category": "compare",
+   "name": "hover / select in compare graphics",
+   "where": "common faces highlight; base-only / target-only geometry not selectable",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3487"
+  },
+  {
+   "id": "cmp-no-differences-tab",
+   "category": "compare",
+   "name": "Compare has found no differences.",
+   "where": "open a tab with no differences: empty list, grey model",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4718"
+  },
+  {
+   "id": "cmp-feature-studio",
+   "category": "compare",
+   "name": "Feature Studio compare",
+   "where": "open a Feature Studio in compare: two diff editors",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4723"
+  },
+  {
+   "id": "cmp-two-entries",
+   "category": "compare",
+   "name": "compare two history entries",
+   "where": "header Compare history entries › pick two rows › \"Comparing V3 and V2\"",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:4712"
+  },
+  {
+   "id": "cmp-missing-tab-toast",
+   "category": "compare",
+   "name": "Can't open tab. The tab does not exist in this document comparison.",
+   "where": "compare when the current tab is missing",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:4715"
+  },
+  {
+   "id": "cmp-leave-workspace-row",
+   "category": "compare",
+   "name": "leave compare",
+   "where": "click the workspace row (no close button on the bar)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:3518"
+  },
+  {
+   "id": "cmp-leave-other-row",
+   "category": "compare",
+   "name": "open another version from compare",
+   "where": "click another version row: leaves compare, opens it",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:2638"
+  },
+  {
+   "id": "mg-dialog",
+   "category": "merge",
+   "name": "Merging changes into [Main] from [B1]",
+   "where": "workspace row › Merge into current workspace…",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5015"
+  },
+  {
+   "id": "mg-overall-keep",
+   "category": "merge",
+   "name": "Keep [Main]",
+   "where": "merge dialog overall strategy card",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5031"
+  },
+  {
+   "id": "mg-overall-merge",
+   "category": "merge",
+   "name": "Merge changes",
+   "where": "merge dialog overall strategy card (default)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5032"
+  },
+  {
+   "id": "mg-overall-replace",
+   "category": "merge",
+   "name": "Replace with [B1]",
+   "where": "merge dialog overall strategy card",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5033"
+  },
+  {
+   "id": "mg-compare-with-base",
+   "category": "merge",
+   "name": "Compare with base ↗",
+   "where": "strategy card link: opens compare against the merge base in a new browser tab",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5075"
+  },
+  {
+   "id": "mg-tab-strategy",
+   "category": "merge",
+   "name": "Tab merge strategy",
+   "where": "per-tab select: Keep / Merge changes from both / Replace (drawings and new tabs: Keep / Replace); override shows yellow corner",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5062"
+  },
+  {
+   "id": "mg-tab-info",
+   "category": "merge",
+   "name": "ⓘ out of date / Open in <ws>",
+   "where": "drawing row icons: tooltip \"… edits from separate branches cannot be merged.\", open in the other workspace",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5055"
+  },
+  {
+   "id": "mg-unchanged-toggle",
+   "category": "merge",
+   "name": "N tabs have no changes",
+   "where": "merge dialog group header, click to collapse/expand",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5066"
+  },
+  {
+   "id": "mg-merge",
+   "category": "merge",
+   "name": "Merge",
+   "where": "merge dialog footer",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5072"
+  },
+  {
+   "id": "mg-cancel",
+   "category": "merge",
+   "name": "Cancel",
+   "where": "merge dialog footer (also ✕)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:5073"
+  },
+  {
+   "id": "mg-help",
+   "category": "merge",
+   "name": "(?) help",
+   "where": "merge dialog footer",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5071"
+  },
+  {
+   "id": "mg-into-protected",
+   "category": "merge",
+   "name": "merge into a protected workspace",
+   "where": "yellow warning \"Workspace protection has been enabled. …\", Merge disabled",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:5586"
+  },
+  {
+   "id": "ref-change-to-version",
+   "category": "other",
+   "name": "Change to version…",
+   "where": "assembly instance or drawing tab right-click › Reference manager panel",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1456"
+  },
+  {
+   "id": "ref-update-to-latest",
+   "category": "other",
+   "name": "Update to latest › Update all",
+   "where": "Reference manager first tab",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1458"
+  },
+  {
+   "id": "ref-selective-update",
+   "category": "other",
+   "name": "Selective update › Update selected",
+   "where": "Reference manager second tab: per-document checkbox",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1458"
+  },
+  {
+   "id": "ref-version-graph-pick",
+   "category": "other",
+   "name": "Version graph",
+   "where": "Reference manager Selective update ⎇ / insert pickers' Version graph button: pick a version node",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1459"
+  },
+  {
+   "id": "ref-update-all-toolbar",
+   "category": "other",
+   "name": "Update all references to latest versions",
+   "where": "assembly toolbar button (enabled when newer versions exist)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1208"
+  },
+  {
+   "id": "ref-outdated-indicators",
+   "category": "other",
+   "name": "Newer versions of linked documents available",
+   "where": "blue version badge on instances / drawing tab",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:1460"
+  },
+  {
+   "id": "rel-release-menu",
+   "category": "release",
+   "name": "Release…",
+   "where": "part / Assembly / Drawing / file tab right-click (Upgrade badge in live Free)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:220"
+  },
+  {
+   "id": "rel-upsell",
+   "category": "release",
+   "name": "Explore Onshape's premium features (Release management upsell)",
+   "where": "Release… on live's Free plan",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:220"
+  },
+  {
+   "id": "rel-rc-dialog",
+   "category": "release",
+   "name": "Create Release candidate",
+   "where": "Release… / panel header Release…: items with Revision, State, Part number",
+   "freq": 2,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-add-items",
+   "category": "release",
+   "name": "Add items",
+   "where": "Create Release candidate dialog (pick from the version graph)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:61"
+  },
+  {
+   "id": "rel-rc-filter",
+   "category": "release",
+   "name": "search / filter items",
+   "where": "Create Release candidate dialog › search, type filter icons, Clear",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-edit-props",
+   "category": "release",
+   "name": "Edit properties",
+   "where": "Create Release candidate dialog › per-item properties view, Apply / Go back",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-attention",
+   "category": "release",
+   "name": "items requiring attention",
+   "where": "Create Release candidate dialog › error count toggle",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-generate-pn",
+   "category": "release",
+   "name": "Generate missing part numbers",
+   "where": "Create Release candidate dialog",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-refresh",
+   "category": "release",
+   "name": "Refresh",
+   "where": "Create Release candidate dialog title button",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-revert",
+   "category": "release",
+   "name": "Revert to last revision",
+   "where": "State column button per item / on the header",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-save-draft",
+   "category": "release",
+   "name": "Save draft",
+   "where": "Create Release candidate dialog bottom left",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-drafts-panel",
+   "category": "release",
+   "name": "Release drafts",
+   "where": "Release drafts panel: edit, submit, delete a draft",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+  },
+  {
+   "id": "rel-rc-release",
+   "category": "release",
+   "name": "Release",
+   "where": "Create Release candidate dialog (release immediately; creates a version)",
+   "freq": 2,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_release_management.htm"
+  },
+  {
+   "id": "rel-rc-submit",
+   "category": "release",
+   "name": "Submit",
+   "where": "Create Release candidate dialog with approvers",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_release_management.htm"
+  },
+  {
+   "id": "rel-graph-icons",
+   "category": "release",
+   "name": "Release candidate / Release / Contains obsoletion rows",
+   "where": "version graph icons for pending (△) and released (▲) versions",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:56"
+  },
+  {
+   "id": "rel-revision-history",
+   "category": "release",
+   "name": "Revision history",
+   "where": "released part / tab right-click › Revision history dialog",
+   "freq": 2,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-rh-view-release",
+   "category": "release",
+   "name": "View release",
+   "where": "Revision history dialog › Review release dialog",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-rh-export",
+   "category": "release",
+   "name": "Export",
+   "where": "Revision history dialog row",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-rh-open-version",
+   "category": "release",
+   "name": "open released version",
+   "where": "Revision history dialog › click the version name (new browser tab)",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-obsolete-revision",
+   "category": "release",
+   "name": "Obsolete revision",
+   "where": "Revision history dialog › Create Obsolete candidate",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-obsolete-rereleasable",
+   "category": "release",
+   "name": "Mark revision as re-releasable",
+   "where": "Create Obsolete candidate checkbox",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-obsolete-add-items",
+   "category": "release",
+   "name": "Add to Obsolete candidate",
+   "where": "Create Obsolete candidate › Add Items to Obsolete candidate › Add",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-obsolete-commit",
+   "category": "release",
+   "name": "Obsolete",
+   "where": "Create Obsolete candidate (no approver)",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-view-obsoletion",
+   "category": "release",
+   "name": "View obsoletion",
+   "where": "Revision history dialog after obsoleting",
+   "freq": 3,
+   "cloud": false,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "rel-props-revision-state",
+   "category": "release",
+   "name": "Part number / Revision / State / Not revision managed",
+   "where": "part / tab Properties… fields (State In progress / Pending / Released / Obsolete / Rejected / Discarded)",
+   "freq": 2,
+   "cloud": false,
+   "source": "behaviours.md:29640"
+  },
+  {
+   "id": "rel-settings",
+   "category": "release",
+   "name": "Release management settings",
+   "where": "company settings › Release management: revision scheme, part numbering, release conditions, watermarks, revision tools",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:9231"
+  },
+  {
+   "id": "rel-workflow-diagrams",
+   "category": "release",
+   "name": "Release workflow / Obsoletion workflow",
+   "where": "Release management settings tabs (Onshape default workflows)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:9238"
+  },
+  {
+   "id": "rel-revtable-template",
+   "category": "release",
+   "name": "Edit revision table template",
+   "where": "Release management settings › Revisions and part numbers › Revision table template › Edit",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:11502"
+  },
+  {
+   "id": "rel-revision-table",
+   "category": "release",
+   "name": "Revision table",
+   "where": "drawing toolbar table group (absent on live's Free plan; unrecordable)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:1405"
+  },
+  {
+   "id": "rel-revision-table-props",
+   "category": "release",
+   "name": "Revision table properties…",
+   "where": "right-click a revision table (unrecordable on Free)",
+   "freq": 3,
+   "cloud": false,
+   "source": "REQUESTS.md (dx 17:57, answered)"
+  },
+  {
+   "id": "rel-revision-callout",
+   "category": "release",
+   "name": "Add revision callout",
+   "where": "right-click a revision table (unrecordable on Free)",
+   "freq": 3,
+   "cloud": false,
+   "source": "REQUESTS.md (dx 17:57, answered)"
+  },
+  {
+   "id": "rel-approve-reject",
+   "category": "release",
+   "name": "Approve / Reject",
+   "where": "Review release dialog, as an approver",
+   "freq": 3,
+   "cloud": true,
+   "source": "ui2-help/raw/Release_release_management.htm"
+  },
+  {
+   "id": "rel-approvers-observers",
+   "category": "release",
+   "name": "Approvers / Observers",
+   "where": "Create Release candidate fields; email + in-app notifications",
+   "freq": 3,
+   "cloud": true,
+   "source": "ui2-help/raw/Release_release_management.htm"
+  },
+  {
+   "id": "rel-custom-workflows",
+   "category": "release",
+   "name": "Customizable release workflows",
+   "where": "Enterprise custom FeatureScript release / obsoletion workflows",
+   "freq": 3,
+   "cloud": true,
+   "source": "dom/upsell-release-management-modal.txt"
+  },
+  {
+   "id": "rel-upsell-trial",
+   "category": "release",
+   "name": "Start Professional Trial / Chat now / Plans and pricing",
+   "where": "upsell modal footer",
+   "freq": 3,
+   "cloud": true,
+   "source": "behaviours.md:220"
+  },
+  {
+   "id": "rel-comments",
+   "category": "release",
+   "name": "release comments / notes",
+   "where": "comments on a release at any stage",
+   "freq": 3,
+   "cloud": true,
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+  },
+  {
+   "id": "sc-create-version",
+   "category": "shortcut",
+   "name": "Create version",
+   "where": "Preferences › Keyboard shortcuts: assignable, Unassigned by default",
+   "freq": 3,
+   "cloud": false,
+   "source": "dom/customize-keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+alt+v"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "sc-compare-esc",
+   "category": "shortcut",
+   "name": "Esc in compare",
+   "where": "Esc does nothing in compare mode (URL stays /and/)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3517"
+  },
+  {
+   "id": "sc-esc-create-version",
+   "category": "shortcut",
+   "name": "Esc closes Create version",
+   "where": "Esc closes only the Create version modal (over a picker)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:6844",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+alt+v"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Create version…"
+      }
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
+  },
+  {
+   "id": "repair-panel",
+   "category": "other",
+   "name": "Repair panel",
+   "where": "View in repair / Repair mode: docked panel \"Viewing <entry>\" with its own view-only graphics",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3318"
+  },
+  {
+   "id": "repair-sync-view",
+   "category": "other",
+   "name": "Synchronize view",
+   "where": "Repair panel toggle (on by default)",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3322"
+  },
+  {
+   "id": "repair-open-new-tab",
+   "category": "other",
+   "name": "Open in new browser tab ↗",
+   "where": "Repair panel pill icon",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3320"
+  },
+  {
+   "id": "repair-close",
+   "category": "other",
+   "name": "Repair panel (close)",
+   "where": "right strip wrench closes the panel",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3324"
+  },
+  {
+   "id": "repair-zoom-to-fit",
+   "category": "other",
+   "name": "Zoom to fit",
+   "where": "right-click inside the Repair graphics",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:3326"
+  },
+  {
+   "id": "edit-healthy-moment",
+   "category": "other",
+   "name": "Edit healthy moment of <feature>…",
+   "where": "failed feature right-click: searches recent history for a healthy state",
+   "freq": 3,
+   "cloud": false,
+   "source": "behaviours.md:28510"
+  }
+ ],
+ "gaps": [
+  "Restore to Main… dialog (version / change row): its text, buttons, and what happens to tabs added since",
+  "Delete workspace: the confirmation dialog (or none), and deleting the open workspace",
+  "Restore deleted workspaces… dialog (☰): list, buttons, empty state",
+  "Update workspace… (☰): what it opens and does",
+  "Navbar workspace / version name: single and double click (does it open Versions and history or rename?), and the versions/branches counter's click",
+  "Open in new browser tab / Copy link from rows: the URL and any toast (\"Link copied\")",
+  "Hide automatic versions: the 'off' tooltip and what an automatic version row looks like",
+  "Hide merges off: how merge history entries show in the graph",
+  "Enter in the Search history box (not captured), and search results: matching rows, highlighting, empty state, and the clear (⊗) button",
+  "Keyboard on the history list: arrow keys, Enter, Delete on rows (if any)",
+  "Branch / Create version validation: empty or duplicate names, the 10000-character limit message",
+  "Version row right-click while viewing that version (menu differences), and on Start",
+  "Merge result: what history shows after Merge (merge entry, chips), and merging a branch into itself or with no changes",
+  "Compare between two workspaces, and between a workspace and a history entry: the bar wording",
+  "Compare in a Variable Studio and in a Drawing (not supported tooltip) opened via the dots",
+  "Release / Release candidate rows' right-click menus in the graph (paid plan)",
+  "Create Release candidate, Review release, Revision history and Create Obsolete candidate dialogs live (paid plan; only help-centre images now)",
+  "Revision table tool, its properties and revision callouts on a drawing (paid plan; unrecordable on the Free account)",
+  "Workspace protection: tooltip on the disabled checkbox and the protected Assembly / Variable Studio views"
+ ],
+ "about": "Versions, branches, history, release: what live has (behaviours.md, live/dom, help pages for the paid-plan release items), studios 2026-11-07; coverage: tools/ui-parity/coverage_versions.py"
+}

@@ -1,0 +1,21 @@
+{
+ "name": "prefs-decimal-comma",
+ "about": "Preferences › Decimal format: tick Use comma as decimal separator, Save decimal format",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Decimal format › Use comma as decimal separator"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Decimal format › Save decimal format"
+   }
+  }
+ ]
+}

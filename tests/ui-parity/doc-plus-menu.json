@@ -1,0 +1,19 @@
+{
+ "name": "doc-plus-menu",
+ "about": "the tab bar's +: its menu",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

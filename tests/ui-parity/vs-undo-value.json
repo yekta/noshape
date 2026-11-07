@@ -1,0 +1,33 @@
+{
+ "name": "vs-undo-value",
+ "about": "edit a value, then Ctrl+Z",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "50"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "mod+z"
+  }
+ ]
+}

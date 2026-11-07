@@ -1,0 +1,29 @@
+{
+ "name": "vs-add-variable",
+ "about": "the italic Name row: type a name, Enter: a Length variable at 0 mm, the next Name row focused",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Variable Studio batch 1)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "Name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "depth"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "name": "doc-units-length-inch",
+ "about": "☰ › Workspace units…, Length default unit › Inch, ✓: the panel closes, the document is in inches; the panel again shows the new value",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Length default unit",
+    "pick": "Inch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace units…"
+   }
+  }
+ ]
+}

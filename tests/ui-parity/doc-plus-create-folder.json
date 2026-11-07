@@ -1,0 +1,29 @@
+{
+ "name": "doc-plus-create-folder",
+ "about": "+ › Create folder: 'Folder 1' after the active tab, its name a field; type, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 1)",
+ "start": "doc-new",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create folder"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Fixtures"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "docs-create-document-cancel",
+ "about": "Create › Document…: the New document modal, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Document…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

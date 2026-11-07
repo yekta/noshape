@@ -13,9 +13,29 @@ pub fn active() -> bool {
     *ON.get_or_init(|| std::env::var_os("NOSHAPE_UI_SCRIPT").is_some())
 }
 
-fn bounds() -> &'static Mutex<HashMap<String, Bounds<Pixels>>> {
-    static B: OnceLock<Mutex<HashMap<String, Bounds<Pixels>>>> = OnceLock::new();
+fn bounds() -> &'static Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>> {
+    static B: OnceLock<Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>>> = OnceLock::new();
     B.get_or_init(Default::default)
+}
+
+type PageState = std::rc::Rc<dyn Fn(&mut Window, &mut App) -> serde_json::Value>;
+
+thread_local! {
+    static PAGES: std::cell::RefCell<HashMap<WindowId, PageState>> = Default::default();
+}
+
+/// How the driver reads window `window`'s state (README "state"): each kind of window (a document, the documents
+/// page, Preferences) registers its reader when it opens.
+pub fn register_page(window: WindowId, state: impl Fn(&mut Window, &mut App) -> serde_json::Value + 'static) {
+    if active() {
+        PAGES.with(|p| p.borrow_mut().insert(window, std::rc::Rc::new(state)));
+    }
+}
+
+/// The state of window `window`, read by its registered reader.
+pub fn page_state(window: &mut Window, cx: &mut App) -> Option<serde_json::Value> {
+    let f = PAGES.with(|p| p.borrow().get(&window.window_handle().window_id()).cloned())?;
+    Some(f(window, cx))
 }
 
 /// `el` recording its bounds under `name` each time it is painted.
@@ -26,9 +46,9 @@ pub fn mark<E: ParentElement>(el: E, name: impl FnOnce() -> String) -> E {
     let name = name();
     el.child(
         canvas(
-            move |b, _, _| {
+            move |b, window, _| {
                 if let Ok(mut m) = bounds().lock() {
-                    m.insert(name.clone(), b);
+                    m.insert(name.clone(), (window.window_handle().window_id(), b));
                 }
             },
             |_, _, _, _| {},
@@ -106,6 +126,56 @@ pub fn note_dialog(dialog: impl FnOnce() -> serde_json::Value) {
     }
 }
 
+fn fields_slot() -> &'static Mutex<Vec<serde_json::Value>> {
+    static F: OnceLock<Mutex<Vec<serde_json::Value>>> = OnceLock::new();
+    F.get_or_init(Default::default)
+}
+
+/// A field of the panel being drawn (`{"label", "kind", "text"}`), taken by the panel's [`note_dialog_fields`].
+pub fn note_field(field: impl FnOnce() -> serde_json::Value) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut f) = fields_slot().lock() {
+        f.push(field());
+    }
+}
+
+/// The fields noted since the last take (a page's: Preferences).
+pub fn take_fields() -> Vec<serde_json::Value> {
+    let all = fields_slot().lock().map(|mut f| std::mem::take(&mut *f)).unwrap_or_default();
+    // A page drawn more than once since: each field once, as last drawn, in the order first drawn.
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for f in all {
+        match out.iter_mut().find(|o| o["label"] == f["label"]) {
+            Some(o) => *o = f,
+            None => out.push(f),
+        }
+    }
+    out
+}
+
+/// A panel drawn now (☰ › Workspace units…) as `state.dialog`, with the fields noted since the last one.
+pub fn note_dialog_fields(title: &str) {
+    if !active() {
+        return;
+    }
+    let fields = fields_slot().lock().map(|mut f| std::mem::take(&mut *f)).unwrap_or_default();
+    note_dialog(|| serde_json::json!({ "title": title, "kind": "other", "tabs": [], "fields": fields, "error": null, "ok": "enabled" }));
+}
+
+/// A modal drawn now by its title alone, unless the frame noted it (or another) in full with [`note_dialog`].
+pub fn note_modal(title: &str) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut d) = dialog_slot().lock()
+        && d.is_none()
+    {
+        *d = Some(serde_json::json!({ "kind": "modal", "title": title, "fields": [], "buttons": [] }));
+    }
+}
+
 /// The modal drawn since the last [`clear_dialog`], if any.
 pub fn open_dialog() -> Option<serde_json::Value> {
     dialog_slot().lock().ok()?.clone()
@@ -114,6 +184,9 @@ pub fn open_dialog() -> Option<serde_json::Value> {
 pub fn clear_dialog() {
     if let Ok(mut d) = dialog_slot().lock() {
         *d = None;
+    }
+    if let Ok(mut f) = fields_slot().lock() {
+        f.clear();
     }
 }
 
@@ -126,12 +199,17 @@ pub fn clear() {
 
 /// The bounds `name` had when last painted.
 pub fn bounds_of(name: &str) -> Option<Bounds<Pixels>> {
+    bounds().lock().ok()?.get(name).map(|(_, b)| *b)
+}
+
+/// The window `name` was last painted in, with its bounds there.
+pub fn window_bounds_of(name: &str) -> Option<(WindowId, Bounds<Pixels>)> {
     bounds().lock().ok()?.get(name).copied()
 }
 
 /// Every recorded name starting with `prefix`, with its bounds.
 pub fn named(prefix: &str) -> Vec<(String, Bounds<Pixels>)> {
-    bounds().lock().map(|m| m.iter().filter(|(k, _)| k.starts_with(prefix)).map(|(k, b)| (k.clone(), *b)).collect()).unwrap_or_default()
+    bounds().lock().map(|m| m.iter().filter(|(k, _)| k.starts_with(prefix)).map(|(k, (_, b))| (k.clone(), *b)).collect()).unwrap_or_default()
 }
 
 /// `state.focus` for a text field with the keyboard: its text and selection in characters.

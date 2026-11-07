@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-length-inch",
+ "about": "Preferences › Units: Length default unit › Inch enables Save changes; Save",
+ "area": "studios",
+ "source": "everyday (studios 11-07, Documents batch 2)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Length default unit",
+    "pick": "Inch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

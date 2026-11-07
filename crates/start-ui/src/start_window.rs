@@ -75,6 +75,14 @@ pub fn show(cx: &mut App) {
     match crate::os_menu::open_window(options, cx, |window, cx| {
         window.set_window_title("Documents — noshape");
         let view = cx.new(|cx| StartView::new(window, cx));
+        // The ui-parity driver's documents page (tests/ui-parity/README.md "Documents page and Preferences").
+        let weak = view.downgrade();
+        crate::ui_script::register_page(window.window_handle().window_id(), move |window, cx| {
+            weak.upgrade().map(|v| {
+                v.update(cx, |v, cx| v.ui_redraw(cx));
+                v.read(cx).ui_state(window, cx)
+            }).unwrap_or(serde_json::Value::Null)
+        });
         let fh = view.read(cx).focus.clone();
         window.defer(cx, move |window, cx| fh.focus(window, cx));
         view
@@ -2294,7 +2302,7 @@ impl StartView {
                                         .border_color(pal.border_strong)
                                         .rounded_l(px(2.))
                                         // The whole box left of the ▾ takes clicks (input_frame).
-                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
+                                        .child(gpui_kit::base::input::input_frame(div().flex_1().h_full().flex().items_center().map(|d| crate::ui_script::mark(d, || "field:Search".into())).child(Input::new(&self.search).text_size(px(14.)).appearance(false).small().h(px(26.)).cleanable(true).pl(px(12.)))))
                                         .child(
                                             div()
                                                 .id("adv-caret")
@@ -2354,6 +2362,7 @@ impl StartView {
         h_flex()
             .id(id)
             .relative()
+            .map(|d| crate::ui_script::mark(d, || format!("nav:{label}")))
             .h(px(32.))
             .pl(px(19.))
             .gap(px(6.))
@@ -2378,6 +2387,7 @@ impl StartView {
         let lit = crate::os_ui::dropdown_open("create-dd", cx) || self.create_focus.is_focused(window);
         let create = div()
             .id("create")
+            .map(|d| crate::ui_script::mark(d, || "button:Create".into()))
             .track_focus(&self.create_focus)
             .w(px(150.))
             .h(px(34.))
@@ -2427,6 +2437,57 @@ impl StartView {
                     .child(self.nav_item("nav-trash", os::GLYPH_TRASH, "Trash", Source::Trash, cx)),
             )
             .into_any_element()
+    }
+
+    /// Every control repainted (the body is a cached slice): the ui-parity driver's marks.
+    fn ui_redraw(&mut self, cx: &mut Context<Self>) {
+        if let Some(b) = &self.body {
+            b.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
+    }
+
+    /// The ui-parity state of the documents page (tests/ui-parity/README.md "Documents page and Preferences").
+    fn ui_state(&self, window: &Window, cx: &App) -> serde_json::Value {
+        let focus = if self.search.read(cx).focus_handle(cx).is_focused(window) {
+            let mut f = crate::ui_script::field_focus("", self.search.read(cx));
+            f["kind"] = "other".into();
+            f["label"] = serde_json::Value::Null;
+            f
+        } else if window.focused(cx).is_some() {
+            serde_json::json!({ "kind": "other" })
+        } else {
+            serde_json::json!({ "kind": "none" })
+        };
+        let selected = self.selected.as_ref().map(|p| self.docs.iter().find(|d| d.path == *p).map(|d| d.name.clone()).unwrap_or_else(|| folder_label(p)));
+        let panel = self.panel.map(|p| match p {
+            DocPanel::Details => "Details",
+            DocPanel::Versions => "Versions and history",
+            DocPanel::Properties => "Properties",
+            DocPanel::Notes => "Document notes",
+        });
+        serde_json::json!({
+            "focus": focus,
+            "dialog": crate::ui_script::open_dialog(),
+            "list": crate::os_menu::ui_state(cx).or_else(crate::ui_script::open_list),
+            "selection": { "count": 0, "items": [] },
+            "features": null,
+            "parts": [],
+            "message": null,
+            "tooltip": null,
+            "undo": null,
+            "sketch": null,
+            "drawing": null,
+            "document": null,
+            "documents": {
+                "place": self.source_title(),
+                "selected": selected,
+                "search": self.query,
+                "panel": panel,
+                "advanced": self.adv_open,
+                "columns": self.cols_open,
+            },
+        })
     }
 
     fn source_title(&self) -> String {
@@ -2595,6 +2656,7 @@ impl StartView {
             tiles = tiles.child(
                 h_flex()
                     .id(SharedString::from(format!("folder-{i}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("doc_row:{name}")))
                     .w(px(267.))
                     .h(px(48.))
                     .px(px(8.))
@@ -3258,6 +3320,7 @@ impl StartView {
                 let cell = |w: f32| div().w(px(w)).flex_none().pl(px(16.)).truncate();
                 h_flex()
                     .id(SharedString::from(format!("row-{ix}")))
+                    .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
                     .h(px(42.))
                     .flex_none()
                     .cursor_pointer()
