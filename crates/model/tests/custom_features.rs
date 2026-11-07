@@ -1514,6 +1514,39 @@ export const hostProbe = defineFeature(function(context is Context, id is Id, de
     assert_ok(&r);
 }
 
+/// An extrude up to a part it starts on, its sides flush with the part's (cf-mortise-and-tenon's tenon): its end cap is
+/// the far face alone, its start cap the start face, read as a std before CapType asks (`qCapEntity(id, isStartCap)`,
+/// a `startCap` boolean: std 355-1494).
+#[test]
+fn an_up_to_body_extrudes_caps_on_an_old_std() {
+    let body = r#"
+annotation { "Feature Type Name" : "Cap probe" }
+export const capProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "block", { "corner1" : vector(0, -100, -25) * millimeter, "corner2" : vector(100, 100, 25) * millimeter });
+        const s = newSketchOnPlane(context, id + "s", { "sketchPlane" : plane(vector(0, 0, 0) * millimeter, vector(1, 0, 0), vector(0, 1, 0)) });
+        skRectangle(s, "r", { "firstCorner" : vector(-50, -25) * millimeter, "secondCorner" : vector(50, 25) * millimeter });
+        skSolve(s);
+        opExtrude(context, id + "tenon", { "entities" : qCreatedBy(id + "s", EntityType.FACE), "direction" : vector(1, 0, 0),
+                                           "endBound" : BoundingType.UP_TO_BODY, "endBoundEntity" : qCreatedBy(id + "block", EntityType.BODY) });
+        for (var start in [false, true])
+        {
+            const caps = evaluateQuery(context, qEntityFilter(qCapEntity(id + "tenon", start), EntityType.FACE));
+            const want = start ? 0 * millimeter : 100 * millimeter;
+            if (size(caps) != 1 || abs(evPlane(context, { "face" : caps[0] }).origin[0] - want) > 1e-9 * meter)
+                throw regenError((start ? "start" : "end") ~ " caps: " ~ size(caps));
+        }
+    });
+"#;
+    let fx = Fixture::new(&format!("FeatureScript 1494;\nimport(path : \"onshape/std/geometry.fs\", version : \"1494.0\");\n{body}"));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("capProbe"), &fx.units).unwrap();
+    ps.features.push(f);
+    let r = fx.regen(&mut Regenerator::new(), &ps);
+    assert_ok(&r);
+}
+
 /// evSurfaceDefinition of a B-spline face: std's BSplineSurface with live's
 /// keys (live "fs (10-25 b)" (2): a loft from a circle to a rectangle).
 #[test]

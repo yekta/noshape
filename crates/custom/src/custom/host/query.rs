@@ -1667,7 +1667,12 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "CAP_ENTITY" => {
             let Some(id) = id_of(query.get("featureId")) else { return Ok(Vec::new()) };
-            let cap = query.get("capType").as_str().unwrap_or_else(|| "EITHER".into());
+            // (Before CapType a std wrote `startCap`, a boolean: std 355-1494's qCapEntity(id, isStartCap).)
+            let cap = query.get("capType").as_str().unwrap_or_else(|| match query.get("startCap").as_bool() {
+                Some(true) => "START".into(),
+                Some(false) => "END".into(),
+                None => "EITHER".into(),
+            });
             let faces: Vec<Ent> = q.all(Some(EType::Face)).into_iter().filter(|e| q.cap_of(e).is_some_and(|(c, op)| has_prefix(&op, &id) && (&*cap == "EITHER" || c == &*cap))).collect();
             // Without an entity type: every cap entity, faces, their edges and vertices (qNonCapEntity subtracts
             // them from a feature's edges; the Spur Gear's root fillet takes the non-cap edges).
