@@ -4509,6 +4509,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 q["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| Some((p["name"].as_str()?.to_string(), p["volume"].as_f64().unwrap_or(0.0) * k * k * k))).collect()
             })
             .unwrap_or_default();
+        // Parts of the same volume are taken one each (alike parts place alike), then shared.
+        let mut taken: Vec<String> = Vec::new();
         for p in parts.as_array().into_iter().flatten() {
             let (Some(pid), Some(pname)) = (p["partId"].as_str(), p["name"].as_str()) else { continue };
             let band = p["volume"].as_array().and_then(|b| Some((b.first()?.as_f64()?, b.get(1)?.as_f64()?)));
@@ -4518,11 +4520,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 only.clone()
             } else {
                 let fits: Vec<&String> = band.map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n).collect()).unwrap_or_default();
-                match fits.as_slice() {
-                    [one] => (*one).clone(),
-                    _ => pname.to_string(),
+                match fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
+                    Some(n) => (*n).clone(),
+                    None => pname.to_string(),
                 }
             };
+            taken.push(ours.clone());
             part_names.insert((element.clone(), pid.to_string()), ours);
         }
     }
