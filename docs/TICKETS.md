@@ -2854,6 +2854,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   no list**, live (re-recorded 11-07 03:09, 43f4389bc) a select-other list ("Front plane / Face of Extrude 1 / Part 1 / Edge of
   Extrude 1 / …") and a Select other panel. It matched before only because the old recording had no list either. Fails 4 / 4
   run alone on green 917d4c4c. Either ours doesn't open the list or the state dump doesn't report it. (qa 2026-11-07 07:16)
+- [ ] P2 UIP-ASM-FACE-MENU-FLAKY (asm) **assembly face-menu scenarios differ in the 6-shard suite run, not alone**: in the
+  13:32 run (green 1c5e1be5) asm-face-menu and asm-face-menu-view-normal-to differ at step 1, `.list.rows[22]`: live "View normal
+  to" / ours "Delete Part 2 <1>" (the right-click's menu as if the part were selected). Both match 2 / 2 run alone on the same
+  green (tools/ui-parity/run.py --display :479). asm-face-menu matched in the 09:40 run, and no recording changed in between.
+  Separately, asm-face-menu-clear-selection differs every time, also alone: step 2 `.list.highlighted` live 24 / ours null.
+  (qa 2026-11-07 14:30)
 - [ ] P2 UIP-DRW-START-FLAKY (dx) **drawing scenarios differ at their start state in the 6-shard suite run, not alone**:
   `.drawing.views[0].scale` live "1:1" / ours null at the start (the view not ready when the state is read). 10 drw-*
   scenarios at 01:25 (green 04121633: bom-table, broken-out-section, centerline-circle-3-point, centermark, detail-view,
