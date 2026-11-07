@@ -875,10 +875,15 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
   hb.add_mapped(0, REL_FIRST, [&](const TopoDS_Shape& s) {
     return images_of(spH, prism.FirstShape(moved(s)));
   });
-  // End cap(s): result faces that come from the target.
+  // End cap(s): result faces that come from the target only (a start cap or side lying on a target face is the
+  // prism's own: cf-mortise-and-tenon's tenon starts on the mortise and runs along its top and bottom).
+  ShapeIMap prismFaces;
+  for (TopExp_Explorer e(longPrism, TopAbs_FACE); e.More(); e.Next())
+    for (const TopoDS_Shape& img : images_vec(spH, e.Current()))
+      prismFaces.Add(img);
   std::vector<TopoDS_Shape> caps;
   for (TopExp_Explorer f(result, TopAbs_FACE); f.More(); f.Next())
-    if (targetFaces.Contains(f.Current()))
+    if (targetFaces.Contains(f.Current()) && !prismFaces.Contains(f.Current()))
       caps.push_back(f.Current());
   hb.add_cap(0, REL_LAST, compound_of(caps));
   return hb.finish();
