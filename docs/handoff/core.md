@@ -16,7 +16,7 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-07 16:46 UTC: dx's c2 list (2132 rerun).**
+**State 11-07 16:23 UTC: dx's c2 list (2132 rerun).**
 - c2-valve-config Extrude 3 (11 circle / 48 other for 9 / 50): Sketch 3 is a text entity; one glyph segment, 0.039 mm,
   is a circle in live and a B-spline in ours, top and bottom of the extruded letters. Text glyph curves (skasm's / the
   sketch text's): live's rule for which segments become circles unknown.
