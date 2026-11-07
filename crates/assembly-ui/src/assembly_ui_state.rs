@@ -478,6 +478,17 @@ impl AssemblyView {
                             fields.push(number(json!("Distance"), quantity(&s.distance2)));
                             fields.push(number(json!("Instance count"), quantity(&s.count2)));
                             fields.push(toggle(s.opposite2));
+                            fields.push(check("Equal spacing", s.equal2));
+                            fields.push(check("Centered", s.centered2));
+                            fields.push(check("Third direction", s.third));
+                            if s.third {
+                                fields.push(query("Direction", axis(&s.axis3, false), s.active == Some(2), false));
+                                fields.push(number(json!("Distance"), quantity(&s.distance3)));
+                                fields.push(number(json!("Instance count"), quantity(&s.count3)));
+                                fields.push(toggle(s.opposite3));
+                                fields.push(check("Equal spacing", s.equal3));
+                                fields.push(check("Centered", s.centered3));
+                            }
                         }
                     }
                 }

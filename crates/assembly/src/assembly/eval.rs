@@ -3112,7 +3112,7 @@ impl AssemblyEvaluator {
                 stored.get(&rep).copied().unwrap_or_default().mul(f)
             };
             let make: Box<FollowMaker> = match &p.kind {
-                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, .. } => {
+                PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, third, .. } => {
                     let (ab, al) = match follow_of(direction) {
                         Ok(x) => x,
                         Err(e) => {
@@ -3120,33 +3120,32 @@ impl AssemblyEvaluator {
                             continue;
                         }
                     };
-                    let mut d1 = eval_len(&Some(distance.clone()), &units);
-                    if *equal_spacing && *count > 1 {
-                        d1 /= (*count - 1) as f64;
-                    }
-                    if *opposite {
-                        d1 = -d1;
-                    }
-                    let a_world = world_of(ab, &al);
-                    // Second direction expressed in the first direction's frame.
-                    let v2 = match second {
-                        Some(s) => match follow_of(&s.direction) {
-                            Ok((b2, l2)) => {
-                                let z2 = world_of(b2, &l2).z();
-                                let d2 = eval_len(&Some(s.distance.clone()), &units) * if s.opposite { -1.0 } else { 1.0 };
-                                a_world.rotation.inverse() * z2 * d2
-                            }
-                            Err(e) => {
-                                prepared.failed_patterns.push((p.id, e));
-                                continue;
-                            }
-                        },
-                        None => DVec3::ZERO,
+                    // A direction's step: its distance (over its count when spaced equally), against it when opposite.
+                    let step = |distance: &ExprValue, count: u32, equal: bool, opposite: bool| {
+                        let d = eval_len(&Some(distance.clone()), &units);
+                        let d = if equal && count > 1 { d / (count - 1) as f64 } else { d };
+                        if opposite { -d } else { d }
                     };
+                    let d1 = step(distance, *count, *equal_spacing, *opposite);
+                    let a_world = world_of(ab, &al);
+                    // The second and third directions' steps expressed in the first direction's frame.
+                    let mut more = [DVec3::ZERO; 2];
+                    let mut failed = None;
+                    for (slot, dir) in [second.as_ref(), third.as_deref().filter(|_| second.is_some())].into_iter().enumerate() {
+                        let Some(s) = dir else { continue };
+                        match follow_of(&s.direction) {
+                            Ok((b2, l2)) => more[slot] = a_world.rotation.inverse() * world_of(b2, &l2).z() * step(&s.distance, s.count, s.equal_spacing, s.opposite),
+                            Err(e) => failed = Some(e),
+                        }
+                    }
+                    if let Some(e) = failed {
+                        prepared.failed_patterns.push((p.id, e));
+                        continue;
+                    }
+                    let [v2, v3] = more;
                     Box::new(move |index, _, _| {
-                        let back = if index & super::CENTERED_BACK != 0 { -1.0 } else { 1.0 };
-                        let (i, j) = ((index & 0x7fff) as f64 * back, (index >> 16) as f64);
-                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j, DQuat::IDENTITY))))
+                        let [i, j, k] = super::grid_steps(index);
+                        Some((ab, al, FollowXform::Rigid(Frame::new(DVec3::Z * d1 * i + v2 * j + v3 * k, DQuat::IDENTITY))))
                     })
                 }
                 PatternKind::Circular { axis, angle, count, opposite, equal_spacing, .. } => {
@@ -3396,7 +3395,7 @@ impl AssemblyEvaluator {
 }
 
 /// Pattern index + seed + copy -> (axis body, axis frame, follower transform).
-type FollowMaker<'a> = dyn Fn(u32, InstanceId, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
+type FollowMaker<'a> = dyn Fn(u64, InstanceId, InstanceId) -> Option<(usize, Frame, FollowXform)> + 'a;
 
 fn prepared_pose(stored: &HashMap<InstanceId, Frame>, prepared: &Prepared, body: usize) -> Frame {
     let rep = stored.get(&prepared.reps[body]).copied().unwrap_or_default();

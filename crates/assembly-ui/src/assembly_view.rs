@@ -1185,6 +1185,7 @@ impl AssemblyView {
         if let Some(p) = &self.pattern {
             chosen.extend(p.axis.iter().cloned());
             chosen.extend(p.axis2.iter().cloned());
+            chosen.extend(p.axis3.iter().cloned());
         }
         if let Some(Some(src)) = &self.snap {
             chosen.push(src.clone());
@@ -2435,12 +2436,19 @@ impl AssemblyView {
             let c = if p.kind == PatternDialogKind::Linear { c.linear_direction() } else { c };
             // Live (auto-advance, request 1650): Direction (≤1) moves the focus on to the second Direction when it
             // shows, filled or not; the last direction field keeps it (a new pick replaces).
-            if slot == 0 {
-                p.axis = Some(c);
-                p.active = if p.second { Some(1) } else { Some(0) };
-            } else {
-                p.axis2 = Some(c);
-                p.active = Some(1);
+            match slot {
+                0 => {
+                    p.axis = Some(c);
+                    p.active = if p.second { Some(1) } else { Some(0) };
+                }
+                1 => {
+                    p.axis2 = Some(c);
+                    p.active = if p.third { Some(2) } else { Some(1) };
+                }
+                _ => {
+                    p.axis3 = Some(c);
+                    p.active = Some(2);
+                }
             }
             return;
         }

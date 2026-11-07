@@ -917,7 +917,7 @@ fn linear_pattern_along_an_edge() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction, distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        kind: PatternKind::Linear { direction, distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
@@ -934,6 +934,64 @@ fn linear_pattern_along_an_edge() {
             assert!((d.x.abs() - 0.025 * (k + 1) as f64).abs() < 1e-6 && d.y.abs() < 1e-6 && d.z.abs() < 1e-6, "copy {k} along the edge (X), only_mate {:?}: {d:?}", opts.only_mate);
         }
     }
+}
+
+/// Live 2204: a linear pattern's second and third directions, each with its own Equal spacing and Centered.
+#[test]
+fn a_linear_pattern_fills_three_directions() {
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    // The origin connector turned −90° about X: its Z along +Y.
+    let mut y = AsmMateConnector::new(MateId(61), "Mate connector 61".into(), MateConnectorRef::origin());
+    y.rotation_axis = 0;
+    y.rotation = Some(ExprValue::new("-90 deg"));
+    let mut asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), part_instance(2, "Block <1>", f.studios[0], body.clone(), DVec3::new(0.0, 0.1, 0.0), false)],
+        mates: vec![mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid))],
+        connectors: vec![x_axis_connector(60), y],
+        ..Default::default()
+    };
+    let dir = |id: u64| MateConnectorRef::assembly_connector(MateId(id), InstanceId::ORIGIN);
+    let further = |d: MateConnectorRef, distance: &str, count: u32, equal_spacing: bool, centered: bool| LinearDirection { direction: d, distance: ExprValue::new(distance), count, opposite: false, equal_spacing, centered };
+    asm.patterns.push(InstancePattern {
+        id: MateId(70),
+        name: "Linear pattern 1".into(),
+        kind: PatternKind::Linear {
+            direction: dir(60),
+            distance: ExprValue::new("25 mm"),
+            count: 2,
+            opposite: false,
+            equal_spacing: false,
+            // Second: 40 mm spread over 3 copies (20 mm apart), both ways from the seed.
+            second: Some(further(dir(61), "40 mm", 3, true, true)),
+            centered: false,
+            // Third: along the first direction's own Z (the X connector's axis turned, here its own axis again).
+            third: Some(Box::new(further(dir(60), "10 mm", 2, false, false))),
+        },
+        seeds: vec![InstanceId(2)],
+        generated: vec![],
+        suppressed: false,
+    });
+    let created = asm.sync_pattern(MateId(70));
+    // 2 × (1 + 2·2) × 2 places, less the seed.
+    assert_eq!(created.len(), 2 * 5 * 2 - 1);
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.pattern_errors.is_empty(), "{:?}", res.pattern_errors);
+    let seed = origin_of(&res, 2);
+    let mut offsets: Vec<(i64, i64)> = created.iter().map(|id| {
+        let d = DVec3::from(res.solved.placement(*id).unwrap().translation) - seed;
+        ((d.length() * 1000.0).round() as i64, (d.dot(DVec3::Y) * 1000.0).round() as i64)
+    }).collect();
+    offsets.sort();
+    // The second direction's copies at ±20 and ±40 mm.
+    for want in [-40, -20, 20, 40] {
+        assert!(offsets.iter().any(|(_, y)| *y == want), "a copy {want} mm along the second direction: {offsets:?}");
+    }
+    let indices: std::collections::HashSet<u64> = asm.patterns[0].generated.iter().map(|g| g.index).collect();
+    assert_eq!(indices.len(), created.len(), "every copy's index is its own");
 }
 
 /// Help "Assembly linear pattern" 7 / live qa5 dialog: Centered puts the
@@ -954,7 +1012,7 @@ fn centered_linear_pattern_goes_both_ways() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: true },
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: true, third: None },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
@@ -987,7 +1045,7 @@ fn linear_and_circular_instance_patterns() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
@@ -2117,7 +2175,7 @@ fn rename_hide_others_and_unfix_all() {
     asm.patterns.push(InstancePattern {
         id: MateId(30),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 2, opposite: false, equal_spacing: false, second: None, centered: false },
+        kind: PatternKind::Linear { direction: MateConnectorRef::assembly_connector(MateId(60), InstanceId::ORIGIN), distance: ExprValue::new("25 mm"), count: 2, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
         seeds: vec![InstanceId(1)],
         generated: vec![PatternInstance { seed: InstanceId(1), index: 1, instance: InstanceId(1), mate: None, target: None, more_mates: Vec::new() }],
         suppressed: false,
@@ -2392,7 +2450,7 @@ fn move_to_new_subassembly_takes_a_dependent_pattern() {
     asm.patterns.push(InstancePattern {
         id: MateId(70),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: conn(1, edge, Inference::Midpoint).linear_direction(), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        kind: PatternKind::Linear { direction: conn(1, edge, Inference::Midpoint).linear_direction(), distance: ExprValue::new("25 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
@@ -6252,7 +6310,7 @@ fn a_patterned_flexible_subassembly_follows_its_seed() {
         asm.patterns.push(InstancePattern {
             id: MateId(70),
             name: "Linear pattern 1".into(),
-            kind: PatternKind::Linear { direction: conn(1, x_edge.clone(), Inference::Midpoint).linear_direction(), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+            kind: PatternKind::Linear { direction: conn(1, x_edge.clone(), Inference::Midpoint).linear_direction(), distance: ExprValue::new("50 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
             seeds: vec![InstanceId(5)],
             generated: vec![],
             suppressed: false,

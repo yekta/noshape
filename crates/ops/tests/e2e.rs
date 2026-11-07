@@ -1648,6 +1648,15 @@ fn assembly_patterns_bom_interference() {
     assert_eq!(pat["instances"].as_array().unwrap().len(), 4, "{pat}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Assembly 1 :: Edit : Linear pattern 1");
+    // A second direction (centered: both ways) and a third (live 2204): 3 × 3 × 2 pins.
+    let edge_along = |k: usize| edges["edges"].as_array().unwrap().iter().find(|e| e["curve"] == "line" && num(&e["direction"][k]).abs() > 0.99).unwrap()["id"].clone();
+    let (y_edge, z_edge) = (edge_along(1), edge_along(2));
+    let pat = call(&mut ctx, "assembly_pattern", json!({ "edit": "Linear pattern 1", "second": { "direction": { "instance": block_i, "entity": y_edge }, "distance": "50 mm", "count": 2, "centered": true }, "third": { "direction": { "instance": block_i, "entity": z_edge }, "distance": "40 mm", "count": 2 } }));
+    assert_eq!(pat["instances"].as_array().unwrap().len(), 1 + 3 * 3 * 2, "{pat}");
+    let e = try_call(&mut ctx, "assembly_pattern", json!({ "edit": "Linear pattern 1", "second": false })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("third"), "{e:?}");
+    let pat = call(&mut ctx, "assembly_pattern", json!({ "edit": "Linear pattern 1", "second": false, "third": false }));
+    assert_eq!(pat["instances"].as_array().unwrap().len(), 4, "{pat}");
 
     // BOM: one block, three pins.
     let csv = scratch("asm_pattern_bom.csv");

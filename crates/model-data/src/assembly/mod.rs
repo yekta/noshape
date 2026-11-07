@@ -650,6 +650,9 @@ pub enum PatternKind {
         second: Option<LinearDirection>,
         #[serde(default)]
         centered: bool,
+        /// Third direction (live 2204: shown once Second direction is ticked; no fourth).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        third: Option<Box<LinearDirection>>,
     },
     /// Copies about the Z axis of a mate connector (cylinder axis, circular edge...).
     Circular {
@@ -756,7 +759,26 @@ pub struct ScopeEntity {
 
 /// Bit of a pattern copy's index for the copies on the far side of a
 /// centered pattern (the others go along the direction, these against it).
-pub const CENTERED_BACK: u32 = 0x8000;
+pub const CENTERED_BACK: u64 = 0x8000;
+/// The same for a linear pattern's second and third directions.
+pub const CENTERED_BACK_2: u64 = 1 << 31;
+pub const CENTERED_BACK_3: u64 = 1 << 47;
+
+/// A linear pattern copy's stable index: step `i` along the first direction, `j` the second, `k` the third (15 bits
+/// each, the centered bits above each; a two-direction copy keeps the index it had as i + j * 65536).
+pub fn grid_index(i: u32, j: u32, k: u32, back: [bool; 3]) -> u64 {
+    let step = |n: u32, b: bool, shift: u32| ((n as u64 & 0x7fff) | if b { 0x8000 } else { 0 }) << shift;
+    step(i, back[0], 0) | step(j, back[1], 16) | step(k, back[2], 32)
+}
+
+/// The signed steps (i, j, k) of a linear pattern copy's index.
+pub fn grid_steps(index: u64) -> [f64; 3] {
+    let step = |shift: u32| {
+        let v = index >> shift;
+        (v & 0x7fff) as f64 * if v & 0x8000 != 0 { -1.0 } else { 1.0 }
+    };
+    [step(0), step(16), step(32)]
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LinearDirection {
@@ -764,14 +786,19 @@ pub struct LinearDirection {
     pub distance: ExprValue,
     pub count: u32,
     pub opposite: bool,
+    /// The distance spans the whole direction (live 2204: every direction has it).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub equal_spacing: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub centered: bool,
 }
 
 /// One generated instance of a pattern.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PatternInstance {
     pub seed: InstanceId,
-    /// Stable index (linear: i + j * 65536; circular: i; matched patterns: target code).
-    pub index: u32,
+    /// Stable index (linear: [`grid_index`]; circular: i; matched patterns: target code).
+    pub index: u64,
     pub instance: InstanceId,
     /// Generated mate (part pattern / replicate).
     #[serde(default)]
@@ -802,7 +829,7 @@ impl InstancePattern {
     /// mirror plane).
     pub fn connector_refs(&self) -> Vec<&MateConnectorRef> {
         match &self.kind {
-            PatternKind::Linear { direction, second, .. } => std::iter::once(direction).chain(second.as_ref().map(|s| &s.direction)).collect(),
+            PatternKind::Linear { direction, second, third, .. } => std::iter::once(direction).chain(second.as_ref().map(|s| &s.direction)).chain(third.as_ref().map(|s| &s.direction)).collect(),
             PatternKind::Circular { axis, .. } => vec![axis],
             PatternKind::Mirror { plane, .. } => vec![plane],
             PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => Vec::new(),
@@ -810,7 +837,7 @@ impl InstancePattern {
     }
     pub fn connector_refs_mut(&mut self) -> Vec<&mut MateConnectorRef> {
         match &mut self.kind {
-            PatternKind::Linear { direction, second, .. } => std::iter::once(direction).chain(second.as_mut().map(|s| &mut s.direction)).collect(),
+            PatternKind::Linear { direction, second, third, .. } => std::iter::once(direction).chain(second.as_mut().map(|s| &mut s.direction)).chain(third.as_mut().map(|s| &mut s.direction)).collect(),
             PatternKind::Circular { axis, .. } => vec![axis],
             PatternKind::Mirror { plane, .. } => vec![plane],
             PatternKind::PartPattern { .. } | PatternKind::Replicate { .. } => Vec::new(),
@@ -833,21 +860,22 @@ impl InstancePattern {
         }
     }
     /// Indices the pattern should generate per seed (linear/circular only).
-    pub fn grid_indices(&self) -> Vec<u32> {
+    pub fn grid_indices(&self) -> Vec<u64> {
         match &self.kind {
-            // Copy indices: i + j * 65536, CENTERED_BACK marking the copies on
-            // the far side of a centered pattern.
-            PatternKind::Linear { count, second, centered, .. } => {
-                let n1 = (*count).max(1);
-                let n2 = second.as_ref().map(|s| s.count.max(1)).unwrap_or(1);
+            // Copy indices: [`grid_index`], the centered bits marking the copies on the far side of a centered direction.
+            PatternKind::Linear { count, second, centered, third, .. } => {
+                // Each direction's steps: 0, then 1.. along it, and against it when centered.
+                let steps = |n: u32, c: bool| -> Vec<(u32, bool)> { std::iter::once((0, false)).chain((1..n.max(1)).flat_map(|i| std::iter::once((i, false)).chain(c.then_some((i, true))))).collect() };
+                let s1 = steps(*count, *centered);
+                let s2 = second.as_ref().map_or(vec![(0, false)], |d| steps(d.count, d.centered));
+                let s3 = third.as_ref().filter(|_| second.is_some()).map_or(vec![(0, false)], |d| steps(d.count, d.centered));
                 let mut v = Vec::new();
-                for j in 0..n2 {
-                    for i in 0..n1 {
-                        if i != 0 || j != 0 {
-                            v.push(i + j * 65536);
-                        }
-                        if *centered && i != 0 {
-                            v.push(i | CENTERED_BACK | (j * 65536));
+                for &(k, bk) in &s3 {
+                    for &(j, bj) in &s2 {
+                        for &(i, bi) in &s1 {
+                            if i != 0 || j != 0 || k != 0 {
+                                v.push(grid_index(i, j, k, [bi, bj, bk]));
+                            }
                         }
                     }
                 }
@@ -855,9 +883,9 @@ impl InstancePattern {
             }
             PatternKind::Circular { count, centered, .. } => {
                 let n = (*count).max(1);
-                let mut v: Vec<u32> = (1..n).collect();
+                let mut v: Vec<u64> = (1..n as u64).collect();
                 if *centered {
-                    v.extend((1..n).map(|i| i | CENTERED_BACK));
+                    v.extend((1..n as u64).map(|i| i | CENTERED_BACK));
                 }
                 v
             }
@@ -1301,7 +1329,7 @@ impl Assembly {
     /// Returns the ids of new instances.
     pub fn sync_pattern(&mut self, id: MateId) -> Vec<InstanceId> {
         let Some(p) = self.pattern(id).cloned() else { return vec![] };
-        let wanted: Vec<(InstanceId, u32)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
+        let wanted: Vec<(InstanceId, u64)> = p.seeds.iter().flat_map(|s| p.grid_indices().into_iter().map(move |i| (*s, i))).collect();
         let created = self.apply_generated(id, wanted.into_iter().map(|(s, i)| (s, i, None, None)).collect());
         // Mirror copies of handed parts use the mirrored part (and back).
         if let PatternKind::Mirror { handed, derived, mirrored_studios, .. } = &p.kind
@@ -1335,6 +1363,7 @@ impl Assembly {
         let first = self.instance(seed).map(|i| i.placement.to_dmat4()).unwrap_or_default();
         let mut wanted = Vec::new();
         for (code, t, pl) in targets {
+            let code = code as u64;
             wanted.push((seed, code, Some(t), pl));
             for other in p.seeds.iter().skip(1) {
                 let at = pl.zip(self.instance(*other)).map(|(pl, o)| Placement::from_dmat4(&(pl.to_dmat4() * first.inverse() * o.placement.to_dmat4())));
@@ -1380,7 +1409,7 @@ impl Assembly {
         }
     }
 
-    fn apply_generated(&mut self, id: MateId, wanted: Vec<(InstanceId, u32, Option<MateConnectorRef>, Option<Placement>)>) -> Vec<InstanceId> {
+    fn apply_generated(&mut self, id: MateId, wanted: Vec<(InstanceId, u64, Option<MateConnectorRef>, Option<Placement>)>) -> Vec<InstanceId> {
         let Some(p) = self.pattern(id).cloned() else { return vec![] };
         let seed_mate = match &p.kind {
             PatternKind::PartPattern { mate } | PatternKind::Replicate { mate, .. } => self.mate(*mate).cloned(),

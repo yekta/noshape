@@ -3525,8 +3525,10 @@ were checked in code by asm; "(verify)" ones need a live check first.
   its configuration) and its Exclude from all BOMs (T1 assemblies_from_other_documents).
 - [ ] P1 ASM-STD-AUTOSIZE-HOLE (asm, verify) standard content's Auto-size uses the hole's cylinder diameter only:
   no fine / coarse thread from a Hole feature, a tapped hole likely sizes a bolt one size down.
-- [ ] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply
+- [x] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply
   to it; the defaults are 50 mm / 2 (live Part Studio 25 mm / 1); Onshape's help names a third direction.
+  Fixed 2026-11-07 (live 2204): every direction has Equal spacing and Centered; a Third direction shows with the
+  second (copy indices widened to u64, old ones unchanged; T1 a_linear_pattern_fills_three_directions).
 - [x] P1 ASM-RELATION-DIRECTION (asm, verify) Gear couples opposite, Linear the same way (`db = ∓ratio·da`): check each
   relation's default direction against live. Fixed 2026-11-07 (live 2204: every relation's follower goes the opposite
   way, B = −ratio·A; Linear, Rack and pinion and Screw went the same way; T1

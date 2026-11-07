@@ -101,7 +101,8 @@ pub fn ops() -> Vec<Op> {
                 opt("count", json!({ "type": "integer", "minimum": 1 }), "Instance count, the seed included (default 2)."),
                 opt("opposite", json!({ "type": "boolean" }), "Opposite direction."),
                 opt("equal_spacing", json!({ "type": "boolean" }), "Linear: `distance` is the total; circular: spread over the angle (default true for circular)."),
-                opt("second", json!({ "type": "object" }), "Linear: a second direction {\"direction\": connector, \"distance\", \"count\", \"opposite\"}."),
+                opt("second", json!({ "type": ["object", "boolean"] }), "Linear: a second direction {\"direction\": connector, \"distance\", \"count\", \"opposite\", \"equal_spacing\", \"centered\"} (distance and count default as the first's); false removes it."),
+                opt("third", json!({ "type": ["object", "boolean"] }), "Linear, with a second direction: a third, as `second`; false removes it."),
                 opt("centered", json!({ "type": "boolean" }), "Linear / circular: the seed in the middle, `count` instances (the seed included) each way."),
                 opt("handed", json!({ "type": "boolean" }), "Mirror: every seed's Mirror action Derived (shorthand for `strategy`)."),
                 opt(
@@ -311,8 +312,8 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     // The old pattern's values, for fields left out.
     let mut o = Old::default();
     match old.as_ref().map(|p| &p.kind) {
-        Some(PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered }) => {
-            o = Old { dir: Some(direction.clone()), dist: Some(distance.text.clone()), count: Some(*count), opposite: *opposite, equal: Some(*equal_spacing), second: second.clone(), centered: *centered, ..o };
+        Some(PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered, third }) => {
+            o = Old { dir: Some(direction.clone()), dist: Some(distance.text.clone()), count: Some(*count), opposite: *opposite, equal: Some(*equal_spacing), second: second.clone(), third: third.clone(), centered: *centered, ..o };
         }
         Some(PatternKind::Circular { axis, angle, count, opposite, equal_spacing, centered }) => {
             o = Old { dir: Some(axis.clone()), dist: Some(angle.text.clone()), count: Some(*count), opposite: *opposite, equal: Some(*equal_spacing), centered: *centered, ..o };
@@ -322,7 +323,7 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(PatternKind::Replicate { mate, scope, scope_refs, .. }) => o = Old { mate: Some(*mate), scope: *scope, scope_refs: scope_refs.clone(), ..o },
         None => {}
     }
-    let Old { dir: o_dir, dist: o_dist, count: o_count, opposite: o_opp, equal: o_equal, second: o_second, centered: o_centered, handed: o_handed, derived: o_derived, placement: o_placement, mate: o_mate, scope: o_scope, scope_refs: o_refs } = o;
+    let Old { dir: o_dir, dist: o_dist, count: o_count, opposite: o_opp, equal: o_equal, second: o_second, third: o_third, centered: o_centered, handed: o_handed, derived: o_derived, placement: o_placement, mate: o_mate, scope: o_scope, scope_refs: o_refs } = o;
     let same_kind = old.as_ref().is_some_and(|p| kind_id(&p.kind) == kind);
     let keep = |o: bool| same_kind && o;
     let (d_dist, d_count) = sa::pattern_defaults(kind == "circular");
@@ -342,21 +343,32 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let pk = match kind {
         "linear" => {
-            let second = match a.object("second")? {
-                Some(o) => {
-                    let d2 = o.get("direction").ok_or_else(|| OpError::param("second.direction", "Select the second direction"))?;
-                    let d2 = resolve_entity(&before, parse_connector(&asm, od, tab, d2, "second.direction")?, &units);
-                    let dist = match o.get("distance") {
-                        Some(Value::String(t)) => t.clone(),
-                        Some(Value::Number(n)) => n.to_string(),
-                        _ => "50 mm".into(),
-                    };
-                    Some(LinearDirection { direction: d2, distance: ExprValue::new(dist), count: count_arg(o.get("count"), "second.count")?.unwrap_or(2), opposite: o.get("opposite").and_then(Value::as_bool).unwrap_or(false) })
-                }
-                None if same_kind => o_second,
-                None => None,
+            // A further direction: given, removed (null), else as it was. Live 2204: its distance and count default as
+            // the first direction's.
+            let further = |key: &str, was: Option<LinearDirection>| -> Result<Option<LinearDirection>, OpError> {
+                let o = match a.get(key) {
+                    Some(Value::Null | Value::Bool(false)) => return Ok(None),
+                    Some(Value::Object(o)) => o,
+                    Some(_) => return Err(OpError::param(key, "a direction object, or false to remove it")),
+                    None => return Ok(if same_kind { was } else { None }),
+                };
+                let d = o.get("direction").ok_or_else(|| OpError::param(&format!("{key}.direction"), "Select a direction (edge, face or mate connector)"))?;
+                let direction = resolve_entity(&before, parse_connector(&asm, od, tab, d, &format!("{key}.direction"))?, &units);
+                let distance = match o.get("distance") {
+                    Some(Value::String(t)) => t.clone(),
+                    Some(Value::Number(n)) => n.to_string(),
+                    _ => d_dist.to_string(),
+                };
+                let flag = |k: &str| o.get(k).and_then(Value::as_bool).unwrap_or(false);
+                let count = count_arg(o.get("count"), &format!("{key}.count"))?.unwrap_or_else(|| d_count.parse().unwrap_or(2));
+                Ok(Some(LinearDirection { direction, distance: ExprValue::new(distance), count, opposite: flag("opposite"), equal_spacing: flag("equal_spacing"), centered: flag("centered") }))
             };
-            PatternKind::Linear { direction: axis.ok_or_else(|| OpError::param("direction", "Select a direction (edge, face or mate connector)"))?, distance, count, opposite, equal_spacing: equal, second, centered }
+            let second = further("second", o_second)?;
+            let third = further("third", o_third.map(|t| *t))?.map(Box::new);
+            if third.is_some() && second.is_none() {
+                return Err(OpError::param("third", "a third direction needs a second one"));
+            }
+            PatternKind::Linear { direction: axis.ok_or_else(|| OpError::param("direction", "Select a direction (edge, face or mate connector)"))?, distance, count, opposite, equal_spacing: equal, second, centered, third }
         }
         "circular" => PatternKind::Circular { axis: axis.ok_or_else(|| OpError::param("direction", "Select the axis of pattern"))?, angle: distance, count, opposite, equal_spacing: equal, centered },
         "mirror" => {
@@ -606,6 +618,7 @@ struct Old {
     opposite: bool,
     equal: Option<bool>,
     second: Option<LinearDirection>,
+    third: Option<Box<LinearDirection>>,
     centered: bool,
     handed: bool,
     derived: Vec<InstanceId>,

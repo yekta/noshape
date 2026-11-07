@@ -611,8 +611,8 @@ pub fn stale_matched_patterns(result: &AssemblyResult, asm: &Assembly, units: &U
     for p in asm.patterns.iter().filter(|p| !p.suppressed && matches!(p.kind, PatternKind::PartPattern { .. } | PatternKind::Replicate { .. })) {
         // An empty match list (the target geometry is gone) removes all copies.
         let targets = matched_targets(result, asm, p, units).unwrap_or_default();
-        let mut want: Vec<(u32, &MateConnectorRef)> = targets.iter().map(|(c, t, _)| (*c, t)).collect();
-        let mut have: Vec<(u32, &MateConnectorRef)> = p.generated.iter().filter_map(|g| g.target.as_ref().map(|t| (g.index, t))).collect();
+        let mut want: Vec<(u64, &MateConnectorRef)> = targets.iter().map(|(c, t, _)| (*c as u64, t)).collect();
+        let mut have: Vec<(u64, &MateConnectorRef)> = p.generated.iter().filter_map(|g| g.target.as_ref().map(|t| (g.index, t))).collect();
         want.sort_by_key(|x| x.0);
         have.sort_by_key(|x| x.0);
         let same = want.len() == have.len() && want.iter().zip(&have).all(|(a, b)| a.0 == b.0 && a.1.instance == b.1.instance && a.1.path == b.1.path && a.1.reference == b.1.reference);

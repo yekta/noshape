@@ -2567,7 +2567,8 @@ Examples:
 | `count` | integer |  | Instance count, the seed included (default 2). |
 | `opposite` | boolean |  | Opposite direction. |
 | `equal_spacing` | boolean |  | Linear: `distance` is the total; circular: spread over the angle (default true for circular). |
-| `second` | object |  | Linear: a second direction {"direction": connector, "distance", "count", "opposite"}. |
+| `second` | object or boolean |  | Linear: a second direction {"direction": connector, "distance", "count", "opposite", "equal_spacing", "centered"} (distance and count default as the first's); false removes it. |
+| `third` | object or boolean |  | Linear, with a second direction: a third, as `second`; false removes it. |
 | `centered` | boolean |  | Linear / circular: the seed in the middle, `count` instances (the seed included) each way. |
 | `handed` | boolean |  | Mirror: every seed's Mirror action Derived (shorthand for `strategy`). |
 | `strategy` | array of object |  | Mirror: the Mirror strategy table, per seed {"instance", "action", "placement"}. `transform` (default) places a rigid copy of the part; `derived` uses its opposite-handed version from the Part Studio's "<Part Studio>-Mirrored" Part Studio (made when missing: one more edit, "Create mirrored Part Studio", in the folder "Mirrored parts and assemblies"). `placement` (Derived): auto (default) or the bounding box / origin plane the copy is placed by. Seeds left out keep their row (a new pattern: transform, auto). |

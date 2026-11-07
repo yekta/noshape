@@ -136,7 +136,8 @@ pub struct PatternSession {
     pub seeds: Vec<InstanceId>,
     pub axis: Option<MateConnectorRef>,
     pub axis2: Option<MateConnectorRef>,
-    /// Connector field receiving picks (0 = direction / axis / plane, 1 = second direction).
+    pub axis3: Option<MateConnectorRef>,
+    /// Connector field receiving picks (0 = direction / axis / plane, 1 = second direction, 2 = third).
     pub active: Option<usize>,
     /// Onshape's number fields (`quantity_field`): Distance (Angle for a
     /// circular pattern), Instance count, and the second direction's.
@@ -144,13 +145,23 @@ pub struct PatternSession {
     pub count: Entity<crate::quantity_field::QuantityInput>,
     pub distance2: Entity<crate::quantity_field::QuantityInput>,
     pub count2: Entity<crate::quantity_field::QuantityInput>,
+    pub distance3: Entity<crate::quantity_field::QuantityInput>,
+    pub count3: Entity<crate::quantity_field::QuantityInput>,
     _field_subs: Vec<Subscription>,
     pub opposite: bool,
     pub opposite2: bool,
+    pub opposite3: bool,
     pub equal: bool,
     /// Centered (linear and circular patterns).
     pub centered: bool,
+    /// The second and third directions' Equal spacing and Centered (live 2204: every direction has them).
+    pub equal2: bool,
+    pub centered2: bool,
+    pub equal3: bool,
+    pub centered3: bool,
     pub second: bool,
+    /// Third direction (shown with the second).
+    pub third: bool,
     /// Seed mate (part pattern / replicate).
     pub mate: Option<MateId>,
     /// Replicate: the match scope (None: the default for the seed mate's
@@ -993,18 +1004,28 @@ impl AssemblyView {
             seeds,
             axis: None,
             axis2: None,
+            axis3: None,
             // Live: the dialog opens with Instances focused.
             active: None,
             distance: mk(d, first, window, cx),
             count: mk(n, count(), window, cx),
-            distance2: mk("50 mm", QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
+            // Live 2204: the further directions default as the first (distance and count).
+            distance2: mk(noshape_ops::assembly::pattern_defaults(false).0, QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
             count2: mk("2", count(), window, cx),
+            distance3: mk(noshape_ops::assembly::pattern_defaults(false).0, QuantitySpec::quantity(noshape_units::Dim::LENGTH).label("Distance"), window, cx),
+            count3: mk("2", count(), window, cx),
             _field_subs: subs,
             opposite: false,
             opposite2: false,
+            opposite3: false,
             equal: kind == PatternDialogKind::Circular,
             centered: false,
+            equal2: false,
+            centered2: false,
+            equal3: false,
+            centered3: false,
             second: false,
+            third: false,
             mate: None,
             scope: None,
             scope_refs: Vec::new(),
@@ -1065,7 +1086,7 @@ impl AssemblyView {
         s.active = None;
         let set = |st: &Entity<crate::quantity_field::QuantityInput>, t: String, window: &mut Window, cx: &mut Context<Self>| st.update(cx, |q, cx| q.set_text(t, window, cx));
         match &pat.kind {
-            PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered } => {
+            PatternKind::Linear { direction, distance, count, opposite, equal_spacing, second, centered, third } => {
                 s.axis = Some(direction.clone());
                 set(&s.distance, distance.text.clone(), window, cx);
                 set(&s.count, count.to_string(), window, cx);
@@ -1078,6 +1099,17 @@ impl AssemblyView {
                     set(&s.distance2, sd.distance.text.clone(), window, cx);
                     set(&s.count2, sd.count.to_string(), window, cx);
                     s.opposite2 = sd.opposite;
+                    s.equal2 = sd.equal_spacing;
+                    s.centered2 = sd.centered;
+                }
+                if let Some(td) = third {
+                    s.third = true;
+                    s.axis3 = Some(td.direction.clone());
+                    set(&s.distance3, td.distance.text.clone(), window, cx);
+                    set(&s.count3, td.count.to_string(), window, cx);
+                    s.opposite3 = td.opposite;
+                    s.equal3 = td.equal_spacing;
+                    s.centered3 = td.centered;
                 }
             }
             PatternKind::Circular { axis, angle, count, opposite, equal_spacing, centered } => {
@@ -1137,11 +1169,17 @@ impl AssemblyView {
                 let direction = s.axis.clone().ok_or("Select a direction (edge, face or mate connector)")?;
                 let second = if s.second {
                     let d2 = s.axis2.clone().ok_or("Select the second direction")?;
-                    Some(noshape_model::assembly::LinearDirection { direction: d2, distance: ExprValue::new(text(&s.distance2)), count: count(&s.count2)?, opposite: s.opposite2 })
+                    Some(noshape_model::assembly::LinearDirection { direction: d2, distance: ExprValue::new(text(&s.distance2)), count: count(&s.count2)?, opposite: s.opposite2, equal_spacing: s.equal2, centered: s.centered2 })
                 } else {
                     None
                 };
-                PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second, centered: s.centered }
+                let third = if s.second && s.third {
+                    let d3 = s.axis3.clone().ok_or("Select the third direction")?;
+                    Some(Box::new(noshape_model::assembly::LinearDirection { direction: d3, distance: ExprValue::new(text(&s.distance3)), count: count(&s.count3)?, opposite: s.opposite3, equal_spacing: s.equal3, centered: s.centered3 }))
+                } else {
+                    None
+                };
+                PatternKind::Linear { direction, distance: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, second, centered: s.centered, third }
             }
             PatternDialogKind::Circular => PatternKind::Circular { axis: s.axis.clone().ok_or("Select the axis of pattern")?, angle: ExprValue::new(text(&s.distance)), count: count(&s.count)?, opposite: s.opposite, equal_spacing: s.equal, centered: s.centered },
             PatternDialogKind::Mirror => {
@@ -1184,6 +1222,7 @@ impl AssemblyView {
             _ => {}
         }
         let counts: &[&Entity<crate::quantity_field::QuantityInput>] = match s.kind {
+            PatternDialogKind::Linear if s.second && s.third => &[&s.count, &s.count2, &s.count3],
             PatternDialogKind::Linear if s.second => &[&s.count, &s.count2],
             PatternDialogKind::Linear | PatternDialogKind::Circular => &[&s.count],
             _ => &[],
@@ -1193,6 +1232,7 @@ impl AssemblyView {
             return Some(format!(" {BAD}"));
         }
         let distances: &[&Entity<crate::quantity_field::QuantityInput>] = match s.kind {
+            PatternDialogKind::Linear if s.second && s.third => &[&s.distance, &s.distance2, &s.distance3],
             PatternDialogKind::Linear if s.second => &[&s.distance, &s.distance2],
             PatternDialogKind::Linear | PatternDialogKind::Circular => &[&s.distance],
             _ => &[],
@@ -1361,10 +1401,10 @@ impl AssemblyView {
                         cx,
                         Box::new(move |this: &mut Self| {
                             if let Some(p) = &mut this.pattern {
-                                if field == 0 {
-                                    p.axis = None;
-                                } else {
-                                    p.axis2 = None;
+                                match field {
+                                    0 => p.axis = None,
+                                    1 => p.axis2 = None,
+                                    _ => p.axis3 = None,
                                 }
                                 p.active = Some(field);
                             }
@@ -1420,6 +1460,46 @@ impl AssemblyView {
                 }))
         };
         let value_row = |label: &'static str, st: &Entity<crate::quantity_field::QuantityInput>| os::param_row_plain(label, st.clone());
+        // A linear pattern's second (n = 1) or third (n = 2) direction: Direction, Distance, Instance count with the
+        // flip, Equal spacing, Centered (live 2204).
+        let further = |this: &Self, s: &PatternSession, body: Div, n: usize, cx: &mut Context<Self>| -> Div {
+            let (axis, distance, count, opposite, equal, centered) = if n == 1 { (&s.axis2, &s.distance2, &s.count2, s.opposite2, s.equal2, s.centered2) } else { (&s.axis3, &s.distance3, &s.count3, s.opposite3, s.equal3, s.centered3) };
+            let flip: fn(&mut Self) = if n == 1 {
+                |t| {
+                    if let Some(p) = &mut t.pattern {
+                        p.opposite2 = !p.opposite2;
+                    }
+                }
+            } else {
+                |t| {
+                    if let Some(p) = &mut t.pattern {
+                        p.opposite3 = !p.opposite3;
+                    }
+                }
+            };
+            let icon = if opposite { "flip-direction" } else { "flip-direction-opposite" };
+            let ids: [&'static str; 4] = if n == 1 { ["pat-axis2", "pat-opp2", "pat-eq2", "pat-centered2"] } else { ["pat-axis3", "pat-opp3", "pat-eq3", "pat-centered3"] };
+            body.child(div().px(px(3.)).pt(px(5.)).child(axis_box(this, ids[0], axis, "Direction", n, cx)))
+                .child(div().h(px(5.)))
+                .child(value_row("Distance", distance))
+                .child(h_flex().child(value_row("Instance count", count)).child(toggle(ids[1], icon, opposite, cx, flip)))
+                .child(os::checkbox(ids[2], "Equal spacing", equal).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(p) = &mut this.pattern {
+                        let e = if n == 1 { &mut p.equal2 } else { &mut p.equal3 };
+                        *e = !*e;
+                    }
+                    this.update_pattern_preview(cx);
+                    cx.notify();
+                })))
+                .child(os::checkbox(ids[3], "Centered", centered).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some(p) = &mut this.pattern {
+                        let c = if n == 1 { &mut p.centered2 } else { &mut p.centered3 };
+                        *c = !*c;
+                    }
+                    this.update_pattern_preview(cx);
+                    cx.notify();
+                })))
+        };
         let mut body = v_flex().pb(px(2.)).child(div().px(px(3.)).pt(px(5.)).child(instances));
         let (opposite, equal, centered, second) = (s.opposite, s.equal, s.centered, s.second);
         match kind {
@@ -1457,7 +1537,7 @@ impl AssemblyView {
                         cx.notify();
                     })));
                 if !circular {
-                    body = body.child(os::checkbox("pat-second", "Second direction", second).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    body = body.child(os::checkbox("pat-second", "Second direction", second).map(|d| crate::ui_script::mark(d, || "checkbox:Second direction".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(p) = &mut this.pattern {
                             p.second = !p.second;
                             if p.second && p.axis2.is_none() {
@@ -1468,17 +1548,22 @@ impl AssemblyView {
                         cx.notify();
                     })));
                     if second {
-                        let flip2 = if s.opposite2 { "flip-direction" } else { "flip-direction-opposite" };
-                        let opp2 = s.opposite2;
-                        body = body
-                            .child(div().px(px(3.)).pt(px(5.)).child(axis_box(self, "pat-axis2", &s.axis2, "Direction", 1, cx)))
-                            .child(div().h(px(5.)))
-                            .child(value_row("Distance", &s.distance2))
-                            .child(h_flex().child(value_row("Instance count", &s.count2)).child(toggle("pat-opp2", flip2, opp2, cx, |this| {
-                                if let Some(p) = &mut this.pattern {
-                                    p.opposite2 = !p.opposite2;
+                        body = further(self, s, body, 1, cx);
+                        let third = s.third;
+                        body = body.child(os::checkbox("pat-third", "Third direction", third).map(|d| crate::ui_script::mark(d, || "checkbox:Third direction".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(p) = &mut this.pattern {
+                                p.third = !p.third;
+                                if p.third && p.axis3.is_none() {
+                                    p.active = Some(2);
                                 }
-                            })));
+                            }
+                            this.update_capture(cx);
+                            this.update_pattern_preview(cx);
+                            cx.notify();
+                        })));
+                        if third {
+                            body = further(self, s, body, 2, cx);
+                        }
                     }
                 }
             }

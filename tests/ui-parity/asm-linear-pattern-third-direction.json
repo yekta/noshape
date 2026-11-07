@@ -1,0 +1,13 @@
+{
+ "name": "asm-linear-pattern-third-direction",
+ "about": "The Assembly linear pattern dialog's Second direction, then Third direction: each adds Direction, Distance, Instance count, Equal spacing and Centered (live 2204); Esc closes.",
+ "area": "asm",
+ "source": "asm 11-07: ASM-LINEAR-PATTERN-SECOND (live 2204)",
+ "start": "two-blocks",
+ "steps": [
+  {"do": "click", "on": {"tool": "Assembly linear pattern"}},
+  {"do": "click", "on": {"checkbox": "Second direction"}},
+  {"do": "click", "on": {"checkbox": "Third direction"}},
+  {"do": "key", "key": "Escape"}
+ ]
+}
