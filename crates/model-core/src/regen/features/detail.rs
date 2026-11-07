@@ -661,7 +661,26 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, &edges) } else { edges };
+        // Each edge's law on the part as it is (for the section route, where OCCT's fails).
+        let mut laws: Vec<(usize, Vec<(f64, f64)>)> = Vec::new();
+        for &e in &edges {
+            let edge = body.shape.sub_shape(ShapeType::Edge, e)?;
+            let info = edge.edge_info()?;
+            let name = body.edges[e].clone();
+            let key = |p: glam::DVec3| (p.x, p.y, p.z);
+            let flip = key(info.end).partial_cmp(&key(info.start)) == Some(std::cmp::Ordering::Less);
+            let mut points: Vec<(f64, f64)> = on_edge.iter().filter(|(n, _, _)| *n == name).map(|(_, t, r)| (if flip { 1.0 - *t } else { *t }, *r)).collect();
+            for (p, r) in &at_vertex {
+                if (*p - info.start).length() > 1e-9 && (*p - info.end).length() > 1e-9
+                    && let Some(t) = param_on_edge(&edge, &info, *p)
+                {
+                    points.push((t, *r));
+                }
+            }
+            laws.push((e, variable_law((radius_at(info.start), radius_at(info.end)), &mut points, smooth)));
+        }
         let names: Vec<Name> = edges.iter().map(|&e| body.edges[e].clone()).collect();
+        let occt = (|| -> FResult<()> {
         for name in names {
             let body = ev.ctx.bodies[bi].clone();
             let Some(&e) = body.find_edges(&name).first() else { continue };
@@ -685,6 +704,13 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
             let names = body.shape_names();
             let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
             ev.replace_body(bi, res.shape, face_names);
+        }
+        Ok(())
+        })();
+        // OCCT's failed (a round wider than its walls: c2-tpd-fillet-variable): the part as it was, the rounds as cuts.
+        if let Err(e) = occt {
+            ev.ctx.bodies[bi] = body.clone();
+            super::blend_section::variable_round(ev, bi, &laws).map_err(|_| e)?;
         }
     }
     Ok(())
