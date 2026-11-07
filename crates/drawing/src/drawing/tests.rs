@@ -5128,3 +5128,19 @@ fn an_assembly_drawing_has_no_auto_centermarks() {
     let ps = doc.tabs.iter().find(|t| matches!(t.content, TabContent::PartStudio(_))).unwrap().id;
     assert!(make(ps).sheets[0].views.iter().any(|v| v.show_centerlines));
 }
+
+/// A 2 point centerline runs 2.5 mm past each picked point in an ISO
+/// drawing (live 2230; 0.09 in in ANSI); its end grips stay on the picks.
+#[test]
+fn centerline_extends_past_its_picks() {
+    let drawing = Drawing::default();
+    let env = sheet::PlainEnv { drawing: &drawing, scale: 1000.0 };
+    let mut s = Sheet::default();
+    s.annotations.push(Annotation { id: 1, kind: AnnotationKind::Centerline { view: ViewId(1), a: [0.01, 0.02], b: [0.05, 0.02] }, ..Default::default() });
+    let mut g = sheet::SheetGeometry::new(420.0, 297.0);
+    g.add_annotations(&s, &env);
+    let l = g.lines.iter().find(|l| l.style == sheet::LineStyle::Centerline).expect("the centerline");
+    let (p, q) = (l.points[0], l.points[1]);
+    assert!(((q[0] - p[0]) - 45.0).abs() < 1e-9 && (p[0] - 7.5).abs() < 1e-9, "{p:?} {q:?}");
+    assert!(g.grips.iter().any(|gr| (gr.pos[0] - 10.0).abs() < 1e-9) && g.grips.iter().any(|gr| (gr.pos[0] - 50.0).abs() < 1e-9));
+}
