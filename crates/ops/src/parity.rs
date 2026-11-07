@@ -4102,7 +4102,14 @@ pub struct PartState {
     /// rest "other"), when known (live: its bodydetails).
     pub face_types: Option<std::collections::BTreeMap<String, usize>>,
     pub edge_types: Option<std::collections::BTreeMap<String, usize>>,
+    /// Ours: the area of the part's faces on other surfaces (blends' procedural surfaces, B-splines), m², whose area
+    /// live measures up to 0.22 % low (docs/PARITY-SUITES.md, "Area of procedural blend faces").
+    pub freeform_area: Option<f64>,
 }
+
+/// How low live measures the area of procedural (OTHER) blend faces: c2-extension-spring's Curvature rounds read
+/// 0.8113 / 2.4341 mm² in live where the exact arc length of live's own section (its G11 poles) gives 0.8131 / 2.4393.
+pub const LIVE_FREEFORM_AREA_SHORT: f64 = 0.0022;
 
 /// A face's or edge's geometry as the parity suite counts it (Onshape's
 /// type names or ours): plane, cylinder, cone, sphere, torus; line, circle,
@@ -4229,6 +4236,7 @@ pub fn live_parts(line: &Value) -> Vec<PartState> {
             centroid_band: p["centroid_band"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?])),
             face_types: types(p, "faces", "surface"),
             edge_types: types(p, "edges", "curve"),
+            freeform_area: None,
         })
         .collect()
 }
@@ -4247,12 +4255,23 @@ pub fn our_parts(t: &mut Translator) -> Result<Vec<PartState>, String> {
         out
     };
     let (faces, edges) = (types("faces", "surface"), types("edges", "curve"));
+    // The area of each part's faces on other surfaces.
+    let mut freeform: HashMap<String, f64> = HashMap::new();
+    if let Ok(e) = t.call("query_entities", json!({ "kind": "faces", "limit": 100000 })) {
+        let k = per_unit(&e["units"]);
+        for x in e["faces"].as_array().into_iter().flatten() {
+            if geometry_kind(x["surface"].as_str().unwrap_or("")) == "other" {
+                *freeform.entry(x["part"].as_str().unwrap_or("").to_string()).or_default() += x["area"].as_f64().unwrap_or(0.0) * k * k;
+            }
+        }
+    }
     Ok(parts_from_query(&r)
         .into_iter()
         .zip(r["parts"].as_array().into_iter().flatten())
         .map(|(mut s, p)| {
             s.face_types = p["id"].as_str().map(|id| faces.get(id).cloned().unwrap_or_default());
             s.edge_types = p["id"].as_str().map(|id| edges.get(id).cloned().unwrap_or_default());
+            s.freeform_area = p["id"].as_str().map(|id| freeform.get(id).copied().unwrap_or(0.0));
             s
         })
         .collect())
@@ -4289,6 +4308,7 @@ pub fn parts_from_query(r: &Value) -> Vec<PartState> {
             centroid_band: None,
             face_types: None,
             edge_types: None,
+            freeform_area: None,
         })
         .collect()
 }
@@ -4320,6 +4340,7 @@ pub fn parts_from_live_import(v: &Value, mesh: bool) -> Vec<PartState> {
             centroid_band: None,
             face_types: None,
             edge_types: None,
+            freeform_area: None,
         })
         .collect()
 }
@@ -4410,8 +4431,10 @@ pub fn differences(live: &[PartState], ours: &[PartState]) -> Vec<String> {
         {
             out.push(format!("{who}: volume {:.6} mm³, live {:.6}", o.volume.unwrap_or(f64::NAN) * 1e9, v * 1e9));
         }
+        // (Widened above by how low live measures our faces on other surfaces: PARITY-SUITES.md.)
+        let short = o.freeform_area.unwrap_or(0.0) * LIVE_FREEFORM_AREA_SHORT;
         if let Some(a) = l.area
-            && !within(o.area, a, l.area_band)
+            && !within(o.area, a, Some(l.area_band.unwrap_or([a, a])).map(|[lo, hi]| [lo, hi + short]))
         {
             out.push(format!("{who}: area {:.6} mm², live {:.6}", o.area.unwrap_or(f64::NAN) * 1e6, a * 1e6));
         }
