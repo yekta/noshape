@@ -1896,6 +1896,27 @@ fn a_frame_with_a_library_profile() {
     assert!((v - (900.0 - 676.0) * 200.0).abs() < 1e-3, "volume {v}");
 }
 
+/// A new Frame's profile is 8020 › 10 Series › 1001 (live 2216: a fresh account's default), a profile with no Size;
+/// feature_frame_profiles lists 8020's series as Types.
+#[test]
+fn a_new_frame_is_an_8020_1001() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "frame-8020.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[0, 0], [200, 0]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    let l = call(&mut ctx, "feature_frame_profiles", json!({}));
+    let s8020 = &l["standards"][0];
+    assert_eq!((&s8020["standard"], &s8020["types"][0]["type"], &s8020["types"][0]["profiles"][0]), (&json!("8020"), &json!("10 Series"), &json!("1001")), "{l}");
+    let p = call(&mut ctx, "feature_frame_profiles", json!({ "standard": "8020", "profile": "1001" }));
+    assert_eq!((&p["sizes"], &p["profileSketch"]), (&json!([]), &json!("frame-library:8020/1001")), "{p}");
+    let f = call(&mut ctx, "feature_add", json!({ "type": "frame", "params": { "selections": [line] } }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    // A 1" square less one T-slot and the bore, 200 mm long.
+    let v = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    let area = (1.0 - (0.256 * 0.087 + 0.584 * 0.236) - std::f64::consts::PI * 0.1025 * 0.1025) * 645.16;
+    assert!((v - area * 200.0).abs() < 1e-2, "volume {v} vs {}", area * 200.0);
+}
+
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
 /// feature_types with `document` and `version`, works in a document without Feature Studios.
 #[test]

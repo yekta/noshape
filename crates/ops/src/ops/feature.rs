@@ -360,7 +360,7 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
 fn frame_profiles(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use noshape_model::regen::features::frame_library as fl;
     let Some(standard) = a.opt_str("standard")? else {
-        let list: Vec<Value> = fl::standards().into_iter().map(|s| json!({ "standard": s, "types": fl::types(s), "profiles": fl::profiles(s) })).collect();
+        let list: Vec<Value> = fl::standards().into_iter().map(|s| json!({ "standard": s, "types": fl::types(s).into_iter().map(|t| json!({ "type": t, "profiles": fl::type_profiles(s, t) })).collect::<Vec<_>>(), "profiles": fl::profiles(s) })).collect();
         return Ok(json!({ "library": fl::LIBRARY, "standards": list }).into());
     };
     if !fl::standards().contains(&standard) {
@@ -372,7 +372,7 @@ fn frame_profiles(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let (sizes, default) = fl::sizes(standard, profile);
     let size = a.opt_str("size")?.unwrap_or(default);
-    if !sizes.contains(&size) {
+    if !(sizes.contains(&size) || sizes.is_empty() && size.is_empty()) {
         return Err(OpError::param("size", &format!("not a size of {standard} {profile}; see this op's sizes")));
     }
     let rounded = a.bool_or("rounded", false)? && fl::has_rounded(standard, profile);

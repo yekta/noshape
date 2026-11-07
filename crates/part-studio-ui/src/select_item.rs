@@ -700,7 +700,7 @@ impl SelectItemPanel {
             .px(px(6.))
             .gap(px(6.))
             .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
-            .child(div().flex_1().child(select))
+            .child(div().flex_1().min_w_0().overflow_hidden().child(select))
             .into_any_element()
     }
 
@@ -710,6 +710,11 @@ impl SelectItemPanel {
         let (standard, profile) = match level {
             "type" => (id.to_string(), frame_library::profiles(id).first().map(|p| p.to_string()).unwrap_or_default()),
             "profile" => (self.frame_choice().0, id.to_string()),
+            "group" => {
+                let standard = self.frame_choice().0;
+                let first = frame_library::type_profiles(&standard, id).first().map(|p| p.to_string()).unwrap_or_default();
+                (standard, first)
+            }
             _ => return,
         };
         let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
@@ -797,11 +802,16 @@ impl SelectItemPanel {
         let library = self.frame_select("library", "Library", vec![frame_library::LIBRARY.to_string()], frame_library::LIBRARY, cx);
         let types = frame_library::standards().into_iter().map(String::from).collect();
         let type_row = self.frame_select("type", frame_library::standard_label(&standard), types, &standard, cx);
-        let profiles = frame_library::profiles(&standard).into_iter().map(String::from).collect();
-        let profile_row = self.frame_select("profile", "Profile", profiles, &profile, cx);
-        // A standard with a Type level (AISC › "AISC profiles") shows it between (live D134).
+        // A standard with a Type level (AISC › "AISC profiles", 8020's series) shows it between; Profile lists that
+        // Type's (live D134).
         let types: Vec<String> = frame_library::types(&standard).into_iter().map(String::from).collect();
-        let group_row = types.first().cloned().map(|t| self.frame_select("group", "Type", types, &t, cx));
+        let ty = frame_library::type_of(&standard, &profile).map(String::from).or_else(|| types.first().cloned());
+        let profiles = match &ty {
+            Some(t) => frame_library::type_profiles(&standard, t),
+            None => frame_library::profiles(&standard),
+        };
+        let profile_row = self.frame_select("profile", "Profile", profiles.into_iter().map(String::from).collect(), &profile, cx);
+        let group_row = ty.filter(|_| !types.is_empty()).map(|t| self.frame_select("group", "Type", types, &t, cx));
         let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library).child(type_row).children(group_row).child(profile_row);
         // The search's matches over the levels (live D134 f23): 55 px rows, a round preview, the name with the match
         // in bold, "Onshape frame profiles - <standard>" grey and italic under it.
@@ -838,13 +848,17 @@ impl SelectItemPanel {
         });
         let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
         let (sizes, default) = frame_library::sizes(&standard, &profile);
-        let mut inputs = vec![ConfigInput {
-            id: frame_library::SIZE.into(),
-            name: frame_library::SIZE.into(),
-            kind: ConfigInputKind::List { options: sizes.iter().map(|s| ListOption { id: (*s).into(), name: (*s).into() }).collect(), default: default.into() },
-            visible_when: None,
-            excluded: false,
-        }];
+        // 8020's profiles are their own size: no Size row (live D134).
+        let mut inputs: Vec<ConfigInput> = (!sizes.is_empty())
+            .then(|| ConfigInput {
+                id: frame_library::SIZE.into(),
+                name: frame_library::SIZE.into(),
+                kind: ConfigInputKind::List { options: sizes.iter().map(|s| ListOption { id: (*s).into(), name: (*s).into() }).collect(), default: default.into() },
+                visible_when: None,
+                excluded: false,
+            })
+            .into_iter()
+            .collect();
         if frame_library::has_rounded(&standard, &profile) {
             inputs.push(ConfigInput { id: frame_library::ROUNDED.into(), name: frame_library::ROUNDED.into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false });
         }
@@ -1004,7 +1018,7 @@ impl SelectItemPanel {
             .px(px(6.))
             .gap(px(6.))
             .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Form"))
-            .child(div().flex_1().child(select));
+            .child(div().flex_1().min_w_0().overflow_hidden().child(select));
         let mut col = v_flex().id("sel-library-form").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(form_row);
         let Some(cfg) = sources.iter().find(|s| s.tab == key).and_then(|s| s.configuration.clone()) else { return col.into_any_element() };
         col = col.child(self.config_editor(&key, &cfg, Vec::new(), true, window, cx));
