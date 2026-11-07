@@ -23,7 +23,7 @@ mod positions;
 mod standard;
 mod structure;
 
-const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name, \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis.";
+const CONNECTOR_DOC: &str = "A mate connector: {\"instance\": instance id or name (a part inside a subassembly by its path, \"Sub <1> > Part 1 <1>\"), \"entity\": a face/edge/vertex id of that instance (from assembly_entities), \"inference\": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {\"instance\", \"reference\", \"align\"}, or {\"origin\": true} for the assembly origin, or {\"connector\": an assembly mate connector id or name}. Optional \"flip\": true flips that connector's primary axis.";
 
 pub fn ops() -> Vec<Op> {
     let connector = json!({ "type": "object" });
@@ -65,7 +65,7 @@ pub fn ops() -> Vec<Op> {
             fields: vec![
                 doc_field(),
                 asm_field(),
-                req("instance", s(), "Instance id or name."),
+                req("instance", s(), "Instance id or name; a part inside a subassembly by its path (\"Sub <1> > Part 1 <1>\"), a subassembly for all its parts."),
                 req("kind", json!({ "type": "string", "enum": ["faces", "edges", "vertices"] }), "Which entities."),
                 opt("surface", json!({ "type": "string" }), "Faces: only this surface type (plane, cylinder, ...)."),
                 opt("curve", json!({ "type": "string", "enum": ["line", "circle", "other"] }), "Edges: only this curve type."),
@@ -84,7 +84,7 @@ pub fn ops() -> Vec<Op> {
             verb: "connectors",
             summary: "The implicit mate connector points on an instance's face, edge or vertex",
             description: "The points Onshape offers while hovering an entity (centroid, vertices, edge midpoints, circle centers, cylinder axis ends...), each with its world position and Z axis, ready to pass as a mate connector.",
-            fields: vec![doc_field(), asm_field(), req("instance", s(), "Instance id or name."), req("entity", s(), "Face, edge or vertex id from assembly_entities.")],
+            fields: vec![doc_field(), asm_field(), req("instance", s(), "Instance id or name; a part inside a subassembly by its path (\"Sub <1> > Part 1 <1>\")."), req("entity", s(), "Face, edge or vertex id from assembly_entities.")],
             mutates: false,
             destructive: false,
             run: connectors,
@@ -502,7 +502,9 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
-    let inst = find_instance(assembly(od, tab)?, a.str("instance")?, "instance")?;
+    let under = find_occurrence(od.doc(), assembly(od, tab)?, a.str("instance")?, "instance")?;
+    // As given back: a nested occurrence by its path, as assembly_mate takes it.
+    let shown = if under.len() > 1 { a.str("instance")?.to_string() } else { format!("inst:{}", under[0].0) };
     let r = solve(od, tab, &SolveOptions::default())?;
     let kind = a.str("kind")?;
     let surface = a.opt_str("surface")?;
@@ -528,7 +530,7 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let parallel = |d: DVec3| direction.is_none_or(|w| d.length() > 0.0 && d.angle_between(w).min(d.angle_between(-w)) < 1f64.to_radians());
     let mut out: Vec<Listed> = Vec::new();
-    for o in r.occurrences.iter().filter(|o| o.path.first() == Some(&inst)) {
+    for o in r.occurrences.iter().filter(|o| o.path.starts_with(&under)) {
         let Some(body) = o.context.body(&o.body) else { continue };
         let m: DMat4 = o.transform;
         match kind {
@@ -618,7 +620,7 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             _ => return Err(OpError::param("kind", "faces, edges or vertices")),
         }
     }
-    if out.is_empty() && occurrence(&r, inst).is_none() {
+    if out.is_empty() && !r.occurrences.iter().any(|o| o.path.starts_with(&under)) {
         return Err(OpError::invalid("the instance has no parts (suppressed or failed?)").with_param("instance"));
     }
     if let Some(points) = at {
@@ -633,30 +635,33 @@ fn entities(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let best = out.iter().map(|x| ((gap(x) / 1e-7).round(), x.0.distance(*p), x)).min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
             list.push(best.map(|(_, _, x)| x.1.clone()).unwrap_or(Value::Null));
         }
-        return Ok(json!({ "units": units_json(&units), "instance": format!("inst:{}", inst.0), "count": list.len(), kind: list }).into());
+        return Ok(json!({ "units": units_json(&units), "instance": shown, "count": list.len(), kind: list }).into());
     }
     if let Some(p) = near {
         out.sort_by(|x, y| x.0.distance(p).total_cmp(&y.0.distance(p)));
     }
     let n = out.len();
     let out: Vec<Value> = out.into_iter().take(limit).map(|x| x.1).collect();
-    Ok(json!({ "units": units_json(&units), "instance": format!("inst:{}", inst.0), "count": n, kind: out }).into())
+    Ok(json!({ "units": units_json(&units), "instance": shown, "count": n, kind: out }).into())
 }
 
 fn connectors(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = target(ctx, a)?;
     let units = od.doc().settings.units;
     let k = len_scale(&units);
-    let inst = find_instance(assembly(od, tab)?, a.str("instance")?, "instance")?;
+    let key = a.str("instance")?;
+    let path = find_occurrence(od.doc(), assembly(od, tab)?, key, "instance")?;
     let on = refs::parse(a.get("entity").expect("required")).map_err(|e| e.with_param("entity"))?;
     let r = solve(od, tab, &SolveOptions::default())?;
-    let o = occurrence(&r, inst).ok_or_else(|| OpError::param("instance", "the instance has no parts"))?;
+    let o = r.occurrences.iter().find(|o| o.path.starts_with(&path)).ok_or_else(|| OpError::param("instance", "the instance has no parts"))?;
+    // The instance as assembly_mate takes it back: a nested part by its path.
+    let instance = if path.len() > 1 { key.to_string() } else { format!("inst:{}", path[0].0) };
     let cands = inference_candidates(&o.context, Some(&o.body), &on, &units);
     let out: Vec<Value> = cands
         .iter()
         .map(|c| {
             let mc = c.connector(&o.path);
-            let mut v = json!({ "instance": format!("inst:{}", inst.0), "reference": refs::to_id(&c.reference) });
+            let mut v = json!({ "instance": instance, "reference": refs::to_id(&c.reference) });
             if let Some(al) = &c.align {
                 v["align"] = json!(refs::to_id(al));
             }
@@ -673,7 +678,7 @@ fn connectors(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 /// A mate connector argument.
 fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &str) -> Result<MateConnectorRef, OpError> {
-    let _ = (od, tab);
+    let _ = tab;
     let o = v.as_object().ok_or_else(|| OpError::param(field, CONNECTOR_DOC))?;
     let mut c = if o.get("origin").and_then(Value::as_bool) == Some(true) {
         MateConnectorRef::origin()
@@ -682,7 +687,7 @@ fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &st
         let mc = a.connectors.iter().find(|c| c.name == k || format!("mc:{}", c.id.0) == k || c.id.0.to_string() == k).ok_or_else(|| OpError::not_found(format!("no assembly mate connector `{k}`")).with_param(format!("{field}.connector")))?;
         MateConnectorRef::assembly_connector(mc.id, mc.owner())
     } else {
-        let inst = find_instance(a, o.get("instance").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{field}.instance"), "instance id or name"))?, &format!("{field}.instance"))?;
+        let path = find_occurrence(od.doc(), a, o.get("instance").and_then(Value::as_str).ok_or_else(|| OpError::param(&format!("{field}.instance"), "instance id or name"))?, &format!("{field}.instance"))?;
         let reference = match (o.get("reference"), o.get("entity")) {
             (Some(r), _) => refs::parse(r).map_err(|e| e.with_param(format!("{field}.reference")))?,
             (None, Some(e)) => {
@@ -697,7 +702,7 @@ fn parse_connector(a: &Assembly, od: &OpenDoc, tab: TabId, v: &Value, field: &st
             }
             _ => return Err(OpError::param(field, "give `entity` (with optional `inference`) or `reference`")),
         };
-        let mut c = MateConnectorRef::on(inst, Vec::new(), reference);
+        let mut c = MateConnectorRef::on(path[0], path[1..].to_vec(), reference);
         if let Some(al) = o.get("align") {
             c.align = Some(Box::new(refs::parse(al).map_err(|e| e.with_param(format!("{field}.align")))?));
         }
@@ -715,7 +720,8 @@ fn resolve_entity(r: &AssemblyResult, c: MateConnectorRef, units: &noshape_units
     if c.connector.is_some() || c.instance == InstanceId::ORIGIN || matches!(c.reference, Reference::Implicit { .. } | Reference::MateConnector { .. }) {
         return c;
     }
-    let Some(o) = occurrence(r, c.instance) else { return c };
+    let full: Vec<InstanceId> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
+    let Some(o) = r.occurrences.iter().find(|o| o.path == full).or_else(|| occurrence(r, c.instance).filter(|_| c.path.is_empty())) else { return c };
     match inference_candidates(&o.context, Some(&o.body), &c.reference, units).first() {
         Some(p) => {
             let mut n = p.connector(&o.path);
@@ -954,12 +960,13 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(describe(od, tab)?.into())
 }
 
-/// An occurrence by path ("Sub <1>/Part 1 <1>", ids or names at each level
+/// An occurrence by path ("Sub <1>/Part 1 <1>", or Onshape's "Sub <1> > Part 1 <1>"; ids or names at each level
 /// through same-document subassemblies).
 pub(crate) fn find_occurrence(d: &noshape_model::Document, a: &Assembly, key: &str, field: &str) -> Result<Vec<InstanceId>, OpError> {
     let mut asm = a.clone();
     let mut out = Vec::new();
-    for (k, part) in key.split('/').enumerate() {
+    let sep = if key.contains(" > ") { " > " } else { "/" };
+    for (k, part) in key.split(sep).enumerate() {
         if k > 0 {
             let Some(InstanceSource::Assembly { assembly, .. }) = asm.instance(out[k - 1]).map(|i| i.source.clone()) else {
                 return Err(OpError::not_found(format!("`{key}`: its part {k} is not a subassembly instance")).with_param(field));

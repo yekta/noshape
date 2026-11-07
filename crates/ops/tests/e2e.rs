@@ -6346,3 +6346,37 @@ fn suggested_views_scale_to_the_exact_extent() {
     let scales: Vec<f64> = d["views"].as_array().unwrap().iter().map(|v| num(&v["scale"])).collect();
     assert_eq!(scales, [1.0; 4], "{d}");
 }
+
+/// A mate to a part inside a subassembly, as the app makes one: the part named by its occurrence path
+/// ("Sub <1> > Part 1 <1>", Onshape's notation) in assembly_entities, assembly_connectors and assembly_mate. The top
+/// block's top face Fastened to the nested block's bottom face lifts the subassembly onto it.
+#[test]
+fn a_mate_reaches_a_part_inside_a_subassembly() {
+    let mut ctx = Ctx::new();
+    let path = scratch("nested-mate.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }, { "tool": "circle", "points": [[70, 10], [75, 10]] }] }));
+    let regions: Vec<Value> = d["regions"].as_array().unwrap().iter().map(|r| r["id"].clone()).collect();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": regions, "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "tab_create", json!({ "kind": "assembly", "name": "Sub" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Sub", "source": "Part Studio 1", "part": "Part 2" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1", "part": "Part 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Sub" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Part 1 <1>"], "fixed": true }));
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0].clone();
+    let top = face(&mut ctx, "Part 1 <1>", 1.0)["id"].as_str().unwrap().to_string();
+    let nested = "Sub <1> > Part 1 <1>";
+    let bottom = face(&mut ctx, nested, -1.0);
+    // Only the nested block's faces: its bottom at z 0, as inserted.
+    assert!(num(&bottom["centroid"][2]).abs() < 1e-6 && num(&bottom["centroid"][0]) < 40.0, "{bottom}");
+    let cands = call(&mut ctx, "assembly_connectors", json!({ "tab": "Assembly 1", "instance": nested, "entity": bottom["id"] }));
+    assert_eq!(cands["connectors"][0]["instance"], nested, "{cands}");
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": nested, "entity": bottom["id"] }, "b": { "instance": "Part 1 <1>", "entity": top } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    let lifted = face(&mut ctx, nested, -1.0);
+    assert!((num(&lifted["centroid"][2]) - 10.0).abs() < 1e-6, "the nested block's bottom on the top block: {lifted}");
+    let e = try_call(&mut ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": "Part 1 <1> > Part 2 <1>", "kind": "faces" })).unwrap_err().to_json();
+    assert_eq!(e["param"], "instance", "{e}");
+}

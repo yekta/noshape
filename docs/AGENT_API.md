@@ -2306,7 +2306,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `instance` | string | required | Instance id or name. |
+| `instance` | string | required | Instance id or name; a part inside a subassembly by its path ("Sub <1> > Part 1 <1>"), a subassembly for all its parts. |
 | `kind` | one of `faces`, `edges`, `vertices` | required | Which entities. |
 | `surface` | string |  | Faces: only this surface type (plane, cylinder, ...). |
 | `curve` | one of `line`, `circle`, `other` |  | Edges: only this curve type. |
@@ -2332,14 +2332,14 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string |  | Assembly tab, by name or id. Default: the tab the window shows if it is an Assembly (tab_activate, an import), else the first Assembly. |
-| `instance` | string | required | Instance id or name. |
+| `instance` | string | required | Instance id or name; a part inside a subassembly by its path ("Sub <1> > Part 1 <1>"). |
 | `entity` | string | required | Face, edge or vertex id from assembly_entities. |
 
 #### assembly_mate
 
 Add or edit a mate between mate connectors (Fastened, Revolute, Slider, Planar, Cylindrical, Pin slot, Ball, Parallel, Tangent, Width) (edits the document (one undoable history entry)).
 
-The mate dialog: picks two connectors, solves the mate (the first connector's instance moves to the second, as in Onshape), and commits. A mate connector: {"instance": instance id or name, "entity": a face/edge/vertex id of that instance (from assembly_entities), "inference": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {"instance", "reference", "align"}, or {"origin": true} for the assembly origin, or {"connector": an assembly mate connector id or name}. Optional "flip": true flips that connector's primary axis. Offsets are expressions ("5 mm", "90 deg").
+The mate dialog: picks two connectors, solves the mate (the first connector's instance moves to the second, as in Onshape), and commits. A mate connector: {"instance": instance id or name (a part inside a subassembly by its path, "Sub <1> > Part 1 <1>"), "entity": a face/edge/vertex id of that instance (from assembly_entities), "inference": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {"instance", "reference", "align"}, or {"origin": true} for the assembly origin, or {"connector": an assembly mate connector id or name}. Optional "flip": true flips that connector's primary axis. Offsets are expressions ("5 mm", "90 deg").
 
 Examples:
 
@@ -2375,7 +2375,7 @@ Examples:
 
 Snap mode: move an instance face to face onto another and fasten them (edits the document (one undoable history entry)).
 
-Snap mode (Shift+S): a mate connector on each of two instances; the first one's instance moves face to face onto the second (the second moves when the first is fixed and it isn't), and a Fastened mate joins them. One edit ("Insert : Fastened (snap)"). Refused as the app refuses: the same instance, both instances fixed. A mate connector: {"instance": instance id or name, "entity": a face/edge/vertex id of that instance (from assembly_entities), "inference": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {"instance", "reference", "align"}, or {"origin": true} for the assembly origin, or {"connector": an assembly mate connector id or name}. Optional "flip": true flips that connector's primary axis.
+Snap mode (Shift+S): a mate connector on each of two instances; the first one's instance moves face to face onto the second (the second moves when the first is fixed and it isn't), and a Fastened mate joins them. One edit ("Insert : Fastened (snap)"). Refused as the app refuses: the same instance, both instances fixed. A mate connector: {"instance": instance id or name (a part inside a subassembly by its path, "Sub <1> > Part 1 <1>"), "entity": a face/edge/vertex id of that instance (from assembly_entities), "inference": where on it (center, centroid, midpoint, vertex, top_axis, mid_axis, bottom_axis, origin; default: the entity's first implicit point, its centroid or center)}, or a candidate from assembly_connectors {"instance", "reference", "align"}, or {"origin": true} for the assembly origin, or {"connector": an assembly mate connector id or name}. Optional "flip": true flips that connector's primary axis.
 
 Examples:
 
