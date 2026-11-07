@@ -16,7 +16,7 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**State 11-07 03:27 UTC: cf-lighten's Lighten 1 nearly as live.**
+**State 11-07 02:57 UTC: cf-lighten's Lighten 1 nearly as live.**
 - Queued: FeatureScript tracking follows a face to faces named after it (`derives_from`: Offset / Generated / Copy /
   Split, query.rs `tracking`); Enclose's history re-indexed onto the regions it keeps (`History::onto`: the cavity's
   faces had the material's faces' names, so Lighten's bottom caps weren't found); Modify fillet keeps fillets already
