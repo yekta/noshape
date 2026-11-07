@@ -782,9 +782,12 @@ impl<'a> QueryCx<'a> {
         }
         // A face's name lineage holds (only edges take each other's names):
         // its pieces by name, moved ones too (std Jog's rotated moving face),
-        // with what lies where it was.
+        // with what lies where it was on their bodies (not a copy's face left there, nor another part's face it lay
+        // on: Box Joint's pin face offset, then drafted).
         if snap.etype == EType::Face && !found.is_empty() {
-            return uniq(found.into_iter().chain(tracked).collect());
+            let bodies: Vec<Option<Ent>> = found.iter().map(|e| self.owner(e)).collect();
+            let on_found = tracked.into_iter().filter(|e| bodies.contains(&self.owner(e)));
+            return uniq(found.into_iter().chain(on_found).collect());
         }
         let kept: Vec<Ent> = found.into_iter().filter(|e| tracked.contains(e)).collect();
         if kept.is_empty() { tracked } else { kept }

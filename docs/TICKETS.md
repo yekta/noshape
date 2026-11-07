@@ -17,7 +17,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   lives_ellipse_mirror_and_handle_constraints_translate; ui-parity sketch-spline-handle-arm. Waiting on live
   (REQUESTS 23:20): which constraints the arm accepts, its selection name, interior handles, Bezier / conic control
   polygons.
-- [x] (skasm 11-07: solid sweeps mitre at sharp path corners (OCCT RightCorner, the Transformed sections as fallback); Sweep 1 as live, cf-box-dovetail-joint 5 -> 14/18, next: Box Joint 1 (custom); suite 622 -> 631/924, nothing else moved) P1 DOVETAIL-SWEEP-CORNERS (skasm, lead 11-06 23:15; parity suite) cf-box-dovetail-joint's Sweep 1 (feature 5,
+- [x] (skasm 11-07: solid sweeps mitre at sharp path corners (OCCT RightCorner, the Transformed sections as fallback); Sweep 1 as live, cf-box-dovetail-joint 5 -> 14/18, next: Box Joint 1 (custom); suite 622 -> 631/924, nothing else moved; skasm 11-07: Box Joint's drafts took the boards' and pin copies' faces left where the offset pin face was: a moved face's transient query keeps to its bodies, cf-box-dovetail-joint 18/18, suite 640 -> 644/936) P1 DOVETAIL-SWEEP-CORNERS (skasm, lead 11-06 23:15; parity suite) cf-box-dovetail-joint's Sweep 1 (feature 5,
   REMOVE): a dovetail profile (Sketch 2 on the base's end face, two lines and two arcs) swept round the base board's
   top rim, a closed path of four straight edges with sharp corners (two CAP_EDGEs, two SWEPT_EDGEs of Extrude 3): ours
   "Could not create valid swept body, check input.", live OK (Part 5 15/32/20, 664406.43 mm³).

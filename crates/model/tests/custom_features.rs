@@ -4059,3 +4059,34 @@ fn hole_countersink_tab_keeps_the_remembered_diameter() {
     };
     assert!((mm - 13.44).abs() < 1e-6, "{mm} mm");
 }
+
+/// A transient face query keeps its face after an offset moved it: not also the faces left where it was on other
+/// bodies (cf-box-dovetail-joint's Box Joint: pin0's end face, offset, then drafted, drafted both boards and the
+/// pin copies too).
+#[test]
+fn a_moved_faces_transient_query_keeps_to_its_body() {
+    let src = r#"
+annotation { "Feature Type Name" : "Moved face" }
+export const movedFace = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "board", { "corner1" : vector(-50, 0, 0) * millimeter, "corner2" : vector(50, 12, 100) * millimeter });
+        fCuboid(context, id + "pin", { "corner1" : vector(38, 0, 0) * millimeter, "corner2" : vector(50, 12, 100) * millimeter });
+        transform(context, id + "copy", { "entities" : qCreatedBy(id + "pin", EntityType.BODY), "transformType" : TransformType.COPY, "makeCopy" : true });
+        const bottom = qCoincidesWithPlane(qCreatedBy(id + "pin", EntityType.FACE), XY_PLANE);
+        const face = evaluateQuery(context, bottom)[0];
+        opOffsetFace(context, id + "offset", { "moveFaces" : face, "offsetDistance" : -20 * millimeter });
+        opOffsetFace(context, id + "again", { "moveFaces" : face, "offsetDistance" : -10 * millimeter });
+    });
+"#;
+    let fx = Fixture::new(&studio(src));
+    let mut ps = PartStudio::new();
+    let f = ps.new_feature(&fx.ty("movedFace"), &fx.units).expect("registered");
+    ps.features.push(f);
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let mut lows: Vec<f64> = r.context.bodies.iter().map(|b| (b.shape.bounding_box(false).unwrap().min.z * 1e3).round()).collect();
+    lows.sort_by(f64::total_cmp);
+    assert_eq!(lows, vec![0.0, 0.0, 30.0], "the board and the copy stay at z 0; the pin's face moved 20 and 10 mm up");
+}
