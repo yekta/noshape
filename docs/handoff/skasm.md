@@ -1825,3 +1825,23 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   0), c2-rings-loft, c2-duct-multipart (PROJECTED geometry not found), c2-sm-corner-break (queries without live geometry).
 - Tried and dropped: a region's interior point by clearance (it moved the translator's inside test: exercise-jan and
   knob-tim 8 -> 4 / 3).
+
+## 11-07: P1s, dovetail, snap hook, screen reach, c2-duct-multipart (written 18:25 UTC)
+- Landed: dovetail Sweep 1 (mitred sweeps) and Box Joint (a moved face's transient query keeps to its bodies:
+  cf-box-dovetail-joint 18/18), snap-hook Fillet 4 (cliff-edge round), the handle tip, SKETCH-SCREEN-SPACE-REACH
+  (inference 7.5 px from what it draws, curve picks a 5 px square: live's woolsthorpe INFERENCE_LINE_WIDTH_PX 15 /
+  MOUSE_PICK_RADIUS_PX 5; sketch scenarios 141 -> 145/147), Bezier control polygons as handle lines (live 2187).
+- Queued 18:11 (0767d13e): c2-duct-multipart 10 -> 17/19 (imprint keeps regions the sketch's curves close with the
+  face's edges off the face; a query text naming curves its sketch no longer has gives way to its ids; CAP_VERTEX at
+  a T-junction) and the sketch point looks from live2's 2221 captures (lit: an 11 px disc with the point 30 % through,
+  centres 10 %; selected wins over hovered; the handle tip a 9 px ring in the point's colour, lit 14 / 15 px).
+- Tried and dropped: taking a region query's ids by live's sketch-face areas when the text finds another region. Live's
+  sketch-body ids come from an end-of-feature-list evaluation and needn't be the ids the query was written with
+  (exercise-chino's Extrude 3: the id's face is 187 mm², the extruded region 14 mm²); it broke chino twice.
+- Next: c2-sm-louver Sheet metal model 1: R8BC's text (curves Lu2RURWz2NlR, qTubuc8Y6xsg, 6oPZf5wQYjRi + imprint)
+  resolves to its 64 mm² neighbour R8BG; live's is the 68414.86 mm² region ours has too (the curve-named region search,
+  parity.rs "Several share them"). Feature 6 (Louver) is live's data, not ours: the UI fetch calls thin cylinders planes
+  (live 2143); dx to refetch its surface types by /bodydetails. c2-duct-multipart Sketch 6: a sketch on a planar part
+  face takes live's x direction (ours horizontal, live (0.389, 0.910, -0.143)). The handle arm's colour is live's
+  grey-purple (~(112, 112, 151), not measured cleanly; ours 0x808080). c2-valve-config's 0.039 mm circle is the Boolean's
+  (plane ∩ surface of revolution kept as a circle, live 2229): core / bool.
