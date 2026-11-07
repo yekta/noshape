@@ -1,0 +1,61 @@
+{
+ "name": "in-context-context-none",
+ "about": "two-blocks asm: the Origin row's Create Part Studio in context… (the Origin in its field), ✓; Sketch on the context's top face of Part 1 (20, 20, 20), ✓ (the Assembly contexts section: Context 1); the context selector (its context's name), None",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Origin"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Part Studio in context…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     20,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Context 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "None"
+   }
+  }
+ ]
+}

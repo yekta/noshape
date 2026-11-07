@@ -144,6 +144,9 @@ def main():
                 diag = on["menu"].rstrip("…").lower()
                 if sketching and diag in sketch_tool_of:
                     items[sketch_tool_of[diag]].add(name)
+                    # A context menu's row of a sketch tool's name ("Use") is that menu item too.
+                    if on["menu"].lower() in menu_of:
+                        items[menu_of[on["menu"].lower()]].add(name)
                     continue
                 if on["menu"].lower() in menu_of:
                     items[menu_of[on["menu"].lower()]].add(name)

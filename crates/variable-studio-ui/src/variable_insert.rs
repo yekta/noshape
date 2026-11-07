@@ -624,7 +624,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .items_center()
                     .justify_center()
                     .bg(pal.accept).when(!changed, crate::ui::disabled_accept)
-                    .child(crate::assets::icon("dialog-ok", 24., cx))
+                    .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                     .on_click(move |_, window, cx| {
                         let _ = (&doc_ok, &st_ok);
                         if changed {

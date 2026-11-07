@@ -156,6 +156,10 @@ fn control_name(t: &Value) -> Option<String> {
         Some(b) => return Some(format!("button:{b}")),
         None => {}
     }
+    // A pick's chip in a selection field (`"chip"`: its row, from 0).
+    if let (Some(row), Some(field)) = (t.get("chip").and_then(Value::as_u64), t.get("field").and_then(Value::as_str)) {
+        return Some(format!("chip:{field}:{row}"));
+    }
     if t.get("rollback_bar").is_some() {
         return Some("button:Rollback bar".into());
     }
@@ -165,7 +169,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "panel_row", "panel_more"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "panel_row", "panel_more", "caret", "context_more"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))

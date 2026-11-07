@@ -330,7 +330,7 @@ impl PartStudioView {
                                         cx.notify();
                                     }
                                 })))
-                                .child(small_button("ctx-split-caret", "").w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(|_this, ev: &ClickEvent, window, cx| {
+                                .child(small_button("ctx-split-caret", "").map(|d| crate::ui_script::mark(d, move || format!("caret:{main}"))).w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(|_this, ev: &ClickEvent, window, cx| {
                                     let view = cx.entity();
                                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                                         let (v1, v2) = (view.clone(), view.clone());
@@ -654,7 +654,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_insert_go(cx))),
                         )
                         .child(
@@ -836,8 +836,10 @@ impl PartStudioView {
         };
         let v = view.clone();
         let list = contexts.clone();
+        let shown = current.as_ref().map_or_else(|| "None".to_string(), |c| c.1.clone());
         let dropdown = h_flex()
             .id("ctx-select")
+            .map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")))
             .w(px(153.))
             .h(px(30.))
             .pl(px(3.))
@@ -869,10 +871,11 @@ impl PartStudioView {
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
-        let more = current.as_ref().filter(|_| !editing).map(|(id, _, _)| {
-            let (id, v) = (*id, view.clone());
+        let more = current.as_ref().filter(|_| !editing).map(|(id, name, _)| {
+            let (id, v, target) = (*id, view.clone(), format!("context_more:{name}"));
             div()
                 .id("ctx-more")
+                .map(|d| crate::ui_script::mark(d, move || target))
                 .w(px(34.))
                 .h(px(31.))
                 .flex()
@@ -971,7 +974,7 @@ impl PartStudioView {
     fn insert_go_split(&self, assembly: noshape_model::document::TabId, cx: &mut Context<Self>) -> AnyElement {
         h_flex()
             .child(small_button("ctx-insert-go", "Insert and go to assembly").rounded_r(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_insert_go(cx))))
-            .child(small_button("ctx-insert-caret", "").w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
+            .child(small_button("ctx-insert-caret", "").map(|d| crate::ui_script::mark(d, || "caret:Insert and go to assembly".into())).w(px(20.)).px(px(0.)).justify_center().rounded_l(px(0.)).border_l_0().child(crate::os_ui::glyph(crate::os_ui::GLYPH_CARET, 8., rgb(0x333333))).on_click(cx.listener(move |_this, ev: &ClickEvent, window, cx| {
                 let view = cx.entity();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                     let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
@@ -1002,6 +1005,8 @@ impl PartStudioView {
 fn small_button(id: &'static str, label: &'static str) -> Stateful<Div> {
     div()
         .id(id)
+        // The ui-parity driver's `{"button": label}`.
+        .map(|d| if label.is_empty() { d } else { crate::ui_script::mark(d, move || format!("button:{label}")) })
         .h(px(22.))
         .px(px(10.))
         .flex()

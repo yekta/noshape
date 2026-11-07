@@ -439,7 +439,7 @@ impl Render for GraphicsPrefsDialog {
                             .justify_center()
                             .bg(pal.accept).when(!changed, crate::ui::disabled_accept)
                             .cursor_pointer()
-                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx))
+                            .cursor(gpui_kit::CursorStyle::Arrow).child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept(cx))),
                     )
                     .child(

@@ -724,7 +724,7 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_np_driver(cx))),
                         )
                         .child(

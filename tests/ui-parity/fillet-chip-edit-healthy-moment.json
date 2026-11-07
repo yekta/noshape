@@ -1,0 +1,32 @@
+{
+ "name": "fillet-chip-edit-healthy-moment",
+ "about": "block-broken: edit Fillet 1, right-click its missing pick, Edit healthy moment (the rollback to where it was healthy); Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block-broken",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Fillet 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "chip": 0,
+    "field": "Entities to fillet"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit healthy moment"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

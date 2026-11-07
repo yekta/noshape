@@ -1,0 +1,37 @@
+{
+ "name": "appearance-part-row-configure",
+ "about": "config-blocks (a Size input), its Part Studio 1 tab: the Appearance panel, right-click Part 1's row, Configure appearance; Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Appearance panel"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure appearance"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

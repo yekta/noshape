@@ -1,0 +1,67 @@
+{
+ "name": "appearance-face-row-remove",
+ "about": "block: right-click the top face, Add appearance to face…, R 200 + Tab, ✓; the Appearance panel: right-click its 1 face row, Remove appearance",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add appearance to face…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "R"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "200"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Appearance panel"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "1 face"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Remove appearance"
+   }
+  }
+ ]
+}

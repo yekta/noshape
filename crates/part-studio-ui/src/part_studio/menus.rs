@@ -1647,7 +1647,7 @@ impl PartStudioView {
                                     .bg(crate::theme::p().accept)
                                     .when(!can_accept, crate::ui::disabled_accept)
                                     .cursor(gpui_kit::CursorStyle::Arrow)
-                                    .child(crate::assets::icon("dialog-ok", 24., cx))
+                                    .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                     .when(can_accept, |d| d.on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_mass_dialog(cx)))),
                             )
                             .child(close("mass-close", false, cx)),

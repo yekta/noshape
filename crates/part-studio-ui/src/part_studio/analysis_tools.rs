@@ -1302,7 +1302,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor_pointer()
                                 .bg(gpui_kit::rgb(0x2b9d3a))
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                     this.accept_view_tool(cx);
                                 })),

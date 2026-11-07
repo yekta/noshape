@@ -2307,7 +2307,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor(CursorStyle::Arrow)
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_sketch_text(window, cx))),
                         )
                         .child(

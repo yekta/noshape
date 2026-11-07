@@ -1,0 +1,59 @@
+{
+ "name": "feature-menu-edit-expression",
+ "about": "block: Extrude 1's Dynamic suppression › Add expression… true + Enter (suppressed); right-click it, Edit dynamic suppression › Edit expression…; Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Dynamic suppression"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Add expression…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "true"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "Edit dynamic suppression"
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit expression…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

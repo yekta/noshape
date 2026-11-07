@@ -1,0 +1,31 @@
+{
+ "name": "graphics-menu-cancel-feature",
+ "about": "block: Fillet open, right-click the front top edge at (20, 0, 10): Confirm Fillet 1 · Cancel …; Cancel",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Fillet"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "edge": [
+     20,
+     0,
+     10
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Cancel"
+   }
+  }
+ ]
+}

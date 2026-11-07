@@ -115,6 +115,21 @@ A target a side can't find makes that step `"ok": false` with `"error"`; the run
 Studio, or the panel's bottom button: by their shared tooltip), `{"config_more": "<input name>"}` an input's ⋯,
 `{"config_more": ""}` the panel's own ⋯ (by Filter inputs), `{"config_row": "<row name>"}` a List input's row.
 
+### Part Studio panels, picks and in context (psui, 11-07)
+
+- `{"caret": "<button>"}`: the ▾ / ▲ beside a split button: `{"caret": "Add configuration input"}` (the ▲ of the
+  configured panel's bottom button: List · Checkbox · Configuration variable · Paste inputs; the button itself adds a
+  List input), `{"caret": "Insert and go to assembly"}` (the in-context banner's split button of a Part Studio created
+  in context).
+- `{"chip": n, "field": "<label>"}`: the n-th pick (from 0) in a selection field, as a target of its own (a right-click
+  on it: Clear all · Clear missing references · Edit healthy moment).
+- `{"panel_row": "<text>"}` in a Part Studio: a row of the open right panel by its text: the Appearance panel's
+  (`"Part 1"`, `"1 face"`) and the Variable table's (by the variable's name, `"wall_thickness"`);
+  `{"panel_more": "Variable table"}` the Variable table's ⋯.
+- The appearance editor's colour fields: `{"field": "#"}`, `{"field": "R"}`, `{"field": "G"}`, `{"field": "B"}`.
+- In context: `{"dropdown": "Context 1"}` the Assembly contexts section's selector (by the context it shows, or
+  `"None"`), `{"context_more": "Context 1"}` its ⋯; an assembly's `{"instance": "Origin"}` is its Origin row.
+
 ### Drawings (dx, 11-05)
 A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create
 Drawing of that part with that template (the dialog's Suggested views or No views), and the run opens on that drawing

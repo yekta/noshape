@@ -611,6 +611,7 @@ impl PartStudioView {
         // 1 px `#d7d7d7` rule (`#1651b0` while focused).
         let field = |label: &'static str, input: &Entity<InputState>, w: f32, focused: bool| {
             h_flex()
+                .map(|d| crate::ui_script::mark(d, move || format!("field:{label}")))
                 .h(px(27.))
                 .pr(px(4.))
                 .items_start()
@@ -722,7 +723,7 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(crate::ui::panel_title("ps-appearance", div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(title)))
-                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!changed, crate::ui::disabled_accept).cursor(CursorStyle::Arrow).child(crate::assets::icon("dialog-ok", 24., cx)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        .child(div().id("ap-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!changed, crate::ui::disabled_accept).cursor(CursorStyle::Arrow).child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into())).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             if changed {
                                 this.accept_appearance(cx);
                             }
@@ -841,8 +842,10 @@ impl PartStudioView {
                 )
         };
         let row = |id: SharedString, color: [f32; 4], label: String, indent: bool, selected: bool| {
+            let target = format!("panel_row:{label}");
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, move || target.clone()))
                 .w_full()
                 .cursor_pointer()
                 .when(selected, |d| d.border_2().border_color(rgb_u32(0x1651b0)))

@@ -5292,7 +5292,7 @@ impl AssemblyView {
                             // Live dom/dialog-assembly-insert: the ok-button sprite, disabled until something is inserted.
                             .when(inserted == 0, crate::ui::disabled_accept)
                             .cursor_pointer()
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_insert(window, cx))),
                     )
                     .child(Button::new("insert-close").ghost().cursor(gpui_kit::CursorStyle::Arrow).child(crate::assets::icon("dialog-cancel", 24., cx)).w(px(28.)).h(px(28.)).p_0().rounded(px(0.)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.cancel_insert(window, cx))))
@@ -5407,7 +5407,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_relation(cx))),
                     )
                     .child(

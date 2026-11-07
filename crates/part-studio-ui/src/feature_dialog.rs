@@ -3032,6 +3032,8 @@ impl FeatureDialog {
                         // no hover background).
                         h_flex()
                             .id(SharedString::from(format!("chip-{path}-{row}")))
+                            // The ui-parity driver's `{"chip": row, "field": label}` (a right-click on a pick).
+                            .map(|d| crate::ui_script::mark(d, || format!("chip:{}:{row}", crate::i18n::spec(s.label))))
                             .on_hover(cx.listener(move |_, h: &bool, _, cx| cx.emit(DialogEvent::HoverRef(h.then(|| hover_ref.clone())))))
                             // Chips name entities: user text in every language.
                             .tooltip(crate::ui::user_tooltip(tip))

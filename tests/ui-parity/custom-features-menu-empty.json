@@ -1,0 +1,25 @@
+{
+ "name": "custom-features-menu-empty",
+ "about": "block: the toolbar's ⊞ Add custom features: its one disabled row No custom features in this document, clicked; Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "No custom features in this document"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1532,7 +1532,7 @@ impl AssemblyView {
                                 .justify_center()
                                 .bg(pal.accept)
                                 .cursor_pointer()
-                                .child(crate::assets::icon("dialog-ok", 24., cx))
+                                .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                                 .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.close_folder_name(true, window, cx))),
                         )
                         .child(
@@ -3998,7 +3998,7 @@ impl AssemblyView {
                             .bg(pal.accept)
                             .when(!ok, |d| d.opacity(0.2))
                             .when(ok, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if ok {
                                     this.accept_group(cx);

@@ -675,7 +675,7 @@ impl AssemblyView {
                         .bg(pal.accept)
                         .when(!ok, |d| d.opacity(0.2))
                         .when(ok, |d| d.cursor_pointer())
-                        .child(crate::assets::icon("dialog-ok", 24., cx))
+                        .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                         .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.accept_mc(window, cx))),
                 )
                 .child(
@@ -709,6 +709,7 @@ impl AssemblyView {
         let pal = p();
         h_flex()
             .id("asm-origin-row")
+            .map(|d| crate::ui_script::mark(d, || "instance:Origin".into()))
             // Live assembly/10: the Part Studio's origin row (dot icon x 73, name x 86).
             .h(px(crate::ui::ROW_H))
             .pl(px(22.))
@@ -1626,7 +1627,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept).when(!valid, crate::ui::disabled_accept)
                             .when(valid, |d| d.hover(|d| d.bg(gpui_kit::rgb(0x74ce3a))).cursor_pointer())
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                 if valid {
                                     this.accept_pattern(cx);
@@ -2861,7 +2862,7 @@ impl AssemblyView {
                             .bg(pal.accept)
                             .hover(|d| d.bg(gpui_kit::rgb(0x74ce3a)))
                             .cursor_pointer()
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.apply_config(cx))),
                     )
                     .child(
@@ -3046,7 +3047,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_replace(cx))),
                     )
                     .child(
@@ -3840,7 +3841,7 @@ impl AssemblyView {
                             .justify_center()
                             .bg(pal.accept)
                             .cursor_pointer()
-                            .child(crate::assets::icon("dialog-ok", 24., cx))
+                            .child(crate::ui_script::wrap(crate::assets::icon("dialog-ok", 24., cx).into_any_element(), || "button:ok".into()))
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.accept_step_edit(cx))),
                     )
                     .child(

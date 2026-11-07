@@ -1,0 +1,43 @@
+{
+ "name": "in-context-caret-insert-go",
+ "about": "two-blocks asm: the Origin row's Create Part Studio in context… (the Origin in its field), ✓; [Insert and go to assembly ▾]'s ▾, Insert and go to assembly (what opens); Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "instance": "Origin"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Part Studio in context…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Insert and go to assembly"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Insert and go to assembly"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

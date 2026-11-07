@@ -1,0 +1,33 @@
+{
+ "name": "analysis-curvature-turn-off",
+ "about": "block: the analysis tools button, Curvature color map; the button again, Turn curvature color map off",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Curvature color map"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show analysis tools"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Turn curvature color map off"
+   }
+  }
+ ]
+}

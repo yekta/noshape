@@ -1,0 +1,27 @@
+{
+ "name": "variable-table-collapse-all",
+ "about": "vars: the Variable table panel, its ⋯: Copy table · Collapse all tables; Collapse all tables",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_more": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Collapse all tables"
+   }
+  }
+ ]
+}

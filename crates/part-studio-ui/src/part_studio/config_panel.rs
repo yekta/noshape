@@ -428,7 +428,7 @@ impl PartStudioView {
             .child(div().flex_1().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(tab_name))
             .child({
                 let v1 = cx.entity();
-                div().id("pvar-more").cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
+                div().id("pvar-more").map(|d| crate::ui_script::mark(d, || "panel_more:Variable table".into())).cursor_pointer().child(crate::assets::icon("more", 20., cx)).on_click(move |e: &ClickEvent, window, cx| {
                     let v1 = v1.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                         let v1 = v1.clone();
@@ -755,13 +755,11 @@ impl PartStudioView {
                     }))
                     // Help: Filter feature list, Delete, Move up / down; the row
                     // menu also over the cells' inputs (qa4 Fixed 11).
-                    .child(
-                        h_flex()
-                            .child(name_el)
-                            .child(kind_select)
-                            .child(value_cell)
-                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable)),
-                    )
+                    .child({
+                        let target = format!("panel_row:{}", r.name);
+                        crate::ui_script::mark(h_flex().child(name_el).child(kind_select).child(value_cell), move || target)
+                            .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable))
+                    })
                     // Right-clicking the Description adds Copy | Convert to
                     // expression (or text) (live 563, 652–656).
                     .child({
@@ -2880,6 +2878,7 @@ impl PartStudioView {
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_config_input("List", cx)));
         let caret = div()
             .id("cfg-add-input-more")
+            .map(|d| crate::ui_script::mark(d, || "caret:Add configuration input".into()))
             .w(px(22.))
             .h(px(28.))
             .flex()

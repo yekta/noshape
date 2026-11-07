@@ -3397,7 +3397,7 @@ impl PartStudioView {
             });
             crate::os_menu::open(e.position(), menu, window, cx);
         });
-        crate::ui::with_tooltip("tt-add-custom", "Add custom features", btn)
+        crate::ui_script::wrap(crate::ui::with_tooltip("tt-add-custom", "Add custom features", btn).into_any_element(), || "tool:Add custom features".into())
     }
 
     /// The workspace's custom features: one {cube} ▾ dropdown after ⊞ (live

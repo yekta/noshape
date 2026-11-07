@@ -1,0 +1,45 @@
+{
+ "name": "config-panel-paste-inputs",
+ "about": "config-blocks, its Part Studio 1 tab: the Configuration panel's ⋯, Copy all inputs; the ▲ beside Add configuration input (its list now ends in Paste inputs), Paste inputs",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": ""
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy all inputs"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Paste inputs"
+   }
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "name": "appearance-part-row-rename",
+ "about": "block: the Appearance panel, right-click Part 1's row: Rename… (its small Rename popup); Escape",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Appearance panel"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

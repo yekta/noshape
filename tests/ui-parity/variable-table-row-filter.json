@@ -1,0 +1,27 @@
+{
+ "name": "variable-table-row-filter",
+ "about": "vars: the Variable table panel, right-click the wall_thickness row: Filter feature list",
+ "area": "psui",
+ "source": "coverage 11-07 (lead: the remaining menu items; batch 15)",
+ "start": "vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "wall_thickness"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Filter feature list"
+   }
+  }
+ ]
+}
