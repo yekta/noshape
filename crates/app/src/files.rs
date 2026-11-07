@@ -125,16 +125,21 @@ fn open_session_window(session: session::Session, gpu: Gpu, cx: &mut App) -> any
         app_id: Some("dev.noshape.noshape".into()),
         ..TitleBar::window_options()
     };
+    noshape_render::perf::milestone("window: opening");
     let (handle, ws) = crate::os_menu::open_window(options, cx, move |window, cx| {
+        noshape_render::perf::milestone("window: created");
         window.set_window_title(&format!("{} — noshape", session.name()));
         let doc = cx.new(|cx| {
             let mut d = doc_model::DocModel::new(session);
             d.watch_external(cx);
             d
         });
+        noshape_render::perf::milestone("window: document model");
         // The CLI and MCP server edit this document here while it is open.
         crate::live_server::serve(&doc, cx);
+        noshape_render::perf::milestone("window: live server");
         let ws = cx.new(|cx| workspace::Workspace::new(doc, gpu, window, cx));
+        noshape_render::perf::milestone("window: workspace built");
         let fh = ws.read(cx).focus_handle(cx);
         // The workspace focuses its active tab view (so Part Studio shortcuts
         // work right away); only fall back to the workspace itself.

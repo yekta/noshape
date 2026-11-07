@@ -138,9 +138,12 @@ impl Workspace {
         // panel), shortcuts keep working: focus returns to the active tab.
         let focus_lost = cx.on_focus_lost(window, |this: &mut Self, window, cx| this.focus_active(window, cx));
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
+        noshape_render::perf::milestone("workspace: subscribed");
         let _ = doc.read(cx).custom_features();
+        noshape_render::perf::milestone("workspace: custom features compiled");
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
+        noshape_render::perf::milestone("workspace: thumbnailers");
         let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
@@ -150,7 +153,9 @@ impl Workspace {
             }
         }));
         this.refresh_behind(true, cx);
+        noshape_render::perf::milestone("workspace: behind refreshed");
         this.sync_tabs(window, cx);
+        noshape_render::perf::milestone("workspace: tabs synced");
         // Focus the active tab view so its shortcuts work immediately.
         if let Some(a) = this.active {
             cx.defer_in(window, move |this: &mut Self, window, cx| this.activate(a, window, cx));
@@ -256,6 +261,7 @@ impl Workspace {
                 let doc = self.doc.clone();
                 let gpu = self.gpu.clone();
                 let v = cx.new(|cx| PartStudioView::new(doc, tab, gpu, window, cx));
+                noshape_render::perf::milestone("workspace: Part Studio view built");
                 // In-context banner › Go to assembly.
                 self._subs.push(cx.subscribe_in(&v, window, |this: &mut Self, _, ev: &crate::part_studio::PartStudioEvent, window, cx| match ev {
                     crate::part_studio::PartStudioEvent::ActivateTab(t) => this.activate(*t, window, cx),
