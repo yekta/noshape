@@ -299,6 +299,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Show all mate connectors", Op("assembly_set_feature_state")),
     ("assembly:Show all mates", Op("assembly_set_feature_state")),
     ("assembly:Show all", Op("assembly_set_state")),
+    ("assembly:Show all instances", Op("assembly_set_state")),
     ("assembly:Show mates", Op("assembly_set_feature_state")),
     ("assembly:Show", Op("assembly_set_state")),
     ("assembly:Suppress", Op("assembly_set_state")),
