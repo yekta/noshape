@@ -126,6 +126,8 @@ impl PartStudioView {
             return;
         }
         cx.write_to_clipboard(ClipboardItem::new_string(lines.join("\n")));
+        // Live config-input-menu-copy-table.
+        self.flash_success("Configuration table copied to clipboard.".into(), cx);
     }
 
     /// Copy input (one) / Copy all inputs (`None`).
@@ -200,6 +202,11 @@ impl PartStudioView {
                 };
                 rows[at].2[k] = Some(c.done);
             }
+        }
+        // Nothing references another studio: no dialog, a message (live config-input-menu-input-propagation).
+        if rows.is_empty() {
+            self.flash_success("No references in the tab.".into(), cx);
+            return;
         }
         let checked = rows.iter().map(|r| r.2.iter().map(|c| c.unwrap_or(false)).collect()).collect();
         let studio_name = self.studio_name(cx);

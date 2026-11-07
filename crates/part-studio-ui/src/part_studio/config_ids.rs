@@ -159,6 +159,18 @@ impl Render for FsIdsDialog {
         };
         let warning = warning_text.map(|text| h_flex().gap(px(12.)).px(px(16.)).py(px(14.)).rounded(px(4.)).bg(pal.warn_fill).border_1().border_color(pal.warn_outline).text_size(px(13.)).text_color(pal.text).child(crate::assets::icon("warning", 24., cx)).child(div().flex_1().min_w_0().child(text)));
         let on_confirm = self.on_confirm.clone();
+        // The parity suite's modal: each row's name and id as inputs, the buttons and the headings (live
+        // config-input-menu-edit-ids).
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": null, "kind": "input", "value": self.input_name }), serde_json::json!({ "label": null, "kind": "input", "value": new_id })];
+            for (_, name, st) in &self.options {
+                fields.push(serde_json::json!({ "label": null, "kind": "input", "value": name }));
+                fields.push(serde_json::json!({ "label": null, "kind": "input", "value": st.read(cx).value().to_string() }));
+            }
+            let ok = if multiple { "Break references and change IDs" } else { "Break references and change ID" };
+            let text = if multiple { "Input ID Name Internal FeatureScript ID Row IDs Row name Internal FeatureScript ID" } else { "Name Internal FeatureScript ID" };
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"], "text": text })
+        });
         v_flex()
             .w_full()
             .child(

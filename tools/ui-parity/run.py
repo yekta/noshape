@@ -384,6 +384,13 @@ def compare(live, ours):
         for side in (a, b):
             if isinstance(side.get("tooltip"), str):
                 side["tooltip"] = " ".join(side["tooltip"].split())
+        # A configuration input's FeatureScript id is random ("List_WkWAMF6ZpKo2kz"): compared as one.
+        for side in (a, b):
+            d = side.get("dialog")
+            if isinstance(d, dict):
+                for f in d.get("fields") or []:
+                    if isinstance(f, dict) and isinstance(f.get("value"), str):
+                        f["value"] = re.sub(r"^List_[A-Za-z0-9]{14}$", "List_<id>", f["value"])
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)
