@@ -3,6 +3,15 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## The gate and live (11-07 05:18 UTC, lead): live wins over OCCT's quirks
+The target is Onshape; OCCT is the Boolean's proxy for correctness, not the goal. The gate stays: 0 differences from
+OCCT on every corpus and parity56, shfall its known 2, knurl and gear results and times level. One exception: where
+OCCT's result is a numerical quirk and live's differs from it, ours does what live does, and the case goes into the gate
+as a recorded exception ("ours = live, OCCT differs") with live's numbers as the evidence. Only with a live capture
+showing ours matches live (REQUESTS.md); without one, OCCT parity holds. First candidate: c2-valve-config's
+Circular pattern 1, the handles' micro-strips at the chamfer's rim (OCCT joins the two vertices on one side only;
+capture filed 11-07 05:18).
+
 ## c2-sm-louver: the 174 s is upstream of the Boolean (11-06 07:29 UTC)
 - Linear pattern 3 (PART, ADD, Merge with all) 188 s here: op_unify 156 s (unify.patches 154 s, unify.reordered 116 s)
   on the fuse's invalid 1382-face result, op_boolean 30 s. The fuse's inputs are wrong: its merge scope holds ten
