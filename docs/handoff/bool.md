@@ -591,6 +591,17 @@ OCCT level. Shell's biggest declines (by OCCT time) and what they need:
   cost (0.2-0.7 ms). Extrude 3's 28 ms is spread over sections 4.4, pieces 4, states 4.6, build and check 7.4; Fillet 2
   is mostly OCCT's build after ours declines "an arc across a cylinder's seam".
 
+## From blend (11-07 21:34 UTC): a cut's one-at-a-time attempt that can't work costs c2-tpd-fillet-variable 35 ms
+- c2-tpd-fillet-variable's Fillet 1 (now 79 ms, live 29): its cut of the block by four exact round tools (B-spline
+  rounds, `k::round_tool`) is ~70 ms in op_boolean, all noshape's Boolean (OCCT alone 110 ms): `tools_meet_outside`
+  is true (the rounds run below the floor and past the corners, where their boxes meet), so `rust_cut_one_by_one`
+  runs first (~35 ms) and fails (the rounds meet at the block's corners, inside the part), then the cut by all four
+  (~38 ms, `sections_ahead` most of it). A cheap test that the tools' pieces inside the part meet (their boxes
+  overlapping within the target's box, say) would skip the attempt here; c2-valve-config's cones are the case it is for.
+- Also from blend (in a4f5e9d8, queued): `BooleanOptions::scaled` (op_boolean's working-scale path on request; the
+  corpus records gained a `scaled` line). Used by the toroidal rounds' fuse (cf-snap-hook's Fillet 5: 306 -> 38 ms
+  with Glue Shift).
+
 ## From core (11-07 19:23 UTC): c2-rings-loft's Circular pattern 1 is one OCCT cut your Boolean declines
 - Circular pattern 1 (Reapply, 18 instances of Extrude 3, a Remove up to the ring's bore) takes 4.9 s here, live 767
   ms. Its instances build in 43 ms (in parallel); the rest is one cut of the 51 instance tools (17 x 3 solids, each

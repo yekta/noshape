@@ -59,3 +59,12 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   propagated". The translator gives Fillet 2's eight edge queries as seven edges and the cap face (one query maps to
   a Face), so the face's edges stopped propagating, the selection "stopped" and went to the section route. Now only a
   selection of faces alone isn't propagated (live 2202's case); with edges picked too, all are, as before.
+
+**11-07 21:40 UTC: c2-tpd-fillet-variable's Fillet 1 156 -> 79 ms (live 29), still to the end.**
+- core's exact round (44368ecdd) ran after OCCT's variable fillet failed (~70 ms). `variable_round_overflows`: a
+  round wider than a face beside it (the law's largest Bézier value x tan(half the normals' angle) past the face's
+  far side) goes to `variable_round` first, OCCT's only if that fails.
+- Left: the cut, ~70 ms in noshape's Boolean, half of it a one-at-a-time attempt that fails (the rounds meet at the
+  corners): asked bool (bool.md "From blend 21:34").
+- Suite before / after on vibe5: 694 = 694 features; the four "slower" documents have no variable fillet (Mirror /
+  Extrude / pattern times: load).

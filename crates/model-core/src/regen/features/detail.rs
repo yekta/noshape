@@ -704,6 +704,13 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
             }
             laws.push((e, law_hermite((radius_at(info.start), radius_at(info.end)), &mut points, smooth)));
         }
+        // A round wider than a face beside it: OCCT's fails there (after ~70 ms), the exact one first.
+        if laws.iter().any(|(e, law)| super::blend_section::variable_round_overflows(&body.shape, *e, law)) {
+            if super::blend_section::variable_round(ev, bi, &laws).is_ok() {
+                continue;
+            }
+            ev.ctx.bodies[bi] = body.clone();
+        }
         let names: Vec<Name> = edges.iter().map(|&e| body.edges[e].clone()).collect();
         let occt = (|| -> FResult<()> {
         for name in names {

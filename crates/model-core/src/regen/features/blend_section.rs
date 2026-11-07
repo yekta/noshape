@@ -1648,6 +1648,36 @@ fn seam_where_whole(rim: &Rim, r: f64) -> FResult<DVec3> {
 /// slope (per fraction) at each.
 pub type RadiusLaw = (Vec<(f64, f64)>, Vec<f64>);
 
+/// Whether a variable round of straight edge `e` between two planes is wider somewhere than a face beside it (its
+/// setback past the face's far side): where OCCT's variable fillet fails (c2-tpd-fillet-variable: 40 mm on 25 mm walls,
+/// ~70 ms to fail), so [`variable_round`] goes first. The law's largest radius is bounded by its Bézier values.
+pub fn variable_round_overflows(shape: &Shape, e: usize, (points, slopes): &RadiusLaw) -> bool {
+    let (Ok(edge), Ok(ef)) = (shape.sub_shape(ShapeType::Edge, e), shape.edge_faces()) else { return false };
+    let Ok(info) = edge.edge_info() else { return false };
+    let k::Curve::Line { .. } = info.curve else { return false };
+    let Some(fs) = ef.get(e).filter(|f| f.len() == 2) else { return false };
+    let faces = shape.faces();
+    let mid = 0.5 * (info.start + info.end);
+    let d = (info.end - info.start).normalize();
+    let mut normals = Vec::new();
+    let mut width = f64::INFINITY;
+    for &f in fs {
+        let face = &faces[f as usize];
+        let (Ok(Some(_)), Ok(n)) = (face.face_plane(), face.normal_at_point(mid)) else { return false };
+        normals.push(n.normalize());
+        let off = |q: DVec3| (q - info.start - d * (q - info.start).dot(d)).length();
+        width = width.min(face.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(off).fold(0.0, f64::max));
+    }
+    let half = 0.5 * normals[0].dot(normals[1]).clamp(-1.0, 1.0).acos();
+    let len = (info.end - info.start).length().max(1e-12);
+    let mut r_max = points.iter().map(|p| p.1).fold(0.0, f64::max);
+    for (w, m) in points.windows(2).zip(slopes.windows(2)) {
+        let h = (w[1].0 - w[0].0) * len;
+        r_max = r_max.max(w[0].1 + m[0] / len * h / 3.0).max(w[1].1 - m[1] / len * h / 3.0);
+    }
+    r_max * half.tan() > width * (1.0 + 1e-9)
+}
+
 /// A variable round of straight edges between planes where OCCT's fails (c2-tpd-fillet-variable's Fillet 1: radii to
 /// 40 mm on 25 mm walls, the round running down onto the floor): per edge, its exact round (`k::round_tool`: the
 /// circular section swept with the radius its law gives, `law`: the Hermite spans' points (fraction from the edge's
