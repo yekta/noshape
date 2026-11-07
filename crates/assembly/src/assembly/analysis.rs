@@ -872,6 +872,62 @@ pub fn isolate_expansion(result: &AssemblyResult, asm: &Assembly, seeds: &[Insta
 /// gives a part's material density (kg/m³); `mass` is None when a part has
 /// none (Onshape: "One or more parts do not have a material defined"), and
 /// `without_material` lists those occurrences.
+/// Each solid part occurrence's density (kg/m³) for `asm`'s mass properties, as Onshape weighs them: a part's Mass
+/// override is its mass (spread over its volume), else its material's density (None: neither); a subassembly's Mass
+/// override is the total of its parts, each scaled alike (spread by volume when one has no material).
+pub fn part_densities(doc: &crate::document::Document, asm: &Assembly, result: &AssemblyResult) -> std::collections::HashMap<(InstancePath, BodyId), Option<f64>> {
+    use crate::document::TabContent;
+    use std::collections::HashMap;
+    let volume = |o: &PartOccurrence| o.context.bodies.iter().find(|b| b.id == o.body).and_then(|b| k::volume_properties(&b.shape).ok()).map_or(0.0, |p| p.mass);
+    let own = |o: &PartOccurrence, v: f64| -> Option<f64> {
+        let TabContent::PartStudio(ps) = &doc.tab(o.studio)?.content else { return None };
+        let p = ps.part_properties.get(&o.body)?;
+        match p.mass_override {
+            Some(m) if v > 0.0 => Some(m / v),
+            _ => p.density,
+        }
+    };
+    // The outermost subassembly above `path` with a Mass override: its path's length and the mass.
+    let sub_override = |path: &InstancePath| -> Option<(usize, f64)> {
+        let mut here = asm;
+        for (n, id) in path.iter().enumerate().take(path.len().saturating_sub(1)) {
+            let super::InstanceSource::Assembly { assembly, .. } = &here.instance(*id)?.source else { return None };
+            let TabContent::Assembly(sub) = &doc.tab(*assembly)?.content else { return None };
+            if let Some(m) = sub.properties.mass_override {
+                return Some((n + 1, m));
+            }
+            here = sub;
+        }
+        None
+    };
+    let mut out: HashMap<(InstancePath, BodyId), Option<f64>> = HashMap::new();
+    let mut groups: HashMap<InstancePath, (f64, Vec<((InstancePath, BodyId), f64, Option<f64>)>)> = HashMap::new();
+    for o in result.occurrences.iter().filter(|o| matches!(o.kind, BodyKind::Solid)) {
+        let key = (o.path.clone(), o.body.clone());
+        let v = volume(o);
+        let r = own(o, v);
+        match sub_override(&o.path) {
+            Some((n, m)) => groups.entry(o.path[..n].to_vec()).or_insert((m, Vec::new())).1.push((key, v, r)),
+            None => {
+                out.insert(key, r);
+            }
+        }
+    }
+    for (m, parts) in groups.into_values() {
+        let weighed: Option<f64> = parts.iter().map(|(_, v, r)| r.map(|r| v * r)).sum();
+        let total_volume: f64 = parts.iter().map(|(_, v, _)| v).sum();
+        for (key, _, r) in parts {
+            let rho = match (weighed, r) {
+                (Some(w), Some(r)) if w > 0.0 => Some(r * m / w),
+                _ if total_volume > 0.0 => Some(m / total_volume),
+                _ => None,
+            };
+            out.insert(key, rho);
+        }
+    }
+    out
+}
+
 pub fn assembly_mass_properties(result: &AssemblyResult, tops: &[InstanceId], density: &dyn Fn(&PartOccurrence) -> Option<f64>) -> Option<AssemblyMass> {
     struct Part {
         mass: f64,
