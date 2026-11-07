@@ -16,6 +16,14 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 17:47 UTC: c2-helical-sweep's Sweep 1 counts (decision asked).**
+- The geometry is live's: a V groove cut along an 8-turn helix round a Ø50.8 cylinder; our pieces' areas sum to live's
+  faces. The counts differ because OCCT splits the cylinder's remaining helical strip at its seam every turn: 9 faces
+  (921-1364 mm², 7,959 mm² in all) where live has one (JMS, 7,955.9 mm²), and the groove's edges at each crossing. A
+  face can't run past one period of an OCCT periodic surface, so no unify merges them.
+- As "an edge split only for a seam is one edge" (2e0ec154): faces of one surface split only by its seam would be one
+  face, counted, named, picked and measured as one. Counting alone would only hide it: asked the lead.
+
 **State 11-07 17:41 UTC: missing features (lead's order).**
 - c2-extension-spring 10 -> 12: the harness's area band takes live's 0.22 % short reading of procedural blend faces
   (PARITY-SUITES.md "Area of procedural blend faces", `LIVE_FREEFORM_AREA_SHORT`); corpus 650/947.
