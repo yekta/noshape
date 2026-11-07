@@ -1745,6 +1745,11 @@ fn assembly_groups_relations_connectors() {
     assert_eq!(m2["mate_ok"], true, "{m2}");
 
     // A gear relation between the two revolutes.
+    // Drag Revolute 2 above Revolute 1 in the list.
+    let r = call(&mut ctx, "assembly_reorder", json!({ "feature": "Revolute 2", "before": "Revolute 1" }));
+    let order: Vec<&str> = r["mates"].as_array().unwrap().iter().filter_map(|m| m["name"].as_str()).filter(|n| n.starts_with("Revolute")).collect();
+    assert_eq!(order, ["Revolute 2", "Revolute 1"], "{r}");
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Reorder");
     let r = call(&mut ctx, "assembly_relation", json!({ "type": "gear", "mates": ["Revolute 1", "Revolute 2"], "ratio": 2 }));
     assert_eq!(r["name"], "Gear 1", "{r}");
     assert_eq!(last(&mut ctx), "Assembly 1 :: Insert : Gear relation");

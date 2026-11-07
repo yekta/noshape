@@ -99,6 +99,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "assembly",
+            verb: "reorder",
+            summary: "Reorder a mate, mate connector, relation or group in the list (drag and drop)",
+            description: "Drags `feature` onto `before` in the Mate features list (rows of one kind among themselves, as the list allows). One edit (\"Reorder\").",
+            fields: vec![doc_field(), asm_field(), req("feature", s(), "The row to move: name or id."), req("before", s(), "The row it lands on (it goes before it): name or id.")],
+            mutates: true,
+            destructive: false,
+            run: reorder,
+        },
+        Op {
+            group: "assembly",
             verb: "mate_value",
             summary: "Type a mate's value: the parts move so that degree of freedom reads it",
             description: "A mate's value box (while dragging, or its indicator's): the instances move so `dof` (rz, x, y or z, as the mate allows) reads `value` as Onshape shows it, the other mates enforced. One edit (\"Move : <mate>\").",
@@ -482,5 +492,24 @@ fn mate_value(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let solved = r.prepared.solve(&SolveOptions { hold_values: holds, start: Some(start), nested_start: Some(r.solved.nested.clone()), ..Default::default() });
     let name = m.name.clone();
     super::positions::commit_solved(od, tab, &format!("Move : {name}"), r, solved, |_| {})?;
+    Ok(describe(od, tab)?.into())
+}
+
+fn reorder(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = target(ctx, a)?;
+    let asm = assembly(od, tab)?.clone();
+    let moved = find_mate(&asm, a.str("feature")?).map_err(|e| e.with_param("feature"))?;
+    let onto = find_mate(&asm, a.str("before")?).map_err(|e| e.with_param("before"))?;
+    if moved == onto {
+        return Ok(describe(od, tab)?.into());
+    }
+    let mut check = asm.clone();
+    if !check.move_feature_before(moved, onto) {
+        return Err(OpError::param("before", "a row of the same kind (mates among mates, connectors among connectors…)"));
+    }
+    let result = solve(od, tab, &SolveOptions::default())?;
+    commit(od, tab, "Reorder", &result, |x| {
+        x.move_feature_before(moved, onto);
+    })?;
     Ok(describe(od, tab)?.into())
 }
