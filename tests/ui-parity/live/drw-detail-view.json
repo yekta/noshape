@@ -1,19 +1,19 @@
 {
  "scenario": "drw-detail-view",
- "recorded": "2026-11-07T15:58:39.431Z",
+ "recorded": "2026-11-07T18:34:17.923Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.8"
+  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.9"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "d0243b7f0a3415db725da902",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "2e417b82a1d292b6c2ac9c82",
   "start": "hole-plate-drawing",
-  "startElement": "e14cce55628fbf2ae4425d70",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "ac3109d7c4982f44b949727b",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -176,7 +176,7 @@
      "selection": []
     }
    },
-   "t": 220096
+   "t": 220587
   },
   {
    "step": 2,
@@ -186,17 +186,17 @@
      "view_point": {
       "view": "Front",
       "at": [
-       16,
+       20,
        -20,
-       16
+       0
       ]
      }
     }
    },
    "ok": true,
    "at": [
-    812,
-    614
+    828,
+    677
    ],
    "state": {
     "focus": {
@@ -279,7 +279,7 @@
      "selection": []
     }
    },
-   "t": 234646
+   "t": 236155
   },
   {
    "step": 3,
@@ -289,17 +289,17 @@
      "view_point": {
       "view": "Front",
       "at": [
-       22,
+       20,
        -20,
-       16
+       20
       ]
      }
     }
    },
    "ok": true,
    "at": [
-    835,
-    614
+    828,
+    599
    ],
    "state": {
     "focus": {
@@ -382,7 +382,7 @@
      "selection": []
     }
    },
-   "t": 250239
+   "t": 251081
   },
   {
    "step": 4,
@@ -390,15 +390,15 @@
     "do": "click",
     "on": {
      "sheet_point": [
-      60,
-      60
+      70,
+      150
      ]
     }
    },
    "ok": true,
    "at": [
-    667,
-    720
+    706,
+    368
    ],
    "state": {
     "focus": {
@@ -478,7 +478,7 @@
      "selection": []
     }
    },
-   "t": 265536
+   "t": 266870
   },
   {
    "step": 5,
@@ -565,7 +565,7 @@
      "selection": []
     }
    },
-   "t": 281497
+   "t": 282014
   }
  ],
  "_meta": {
@@ -574,7 +574,7 @@
     "format": "DXF",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.dxf",
-    "bytes": 115518,
+    "bytes": 115716,
     "error": null,
     "formatBefore": "PDF",
     "fields": [
@@ -641,7 +641,7 @@
     "format": "DWG",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.dwg",
-    "bytes": 29504,
+    "bytes": 30016,
     "error": null,
     "formatBefore": "DXF",
     "fields": [
@@ -708,7 +708,7 @@
     "format": "PDF",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.pdf",
-    "bytes": 83147,
+    "bytes": 84766,
     "error": null,
     "formatBefore": "DWG",
     "fields": [
