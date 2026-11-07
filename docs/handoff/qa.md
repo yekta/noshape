@@ -36,6 +36,15 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 22:29: new release check (lead 11-07, the user's): one real agent session per release.** bin/agent-session.sh
+<release noshape-cli> <tag>: `claude -p` on Haiku (claude-haiku-5-5) in an empty folder, only noshape's MCP server
+(--strict-mcp-config, other tools disallowed), the fixed task "create a 60×40×10 mm block with a 10 mm hole in the documents folder
+and tell me where it is"; transcript and summary in qa-scratch/agent/<tag>/ (tool calls, failed calls with their errors, the
+answer, cost). Remove the block it saves in ~/Documents/noshape afterwards. A blocker if it can't finish. First, v0.4.35: finished
+(the block, 23,214.6 mm³, at /root/Documents/noshape/…), 14 calls, 3 failed: 2 × sketch_dimension with a quoted value (P2
+MCP-QUOTED-VALUE), 1 Bash (the harness's: it looked for the documents folder), $0.009. Windows: not run (it needs a runner
+with the CLI and an API key: the lead's to provide, e.g. a workflow job).
+
 **11-07 19:30: new standing job (lead 11-07, the user's): the parity index (docs/parity/INDEX.md).** tools/parity/index.py
 (landing c00891cb) computes it from one suite run's folder: models-report.json (features matching; speed's regeneration cases),
 uip/score.log (states by area: asm-*, drw-*, the rest Part Studio / sketch) × tools/ui-parity/coverage*.py, assemblies.log

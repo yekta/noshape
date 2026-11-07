@@ -745,6 +745,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P2 MCP-QUOTED-VALUE (ops) **a real agent's first sketch_dimension calls fail on a quoted value**: the release agent
+  check (bin/agent-session.sh, `claude -p` on Haiku, v0.4.35's MCP server, the fixed block-with-hole task) sent
+  `"value": "\"60 mm\""` (the expression in quotes) twice and got `expected a value, found `\"` at 0..1` (param value)
+  before trying `"60 mm"`. 2 of its 14 calls failed this way (a third was the agent trying Bash to look for the documents
+  folder: the harness's, and the next release's MCP server names the folder). Accepting an expression in quotes, or saying
+  "60 mm, without quotes" in the error, would save the round trip; every agent session pays it. Transcript:
+  qa-scratch/agent/v0435/transcript.jsonl. (qa 2026-11-07 22:29, v0.4.35)
 - [x] fixed 1f2388a9 / 996ab4b1 (lead: the check job checks out tests/budget; v0.4.33 re-run 42249878030; qa reads its budget table) P0 RELEASE-BUDGET-STEP-SPARSE (lead / core) **v0.4.33 can't publish: release.yml's "Budgeted documents" step fails on
   every platform** (Release run 42240367775: Check Linux and Check Windows failed, macOS's check still queued): `time_cli.py
   --limit 180 "$cli" tests/budget/*.noshape` gets the pattern itself (`FileNotFoundError: 'tests/budget/*.noshape'`), because
