@@ -1282,6 +1282,48 @@ fn a_spline_closes_on_its_first_point() {
     assert!(created(&r, "spline")[0].get("closed").is_none(), "{r}");
 }
 
+/// A spline's handle arms (Onshape's spline handles, the lines from its ends to the handle tips): listed by
+/// sketch_get as lines of the spline, constrained and dimensioned as lines; deleting the spline takes them.
+#[test]
+fn a_splines_handle_arms_take_constraints_and_dimensions() {
+    let mut ctx = Ctx::new();
+    let path = scratch("spline-handle-arms.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "spline", "points": [[0, 0], [30, 20], [60, 0]] }, { "tool": "line", "points": [[0, -20], [40, -20]] }] }));
+    let spline = created(&r, "spline")[0].clone();
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line" && e.get("handle_of").is_none()).unwrap()["id"].clone();
+    let arms = spline["handle_arms"].as_array().cloned().unwrap_or_default();
+    assert_eq!(arms.len(), 2, "{spline}");
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let entity = |g: &Value, id: &Value| g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *id).cloned().unwrap();
+    let start_arm = entity(&g, &arms[0]);
+    assert_eq!((start_arm["type"].as_str(), start_arm["handle_of"].as_str(), start_arm["handle_end"].as_str(), start_arm["construction"].as_bool()), (Some("line"), spline["id"].as_str(), Some("start"), Some(true)), "{start_arm}");
+    assert_eq!(entity(&g, &arms[1])["handle_end"], "end");
+    // Horizontal, 15 long; the end arm at 30° to the line.
+    call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "horizontal", "entities": [arms[0]] }));
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "entities": [arms[0]], "value": "15 mm" }));
+    call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "kind": "angle", "entities": [arms[1], line], "value": "30 deg" }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    let ends = |e: &Value| -> (glam::DVec2, glam::DVec2) {
+        let p = |k: &str| glam::DVec2::new(e[k][0].as_f64().unwrap(), e[k][1].as_f64().unwrap());
+        (p("start"), p("end"))
+    };
+    let (a, b) = ends(&entity(&g, &arms[0]));
+    assert!((a.y - b.y).abs() < 1e-6 && (a.distance(b) - 15.0).abs() < 1e-6, "{a} {b}");
+    let (c, d) = ends(&entity(&g, &arms[1]));
+    let (l0, l1) = ends(&entity(&g, &line));
+    let t = (l1 - l0).angle_to(d - c).abs();
+    assert!((t.min(std::f64::consts::PI - t) - 30f64.to_radians()).abs() < 1e-6, "{}", t.to_degrees());
+    // The arm alone isn't deleted; with its spline it goes.
+    let _ = try_call(&mut ctx, "sketch_delete", json!({ "sketch": sk, "entities": [arms[0]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    assert!(g["entities"].as_array().unwrap().iter().any(|e| e["id"] == arms[0]));
+    call(&mut ctx, "sketch_delete", json!({ "sketch": sk, "entities": [spline["id"]] }));
+    let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
+    assert!(!g["entities"].as_array().unwrap().iter().any(|e| e["id"] == arms[0] || e["id"] == arms[1]), "{g}");
+}
+
 /// Live's template documents: ANSI A–D (no E), ISO A0–A4 and A4 Portrait,
 /// JIS the same sizes; a JIS drawing's title block in Japanese, third angle,
 /// its texts in Onshape-Standard-JapaneseFields (live tpl-JIS_A3.dxf).

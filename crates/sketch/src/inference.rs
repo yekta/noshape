@@ -193,7 +193,8 @@ fn direction_held(sk: &Sketch, l: EntityId) -> bool {
 }
 
 fn excluded(sk: &Sketch, ctx: &InferenceContext, id: EntityId) -> bool {
-    if ctx.exclude.contains(&id) {
+    // (A spline's handle arm: no inference to or along it.)
+    if ctx.exclude.contains(&id) || sk.entity(id).is_some_and(|e| e.handle_of.is_some()) {
         return true;
     }
     // points of excluded curves

@@ -6,6 +6,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-04
+- [ ] P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an
+  end point to its handle tip) can't be selected; in Onshape the arm is its own entity (hover, click, constraints and
+  dimensions like a line). skasm 11-06 23:55: the arm is a sketch entity now (`Entity::handle_of`: a construction line
+  from the spline's end point to its handle point, made with the spline's handles, removed only with the spline,
+  never inferred to, drawn as the thin grey handle line while editing, picked and highlighted as a curve; dragging it
+  moves the tip); sketch_get lists it (`handle_of`, `handle_end`, the spline's `handle_arms`); the translator maps
+  live's `<spline>.startHandle` / `.endHandle` to it (c2-hunting-knife's handle ANGLE and LENGTHs). Tests: T1
+  regions::a_splines_handle_arms_are_lines, e2e a_splines_handle_arms_take_constraints_and_dimensions, parity
+  lives_ellipse_mirror_and_handle_constraints_translate; ui-parity sketch-spline-handle-arm. Waiting on live
+  (REQUESTS 23:20): which constraints the arm accepts, its selection name, interior handles, Bezier / conic control
+  polygons.
 - [ ] P1 DOVETAIL-SWEEP-CORNERS (skasm, lead 11-06 23:15; parity suite) cf-box-dovetail-joint's Sweep 1 (feature 5,
   REMOVE): a dovetail profile (Sketch 2 on the base's end face, two lines and two arcs) swept round the base board's
   top rim, a closed path of four straight edges with sharp corners (two CAP_EDGEs, two SWEPT_EDGEs of Extrude 3): ours

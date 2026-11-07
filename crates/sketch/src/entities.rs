@@ -89,6 +89,11 @@ pub struct Entity {
     /// geometry for a dimension to a model edge; qa5 SK3).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub reference_only: bool,
+    /// A fit spline's end-tangent handle arm (Onshape's spline handle: the line from the spline's end point to its
+    /// handle tip): the spline it belongs to. A construction line, drawn and picked as the handle, constrained and
+    /// dimensioned as a line; it goes with its spline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handle_of: Option<EntityId>,
 }
 
 impl Entity {

@@ -1,0 +1,93 @@
+{
+ "name": "sketch-spline-handle-arm",
+ "about": "A spline's start handle arm (the line from its first point to the handle tip, (0,0) to (10,10)): hovered and clicked at (6,6) it highlights and is selected as one entity; h makes it horizontal (the handle turns, the spline's end tangent with it), Esc.",
+ "area": "skasm",
+ "source": "lead 11-06: P1 from the user, spline handle arms as sketch entities",
+ "start": "empty",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Spline"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     60,
+     0
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "sketch_point": [
+     6,
+     6
+    ]
+   },
+   "ms": 600
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     6,
+     6
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "h"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

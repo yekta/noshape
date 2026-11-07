@@ -472,15 +472,22 @@ fn geometry_json(data: &SketchData, sketch: FeatureId, e: &noshape_sketch::Entit
             if points.len() > 3 && points.first() == points.last() {
                 v["closed"] = json!(true);
             }
-            // Its end handles' tips (Onshape's white handles), start's then end's.
+            // Its end handles' tips (Onshape's white handles), start's then end's, and the arms to them (lines that
+            // take constraints and dimensions).
             if let Some((h0, h1)) = handles {
                 v["handles"] = json!([eid(*h0), eid(*h1)]);
+                v["handle_arms"] = json!(data.sketch.handle_arms(e.id).map(|a| a.map(eid)));
             }
             v
         }
         Geometry::Conic { start, control, end, rho } => json!({ "type": "conic", "start": p(*start), "control": p(*control), "end": p(*end), "rho": rho, "start_point": eid(*start), "control_point": eid(*control), "end_point": eid(*end) }),
     };
     v["id"] = json!(entity_id(sketch, e.id));
+    // A spline's handle arm: the spline and its end.
+    if let Some((spline, k)) = data.sketch.arm_of(e.id) {
+        v["handle_of"] = json!(entity_id(sketch, spline));
+        v["handle_end"] = json!(if k == 0 { "start" } else { "end" });
+    }
     if e.construction {
         v["construction"] = json!(true);
     }

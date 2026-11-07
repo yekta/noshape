@@ -1416,7 +1416,9 @@ fn lives_ellipse_mirror_and_handle_constraints_translate() {
               c("COINCIDENT", vec![s("localFirst", "e1"), s("localSecond", "e2")]),
               c("MINOR_DIAMETER", vec![s("localFirst", "e1"), q("length", "24 mm")]),
               c("MIRROR", vec![s("localFirst", "p1"), s("localSecond", "p2"), s("localMirror", "m")]),
-              c("LENGTH", vec![s("localFirst", "sp.startHandle"), q("length", "7.0710678 mm")])
+              c("LENGTH", vec![s("localFirst", "sp.startHandle"), q("length", "7.0710678 mm")]),
+              // (An angle to a handle line: our handle arm, c2-hunting-knife's Sketch 1.)
+              c("ANGLE", vec![s("localFirst", "sp.endHandle"), s("localSecond", "m"), q("angle", "45 deg")])
           ] }
     ] });
     let mut ctx = Ctx::new();
@@ -1430,7 +1432,7 @@ fn lives_ellipse_mirror_and_handle_constraints_translate() {
         assert_eq!((a["center"].clone(), a["major"].clone(), a["minor_radius"].clone()), (json!([0.0, 1.5]), json!([0.0, 12.75]), json!(12.0)), "{a}");
     }
     let types: Vec<&str> = g["constraints"].as_array().unwrap().iter().filter_map(|c| c["type"].as_str()).collect();
-    for want in ["Quadrant", "Vertical", "Coincident"] {
+    for want in ["Quadrant", "Vertical", "Coincident", "Angle"] {
         assert!(types.contains(&want), "{want}: {types:?}");
     }
 }

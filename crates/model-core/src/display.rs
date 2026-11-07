@@ -180,6 +180,8 @@ pub struct SketchCurveDisplay {
     pub construction: bool,
     pub external: bool,
     pub state: SketchEntityState,
+    /// A spline's handle arm (drawn as Onshape's thin grey handle line).
+    pub handle: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

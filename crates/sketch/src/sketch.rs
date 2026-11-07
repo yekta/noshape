@@ -229,7 +229,7 @@ impl Sketch {
 
     /// Adds an entity with validated references.
     pub fn add_entity(&mut self, geometry: Geometry, construction: bool, external: bool) -> Result<EntityId> {
-        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false };
+        let probe = Entity { id: EntityId(u32::MAX), geometry, construction, external, reference_only: false, handle_of: None };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -252,8 +252,49 @@ impl Sketch {
         }
         let id = self.alloc_entity();
         self.entities.insert(id, Entity { id, ..probe });
+        self.add_handle_arms(id);
         self.touch();
         Ok(id)
+    }
+
+    /// A fit spline's handle arms, at its start and its end (None where it has no handles, or no arm there).
+    pub fn handle_arms(&self, spline: EntityId) -> [Option<EntityId>; 2] {
+        let Some(Geometry::FitSpline { points, handles: Some(_) }) = self.entity(spline).map(|e| &e.geometry) else { return [None, None] };
+        let arm = |at: EntityId| self.entities.values().find(|e| e.handle_of == Some(spline) && matches!(e.geometry, Geometry::Line { start, .. } if start == at)).map(|e| e.id);
+        [points.first().and_then(|p| arm(*p)), points.last().and_then(|p| arm(*p))]
+    }
+
+    /// The spline and end (0 its start, 1 its end) a handle arm belongs to.
+    pub fn arm_of(&self, arm: EntityId) -> Option<(EntityId, usize)> {
+        let spline = self.entity(arm)?.handle_of?;
+        let k = self.handle_arms(spline).iter().position(|a| *a == Some(arm))?;
+        Some((spline, k))
+    }
+
+    /// Gives a fit spline with handles its missing handle arms (construction lines from its end points to the handle
+    /// tips; a spline saved before arms existed gets them too).
+    pub fn add_handle_arms(&mut self, spline: EntityId) {
+        let Some(Geometry::FitSpline { points, handles: Some((h0, h1)) }) = self.entity(spline).map(|e| e.geometry.clone()) else { return };
+        let (Some(&first), Some(&last)) = (points.first(), points.last()) else { return };
+        let have = self.handle_arms(spline);
+        for (k, (at, tip)) in [(first, h0), (last, h1)].into_iter().enumerate() {
+            if have[k].is_some() {
+                continue;
+            }
+            let id = self.alloc_entity();
+            self.entities.insert(id, Entity { id, geometry: Geometry::Line { start: at, end: tip }, construction: true, external: false, reference_only: false, handle_of: Some(spline) });
+        }
+        self.touch();
+    }
+
+    /// Every fit spline's missing handle arms ([`Self::add_handle_arms`]).
+    pub fn add_all_handle_arms(&mut self) {
+        let splines: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. })).map(|e| e.id).collect();
+        for s in splines {
+            if self.handle_arms(s).iter().any(Option::is_none) {
+                self.add_handle_arms(s);
+            }
+        }
     }
 
     /// Inserts an entity with a caller-chosen id at or above the allocator
@@ -264,7 +305,7 @@ impl Sketch {
         if id.0 < self.next_entity || self.entities.contains_key(&id) {
             return Err(SketchError::InvalidGeometry(format!("entity id {id} is already allocated")));
         }
-        let probe = Entity { id, geometry, construction, external, reference_only: false };
+        let probe = Entity { id, geometry, construction, external, reference_only: false, handle_of: None };
         for r in probe.point_refs() {
             if self.kind(r) != Some(EntityKind::Point) {
                 return Err(SketchError::InvalidGeometry(format!("{r} is not a point")));
@@ -324,9 +365,10 @@ impl Sketch {
                 points.push(id);
             }
         }
-        for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point) {
+        // (A pasted spline brings its own handle arms; the copied ones' constraints go to those.)
+        for e in other.entities.values().filter(|e| e.kind() != EntityKind::Point && e.handle_of.is_none()) {
             let mut g = e.geometry.clone();
-            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false };
+            let mut probe = Entity { id: e.id, geometry: g.clone(), construction: e.construction, external: false, reference_only: false, handle_of: None };
             for p in e.point_refs() {
                 if let Some(n) = map.get(&p) {
                     probe.replace_point(p, *n);
@@ -336,6 +378,14 @@ impl Sketch {
             if let Ok(id) = self.add_entity(g, e.construction, false) {
                 map.insert(e.id, id);
                 created.push(id);
+            }
+        }
+        for e in other.entities.values().filter(|e| e.handle_of.is_some()) {
+            if let Some((spline, k)) = other.arm_of(e.id)
+                && let Some(new_spline) = map.get(&spline).copied()
+                && let Some(new_arm) = self.handle_arms(new_spline)[k]
+            {
+                map.insert(e.id, new_arm);
             }
         }
         for c in other.constraints.values() {
@@ -473,6 +523,7 @@ impl Sketch {
                 if let Some(e) = self.entity_mut_silent(id) {
                     e.geometry = Geometry::FitSpline { points, handles: Some((h0, h1)) };
                 }
+                self.add_handle_arms(id);
                 self.touch();
             }
         }
@@ -570,12 +621,21 @@ impl Sketch {
     /// removed entity ids.
     pub fn remove_entities(&mut self, ids: &[EntityId]) -> Vec<EntityId> {
         let mut removed: Vec<EntityId> = Vec::new();
-        let mut set: std::collections::BTreeSet<EntityId> = ids.iter().copied().filter(|i| self.entities.contains_key(i)).collect();
+        // (A handle arm goes only with its spline.)
+        let arm_alone = |i: &EntityId| self.entities.get(i).and_then(|e| e.handle_of).is_some_and(|s| !ids.contains(&s));
+        let mut set: std::collections::BTreeSet<EntityId> = ids.iter().copied().filter(|i| self.entities.contains_key(i) && !arm_alone(i)).collect();
         // cascade: curves referencing removed points
         loop {
             let mut grew = false;
             for e in self.entities.values() {
                 if !set.contains(&e.id) && e.point_refs().iter().any(|p| set.contains(p)) {
+                    set.insert(e.id);
+                    grew = true;
+                }
+            }
+            // (A removed spline's arms.)
+            for e in self.entities.values() {
+                if !set.contains(&e.id) && e.handle_of.is_some_and(|sp| set.contains(&sp)) {
                     set.insert(e.id);
                     grew = true;
                 }

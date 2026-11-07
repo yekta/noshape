@@ -1015,9 +1015,14 @@ impl<'a> Translator<'a> {
         // A spline's handles: their tips, and the lines from its ends.
         if let (Some([h0, h1]), Some(pts)) = (c["handles"].as_array().and_then(|h| Some([h.first()?.as_str()?.to_string(), h.get(1)?.as_str()?.to_string()])), c["point_ids"].as_array()) {
             let (first, last) = (pts.first().and_then(Value::as_str).unwrap_or_default().to_string(), pts.last().and_then(Value::as_str).unwrap_or_default().to_string());
-            for (end, tip, at) in [("startHandle", h0, first), ("endHandle", h1, last)] {
+            let arms: Vec<Option<String>> = c["handle_arms"].as_array().map(|a| a.iter().map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            for (k, (end, tip, at)) in [("startHandle", h0, first), ("endHandle", h1, last)].into_iter().enumerate() {
                 self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.start")), at.clone());
                 self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}.end")), tip.clone());
+                // Live's handle line itself: our arm (a line taking its constraints and dimensions).
+                if let Some(Some(arm)) = arms.get(k) {
+                    self.sketch_entities.insert((oid.clone(), format!("{eid}.{end}")), arm.clone());
+                }
                 self.handle_lines.insert((oid.clone(), format!("{eid}.{end}")), [at, tip]);
             }
         }

@@ -3512,7 +3512,13 @@ impl SketchEditor {
                 if (p - start).length() < self.world_per_px * 3.0 {
                     return EditOutcome::none();
                 }
-                let handle = if is_point(&data.sketch, entity) { DragHandle::Point(entity) } else { DragHandle::Entity { id: entity, grab: start } };
+                // (A spline's handle arm drags its handle: the tip follows, the spline's end stays.)
+                let tip = data.sketch.entity(entity).filter(|e| e.handle_of.is_some()).and_then(|e| e.endpoints()).map(|(_, tip)| tip);
+                let handle = match tip {
+                    Some(t) => DragHandle::Point(t),
+                    None if is_point(&data.sketch, entity) => DragHandle::Point(entity),
+                    None => DragHandle::Entity { id: entity, grab: start },
+                };
                 // The DOF analysis once, before the drag: dragging keeps it
                 // current, so every step's regeneration reuses it instead of
                 // redoing it (qa SKETCH-DRAG-BIG: 30–50 ms per step on 1000
@@ -4788,7 +4794,8 @@ impl SketchEditor {
         }
         let mut now = None;
         for id in &self.selection {
-            if is_point(&data.sketch, *id) {
+            // (A spline's handle arm stays construction.)
+            if is_point(&data.sketch, *id) || data.sketch.entity(*id).is_some_and(|e| e.handle_of.is_some()) {
                 continue;
             }
             let cur = data.sketch.entity(*id).is_some_and(|e| e.construction);
@@ -4806,7 +4813,8 @@ impl SketchEditor {
     /// The Construction button's state (live 1853 addendum): construction
     /// mode, or a selection of construction curves only.
     pub fn construction_shown(&self, sk: &Sketch) -> bool {
-        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id)).collect();
+        // (A spline's handle arm isn't the user's construction geometry.)
+        let curves: Vec<EntityId> = self.selection.iter().copied().filter(|id| !is_point(sk, *id) && sk.entity(*id).is_none_or(|e| e.handle_of.is_none())).collect();
         self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
     }
 
@@ -5596,13 +5604,17 @@ impl SketchEditor {
                 }
             }
         }
-        // Spline tangent handles: white points joined to the spline ends.
+        // Spline tangent handles: white points at the tips (the arms joining them to the spline ends are the sketch's
+        // handle-arm lines, drawn and picked with its curves).
         for e in data.sketch.entities() {
             let Some((h0, h1)) = e.spline_handles() else { continue };
             let Some((s, en)) = e.endpoints() else { continue };
             for (end, h) in [(s, h0), (en, h1)] {
                 if let (Some(a), Some(b)) = (data.sketch.point(end), data.sketch.point(h)) {
-                    lines.push_polyline(&[w(a), w(b)], [0x80, 0x80, 0x80, 255], 0, 1.0, on_top);
+                    // (An arm missing, a spline from before arms: its line drawn here.)
+                    if !data.sketch.handle_arms(e.id).iter().flatten().any(|arm| data.sketch.endpoints(*arm).is_some_and(|(p, q)| (p, q) == (end, h))) {
+                        lines.push_polyline(&[w(a), w(b)], [0x80, 0x80, 0x80, 255], 0, 1.0, on_top);
+                    }
                     points.points.push(PointSprite { position: w(b), color: [0x60, 0x60, 0x60, 255], pick_id: 0, size: 10.0, style: on_top, _pad: 0 });
                     points.points.push(PointSprite { position: w(b), color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: 7.0, style: on_top, _pad: 0 });
                 }
@@ -9097,6 +9109,28 @@ mod tests {
             let (a, b) = line_of(&sk, l).unwrap();
             assert!((a.y - b.y).abs() < 1e-9);
         }
+    }
+
+    /// SKETCH-SPLINE-HANDLE-ARM: a spline's handle arm picks (near its tip, where the curve has left it), takes
+    /// Horizontal like a line, and dragging it moves the handle, not the spline's end.
+    #[test]
+    fn a_spline_handle_arm_picks_and_takes_horizontal() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let s = d.sketch.add_fit_spline_with_handles(&[v(0.0, 0.0), v(0.03, 0.02), v(0.06, 0.0)]).unwrap();
+        let [Some(arm), _] = d.sketch.handle_arms(s) else { panic!("arms") };
+        let (start, tip) = d.sketch.endpoints(arm).unwrap();
+        let (a, b) = (d.sketch.point(start).unwrap(), d.sketch.point(tip).unwrap());
+        let near_tip = a + (b - a) * 0.85;
+        assert_eq!(d.sketch.pick(near_tip, PX * 4.0), Some(arm), "the arm picks");
+        assert!(constraint_applicable(&d.sketch, ConstraintTool::Horizontal, &[arm]));
+        assert_eq!(apply_constraint(&mut d.sketch, ConstraintTool::Horizontal, &[arm]), Ok(1));
+        assert!(d.sketch.solve().is_solved());
+        let (a, b) = (d.sketch.point(start).unwrap(), d.sketch.point(tip).unwrap());
+        assert!((a.y - b.y).abs() < 1e-9);
+        // Dragging the arm: the tip follows, the spline's start stays.
+        let grab = a + (b - a) * 0.85;
+        drag(&mut ed, &mut d, grab, grab + v(0.005, 0.0));
+        assert!((d.sketch.point(start).unwrap() - a).length() < 1e-9, "the spline's end stays");
     }
 
     /// SKETCH-SPLINE-END-DERIVATIVES: a spline's end-tangent handle drags

@@ -238,3 +238,36 @@ fn regions_unite_across_a_whole_loop_not_an_arc() {
     assert_eq!(regions.len(), 3);
     assert!(regions::union_touching(&regions).iter().all(|u| u.is_some()));
 }
+
+/// A spline's handle arms (Onshape's spline handles): construction lines from its ends to the handle tips that take
+/// line constraints and dimensions, can't be deleted alone, and go with the spline.
+#[test]
+fn a_splines_handle_arms_are_lines() {
+    let mut sk = Sketch::new();
+    let s = sk.add_fit_spline_with_handles(&[v(0.0, 0.0), v(30.0, 20.0), v(60.0, 0.0)]).unwrap();
+    let [Some(a0), Some(a1)] = sk.handle_arms(s) else { panic!("no arms") };
+    assert_eq!((sk.kind(a0), sk.arm_of(a0), sk.arm_of(a1)), (Some(EntityKind::Line), Some((s, 0)), Some((s, 1))));
+    assert!(sk.entity(a0).unwrap().construction);
+    // (Construction: no region.)
+    assert!(sk.regions().is_empty());
+    let line = sk.add_line(v(0.0, -20.0), v(40.0, -20.0));
+    sk.add_constraint(ConstraintKind::Horizontal { a: a0, b: None }).unwrap();
+    sk.add_constraint(ConstraintKind::Length { curve: a0, value: 15.0 }).unwrap();
+    sk.add_constraint(ConstraintKind::Angle { a: a1, b: line, value: 30f64.to_radians() }).unwrap();
+    sk.solve();
+    let (h0, h1) = sk.entity(s).unwrap().spline_handles().unwrap();
+    let (e0, e1) = sk.entity(s).unwrap().endpoints().unwrap();
+    let tip = sk.point(h0).unwrap() - sk.point(e0).unwrap();
+    assert!(tip.y.abs() < 1e-9 && (tip.length() - 15.0).abs() < 1e-9, "{tip}");
+    let end = sk.point(h1).unwrap() - sk.point(e1).unwrap();
+    let (la, lb) = sk.entity(line).unwrap().endpoints().unwrap();
+    let dir = sk.point(lb).unwrap() - sk.point(la).unwrap();
+    let a = dir.angle_to(end).abs();
+    let angle = a.min(std::f64::consts::PI - a);
+    assert!((angle - 30f64.to_radians()).abs() < 1e-9, "{}", angle.to_degrees());
+    // Deleted alone: it stays; with its spline: gone.
+    sk.remove_entities(&[a0]);
+    assert!(sk.entity(a0).is_some());
+    let removed = sk.remove_entities(&[s]);
+    assert!(removed.contains(&a0) && removed.contains(&a1) && sk.entity(h0).is_none());
+}

@@ -651,7 +651,7 @@ pub fn sketch_display(s: &super::context::SketchResult, editing: bool) -> Sketch
             points.push(SketchPointDisplay { entity: e.id.0, position: f3(frame.to_world(p)), state: state_of(e.id), standalone, handle, external: e.external });
         } else {
             let pts: Vec<[f32; 3]> = s.sketch.tessellate(e.id, tol).into_iter().map(|p| f3(frame.to_world(p))).collect();
-            curves.push(SketchCurveDisplay { entity: e.id.0, points: pts, construction: e.construction, external: e.external && !glyph, state: state_of(e.id) });
+            curves.push(SketchCurveDisplay { entity: e.id.0, points: pts, construction: e.construction, external: e.external && !glyph, state: state_of(e.id), handle: e.handle_of.is_some() });
         }
     }
     let mut regions = Vec::new();

@@ -302,6 +302,14 @@ impl PartStudioView {
                     self.sketch_fillet_radius = Some(ed.fillet_radius);
                 }
                 self.sketch = Some(SketchEditor::new(id, frame));
+                // A spline from before handle arms gets them, so its handles can be picked and constrained.
+                if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) {
+                    dialog.update(cx, |d, _| {
+                        if let Some(data) = d.sketch_data_mut() {
+                            data.sketch.add_all_handle_arms();
+                        }
+                    });
+                }
                 let length = self.doc.read(cx).session.doc.settings.units.length;
                 let pending = self.sketch_pending_options.take();
                 if let Some(ed) = &mut self.sketch {

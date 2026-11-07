@@ -64,6 +64,9 @@ pub struct PickMap {
     /// Per pickable body, ascending: (its first face id − 1, face count, its first edge id − 1, its index in the
     /// display's bodies).
     bodies: Vec<(u32, u32, u32, usize)>,
+    /// Ids that win over others of their kind under the cursor (a spline's handle arm over the spline it runs
+    /// along), ascending.
+    boosted: Vec<u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -308,10 +311,18 @@ impl PickMap {
         self.priority_fn_filtered(|_| true)
     }
 
+    /// `id` wins over the other targets of its kind under the cursor ([`Self::priority_fn`]).
+    pub fn boost(&mut self, id: u32) {
+        if let Err(k) = self.boosted.binary_search(&id) {
+            self.boosted.insert(k, id);
+        }
+    }
+
     /// Like [`Self::priority_fn`], but kinds `allow` rejects are never
     /// picked or hovered (a dialog field's selection filter, Onshape).
     pub fn priority_fn_filtered(&self, allow: impl Fn(PickKind) -> bool) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
-        let prio: Vec<i32> = self.iter().map(|t| if allow(t.kind) { t.kind.priority() } else { i32::MIN }).collect();
+        // (Doubled: a boosted id one above its kind, below the next kind.)
+        let prio: Vec<i32> = self.iter().zip(1u32..).map(|(t, id)| if allow(t.kind) { 2 * t.kind.priority() + i32::from(self.boosted.binary_search(&id).is_ok()) } else { i32::MIN }).collect();
         Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(0) })
     }
 }
@@ -935,17 +946,28 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             }
             let mut lines = LineData::default();
             for c in &sk.curves {
+                // A spline's handle arm: only while the sketch is edited (live: the white handles show then).
+                if c.handle && !editing {
+                    continue;
+                }
                 let id = picks.push(PickTarget { reference: Reference::SketchEntity { sketch: sk.feature, entity: c.entity }, kind: PickKind::SketchCurve, anchor: None });
+                // (A handle arm, 1 px beside its 2 px spline, wins under the cursor.)
+                if c.handle {
+                    picks.boost(id);
+                }
                 // Custom sketch appearance (Edit sketch appearance) when not editing.
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
+                    // (A handle arm: Onshape's thin grey handle line, sketch/100–101.)
+                    None if c.handle => [0x80, 0x80, 0x80, 255],
                     None => sketch_color(&opts.graphics, c.state, c.construction, editing, c.external),
                 };
                 // Hovered / selected it keeps a dark core like a part edge
                 // (live sketch/21, 22).
-                let style = LineSegment::CORE | if c.construction { LineSegment::CONSTRUCTION } else { 0 };
+                // (A handle arm on top: it runs along its spline from the end, and under it it couldn't be picked.)
+                let style = LineSegment::CORE | if c.handle { LineSegment::ON_TOP } else if c.construction { LineSegment::CONSTRUCTION } else { 0 };
                 // Graphics preferences: active 2 px, inactive 1 px by default.
-                let width = if editing { opts.graphics.sketch_line_width } else { 1.5 * opts.graphics.inactive_line_width };
+                let width = if c.handle { 1.0 } else if editing { opts.graphics.sketch_line_width } else { 1.5 * opts.graphics.inactive_line_width };
                 lines.push_polyline(&c.points, color, id, width, style);
             }
             let mut points = PointData::default();
@@ -1000,7 +1022,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
             if editing {
                 let oc = theme::rgb8(opts.graphics.sketch_under_occluded);
                 let mut hidden = LineData::default();
-                for c in sk.curves.iter().filter(|c| c.state == SketchEntityState::Under && !c.external) {
+                for c in sk.curves.iter().filter(|c| c.state == SketchEntityState::Under && !c.external && !c.handle) {
                     let style = if c.construction { LineSegment::CONSTRUCTION } else { 0 };
                     hidden.push_polyline(&c.points, oc, 0, opts.graphics.sketch_line_width, style);
                 }
