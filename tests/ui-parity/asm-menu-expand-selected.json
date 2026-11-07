@@ -20,7 +20,7 @@
   {
    "do": "rclick",
    "on": {
-    "instance": "Assembly 1 <1>"
+    "instance": "Assembly"
    }
   },
   {

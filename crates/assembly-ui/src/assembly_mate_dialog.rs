@@ -292,7 +292,8 @@ impl MateDialog {
         let use_limits = !mate.limits.is_empty();
         let (a, b) = if is_new { (None, None) } else { (Some(mate.a.clone()), Some(mate.b.clone())) };
         let (c, d) = if is_new { (None, None) } else { (mate.extra.first().cloned(), mate.extra.get(1).cloned()) };
-        let active = if a.is_none() { Some(0) } else if b.is_none() { Some(1) } else { None };
+        // Editing, the full field still takes picks (live asm-mate-edit-escape: "Mate connectors" active).
+        let active = if a.is_none() { Some(0) } else if b.is_none() { Some(1) } else { Some(0) };
         Self {
             id: mate.id,
             name: mate.name,

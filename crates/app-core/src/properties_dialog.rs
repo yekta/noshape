@@ -912,8 +912,10 @@ pub fn open_instance_properties(instance: String, designator: String, on_save: i
         let dirty = value != designator;
         let (st2, on_save) = (st.clone(), on_save.clone());
         crate::ui_script::note_dialog(|| {
-            let field = serde_json::json!({ "label": "Reference designator", "kind": "input", "value": st.read(cx).value().to_string() });
-            serde_json::json!({ "kind": "modal", "title": "Instance properties", "fields": [field], "buttons": ["Save", "Close"] })
+            // Its one input has the keyboard (the focus' text and selection); live's recorder reads it as the focus, no
+            // fields (asm-menu-instance-properties).
+            let focus = crate::ui_script::field_focus("", st.read(cx));
+            serde_json::json!({ "kind": "modal", "title": "Instance properties", "fields": [], "buttons": ["Save", "Close"], "focus": focus })
         });
         bootstrap_modal(dialog, "Instance properties", 600., 25.).child(
             v_flex()

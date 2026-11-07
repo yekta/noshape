@@ -236,7 +236,7 @@ pub enum RenameRow {
 pub struct FolderNameDialog {
     instances: Vec<InstanceId>,
     features: Vec<MateId>,
-    input: Entity<InputState>,
+    pub input: Entity<InputState>,
     _sub: Subscription,
 }
 
@@ -496,6 +496,9 @@ pub struct AsmUi {
     pub insert_config: HashMap<TabId, noshape_model::configuration::ConfigValues>,
     /// Display states dialog: open, name field, chosen state, renaming.
     pub display_states: bool,
+    /// The graphics menu being built was opened off the part (empty space, the selection's menu): no Section view…,
+    /// Find in instance list or View normal to (live asm-empty-menu-clear-selection).
+    pub menu_off_part: bool,
     pub ds_name: Option<Entity<InputState>>,
     pub ds_selected: Option<usize>,
     pub ds_renaming: Option<Entity<InputState>>,
@@ -1063,35 +1066,46 @@ impl AssemblyView {
         let is_asm = matches!(inst.source, InstanceSource::Assembly { .. }) || self.linked_assembly(top).is_some();
         let isolating = self.isolate.is_some() || self.ui.transparent.is_some();
         let name = inst.name.clone();
+        let off_part = graphics && self.ui.menu_off_part;
         let mut m: Vec<MenuEntry> = Vec::new();
-        if isolating {
-            m.push(item("Exit isolate", |t, _, cx| {
-                t.exit_isolate(cx);
-            }));
-            m.push(MenuEntry::Sep);
-        }
         // Properties (list only): the part's metadata and the instance's own.
         if !graphics && !multi {
             if matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::Assembly { .. } | InstanceSource::PartStudio { .. }) {
                 m.push(item("Properties…", move |t, w, cx| t.open_instance_metadata(top, w, cx)));
             }
             m.push(item("Instance properties…", move |t, w, cx| t.open_instance_properties(top, w, cx)));
-            m.push(MenuEntry::Sep);
         }
-        // Visibility group.
+        // Live (asm-menu-exit-isolate): Exit isolate after the properties, the visibility group's first.
+        if isolating {
+            m.push(item("Exit isolate", |t, _, cx| {
+                t.exit_isolate(cx);
+            }));
+        }
+        m.push(MenuEntry::Sep);
+        // Visibility group. Live (asm-instance-hide-show): a hidden instance has Show · Show all instances; a suppressed
+        // one (asm-instance-suppress-unsuppress) no center of mass, Isolate or Make transparent; isolating, no Isolate
+        // or Make transparent.
         let tg = targets.clone();
         m.push(icon_item(if hidden { "Show" } else { "Hide" }, "eye-off", move |t, _, cx| t.set_hidden(tg.clone(), !hidden, cx)));
-        let tg = targets.clone();
-        m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
-        m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
-        let tg = targets.clone();
-        let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
-        m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
-        let tg = targets.clone();
-        m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
-        let tg = targets.clone();
-        m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
-        if graphics {
+        if hidden {
+            m.push(item("Show all instances", |t, _, cx| t.show_hidden(cx)));
+        } else {
+            let tg = targets.clone();
+            m.push(item(crate::i18n::template("Hide other __label__", &[("label", "instances")]), move |t, _, cx| t.hide_other_instances(tg.clone(), cx)));
+            m.push(item(crate::i18n::template("Hide all __label__", &[("label", "instances")]), |t, _, cx| t.hide_all_instances(cx)));
+        }
+        if !suppressed {
+            let tg = targets.clone();
+            let com_on = self.ui.com.as_ref().is_some_and(|(c, _)| *c == targets);
+            m.push(icon_item(if com_on { "Hide center of mass" } else { "Show center of mass" }, "com-indicator", move |t, _, cx| t.toggle_center_of_mass(tg.clone(), cx)));
+        }
+        if !suppressed && !isolating {
+            let tg = targets.clone();
+            m.push(item("Isolate…", move |t, _, cx| t.isolate_cmd(false, tg.clone(), cx)));
+            let tg = targets.clone();
+            m.push(item("Make transparent…", move |t, _, cx| t.isolate_cmd(true, tg.clone(), cx)));
+        }
+        if graphics && !off_part {
             m.push(icon_item("Section view…", "section-view-3d", |t, w, cx| t.toggle_section(w, cx)));
         }
         let tg = targets.clone();
@@ -1147,7 +1161,7 @@ impl AssemblyView {
         let mut edit: Vec<MenuEntry> = Vec::new();
         // Graphics (live rmb-asm-two-instances-selected): Edit in context,
         // Find in instance list, Add mate connector…, Replace…, Switch to….
-        if !multi && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
+        if !multi && !suppressed && matches!(inst.source, InstanceSource::Part { .. } | InstanceSource::PartStudio { .. }) {
             // With contexts already in the Part Studio: pick one or Create
             // new context; Update context ▸ re-snapshots one (help:
             // Modeling in context).
@@ -1182,7 +1196,7 @@ impl AssemblyView {
                 }
             }
         }
-        if graphics {
+        if graphics && !off_part {
             edit.push(item("Find in instance list", move |t, _, cx| {
                 t.selected = vec![top];
                 t.ui.scroll_to_selection = true;
@@ -1192,14 +1206,16 @@ impl AssemblyView {
         if !multi {
             edit.push(icon_item("Add mate connector to instance origin…", "add-mate-connector", move |t, w, cx| t.mc_at_instance_origin(top, w, cx)));
         }
-        edit.push(item(
-            match (graphics, multi) {
-                (_, true) => format!("Replace {} instances…", targets.len()),
-                (true, false) => format!("Replace {name}…"),
-                (false, false) => "Replace instances…".to_string(),
-            },
-            move |t, _, cx| t.open_replace(top, cx),
-        ));
+        if !suppressed {
+            edit.push(item(
+                match (graphics, multi) {
+                    (_, true) => format!("Replace {} instances…", targets.len()),
+                    (true, false) => format!("Replace {name}…"),
+                    (false, false) => "Replace instances…".to_string(),
+                },
+                move |t, _, cx| t.open_replace(top, cx),
+            ));
+        }
         let switch_tab = match &inst.source {
             InstanceSource::Assembly { assembly, .. } => Some(*assembly),
             other => other.studio(),
@@ -1281,7 +1297,10 @@ impl AssemblyView {
             let tg = targets.clone();
             m.push(icon_item("Change to version…", "change-version", move |t, _, cx| t.open_reference_manager(Some(tg.clone()), cx)));
         }
-        m.push(export);
+        // Live (asm-instance-suppress-unsuppress): no Export… or Zoom to selection on a suppressed instance.
+        if !suppressed {
+            m.push(export);
+        }
         // Live qa5 CA2: Release… after Export… (the instances' parts).
         if matches!(inst.source, InstanceSource::Part { .. }) {
             let tg = targets.clone();
@@ -1289,7 +1308,9 @@ impl AssemblyView {
         }
         m.push(MenuEntry::Sep);
         let tg = targets.clone();
-        m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
+        if !suppressed {
+            m.push(item("Zoom to selection", move |t, _, cx| t.zoom_to_instances(tg.clone(), cx)));
+        }
         m.push(MenuEntry::Sep);
         m.extend(drawing);
         m.push(MenuEntry::Sep);
@@ -1831,7 +1852,7 @@ impl AssemblyView {
     }
 
     /// Structural edit touching several tabs, with the solved placements folded in.
-    fn edit_doc(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut noshape_model::Document, TabId)) {
+    pub(super) fn edit_doc(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut noshape_model::Document, TabId)) {
         let solved = self.result.solved.placements.clone();
         let tab = self.tab;
         self.doc.update(cx, |d, cx| {
@@ -1915,8 +1936,9 @@ impl AssemblyView {
     fn move_ids_to_new_subassembly(&mut self, ids: Vec<InstanceId>, cx: &mut Context<Self>) {
         let mut new_id = None;
         self.edit_doc(noshape_ops::assembly::MOVE_TO_NEW_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::move_to_new_subassembly(doc, tab, &ids));
-        if let Some(id) = new_id {
-            self.selected = vec![id];
+        // Live (asm-menu-move-to-new-subassembly): nothing is selected after.
+        if new_id.is_some() {
+            self.selected.clear();
             self.selected_mate = None;
         }
     }
@@ -1980,8 +2002,9 @@ impl AssemblyView {
     pub(super) fn create_empty_subassembly(&mut self, cx: &mut Context<Self>) {
         let mut new_id = None;
         self.edit_doc(noshape_ops::assembly::CREATE_EMPTY_SUBASSEMBLY, cx, |doc, tab| new_id = noshape_ops::assembly::create_empty_subassembly(doc, tab));
-        if let Some(id) = new_id {
-            self.selected = vec![id];
+        // Live (asm-menu-create-empty-subassembly): nothing is selected after.
+        if new_id.is_some() {
+            self.selected.clear();
         }
     }
 
@@ -1991,9 +2014,11 @@ impl AssemblyView {
         if ids.is_empty() {
             return;
         }
-        let mut created = Vec::new();
-        self.edit_doc(noshape_ops::assembly::DISSOLVE_SUBASSEMBLY, cx, |doc, tab| created = noshape_ops::assembly::dissolve_subassemblies(doc, tab, &ids));
-        self.selected = created;
+        // Live (asm-menu-dissolve-subassembly): nothing is selected after.
+        self.edit_doc(noshape_ops::assembly::DISSOLVE_SUBASSEMBLY, cx, |doc, tab| {
+            noshape_ops::assembly::dissolve_subassemblies(doc, tab, &ids);
+        });
+        self.selected.clear();
     }
 
     /// Top-level assembly row menu (Onshape: Rename, Show center of mass,
@@ -2020,10 +2045,7 @@ impl AssemblyView {
         if any_fixed {
             m.push(icon_item("Unfix all", "fix", |t, _, cx| t.unfix_all(cx)));
         }
-        m.push(item("Check interference…", |t, _, cx| {
-            let all: Vec<InstanceId> = t.assembly(cx).map(|a| a.instances.iter().filter(|i| !i.suppressed).map(|i| i.id).collect()).unwrap_or_default();
-            t.open_interference_with(all, cx);
-        }));
+        m.push(item("Check interference…", |t, _, cx| t.open_interference_whole(cx)));
         m.push(MenuEntry::Sep);
         let name = self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         m.push(icon_item(format!("Create Drawing of {name}…"), "menu-create-drawing", move |_, w, cx| {
@@ -2690,6 +2712,14 @@ impl AssemblyView {
                 m
             }
             Some(t) => self.instance_menu(t, true, cx),
+            // Live (asm-empty-menu-clear-selection): with instances selected, empty space gives their menu, as off the
+            // part.
+            None if !self.selected.is_empty() => {
+                self.ui.menu_off_part = true;
+                let m = self.instance_menu(self.selected[0], true, cx);
+                self.ui.menu_off_part = false;
+                m
+            }
             None => {
                 // Onshape: Show all | Create Drawing of <assembly>… | Zoom to fit, Isometric.
                 let mut m = Vec::new();
@@ -2700,6 +2730,10 @@ impl AssemblyView {
                     m.push(MenuEntry::Sep);
                 }
                 m.push(item("Show all", |t, _, cx| t.show_hidden(cx)));
+                // Live (asm-empty-menu-show-all): Show all instances while one is hidden.
+                if self.assembly(cx).is_some_and(|a| a.instances.iter().any(|i| i.hidden)) {
+                    m.push(item("Show all instances", |t, _, cx| t.show_hidden(cx)));
+                }
                 // Live (behaviours "skb (10-24) assembly section" (4)): Show all |
                 // Edit section view… (section icon) | Turn off section view | —.
                 if self.ui.section.as_ref().is_some_and(|s| s.dialog.is_none() && !s.planes.is_empty()) {
@@ -2781,7 +2815,8 @@ impl AssemblyView {
             }
             self.expanded = set;
         } else {
-            self.expanded.clear();
+            // Live (asm-root-menu-collapse-all): the Mate features folder folds too.
+            self.expanded = HashSet::from([vec![MATE_FEATURES_COLLAPSED]]);
             self.ui.expanded_mates.clear();
         }
         cx.notify();
@@ -3138,6 +3173,17 @@ pub enum Playback {
     Single,
     Reciprocate,
     Loop,
+}
+
+impl Playback {
+    /// The Playback type select's text.
+    pub fn label(self) -> &'static str {
+        match self {
+            Playback::Single => "Single",
+            Playback::Reciprocate => "Reciprocate",
+            Playback::Loop => "Loop",
+        }
+    }
 }
 
 /// Animate mate dialog state.
@@ -3573,11 +3619,7 @@ impl AssemblyView {
             body = body.child(list);
         }
         let view = cx.entity();
-        let pb_label = match pb {
-            Playback::Single => "Single",
-            Playback::Reciprocate => "Reciprocate",
-            Playback::Loop => "Loop",
-        };
+        let pb_label = pb.label();
         // Live: 110 px, the text 6 px in, an 8x4 #333 caret 6 px from the right.
         let playback = Button::new("anim-playback")
             .ghost()
@@ -4074,12 +4116,10 @@ impl AssemblyView {
         cx.notify();
     }
 
-    pub(super) fn render_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (list, ix, at) = self.ui.select_other.clone()?;
-        let pal = p();
-        let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
-        let label = |r: &SelectOtherRow| match r {
-            SelectOtherRow::Instance(id) => names.get(id).cloned().unwrap_or_default(),
+    /// A Select other row's text ("Face of Part 2 <1>", an instance's name).
+    pub(super) fn select_other_label(&self, r: &SelectOtherRow, cx: &App) -> String {
+        match r {
+            SelectOtherRow::Instance(id) => self.assembly(cx).and_then(|a| a.instance(*id)).map(|i| i.name.clone()).unwrap_or_default(),
             SelectOtherRow::Entity(t) => {
                 let part = self.result.node(&t.path).map(|n| n.name.clone()).unwrap_or_default();
                 match t.kind {
@@ -4088,7 +4128,13 @@ impl AssemblyView {
                     _ => format!("Face of {part}"),
                 }
             }
-        };
+        }
+    }
+
+    pub(super) fn render_select_other(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (list, ix, at) = self.ui.select_other.clone()?;
+        let pal = p();
+        let labels: Vec<String> = list.iter().map(|r| self.select_other_label(r, cx)).collect();
         let mut rows: Vec<AnyElement> = Vec::new();
         for (k, r) in list.iter().enumerate() {
             let (hover_row, pick_row) = (r.clone(), r.clone());
@@ -4101,7 +4147,7 @@ impl AssemblyView {
                     .pr(px(20.))
                     .cursor_pointer()
                     .when(k % 2 == 1, |d| d.bg(gpui_kit::rgba(0xffffff59)))
-                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).when(k == ix, |d| d.font_weight(FontWeight::BOLD)).child(label(r)))
+                    .child(div().truncate().text_size(px(13.33)).text_color(pal.text).when(k == ix, |d| d.font_weight(FontWeight::BOLD)).child(labels[k].clone()))
                     // Hovering a row pre-highlights its entity or instance.
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         match &hover_row {

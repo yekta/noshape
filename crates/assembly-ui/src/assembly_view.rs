@@ -1362,6 +1362,19 @@ impl AssemblyView {
     // ------------------------------------------------------------ editing
 
     /// Commit a change to the assembly, folding in the latest solved placements.
+    /// An edit that changes the order of the exploded views or named positions: one undo step that also keeps the
+    /// document's drawing views of this assembly on the same one (they refer to them by position).
+    fn edit_view_list(&mut self, desc: &str, list: noshape_model::drawing::AssemblyViewList, change: noshape_model::drawing::ListChange, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly)) {
+        // Labelled as the tab's own edits ("Assembly 1 :: Move down").
+        let label = format!("{} :: {desc}", self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.as_str()).unwrap_or_default());
+        self.edit_doc(&label, cx, |doc, tab| {
+            if let Some(TabContent::Assembly(a)) = doc.tab_mut(tab).map(|t| &mut t.content) {
+                f(a);
+            }
+            doc.remap_assembly_views(tab, list, change);
+        });
+    }
+
     fn edit<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
         let result = &self.result;
         let tab = self.tab;
@@ -2068,7 +2081,7 @@ impl AssemblyView {
         }
         v.name = format!("{} ({k})", v.name);
         let name = v.name.clone();
-        self.edit(&format!("Duplicate : {name}"), cx, |a| a.exploded_views.insert(i + 1, v));
+        self.edit_view_list(&format!("Duplicate : {name}"), noshape_model::drawing::AssemblyViewList::ExplodedViews, noshape_model::drawing::ListChange::Inserted(i + 1), cx, |a| a.exploded_views.insert(i + 1, v));
         if let Some(e) = self.explode.filter(|e| *e > i) {
             self.explode = Some(e + 1);
         }
@@ -2076,7 +2089,7 @@ impl AssemblyView {
 
     fn delete_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.exploded_views.get(i).map(|v| v.name.clone())).unwrap_or_default();
-        self.edit(&format!("Delete : {name}"), cx, |a| {
+        self.edit_view_list(&format!("Delete : {name}"), noshape_model::drawing::AssemblyViewList::ExplodedViews, noshape_model::drawing::ListChange::Removed(i), cx, |a| {
             if i < a.exploded_views.len() {
                 a.exploded_views.remove(i);
             }
@@ -4553,6 +4566,14 @@ impl AssemblyView {
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
+        // Live (asm-mate-connector-on-face): a new mate connector's row ("Mate connector 1", selected, red until its
+        // origin is picked) is in the list while its dialog is open (not one opened from a mate's chip).
+        let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some()));
+        if let Some((id, name, ok)) = new_mc.clone() {
+            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly").into(), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
+            mate_ids.push(id);
+        }
         // Live 1693: a new group's row ("Group 1", grey, selected) is in the
         // list while its dialog is open.
         let new_group = self.ui.group.as_ref().filter(|g| g.0.is_none()).map(|_| asm.next_feature_name("Group"));
@@ -4574,7 +4595,7 @@ impl AssemblyView {
         // with its new-folder button, then one tree that ends with the
         // collapsible "Mate features (N)" folder holding the mates.
         let mates_open = !self.expanded.contains(&vec![MATE_FEATURES_COLLAPSED]);
-        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some()) + usize::from(new_group.is_some());
+        let mate_count = asm.listed_mate_count() + usize::from(new_relation.is_some()) + usize::from(new_mate.is_some()) + usize::from(new_group.is_some()) + usize::from(new_mc.is_some());
         let mate_error = result.mates.iter().any(|m| !m.ok) || result.relations.iter().any(|r| !r.ok);
         if !filtering || (tree && !mate_rows.is_empty()) {
             let folder = crate::ui::tree_row("mates-folder", false)
@@ -6332,6 +6353,9 @@ impl AssemblyView {
             self.message = None;
             self.activate_explode(None, cx);
             cx.notify();
+        } else if self.ui.display_states {
+            // Live (asm-display-states-open-escape): Esc closes the Display states panel.
+            self.toggle_display_states(window, cx);
         } else if self.ui.shortcut_sheet.is_some() {
             self.toggle_shortcut_sheet(window, cx);
         } else if self.ui.ctx_menu.is_some() || self.ui.mini_toolbar.is_some() || self.ui.select_other.is_some() {

@@ -9,7 +9,8 @@ use crate::{Ctx, OpenDoc, assembly as sa};
 use glam::DVec3;
 use noshape_model::assembly::eval::{AssemblyResult, SolveOptions};
 use noshape_model::assembly::{Assembly, ExplodeStep, ExplodedView, MateId};
-use noshape_model::document::TabId;
+use noshape_model::document::{TabContent, TabId};
+use noshape_model::drawing::{AssemblyViewList, ListChange};
 use noshape_units::{Dim, EmptyScope, UnitPrefs};
 use serde_json::{Value, json};
 
@@ -170,6 +171,21 @@ fn quantity(v: &Value, dim: Dim, units: &UnitPrefs, field: &str) -> Result<f64, 
 
 /// Commit with `solved` in place of the current solution (the app's
 /// apply_solved followed by an edit).
+/// An edit that changes the order of the exploded views or named positions: one undo step that also keeps the
+/// document's drawing views of this assembly on the same one (they refer to them by position).
+fn commit_view_list(od: &mut OpenDoc, tab: TabId, desc: &str, result: &AssemblyResult, list: AssemblyViewList, change: ListChange, f: impl FnOnce(&mut Assembly)) -> Result<(), OpError> {
+    // Labelled as the tab's own edits ("Assembly 1 :: Move down").
+    let label = format!("{} :: {desc}", od.doc().tab(tab).map(|t| t.name.as_str()).unwrap_or_default());
+    od.session.edit_document(&label, |d| {
+        if let Some(TabContent::Assembly(a)) = d.tab_mut(tab).map(|t| &mut t.content) {
+            sa::fold_solved(a, result);
+            f(a);
+        }
+        d.remap_assembly_views(tab, list, change);
+    })?;
+    Ok(())
+}
+
 pub(super) fn commit_solved(od: &mut OpenDoc, tab: TabId, desc: &str, mut result: AssemblyResult, solved: noshape_model::assembly::eval::Solved, f: impl FnOnce(&mut Assembly)) -> Result<(), OpError> {
     result.solved = solved;
     commit(od, tab, desc, &result, f)
@@ -286,11 +302,11 @@ fn named_position(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             let i = pos()?;
             let mut np = asm.named_positions[i].clone();
             np.name = sa::duplicate_position_name(&asm, &np.name);
-            commit(od, tab, &format!("Duplicate named position : {}", np.name), &result, |a| a.named_positions.insert(i + 1, np))?;
+            commit_view_list(od, tab, &format!("Duplicate named position : {}", np.name), &result, AssemblyViewList::NamedPositions, ListChange::Inserted(i + 1), |a| a.named_positions.insert(i + 1, np))?;
         }
         "delete" => {
             let i = pos()?;
-            commit(od, tab, &format!("Delete named position : {}", name_of(i)), &result, |a| {
+            commit_view_list(od, tab, &format!("Delete named position : {}", name_of(i)), &result, AssemblyViewList::NamedPositions, ListChange::Removed(i), |a| {
                 if i < a.named_positions.len() {
                     a.named_positions.remove(i);
                 }
@@ -312,7 +328,7 @@ fn named_position(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             if j >= asm.named_positions.len() {
                 return Err(OpError::param("position", if down { "already the last" } else { "already the first" }));
             }
-            commit(od, tab, if down { "Move down" } else { "Move up" }, &result, |a| a.named_positions.swap(i, j))?;
+            commit_view_list(od, tab, if down { "Move down" } else { "Move up" }, &result, AssemblyViewList::NamedPositions, ListChange::Swapped(i, j), |a| a.named_positions.swap(i, j))?;
         }
         "set_value" => {
             let i = pos()?;
@@ -429,7 +445,7 @@ fn exploded_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 Some(k) => commit(od, tab, "Delete : Explode step", &result, |a| {
                     a.exploded_views[v].steps.remove(k);
                 })?,
-                None => commit(od, tab, &format!("Delete : {}", asm.exploded_views[v].name), &result, |a| {
+                None => commit_view_list(od, tab, &format!("Delete : {}", asm.exploded_views[v].name), &result, AssemblyViewList::ExplodedViews, ListChange::Removed(v), |a| {
                     a.exploded_views.remove(v);
                 })?,
             }

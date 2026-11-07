@@ -392,6 +392,54 @@ pub enum RenderStyle {
     Shaded,
 }
 
+/// An assembly list a drawing view refers into by position.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AssemblyViewList {
+    ExplodedViews,
+    NamedPositions,
+}
+
+/// A change of one of those lists' order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListChange {
+    /// An entry added at this position (a duplicate).
+    Inserted(usize),
+    Removed(usize),
+    Swapped(usize, usize),
+}
+
+impl ListChange {
+    /// Where the entry that was at `k` is now (None: removed).
+    pub fn map(self, k: usize) -> Option<usize> {
+        match self {
+            ListChange::Inserted(i) => Some(if k >= i { k + 1 } else { k }),
+            ListChange::Removed(i) if k == i => None,
+            ListChange::Removed(i) => Some(if k > i { k - 1 } else { k }),
+            ListChange::Swapped(i, j) => Some(if k == i { j } else if k == j { i } else { k }),
+        }
+    }
+}
+
+impl crate::Document {
+    /// Assembly `asm`'s exploded views or named positions changed order: its drawing views keep showing the same one
+    /// (one that was removed shows none).
+    pub fn remap_assembly_views(&mut self, asm: TabId, list: AssemblyViewList, change: ListChange) {
+        for t in &mut self.tabs {
+            let crate::document::TabContent::Drawing(d) = &mut t.content else { continue };
+            for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+                if !matches!(&v.kind, ViewKind::Base { source, .. } if *source == asm) {
+                    continue;
+                }
+                let slot = match list {
+                    AssemblyViewList::ExplodedViews => &mut v.explode,
+                    AssemblyViewList::NamedPositions => &mut v.named_position,
+                };
+                *slot = slot.and_then(|k| change.map(k));
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DrawingView {
     pub id: ViewId,

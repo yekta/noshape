@@ -8,6 +8,7 @@
 //! toolbar; "Edit named position driver mate…" (mate menu) opens the
 //! "Driving mate selector" dialog.
 
+use noshape_model::drawing::{AssemblyViewList, ListChange};
 use super::*;
 use gpui_kit::component::input::InputEvent;
 
@@ -256,16 +257,16 @@ impl AssemblyView {
         }
         np.name = format!("{} ({k})", np.name);
         let name = np.name.clone();
-        self.edit(&format!("Duplicate named position : {name}"), cx, |a| a.named_positions.insert(i + 1, np));
+        self.edit_view_list(&format!("Duplicate named position : {name}"), AssemblyViewList::NamedPositions, ListChange::Inserted(i + 1), cx, |a| a.named_positions.insert(i + 1, np));
     }
 
     fn move_np(&mut self, i: usize, down: bool, cx: &mut Context<Self>) {
         let j = if down { i + 1 } else { i.wrapping_sub(1) };
-        self.edit(if down { "Move down" } else { "Move up" }, cx, |a| {
-            if j < a.named_positions.len() && i < a.named_positions.len() {
-                a.named_positions.swap(i, j);
-            }
-        });
+        let Some(count) = self.assembly(cx).map(|a| a.named_positions.len()) else { return };
+        if i >= count || j >= count {
+            return;
+        }
+        self.edit_view_list(if down { "Move down" } else { "Move up" }, AssemblyViewList::NamedPositions, ListChange::Swapped(i, j), cx, |a| a.named_positions.swap(i, j));
         for slot in [&mut self.ui.np_applied, &mut self.ui.np_editing] {
             if *slot == Some(i) {
                 *slot = Some(j);
@@ -277,7 +278,7 @@ impl AssemblyView {
 
     fn delete_np(&mut self, i: usize, cx: &mut Context<Self>) {
         let name = self.assembly(cx).and_then(|a| a.named_positions.get(i).map(|n| n.name.clone())).unwrap_or_default();
-        self.edit(&format!("Delete named position : {name}"), cx, |a| {
+        self.edit_view_list(&format!("Delete named position : {name}"), AssemblyViewList::NamedPositions, ListChange::Removed(i), cx, |a| {
             if i < a.named_positions.len() {
                 a.named_positions.remove(i);
             }

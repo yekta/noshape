@@ -14,6 +14,8 @@ use noshape_model::assembly::analysis::{InstanceInterference, instance_interfere
 /// The open Interference detection dialog.
 pub struct InterferenceDialog {
     pub instances: Vec<InstanceId>,
+    /// Opened from the assembly's own row: the field holds the assembly (live asm-root-menu-check-interference).
+    pub whole: bool,
     pub include_standard: bool,
     pub top_only: bool,
     pub rows: Vec<InstanceInterference>,
@@ -32,7 +34,7 @@ impl AssemblyView {
         let seq = self.ui.interference.as_ref().map_or(0, |d| d.seq);
         // The dialog's picks are the selection (their list rows highlight).
         self.selected = instances.clone();
-        self.ui.interference = Some(InterferenceDialog { instances, include_standard: false, top_only: false, rows: Vec::new(), meshes: Vec::new(), hover: None, done: false, seq });
+        self.ui.interference = Some(InterferenceDialog { instances, whole: false, include_standard: false, top_only: false, rows: Vec::new(), meshes: Vec::new(), hover: None, done: false, seq });
         self.recompute_interference(cx);
         self.update_capture(cx);
         cx.notify();
@@ -42,6 +44,25 @@ impl AssemblyView {
     pub(super) fn open_interference(&mut self, cx: &mut Context<Self>) {
         let tops: Vec<InstanceId> = self.selected.iter().copied().filter(|id| self.assembly(cx).is_some_and(|a| a.instance(*id).is_some())).collect();
         self.open_interference_with(tops, cx);
+    }
+
+    /// Check interference… from the assembly's own row: every instance, the field showing the assembly.
+    pub(super) fn open_interference_whole(&mut self, cx: &mut Context<Self>) {
+        let all: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().filter(|i| !i.suppressed).map(|i| i.id).collect()).unwrap_or_default();
+        self.open_interference_with(all, cx);
+        self.selected.clear();
+        if let Some(d) = &mut self.ui.interference {
+            d.whole = true;
+        }
+    }
+
+    /// The Instances to analyze field's entries: the assembly itself, or each instance's name.
+    pub(super) fn interference_entries(&self, d: &InterferenceDialog, cx: &App) -> Vec<String> {
+        let asm = self.assembly(cx);
+        if d.whole {
+            return vec![self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default()];
+        }
+        d.instances.iter().filter_map(|id| asm.and_then(|a| a.instance(*id)).map(|i| i.name.clone())).collect()
     }
 
     pub(super) fn close_interference(&mut self, cx: &mut Context<Self>) {
@@ -116,9 +137,11 @@ impl AssemblyView {
         let pal = p();
         let names: HashMap<InstanceId, String> = self.assembly(cx).map(|a| a.instances.iter().map(|i| (i.id, i.name.clone())).collect()).unwrap_or_default();
         let (include, top_only) = (d.include_standard, d.top_only);
-        let entries: Vec<AnyElement> = d
+        let whole = d.whole.then(|| crate::os_ui::query_row("aintf-whole", self.interference_entries(d, cx).concat()).into_any_element());
+        let entries: Vec<AnyElement> = whole.into_iter().chain(d
             .instances
             .iter()
+            .filter(|_| !d.whole)
             .map(|id| {
                 let id = *id;
                 let n = names.get(&id).cloned().unwrap_or_default();
@@ -138,7 +161,7 @@ impl AssemblyView {
                             })),
                     )
                     .into_any_element()
-            })
+            }))
             .collect();
         // Live (the Part Studio's component, behaviours 419 / analysis 81):
         // a finished check without overlaps reads "No interferences".

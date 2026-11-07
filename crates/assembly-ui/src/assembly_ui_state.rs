@@ -137,11 +137,16 @@ impl AssemblyView {
                     continue;
                 }
             }
+            // Related through a selected mate (live: a selected row alone isn't).
             let selected = self.selected.contains(&i.id);
-            rows.push(row(&i.name, if i.suppressed { "suppressed" } else { "ok" }, selected, false, selected || related.contains(&i.id), i.hidden));
+            rows.push(row(&i.name, if i.suppressed { "suppressed" } else { "ok" }, selected, false, related.contains(&i.id), i.hidden));
             if let Some(n) = self.result.node(&[i.id]) {
                 self.nested_state_rows(n, &mut rows, cx);
             }
+        }
+        if let Some(p) = self.pattern.as_ref().filter(|p| p.editing.is_none()) {
+            let ok = self.pattern_from_session(p, cx).is_ok();
+            rows.push(row(&p.name, if ok { "ok" } else { "error" }, true, true, false, false));
         }
         let mate_selected = |id: MateId| self.selected_mate == Some(id) || (self.selected_mate.is_some() && self.ui.more_mates.contains(&id));
         let mut items: Vec<(MateId, Value)> = asm.connectors.iter().map(|c| (c.id, row(&c.name, "ok", mate_selected(c.id), false, mate_selected(c.id), c.hidden))).collect();
@@ -155,6 +160,18 @@ impl AssemblyView {
         let picked = new_mate.is_some_and(|d| d.a.is_some() || d.b.is_some());
         if let Some(d) = new_mate {
             items.push((d.id, row(&d.name, if d.a.is_some() && d.b.is_some() && !d.same_instance() { "ok" } else { "error" }, true, true, picked, !self.show_mates)));
+        }
+        // A new relation, mate connector or group: its row while its dialog is open (live: selected, red until it has
+        // what it needs; a group hidden as the mates are).
+        if let Some(r) = self.relation.as_ref().filter(|r| r.editing.is_none()) {
+            items.push((MateId(u64::MAX), row(&self.relation_name(cx), if r.a.is_some() && (r.b.is_some() || r.kind == RelationType::Screw) { "ok" } else { "error" }, true, true, false, false)));
+        }
+        if let Some(m) = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)) {
+            items.push((m.id, row(&m.name, if m.on.is_some() { "ok" } else { "error" }, true, true, false, false)));
+        }
+        if let Some((_, members)) = self.ui.group.as_ref().filter(|g| g.0.is_none()) {
+            let ok = members.len() >= 2 || !self.ui.group_patterns.is_empty();
+            items.push((MateId(u64::MAX - 1), row(&asm.next_feature_name("Group"), if ok { "ok" } else { "error" }, true, true, false, !self.show_mates)));
         }
         let folder_related = self.selected_mate.is_some_and(|id| asm.mates.iter().any(|m| m.id == id)) || picked;
         rows.push(row(&format!("Mate features ({})", items.len()), "ok", false, false, folder_related, false));
@@ -172,7 +189,12 @@ impl AssemblyView {
         let previewing = self.mate.is_some();
         let instances: Vec<Value> = asm.instances.iter().map(|i| json!({ "name": i.name, "fixed": i.fixed, "transform": transform(if previewing { &i.placement } else { placed.get(&i.id).unwrap_or(&i.placement) }) })).collect();
         // As live's REST gives them: the mateType enum ("PIN_SLOT") and the feature status ("OK").
-        let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": mate_state(m).to_uppercase() })).collect();
+        // As live's REST gives them: a suppressed mate's status stays OK (asm-mate-menu-suppress).
+        let rest_status = |m: &Mate| match mate_state(m) {
+            "suppressed" => "OK".to_string(),
+            s => s.to_uppercase(),
+        };
+        let mates: Vec<Value> = asm.mates.iter().map(|m| json!({ "name": m.name, "type": m.mate_type.name().to_uppercase().replace(' ', "_"), "status": rest_status(m) })).collect();
         // A mate selected in the list is a FEATURE (live), listed before the instances.
         let mates_selected = self.selected_mate.into_iter().chain(self.ui.more_mates.iter().copied().filter(|_| self.selected_mate.is_some()));
         let mut items: Vec<Value> = mates_selected.filter_map(|id| asm.mates.iter().find(|m| m.id == id)).map(|m| json!({ "kind": "FEATURE", "owner": m.name })).collect();
@@ -200,8 +222,36 @@ impl AssemblyView {
         let modal = crate::ui_script::open_dialog().filter(|d| d["kind"] == "modal");
         dialogs.extend(modal.clone());
         let dialog = dialogs.last().cloned();
-        // The mate dialog's empty query box has the focus (live: field "Mate connectors").
-        let focus = if modal.is_some() { Some(json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })) } else { None };
+        // As live's recorder reads it: a modal holds the keyboard ("other"), a row being renamed is its input, else
+        // the open dialog's active query field (with the dialog's title).
+        let input = |label: Option<&str>, st: &Entity<InputState>| {
+            let mut f = crate::ui_script::field_focus(label.unwrap_or(""), st.read(cx));
+            if label.is_none() {
+                f["label"] = Value::Null;
+            }
+            f
+        };
+        let rename = self.ui.rename.as_ref().map(|(_, st, _)| input(None, st))
+            .or_else(|| self.ui.dynamic_suppression.as_ref().map(|(_, st, _)| input(Some("Unsuppressed if"), st)))
+            .or_else(|| self.ui.folder_name.as_ref().map(|f| input(None, &f.input)))
+            .or_else(|| self.ui.ds_name.as_ref().filter(|_| self.ui.display_states).map(|st| input(None, st)));
+        let active_field = || {
+            // (A dialog with only ✕, Interference detection or Animate mate, keeps no field focused: live.)
+            dialog.as_ref().filter(|d| d["kind"] == "feature" && d.get("ok").is_some()).and_then(|d| {
+                // (Origin of new Part Studio's field takes picks without the keyboard: live asm-create-part-studio-in-context.)
+                let f = d["fields"].as_array()?.iter().find(|f| f["kind"] == "query" && f["active"] == true && d["title"] != "Origin of new Part Studio" && d["title"] != "Replace instance")?;
+                Some(json!({ "kind": "field", "label": f["label"], "dialog": d["title"] }))
+            })
+        };
+        let focus = match &modal {
+            Some(d) => Some(match d.get("focus") {
+                Some(f) => json!({ "kind": "other", "label": null, "text": f["text"], "selection": f["selection"], "all": f["all"] }),
+                None => json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false }),
+            }),
+            None => rename,
+        };
+        let focus = focus.or_else(|| if self.mate.is_none() { active_field() } else { None });
+        // The mate dialog's query box has the focus while it takes picks (live: field "Mate connectors").
         let focus = focus.or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } }))).unwrap_or_else(|| json!({ "kind": "none" }));
         let history = self.history_state(cx);
         json!({
@@ -318,7 +368,9 @@ impl AssemblyView {
                     })
                     .collect()
             };
-            let mut fields = vec![query(if s.kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" }, seeds, s.active.is_none(), false)];
+            // Live (asm-linear-pattern-open-escape, -mirror-, -replicate-): an empty Instances field is red but in Replicate.
+            let empty = seeds.is_empty() && s.kind != PatternDialogKind::Replicate;
+            let mut fields = vec![query(if s.kind == PatternDialogKind::Mirror { "Instances to mirror" } else { "Instances" }, seeds, s.active.is_none(), empty)];
             match s.kind {
                 PatternDialogKind::Linear | PatternDialogKind::Circular => {
                     let circular = s.kind == PatternDialogKind::Circular;
@@ -379,7 +431,8 @@ impl AssemblyView {
                 None => asm.map(|a| a.next_feature_name("Group")).unwrap_or_else(|| "Group 1".into()),
             };
             let complete = ids.len() >= 2 || !self.ui.group_patterns.is_empty();
-            out.push(dialog(title, complete, true, vec![query("Instances", ids.iter().filter_map(|i| names.get(i).cloned()).collect(), true, false)]));
+            // Live (asm-group-two-instances): ✓ off until two members.
+            out.push(dialog(title, complete, complete, vec![query("Instances", ids.iter().filter_map(|i| names.get(i).cloned()).collect(), true, false)]));
         }
         if let Some(r) = &self.relation {
             let mates: Vec<String> = [r.a, r.b].into_iter().flatten().map(mate_name).collect();
@@ -406,9 +459,23 @@ impl AssemblyView {
             let chip = o.chip(|id| asm.and_then(|a| a.connectors.iter().find(|c| c.id == id).map(|c| c.name.clone())));
             out.push(dialog("Origin of new Part Studio".into(), true, true, vec![query("Select origin/mate connector", chip.into_iter().collect(), true, false)]));
         }
-        // Dynamic suppression (live assembly/104): one expression.
-        if let Some((_, input, _)) = &self.ui.dynamic_suppression {
-            out.push(dialog("Dynamic suppression".into(), true, true, vec![number(json!("Unsuppressed if"), input.read(cx).value().to_string())]));
+        // Panels live's recorder reads as their title and text (asm-menu-add-expression, -add-selection-to-folder,
+        // asm-face-menu-select-other).
+        let panel = |title: &str, text: Vec<String>| json!({ "kind": "panel", "title": title, "text": text });
+        if self.ui.dynamic_suppression.is_some() {
+            out.push(panel("Dynamic suppression", vec!["Unsuppressed if".into()]));
+        }
+        if let Some(f) = &self.ui.folder_name {
+            out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));
+        }
+        if let Some((rows, _, _)) = &self.ui.select_other {
+            out.push(panel("Select other", rows.iter().map(|r| self.select_other_label(r, cx)).collect()));
+        }
+        // Isolate / Make transparent (live asm-menu-isolate): a feature dialog without fields.
+        if self.isolate.is_some() {
+            out.push(dialog("Isolate".into(), true, true, vec![]));
+        } else if self.ui.transparent.is_some() {
+            out.push(dialog("Make transparent".into(), true, true, vec![]));
         }
         // Driving mate selector (live assembly/105–107): the mates listed.
         if let Some(d) = &self.ui.np_driver {
@@ -421,10 +488,30 @@ impl AssemblyView {
         if let Some(p) = self.section_props(cx) {
             out.push(crate::section_dialog::state(&p));
         }
-        if self.insert_open {
-            // A list panel, not a feature dialog: its title (its rows aren't fields).
-            out.push(json!({ "title": "Insert parts and assemblies", "titleState": "ok", "kind": "other", "tabs": [], "fields": [], "error": null, "ok": null }));
+        // Interference detection and Animate mate: ✕-only dialogs (no "ok"), live asm-root-menu-check-interference /
+        // asm-mate-menu-animate.
+        let closing = |title: &str, fields: Vec<Value>| json!({ "title": title, "titleState": "ok", "kind": "feature", "tabs": [], "fields": fields, "error": null });
+        if let Some(d) = &self.ui.interference {
+            let rows: Vec<String> = if d.done && d.rows.is_empty() && !d.instances.is_empty() { vec!["No interferences".into()] } else { noshape_ops::assembly::interference_rows(&self.result, &d.rows, d.top_only, &self.units(cx)).into_iter().map(|(_, l, _)| l).collect() };
+            out.push(closing("Interference detection", vec![query("Instances to analyze", self.interference_entries(d, cx), true, false), check("Include standard content", d.include_standard), check("Show top level only", d.top_only), query("Interferences", rows, false, false)]));
         }
+        if let Some(a) = &self.anim {
+            let dof = asm.and_then(|x| x.mate(a.mate)).map(|m| {
+                let axis = ["z", "x", "y", "z"][a.dof.min(3)];
+                format!("{} - {axis} - {}", if a.dof == 0 { "⟳" } else { "↹" }, m.name)
+            });
+            let current = json!({ "label": "Current value", "kind": "number", "text": " ", "state": "disabled" });
+            out.push(closing("Animate mate", vec![
+                query("Mate DOF to animate", dof.into_iter().collect(), true, false),
+                number(json!("Start value"), quantity(&a.start)),
+                number(json!("End value"), quantity(&a.end)),
+                number(json!("Steps"), quantity(&a.steps)),
+                choice(a.playback.label()),
+                toggle(false),
+                current,
+            ]));
+        }
+        // (The Insert dialog is a list panel live's recorder doesn't read as a dialog: asm-insert-open-escape.)
         out
     }
 }

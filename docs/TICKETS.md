@@ -3476,15 +3476,15 @@ From asm's feature audit of 2026-11-07 01:5x (every assembly tool and option in 
 /root/onshape-research/docs-raw/md/Assembly__*.md, against crates/model-data, assembly, assembly-ui and ops). The P0s
 were checked in code by asm; "(verify)" ones need a live check first.
 
-- [ ] P0 ASM-RELATION-TURNS (asm) relations compare wrapped angle changes (`solver.rs` `relation_residual`:
+- [x] (asm 11-07: turns read from where each solve starts; T1 solver a_screw_relation_keeps_its_turns, a_half_ratio_gear_follows_its_driver_round) P0 ASM-RELATION-TURNS (asm) relations compare wrapped angle changes (`solver.rs` `relation_residual`:
   `wrap_angle(v[0] - base)`, base never updated): a Screw or Rack and pinion travels at most ±½ distance per revolution
   from where it was made (a vise jaw stops), and a Gear with a ratio that isn't whole jumps 180° when its driver
   passes ±180°. The same wrapping caps a Revolute's angle (and its limits) at ±180°. Track turns instead.
-- [ ] P0 ASM-RELATION-RATIO-VARIABLES (asm) a relation's ratio / distance per revolution is evaluated with no
+- [x] (asm 11-07: eval_in, "Enter a valid expression."; e2e assembly_groups_relations_connectors) P0 ASM-RELATION-RATIO-VARIABLES (asm) a relation's ratio / distance per revolution is evaluated with no
   variables (`eval.rs` `prepare_relation`, `EmptyScope`) and silently becomes 1 when that fails: `#ratio` or a typo
   gives a 1:1 relation with no error. Evaluate in the assembly's scope as mate offsets do; an invalid expression is an
   error on the field (dialog and op), not 1.
-- [ ] P0 ASM-DRAWING-VIEW-INDEX (asm) a drawing view names its exploded view and named position by list position
+- [x] (asm 11-07: `Document::remap_assembly_views` in the same undo step; e2e a_drawing_view_keeps_its_exploded_view_and_named_position) P0 ASM-DRAWING-VIEW-INDEX (asm) a drawing view names its exploded view and named position by list position
   (`DrawingView.explode`, `named_position: Option<usize>`); deleting or reordering one (Delete, Move up / down) leaves
   drawing views showing another (or none). Refer to them by id, as Onshape.
 - [ ] P0 ASM-BOM-CONFIGURED-SUBASSEMBLY (asm) the BOM walks a subassembly instance without its configuration
@@ -3495,7 +3495,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
 - [ ] P0 ASM-MASS-OVERRIDES (asm, verify in code) assembly mass properties use material density only: a part's
   mass override counts as "no material", a subassembly's override and configured materials are ignored, parts excluded
   from BOMs are counted.
-- [ ] P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but
+- [x] (asm 11-07: Mate::new and the op default X; saved mates keep theirs) P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but
   Fastened (`Mate::new`); live's Revolute dialog shows "Rotate about X" (behaviours 1256, 19950). Change the default
   for new mates and the op (saved documents keep what they stored).
 - [ ] P1 ASM-FLEX-SUB-RIGID (asm) a subassembly with relations, patterns, tangent mates or a flexible subassembly is

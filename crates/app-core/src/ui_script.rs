@@ -133,3 +133,12 @@ pub fn bounds_of(name: &str) -> Option<Bounds<Pixels>> {
 pub fn named(prefix: &str) -> Vec<(String, Bounds<Pixels>)> {
     bounds().lock().map(|m| m.iter().filter(|(k, _)| k.starts_with(prefix)).map(|(k, b)| (k.clone(), *b)).collect()).unwrap_or_default()
 }
+
+/// `state.focus` for a text field with the keyboard: its text and selection in characters.
+pub fn field_focus(label: &str, st: &gpui_kit::component::input::InputState) -> serde_json::Value {
+    let text = st.value().to_string();
+    let sel = st.selected_range();
+    let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
+    let (a, b) = (chars(sel.start), chars(sel.end));
+    serde_json::json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": a == 0 && b == text.chars().count() && b > 0 })
+}

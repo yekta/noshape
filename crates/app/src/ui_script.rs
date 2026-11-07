@@ -188,6 +188,17 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 _ => b.center(),
             });
         }
+        // A list row by the start of its text, as live's runner falls back to ("Assembly" for "Assembly 2 <1>"), when only
+        // one row starts with it and a space.
+        for kind in ["instance:", "feature:"] {
+            if let Some(rest) = name.strip_prefix(kind) {
+                let prefix = format!("{kind}{rest} ");
+                let near: Vec<_> = noshape_app_core::ui_script::named(kind).into_iter().filter(|(k, _)| k.starts_with(&prefix)).collect();
+                if let [(_, b)] = near.as_slice() {
+                    return Ok(b.center());
+                }
+            }
+        }
         // A field named by part of its label ("Distance" for "Offset distance"), a button by the words of its tooltip
         // ("Mass properties" for "Display mass and section properties", as live's runner), when only one matches.
         for kind in ["field:", "button:"] {
