@@ -32,6 +32,13 @@ pub fn milestone(what: &str) {
     }
 }
 
+/// A step of one of a viewport's first frames (`frame <seq> <what>`): where a document open's frames wait.
+pub fn frame_milestone(seq: u64, what: &str) {
+    if (1..=6).contains(&seq) && enabled() {
+        milestone(&format!("frame {seq} {what}"));
+    }
+}
+
 fn armed() -> &'static Mutex<Vec<String>> {
     static A: OnceLock<Mutex<Vec<String>>> = OnceLock::new();
     A.get_or_init(Default::default)

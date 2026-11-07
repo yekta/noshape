@@ -694,6 +694,7 @@ impl Viewport {
         let picks_changed = no_pick(&scene) != no_pick(&self.scene);
         self.scene_bounds = scene.bounds();
         self.scene = scene;
+        noshape_render::perf::frame_milestone(self.seq + 1, "scene set");
         if self.scene_log.is_some() {
             let sig = self.frame_signature();
             self.scene_log.get_or_insert_default().push(sig);
@@ -828,6 +829,7 @@ impl Viewport {
                     } else if this.dirty {
                         // Not drawn lately (idle window or hidden tab): `render`
                         // submits once the viewport is laid out again.
+                        noshape_render::perf::frame_milestone(this.seq + 1, "waits for a layout");
                         cx.notify();
                     }
                 });
@@ -879,7 +881,10 @@ impl Viewport {
         }
         if self.in_flight.len() < self.gpu.frames_in_flight() {
             self.submit(cx);
-        } else if !self.retry_scheduled {
+            return;
+        }
+        noshape_render::perf::frame_milestone(self.seq + 1, "waits for a frame slot");
+        if !self.retry_scheduled {
             // Normally the next presented frame submits this one; re-check
             // in case that frame is lost.
             self.retry_scheduled = true;
@@ -1239,6 +1244,7 @@ impl Viewport {
             b.click_submit_ms.push(t.elapsed().as_secs_f32() * 1000.0);
         }
         self.in_flight.push_back((self.seq, now, interactive));
+        noshape_render::perf::frame_milestone(self.seq, "submitted");
         self.gpu.submit(RenderJob {
             target: self.target_id,
             scene: self.scene.clone(),
@@ -1318,6 +1324,7 @@ impl Viewport {
     }
 
     fn present(&mut self, seq: u64, result: Result<(Frame, FrameImage), String>, window: &mut Window, cx: &mut Context<Self>) {
+        noshape_render::perf::frame_milestone(seq, "back on the UI thread");
         // Frames up to `seq` are done (older ones may have been coalesced away).
         while self.in_flight.front().is_some_and(|(s, _, _)| *s <= seq) {
             let (s, t, interactive) = self.in_flight.pop_front().expect("front");

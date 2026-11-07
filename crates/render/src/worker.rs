@@ -194,6 +194,7 @@ impl RenderWorker {
                                 style: job.style,
                                 invalidate_pick: job.pick,
                             };
+                            perf::frame_milestone(seq, "taken by the render thread");
                             if let Err(e) = renderer.submit_frame(target, seq, req) {
                                 on_done(Completed::Frame { target, seq, result: Err(e) });
                             }
@@ -216,6 +217,9 @@ impl RenderWorker {
                     let done = renderer.collect();
                     let delivered = !done.is_empty();
                     for c in done {
+                        if let Completed::Frame { seq, .. } = &c {
+                            perf::frame_milestone(*seq, "rendered");
+                        }
                         let frame = matches!(c, Completed::Frame { .. });
                         on_done(c);
                         // Render-thread CPU per delivered frame (encoding,

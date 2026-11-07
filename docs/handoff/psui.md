@@ -603,6 +603,16 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   render. Milestones added through the window's opening (window, document model, live server, workspace, Part
   Studio view); on Linux the span is the window waiting for the renderer's device (0.5 s first run, 0.07 s warm), the
   workspace builds in 10 ms. macOS bench on main dispatched with them (perf runs 42394224613, then the next).
+  11-07 20:00, perf 42395752773 (all green: 42394224613's dialog-open CPU flag was noise): only each VM's first launch
+  is slow (window creation 0.45 / 1.28 s, gpui-kit 0.8 s on macOS 26: OS caches); every later launch has the window in
+  20–100 ms, the first viewport frame at 0.45–1.2 s. The open row (target 0.5 s) misses on every launch: live-30 opens
+  in 480–570 ms with its display in at 524 ms. Two waits: (1) the regeneration's background work started only once
+  the UI thread polled its task, 106 ms after it was asked (Linux 84–216 ms): spawned at once now (schedule_regen;
+  vibe5: started 0–2 ms after asked); (2) the model's frame presented 380 ms after its display was in, with the GPU
+  idle (encode 3 ms, gpu wait 6 ms), and frame 1 took 228 ms from submit to present. Milestones `frame <n> submitted /
+  taken by the render thread / rendered / back on the UI thread / scene set / waits for a frame slot / waits for a
+  layout` for the first 6 frames find where; on lavapipe it's the one frame in flight and a 150–300 ms CPU render.
+  Next: perf.yml on main with them, then fix the Mac's wait.
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

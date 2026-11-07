@@ -761,42 +761,41 @@ impl PartStudioView {
         // macOS App Nap throttles an app that isn't in front: a long regeneration keeps its pace when the user
         // switches away (the activity lasts until it's shown). It wasn't COMMIT-LATENCY's late first poll.
         let awake = cx.background_executor().prevent_app_nap("Regenerating the Part Studio");
+        // Spawned here, not from the UI task below: that one is first polled only once the UI thread is free (106 ms
+        // after the open asked on the macOS runners, behind the window's first frames).
+        let executor = cx.background_executor().clone();
+        let work = cx.background_spawn(async move {
+            if burst {
+                executor.timer(Duration::from_millis(12)).await;
+            }
+            let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
+            // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
+            let started = asked.elapsed();
+            // `NOSHAPE_PERF`: when the opened document's first regeneration starts (document open's split).
+            if noshape_render::perf::enabled() {
+                static FIRST: std::sync::Once = std::sync::Once::new();
+                FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
+            }
+            // Work no one wants any more (a cancelled preview in a kernel step that doesn't stop at once) may
+            // hold the Regenerator: past a short grace this run doesn't wait for it, it starts on a fresh one
+            // (user P1 11-05: the spinner went on after Esc until the cancelled preview's step ended).
+            let Some(target) = regenerator_for(&regen, waits, opts.cancel.as_ref(), &seed) else {
+                return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config, units, upto, editing_sketch, doc_vars, regen);
+            };
+            let mut held = target.lock();
+            if noshape_render::perf::enabled() {
+                log::info!(target: "perf", "regen #{seq}: started {:.1} ms after asked, lock {:.1} ms{}", started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3, if Arc::ptr_eq(&target, &regen) { "" } else { " (a fresh Regenerator)" });
+            }
+            let r = held.regenerate(&studio, &config, &units, &opts);
+            if !r.cancelled {
+                *seed.lock() = Some(held.snapshot());
+            }
+            drop(held);
+            (r, studio, config, units, upto, editing_sketch, doc_vars, target)
+        });
         self.regen_task = Some(cx.spawn_in(window, async move |this, cx| {
             let _awake = awake;
-            // When the UI thread first ran this task (COMMIT-LATENCY: before the background thread starts below).
-            let polled = asked.elapsed();
-            if burst {
-                cx.background_executor().timer(Duration::from_millis(12)).await;
-            }
-            let result = cx
-                .background_spawn(async move {
-                    let opts = RegenOptions { upto, editing_sketch, document_variables: doc_vars.clone(), preview_meshes: true, relative_deflection: deflection, derived: Some(derived), custom_features: Some(custom), cancel: Some(cancel), touch_probe, ..Default::default() };
-                    // Where a slow round trip waits (COMMIT-LATENCY): the background thread starting, the regenerator's lock.
-                    let started = asked.elapsed();
-                    // `NOSHAPE_PERF`: when the opened document's first regeneration starts (document open's split).
-                    if noshape_render::perf::enabled() {
-                        static FIRST: std::sync::Once = std::sync::Once::new();
-                        FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
-                    }
-                    // Work no one wants any more (a cancelled preview in a kernel step that doesn't stop at once) may
-                    // hold the Regenerator: past a short grace this run doesn't wait for it, it starts on a fresh one
-                    // (user P1 11-05: the spinner went on after Esc until the cancelled preview's step ended).
-                    let Some(target) = regenerator_for(&regen, waits, opts.cancel.as_ref(), &seed) else {
-                        return (noshape_model::regen::RegenResult { cancelled: true, ..Default::default() }, studio, config, units, upto, editing_sketch, doc_vars, regen);
-                    };
-                    let mut held = target.lock();
-                    if noshape_render::perf::enabled() {
-                        log::info!(target: "perf", "regen #{seq}: polled {:.1} ms, started {:.1} ms after asked, lock {:.1} ms{}", polled.as_secs_f64() * 1e3, started.as_secs_f64() * 1e3, (asked.elapsed() - started).as_secs_f64() * 1e3, if Arc::ptr_eq(&target, &regen) { "" } else { " (a fresh Regenerator)" });
-                    }
-                    let r = held.regenerate(&studio, &config, &units, &opts);
-                    if !r.cancelled {
-                        *seed.lock() = Some(held.snapshot());
-                    }
-                    drop(held);
-                    (r, studio, config, units, upto, editing_sketch, doc_vars, target)
-                })
-                .await;
-            let (result, studio, config, units, upto, editing_sketch, doc_vars, target) = result;
+            let (result, studio, config, units, upto, editing_sketch, doc_vars, target) = work.await;
             // A fresh Regenerator: this view's from now on, and the refine pass's.
             let fresh = (!Arc::ptr_eq(&target, &regen2)).then_some(target);
             if let Some(f) = &fresh {
