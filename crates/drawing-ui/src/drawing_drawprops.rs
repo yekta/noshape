@@ -120,8 +120,10 @@ const SELECT_CARET_UP: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewB
 /// their table columns), the #555 value's ink 7 px in, an 8 px #777 caret
 /// 6 px from the right.
 fn select_field(id: &'static str, current: String, w: f32) -> Stateful<Div> {
+    let shown = current.clone();
     h_flex()
         .id(id)
+        .map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")))
         .w(px(w))
         .h(px(26.))
         .pl(px(6.))
@@ -1645,6 +1647,7 @@ impl DrawingEditor {
             tabs = tabs.child(
                 div()
                     .id(("dr-dprops-tab", i))
+                    .map(|d| crate::ui_script::mark(d, || format!("tab:{tip}")))
                     .size(px(38.))
                     .flex()
                     .items_center()

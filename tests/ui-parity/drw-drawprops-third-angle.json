@@ -1,0 +1,57 @@
+{
+  "name": "drw-drawprops-third-angle",
+  "about": "Drawing properties › Views › Projection angle ▾ Third angle (already chosen)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          150,
+          40
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Drawing properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Views"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Third angle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Third angle"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
