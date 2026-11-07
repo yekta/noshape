@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 00:30:** psui's display cache (f297f1b1 / 85c7ebdc, green e02e95e9) checked on vibe3 :65 (bin/cachetest.sh <app>
+<cli wrapper> <tag>): a reopen shows the cached display (pixel-identical); after a change made through the CLI (Extrude 3
+suppressed) the reopen shows the new state at 2 s, never the old one. **Waiting on live (REQUESTS.md line 2201, lead 11-07):
+after the suppression our Sketch 3 is drawn again and its row loses the hidden eye**: if live keeps it hidden, ticket it for
+psui. P0 SECTIONS-AHEAD-HANG filed 11-06 23:2x (fuzz seed 5786). The 4a88d8d9 regression bool fixed in 6d194fa1 (patterns
+of filleted tools) wasn't in qa's sweeps: they have no patterns of filleted cutting tools.
+
 **11-06 21:20: new standing job (lead 20:2x): both parity suites on the newest green every 4 h, on this machine.**
 `qa-scratch/bin/qa-suites-loop.sh` (setsid; pid in qa-scratch/suites-loop.pid; stop: touch qa-scratch/suites/stop) runs
 `qa-suites.sh`: a checkout at the green in noshape-wt/qa-suite, tools/ui-parity/shards.sh on a copy of the green binary
