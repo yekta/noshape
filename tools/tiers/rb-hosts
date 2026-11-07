@@ -7,6 +7,7 @@
 # Heavy one-off probes: NOSHAPE_RB_HOST=<the idlest host>.
 bool*     vibe4
 core*     vibe5
+blend*    vibe5
 dev*      vibe4
 psui*     vibe5
 skasm*    vibe5
