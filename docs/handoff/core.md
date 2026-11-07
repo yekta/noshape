@@ -22,9 +22,13 @@ COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-
   of the edge) both came back the same at a vertical face's corner, the first was taken; undecided, the face's
   centroid now gives the side. 51.8817 mm³ (live 51.8821). T1 model features_a::
   a_curvature_fillet_of_a_concave_corner_adds_material (a Curvature fillet's size is `nonCircularRadius`).
-- Next there: Fillet 2 (Curvature, R gap/2 + depth = 1.5 mm, the arms' outer end corners) fails ("wider than a
-  face"): live rounds a 1 mm arm end's two corners into one face across it (1.9357 mm², x 11.2-12.66) and the 3 mm end's
-  two meet in its middle (2.4341 mm² each). Needs two rounds wider than the face between them.
+- Fillet 2 (Curvature, R gap/2 + depth = 1.5 mm): each 1 mm arm end has one picked corner, its round running across
+  the end and trimmed by the far side (one face, 1.9357 mm²); the 3 mm end's two meet in its middle. Our section route
+  refused a section wider than its face ("Onshape fails too": no live case behind it); now it runs on and the cut
+  trims it. Topology as live; "DON'T USE!"'s area 206.398 vs live 206.371 (just out of band) because every Curvature
+  round of this document comes out 0.22 % longer than live's (0.8131 / 0.8113, 1.9362 / 1.9357, 2.4393 / 2.4341). The
+  section's poles are live's (G11, m 0.5), so the setback differs: how `#gap` / `#depth` evaluate there, or Onshape's
+  setback for a Curvature R. T1 features_a::a_round_wider_than_the_end_beside_it_runs_across_it.
 
 **State 11-07 16:42 UTC: c2-extension-spring's Fillet 1, the translator side (for asm too).**
 - Its edges aren't resolved from the sketch queries: Fillet 1's (configured, default True) queries carry live ids,

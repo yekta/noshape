@@ -595,16 +595,13 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             k::Curve::Line { .. } => {
                 let d = (c.end - c.start).normalize();
                 let mut fr = frame_at(shape, ff, c.start + d * ((a + b) / 2.0), d, scale)?;
-                // The ball must touch both faces within them (otherwise Onshape
-                // fails too), or rest on a face's far edge with overflow off.
-                let sb = setbacks(&fr, spec, side1_first)?;
-                for (k, (fi, setback)) in ff.iter().zip([sb.0, sb.1]).enumerate() {
-                    let line_dist = |q: DVec3| (q - c.start - d * (q - c.start).dot(d)).length();
-                    let width = fi.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max);
-                    if spec.cliff {
-                        fr.extent[k] = width;
-                    } else if width < setback * (1.0 - 1e-9) {
-                        return Err(fail("the fillet is wider than a face"));
+                // With overflow off the ball rests on a face's far edge; on, a section wider than a face runs on past it
+                // and the cut trims it where it meets the faces beyond (live c2-extension-spring's Fillet 2: a 1.5 mm
+                // Curvature round across a 1 mm arm's end, two meeting in the middle of a 3 mm end).
+                if spec.cliff {
+                    for (k, fi) in ff.iter().enumerate() {
+                        let line_dist = |q: DVec3| (q - c.start - d * (q - c.start).dot(d)).length();
+                        fr.extent[k] = fi.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(line_dist).fold(0.0, f64::max);
                     }
                 }
                 // Running on into a tangent neighbour: the section carries on until it

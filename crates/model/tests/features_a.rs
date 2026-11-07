@@ -2404,3 +2404,24 @@ fn a_curvature_fillet_of_a_concave_corner_adds_material() {
     let added = (total_volume(&res.context) - before) * 1e9;
     assert!(added > 0.03 && added < 0.054, "{added} mm³ added (live about 0.041)");
 }
+
+/// A Curvature round wider than the face beside it runs on across it and is trimmed by the face beyond (live
+/// c2-extension-spring's Fillet 2: R 1.5 on one corner of a 1 mm wide arm's end, one round across the end).
+#[test]
+fn a_round_wider_than_the_end_beside_it_runs_across_it() {
+    let mut t = T::new();
+    let (_, _) = t.block(0.0, 0.0, 0.01, 0.001, "1 mm");
+    let res = t.ok();
+    let before = total_volume(&res.context);
+    let body = solids(&res.context)[0].clone();
+    let corner = edge_near(&body, DVec3::new(0.01, 0.001, 0.5e-3));
+    t.add("fillet", &[("entities", q(vec![corner])), ("radius", e("1.5 mm")), ("nonCircularRadius", e("1.5 mm")), ("crossSection", en("CURVATURE")), ("magnitude", e("0.5"))]);
+    let res = t.ok();
+    let after = solids(&res.context);
+    assert_eq!(after.len(), 1);
+    assert!(after[0].shape.is_valid());
+    // The end face is gone: the round runs from the side 1.5 mm back to the far side.
+    assert_eq!(after[0].shape.faces().len(), 6);
+    let removed = (before - total_volume(&res.context)) * 1e9;
+    assert!(removed > 0.3 && removed < 1.0, "{removed} mm³");
+}
