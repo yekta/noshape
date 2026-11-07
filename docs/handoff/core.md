@@ -16,6 +16,20 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 16:46 UTC: dx's c2 list (2132 rerun).**
+- c2-valve-config Extrude 3 (11 circle / 48 other for 9 / 50): Sketch 3 is a text entity; one glyph segment, 0.039 mm,
+  is a circle in live and a B-spline in ours, top and bottom of the extruded letters. Text glyph curves (skasm's / the
+  sketch text's): live's rule for which segments become circles unknown.
+- c2-extension-spring Fillet 1: the translator took a Boolean configuration's first value (False, 12 edges), not its
+  default (True, 4 edges): Boolean defaults are JSON booleans (fixed: 15/39/26 -> 12/30/20, live 11/27/18). Left: its
+  edges are SWEPT_EDGEs named by two rectangles' sides from different sketches (`iaB0kJQLlWd2.top` x
+  `bHUnVFlGciWI.right`) whose features.json curves don't cross (y -10 vs y -3.5..-2.5): the stored sketch geometry
+  seems another configuration's than the one built, so we round an arm's outer corners, not the slot's end (one
+  1 mm² end face left). Translator / configurations.
+- c2-impeller-loft: live asked for the loft's own surface (REQUESTS core 16:10); cf-surface-pattern: Part 5's side edge
+  filleted alone asked (core 16:09; 2222 showed a simple profile rolls against the curved face, as OCCT).
+- Corpus 647/936 (88 documents) at this commit's run (vibe5), no regressions.
+
 **State 11-07 16:07 UTC: cf-lighten to the end (4 -> 5); ring blends faster.**
 - Lighten 1's last difference (44/106/66 vs live 44/108/68) wasn't Modify fillet: OCCT's offset of its pocket tool
   (op_offset_faces, BRepOffset_MakeOffset) lost the 0.79 mm strip between two rounds (live's 0.8 mm edges Jih / KitE): a

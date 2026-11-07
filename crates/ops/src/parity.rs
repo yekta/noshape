@@ -296,7 +296,8 @@ impl<'a> Translator<'a> {
             .as_array()
             .into_iter()
             .flatten()
-            .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
+            // (A boolean configuration's default is a JSON boolean.)
+            .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
         Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect() })
     }
@@ -1386,7 +1387,11 @@ impl<'a> Translator<'a> {
             "BTMParameterConfigured" => {
                 let values = p["values"].as_array().ok_or("configured parameter without values")?;
                 let want = p["configurationParameterId"].as_str().and_then(|c| self.config_defaults.get(c)).map(String::as_str).unwrap_or("Default");
-                let default = values.iter().find(|v| v["enumValue"] == want).or_else(|| values.first()).ok_or("configured parameter without values")?;
+                let default = values
+                    .iter()
+                    .find(|v| v["enumValue"] == want || v["booleanValue"].as_bool().is_some_and(|b| b.to_string() == want))
+                    .or_else(|| values.first())
+                    .ok_or("configured parameter without values")?;
                 return self.param(k, &default["value"]);
             }
             // A standard's lookup path, by level name: ours in level order.
