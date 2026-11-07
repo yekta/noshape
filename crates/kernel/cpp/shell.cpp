@@ -88,7 +88,6 @@
 #include <BRepPrimAPI_MakeRevol.hxx>
 #include <Geom2dAdaptor_Curve.hxx>
 #include <Geom_Line.hxx>
-#include <GeomAPI_ExtremaCurveCurve.hxx>
 #include <Geom2d_Curve.hxx>
 #include <gp_Lin2d.hxx>
 #include <BRepTools.hxx>
@@ -117,16 +116,6 @@
 #include <Geom_SphericalSurface.hxx>
 #include <functional>
 #include <GeomProjLib.hxx>
-#include <Geom2dConvert.hxx>
-#include <GeomConvert.hxx>
-#include <GeomConvert_CompCurveToBSplineCurve.hxx>
-#include <ShapeAnalysis.hxx>
-#include <memory>
-#include <typeinfo>
-#include <tuple>
-#include <BRepTools_ReShape.hxx>
-#include <Geom2d_TrimmedCurve.hxx>
-#include <Geom2dAPI_InterCurveCurve.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <TColgp_HArray1OfPnt2d.hxx>
@@ -3006,9 +2995,6 @@ struct Surf
   double                                d = 0;
   mutable gp_Pnt2d                      hint;
   mutable bool                          has_hint = false;
-  // (The nearest foot over the whole surface, its search grid built once: solve3_damped.)
-  mutable std::shared_ptr<GeomAPI_ProjectPointOnSurf> nearest;
-  double                                              own[4] = {0, 0, 0, 0}; // the face's own parameters' box
 };
 
 // Signed distance-like value of x from s's offset (zero on it).
@@ -3110,120 +3096,6 @@ bool solve3_grad(const Surf* s[3], gp_XYZ& x, double scale)
     if (std::abs(J.Determinant()) < 1e-12)
       return false;
     x -= J.Inverted() * F;
-  }
-  return false;
-}
-
-// eval_grad by a free-form face's nearest foot, square below the point (elsewhere a projection held at the surface's
-// end gives a false sheet of zeros, and the last foot's can jump to another sheet of the offset): 1e300 where there's
-// none.
-double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, bool global = true)
-{
-  const double e = eval_grad(q, p, g);
-  if (!q.general || std::abs(e) > 1e299)
-    return e;
-  // At foot (u, v): the value and its gradient, where the foot lies square below the point.
-  auto at = [&](double u, double v, double& out) {
-    gp_Pnt S;
-    gp_Vec du, dv;
-    q.base->D1(u, v, S, du, dv);
-    const gp_Vec d(S, gp_Pnt(p));
-    const double m = d.Magnitude();
-    if (m > 1e-9 * scale && (std::abs(d.Dot(du)) > 1e-4 * m * du.Magnitude() || std::abs(d.Dot(dv)) > 1e-4 * m * dv.Magnitude()))
-      return false;
-    const gp_Vec N = du.Crossed(dv);
-    if (N.Magnitude() < 1e-300)
-      return false;
-    g   = N.XYZ() / N.Magnitude();
-    out = d.Dot(N) / N.Magnitude() - q.d;
-    return true;
-  };
-  // (The last one's foot where it lies square on the face's own patch; else the nearest square foot over the whole
-  // surface: the last one's can jump to another sheet of the offset, or to the surface's end.)
-  const double mu = 0.1 * (q.own[1] - q.own[0]), mv = 0.1 * (q.own[3] - q.own[2]);
-  auto         own = [&](double u, double v) { return !(q.own[1] > q.own[0]) || (u >= q.own[0] - mu && u <= q.own[1] + mu && v >= q.own[2] - mv && v <= q.own[3] + mv); };
-  double       out0 = e;
-  if (own(q.hint.X(), q.hint.Y()) && at(q.hint.X(), q.hint.Y(), out0))
-    return out0;
-  // (A local search from the last foot before the global one.)
-  if (q.has_hint)
-  {
-    const gp_Pnt2d w = q.sas->NextValueOfUV(q.hint, gp_Pnt(p), 1e-9 * scale, 1e-3 * scale);
-    if (own(w.X(), w.Y()) && at(w.X(), w.Y(), out0))
-    {
-      q.hint = w;
-      return out0;
-    }
-  }
-  if (!global)
-    return 1e300;
-  if (!q.nearest)
-  {
-    double u0, u1, v0, v1;
-    q.base->Bounds(u0, u1, v0, v1);
-    q.nearest = std::make_shared<GeomAPI_ProjectPointOnSurf>();
-    q.nearest->Init(q.base, u0, u1, v0, v1);
-  }
-  q.nearest->Perform(gp_Pnt(p));
-  double out = e;
-  // (Of the square feet, the nearest on the face's own patch and a little past it: a high degree's continuation
-  // curls back near points by the face's end, c2-rings-loft's loft side by its signet.)
-  double best = 1e300, bu = 0, bv = 0;
-  for (int k = 1; q.nearest->IsDone() && k <= q.nearest->NbPoints(); ++k)
-  {
-    double u, v, o2;
-    q.nearest->Parameters(k, u, v);
-    if (!own(u, v))
-      continue;
-    if (q.nearest->Distance(k) < best && at(u, v, o2))
-      best = q.nearest->Distance(k), bu = u, bv = v;
-  }
-  if (best < 1e300 && at(bu, bv, out))
-  {
-    q.hint     = gp_Pnt2d(bu, bv);
-    q.has_hint = true;
-    return out;
-  }
-  if (at(q.hint.X(), q.hint.Y(), out))
-    return out;
-  return 1e300;
-}
-
-// solve3_grad damped: each step halved until the largest value falls (a free-form offset's foot can jump between
-// steps), to 1e-10 of `scale`.
-bool solve3_damped(const Surf* s[3], gp_XYZ& x, double scale)
-{
-  auto one = [&](const Surf& q, const gp_XYZ& p, gp_XYZ& g) { return eval_grad_near(q, p, g, scale); };
-  auto F = [&](const gp_XYZ& p, gp_XYZ* g) {
-    gp_XYZ dummy[3];
-    gp_XYZ* gg = g ? g : dummy;
-    return gp_XYZ(one(*s[0], p, gg[0]), one(*s[1], p, gg[1]), one(*s[2], p, gg[2]));
-  };
-  auto worst = [](const gp_XYZ& f) { return std::max({std::abs(f.X()), std::abs(f.Y()), std::abs(f.Z())}); };
-  for (int it = 0; it < 100; ++it)
-  {
-    gp_XYZ       g[3];
-    const gp_XYZ f = F(x, g);
-    const double w = worst(f);
-    if (w < 1e-10 * scale)
-      return true;
-    if (w > 1e299)
-      return false;
-    gp_Mat J;
-    for (int r = 1; r <= 3; ++r)
-      J.SetRow(r, g[r - 1]);
-    if (std::abs(J.Determinant()) < 1e-12)
-      return false;
-    const gp_XYZ dx = J.Inverted() * f;
-    bool         moved = false;
-    for (double h = 1; h >= 1.0 / 1024 && !moved; h /= 2)
-    {
-      const gp_XYZ y = x - dx * h;
-      if (worst(F(y, nullptr)) < w)
-        x = y, moved = true;
-    }
-    if (!moved)
-      return false;
   }
   return false;
 }
@@ -3380,16 +3252,12 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
     occ::handle<Geom2d_Curve>        cn;
     // A free-form (offset) surface: projected keeping the edge's own parameter (an intersection curve's pcurves
     // from GeomProjLib ran 1.6 µm off it along a vase's sharp edges: no SameParameter at the wall's tolerance).
-    const GeomAbs_SurfaceType kind = GeomAdaptor_Surface(sn).GetType();
-    // (Also a surface of extrusion or revolution: GeomProjLib's curve on one fell short of the edge's ends,
-    // c2-rings-loft's top.)
-    if (kind == GeomAbs_BSplineSurface || kind == GeomAbs_OffsetSurface || kind == GeomAbs_SurfaceOfExtrusion || kind == GeomAbs_SurfaceOfRevolution || kind == GeomAbs_BezierSurface)
+    if (GeomAdaptor_Surface(sn).GetType() == GeomAbs_BSplineSurface || GeomAdaptor_Surface(sn).GetType() == GeomAbs_OffsetSurface)
     {
       ShapeConstruct_ProjectCurveOnSurface pcs;
       pcs.Init(sn, Precision::Confusion());
       if (!pcs.Perform(c3, a, b, cn))
         cn.Nullify();
-
       // An offset edge traced on the offset of the original's surface keeps the original's curve there (the same
       // parameters on both): taken where it lies closer to the edge than the projection.
       if (!co.IsNull() && GeomAdaptor_Surface(sn).GetType() == GeomAbs_OffsetSurface && a >= f0 - 1e-9 && b <= f1 + 1e-9)
@@ -3404,12 +3272,7 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
           }
           return w;
         };
-        // (On a closed surface the original's (a seam's two each on its own side, an edge to the seam's corner on the
-        // side it comes to it from): the projection can put a point of the seam on either.)
-        // (And wherever the original's lies on it within the tolerance: an offset surface's extension can come back
-        // near its other end, where the projection then wanders, c2-rings-loft's loft side.)
-        const bool closed = sn->IsUClosed() || sn->IsVClosed();
-        if (cn.IsNull() || worst(co) < worst(cn) || worst(co) <= tol || ((seam_edge || closed) && worst(co) <= std::max(tol, 2 * worst(cn))))
+        if (cn.IsNull() || worst(co) < worst(cn))
           cn = occ::down_cast<Geom2d_Curve>(co->Copy());
       }
     }
@@ -3417,25 +3280,6 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
       cn = GeomProjLib::Curve2d(c3, a, b, sn);
     if (co.IsNull() || cn.IsNull())
       return nullptr;
-    // (On a closed surface an end on its seam can come out on the other side, from the projection or the original
-    // itself: c2-rings-loft's loft side. That end's pole moved back by the surface's span.)
-    if (const occ::handle<Geom2d_BSplineCurve> bc = occ::down_cast<Geom2d_BSplineCurve>(cn); !bc.IsNull() && bc->NbPoles() >= 3 && (sn->IsUClosed() || sn->IsVClosed()))
-    {
-      double su0, su1, sv0, sv1;
-      sn->Bounds(su0, su1, sv0, sv1);
-      const double span_u = sn->IsUClosed() && !sn->IsUPeriodic() ? su1 - su0 : 0, span_v = sn->IsVClosed() && !sn->IsVPeriodic() ? sv1 - sv0 : 0;
-      for (const auto [end, next] : {std::pair{1, 2}, std::pair{bc->NbPoles(), bc->NbPoles() - 1}})
-      {
-        gp_Pnt2d       q  = bc->Pole(end);
-        const gp_Pnt2d nq = bc->Pole(next);
-        if (span_u > 0 && std::abs(q.X() - nq.X()) > 0.5 * span_u)
-          q.SetX(q.X() + (nq.X() > q.X() ? span_u : -span_u));
-        if (span_v > 0 && std::abs(q.Y() - nq.Y()) > 0.5 * span_v)
-          q.SetY(q.Y() + (nq.Y() > q.Y() ? span_v : -span_v));
-        if (!q.IsEqual(bc->Pole(end), 0))
-          bc->SetPole(end, q);
-      }
-    }
     if (per || sn->IsVPeriodic())
     {
       // Original start (in oe's own direction) against the new curve's start, by whole periods in u (and v).
@@ -3699,7 +3543,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return no("a free-form face not smooth");
       double u0, u1, v0, v1;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
-      q.own[0] = u0, q.own[1] = u1, q.own[2] = v0, q.own[3] = v1;
       // (The face's own surface, for the fold check: an extension's curvature on the bounds is the extension's.)
       const occ::handle<Geom_Surface> own = q.base;
       // A B-spline extended past its bounds (tangentially, its own parameters kept): an outward wall's corner and
@@ -3806,10 +3649,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   // Edges: their faces (a seam: the same twice), whether tangent there.
   std::vector<std::array<int, 2>> efi(ne + 1);
   std::vector<char>               seam(ne + 1), tangent(ne + 1), degen(ne + 1);
-  // A curved seam (a closed loft's or swept face's): its offset is the seam's points moved along the face's normal,
-  // as a curve where two faces are tangent (c2-rings-loft's ring).
-  std::vector<char> cseam(ne + 1);
-  std::vector<double> slack(ne + 1); // a nearly tangent edge: how far its faces' offsets part along it
   // A kept face's line tangent to a removed face: its wall ends there in a flat rim normal to it (below).
   std::vector<char> rimt(ne + 1);
   for (int i = 1; i <= ne; ++i)
@@ -3833,11 +3672,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       efi[(size_t)i]  = {a, a};
       seam[(size_t)i] = 1;
       if (BRepAdaptor_Curve(e).GetType() != GeomAbs_Line)
-      {
-        if (!kept[(size_t)a] || collapse[(size_t)a])
-          return no("a seam not a generator");
-        cseam[(size_t)i] = 1;
-      }
+        return no("a seam not a generator");
       continue;
     }
     if (fl.Extent() != 2)
@@ -3861,21 +3696,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     if (na.Dot(nb) > 1 - 1e-9)
     {
       tangent[(size_t)i] = 1;
-    }
-    else if (kept[(size_t)a] && kept[(size_t)b] && !outward)
-    {
-      // (Two kept faces nearly tangent all along, their offsets t apart parting by less than the edge's own tolerance
-      // (t θ): tangent as far as the offset can tell (c2-rings-loft's loft sides and its cylinder, 0.04-0.09°: their
-      // offsets' crossing has no well-defined place).)
-      const double et = std::max(BRep_Tool::Tolerance(e), 10 * tol);
-      bool         parallel = true;
-      for (double w : {0.0, 0.25, 0.5, 0.75, 1.0})
-      {
-        const gp_Pnt q = c.Value(c.FirstParameter() + w * (c.LastParameter() - c.FirstParameter()));
-        parallel       = parallel && normal_at(TopoDS::Face(faces(a)), q).Angle(normal_at(TopoDS::Face(faces(b)), q)) * thickness <= et;
-      }
-      if (parallel)
-        tangent[(size_t)i] = 1, slack[(size_t)i] = et;
     }
   }
   // Collapsing fillets: a strip between two tangent faces a and b and two caps. In the wall's inside the strip is
@@ -4177,7 +3997,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     // offset passes V moved in along the common normal.
     bool all_tangent = fs.size() >= 2 && col == fs.end();
     for (size_t p = 0; p < fs.size() && all_tangent; ++p)
-      all_tangent = kept[(size_t)fs[p]] && (n_at(fs[p]).Dot(n_at(fs[0])) > 1 - 1e-9 || (!outward && gp_Dir(n_at(fs[p])).Angle(gp_Dir(n_at(fs[0]))) * thickness <= std::max(BRep_Tool::Tolerance(v), 10 * tol)));
+      all_tangent = kept[(size_t)fs[p]] && n_at(fs[p]).Dot(n_at(fs[0])) > 1 - 1e-9;
     if (all_tangent)
       x = V.XYZ() - n_at(fs[0]) * t;
     else if (col != fs.end())
@@ -4302,19 +4122,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
             }
           }
           if (!found)
-          {
-            if (dbg)
-            {
-              std::fprintf(stderr, "quadrics: corner at %g %g %g, faces", V.X() * 1e3, V.Y() * 1e3, V.Z() * 1e3);
-              for (int f : fs)
-                std::fprintf(stderr, " %d (kind %d kept %d general %d)", f, (int)sf[(size_t)f].kind, (int)kept[(size_t)f], (int)sf[(size_t)f].general);
-              for (int a1 = 0; a1 < 3; ++a1)
-                for (int b1 = a1 + 1; b1 < 3; ++b1)
-                  std::fprintf(stderr, " angle %d-%d %.4g deg", fs[(size_t)a1], fs[(size_t)b1], std::acos(std::min(1.0, n_at(fs[(size_t)a1]).Dot(n_at(fs[(size_t)b1])))) * 180 / M_PI);
-              std::fprintf(stderr, "\n");
-            }
             return no("a corner's offsets don't meet");
-          }
         }
       }
     }
@@ -4378,51 +4186,12 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     {
       const int sm = *std::find_if(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0; });
       const int a  = efi[(size_t)sm][0], b = fs[0] == a ? fs[1] : fs[0];
-      const TopoDS_Edge& se = TopoDS::Edge(edges(sm));
-      BRepAdaptor_Curve  c(se);
-      gp_Pnt             p0;
-      gp_Vec             d0;
-      // (Along the seam's direction here: a curved seam's turns.)
-      const double sv = BRep_Tool::Parameter(v, se);
-      c.D1(sv, p0, d0);
+      BRepAdaptor_Curve c(TopoDS::Edge(edges(sm)));
+      gp_Pnt            p0;
+      gp_Vec            d0;
+      c.D1(c.FirstParameter(), p0, d0);
       if (!quad::solve_line(sf[(size_t)b], V.XYZ() - n_at(a) * (kept[(size_t)a] ? t : 0.0), d0.Normalized().XYZ(), x, size))
         return no("a seam's corner not found");
-      if (cseam[(size_t)sm])
-      {
-        // On the offset seam itself (its point at s moved along a's normal): a secant on s from the vertex's, its
-        // second guess the seam point the line's corner lies off.
-        const TopoDS_Face& fa = TopoDS::Face(faces(a));
-        auto off_at = [&](double sp) {
-          const gp_Pnt q = c.Value(sp);
-          return q.XYZ() - gp_Vec(normal_at(fa, q)).XYZ() * t;
-        };
-        const double lo = c.FirstParameter(), hi = c.LastParameter();
-        double       s0 = sv, s1 = sv;
-        double c0 = 0, c1 = 0;
-        const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(se, c0, c1);
-        if (!c3.IsNull())
-        {
-          GeomAPI_ProjectPointOnCurve pr(gp_Pnt(x + n_at(a) * t), c3, c0, c1);
-          if (pr.NbPoints() > 0)
-            s1 = pr.LowerDistanceParameter();
-        }
-        if (std::abs(s1 - s0) < 1e-12 * (1 + std::abs(s0)))
-          s1 = s0 + 1e-6 * (hi - lo);
-        double h0 = quad::eval(sf[(size_t)b], off_at(s0)), h1 = quad::eval(sf[(size_t)b], off_at(s1));
-        bool   ok = std::abs(h1) <= 1e-9 * size;
-        for (int k = 0; k < 40 && !ok; ++k)
-        {
-          if (std::abs(h1 - h0) < 1e-300)
-            break;
-          const double s2 = std::min(hi, std::max(lo, s1 - h1 * (s1 - s0) / (h1 - h0)));
-          s0 = s1, h0 = h1;
-          s1 = s2, h1 = quad::eval(sf[(size_t)b], off_at(s1));
-          ok = std::abs(h1) <= 1e-9 * size;
-        }
-        if (!ok)
-          return no("a curved seam's corner not found");
-        x = off_at(s1);
-      }
     }
     else
       return no("a vertex not of three faces (or a seam and one)");
@@ -4503,13 +4272,12 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     // (A collapsing face's tangent edge: the mitre of its two neighbours' offsets.)
     const int fa = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][0] : efi[(size_t)i][0];
     const int fb = group[(size_t)i] != 0 ? across[(size_t)group[(size_t)i]][1] : efi[(size_t)i][1];
-    const bool along = (tangent[(size_t)i] || cseam[(size_t)i]) && group[(size_t)i] == 0;
-    const bool tangent_circle = along && oc.GetType() == GeomAbs_Circle;
-    // (Tangent along another curve, or a curved seam: its points moved along the faces' common normal, fitted.)
-    const bool tangent_free = along && oc.GetType() != GeomAbs_Circle && oc.GetType() != GeomAbs_Line;
+    const bool tangent_circle = tangent[(size_t)i] && group[(size_t)i] == 0 && oc.GetType() == GeomAbs_Circle;
+    // (Tangent along another curve: its points moved along the faces' common normal, fitted.)
+    const bool tangent_free = tangent[(size_t)i] && group[(size_t)i] == 0 && oc.GetType() != GeomAbs_Circle && oc.GetType() != GeomAbs_Line;
     if (!tangent_circle && !tangent_free && (seam[(size_t)i] || (tangent[(size_t)i] && group[(size_t)i] == 0) || (sf[(size_t)fa].kind == GeomAbs_Plane && sf[(size_t)fb].kind == GeomAbs_Plane)))
     {
-      if (A.Distance(B) <= 10 * tol || (gp_Vec(A, B).Dot(t0) <= 0 && outward))
+      if (A.Distance(B) <= 10 * tol || gp_Vec(A, B).Dot(t0) <= 0)
       {
         if (dbg)
         {
@@ -4518,8 +4286,6 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         }
         return no("an offset edge vanishes or turns round");
       }
-      // (Turned round: built as it lies, the line from A to B back along the edge; its faces' loops then cross, and
-      // the repair below drops what lies inside the wall.)
       c  = new Geom_Line(A, gp_Dir(gp_Vec(A, B)));
       p1 = A.Distance(B);
     }
@@ -4541,76 +4307,15 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           return no("a tangent circle's offset failed");
         cands.push_back(mc.Value());
       }
-      else if (const int fg = !tangent_free                                                                       ? 0
-                              : sf[(size_t)fa].general && kept[(size_t)fa] && !sf[(size_t)fa].off.IsNull() ? fa
-                              : sf[(size_t)fb].general && kept[(size_t)fb] && !sf[(size_t)fb].off.IsNull() ? fb
-                                                                                                           : 0;
-               fg != 0)
+      else if (tangent_free && sf[(size_t)fa].general && kept[(size_t)fa] && !sf[(size_t)fa].off.IsNull())
       {
-        // On a free-form face (either), the edge's own curve there (the offset keeps the surface's parameters) traced
-        // on the offset: exact (a fit through its points ran off both offsets by more than the wall's tolerance on a
+        // On a free-form face, the edge's own curve there (the offset keeps the surface's parameters) traced on the
+        // offset: exact (a fit through its points ran off both offsets by more than the wall's tolerance on a
         // twisted vase's rounded corners).
-        double                    f0, f1;
-        occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(fg)), f0, f1);
+        double                          f0, f1;
+        const occ::handle<Geom2d_Curve> pc = BRep_Tool::CurveOnSurface(e, TopoDS::Face(faces(fa)), f0, f1);
         if (pc.IsNull())
           return no("a tangent curve's offset failed");
-        // (On a face round a seam, a curve swinging across it near an end (c2-rings-loft's loft side, its bore edge
-        // ending on the seam): made again from the edge's points, each foot on the side of the last.)
-        if (!pc->IsPeriodic())
-        {
-          const TopoDS_Face& gf = TopoDS::Face(faces(fg));
-          double             span_u = 0, span_v = 0;
-          for (TopExp_Explorer x(gf, TopAbs_EDGE); x.More(); x.Next())
-          {
-            const TopoDS_Edge& se = TopoDS::Edge(x.Current());
-            if (!BRep_Tool::IsClosed(se, gf))
-              continue;
-            double                          s0, s1, r0, r1;
-            const occ::handle<Geom2d_Curve> k1 = BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Oriented(TopAbs_FORWARD)), gf, s0, s1);
-            const occ::handle<Geom2d_Curve> k2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(se.Oriented(TopAbs_REVERSED)), gf, r0, r1);
-            if (k1.IsNull() || k2.IsNull())
-              continue;
-            span_u = std::max(span_u, std::abs(k2->Value(s0).X() - k1->Value(s0).X()));
-            span_v = std::max(span_v, std::abs(k2->Value(s0).Y() - k1->Value(s0).Y()));
-          }
-          bool jumps = false;
-          for (int k = 1; k <= 64 && !jumps && (span_u > 0 || span_v > 0); ++k)
-          {
-            const gp_Pnt2d p0 = pc->Value(f0 + (f1 - f0) * (k - 1) / 64), p1 = pc->Value(f0 + (f1 - f0) * k / 64);
-            jumps             = (span_u > 0 && std::abs(p1.X() - p0.X()) > 0.25 * span_u) || (span_v > 0 && std::abs(p1.Y() - p0.Y()) > 0.25 * span_v);
-          }
-          double                        c0, c1;
-          const occ::handle<Geom_Curve> c3e = BRep_Tool::Curve(e, c0, c1);
-          if (jumps && !c3e.IsNull() && sf[(size_t)fg].general)
-          {
-            const int                    n = 64;
-            NCollection_Array1<gp_Pnt2d> uv(1, n + 1);
-            NCollection_Array1<double>   pp(1, n + 1);
-            const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(BRep_Tool::Surface(gf));
-            for (int k = 0; k <= n; ++k)
-            {
-              const double w = f0 + (f1 - f0) * k / n;
-              gp_Pnt2d     q = k == 0 ? pc->Value(f0) : sas->NextValueOfUV(uv(k), c3e->Value(c0 + (c1 - c0) * k / n), 1e-9 * size);
-              if (k > 0)
-              {
-                if (span_u > 0)
-                  q.SetX(q.X() + std::round((uv(k).X() - q.X()) / span_u) * span_u);
-                if (span_v > 0)
-                  q.SetY(q.Y() + std::round((uv(k).Y() - q.Y()) / span_v) * span_v);
-              }
-              uv(k + 1) = q;
-              pp(k + 1) = w;
-            }
-            occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
-            occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pp);
-            Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
-            fit2.Perform();
-            if (fit2.IsDone())
-              pc = fit2.Curve();
-            if (dbg)
-              std::fprintf(stderr, "quadrics: edge %d's curve on %d swung across its seam: made again\n", i, fg);
-          }
-        }
         // (Past the edge's ends as far as the surface was extended: an outward wall's offset edge runs on past them.)
         if (occ::down_cast<Geom2d_Line>(pc))
         {
@@ -4618,7 +4323,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           f0 -= ext;
           f1 += ext;
         }
-        BRepBuilderAPI_MakeEdge tmp(pc, sf[(size_t)fg].off, f0, f1);
+        BRepBuilderAPI_MakeEdge tmp(pc, sf[(size_t)fa].off, f0, f1);
         if (!tmp.IsDone() || !BRepLib::BuildCurve3d(tmp.Edge(), 1e-9 * size, GeomAbs_C2, 14, 0))
           return no("a tangent curve's offset failed");
         double                        g0, g1;
@@ -4677,7 +4382,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           for (const double e : {cand->FirstParameter(), cand->LastParameter()})
             if (!Precision::IsInfinite(e) && cand->Value(e).Distance(p) < best)
               best = cand->Value(e).Distance(p), u = e;
-        return best <= 1e3 * tol + slack[(size_t)i];
+        return best <= 1e3 * tol;
       };
       for (size_t k = 0; k < cands.size() && c.IsNull(); ++k)
       {
@@ -4708,12 +4413,11 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         p0 = u0;
         p1 = u1;
       }
-      if (c.IsNull() && !tangent[(size_t)i] && (sf[(size_t)fa].general || sf[(size_t)fb].general))
+      if (c.IsNull() && !tangent[(size_t)i] && sf[(size_t)fa].general != sf[(size_t)fb].general)
       {
         // No one piece of the offsets' intersection runs from end to end (a free-form offset's intersection comes in
-        // pieces with gaps at its patches: Shell 4's ramp round the half cylinder; or stops short of an end where the
-        // faces turn tangent: c2-rings-loft's loft sides): marched along the edge instead, each point on both offsets
-        // in the plane across the edge there, fitted.
+        // pieces with gaps at its patches: Shell 4's ramp round the half cylinder): marched along the edge instead,
+        // each point on both offsets in the plane across the edge there, fitted.
         double                        c0, c1;
         const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(e, c0, c1);
         double                        m0 = oc.FirstParameter(), m1 = oc.LastParameter();
@@ -4771,9 +4475,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           pl.n                    = d.Normalized().XYZ();
           pl.c                    = pl.n.Dot(p.XYZ());
           const quad::Surf* s3[3] = {&sf[(size_t)fa], &sf[(size_t)fb], &pl};
-          // (The point t off both faces' tangent planes: (na + nb) t / (1 + na·nb), right for tangent faces too.)
-          const gp_XYZ      na    = foot[0].normal(p, 1e-6 * size), nb = foot[1].normal(p, 1e-6 * size);
-          gp_XYZ            y     = p.XYZ() - (na + nb) * (t / std::max(1 + na.Dot(nb), 1e-3));
+          gp_XYZ            y     = p.XYZ() - (foot[0].normal(p, 1e-6 * size) + foot[1].normal(p, 1e-6 * size)) * t;
           marched                 = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
           q(k + 1)                = gp_Pnt(y);
         }
@@ -4812,22 +4514,10 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         return no("no intersection of two offsets through an edge's ends");
       }
     }
-    const TopoDS_Vertex& v0 = sa >= 0 ? splits[(size_t)sa].vb : vx[(size_t)ia];
-    const TopoDS_Vertex& v1 = sb >= 0 ? splits[(size_t)sb].vb : vx[(size_t)ib];
-    // (A nearly tangent edge lies on one face's offset, the other's up to its slack away.)
-    if (slack[(size_t)i] > 0)
-      for (const auto& [v, u] : {std::pair{v0, p0}, std::pair{v1, p1}})
-      {
-        const double d = std::max(BRep_Tool::Pnt(v).Distance(c->Value(u)), slack[(size_t)i]);
-        if (d > BRep_Tool::Tolerance(v))
-          BRep_Builder().UpdateVertex(v, 1.01 * d);
-      }
-    BRepBuilderAPI_MakeEdge mk(c, v0, v1, p0, p1);
+    BRepBuilderAPI_MakeEdge mk(c, sa >= 0 ? splits[(size_t)sa].vb : vx[(size_t)ia], sb >= 0 ? splits[(size_t)sb].vb : vx[(size_t)ib], p0, p1);
     if (!mk.IsDone())
       return no("an offset edge failed");
     ex[(size_t)i] = mk.Edge();
-    if (slack[(size_t)i] > BRep_Tool::Tolerance(ex[(size_t)i]))
-      BRep_Builder().UpdateEdge(ex[(size_t)i], slack[(size_t)i]);
     if (group[(size_t)i] != 0)
       group_edge[(size_t)group[(size_t)i]] = i;
   }
@@ -5413,1377 +5103,11 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   lap("same parameter");
   if (!ok_wires)
     return no("an edge without its offset");
-  // Offsets that change the part's topology (c2-rings-loft's Shell 1: a crease's offset and its sides' leave through
-  // the removed band where the ring is thinner than the wall; a narrow strip's offset vanishes between its
-  // neighbours'): a face's offset edges cross on it. Each crossing is a point on three offsets (or removed faces); the
-  // edges through it are split there, the pieces nearer the part's kept faces than the wall (or outside the part)
-  // dropped, two faces whose offsets now meet joined by a new edge between their two such points, and the faces' loops
-  // made again from what is left. False where it can't (the shell as it was).
-  auto repair = [&](const TopoDS_Shell& in, TopoDS_Shell& fixed, HHist& h2) -> bool {
-    auto fail = [&](const char* why) {
-      if (dbg)
-        std::fprintf(stderr, "quadrics: repair: %s\n", why);
-      return false;
-    };
-
-    // Each shell face's owner: the part's face whose offset it lies on, or the removed face whose surface (0: a kept
-    // face of the part, a flat rim).
-    NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> owner;
-    std::vector<std::vector<TopoDS_Face>>                           of_owner(nf + 1);
-    for (TopoDS_Iterator it(in, false); it.More(); it.Next())
-    {
-      const TopoDS_Face& F = TopoDS::Face(it.Value());
-      int                o = 0;
-      if (const Source* s = sources.Seek(F))
-        o = faces.FindIndex(s->face);
-      else
-        for (int i = 1; i <= nf && o == 0; ++i)
-          if (!kept[(size_t)i] && BRep_Tool::Surface(F) == BRep_Tool::Surface(TopoDS::Face(faces(i))))
-            o = i;
-      owner.Bind(F, o);
-      if (o > 0)
-        of_owner[(size_t)o].push_back(F);
-    }
-    ShapeAncMap ef2;
-    TopExp::MapShapesAndUniqueAncestors(in, TopAbs_EDGE, TopAbs_FACE, ef2);
-    std::set<std::pair<int, int>> adj, smooth; // faces next to each other in the part; those nearly tangent there
-    for (int k = 1; k <= ne; ++k)
-    {
-      const std::pair<int, int> pr2{std::min(efi[(size_t)k][0], efi[(size_t)k][1]), std::max(efi[(size_t)k][0], efi[(size_t)k][1])};
-      adj.insert(pr2);
-      if (slack[(size_t)k] > 0 || tangent[(size_t)k])
-        smooth.insert(pr2);
-    }
-    auto other_face = [&](const TopoDS_Shape& e, const TopoDS_Shape& F) -> TopoDS_Shape {
-      const int k = ef2.FindIndex(e);
-      if (k == 0 || ef2(k).Extent() != 2)
-        return TopoDS_Shape();
-      return ef2(k).First().IsSame(F) ? ef2(k).Last() : ef2(k).First();
-    };
-    // A face's offset's value at a point, where it means something: a free-form face's foot square below the point
-    // (not held at the end of the surface it runs on as: 1e300).
-    auto value = [&](int j, const gp_XYZ& p) {
-      gp_XYZ g;
-      return quad::eval_grad_near(sf[(size_t)j], p, g, size);
-    };
-    // (Without the global projection: 1e300 where the last foot and a local search from it find none.)
-    auto quick_value = [&](int j, const gp_XYZ& p) {
-      gp_XYZ g;
-      return quad::eval_grad_near(sf[(size_t)j], p, g, size, false);
-    };
-    // The crossings: points on three surfaces.
-    struct Triple
-    {
-      gp_XYZ        p;
-      int           f[3];
-      TopoDS_Vertex v;
-    };
-    std::vector<Triple> tps;
-    auto has = [](const Triple& t, int a) { return t.f[0] == a || t.f[1] == a || t.f[2] == a; };
-    for (TopoDS_Iterator it(in, false); it.More(); it.Next())
-    {
-      const TopoDS_Face F = TopoDS::Face(it.Value().Oriented(TopAbs_FORWARD));
-      const int         a = owner.Find(F);
-      if (a == 0)
-        continue;
-      std::vector<TopoDS_Edge> es;
-      for (TopExp_Explorer x(F, TopAbs_EDGE); x.More(); x.Next())
-        es.push_back(TopoDS::Edge(x.Current()));
-      const occ::handle<Geom_Surface> S = BRep_Tool::Surface(F);
-      for (size_t i = 0; i < es.size(); ++i)
-        for (size_t j = i + 1; j < es.size(); ++j)
-        {
-          if (es[i].IsSame(es[j]) || BRep_Tool::Degenerated(es[i]) || BRep_Tool::Degenerated(es[j]))
-            continue;
-          double                          a0, a1, b0, b1;
-          const occ::handle<Geom2d_Curve> ci = BRep_Tool::CurveOnSurface(es[i], F, a0, a1);
-          const occ::handle<Geom2d_Curve> cj = BRep_Tool::CurveOnSurface(es[j], F, b0, b1);
-          if (ci.IsNull() || cj.IsNull())
-            return fail("an edge without its curve on its face");
-          if (!ci->IsPeriodic())
-            a0 = std::max(a0, ci->FirstParameter()), a1 = std::min(a1, ci->LastParameter());
-          if (!cj->IsPeriodic())
-            b0 = std::max(b0, cj->FirstParameter()), b1 = std::min(b1, cj->LastParameter());
-          if (!(a1 > a0) || !(b1 > b0))
-            continue;
-          Geom2dAPI_InterCurveCurve ic(new Geom2d_TrimmedCurve(ci, a0, a1), new Geom2d_TrimmedCurve(cj, b0, b1), 1e-9);
-          for (int k = 1; k <= ic.NbPoints(); ++k)
-          {
-            const gp_Pnt2d uv = ic.Point(k);
-            const gp_Pnt   P  = S->Value(uv.X(), uv.Y());
-            // (Not at either's end: edges meeting at a corner; near their common corner (a twentieth of the wall), two
-            // edges meeting there at a narrow angle.)
-            bool at_end = false;
-            for (const TopoDS_Edge& e : {es[i], es[j]})
-              for (TopExp_Explorer vx2(e, TopAbs_VERTEX); vx2.More(); vx2.Next())
-              {
-                const TopoDS_Vertex& V      = TopoDS::Vertex(vx2.Current());
-                bool                 common = false;
-                for (TopExp_Explorer vx3(e.IsSame(es[i]) ? es[j] : es[i], TopAbs_VERTEX); vx3.More(); vx3.Next())
-                  common = common || vx3.Current().IsSame(V);
-                at_end = at_end || P.Distance(BRep_Tool::Pnt(V)) <= std::max(common ? 0.05 * thickness : 10 * BRep_Tool::Tolerance(V), 1e-6 * size);
-              }
-            if (at_end)
-              continue;
-            // (A seam bounds the face's parameters: no crossing.)
-            if (BRep_Tool::IsClosed(es[i], F) || BRep_Tool::IsClosed(es[j], F))
-              continue;
-            const TopoDS_Shape gi = other_face(es[i], F), gj = other_face(es[j], F);
-            if (gi.IsNull() || gj.IsNull())
-              return fail("a crossing edge not between two faces");
-            const int b = owner.Find(gi), c = owner.Find(gj);
-            if (b == 0 || c == 0)
-              return fail("a crossing by an edge on a face of the part");
-            // (Two edges to the same face lie on one curve: where they touch is no crossing.)
-            if (b == c)
-              continue;
-            if (b == a || c == a)
-              return fail("a crossing of two edges with the same faces");
-            Triple t{P.XYZ(), {a, b, c}, TopoDS_Vertex()};
-            std::sort(t.f, t.f + 3);
-            const quad::Surf* s3[3] = {&sf[(size_t)t.f[0]], &sf[(size_t)t.f[1]], &sf[(size_t)t.f[2]]};
-            for (const quad::Surf* q : s3)
-              q->has_hint = false;
-            gp_XYZ y = t.p;
-            if (!quad::solve3_grad(s3, y, size) || (y - t.p).Modulus() > 1e-2 * thickness)
-            {
-              // (Newton off to another root: the crossing itself where it lies on all three.)
-              double r = 0;
-              for (int k = 0; k < 3; ++k)
-                r = std::max(r, std::abs(value(t.f[k], t.p)));
-              // (Not on all three: two edges running close by each other near their corner, no crossing.)
-              if (r > 1e-3 * thickness)
-                continue;
-              y = t.p;
-            }
-            t.p = y;
-            // (A corner of the face's found a little off it: no crossing.)
-            bool corner = false;
-            for (TopExp_Explorer vx2(F, TopAbs_VERTEX); vx2.More() && !corner; vx2.Next())
-            {
-              const TopoDS_Vertex& V = TopoDS::Vertex(vx2.Current());
-              corner                 = (BRep_Tool::Pnt(V).XYZ() - y).Modulus() <= std::max(10 * BRep_Tool::Tolerance(V), 1e-6 * size);
-            }
-            if (corner)
-              continue;
-            bool known = false;
-            for (const Triple& u : tps)
-              known = known || (std::equal(u.f, u.f + 3, t.f) && (u.p - t.p).Modulus() <= 1e-6 * size);
-            if (!known)
-              tps.push_back(t);
-          }
-        }
-    }
-    if (tps.empty())
-      return fail("no crossing found");
-    if (dbg)
-      for (const Triple& t : tps)
-        std::fprintf(stderr, "quadrics: repair: faces %d %d %d meet at %.4f %.4f %.4f\n", t.f[0], t.f[1], t.f[2], t.p.X() * 1e3, t.p.Y() * 1e3, t.p.Z() * 1e3);
-    for (Triple& t : tps)
-    {
-      t.v = BRepBuilderAPI_MakeVertex(gp_Pnt(t.p));
-      bld.UpdateVertex(t.v, 1e3 * tol);
-    }
-    // Whether a point of a new edge lies on the wall's inside: in the part, no nearer its kept faces than the wall.
-    std::vector<Bnd_Box> kb(nf + 1), kb_all(nf + 1);
-    for (int j = 1; j <= nf; ++j)
-    {
-      BRepBndLib::Add(faces(j), kb_all[(size_t)j], false);
-      if (kept[(size_t)j])
-        kb[(size_t)j] = kb_all[(size_t)j];
-    }
-    BRepClass3d_SolidClassifier inside(so);
-    auto on_wall = [&](const gp_Pnt& p, double eps) {
-      // In the part: only across a removed face's surface can a point by the wall leave it (the classifier there).
-      bool past_removed = false;
-      for (int j = 1; j <= nf && !past_removed; ++j)
-      {
-        if (kept[(size_t)j])
-          continue;
-        Bnd_Box b = kb_all[(size_t)j];
-        b.Enlarge(thickness);
-        if (b.IsOut(p))
-          continue;
-        const double e = quick_value(j, p.XYZ());
-        past_removed   = std::abs(e) > 1e299 || e * (faces(j).Orientation() == TopAbs_REVERSED ? -1 : 1) > -eps;
-      }
-      if (past_removed)
-      {
-        inside.Perform(p, std::max(eps, 1e3 * tol));
-        if (inside.State() == TopAbs_OUT)
-          return false;
-      }
-      // No nearer a kept face than the wall: exactly only where its surface is that near (a point on its offset or
-      // a wall past it is no nearer the face than the wall).
-      TopoDS_Vertex v;
-      for (int j = 1; j <= nf; ++j)
-      {
-        if (!kept[(size_t)j])
-          continue;
-        Bnd_Box b = kb[(size_t)j];
-        b.Enlarge(thickness);
-        if (b.IsOut(p))
-          continue;
-        const double e = std::abs(quick_value(j, p.XYZ()));
-        if (e <= eps || (e < 1e299 && e >= 2 * thickness - eps))
-          continue;
-        if (v.IsNull())
-          v = BRepBuilderAPI_MakeVertex(p);
-        BRepExtrema_DistShapeShape d(v, faces(j));
-        if (d.IsDone() && d.NbSolution() > 0 && d.Value() < thickness - eps)
-          return false;
-      }
-      return true;
-    };
-    // The edges split at the points on them, their pieces on the wall kept (an edge by no point: kept or dropped);
-    // `ends`: the faces and the point of each kept piece's and new edge's ends.
-    NCollection_DataMap<TopoDS_Shape, std::vector<TopoDS_Edge>, TopTools_ShapeMapHasher> pieces_of;
-    ShapeIMap                                                                          touched; // faces to make again
-    std::set<std::tuple<int, int, const void*>>                                        ends;
-    struct Made
-    {
-      int         b, c;
-      TopoDS_Edge e;
-    };
-    std::vector<Made> made;
-    auto end_key = [](int b, int c, const TopoDS_Shape& v) { return std::tuple<int, int, const void*>{std::min(b, c), std::max(b, c), v.TShape().get()}; };
-    std::map<std::tuple<const void*, double, double>, bool> wall_cache; // an edge's piece (by its range): on the wall
-    auto split_all = [&]() -> bool {
-      pieces_of.Clear();
-      touched.Clear();
-      ends.clear();
-      for (int k = 1; k <= ef2.Extent(); ++k)
-      {
-        const TopoDS_Edge E = TopoDS::Edge(ef2.FindKey(k).Oriented(TopAbs_FORWARD));
-        if (ef2(k).Extent() != 2)
-          continue;
-        const TopoDS_Shape& F1 = ef2(k).First();
-        const TopoDS_Shape& F2 = ef2(k).Last();
-        const int           o1 = owner.Find(F1), o2 = owner.Find(F2);
-        if (o1 == 0 || o2 == 0 || o1 == o2)
-          continue;
-        double                        c0, c1;
-        const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(E, c0, c1);
-        if (c3.IsNull())
-          return fail("an edge without its curve");
-        const double                                  et = BRep_Tool::Tolerance(E);
-        std::vector<std::pair<double, TopoDS_Vertex>> cuts;
-        for (const Triple& t : tps)
-        {
-          if (!has(t, o1) || !has(t, o2))
-            continue;
-          GeomAPI_ProjectPointOnCurve pr(gp_Pnt(t.p), c3, c0, c1);
-          if (pr.NbPoints() == 0 || pr.LowerDistance() > std::max(10 * et, 1e-6 * size))
-            continue;
-          cuts.push_back({pr.LowerDistanceParameter(), t.v});
-        }
-        const double eps = std::max(1e-3 * thickness, 4 * et);
-        if (cuts.empty())
-        {
-          const auto key = std::tuple<const void*, double, double>{E.TShape().get(), c0, c1};
-          auto       hit = wall_cache.find(key);
-          if (hit == wall_cache.end())
-            hit = wall_cache.emplace(key, on_wall(c3->Value(0.5 * (c0 + c1)), eps)).first;
-          if (hit->second)
-            continue;
-          pieces_of.Bind(E, {});
-          touched.Add(F1);
-          touched.Add(F2);
-          continue;
-        }
-        std::sort(cuts.begin(), cuts.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
-        TopoDS_Vertex v0, v1;
-        TopExp::Vertices(E, v0, v1);
-        std::vector<std::pair<double, TopoDS_Vertex>> at = {{c0, v0}};
-        at.insert(at.end(), cuts.begin(), cuts.end());
-        at.push_back({c1, v1});
-        std::vector<TopoDS_Edge> kept_pieces;
-        for (size_t p = 0; p + 1 < at.size(); ++p)
-        {
-          if (at[p + 1].first - at[p].first <= 1e-12 * (std::abs(c1 - c0) + 1))
-            continue;
-          {
-            const auto key = std::tuple<const void*, double, double>{E.TShape().get(), at[p].first, at[p + 1].first};
-            auto       hit = wall_cache.find(key);
-            if (hit == wall_cache.end())
-              hit = wall_cache.emplace(key, on_wall(c3->Value(0.5 * (at[p].first + at[p + 1].first)), eps)).first;
-            if (!hit->second)
-              continue;
-          }
-          for (const size_t q2 : {p, p + 1})
-          {
-            const double d = BRep_Tool::Pnt(at[q2].second).Distance(c3->Value(at[q2].first));
-            if (1.01 * d > BRep_Tool::Tolerance(at[q2].second))
-              bld.UpdateVertex(at[q2].second, 1.01 * d);
-          }
-          BRepBuilderAPI_MakeEdge mk(c3, TopoDS::Vertex(at[p].second.Oriented(TopAbs_FORWARD)), TopoDS::Vertex(at[p + 1].second.Oriented(TopAbs_REVERSED)), at[p].first, at[p + 1].first);
-          if (!mk.IsDone())
-            return fail("an edge's piece failed");
-          TopoDS_Edge pe = mk.Edge();
-          for (const TopoDS_Shape& Fs : {F1, F2})
-          {
-            const TopoDS_Face Ff = TopoDS::Face(Fs.Oriented(TopAbs_FORWARD));
-            double            f0, f1;
-            const occ::handle<Geom2d_Curve> pa = BRep_Tool::CurveOnSurface(E, Ff, f0, f1);
-            if (pa.IsNull())
-              return fail("an edge without its curve on its face");
-            if (BRep_Tool::IsClosed(E, Ff))
-              bld.UpdateEdge(pe, pa, BRep_Tool::CurveOnSurface(TopoDS::Edge(E.Reversed()), Ff, f0, f1), Ff, et);
-            else
-              bld.UpdateEdge(pe, pa, Ff, et);
-            bld.Range(pe, Ff, at[p].first, at[p + 1].first);
-          }
-          bld.UpdateEdge(pe, et);
-          bld.SameParameter(pe, false);
-          bld.SameRange(pe, false);
-          BRepLib::SameParameter(pe, std::max(et, 1e3 * tol));
-          kept_pieces.push_back(pe);
-          ends.insert(end_key(o1, o2, at[p].second));
-          ends.insert(end_key(o1, o2, at[p + 1].second));
-        }
-        pieces_of.Bind(E, kept_pieces);
-        touched.Add(F1);
-        touched.Add(F2);
-      }
-      for (const Made& m : made)
-      {
-        ends.insert(end_key(m.b, m.c, TopExp::FirstVertex(m.e)));
-        ends.insert(end_key(m.b, m.c, TopExp::LastVertex(m.e)));
-        touched.Add(of_owner[(size_t)m.b][0]);
-        touched.Add(of_owner[(size_t)m.c][0]);
-      }
-      return true;
-    };
-    // A point on three surfaces, the one known there or a new one.
-    auto add_triple = [&](const gp_XYZ& p, int a, int b, int c) -> size_t {
-      Triple t{p, {a, b, c}, TopoDS_Vertex()};
-      std::sort(t.f, t.f + 3);
-      for (size_t k = 0; k < tps.size(); ++k)
-        if (std::equal(tps[k].f, tps[k].f + 3, t.f) && (tps[k].p - p).Modulus() <= 1e-5 * size)
-          return k;
-      t.v = BRepBuilderAPI_MakeVertex(gp_Pnt(p));
-      bld.UpdateVertex(t.v, 1e3 * tol);
-      tps.push_back(t);
-      if (dbg)
-        std::fprintf(stderr, "quadrics: repair: faces %d %d %d meet at %.4f %.4f %.4f (traced)\n", t.f[0], t.f[1], t.f[2], p.X() * 1e3, p.Y() * 1e3, p.Z() * 1e3);
-      return tps.size() - 1;
-    };
-    // An edge made from points through them, with its curves on its two faces.
-    auto make_edge = [&](int b, int c, std::vector<gp_Pnt> pts, const TopoDS_Vertex& va, const TopoDS_Vertex& vb) -> bool {
-      if (of_owner[(size_t)b].size() != 1 || of_owner[(size_t)c].size() != 1)
-        return fail("a new edge on a face in more than one piece");
-      // (At least eight points: halves of the steps put on both offsets, square to the step.)
-      while (pts.size() < 8)
-      {
-        std::vector<gp_Pnt> more = {pts[0]};
-        for (size_t k = 1; k < pts.size(); ++k)
-        {
-          gp_XYZ           m = 0.5 * (pts[k - 1].XYZ() + pts[k].XYZ());
-          const gp_XYZ     d = (pts[k].XYZ() - pts[k - 1].XYZ());
-          if (d.Modulus() < 1e-12)
-            return fail("a new edge's points on each other");
-          quad::Surf pl;
-          pl.kind                 = GeomAbs_Plane;
-          pl.n                    = d.Normalized();
-          pl.c                    = pl.n.Dot(m);
-          const quad::Surf* s3[3] = {&sf[(size_t)b], &sf[(size_t)c], &pl};
-          const gp_XYZ      m0    = m;
-          if (!quad::solve3_damped(s3, m, size) || (m - m0).Modulus() > d.Modulus())
-            return fail("a new edge's middle point not found");
-          more.push_back(gp_Pnt(m));
-          more.push_back(pts[k]);
-        }
-        pts = more;
-      }
-      NCollection_Array1<gp_Pnt> q(1, (int)pts.size());
-      NCollection_Array1<double> pr(1, (int)pts.size());
-      pr(1) = 0;
-      for (int k = 1; k <= (int)pts.size(); ++k)
-      {
-        q(k) = pts[(size_t)k - 1];
-        if (k > 1)
-          pr(k) = pr(k - 1) + q(k).Distance(q(k - 1));
-      }
-      GeomAPI_PointsToBSpline fit(q, pr, 3, 8, GeomAbs_C2, 1e-7 * size);
-      if (!fit.IsDone())
-        return fail("a new edge's curve failed");
-      const occ::handle<Geom_BSplineCurve> nc = fit.Curve();
-      const double                         n0 = nc->FirstParameter(), n1 = nc->LastParameter();
-      BRepBuilderAPI_MakeEdge              mk(nc, va, vb, n0, n1);
-      if (!mk.IsDone())
-        return fail("a new edge failed");
-      TopoDS_Edge ne = mk.Edge();
-      for (const int o : {b, c})
-      {
-        const TopoDS_Face               Ff = TopoDS::Face(of_owner[(size_t)o][0].Oriented(TopAbs_FORWARD));
-        TopLoc_Location                 floc;
-        const occ::handle<Geom_Surface> S  = BRep_Tool::Surface(Ff, floc);
-        if (!floc.IsIdentity())
-          return fail("a new edge on a located face");
-        // Its points' places on the face (each from the last's), interpolated at the curve's parameters.
-        const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(S);
-        NCollection_Array1<gp_Pnt2d>              uv(1, (int)pts.size());
-        for (int k = 1; k <= (int)pts.size(); ++k)
-        {
-          gp_Pnt2d w = k == 1 ? sas->ValueOfUV(pts[0], 1e3 * tol) : sas->NextValueOfUV(uv(k - 1), pts[(size_t)k - 1], 1e3 * tol);
-          // (A free-form face's offset keeps its parameters: the nearest foot on the face's own patch.)
-          if (const quad::Surf& q = sf[(size_t)o]; q.general && kept[(size_t)o])
-          {
-            gp_XYZ g;
-            if (std::abs(quad::eval_grad_near(q, pts[(size_t)k - 1].XYZ(), g, size)) < 1e299)
-              w = q.hint;
-          }
-          const double off_by = std::max({1e3 * tol, 1e-5 * size, 1e-2 * thickness});
-          if (S->Value(w.X(), w.Y()).Distance(pts[(size_t)k - 1]) > off_by)
-          {
-            const gp_Pnt2d w2 = sas->ValueOfUV(pts[(size_t)k - 1], 1e3 * tol);
-            if (S->Value(w2.X(), w2.Y()).Distance(pts[(size_t)k - 1]) > off_by)
-              return fail("a new edge's point off its face");
-            w = w2;
-          }
-          if (k > 1 && S->IsUPeriodic())
-            w.SetX(w.X() + std::round((uv(k - 1).X() - w.X()) / S->UPeriod()) * S->UPeriod());
-          if (k > 1 && S->IsVPeriodic())
-            w.SetY(w.Y() + std::round((uv(k - 1).Y() - w.Y()) / S->VPeriod()) * S->VPeriod());
-          uv(k) = w;
-        }
-        occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
-        occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pr);
-        Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
-        fit2.Perform();
-        if (!fit2.IsDone())
-          return fail("a new edge's curve on its face failed");
-        occ::handle<Geom2d_Curve> pc(fit2.Curve());
-        // (A whole number of periods to where its first end lies on the face's other edges there.)
-        if (S->IsUPeriodic() || S->IsVPeriodic())
-        {
-          const gp_Pnt2d p0 = pc->Value(pc->FirstParameter());
-          for (TopExp_Explorer x(Ff, TopAbs_EDGE); x.More(); x.Next())
-          {
-            double                          e0, e1;
-            const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(TopoDS::Edge(x.Current()), Ff, e0, e1);
-            if (ce.IsNull())
-              continue;
-            const gp_Pnt2d w  = ce->Value(e0).Distance(p0) < ce->Value(e1).Distance(p0) ? ce->Value(e0) : ce->Value(e1);
-            const double   du = S->IsUPeriodic() ? std::round((w.X() - p0.X()) / S->UPeriod()) * S->UPeriod() : 0;
-            const double   dv = S->IsVPeriodic() ? std::round((w.Y() - p0.Y()) / S->VPeriod()) * S->VPeriod() : 0;
-            if (du != 0 || dv != 0)
-              pc = occ::down_cast<Geom2d_Curve>(pc->Translated(gp_Vec2d(du, dv)));
-            break;
-          }
-        }
-        bld.UpdateEdge(ne, pc, Ff, 1e3 * tol);
-        bld.Range(ne, Ff, n0, n1);
-        // (Its tolerance what the curves are apart: fitted through the same points at the same parameters.)
-        double w = 0;
-        for (int k = 0; k <= 64; ++k)
-        {
-          const double   sp = n0 + (n1 - n0) * k / 64;
-          const gp_Pnt2d q2 = pc->Value(sp);
-          w                 = std::max(w, S->Value(q2.X(), q2.Y()).Distance(nc->Value(sp)));
-        }
-        if (1.5 * w > BRep_Tool::Tolerance(ne))
-          bld.UpdateEdge(ne, 1.5 * w);
-      }
-      bld.SameParameter(ne, true);
-      bld.SameRange(ne, true);
-      for (TopExp_Explorer vx2(ne, TopAbs_VERTEX); vx2.More(); vx2.Next())
-        if (BRep_Tool::Tolerance(TopoDS::Vertex(vx2.Current())) < BRep_Tool::Tolerance(ne))
-          bld.UpdateVertex(TopoDS::Vertex(vx2.Current()), BRep_Tool::Tolerance(ne));
-      made.push_back({b, c, ne});
-      return true;
-    };
-    // The march's last point: its end (in place of a point all but on it).
-    auto finish = [&](std::vector<gp_Pnt>& pts, const gp_XYZ& p) {
-      while (pts.size() > 1 && pts.back().XYZ().IsEqual(p, 1e-4 * thickness))
-        pts.pop_back();
-      pts.push_back(gp_Pnt(p));
-    };
-    // From a point where faces b and c meet without an edge of theirs: along their offsets' intersection, the way
-    // that stays on the wall, until it comes to another such point of theirs or to a third surface (a new point).
-    auto trace = [&](size_t ti, int b, int c) -> bool {
-      const quad::Surf* s2[2] = {&sf[(size_t)b], &sf[(size_t)c]};
-      s2[0]->has_hint = s2[1]->has_hint = false;
-      const double eps  = 1e-3 * thickness;
-      const double step = 0.25 * thickness;
-      auto         on_curve = [&](const gp_XYZ& from, const gp_XYZ& tg, double h, gp_XYZ& y) {
-        for (double hh = h; hh >= h / 64; hh /= 2)
-        {
-          quad::Surf pl;
-          pl.kind                 = GeomAbs_Plane;
-          pl.n                    = tg;
-          y                       = from + tg * hh;
-          pl.c                    = tg.Dot(y);
-          const quad::Surf* s3[3] = {s2[0], s2[1], &pl};
-          if (quad::solve3_damped(s3, y, size) && (y - from).Modulus() < 2 * hh)
-            return true;
-        }
-        return false;
-      };
-      auto tangent = [&](const gp_XYZ& x, gp_XYZ& tg) {
-        gp_XYZ g0, g1;
-        if (std::abs(quad::eval_grad_near(*s2[0], x, g0, size)) > 1e299 || std::abs(quad::eval_grad_near(*s2[1], x, g1, size)) > 1e299)
-          return false;
-        tg = g0.Crossed(g1);
-        if (tg.Modulus() < 1e-9)
-          return false;
-        tg.Normalize();
-        return true;
-      };
-      const gp_XYZ start = tps[ti].p;
-      gp_XYZ       tg;
-      if (!tangent(start, tg))
-        return fail("a new edge along tangent offsets");
-      // (The way on the wall: a fifth of a wall along each.)
-      gp_XYZ ya, yb;
-      const bool wa = on_curve(start, tg, 0.2 * thickness, ya) && on_wall(gp_Pnt(ya), eps);
-      const bool wb = on_curve(start, tg.Reversed(), 0.2 * thickness, yb) && on_wall(gp_Pnt(yb), eps);
-      if (wa == wb)
-      {
-        return fail("a new edge's way not found");
-      }
-      if (wb)
-        tg.Reverse();
-      std::vector<gp_Pnt> pts = {gp_Pnt(start)};
-      gp_XYZ              x = start;
-      // The neighbours' offsets' values at the last two points (a nearly tangent one touches the curve: its value
-      // dips to nothing without changing sign).
-      std::vector<int> nbs;
-      for (int j = 1; j <= nf; ++j)
-        if (!has(tps[ti], j) && kept[(size_t)j] && !collapse[(size_t)j] && (adj.count({std::min(j, b), std::max(j, b)}) || adj.count({std::min(j, c), std::max(j, c)})) &&
-            !smooth.count({std::min(j, b), std::max(j, b)}) && !smooth.count({std::min(j, c), std::max(j, c)}))
-          nbs.push_back(j);
-      std::vector<std::array<double, 2>> hist(nbs.size(), {1e300, 1e300});
-      for (size_t q2 = 0; q2 < nbs.size(); ++q2)
-        hist[q2][1] = std::abs(value(nbs[q2], x));
-      for (int it = 0; it < 400; ++it)
-      {
-        gp_XYZ t2;
-        if (!tangent(x, t2))
-          return fail("a new edge along tangent offsets");
-        if (t2.Dot(tg) < 0)
-          t2.Reverse();
-        tg = t2;
-        gp_XYZ y;
-        if (!on_curve(x, tg, step, y))
-          return fail("a new edge's point not found");
-        // Another point of b's and c's within the step: the edge ends there.
-        for (size_t k = 0; k < tps.size(); ++k)
-        {
-          if (k == ti || !has(tps[k], b) || !has(tps[k], c))
-            continue;
-          const gp_XYZ d = tps[k].p - x;
-          if (d.Modulus() <= (y - x).Modulus() * 1.01 && d.Dot(tg) > 0)
-          {
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
-          }
-        }
-        // Across an edge of b's or c's (on its offset, so within its tolerance of the curve): it ends where it
-        // crosses it (nearly tangent faces' offsets cross in no well-defined place, the edge between them does:
-        // c2-rings-loft's cylinder offset meeting the bore's and the loft side's at their tangent edge).
-        {
-          double         es = 2;
-          gp_Pnt         ep;
-          int            ej = 0;
-          const double   L  = (y - x).Modulus();
-          const occ::handle<Geom_Line> seg = new Geom_Line(gp_Pnt(x), gp_Dir(y - x));
-          for (const int o : {b, c})
-            for (const TopoDS_Face& Fo : of_owner[(size_t)o])
-              for (TopExp_Explorer ex2(Fo, TopAbs_EDGE); ex2.More(); ex2.Next())
-              {
-                const TopoDS_Edge&  E  = TopoDS::Edge(ex2.Current());
-                const TopoDS_Shape  G  = other_face(E, Fo);
-                const int           oj = G.IsNull() ? 0 : owner.Find(G);
-                if (oj == 0 || oj == b || oj == c)
-                  continue;
-                Bnd_Box eb;
-                BRepBndLib::Add(E, eb);
-                eb.Enlarge(L + 1e-2 * thickness);
-                if (eb.IsOut(gp_Pnt(x)))
-                  continue;
-                double                        c0, c1;
-                const occ::handle<Geom_Curve> c3 = BRep_Tool::Curve(E, c0, c1);
-                if (c3.IsNull())
-                  continue;
-                GeomAPI_ExtremaCurveCurve xc(seg, c3, 0, L, c0, c1);
-                if (xc.NbExtrema() == 0)
-                  continue;
-                double sa, sb;
-                xc.LowerDistanceParameters(sa, sb);
-                const double reach = std::max(10 * BRep_Tool::Tolerance(E), 1e-3 * thickness);
-                // (Not where it starts: the edges through its first point.)
-                if (xc.LowerDistance() > reach || (pts.size() == 1 && sa < 1e-2 * thickness))
-                  continue;
-                if (sa / L < es)
-                  es = sa / L, ep = c3->Value(sb), ej = oj;
-              }
-          if (ej != 0)
-          {
-            // (On both offsets by it, square to the step: the edge lies within its tolerance of it.)
-            gp_XYZ     p3 = ep.XYZ();
-            quad::Surf pl;
-            pl.kind                 = GeomAbs_Plane;
-            pl.n                    = (y - x).Normalized();
-            pl.c                    = pl.n.Dot(p3);
-            const quad::Surf* s3[3] = {s2[0], s2[1], &pl};
-            if (!quad::solve3_grad(s3, p3, size) || (p3 - ep.XYZ()).Modulus() > 1e-2 * thickness)
-              p3 = ep.XYZ();
-            if (dbg)
-              std::fprintf(stderr, "quadrics: repair: %d-%d crosses an edge to %d at %.4f %.4f %.4f\n", b, c, ej, p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-            const size_t k = add_triple(p3, b, c, ej);
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
-          }
-        }
-        // Touching a neighbour's offset at the last point (its value least there, all but nothing): it ends there.
-        for (size_t q2 = 0; q2 < nbs.size(); ++q2)
-        {
-          const double ey = std::abs(value(nbs[q2], y));
-          const bool   dip             = pts.size() >= 2 && hist[q2][1] < 0.1 * thickness && hist[q2][1] < hist[q2][0] && hist[q2][1] < ey;
-          hist[q2]                     = {hist[q2][1], ey};
-          if (!dip)
-            continue;
-          // (Its least along the curve between the points before and after, by thirds.)
-          const gp_XYZ a0 = pts[pts.size() - 2].XYZ();
-          double       lo = 0, hi = 1;
-          auto         at = [&](double w) {
-            gp_XYZ z = a0 + (y - a0) * w, zz;
-            const gp_XYZ dir = (y - a0).Normalized();
-            quad::Surf pl;
-            pl.kind                 = GeomAbs_Plane;
-            pl.n                    = dir;
-            pl.c                    = dir.Dot(z);
-            const quad::Surf* s3[3] = {s2[0], s2[1], &pl};
-            zz                      = z;
-            if (!quad::solve3_grad(s3, zz, size))
-              zz = z;
-            return zz;
-          };
-          for (int k = 0; k < 40; ++k)
-          {
-            const double m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
-            const double f1 = std::abs(value(nbs[q2], at(m1)));
-            const double f2 = std::abs(value(nbs[q2], at(m2)));
-            (f1 < f2 ? hi : lo) = f1 < f2 ? m2 : m1;
-          }
-          const gp_XYZ p3 = at(0.5 * (lo + hi));
-          // (A touch only where its least is within a hundredth of the wall: c2-rings-loft's two loft halves nearly
-          // tangent at the top of their crease, their offsets 0.1-3 um apart there.)
-          if (std::abs(value(nbs[q2], p3)) > 1e-2 * thickness)
-            continue;
-          if (dbg)
-            std::fprintf(stderr, "quadrics: repair: %d-%d touches %d's offset at %.4f %.4f %.4f\n", b, c, nbs[q2], p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-          const size_t k = add_triple(p3, b, c, nbs[q2]);
-          finish(pts, tps[k].p);
-          return make_edge(b, c, pts, tps[ti].v, tps[k].v);
-        }
-        // Across the offset of a face next to b or c in the part (their offsets meet, run on past the faces): it
-        // ends there.
-        {
-          int    nb = 0;
-          double ns = 2;
-          for (int j = 1; j <= nf; ++j)
-          {
-            if (has(tps[ti], j) || !kept[(size_t)j] || collapse[(size_t)j] || !(adj.count({std::min(j, b), std::max(j, b)}) || adj.count({std::min(j, c), std::max(j, c)})) ||
-                smooth.count({std::min(j, b), std::max(j, b)}) || smooth.count({std::min(j, c), std::max(j, c)}))
-              continue;
-            // (One on b's or c's offset: two faces of one plane or surface.)
-            if (std::abs(value(j, x)) < 1e-6 * thickness && std::abs(value(j, y)) < 1e-6 * thickness)
-              continue;
-            const double e0 = value(j, x);
-            const double e1 = value(j, y);
-            if (e0 * e1 > 0 || std::abs(e0) > 1e299 || std::abs(e1) > 1e299)
-              continue;
-            double lo = 0, hi = 1;
-            for (int k = 0; k < 40; ++k)
-            {
-              const double mid = 0.5 * (lo + hi);
-              ((value(j, x + (y - x) * mid) > 0) == (e0 > 0) ? lo : hi) = mid;
-            }
-            if (hi < ns)
-              ns = hi, nb = j;
-          }
-          if (nb != 0 && on_wall(gp_Pnt(x + (y - x) * ns), eps))
-          {
-            gp_XYZ            p3    = x + (y - x) * ns;
-            const quad::Surf* s3[3] = {s2[0], s2[1], &sf[(size_t)nb]};
-            s2[0]->has_hint = s2[1]->has_hint = sf[(size_t)nb].has_hint = false;
-            if (!quad::solve3_grad(s3, p3, size) || (p3 - x).Modulus() > 2 * step)
-              return fail("a new edge's end not found");
-            if (dbg)
-              std::fprintf(stderr, "quadrics: repair: %d-%d crosses %d's offset at %.4f %.4f %.4f\n", b, c, nb, p3.X() * 1e3, p3.Y() * 1e3, p3.Z() * 1e3);
-            const size_t k = add_triple(p3, b, c, nb);
-            finish(pts, tps[k].p);
-            return make_edge(b, c, pts, tps[ti].v, tps[k].v);
-          }
-        }
-        if (on_wall(gp_Pnt(y), eps))
-        {
-          pts.push_back(gp_Pnt(y));
-          x = y;
-          continue;
-        }
-        // Off the wall: where (bisected), and by which face: one nearer than the wall, or the removed face it leaves
-        // the part through.
-        double lo = 0, hi = 1;
-        for (int k = 0; k < 30; ++k)
-        {
-          const double mid = 0.5 * (lo + hi);
-          (on_wall(gp_Pnt(x + (y - x) * mid), eps) ? lo : hi) = mid;
-        }
-        const double bs  = hi;
-        const gp_Pnt beyond(x + (y - x) * std::min(1.0, hi + 0.05));
-        int          best = 0;
-        double       bd   = 1e300;
-        inside.Perform(beyond, 1e3 * tol);
-        const bool out = inside.State() == TopAbs_OUT;
-        {
-          const TopoDS_Vertex v = BRepBuilderAPI_MakeVertex(beyond);
-          for (int j = 1; j <= nf; ++j)
-          {
-            if (j == b || j == c || collapse[(size_t)j] || (out == (bool)kept[(size_t)j]))
-              continue;
-            BRepExtrema_DistShapeShape d(v, faces(j));
-            if (!d.IsDone() || d.NbSolution() == 0)
-              continue;
-            const double dj = out ? d.Value() : d.Value() - thickness;
-            if (dj < bd)
-              bd = dj, best = j;
-          }
-        }
-        if (dbg)
-          std::fprintf(stderr, "quadrics: repair: %d-%d leaves the wall at %.4f %.4f %.4f (%s) by %d, %g mm\n", b, c, beyond.X() * 1e3, beyond.Y() * 1e3, beyond.Z() * 1e3, out ? "out" : "in", best, bd * 1e3);
-        if (best == 0)
-          return fail("a new edge leaves the wall by no surface");
-        gp_XYZ            p3      = x + (y - x) * bs;
-        const quad::Surf* s3[3]   = {s2[0], s2[1], &sf[(size_t)best]};
-        s2[0]->has_hint = s2[1]->has_hint = sf[(size_t)best].has_hint = false;
-        if (!quad::solve3_grad(s3, p3, size) || (p3 - x).Modulus() > 2 * step)
-          return fail("a new edge's end not found");
-        const size_t k = add_triple(p3, b, c, best);
-        finish(pts, tps[k].p);
-        return make_edge(b, c, pts, tps[ti].v, tps[k].v);
-      }
-      return fail("a new edge's march didn't end");
-    };
-    for (int round = 0;; ++round)
-    {
-      if (round > 32 || tps.size() > 64)
-        return fail("too many new points");
-      if (!split_all())
-        return false;
-      std::vector<std::tuple<size_t, int, int>> open;
-      for (size_t ti = 0; ti < tps.size(); ++ti)
-        for (const auto [x, y] : {std::pair{0, 1}, std::pair{0, 2}, std::pair{1, 2}})
-          if (!ends.count(end_key(tps[ti].f[x], tps[ti].f[y], tps[ti].v)))
-            open.push_back({ti, tps[ti].f[x], tps[ti].f[y]});
-      if (open.empty())
-        break;
-      // (All of this round's: an edge traced from one point can end at another, closing its end too.)
-      for (const auto& [ti, b, c] : open)
-      {
-        bool closed = false;
-        for (const Made& m : made)
-          closed = closed || (std::min(m.b, m.c) == std::min(b, c) && std::max(m.b, m.c) == std::max(b, c) && (TopExp::FirstVertex(m.e).IsSame(tps[ti].v) || TopExp::LastVertex(m.e).IsSame(tps[ti].v)));
-        if (!closed && !trace(ti, b, c))
-          return false;
-      }
-    }
-    // The touched faces made again: their edges (pieces in place of split ones, new ones), in loops.
-    BRepTools_ReShape re;
-    h2 = new BRepTools_History();
-    for (int fi = 1; fi <= touched.Extent(); ++fi)
-    {
-      const TopoDS_Face F  = TopoDS::Face(touched(fi));
-      const TopoDS_Face Ff = TopoDS::Face(F.Oriented(TopAbs_FORWARD));
-      const int         o  = owner.Find(F);
-      std::vector<TopoDS_Edge> use;
-      for (TopExp_Explorer x(Ff, TopAbs_EDGE); x.More(); x.Next())
-      {
-        const TopoDS_Edge& e = TopoDS::Edge(x.Current());
-        if (const std::vector<TopoDS_Edge>* ps = pieces_of.Seek(e))
-        {
-          for (const TopoDS_Edge& pe : *ps)
-            use.push_back(TopoDS::Edge(pe.Oriented(e.Orientation())));
-          continue;
-        }
-        use.push_back(e);
-      }
-      // (On a face round a seam, an edge's curve that jumps across it (SameParameter's re-projection, an input's own
-      // curve ending on the seam's other side): made again from its points' feet, each kept on the side of the
-      // last.)
-      if (sf[(size_t)o].general && kept[(size_t)o])
-      {
-        double span_u = 0, span_v = 0;
-        for (const TopoDS_Edge& e : use)
-        {
-          if (!BRep_Tool::IsClosed(e, Ff))
-            continue;
-          double                          e0, e1, g0, g1;
-          const occ::handle<Geom2d_Curve> c1 = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), Ff, e0, e1);
-          const occ::handle<Geom2d_Curve> c2 = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Oriented(TopAbs_REVERSED)), Ff, g0, g1);
-          if (c1.IsNull() || c2.IsNull())
-            continue;
-          const gp_Pnt2d d = gp_Pnt2d(c2->Value(e0).XY() - c1->Value(e0).XY());
-          span_u           = std::max(span_u, std::abs(d.X()));
-          span_v           = std::max(span_v, std::abs(d.Y()));
-        }
-        for (const TopoDS_Edge& e : use)
-        {
-          if ((span_u <= 0 && span_v <= 0) || BRep_Tool::IsClosed(e, Ff))
-            continue;
-          const TopoDS_Edge               ef = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
-          double                          e0, e1, c0, c1;
-          const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(ef, Ff, e0, e1);
-          const occ::handle<Geom_Curve>   c3 = BRep_Tool::Curve(ef, c0, c1);
-          if (ce.IsNull() || c3.IsNull())
-            continue;
-          bool jumps = false;
-          for (int k = 1; k <= 32 && !jumps; ++k)
-          {
-            const gp_Pnt2d p0 = ce->Value(e0 + (e1 - e0) * (k - 1) / 32), p1 = ce->Value(e0 + (e1 - e0) * k / 32);
-            jumps             = (span_u > 0 && std::abs(p1.X() - p0.X()) > 0.5 * span_u) || (span_v > 0 && std::abs(p1.Y() - p0.Y()) > 0.5 * span_v);
-          }
-          if (!jumps)
-            continue;
-          const int                                n = 32;
-          NCollection_Array1<gp_Pnt2d>             uv(1, n + 1);
-          NCollection_Array1<double>               pp(1, n + 1);
-          const occ::handle<ShapeAnalysis_Surface> sas2 = new ShapeAnalysis_Surface(BRep_Tool::Surface(Ff));
-          for (int k = 0; k <= n; ++k)
-          {
-            const double w = c0 + (c1 - c0) * k / n;
-            // (Along the curve from its own start, each foot from the last: the nearest foot by the face's edge can
-            // lie on the surface's extension past it.)
-            gp_Pnt2d q = k == 0 ? ce->Value(e0) : sas2->NextValueOfUV(uv(k), c3->Value(w), 1e3 * tol);
-            const gp_Pnt2d ref = k == 0 ? ce->Value(e0) : uv(k);
-            if (span_u > 0)
-              q.SetX(q.X() + std::round((ref.X() - q.X()) / span_u) * span_u);
-            if (span_v > 0)
-              q.SetY(q.Y() + std::round((ref.Y() - q.Y()) / span_v) * span_v);
-            uv(k + 1) = q;
-            pp(k + 1) = w;
-          }
-          occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
-          occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pp);
-          Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
-          fit2.Perform();
-          if (!fit2.IsDone())
-            return fail("an edge's curve across a seam not made again");
-          const occ::handle<Geom2d_Curve> nc2 = fit2.Curve();
-          bld.UpdateEdge(ef, nc2, Ff, BRep_Tool::Tolerance(e));
-          bld.Range(ef, Ff, c0, c1);
-          const occ::handle<Geom_Surface> Sx = BRep_Tool::Surface(Ff);
-          double                          dev = 0;
-          for (int k = 0; k <= 4 * n; ++k)
-          {
-            const double   w  = c0 + (c1 - c0) * k / (4 * n);
-            const gp_Pnt2d q2 = nc2->Value(w);
-            dev               = std::max(dev, Sx->Value(q2.X(), q2.Y()).Distance(c3->Value(w)));
-          }
-          if (1.5 * dev > BRep_Tool::Tolerance(e))
-          {
-            bld.UpdateEdge(ef, 1.5 * dev);
-            for (TopExp_Explorer vx2(ef, TopAbs_VERTEX); vx2.More(); vx2.Next())
-              if (BRep_Tool::Tolerance(TopoDS::Vertex(vx2.Current())) < 1.5 * dev)
-                bld.UpdateVertex(TopoDS::Vertex(vx2.Current()), 1.5 * dev);
-          }
-          if (dbg)
-            std::fprintf(stderr, "quadrics: repair: an edge's curve on %d made again across its seam (%g off)\n", o, dev);
-        }
-      }
-      std::vector<TopoDS_Edge> fresh;
-      for (const Made& m : made)
-        if ((m.b == o || m.c == o) && of_owner[(size_t)o][0].IsSame(F))
-          fresh.push_back(m.e);
-      if (use.empty())
-      {
-        // (Nothing of it left: its offset lies inside the wall.)
-        if (dbg)
-          std::fprintf(stderr, "quadrics: repair: face of %d gone\n", o);
-        TopoDS_Compound none;
-        bld.MakeCompound(none);
-        h2->Remove(F);
-        re.Replace(F, none);
-        continue;
-      }
-      // The new edges' way: out of the point where more edges come in than go out.
-      auto start = [&](const TopoDS_Edge& e) { return TopExp::FirstVertex(e, true); };
-      auto end   = [&](const TopoDS_Edge& e) { return TopExp::LastVertex(e, true); };
-      for (const TopoDS_Edge& ne : fresh)
-      {
-        int bal = 0;
-        for (const TopoDS_Edge& e : use)
-          bal += (end(e).IsSame(TopExp::FirstVertex(ne)) ? 1 : 0) - (start(e).IsSame(TopExp::FirstVertex(ne)) ? 1 : 0);
-        use.push_back(TopoDS::Edge(ne.Oriented(bal > 0 ? TopAbs_FORWARD : TopAbs_REVERSED)));
-      }
-      // Loops: each edge on to one starting where it ends.
-      std::vector<char>                     used(use.size());
-      std::vector<std::vector<TopoDS_Edge>> loops;
-      for (size_t s0 = 0; s0 < use.size(); ++s0)
-      {
-        if (used[s0])
-          continue;
-        std::vector<TopoDS_Edge> lp;
-        size_t                   cur = s0;
-        used[cur]                    = 1;
-        lp.push_back(use[cur]);
-        for (;;)
-        {
-          const TopoDS_Vertex v = end(use[cur]);
-          if (v.IsSame(start(lp.front())))
-            break;
-          // (Of the edges starting there, the one starting where this one ends on the face: a seam's two ways.)
-          auto uv_at = [&](const TopoDS_Edge& e, bool at_start) {
-            double                          e0, e1;
-            const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(e, Ff, e0, e1);
-            const bool                      rv = e.Orientation() == TopAbs_REVERSED;
-            return ce.IsNull() ? gp_Pnt2d(1e300, 1e300) : ce->Value((at_start != rv) ? e0 : e1);
-          };
-          const gp_Pnt2d here = uv_at(use[cur], false);
-          size_t         nx   = use.size();
-          double         best = 1e300;
-          for (size_t k = 0; k < use.size(); ++k)
-            if (!used[k] && start(use[k]).IsSame(v) && uv_at(use[k], true).Distance(here) < best)
-              nx = k, best = uv_at(use[k], true).Distance(here);
-          if (nx == use.size())
-            return fail("a face's loop doesn't close");
-          used[nx] = 1;
-          lp.push_back(use[nx]);
-          cur = nx;
-        }
-        loops.push_back(lp);
-      }
-      // A free-form face's offset closed round a seam but not periodic (an extension runs on past its ends), its pieces
-      // now on both sides of the seam: built on the face's own surface made periodic there, offset alike (the same
-      // parameters, so the edges' curves carry over).
-      TopoDS_Face      Fb = Ff;
-      std::set<size_t> on_fb; // loops (by index) merged onto Fb
-      {
-        bool split_at_seam = false;
-        for (size_t la = 0; la < loops.size() && !split_at_seam; ++la)
-          for (const TopoDS_Edge& e : loops[la])
-            if (BRep_Tool::IsClosed(e, Ff))
-              for (size_t lb = la + 1; lb < loops.size() && !split_at_seam; ++lb)
-                for (const TopoDS_Edge& e2 : loops[lb])
-                  split_at_seam = split_at_seam || e2.IsSame(e);
-        const occ::handle<Geom_Surface> S0 = BRep_Tool::Surface(Ff);
-        occ::handle<Geom_BSplineSurface> own = occ::down_cast<Geom_BSplineSurface>(BRep_Tool::Surface(TopoDS::Face(faces(o))));
-        if (split_at_seam && !S0->IsUPeriodic() && !S0->IsVPeriodic() && sf[(size_t)o].general && kept[(size_t)o] && !own.IsNull())
-        {
-          try
-          {
-            own = occ::down_cast<Geom_BSplineSurface>(own->Copy());
-            // (Closed within a hair (its seam's first and last poles that far apart, c2-rings-loft's loft side): the
-            // two rows made one, the edges' tolerances take the hair.)
-            const double hair = 1e-5 * size;
-            for (const bool in_u : {true, false})
-            {
-              if (in_u ? own->IsUClosed() : own->IsVClosed())
-                continue;
-              const int    n1 = in_u ? own->NbUPoles() : own->NbVPoles(), n2 = in_u ? own->NbVPoles() : own->NbUPoles();
-              double       gap = 0;
-              for (int k = 1; k <= n2; ++k)
-                gap = std::max(gap, (in_u ? own->Pole(1, k) : own->Pole(k, 1)).Distance(in_u ? own->Pole(n1, k) : own->Pole(k, n1)));
-              if (gap > hair)
-                continue;
-              // (Its weights too, for a rational surface: OCCT calls it closed only with both rows' alike.)
-              bool alike = true;
-              for (int k = 1; k <= n2 && own->IsURational() + own->IsVRational() > 0; ++k)
-              {
-                const double w1 = in_u ? own->Weight(1, k) : own->Weight(k, 1), w2 = in_u ? own->Weight(n1, k) : own->Weight(k, n1);
-                alike           = alike && std::abs(w1 - w2) <= 1e-6 * std::max(std::abs(w1), std::abs(w2));
-              }
-              if (!alike)
-                continue;
-              for (int k = 1; k <= n2; ++k)
-              {
-                const gp_Pnt m((in_u ? own->Pole(1, k) : own->Pole(k, 1)).XYZ() * 0.5 + (in_u ? own->Pole(n1, k) : own->Pole(k, n1)).XYZ() * 0.5);
-                const double w = own->IsURational() || own->IsVRational() ? 0.5 * ((in_u ? own->Weight(1, k) : own->Weight(k, 1)) + (in_u ? own->Weight(n1, k) : own->Weight(k, n1))) : 1.0;
-                if (in_u)
-                  own->SetPole(1, k, m, w), own->SetPole(n1, k, m, w);
-                else
-                  own->SetPole(k, 1, m, w), own->SetPole(k, n1, m, w);
-              }
-            }
-            if (own->IsUClosed())
-              own->SetUPeriodic();
-            if (own->IsVClosed())
-              own->SetVPeriodic();
-            if (own->IsUPeriodic() || own->IsVPeriodic())
-              bld.MakeFace(Fb, new Geom_OffsetSurface(own, sf[(size_t)o].d), BRep_Tool::Tolerance(Ff));
-          }
-          catch (const Standard_Failure&)
-          {
-            Fb = Ff;
-          }
-        }
-      }
-      // Two loops through one seam the two ways: the piece no longer goes round; one loop without the seam, the second
-      // one's curves on the face a period on, to follow on from the first's.
-      {
-        const occ::handle<Geom_Surface> Sf = BRep_Tool::Surface(Fb);
-        // (Closed but not periodic: the two pieces stay two faces, the seam between them.)
-        for (bool merged = Sf->IsUPeriodic() || Sf->IsVPeriodic(); merged;)
-        {
-          merged = false;
-          for (size_t la = 0; la < loops.size() && !merged; ++la)
-            for (size_t ia = 0; ia < loops[la].size() && !merged; ++ia)
-            {
-              if (!BRep_Tool::IsClosed(loops[la][ia], Ff))
-                continue;
-              for (size_t lb = 0; lb < loops.size() && !merged; ++lb)
-              {
-                if (lb == la)
-                  continue;
-                for (size_t ib = 0; ib < loops[lb].size() && !merged; ++ib)
-                {
-                  if (!loops[lb][ib].IsSame(loops[la][ia]) || loops[lb][ib].Orientation() == loops[la][ia].Orientation())
-                    continue;
-                  // (The two loops' edges' curves onto the periodic surface, where it isn't the face's own.)
-                  if (!Fb.IsSame(Ff))
-                  {
-                    for (const size_t l : {la, lb})
-                      for (const TopoDS_Edge& e : loops[l])
-                      {
-                        const TopoDS_Edge               ef = TopoDS::Edge(e.Oriented(TopAbs_FORWARD));
-                        double                          e0, e1;
-                        const occ::handle<Geom2d_Curve> c1 = BRep_Tool::CurveOnSurface(ef, Ff, e0, e1);
-                        if (c1.IsNull())
-                          return fail("a loop's edge without its curve on the face");
-                        if (BRep_Tool::IsClosed(ef, Ff))
-                          bld.UpdateEdge(ef, c1, BRep_Tool::CurveOnSurface(TopoDS::Edge(ef.Reversed()), Ff, e0, e1), Fb, BRep_Tool::Tolerance(ef));
-                        else
-                          bld.UpdateEdge(ef, c1, Fb, BRep_Tool::Tolerance(ef));
-                        bld.Range(ef, Fb, e0, e1);
-                        // (Just past the face's own end the periodic surface isn't the extension the offset ran on:
-                        // the edge's tolerance takes the difference.)
-                        const occ::handle<Geom_Surface> s1 = BRep_Tool::Surface(Ff), s2b = BRep_Tool::Surface(Fb);
-                        double                          w  = 0;
-                        for (int k = 0; k <= 32; ++k)
-                        {
-                          const gp_Pnt2d q2 = c1->Value(e0 + (e1 - e0) * k / 32);
-                          w                 = std::max(w, s1->Value(q2.X(), q2.Y()).Distance(s2b->Value(q2.X(), q2.Y())));
-                        }
-                        if (w > 0.1 * thickness)
-                          return fail("a face's own surface far from its offset's extension");
-                        if (BRep_Tool::Tolerance(ef) < BRep_Tool::Tolerance(ef) + 1.5 * w && w > 0)
-                        {
-                          bld.UpdateEdge(ef, BRep_Tool::Tolerance(ef) + 1.5 * w);
-                          for (TopExp_Explorer vx2(ef, TopAbs_VERTEX); vx2.More(); vx2.Next())
-                            if (BRep_Tool::Tolerance(TopoDS::Vertex(vx2.Current())) < BRep_Tool::Tolerance(ef))
-                              bld.UpdateVertex(TopoDS::Vertex(vx2.Current()), BRep_Tool::Tolerance(ef));
-                        }
-                      }
-                    on_fb.insert(la);
-                  }
-                  std::vector<TopoDS_Edge> A, B;
-                  for (size_t k = 1; k < loops[la].size(); ++k)
-                    A.push_back(loops[la][(ia + k) % loops[la].size()]);
-                  for (size_t k = 1; k < loops[lb].size(); ++k)
-                    B.push_back(loops[lb][(ib + k) % loops[lb].size()]);
-                  if (A.empty() || B.empty())
-                    return fail("a seam's loop of nothing else");
-                  // (A's last end and B's first start in the face's parameters: B's curves moved by whole periods.)
-                  auto uv_end = [&](const TopoDS_Edge& e, bool at_start) {
-                    double                          e0, e1;
-                    const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(e, Fb, e0, e1);
-                    const bool                      rev = e.Orientation() == TopAbs_REVERSED;
-                    return ce->Value((at_start != rev) ? e0 : e1);
-                  };
-                  const gp_Pnt2d qa = uv_end(A.back(), false), qb = uv_end(B.front(), true);
-                  const double   du = Sf->IsUPeriodic() ? std::round((qa.X() - qb.X()) / Sf->UPeriod()) * Sf->UPeriod() : 0;
-                  const double   dv = Sf->IsVPeriodic() ? std::round((qa.Y() - qb.Y()) / Sf->VPeriod()) * Sf->VPeriod() : 0;
-                  if (du != 0 || dv != 0)
-                    for (const TopoDS_Edge& e : B)
-                    {
-                      double                          e0, e1;
-                      const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), Fb, e0, e1);
-                      if (ce.IsNull() || BRep_Tool::IsClosed(e, Fb))
-                        return fail("a seam's loop with a seam of its own");
-                      const occ::handle<Geom2d_Curve> moved = occ::down_cast<Geom2d_Curve>(ce->Translated(gp_Vec2d(du, dv)));
-                      bld.UpdateEdge(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), moved, Fb, BRep_Tool::Tolerance(e));
-                      bld.Range(TopoDS::Edge(e.Oriented(TopAbs_FORWARD)), Fb, e0, e1);
-                    }
-                  A.insert(A.end(), B.begin(), B.end());
-                  loops[la] = A;
-                  loops.erase(loops.begin() + (long)lb);
-                  {
-                    std::set<size_t> moved;
-                    for (const size_t l : on_fb)
-                      if (l != lb)
-                        moved.insert(l > lb ? l - 1 : l);
-                    moved.insert(la > lb ? la - 1 : la);
-                    on_fb = moved;
-                  }
-                  merged = true;
-                }
-              }
-            }
-        }
-      }
-      // Outer loops (going round anticlockwise in the face's parameters) and the holes inside them.
-      struct Loop
-      {
-        std::vector<gp_Pnt2d> poly;
-        double                area;
-        TopoDS_Wire           w;
-        bool                  on_fb = false;
-      };
-      std::vector<Loop> ls;
-      for (size_t li = 0; li < loops.size(); ++li)
-      {
-        const auto&        lp = loops[li];
-        const TopoDS_Face& Fl = on_fb.count(li) ? Fb : Ff;
-        Loop               L;
-        L.on_fb               = on_fb.count(li) > 0;
-        bld.MakeWire(L.w);
-        for (const TopoDS_Edge& e : lp)
-        {
-          bld.Add(L.w, e);
-          double                          e0, e1;
-          const occ::handle<Geom2d_Curve> ce = BRep_Tool::CurveOnSurface(e, Fl, e0, e1);
-          if (ce.IsNull())
-            return fail("a loop's edge without its curve on the face");
-          const bool rev = e.Orientation() == TopAbs_REVERSED;
-          for (int k = 0; k < 16; ++k)
-            L.poly.push_back(ce->Value(rev ? e1 - (e1 - e0) * k / 16 : e0 + (e1 - e0) * k / 16));
-        }
-        L.w.Closed(true);
-        L.area = 0;
-        for (size_t k = 0; k < L.poly.size(); ++k)
-        {
-          const gp_Pnt2d& a = L.poly[k];
-          const gp_Pnt2d& b = L.poly[(k + 1) % L.poly.size()];
-          L.area += 0.5 * (a.X() * b.Y() - b.X() * a.Y());
-        }
-        // (Outer or a hole by whether the loop alone bounds a face holding no far point: the area in the parameters
-        // misleads across a periodic surface's seam.)
-        {
-          TopLoc_Location                 lloc;
-          const occ::handle<Geom_Surface> lS = BRep_Tool::Surface(Fl, lloc);
-          TopoDS_Face                     one;
-          bld.MakeFace(one, lS, lloc, BRep_Tool::Tolerance(Fl));
-          bld.Add(one, L.w);
-          L.area = std::abs(L.area) * (ShapeAnalysis::IsOuterBound(one) ? 1 : -1);
-        }
-        ls.push_back(L);
-      }
-      auto inside2d = [](const std::vector<gp_Pnt2d>& poly, const gp_Pnt2d& p) {
-        bool c = false;
-        for (size_t i = 0, j = poly.size() - 1; i < poly.size(); j = i++)
-          if (((poly[i].Y() > p.Y()) != (poly[j].Y() > p.Y())) && p.X() < (poly[j].X() - poly[i].X()) * (p.Y() - poly[i].Y()) / (poly[j].Y() - poly[i].Y()) + poly[i].X())
-            c = !c;
-        return c;
-      };
-      std::vector<size_t> outers;
-      for (size_t k = 0; k < ls.size(); ++k)
-        if (ls[k].area > 0)
-          outers.push_back(k);
-      if (outers.empty())
-        return fail("a face made again without an outer loop");
-      std::vector<TopoDS_Face> nfs(outers.size());
-      for (size_t k = 0; k < outers.size(); ++k)
-      {
-        TopLoc_Location                 kloc;
-        const occ::handle<Geom_Surface> kS = BRep_Tool::Surface(ls[outers[k]].on_fb ? Fb : Ff, kloc);
-        bld.MakeFace(nfs[k], kS, kloc, BRep_Tool::Tolerance(Ff));
-        bld.Add(nfs[k], ls[outers[k]].w);
-      }
-      for (size_t k = 0; k < ls.size(); ++k)
-      {
-        if (ls[k].area > 0)
-          continue;
-        size_t best = outers.size();
-        for (size_t m = 0; m < outers.size(); ++m)
-          if (ls[outers[m]].on_fb == ls[k].on_fb && inside2d(ls[outers[m]].poly, ls[k].poly[0]) && (best == outers.size() || ls[outers[m]].area < ls[outers[best]].area))
-            best = m;
-        if (best == outers.size())
-          return fail("a hole in no outer loop");
-        bld.Add(nfs[best], ls[k].w);
-      }
-      TopoDS_Compound cf;
-      bld.MakeCompound(cf);
-      for (TopoDS_Face& nf2 : nfs)
-      {
-        const TopoDS_Face of2 = TopoDS::Face(nf2.Oriented(F.Orientation()));
-        bld.Add(cf, of2);
-        h2->AddModified(F, of2);
-        if (const Source* s = sources.Seek(F))
-          sources.Bind(of2, *s);
-      }
-      if (dbg)
-        std::fprintf(stderr, "quadrics: repair: face of %d in %zu pieces from %zu loops\n", o, nfs.size(), ls.size());
-      re.Replace(F, cf);
-    }
-    TopoDS_Shape r = re.Apply(in);
-    // Two edges meeting at a vertex of theirs alone, between the same two faces (a seam's end, once the pieces on its
-    // two sides are one face): one edge, their curves joined.
-    {
-      ShapeAncMap ve3, ef3;
-      TopExp::MapShapesAndUniqueAncestors(r, TopAbs_VERTEX, TopAbs_EDGE, ve3);
-      TopExp::MapShapesAndUniqueAncestors(r, TopAbs_EDGE, TopAbs_FACE, ef3);
-      BRepTools_ReShape re2;
-      ShapeIMap         used;
-      for (int k = 1; k <= ve3.Extent(); ++k)
-      {
-        if (ve3(k).Extent() != 2)
-          continue;
-        const TopoDS_Vertex& V  = TopoDS::Vertex(ve3.FindKey(k));
-        const TopoDS_Edge    e1 = TopoDS::Edge(ve3(k).First().Oriented(TopAbs_FORWARD)), e2 = TopoDS::Edge(ve3(k).Last().Oriented(TopAbs_FORWARD));
-        if (e1.IsSame(e2) || used.Contains(e1) || used.Contains(e2) || BRep_Tool::Degenerated(e1) || BRep_Tool::Degenerated(e2))
-          continue;
-        const ShapeList& f1 = ef3.FindFromKey(e1);
-        const ShapeList& f2 = ef3.FindFromKey(e2);
-        if (f1.Extent() != 2 || f2.Extent() != 2 || !((f1.First().IsSame(f2.First()) && f1.Last().IsSame(f2.Last())) || (f1.First().IsSame(f2.Last()) && f1.Last().IsSame(f2.First()))))
-          continue;
-        // (Each way round so that the first ends at V and the second starts there.)
-        const bool r1 = !TopExp::LastVertex(e1).IsSame(V), r2 = !TopExp::FirstVertex(e2).IsSame(V);
-        double     a1, b1, a2, b2;
-        const occ::handle<Geom_Curve> g1 = BRep_Tool::Curve(e1, a1, b1), g2 = BRep_Tool::Curve(e2, a2, b2);
-        if (g1.IsNull() || g2.IsNull())
-          continue;
-        auto bs3 = [](const occ::handle<Geom_Curve>& g, double a, double b, bool rev) {
-          occ::handle<Geom_BSplineCurve> c = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(g, a, b));
-          if (rev)
-            c->Reverse();
-          return c;
-        };
-        GeomConvert_CompCurveToBSplineCurve j3(bs3(g1, a1, b1, r1));
-        const double                        tj = std::max({BRep_Tool::Tolerance(e1), BRep_Tool::Tolerance(e2), BRep_Tool::Tolerance(V)});
-        if (!j3.Add(bs3(g2, a2, b2, r2), 2 * tj))
-          continue;
-        const occ::handle<Geom_BSplineCurve> c3 = j3.BSplineCurve();
-        const TopoDS_Vertex v0 = r1 ? TopExp::LastVertex(e1) : TopExp::FirstVertex(e1), v1 = r2 ? TopExp::FirstVertex(e2) : TopExp::LastVertex(e2);
-        BRepBuilderAPI_MakeEdge mk(c3, v0, v1, c3->FirstParameter(), c3->LastParameter());
-        if (!mk.IsDone())
-          continue;
-        TopoDS_Edge ne = mk.Edge();
-        bool        ok = true;
-        for (const TopoDS_Shape& Fs : {f1.First(), f1.Last()})
-        {
-          const TopoDS_Face Fj = TopoDS::Face(Fs.Oriented(TopAbs_FORWARD));
-          double            p0, p1, q0, q1;
-          const occ::handle<Geom2d_Curve> h1 = BRep_Tool::CurveOnSurface(e1, Fj, p0, p1), h2c = BRep_Tool::CurveOnSurface(e2, Fj, q0, q1);
-          if (h1.IsNull() || h2c.IsNull() || BRep_Tool::IsClosed(e1, Fj) || BRep_Tool::IsClosed(e2, Fj))
-          {
-            ok = false;
-            break;
-          }
-          // (Its points' places on the face, each from the last from the first edge's start, interpolated at the
-          // joined curve's parameters.)
-          TopLoc_Location                          jl;
-          const occ::handle<Geom_Surface>          Sj  = BRep_Tool::Surface(Fj, jl);
-          const occ::handle<ShapeAnalysis_Surface> saj = new ShapeAnalysis_Surface(Sj);
-          const int                                n   = 48;
-          NCollection_Array1<gp_Pnt2d>             uvj(1, n + 1);
-          NCollection_Array1<double>               ppj(1, n + 1);
-          const double                             j0 = c3->FirstParameter(), j1 = c3->LastParameter();
-          for (int k = 0; k <= n; ++k)
-          {
-            const double w = j0 + (j1 - j0) * k / n;
-            gp_Pnt2d     q = k == 0 ? h1->Value(r1 ? p1 : p0) : saj->NextValueOfUV(uvj(k), c3->Value(w), 1e3 * tol);
-            // (Continuous through a period.)
-            if (k > 0 && Sj->IsUPeriodic())
-              q.SetX(q.X() + std::round((uvj(k).X() - q.X()) / Sj->UPeriod()) * Sj->UPeriod());
-            if (k > 0 && Sj->IsVPeriodic())
-              q.SetY(q.Y() + std::round((uvj(k).Y() - q.Y()) / Sj->VPeriod()) * Sj->VPeriod());
-            uvj(k + 1) = q;
-            ppj(k + 1) = w;
-          }
-          Geom2dAPI_Interpolate fj(new TColgp_HArray1OfPnt2d(uvj), new TColStd_HArray1OfReal(ppj), false, 1e-12);
-          fj.Perform();
-          if (!fj.IsDone() || !jl.IsIdentity())
-          {
-            ok = false;
-            break;
-          }
-          const occ::handle<Geom2d_Curve> pj = fj.Curve();
-          double                          dev = 0;
-          for (int k = 0; k <= 4 * n; ++k)
-          {
-            const double   w = j0 + (j1 - j0) * k / (4 * n);
-            const gp_Pnt2d q = pj->Value(w);
-            dev              = std::max(dev, Sj->Value(q.X(), q.Y()).Distance(c3->Value(w)));
-          }
-          if (dev > 1e-2 * thickness)
-          {
-            ok = false;
-            break;
-          }
-          bld.UpdateEdge(ne, pj, Fj, std::max(tj, 1.5 * dev));
-          bld.Range(ne, Fj, j0, j1);
-          if (1.5 * dev > BRep_Tool::Tolerance(ne))
-            bld.UpdateEdge(ne, 1.5 * dev);
-        }
-        if (!ok)
-          continue;
-        bld.SameParameter(ne, true);
-        bld.SameRange(ne, true);
-        for (TopExp_Explorer vx2(ne, TopAbs_VERTEX); vx2.More(); vx2.Next())
-          if (BRep_Tool::Tolerance(TopoDS::Vertex(vx2.Current())) < BRep_Tool::Tolerance(ne))
-            bld.UpdateVertex(TopoDS::Vertex(vx2.Current()), BRep_Tool::Tolerance(ne));
-        // (In place of the first the way it ran; the second gone.)
-        re2.Replace(e1, r1 ? TopoDS::Edge(ne.Reversed()) : ne);
-        re2.Remove(e2);
-        used.Add(e1);
-        used.Add(e2);
-        if (dbg)
-        {
-          const gp_Pnt q = BRep_Tool::Pnt(V);
-          std::fprintf(stderr, "quadrics: repair: two edges joined at %.4f %.4f %.4f\n", q.X() * 1e3, q.Y() * 1e3, q.Z() * 1e3);
-        }
-      }
-      if (used.Extent() > 0)
-      {
-        r = re2.Apply(r);
-        h2->Merge(re2.History());
-        SourceMap moved;
-        for (SourceMap::Iterator it(sources); it.More(); it.Next())
-        {
-          const TopoDS_Shape nw = re2.Value(it.Key());
-          if (!nw.IsNull() && !nw.IsSame(it.Key()))
-            moved.Bind(nw, it.Value());
-        }
-        for (SourceMap::Iterator it(moved); it.More(); it.Next())
-          sources.Bind(it.Key(), it.Value());
-      }
-    }
-    bld.MakeShell(fixed);
-    for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
-      bld.Add(fixed, x.Current());
-    fixed.Closed(true);
-    return true;
-  };
   shell.Closed(true);
   TopoDS_Solid outer_wall;
   bld.MakeSolid(outer_wall);
   bld.Add(outer_wall, shell.Oriented(old_shell.Orientation()));
-  TopoDS_Shape wall = outer_wall;
-  HHist        h2;
-  if (BRepCheck_Analyzer wan0(wall); !wan0.IsValid() && !outward)
-  {
-    TopoDS_Shell fixed;
-    bool         ok = false;
-    try
-    {
-      ok = repair(shell, fixed, h2);
-    }
-    catch (const Standard_Failure& e)
-    {
-      if (dbg)
-        std::fprintf(stderr, "quadrics: repair: %s %s\n", typeid(e).name(), e.GetMessageString());
-    }
-    if (ok)
-    {
-      TopoDS_Solid sol;
-      bld.MakeSolid(sol);
-      bld.Add(sol, fixed.Oriented(old_shell.Orientation()));
-      wall = sol;
-      lap("repair");
-    }
-  }
+  const TopoDS_Shape wall = outer_wall;
   if (BRepCheck_Analyzer wan(wall); !wan.IsValid())
   {
     if (const char* dir = std::getenv("NOSHAPE_SHELL_DUMP"))
@@ -6804,13 +5128,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           for (r->InitContextIterator(); r->MoreShapeInContext(); r->NextShapeInContext())
             for (const BRepCheck_Status st : r->StatusOnShape())
               if (st != BRepCheck_NoError)
-              {
-                Bnd_Box cb;
-                BRepBndLib::Add(r->ContextualShape(), cb);
-                const gp_Pnt cc = cb.IsVoid() ? gp_Pnt() : gp_Pnt((cb.CornerMin().XYZ() + cb.CornerMax().XYZ()) / 2);
-                const int    surf = r->ContextualShape().ShapeType() == TopAbs_FACE ? (int)BRepAdaptor_Surface(TopoDS::Face(r->ContextualShape())).GetType() : -1;
-                std::fprintf(stderr, "quadrics: kind %d status %d in context (%d, surface %d at %.3f %.3f %.3f mm) at %g %g %g\n", (int)k, (int)st, (int)r->ContextualShape().ShapeType(), surf, cc.X() * 1e3, cc.Y() * 1e3, cc.Z() * 1e3, c.X(), c.Y(), c.Z());
-              }
+                std::fprintf(stderr, "quadrics: kind %d status %d in context at %g %g %g\n", (int)k, (int)st, c.X(), c.Y(), c.Z());
         }
     return no("the wall is invalid");
   }
@@ -6856,7 +5174,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   if (!(vw > 0) || !(outward || vw <= vs * (1 + 1e-3)))
     return no("the wall's volume is off");
   out.result  = wall;
-  out.history = shell_history(solid, wall, {h, h2}, {}, sources, removed);
+  out.history = shell_history(solid, wall, {h}, {}, sources, removed);
   return true;
 }
 
@@ -7855,11 +6173,10 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
     return ok;
   };
-  bool       quadrics_tried = false; // (its second place in the order: not again once failed)
   const bool done = (method == 0 && removed.empty() && !outward && timed("inversion", [&] { return by_inversion(solid.shape, thickness, b); })) ||
                     (method == 0 && timed("regions", [&] { return by_regions(solid.shape, removed, thickness, sign, b); })) ||
                     (method == 0 && !std::getenv("NOSHAPE_SHELL_NO_SMOOTH") && timed("smooth", [&] { return by_smooth(solid.shape, removed, thickness, sign, b); })) ||
-                    (method == 0 && sharp_freeform && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return quadrics_tried = true, by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
+                    (method == 0 && sharp_freeform && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] { return by_quadrics(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 1) && (offset_ok || method == 1) && timed("offset", [&] { return by_offset(solid.shape, removed, thickness, sign, b); })) ||
                     ((method == 0 || method == 3) && !std::getenv("NOSHAPE_SHELL_NO_PLANES") && timed("planes", [&] {
                        const bool ok = by_planes(solid.shape, removed, thickness, sign, b);
@@ -7867,7 +6184,7 @@ OpOut op_shell_solid_unbudgeted(const OcShape& solid, const OcShapeList& faces, 
                          compare_with_slabs(solid.shape, removed, thickness, sign, b);
                        return ok;
                      })) ||
-                    ((method == 0 || method == 4) && !quadrics_tried && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] {
+                    ((method == 0 || method == 4) && !std::getenv("NOSHAPE_SHELL_NO_QUADRICS") && timed("quadrics", [&] {
                        const bool ok = by_quadrics(solid.shape, removed, thickness, sign, b);
                        if (ok && std::getenv("NOSHAPE_SHELL_COMPARE"))
                          compare_with_slabs(solid.shape, removed, thickness, sign, b);
