@@ -339,7 +339,8 @@ pub enum Value {
     /// A box; std tags some (`new box(...) as Instantiator`).
     Box(Shared<BoxCell>, Tag),
     Builtin(Arc<dyn Builtin>, Tag),
-    Function(Shared<Func>),
+    /// A function; a typecheck type may tag it (`function(t) { … } as Expression`: cf-parametric-curve).
+    Function(Shared<Func>, Tag),
     /// A ValueWithUnits held in the value: `{ "unit" : unit(id), "value" : x } as ValueWithUnits` without its map
     /// (FS-COMPILED-INTERP stage 2; std's operators make them). Alike in every respect but its form.
     Quantity(f64, UnitId),
@@ -549,7 +550,7 @@ impl Value {
 
     pub fn tag(&self) -> Tag {
         match self {
-            Value::Bool(_, t) | Value::Number(_, t) | Value::Str(_, t) | Value::Array(_, t) | Value::Map(_, t) | Value::Box(_, t) | Value::Builtin(_, t) | Value::Enum(t, _) | Value::TaggedUndefined(t) => *t,
+            Value::Bool(_, t) | Value::Number(_, t) | Value::Str(_, t) | Value::Array(_, t) | Value::Map(_, t) | Value::Box(_, t) | Value::Builtin(_, t) | Value::Function(_, t) | Value::Enum(t, _) | Value::TaggedUndefined(t) => *t,
             Value::Quantity(..) => vwu_tag().unwrap_or(Tag::NONE),
             Value::Vector(..) => vector_tag().unwrap_or(Tag::NONE),
             _ => Tag::NONE,
@@ -619,13 +620,13 @@ impl Value {
             Value::Map(m, _) => Value::Map(m, tag),
             Value::Builtin(b, _) => Value::Builtin(b, tag),
             Value::Box(b, _) => Value::Box(b, tag),
+            Value::Function(f, _) => Value::Function(f, tag),
             // (Its own tag keeps it compact; another makes it the map or array it stands for.)
             v @ (Value::Quantity(..) | Value::Vector(..)) if v.tag() == tag => v,
             v @ (Value::Quantity(..) | Value::Vector(..)) => v.shallow().into_owned().with_tag(tag),
             Value::Undefined | Value::TaggedUndefined(_) => {
                 if tag.is_none() { Value::Undefined } else { Value::TaggedUndefined(tag) }
             }
-            other => other,
         }
     }
 
@@ -749,7 +750,7 @@ impl Ord for Value {
             (a, b) if a.is_compact() || b.is_compact() => a.shallow().cmp(&b.shallow()),
             (Value::Box(a, _), Value::Box(b, _)) => a.serial.cmp(&b.serial),
             (Value::Builtin(a, _), Value::Builtin(b, _)) => a.serial().cmp(&b.serial()),
-            (Value::Function(a), Value::Function(b)) => {
+            (Value::Function(a, _), Value::Function(b, _)) => {
                 if Shared::ptr_eq(a, b) {
                     return Ordering::Equal;
                 }
@@ -879,7 +880,10 @@ fn write_display(out: &mut String, v: &Value, top: bool) {
             }
             let _ = write!(out, "BuiltIn: {}", shown_number(b.serial()));
         }
-        Value::Function(f) => {
+        Value::Function(f, t) => {
+            if !t.is_none() {
+                let _ = write!(out, "{} : ", tag_name(*t));
+            }
             let line = match &**f {
                 Func::Closure { def, .. } => def.pos.line,
                 Func::Overloads(s) => s.fns.first().map(|d| d.pos.line).unwrap_or(0),

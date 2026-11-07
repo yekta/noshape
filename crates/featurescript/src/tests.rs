@@ -195,6 +195,20 @@ fn units_from_the_standard_library() {
     assert_eq!(run_str("function f() { return sqrt(4 * meter ^ 2) == 2 * meter; }"), "true");
 }
 
+/// A typecheck type tags a function (`function(t) { … } as Expression`): `is` sees the type and operators overloaded for
+/// it apply to it (cf-parametric-curve's symbolic parameter `#t`, live OK).
+#[test]
+fn a_function_takes_a_type() {
+    let src = r#"
+export type Expression typecheck canBeExpression;
+predicate canBeExpression(value) { value is function; }
+const t_ = function(t) { return t; } as Expression;
+export operator*(lhs is Expression, rhs) returns Expression { return function(t) { return lhs(t) * rhs; } as Expression; }
+function f() { const twice = t_ * 2; return [t_ is Expression, twice is Expression, twice(3), (function(t) { return t; }) is Expression]; }
+"#;
+    assert_eq!(run_str(src), "[ true , true , 6 , false ]");
+}
+
 #[test]
 fn enums_and_types() {
     let src = "enum E { A, B }\nfunction f() { return [E.B is E, E.A is string, ('A' as E) == E.A, E.A < E.B, try('Z' as E)]; }";

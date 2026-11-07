@@ -450,7 +450,7 @@ pub(crate) fn run_manipulator_change(
 /// returns.
 #[allow(clippy::too_many_arguments)]
 fn call_and_diff(f: &Arc<noshape_featurescript::ir::OverloadSet>, args: Vec<Value>, name: &str, units: &noshape_units::UnitPrefs, decls: &[ParamDecl], new_def: &Value, news: &ParamValues, cx: &Arc<FsContext>) -> Option<ParamValues> {
-    let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())));
+    let func = Value::Function(noshape_featurescript::value::Shared::new(noshape_featurescript::value::Func::Overloads(f.clone())), noshape_featurescript::value::Tag::NONE);
     let units = *units;
     let legacy = noshape_kernel::kernel_legacy();
     // The kernel's cancel flag for the call, raised at the limit (a timer woken when the call ends).

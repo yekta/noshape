@@ -8,7 +8,7 @@
 use crate::ast::{BinOp, FnKind, Name};
 use crate::ir::*;
 use crate::lexer::Pos;
-use crate::value::{Func, Map, Shared, StdType, Tag, Value, to_display, type_info};
+use crate::value::{Func, Map, Shared, Tag, Value, to_display, type_info};
 use parking_lot::{ReentrantMutex, RwLock};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -158,7 +158,7 @@ pub fn register_natives(list: &[(&'static str, NativeFn)]) {
 /// A function value calling the native `name` with `bound` first.
 pub fn native_function(name: &str, bound: Vec<Value>) -> Option<Value> {
     let f = native(name)?;
-    Some(Value::Function(Shared::new(Func::Native { name: name.into(), f, bound })))
+    Some(Value::Function(Shared::new(Func::Native { name: name.into(), f, bound }), Tag::NONE))
 }
 
 pub fn native(name: &str) -> Option<NativeFn> {
@@ -601,7 +601,7 @@ impl Interp {
     /// Call a function value with arguments.
     pub(crate) fn call_value_in(&mut self, f: &Value, args: Vec<Value>) -> R<Value> {
         match f {
-            Value::Function(func) => match &**func {
+            Value::Function(func, _) => match &**func {
                 Func::Closure { def, captures } => {
                     let (def, captures) = (def.clone(), captures.clone());
                     self.invoke_in(&def, args, &captures, true)
@@ -1415,7 +1415,7 @@ impl Interp {
                 self.pos = e.pos;
                 self.global_in(c)
             }
-            ExK::FnValue(set) => Ok(Value::Function(Shared::new(Func::Overloads(set.clone())))),
+            ExK::FnValue(set) => Ok(Value::Function(Shared::new(Func::Overloads(set.clone())), Tag::NONE)),
             ExK::Array(items) => {
                 let mut v = Vec::with_capacity(items.len());
                 for x in items {
@@ -1582,7 +1582,7 @@ impl Interp {
             },
             ExK::Lambda(def, outer) => {
                 let captures = outer.iter().map(|s| self.stack[self.base + *s as usize].clone()).collect();
-                Ok(Value::Function(Shared::new(Func::Closure { def: def.clone(), captures })))
+                Ok(Value::Function(Shared::new(Func::Closure { def: def.clone(), captures }), Tag::NONE))
             }
             ExK::NewBox(x) => {
                 let v = self.eval_in(x)?;
@@ -1711,11 +1711,9 @@ impl Interp {
             }
             TypeRef::Tag(tag) => {
                 if !crate::value::is_enum_tag(tag) {
-                    // std tags boxes (`new box(...) as Instantiator`).
-                    return match v.std_type() {
-                        StdType::Function => Err(self.error(format!("Cannot convert a value of type {} to {}", v.type_description(), type_info(tag).name))),
-                        _ => Ok(v.with_tag(tag)),
-                    };
+                    // std tags boxes (`new box(...) as Instantiator`); a studio its functions
+                    // (`function(t) { … } as Expression`, cf-parametric-curve).
+                    return Ok(v.with_tag(tag));
                 }
                 // Live: 'Type error: value "FOO" cannot be enum Shade'.
                 let info = type_info(tag);
