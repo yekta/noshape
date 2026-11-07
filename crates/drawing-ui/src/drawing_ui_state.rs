@@ -29,7 +29,8 @@ impl DrawingEditor {
     }
 
     /// Where target `t` shows now, in window coordinates: `sheet_point` [x, y] (sheet mm), `view` (its middle),
-    /// `view_point` / `view_edge` {view, at: [x, y, z] mm}, `break_line` {view, index}, `annotation` (by its text).
+    /// `view_point` / `view_edge` {view, at: [x, y, z] mm}, `break_line` {view, index}, `hole_axis` ("X" / "Y"),
+    /// `annotation` (by its text).
     pub fn ui_target_point(&self, t: &Value, _cx: &App) -> Result<Point<Pixels>, String> {
         let pair = |v: &Value| -> Option<[f64; 2]> { Some([v.get(0)?.as_f64()?, v.get(1)?.as_f64()?]) };
         let at = if let Some(p) = t.get("sheet_point") {
@@ -54,6 +55,20 @@ impl DrawingEditor {
             let pick = built.picks.iter().position(|p| *p == PickTarget::BreakLine { view, index }).ok_or_else(|| format!("no break {index} on {name}"))? as u32;
             let line = built.geometry.lines.iter().find(|l| l.pick == pick).ok_or("the break isn't drawn")?;
             *line.points.get(line.points.len() / 2).ok_or("an empty line")?
+        } else if let Some(axis) = t.get("hole_axis").and_then(Value::as_str) {
+            // The sheet's first hole table's origin indicator: the middle of its X or Y arrow (one pick, its menu has
+            // the flips).
+            let table = self.current_sheet().tables.iter().find(|t| matches!(t.kind, TableKind::Hole { .. })).ok_or("no hole table")?;
+            let built = self.built.as_ref().ok_or("the sheet isn't built yet")?;
+            let pick = built.picks.iter().position(|p| *p == PickTarget::HoleAxis(table.id)).ok_or("the hole table has no origin")? as u32;
+            let k = match axis {
+                "X" => 1,
+                "Y" => 3,
+                _ => return Err("hole_axis: \"X\" or \"Y\"".into()),
+            };
+            let line = built.geometry.lines.iter().filter(|l| l.pick == pick).nth(k).ok_or("the origin indicator isn't drawn")?;
+            let (a, b) = (line.points[0], *line.points.last().ok_or("an empty line")?);
+            [(a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0]
         } else if let Some(text) = t.get("annotation").and_then(Value::as_str) {
             let a = self.ui_annotations().into_iter().find(|(_, _, s)| s == text).ok_or_else(|| format!("no annotation {text}"))?;
             self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?

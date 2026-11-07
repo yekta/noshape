@@ -690,7 +690,9 @@ impl DrawingEditor {
                 None => (name.to_string(), None),
             };
             let menu = src.map(|(tab, part)| this.reference_menu(tab, part, version.is_some(), cx));
+            let mark = name.clone();
             crate::ui::tree_row(SharedString::from(key), false)
+                .map(|d| crate::ui_script::mark(d, || format!("sheet_ref:{mark}")))
                 .cursor_pointer()
                 .tooltip(crate::ui::tooltip("Reference manager"))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_ref_manager(cx)))
