@@ -3,6 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Shell's walls and slabs: one builder, bool's (11-07 07:34 UTC, agreed with core, lead)
+bool owns the single wall/slab builder in shell.cpp, starting from core's branch core-walls-wip (1dad1804, not for
+main): by_cut_walls (the offset walls of the removed faces' neighbours, cut where they meet), join_in_u, cross_point,
+B-spline offsets approximated first and extended after, adaptive sampling at a loft's C0 run-on kinks, pcurves by
+interpolation with a drift check (2e-4 x size; least squares gave 11-41 mm tolerances), T1 kernel
+shell::a_lofts_angled_sides_shell and tests/data/shell/impeller-loft-input.brep. core keeps Shell's other paths
+(regions, smooth, quadrics, offset, planes), moves them onto this builder, and reviews its changes (handoff/core.md).
+Order: cylinder slabs exact (any boundary: the offset is a radial scaling, affine, so B-spline edges stay exact), then
+B-spline faces' slabs on the shared offset, then the slab fuse in ours; c2-rings-loft's Shell 1 (OCCT's simple
+offsets: vertex tolerances 0.3-1.17 mm; the slabs' fuse declined "a point near two vertices", OCCT 8 s then fails;
+BRepOffset's whole offset 2 faces, invalid) and c2-impeller-loft's Shell Gehäuse against live when it lands; rings-loft's
+two fuses that differ from OCCT by 3e-8 along. Inputs: vibe5 ~/agents/bool-rings-dump-1107.
+
 ## The gate and live (11-07 05:18 UTC, lead): live wins over OCCT's quirks
 The target is Onshape; OCCT is the Boolean's proxy for correctness, not the goal. The gate stays: 0 differences from
 OCCT on every corpus and parity56, shfall its known 2, knurl and gear results and times level. One exception: where
