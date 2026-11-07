@@ -417,6 +417,7 @@ Examples:
 | `path` | string |  | Where to create it: a full path ("/home/ann/parts/bracket.noshape"), or a file name ("bracket", "bracket.noshape") for the documents folder the app lists (noshape's documents folder in the user's Documents). Default: a new "Untitled <n>.noshape" there. Must not exist. The reply's `path` is where it is. |
 | `length_unit` | one of `mm`, `cm`, `m`, `in`, `ft`, `yd`, `um` |  | Workspace length unit (default mm): bare numbers in length fields use it. |
 | `angle_unit` | one of `deg`, `rad` |  | Workspace angle unit (default deg). |
+| `if_exists` | one of `error`, `open` |  | A file already at `path`: "error" (default) or "open" (opens it, the reply says `existed`). A document this session made and hasn't edited yet opens either way. |
 
 #### document_update_workspace
 

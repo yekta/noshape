@@ -235,10 +235,16 @@ impl Ctx {
         }
     }
 
+    /// `path` is a document this session made and that holds nothing since (`document_create` again: a retry).
+    pub fn is_unedited_creation(&self, path: &Path) -> bool {
+        let key = canonical(path);
+        self.docs.iter().find(|(p, _)| *p == key).is_some_and(|(_, od)| od.session.store.history(od.session.branch).is_ok_and(|h| h.len() <= 1))
+    }
+
     /// Create a new document file (Onshape's new document: Part Studio 1 and Assembly 1).
     pub fn create(&mut self, path: &Path, doc: Document) -> Result<&mut OpenDoc, OpError> {
         if path.exists() {
-            return Err(OpError::invalid(format!("{} already exists", path.display())).with_param("path"));
+            return Err(OpError::invalid(format!("{} already exists: open it with document_open, or choose another name", path.display())).with_param("path"));
         }
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir).map_err(|e| OpError::new("io", format!("creating {}: {e}", dir.display())))?;

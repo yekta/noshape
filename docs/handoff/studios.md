@@ -28,6 +28,17 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-07 22:31 UTC: P0 "an agent's first MCP calls fail" (lead, user's screenshot of a Claude Desktop session)
+- `~` paths: `noshape_scene::expand_home` (`~`, `~/…`, `~\…`), applied in `registry::run` to every path argument
+  at any depth (`PATH_ARGS`: doc, path, file, files, folder, csv, template, out…), so every op and the CLI take them.
+- `document_create`: a relative path from the MCP server goes in the documents folder (the CLI keeps the shell's
+  folder); a file already there: "…already exists: open it with document_open (or document_create with if_exists
+  "open"), or choose another name"; `if_exists: "open"`; this session's own unedited document opens either way (an
+  agent's retry; the reply says `existed`). `document_open` finds a bare name in the documents folder.
+- The MCP instructions were written to the model ("Tell the user…", "Model the way…", "your calls"): rewritten as
+  documentation of the tools; a test keeps second person, "the user", "remind", "must", "system" out of them.
+- Guard: cli test `tool_list::an_agents_first_calls_work_or_say_what_to_do`.
+
 ### 2026-11-07 20:58 UTC: P0 "a Windows user can't find their documents" (lead), then paused again
 - One documents folder for everything: `noshape_scene::documents_dir` (`NOSHAPE_DOCUMENTS_DIR`, else the OS's
   Documents Known Folder's `noshape`), used by app-core (`file_dialogs::documents_dir`), ops (`noshape_ops::documents_dir`,

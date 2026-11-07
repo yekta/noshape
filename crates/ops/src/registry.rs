@@ -280,6 +280,14 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
             return Err(OpError::param(f.name, &format!("{want} items, got {n} ({})", f.description)));
         }
     }
+    // A path written from the home folder ("~/Documents/x.noshape") is the home folder's, in every op.
+    let homed;
+    let args = if has_home_path(args, false) {
+        homed = with_home_paths(args.clone(), false);
+        &homed
+    } else {
+        args
+    };
     // Live mode: the document is open in the app; the call runs there.
     if let Some(r) = crate::live::forward(ctx, op, args) {
         return r;
@@ -292,6 +300,32 @@ pub fn run(ctx: &mut Ctx, op: &'static Op, args: &Value) -> Result<OpOutput, OpE
             out
         })
         .map_err(|e| off_list().unwrap_or(e))
+}
+
+/// The arguments that are file or folder paths, at any depth (`doc`, an export's `file`…).
+const PATH_ARGS: &[&str] = &["doc", "document", "path", "paths", "file", "files", "folder", "dir", "csv", "template", "out", "output", "dest"];
+
+/// `v` holds a path argument starting with `~` (`under`: `v` is a path argument's value).
+fn has_home_path(v: &Value, under: bool) -> bool {
+    match v {
+        Value::String(s) => under && s.starts_with('~'),
+        Value::Array(items) => items.iter().any(|i| has_home_path(i, under)),
+        Value::Object(m) => m.iter().any(|(k, v)| has_home_path(v, PATH_ARGS.contains(&k.as_str()))),
+        _ => false,
+    }
+}
+
+/// `v` with its path arguments' leading `~` as the home folder (`noshape_scene::expand_home`).
+fn with_home_paths(v: Value, under: bool) -> Value {
+    match v {
+        Value::String(s) if under => Value::String(noshape_scene::expand_home(&s).into_owned()),
+        Value::Array(items) => Value::Array(items.into_iter().map(|i| with_home_paths(i, under)).collect()),
+        Value::Object(m) => Value::Object(m.into_iter().map(|(k, v)| {
+            let path = PATH_ARGS.contains(&k.as_str());
+            (k, with_home_paths(v, path))
+        }).collect()),
+        v => v,
+    }
 }
 
 /// Reply numbers without floating-point noise: 12 significant digits,

@@ -21,6 +21,7 @@ pub fn ops() -> Vec<Op> {
                 opt("path", s(), "Where to create it: a full path (\"/home/ann/parts/bracket.noshape\"), or a file name (\"bracket\", \"bracket.noshape\") for the documents folder the app lists (noshape's documents folder in the user's Documents). Default: a new \"Untitled <n>.noshape\" there. Must not exist. The reply's `path` is where it is."),
                 opt("length_unit", json!({ "type": "string", "enum": ["mm", "cm", "m", "in", "ft", "yd", "um"] }), "Workspace length unit (default mm): bare numbers in length fields use it."),
                 opt("angle_unit", json!({ "type": "string", "enum": ["deg", "rad"] }), "Workspace angle unit (default deg)."),
+                opt("if_exists", json!({ "type": "string", "enum": ["error", "open"] }), "A file already at `path`: \"error\" (default) or \"open\" (opens it, the reply says `existed`). A document this session made and hasn't edited yet opens either way."),
             ],
             mutates: true,
             destructive: false,
@@ -285,15 +286,21 @@ pub(crate) fn describe(od: &OpenDoc) -> Value {
     v
 }
 
-/// Where `document_create` makes its file: `path` as given when it has a folder, a bare name (".noshape" added) in
-/// the documents folder, nothing: a free "Untitled <n>.noshape" there; always absolute.
-pub fn new_document_path(path: Option<&str>, documents: &Path) -> Result<std::path::PathBuf, OpError> {
+/// Where `document_create` makes its file: a full path as given, a bare name (".noshape" added) in the documents
+/// folder, nothing: a free "Untitled <n>.noshape" there; another relative path from `relative_to` (the shell's folder
+/// for a CLI call; the documents folder for the MCP server, whose own folder means nothing to the user). Always
+/// absolute.
+pub fn new_document_path(path: Option<&str>, documents: &Path, relative_to: Option<&Path>) -> Result<std::path::PathBuf, OpError> {
     let p = match path.map(str::trim).filter(|p| !p.is_empty()) {
         None => (1..).map(|n| documents.join(format!("Untitled {n}.noshape"))).find(|p| !p.exists()).expect("a free name"),
         Some(p) => {
             let given = Path::new(p);
             let bare = given.parent().is_none_or(|d| d.as_os_str().is_empty());
-            let mut p = if bare { documents.join(given) } else { given.to_path_buf() };
+            let mut p = match relative_to {
+                _ if bare => documents.join(given),
+                Some(base) if given.is_relative() => base.join(given),
+                _ => given.to_path_buf(),
+            };
             if p.extension().is_none() {
                 p.set_extension("noshape");
             }
@@ -315,13 +322,36 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         d.settings.units.angle = angle_unit(u)?;
     }
     let documents = ctx.documents.clone().unwrap_or_else(noshape_scene::documents_dir);
-    let path = new_document_path(a.opt_str("path")?, &documents)?;
+    let relative_to = if ctx.one_shot { None } else { Some(documents.as_path()) };
+    let path = new_document_path(a.opt_str("path")?, &documents, relative_to)?;
+    if path.exists() {
+        // `if_exists: "open"`, or this session's own document still as it was made (an agent's retry).
+        if a.opt_str("if_exists")? == Some("open") || ctx.is_unedited_creation(&path) {
+            let od = ctx.open(&path).map_err(|e| e.with_param("path"))?;
+            let mut v = describe(od);
+            v["existed"] = json!(true);
+            return Ok(v.into());
+        }
+        return Err(OpError::invalid(format!("{} already exists: open it with document_open (or document_create with if_exists \"open\"), or choose another name", path.display())).with_param("path"));
+    }
     let od = ctx.create(&path, d)?;
     Ok(describe(od).into())
 }
 
 fn open(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let od = ctx.open(Path::new(a.str("path")?)).map_err(|e| e.with_param("path"))?;
+    // A bare or relative name the server's own folder doesn't hold: the documents folder's.
+    let given = Path::new(a.str("path")?);
+    let path = if given.is_relative() && !given.exists() && !ctx.one_shot {
+        let documents = ctx.documents.clone().unwrap_or_else(noshape_scene::documents_dir);
+        let mut p = documents.join(given);
+        if p.extension().is_none() {
+            p.set_extension("noshape");
+        }
+        p
+    } else {
+        given.to_path_buf()
+    };
+    let od = ctx.open(&path).map_err(|e| e.with_param("path"))?;
     Ok(describe(od).into())
 }
 
