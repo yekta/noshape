@@ -1292,9 +1292,13 @@ fn a_splines_handle_arms_take_constraints_and_dimensions() {
     let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
     let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "spline", "points": [[0, 0], [30, 20], [60, 0]] }, { "tool": "line", "points": [[0, -20], [40, -20]] }] }));
     let spline = created(&r, "spline")[0].clone();
-    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line" && e.get("handle_of").is_none()).unwrap()["id"].clone();
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap()["id"].clone();
     let arms = spline["handle_arms"].as_array().cloned().unwrap_or_default();
     assert_eq!(arms.len(), 2, "{spline}");
+    // `created` is what was drawn, one entry a shape (the parity translator pairs them with live's in order:
+    // c2-impeller-loft's construction line had paired with an arm).
+    let drawn: Vec<&str> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] != "point").filter_map(|e| e["type"].as_str()).collect();
+    assert_eq!(drawn, ["spline", "line"], "{r}");
     let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));
     let entity = |g: &Value, id: &Value| g["entities"].as_array().unwrap().iter().find(|e| e["id"] == *id).cloned().unwrap();
     let start_arm = entity(&g, &arms[0]);

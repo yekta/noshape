@@ -1177,7 +1177,7 @@ impl<'a> Translator<'a> {
         let sketch = self.features[..k].iter().rev().find(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")))?;
         let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
         let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
-        let lines: Vec<String> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "line" && e["construction"] == true).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
+        let lines: Vec<String> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "line" && e["construction"] == true && e.get("handle_of").is_none()).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
         (lines.len() == 1).then_some(lines)
     }
 
@@ -2801,7 +2801,8 @@ impl<'a> Translator<'a> {
                 }
             };
             for (ids, r) in &replies {
-                let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points).collect();
+                // (Not a spline's handle arms: they come with it, not drawn for live's entities.)
+                let made: Vec<&Value> = r["created"].as_array().into_iter().flatten().filter(|c| (c["type"] == "point") == points && c.get("handle_of").is_none()).collect();
                 for (eid, c) in ids.iter().zip(made) {
                     self.map_drawn(&oid, eid, c, points, ends_of.get(eid).copied());
                 }

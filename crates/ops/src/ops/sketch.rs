@@ -555,7 +555,9 @@ pub(super) fn sketch_state(od: &mut OpenDoc, tab: TabId, id: FeatureId, before: 
     let mut v = json!({ "sketch": id.to_string(), "units": crate::ops::query::units_json(&units), "failed": failed });
     // Reference-only geometry (the Origin, model edges constraints point
     // at) isn't a sketch entity in live: constraints name the reference.
-    let entities: Vec<Value> = data.sketch.entities().filter(|e| !e.reference_only && before.is_none_or(|b| !b.contains(&e.id))).map(|e| geometry_json(&data, id, e, k)).collect();
+    // (`created`: what was drawn, one entry a shape; a spline's handle arms come with it, named in its
+    // `handle_arms`, and are listed by sketch_get.)
+    let entities: Vec<Value> = data.sketch.entities().filter(|e| !e.reference_only && before.is_none_or(|b| !b.contains(&e.id) && e.handle_of.is_none())).map(|e| geometry_json(&data, id, e, k)).collect();
     v[if before.is_some() { "created" } else { "entities" }] = json!(entities);
     if before.is_none() {
         v["constraints"] = json!(data.sketch.constraints().map(|c| constraint_json(&data, id, c, &units)).collect::<Vec<_>>());
