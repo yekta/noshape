@@ -3493,7 +3493,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
   for new mates and the op (saved documents keep what they stored).
 - [ ] P1 ASM-FLEX-SUB-RIGID (asm) a subassembly with relations, patterns, tangent mates or a flexible subassembly is
   forced rigid even when set flexible (`eval.rs` ~2456): a gearbox subassembly can't be driven from its parent.
-- [ ] P1 ASM-DISPLAY-STATE-NESTED (asm) display states save and apply only top-level instances' visibility
+- [x] (asm 11-07: `DisplayState.hidden_occurrences`; T1 model-data a_display_state_keeps_parts_hidden_inside_subassemblies) P1 ASM-DISPLAY-STATE-NESTED (asm) display states save and apply only top-level instances' visibility
   (`ops.rs` `save_display_state`): parts hidden inside a subassembly are lost.
 - [ ] P1 ASM-REPLICATE-SEEDS (asm) Replicate keeps only its first seed instance, in the dialog and the op, silently
   (`assembly_panels.rs` `seeds[..1]`, `more.rs`); live replicates several.

@@ -745,6 +745,7 @@ impl Assembly {
             hidden_instances: self.instances.iter().filter(|i| i.hidden).map(|i| i.id).collect(),
             hidden_features: self.mates.iter().filter(|m| m.hidden).map(|m| m.id).chain(self.connectors.iter().filter(|c| c.hidden).map(|c| c.id)).collect(),
             known: self.instances.iter().map(|i| i.id.0).chain(self.mates.iter().map(|m| m.id.0)).chain(self.connectors.iter().map(|c| c.id.0)).collect(),
+            hidden_occurrences: self.occurrences.iter().filter(|(_, s)| s.hidden).map(|(p, _)| p.clone()).collect(),
         };
         match self.display_states.iter_mut().find(|d| d.name == state.name) {
             Some(d) => *d = state,
@@ -768,6 +769,14 @@ impl Assembly {
         for c in &mut self.connectors {
             c.hidden = if known(c.id.0) { d.hidden_features.contains(&c.id) } else { false };
         }
+        // Occurrences inside subassemblies: hidden as captured; those of instances made since keep theirs shown.
+        let nested: Vec<Vec<InstanceId>> = self.occurrences.iter().map(|(p, _)| p.clone()).chain(d.hidden_occurrences.iter().cloned()).collect();
+        for path in nested {
+            let hidden = d.hidden_occurrences.contains(&path);
+            if known(path[0].0) || !hidden {
+                self.set_occurrence(&path, |s| s.hidden = hidden);
+            }
+        }
         true
     }
 
@@ -779,6 +788,7 @@ impl Assembly {
             && applied.instances.iter().zip(&self.instances).all(|(a, b)| a.hidden == b.hidden)
             && applied.mates.iter().zip(&self.mates).all(|(a, b)| a.hidden == b.hidden)
             && applied.connectors.iter().zip(&self.connectors).all(|(a, b)| a.hidden == b.hidden)
+            && applied.occurrences.iter().chain(&self.occurrences).all(|(p, _)| applied.occurrence(p).hidden == self.occurrence(p).hidden)
     }
 }
 
@@ -913,5 +923,25 @@ impl Assembly {
             .or_else(|| move_before(&mut self.relations, |r| r.id, moved, target))
             .or_else(|| move_before(&mut self.groups, |g| g.id, moved, target))
             .unwrap_or(false)
+    }
+}
+
+#[cfg(test)]
+mod display_state_tests {
+    use super::super::{Assembly, InstanceId};
+
+    /// A part hidden inside a subassembly is part of a display state: applying it hides the part again.
+    #[test]
+    fn a_display_state_keeps_parts_hidden_inside_subassemblies() {
+        let mut a = Assembly::default();
+        let nested = vec![InstanceId(2), InstanceId(7)];
+        let sub = super::super::InstanceSource::Assembly { assembly: crate::document::TabId(9), config: Default::default() };
+        a.instances.push(super::super::Instance::new(InstanceId(2), "Sub <1>".into(), sub, Default::default()));
+        a.set_occurrence(&nested, |s| s.hidden = true);
+        assert!(a.save_display_state("Hidden pin"));
+        a.set_occurrence(&nested, |s| s.hidden = false);
+        assert!(!a.occurrence_hidden(&nested) && !a.matches_display_state(0));
+        assert!(a.apply_display_state(0));
+        assert!(a.occurrence_hidden(&nested) && a.matches_display_state(0));
     }
 }
