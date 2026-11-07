@@ -1,6 +1,6 @@
 {
   "name": "drw-table-cells-merge",
-  "about": "A 2 x 2 table: a click selects it, a second its top-right cell, Shift+click the top-left extends to both (qa TB7), their menu: Merge ▸ Horizontal",
+  "about": "A 2 x 2 table: a click selects its top-right cell, Shift+click the top-left extends to both (qa TB7), their menu: Merge ▸ Horizontal",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-06: drawing menus, the biggest gap, most-used first)",
@@ -44,15 +44,6 @@
     {
       "do": "key",
       "key": "Escape"
-    },
-    {
-      "do": "click",
-      "on": {
-        "sheet_point": [
-          148,
-          148
-        ]
-      }
     },
     {
       "do": "click",

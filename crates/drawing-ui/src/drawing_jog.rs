@@ -63,10 +63,9 @@ impl DrawingEditor {
         Some(out)
     }
 
-    /// An ordinate dimension's menu (live behaviours.md "Ordinate dimensions"):
-    /// Add to ordinate dimension group · Edit... · Paste · Paste as table ·
-    /// Reset ordinate · Unbreak dimension | Clear selection · Zoom to fit ·
-    /// Delete. (Add comment is a cloud feature.)
+    /// An ordinate dimension's menu (live behaviours.md "Ordinate dimensions"; live2 2185: no Reset ordinate on a
+    /// placed group): Add to ordinate dimension group · Edit... · Paste · Paste as table · Unbreak dimension | Clear
+    /// selection · Zoom to fit · Delete. (Add comment is a cloud feature.)
     pub fn ordinate_entries(&self, id: u64, cx: &gpui_kit::App) -> Option<Vec<MenuEntry>> {
         let a = self.resolved_annotation(id)?;
         let AnnotationKind::OrdinateGroup { view, origin, horizontal, .. } = a.kind else { return None };
@@ -81,8 +80,6 @@ impl DrawingEditor {
         out.push(MenuEntry::item("Paste as table", |t, _, cx| {
             t.paste_as_table(cx);
         }));
-        // The values sit on the group's text line (no moved values to reset).
-        out.push(MenuEntry::item("Reset ordinate", |_, _, _| {}));
         let unbroken = a.unbroken;
         out.push(MenuEntry::item(if unbroken { "Break dimension" } else { "Unbreak dimension" }, move |t, _, cx| {
             t.edit_sheet(if unbroken { "Break dimension" } else { "Unbreak dimension" }, cx, |s| s.annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.unbroken = !unbroken))

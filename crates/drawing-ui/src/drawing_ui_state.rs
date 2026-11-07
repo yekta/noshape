@@ -29,7 +29,7 @@ impl DrawingEditor {
     }
 
     /// Where target `t` shows now, in window coordinates: `sheet_point` [x, y] (sheet mm), `view` (its middle),
-    /// `view_point` / `view_edge` {view, at: [x, y, z] mm}, `annotation` (by its text).
+    /// `view_point` / `view_edge` {view, at: [x, y, z] mm}, `break_line` {view, index}, `annotation` (by its text).
     pub fn ui_target_point(&self, t: &Value, _cx: &App) -> Result<Point<Pixels>, String> {
         let pair = |v: &Value| -> Option<[f64; 2]> { Some([v.get(0)?.as_f64()?, v.get(1)?.as_f64()?]) };
         let at = if let Some(p) = t.get("sheet_point") {
@@ -44,6 +44,16 @@ impl DrawingEditor {
             let id = self.view_named(name)?;
             let frame = self.geoms.get(&id).and_then(|g| g.frame).ok_or("the view isn't built yet")?;
             self.placement(id).ok_or("the view isn't built yet")?.to_sheet(frame.project(p))
+        } else if let Some(b) = t.get("break_line") {
+            // A break's first line (its middle), by the view's name and the break's index (live2 2188: a model point
+            // there moves with the break).
+            let name = b.get("view").and_then(Value::as_str).ok_or("break_line: a view name")?;
+            let index = b.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
+            let view = self.view_named(name)?;
+            let built = self.built.as_ref().ok_or("the sheet isn't built yet")?;
+            let pick = built.picks.iter().position(|p| *p == PickTarget::BreakLine { view, index }).ok_or_else(|| format!("no break {index} on {name}"))? as u32;
+            let line = built.geometry.lines.iter().find(|l| l.pick == pick).ok_or("the break isn't drawn")?;
+            *line.points.get(line.points.len() / 2).ok_or("an empty line")?
         } else if let Some(text) = t.get("annotation").and_then(Value::as_str) {
             let a = self.ui_annotations().into_iter().find(|(_, _, s)| s == text).ok_or_else(|| format!("no annotation {text}"))?;
             self.display().sheets.get(self.sheet).and_then(|s| s.annotations.iter().find(|x| x.id == a.0)).map(|x| x.position).ok_or("no annotation")?
@@ -108,6 +118,8 @@ impl DrawingEditor {
             .annotations
             .iter()
             .filter(|a| Some(a.id) != placing)
+            // Not in live's drawing export, which its recorder reads (live2 2181): weld and edge condition symbols.
+            .filter(|a| !matches!(a.kind, AnnotationKind::Weld { .. } | AnnotationKind::EdgeCondition { .. }))
             .map(|a| {
                 let kind = format!("{:?}", a.kind);
                 let variant = kind.split([' ', '(', '{']).next().unwrap_or("");
@@ -123,6 +135,7 @@ impl DrawingEditor {
                     "Datum" => "datum",
                     "Gdt" => "gdt",
                     "SurfaceFinish" => "surfacefinishsymbol",
+                    "VirtualSharp" => "virtualsharp",
                     _ => "other",
                 };
                 let t = text(a.id);
@@ -231,7 +244,7 @@ impl DrawingEditor {
             "tool": ui_tool_name(&self.tool).or_else(|| (matches!(self.tool, Tool::Select) && (self.insert.panel || self.insert.chooser.is_some())).then_some("Insert view")),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol")).then_some(t) })).collect::<Vec<_>>(),
+            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp")).then_some(t) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }

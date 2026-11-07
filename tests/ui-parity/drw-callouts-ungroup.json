@@ -1,6 +1,6 @@
 {
   "name": "drw-callouts-ungroup",
-  "about": "Two callouts grouped, then one's menu: Remove from group",
+  "about": "Two callouts grouped, then one's menu: Remove from grouped annotation",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-06: drawing menus, most-used first)",
@@ -149,7 +149,7 @@
     {
       "do": "click",
       "on": {
-        "menu": "Remove from group"
+        "menu": "Remove from grouped annotation"
       }
     }
   ]

@@ -385,10 +385,19 @@ impl DrawingEditor {
             }
             // Callouts and surface finish symbols (help callout_balloon,
             // surface_finish): Add leader / Remove leaders.
+            // An attached callout's own leader is one too (live2 2185: a callout on an edge offers Remove leaders);
+            // without them it stands free.
             AnnotationKind::Balloon { callout, .. } => {
                 out.push(MenuEntry::item("Add leader", move |t, _, cx| t.set_tool(Tool::GdtLeader { id }, cx)));
-                if !callout.leaders.is_empty() {
-                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
+                if !callout.leaders.is_empty() || !callout.free {
+                    out.push(MenuEntry::item("Remove leaders", move |t, _, cx| {
+                        t.edit_sheet("Remove leaders", cx, |s| {
+                            noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id);
+                            if let Some(AnnotationKind::Balloon { callout, .. }) = s.annotations.iter_mut().find(|a| a.id == id).map(|a| &mut a.kind) {
+                                callout.free = true;
+                            }
+                        })
+                    }));
                 }
             }
             AnnotationKind::SurfaceFinish { leaders, .. } => {

@@ -4537,7 +4537,8 @@ impl Drawing {
     pub fn duplicate_sheet(&mut self, i: usize) -> Option<usize> {
         let mut copy = self.sheets.get(i)?.clone();
         let base = copy.name.clone();
-        copy.name = (1..).map(|n| if n == 1 { format!("{base} copy") } else { format!("{base} copy {n}") }).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
+        // Live (live2 2180): "Sheet1 Copy 1", then "Sheet1 Copy 2".
+        copy.name = (1..).map(|n| format!("{base} Copy {n}")).find(|n| !self.sheets.iter().any(|s| &s.name == n)).expect("unbounded");
         self.sheets.insert(i + 1, copy);
         Some(i + 1)
     }

@@ -123,7 +123,8 @@ impl DrawingEditor {
     /// offered with a copied sheet on the clipboard.
     fn sheet_entries(&self, i: usize, cx: &App) -> Vec<MenuEntry> {
         let n = self.drawing.sheets.len();
-        let mut out = vec![MenuEntry::item("Rename...", move |t, w, cx| t.open_sheet_name_panel(i, w, cx))];
+        // Live (live2 2180): Rename… edits the panel's row in place.
+        let mut out = vec![MenuEntry::item("Rename...", move |t, w, cx| t.open_row_rename(RowRename::Sheet(i), w, cx))];
         if n == 1 {
             out.push(MenuEntry::item("Properties...", move |t, w, cx| t.open_sheet_props(i, w, cx)));
         }
@@ -506,50 +507,28 @@ impl DrawingEditor {
             .into_any_element()
     }
 
-    /// Onshape's sheet tabs at the top-left of the drawing area ("Sheet1",
-    /// the active one on a `#c7c7c7` chip) while the Sheets panel is closed.
-    /// The canvas draws them under its tool dialogs, which cover them.
-    pub fn render_sheet_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    /// The active sheet's name at the top-left of the drawing area (a `#c7c7c7` chip) while the Sheets panel is
+    /// closed: only a label (live2 2180: click, double-click and right-click do nothing; the sheets are in the
+    /// Sheets panel). The canvas draws it under its tool dialogs, which cover it.
+    pub fn render_sheet_tabs(&mut self, _cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
-        let mut tabs = h_flex().absolute().top(px(4.)).left(px(4.)).gap(px(2.));
-        for (i, s) in self.drawing.sheets.iter().enumerate() {
-            let active = i == self.sheet;
-            let name = s.name.clone();
-            tabs = tabs.child(
-                div()
-                    .id(("dr-sheet-chip", i))
-                    .map(|d| crate::ui_script::mark(d, || format!("sheet_tab:{name}")))
-                    .occlude()
-                    .h(px(20.))
-                    .px(px(5.))
-                    .flex()
-                    .items_center()
-                    .text_size(px(13.))
-                    .text_color(pal.text)
-                    .cursor_pointer()
-                    .when(active, |d| d.bg(rgb(0xc7c7c7)))
-                    .when(!active, |d| d.hover(|d| d.bg(rgb(0xd0d0d0))))
-                    .child(crate::ui::user_text(s.name.clone()))
-                    .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
-                        if this.drawing.sheets.get(i).and_then(|s| s.imported.as_ref()).is_some_and(|m| m.locked) {
-                            return;
-                        }
-                        if e.click_count() >= 2 {
-                            this.open_sheet_name_panel(i, window, cx);
-                        } else {
-                            this.switch_sheet(i, cx);
-                        }
-                    }))
-                    .on_mouse_down(
-                        MouseButton::Right,
-                        cx.listener(move |this, e: &MouseDownEvent, window, cx| {
-                            cx.stop_propagation();
-                            this.open_sheet_menu(i, e.position, window, cx);
-                        }),
-                    ),
-            );
-        }
-        div().absolute().top_0().left_0().size_full().child(tabs).into_any_element()
+        let name = self.drawing.sheets.get(self.sheet).map(|s| s.name.clone()).unwrap_or_default();
+        let label = name.clone();
+        let chip = div()
+            .id("dr-sheet-chip")
+            .map(|d| crate::ui_script::mark(d, || format!("sheet_tab:{label}")))
+            .absolute()
+            .top(px(4.))
+            .left(px(4.))
+            .h(px(20.))
+            .px(px(5.))
+            .flex()
+            .items_center()
+            .text_size(px(13.))
+            .text_color(pal.text)
+            .bg(rgb(0xc7c7c7))
+            .child(crate::ui::user_text(name));
+        div().absolute().top_0().left_0().size_full().child(chip).into_any_element()
     }
 
     /// The panel toggle on the canvas's left edge (the panel's edge when

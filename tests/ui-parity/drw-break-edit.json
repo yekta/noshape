@@ -1,6 +1,6 @@
 {
   "name": "drw-break-edit",
-  "about": "A break on Front, its line's menu: Edit…, then closed",
+  "about": "A break on Front, its first line's menu (the break_line target): Edit…, then closed",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-06: the break and crop menus)",
@@ -57,13 +57,9 @@
     {
       "do": "rclick",
       "on": {
-        "view_point": {
+        "break_line": {
           "view": "Front",
-          "at": [
-            10,
-            0,
-            5
-          ]
+          "index": 0
         }
       }
     },

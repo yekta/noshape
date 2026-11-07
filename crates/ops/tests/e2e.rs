@@ -4227,11 +4227,11 @@ fn drawing_sheet_menu_and_properties() {
     assert_eq!(last(&mut ctx), "Rename sheet");
     let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Sheet1", "action": "duplicate" }));
     assert_eq!(last(&mut ctx), "Duplicate sheet");
-    assert_eq!(sheets(&r), ["Sheet1", "Sheet1 copy", "Details"], "{r}");
+    assert_eq!(sheets(&r), ["Sheet1", "Sheet1 Copy 1", "Details"], "{r}");
     assert_eq!(r["views"].as_array().unwrap().len(), d["views"].as_array().unwrap().len(), "the copy has the views: {r}");
     let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Details", "action": "move", "to": 1 }));
     assert_eq!(last(&mut ctx), "Move sheet");
-    assert_eq!(sheets(&r), ["Details", "Sheet1", "Sheet1 copy"], "{r}");
+    assert_eq!(sheets(&r), ["Details", "Sheet1", "Sheet1 Copy 1"], "{r}");
     let r = call(&mut ctx, "drawing_sheet", json!({ "drawing": tab, "sheet": "Details", "action": "copy" }));
     assert_eq!(last(&mut ctx), "Paste sheet");
     assert_eq!(sheets(&r).last().unwrap(), "Details (1)");

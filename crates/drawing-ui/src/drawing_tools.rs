@@ -946,7 +946,9 @@ impl DrawingEditor {
                 }
             }
             Tool::HoleCallout { circle: None } => {
-                if let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(c) {
+                if let Some(Pick::Circle { view, center, radius, r }) = self.circle_pick(c)
+                    && self.pk().is_hole_circle(view, r.as_ref())
+                {
                     self.tool = Tool::HoleCallout { circle: Some((view, center, radius, r)) };
                 }
             }
@@ -2479,9 +2481,19 @@ impl DrawingEditor {
                 }));
                 out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
             }
+            // Live (live2 2186): Copy · Paste as table · Edit hatch region... | Clear selection · Zoom to fit · Delete.
             Some(Sel::Hatch(id)) => {
-                out.push(MenuEntry::item("Edit hatch", move |t, w, cx| t.open_hatch_dialog(Some(id), w, cx)));
+                out.push(MenuEntry::item("Copy", |t, _, cx| t.copy_views(None, cx)));
+                out.push(MenuEntry::item("Paste as table", |t, _, cx| {
+                    t.paste_as_table(cx);
+                }));
+                out.push(MenuEntry::item("Edit hatch region...", move |t, w, cx| t.open_hatch_dialog(Some(id), w, cx)));
                 out.push(MenuEntry::Separator);
+                out.push(MenuEntry::item("Clear selection", |t, _, cx| {
+                    t.selection.clear();
+                    t.redraw(cx);
+                }));
+                out.push(MenuEntry::item("Zoom to fit", |t, _, cx| t.zoom_to_fit(cx)));
                 out.push(MenuEntry::item("Delete", move |t, _, cx| {
                     t.selection.clear();
                     t.edit_sheet("Delete hatch", cx, |s| s.sketch.hatches.retain(|h| h.id != id));

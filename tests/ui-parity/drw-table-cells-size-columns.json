@@ -58,15 +58,6 @@
       "do": "click",
       "on": {
         "sheet_point": [
-          148,
-          148
-        ]
-      }
-    },
-    {
-      "do": "click",
-      "on": {
-        "sheet_point": [
           110,
           148
         ]

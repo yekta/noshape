@@ -159,13 +159,13 @@ fn sheet_operations() {
     assert!(d.rename_sheet(1, "Details"));
     assert!(!d.rename_sheet(1, "  "));
     let j = d.duplicate_sheet(0).unwrap();
-    assert_eq!(d.sheets[j].name, "Sheet1 copy");
-    assert_eq!(d.sheets.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["Sheet1", "Sheet1 copy", "Details"]);
+    assert_eq!(d.sheets[j].name, "Sheet1 Copy 1");
+    assert_eq!(d.sheets.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(), ["Sheet1", "Sheet1 Copy 1", "Details"]);
     assert!(d.move_sheet(2, 0));
     assert_eq!(d.sheets[0].name, "Details");
     assert!(d.delete_sheet(0) && d.delete_sheet(0));
     assert!(!d.delete_sheet(0), "the last sheet stays");
-    assert_eq!(d.sheets[0].name, "Sheet1 copy");
+    assert_eq!(d.sheets[0].name, "Sheet1 Copy 1");
     assert_eq!(d.unique_sheet_name(), "Sheet1");
 }
 

@@ -429,6 +429,16 @@ impl<'a> SheetPick<'a> {
         Some(Pick::Arc { view, center, radius, a: PickedPoint { view, p: pa, r: Some(ra) }, b: PickedPoint { view, p: pb, r: Some(rb) }, mid, r: me.center_ref() })
     }
 
+    /// Whether a picked circle is a hole's (a Hole feature's, which the Hole/thread callout takes; live2 2177: not
+    /// a plain cylindrical cut's).
+    pub fn is_hole_circle(&self, view: ViewId, r: Option<&PointRef>) -> bool {
+        let Some(r) = r else { return false };
+        let Some((key, _)) = views::view_source(&self.drawing.sheets[self.sheet], view) else { return false };
+        let Some(src) = self.sources.get(&key) else { return false };
+        let Some((c, Some(radius))) = views::resolve_point3(&src.context, r) else { return false };
+        src.context.holes.iter().any(|h| h.matches_circle(c, radius, radius * 1e-3 + 1e-7))
+    }
+
     pub fn circle_pick(&self, s: [f64; 2]) -> Option<Pick> {
         if let Some((view, me)) = self.hovered_edge()
             && let EdgeGeom::Circle { center, radius, .. } = me.geom

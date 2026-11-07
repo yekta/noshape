@@ -141,8 +141,9 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"view_point": {"view": "Top", "at": [x, y, z]}}`: model point (mm) where it shows in that view;
   `{"view_edge": {…}}` the same picking the model edge drawn there;
 - `{"annotation": "1.575"}`: an annotation by its shown text; `{"doc_tab": "Part 1 Drawing 1"}`: a document tab;
-- `{"sheet_tab": "Sheet2"}`: a sheet by its name: its tab at the drawing's top left, or its row in the Sheets panel
-  when that is open (click, double-click, rclick);
+- `{"sheet_tab": "Sheet2"}`: a sheet by its name: the active sheet's label at the drawing's top left (inert, live2
+  2180), or its row in the Sheets panel (Ctrl+S) when that is open (click, double-click, rclick);
+- `{"break_line": {"view": "Front", "index": 0}}`: a break's first line (a model point there moves with the break);
 - `"export": ["PDF", "DXF", "DWG"]` (a scenario key): after the last step each runner exports the drawing in those
   formats with the Export dialog's defaults, beside its recording as `<scenario>.pdf` / `.dxf` / `.dwg`;
   `tools/drawing-export/compare.py <live dir> <ours dir>` compares them (export fidelity, lead 11-06);
