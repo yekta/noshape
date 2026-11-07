@@ -279,6 +279,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-07 17:00 release (qa list 16:14, checked on green 5baedbe4; the latest release is v0.4.34)
+- **qa 16:26: still no blocker on green 5faa88b6** (bool's Shell builder for offsets that change topology, 73df9750, back in):
+  its full CLI smoke, the volume sweep, dx's cf corpus and the 47 ticket documents = 5baedbe4.
 - **qa 16:14: no new blocker.** On green 5baedbe4 (vibe3): the full CLI smoke = v0.4.34's except the change below; the volume
   sweep, dx's cf corpus and the 47 ticket documents = the greens since v0.4.34 (b3f393b8, 0adb0644, d973df07 …); GUI rows
   pixel-identical to v0.4.34. Parity suites (13:32 on 1c5e1be5): models 59/88, features 638/936, scenarios 648/762 (4145/4358
