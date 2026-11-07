@@ -434,17 +434,23 @@ fn centroid_on_face(face: &Shape) -> Option<DVec3> {
     face.project_point(c).ok().map(|p| p.point)
 }
 
-/// A point inside `face`, cheaply: its parameters' middle or a few others when on it, else its centroid projected
-/// onto it.
+/// A point inside `face`, cheaply: its parameters' middle or a few others when on it, then a finer grid of them, else
+/// its centroid projected onto it if that is on it (cf-lighten's tool: a cylinder face whose centroid projects onto
+/// the surface outside it). None when none is.
 pub fn inner_point(face: &Shape) -> Option<DVec3> {
+    let on = |p: &DVec3| face.contains_point(*p, 1e-9).unwrap_or(false);
     if let Ok([u0, u1, v0, v1]) = face.uv_bounds() {
         let at = |a: f64, b: f64| face.point_at_uv(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b).ok();
-        let inside = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.75), (0.25, 0.75), (0.75, 0.25)].into_iter().filter_map(|(a, b)| at(a, b)).find(|p| face.contains_point(*p, 1e-9).unwrap_or(false));
+        let inside = [(0.5, 0.5), (0.25, 0.25), (0.75, 0.75), (0.25, 0.75), (0.75, 0.25)].into_iter().filter_map(|(a, b)| at(a, b)).find(on);
         if inside.is_some() {
             return inside;
         }
+        let grid = (1..8).flat_map(|i| (1..8).map(move |j| (i as f64 / 8.0, j as f64 / 8.0)));
+        if let Some(p) = grid.filter_map(|(a, b)| at(a, b)).find(on) {
+            return Some(p);
+        }
     }
-    centroid_on_face(face)
+    centroid_on_face(face).filter(on)
 }
 
 pub fn v2(x: f64, y: f64) -> DVec2 {
