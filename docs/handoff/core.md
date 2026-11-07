@@ -16,6 +16,19 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 02:20 UTC: cf-lighten's Lighten 1 (the lead's next after the impeller).**
+- Landed / queued: a hollow's "whole" check took a cylinder face's centroid projected off the face (`inner_point` now
+  only returns points on the face: a 7x7 grid of its parameters, then the centroid if it's on it); Enclose of a
+  hollowed part is its cavity (a region that is a picked part's own material is left out: Lighten encloses its shelled
+  tools for their insides); opOffsetFace doesn't reapply fillets (that's Move face's option).
+- Next in Lighten (`expandWithFillet`): its noEditFaces are the extrudes' caps followed by `startTracking` through the
+  shell, enclose and SUBTRACT_COMPLEMENT; ours resolve to nothing (0 no-edit faces), so every face of the four tools
+  gets the tiny convex fillets and moves out 2.54 mm, and OCCT's offset (then the Booleans) fails. Fix the tracking
+  (the shell's offset faces and the enclose's faces keeping their caps' lineage), then compare with live (44 faces,
+  209,676 mm³). Trace: /root/core-scratch/lighten-dbg.fs (printlns per step; featurestudio_edit + commit + monitor).
+- The corpus after these: c2-impeller-loft 10 -> 9 from main's f150c083 (skasm's spline handle arms): its Sketch
+  Ansaugflansch now says "Sketch has conflicting constraints" (told the lead).
+
 **State 11-07 00:45 UTC.**
 - Landed: `#var mm` (a unit after a variable) parses; the corpus 594 -> 615 features (cf-multi-plane to the end,
   cf-snap-hook 1 -> 7, cf-mortise-and-tenon 1 -> 5, cf-3d-spline 1 -> 2). The impeller's Shell is 3 mm again (it was
