@@ -2425,3 +2425,52 @@ fn a_round_wider_than_the_end_beside_it_runs_across_it() {
     let removed = (before - total_volume(&res.context)) * 1e9;
     assert!(removed > 0.3 && removed < 1.0, "{removed} mm³");
 }
+
+/// A variable round along a block's top front edge, steep (15 -> 5 -> 40 -> 5 -> 40 mm) and past the 25 mm wall's
+/// height, where OCCT's variable fillet fails: its sections lofted along the edge and cut, the round running down onto
+/// the floor (live c2-tpd-fillet-variable's Fillet 1: radii 5-40 mm on a 25 mm block).
+#[test]
+fn variable_rounds_taller_than_their_walls_run_onto_the_floor() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.14, 0.08, "25 mm");
+    let res = t.ok();
+    let before = total_volume(&res.context);
+    let body = solids(&res.context)[0].clone();
+    let edge = edge_near(&body, DVec3::new(0.07, 0.0, 0.025));
+    let vertex = |p: DVec3| {
+        let vi = body.shape.vertices().iter().position(|v| v.vertex_point().is_ok_and(|q| q.distance(p) < 1e-9)).expect("vertex");
+        Reference::Vertex((*body.vertices[vi]).clone())
+    };
+    let row = |v: Reference, r: &str| {
+        let mut p = ParamValues::default();
+        p.set("vertex", q(vec![v]));
+        p.set("vertexRadius", e(r));
+        p
+    };
+    let rows = vec![
+        row(vertex(DVec3::new(0.0, 0.0, 0.025)), "15 mm"),
+        row(vertex(DVec3::new(0.14, 0.0, 0.025)), "40 mm"),
+        row(vertex(DVec3::new(0.14, 0.08, 0.025)), "10 mm"),
+        row(vertex(DVec3::new(0.0, 0.08, 0.025)), "30 mm"),
+    ];
+    // Steep along the front edge, as the document's points (5 mm between 25s and 40s).
+    let point = |f: &str, r: &str| {
+        let mut p = ParamValues::default();
+        p.set("edge", q(vec![edge.clone()]));
+        p.set("edgeParameter", e(f));
+        p.set("pointOnEdgeRadius", e(r));
+        p
+    };
+    let points = vec![point("0.25", "5 mm"), point("0.5", "40 mm"), point("0.75", "5 mm")];
+    t.add("fillet", &[("entities", q(vec![edge.clone()])), ("radius", e("15 mm")), ("isVariable", b(true)), ("tangentPropagation", b(true)), ("vertexSettings", ParamValue::Array(rows)), ("pointOnEdgeSettings", ParamValue::Array(points))]);
+    let res = t.ok();
+    let after = solids(&res.context);
+    assert_eq!(after.len(), 1);
+    assert!(after[0].shape.is_valid());
+    // At most the unclipped quarter-round spandrel along the edge, (1 - pi/4) r^2 (about 21,000 mm³), less where the
+    // round is clipped at the floor.
+    let removed = (before - total_volume(&res.context)) * 1e9;
+    assert!(removed > 8000.0 && removed < 21100.0, "{removed} mm³");
+    let floor_front = after[0].shape.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9)).map(|e| e.edge_info().unwrap().length).fold(0.0, f64::max);
+    assert!(floor_front < 0.14 - 1e-3, "{floor_front}");
+}

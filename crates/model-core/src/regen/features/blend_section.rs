@@ -1358,3 +1358,103 @@ fn seam_where_whole(rim: &Rim, r: f64) -> FResult<DVec3> {
     }
     Ok(x)
 }
+
+/// A variable round of straight edges between planes where OCCT's fails (c2-tpd-fillet-variable's Fillet 1: radii to
+/// 40 mm on 25 mm walls, the round running down onto the floor): per edge, its circular sections lofted along it with
+/// the radius its law gives (`law`: (fraction from the edge's start, radius), increasing), on past a free end (into a
+/// corner's neighbour's round, mitred there), and every edge's region between the edge and its round cut away (added
+/// at a concave edge) at once, so a round ends where it meets the faces beyond or another round.
+pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, Vec<(f64, f64)>)]) -> FResult<()> {
+    use super::sheetmetal_util::{body_named, bool_named};
+    let body = ev.ctx.bodies[bi].clone();
+    let shape = &body.shape;
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let feature = ev.feature;
+    let (mut cuts, mut adds) = (Vec::new(), Vec::new());
+    for (e, law) in laws {
+        let r_at = |f: f64| -> f64 {
+            let f = f.clamp(0.0, 1.0);
+            match law.windows(2).find(|w| f <= w[1].0) {
+                Some(w) if w[1].0 > w[0].0 => w[0].1 + (w[1].1 - w[0].1) * (f - w[0].0) / (w[1].0 - w[0].0),
+                Some(w) => w[1].1,
+                None => law.last().map_or(0.0, |x| x.1),
+            }
+        };
+        let edge = shape.sub_shape(ShapeType::Edge, *e)?;
+        let info = edge.edge_info()?;
+        if !matches!(info.curve, k::Curve::Line { .. }) {
+            return Err(fail("a variable round of a curved edge"));
+        }
+        let fs = ef.get(*e).filter(|f| f.len() == 2).ok_or_else(|| fail("the edge doesn't have two faces"))?;
+        let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+        if ff.iter().any(|f| f.face_plane().ok().flatten().is_none()) {
+            return Err(fail("a variable round off planes"));
+        }
+        let (a, b) = (info.start, info.end);
+        let len = (b - a).length();
+        let d = (b - a) / len;
+        let fr = frame_at(shape, ff, (a + b) * 0.5, d, scale)?;
+        let convex = fr.u[0].dot(fr.m[1]) > 0.0;
+        // On past an end with nothing of the part beyond it (a corner's: the neighbour's round meets this one there).
+        let ext = |p: DVec3, out: DVec3, r: f64| -> FResult<f64> {
+            if !convex {
+                return Ok(0.0);
+            }
+            let probe = p + out * (r * 0.5) + (fr.u[0] + fr.u[1]) * (r * 0.05);
+            Ok(if shape.classify_point(probe, scale * 1e-9)? == k::PointClass::Outside { 1.5 * r } else { 0.0 })
+        };
+        let (e0, e1) = (ext(a, -d, r_at(0.0))?, ext(b, d, r_at(1.0))?);
+        // Stations: the law's own points and enough between them for the loft to follow it.
+        const N: usize = 48;
+        let mut at: Vec<f64> = (0..=N).map(|k| k as f64 / N as f64).chain(law.iter().map(|x| x.0)).filter(|f| (0.0..=1.0).contains(f)).collect();
+        at.sort_by(f64::total_cmp);
+        at.dedup_by(|x, y| (*x - *y).abs() < 1e-6);
+        let mut secs = Vec::new();
+        let mut starts = Vec::new();
+        let mut put = |s: f64, r: f64| -> FResult<()> {
+            let spec = BlendSpec { section: Section::Circular, r1: r, r2: r, width: None, partial: None, run_on: false, cliff: false, sides: None };
+            let p = a + d * s;
+            let (face, _, _) = section_face(p, &fr, &spec, true)?;
+            secs.push(face);
+            starts.push(p);
+            Ok(())
+        };
+        if e0 > 0.0 {
+            put(-e0, r_at(0.0))?;
+        }
+        for f in &at {
+            put(f * len, r_at(*f))?;
+        }
+        if e1 > 0.0 {
+            put(len + e1, r_at(1.0))?;
+        }
+        let tool = k::loft(&secs, &k::LoftOptions { solid: true, start_points: Some(starts), ..Default::default() })?;
+        if !tool.shape.is_valid() || tool.shape.count(ShapeType::Solid) != 1 {
+            return Err(fail("a variable round's sections didn't loft"));
+        }
+        // Its round: the face on neither support's plane.
+        let ename = body.edges[*e].clone();
+        let blend = Arc::new(TopoName::face(feature, Role::Blend(ename.clone())));
+        let generated = Arc::new(TopoName::face(feature, Role::Generated(ename)));
+        let names: Vec<Name> = tool.shape.faces().iter().map(|f| if f.face_plane().ok().flatten().is_some() { generated.clone() } else { blend.clone() }).collect();
+        let named = NamedShape::new(tool.shape, names);
+        if convex { cuts.push(named) } else { adds.push(named) }
+    }
+    let mut named = body_named(&body);
+    for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
+        if tools.is_empty() {
+            continue;
+        }
+        let (s, n) = bool_named(ev, op, &named, &tools)?;
+        named = NamedShape::new(s, n);
+    }
+    let un = k::unify_same_domain(&named.shape)?;
+    if !un.shape.is_valid() || un.shape.count(ShapeType::Solid) != 1 {
+        return Err(fail("the result is not one valid solid"));
+    }
+    let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
+    ev.replace_body(bi, un.shape, names);
+    Ok(())
+}
