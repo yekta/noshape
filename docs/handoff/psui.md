@@ -613,6 +613,24 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   taken by the render thread / rendered / back on the UI thread / scene set / waits for a frame slot / waits for a
   layout` for the first 6 frames find where; on lavapipe it's the one frame in flight and a 150–300 ms CPU render.
   Next: perf.yml on main with them, then fix the Mac's wait.
+  Landed 611236c0 (20:10); perf 42411762630 on main dispatched 20:35 for the Mac's frame milestones.
+- P0 user dock (lead 11-07 20:00, a user's friend's AppleWatchDock; user data, kept in /root/psui-scratch/dock and
+  vibe5:~/psui-scratch/dock only): the black rectangle in the hole (dock-top.png) and the section's red regions, grey
+  band and hatched wedges (dock-section.png) are tab "A - Yumusak Kutu" as it stood 01:01–13:15 on 11-07 (history
+  01a1b386…: Kolon Inceltme on, the lid "Alt Kapak" shown, no funnel yet), made with v0.4.33 (the user's builds of
+  11-07 00:xx predate v0.4.34). Govde and Alt Kapak don't intersect (a Boolean intersect of the two: "do not
+  intersect"), so no red is the model's. Neither picture reproduces on Linux with v0.4.33 or green (CLI renders and
+  the app on vibe5, standard and the user's views): on x86 the meshes are sound (the guard below: every face covered,
+  each body's mesh closed; d7a6f2355's tidy turns 4 of 20k triangles). The user is on Apple silicon, where OCCT's
+  C++ is compiled with FMA contraction (clang's default; x86-64 baseline has none), so face boundaries round
+  differently and noshape's mesher turned triangles over on flat faces there: culled with the closed solid's back
+  faces they show its black inside (the channel over the lid), and in a section the turned triangles count with the
+  wrong sign in the cap mask: material where there is none (the wedge, hatched blue), two parts where one is (red),
+  the lid's inside (the dark band). d7a6f2355 (v0.4.34) turns every triangle along its corners' normals on every
+  platform, which removes both. Not yet confirmed on a Mac (needs the document on a macOS machine: the lead's call).
+  Guard: planar_face_mesh's coverage check (each face's triangles against its area, each body's mesh volume against
+  the solid's) on the synthetic plates and the corpus, and a test that both checks catch a turned triangle and one
+  across a hole. The in-app updater replaced a v0.4.33 binary run from scratch while measuring: NOSHAPE_NO_UPDATES=1.
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

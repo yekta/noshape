@@ -54,6 +54,41 @@ pub fn planar_face_problems(shape: &Shape, mesh: &MeshBuffers) -> Vec<String> {
     out
 }
 
+/// Where `mesh` covers more or less than its faces of `shape` (each face's triangles' area against the face's own,
+/// any surface) or doesn't close (the triangles' signed volume against the solid's): a triangle across a hole or
+/// two faces' triangles over one another, which the section view's caps count as material (hatched over empty
+/// space, red over the walls).
+pub fn coverage_problems(shape: &Shape, mesh: &MeshBuffers) -> Vec<String> {
+    let mut out = Vec::new();
+    let p = |i: u32| DVec3::from(mesh.positions[i as usize].map(f64::from));
+    let mut volume6 = 0.0;
+    for (fi, &(first, count)) in mesh.face_ranges.iter().enumerate() {
+        let Ok(face) = shape.sub_shape(ShapeType::Face, fi) else { continue };
+        let Ok(area) = face.area() else { continue };
+        let tris = &mesh.indices[first as usize..(first + count) as usize];
+        let mut meshed = 0.0;
+        for t in tris.as_chunks::<3>().0 {
+            let (a, b, c) = (p(t[0]), p(t[1]), p(t[2]));
+            meshed += 0.5 * (b - a).cross(c - a).length();
+            volume6 += a.dot(b.cross(c));
+        }
+        // Chords move a face's area by a few per cent at the coarsest level (a flat face's arcs too); a triangle
+        // across a hole or a channel adds that hole's area.
+        let planar = matches!(face.face_surface(), Ok(k::Surface::Plane(_)));
+        let slack = if planar { 0.03 } else { 0.08 };
+        if (meshed - area).abs() > slack * area + 0.15e-6 {
+            out.push(format!("face {fi} ({}): its triangles cover {:.3} mm², the face {:.3} mm²", if planar { "plane" } else { "curved" }, meshed * 1e6, area * 1e6));
+        }
+    }
+    if let Ok(props) = k::mass_properties(shape)
+        && props.mass > 0.0
+        && (volume6 / 6.0 - props.mass).abs() > 0.03 * props.mass
+    {
+        out.push(format!("the mesh encloses {:.1} mm³, the solid {:.1} mm³", volume6 / 6.0 * 1e9, props.mass * 1e9));
+    }
+    out
+}
+
 fn frame(origin: DVec3) -> Plane {
     Plane::new(origin, DVec3::Z, DVec3::X)
 }
@@ -141,7 +176,7 @@ fn planar_faces_mesh_flat_along_their_normal() {
             let shape = make();
             for quality in [0.25, 1.0, 2.0, 4.0] {
                 let mesh = display_mesh(&shape, quality);
-                for p in planar_face_problems(&shape, &mesh) {
+                for p in planar_face_problems(&shape, &mesh).into_iter().chain(coverage_problems(&shape, &mesh)) {
                     problems.push(format!("plate {s} at {quality} ({}): {p}", if rust { "noshape's mesher" } else { "BRepMesh" }));
                 }
             }
@@ -153,7 +188,7 @@ fn planar_faces_mesh_flat_along_their_normal() {
 }
 
 /// The parity corpus: every Part Studio's parts (NOSHAPE_PARITY_SAVE's translated documents under
-/// NOSHAPE_PLANAR_CORPUS, default ~/agents/psui/corpus).
+/// NOSHAPE_PLANAR_CORPUS, default ~/agents/psui/corpus), their planar faces and every face's coverage.
 #[test]
 #[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
 fn corpus_planar_faces_mesh_flat_along_their_normal() {
@@ -177,7 +212,7 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
             for b in &r.display.bodies {
                 let Some(ctx) = r.context.bodies.iter().find(|c| c.id == b.id) else { continue };
                 for (level, mesh) in b.coarser.iter().chain(std::iter::once(&b.mesh)).enumerate() {
-                    for p in planar_face_problems(&ctx.shape, mesh) {
+                    for p in planar_face_problems(&ctx.shape, mesh).into_iter().chain(coverage_problems(&ctx.shape, mesh)) {
                         problems.push(format!("{} / {} / {} level {level}: {p}", path.file_stem().unwrap().to_string_lossy(), tab.name, b.name));
                     }
                 }
@@ -188,3 +223,25 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
     assert!(problems.is_empty(), "{} planar faces:\n{}", problems.len(), problems.join("\n"));
 }
 
+
+/// The checks see the two faults the user's dock showed on a Mac (v0.4.33): a flat face's triangle turned over (the
+/// solid's inside shown black, a hatched wedge in a section) and one stretched across the face over a hole or channel
+/// (the section's caps hatched over empty space and red over the walls).
+#[test]
+fn the_checks_catch_a_triangle_turned_over_or_across_a_hole() {
+    let shape = cable_box(0.0);
+    let mesh = display_mesh(&shape, 1.0);
+    assert!(planar_face_problems(&shape, &mesh).is_empty() && coverage_problems(&shape, &mesh).is_empty());
+    // The flat face with the most triangles: the cavity's floor round the recess.
+    let (fi, &(first, count)) = mesh.face_ranges.iter().enumerate().filter(|(i, _)| shape.sub_shape(ShapeType::Face, *i).is_ok_and(|f| matches!(f.face_surface(), Ok(k::Surface::Plane(_))))).max_by_key(|(_, r)| r.1).expect("a flat face");
+    let mut turned = mesh.clone();
+    turned.indices.swap(first as usize + 1, first as usize + 2);
+    assert!(planar_face_problems(&shape, &turned).iter().any(|p| p.starts_with(&format!("face {fi} "))), "a turned triangle passed");
+    // Its first triangle's corner moved to the face's corner farthest from it: across the face.
+    let mut across = mesh.clone();
+    let tri = &mesh.indices[first as usize..first as usize + 3];
+    let p = |i: u32| DVec3::from(mesh.positions[i as usize].map(f64::from));
+    let far = mesh.indices[first as usize..(first + count) as usize].iter().copied().max_by(|&a, &b| p(a).distance(p(tri[0])).total_cmp(&p(b).distance(p(tri[0])))).expect("corners");
+    across.indices[first as usize + 2] = far;
+    assert!(coverage_problems(&shape, &across).iter().any(|p| p.starts_with(&format!("face {fi} "))), "a triangle across the face passed: {:?}", coverage_problems(&shape, &across));
+}
