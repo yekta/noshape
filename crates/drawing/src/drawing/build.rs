@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// What a pick id (the `pick` of lines and texts) refers to.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PickTarget {
     None,
     /// View label, centermarks and other view decorations.
@@ -79,7 +79,7 @@ impl PickTarget {
 
 /// One break of a placed view, in view coordinates: the band `a..b` of
 /// axis `axis` (0 = x) shrinks to `band` (view units).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BreakMap {
     pub axis: u8,
     pub a: f64,
@@ -95,7 +95,7 @@ pub struct BreakMap {
 pub const MAX_BREAKS: usize = 4;
 
 /// Mapping between a view's coordinates (meters) and the sheet (mm).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ViewPlacement {
     pub id: ViewId,
     pub origin: [f64; 2],
@@ -211,6 +211,7 @@ pub struct SheetInfo {
     pub custom_tables: tables::CustomTables,
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuiltSheet {
     pub geometry: SheetGeometry,
     /// Indexed by pick id (0 = nothing).

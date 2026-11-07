@@ -252,6 +252,12 @@ pub struct DrawingEditor {
     frame_dirty: bool,
     seq: u64,
     last_presented: u64,
+    /// `NOSHAPE_PERF`: each frame in flight's armed milestones (`perf::arm_frame_milestone`), logged at its present.
+    frame_milestones: std::collections::VecDeque<(u64, Vec<String>)>,
+    /// The opened drawing's views on screen (drawing_open.rs): 1 with geometry, 2 exact.
+    pub(crate) open_stage: u8,
+    /// The display cache (drawing_open.rs).
+    pub(crate) cached_open: crate::drawing_open::CachedOpen,
     image: Option<Arc<RenderImage>>,
     _frames: Task<()>,
 
@@ -583,6 +589,9 @@ impl DrawingEditor {
             frame_dirty: true,
             seq: 0,
             last_presented: 0,
+            frame_milestones: Default::default(),
+            open_stage: 0,
+            cached_open: Default::default(),
             image: None,
             _frames: frames,
             tool: Tool::Select,
@@ -961,6 +970,8 @@ impl DrawingEditor {
                 let k2 = key.clone();
                 let src = cx
                     .background_spawn(async move {
+                        static FIRST: std::sync::Once = std::sync::Once::new();
+                        FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
                         match shown {
                             Some(context) => views::studio_source(&doc, &k2, context),
                             None => views::regenerate_source(&doc, &k2, &mut regen.lock(), &mut assemblies.lock()),
@@ -1079,12 +1090,18 @@ impl DrawingEditor {
             }
         }
         self.geoms = geoms;
+        // Every view's source is in (or failed) and has its geometry: the sheet shows the model.
+        let sourced = sheet.views.iter().all(|v| views::view_source(sheet, v.id).is_none_or(|(k, _)| self.sources.contains_key(&k) || self.failed_sources.contains(&k)));
+        let shown = sourced && self.regenerating.is_empty() && !need_fast;
+        let complete = shown && !need_exact && !self.computing;
+        self.note_open_sheet(shown, complete, cx);
         if need_fast {
             self.schedule_compute(false, cx);
         } else if need_exact && !interactive {
             self.schedule_compute(true, cx);
         }
-        let mut built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
+        let built = assemble_sheet(&d, si, &self.geoms, &self.sources, &self.info);
+        let mut built = self.sheet_to_show(si, built, complete, cx);
         // Model space (live behaviours "Imported DWG/DXF drawings"): no paper,
         // the canvas in the model-space colour; on Dark view the foreground
         // ink (ACI 7) draws white, other colours stay.
@@ -1476,6 +1493,10 @@ impl DrawingEditor {
         style.accent_color = crate::theme::lin(0xebeb92);
         style.show_edges = false;
         self.seq += 1;
+        let armed = noshape_render::perf::take_armed();
+        if !armed.is_empty() {
+            self.frame_milestones.push_back((self.seq, armed));
+        }
         self.gpu.submit(RenderJob {
             target: self.target_id,
             scene: Arc::new(self.build_scene()),
@@ -1496,6 +1517,11 @@ impl DrawingEditor {
             return;
         }
         self.last_presented = seq;
+        while self.frame_milestones.front().is_some_and(|(s, _)| *s <= seq) {
+            for m in self.frame_milestones.pop_front().map(|f| f.1).unwrap_or_default() {
+                noshape_render::perf::milestone(&m);
+            }
+        }
         match result {
             Ok((_, image)) => {
                 if let Some(old) = self.image.replace(image) {
@@ -1747,6 +1773,7 @@ impl DrawingEditor {
             .children(self.render_measure())
             .children(self.render_sheet_props(cx))
             .children(self.render_drawing_props(cx))
+            .children(self.render_regenerating())
             .children(self.render_toast(cx))
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone()))
             .children(self.render_section_dlg(cx))

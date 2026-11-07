@@ -16,6 +16,12 @@ impl DrawingEditor {
     // ------------------------------------------------------------ tools
 
     pub fn set_tool(&mut self, tool: Tool, cx: &mut Context<Self>) {
+        if !matches!(tool, Tool::Select) {
+            let again = tool.clone();
+            if self.wait_for_sheet(Box::new(move |this, cx| this.set_tool(again, cx)), cx) {
+                return;
+            }
+        }
         self.projection_parent_lit = false;
         // A constraint key on a selection that completes it: applied at once.
         if let Tool::Constrain { kind, picks } = &tool
@@ -1092,6 +1098,12 @@ impl DrawingEditor {
         }
         if self.shortcut_toolbar.take().is_some() {
             cx.notify();
+        }
+        // The cached sheet is view-only: selecting and dragging wait for the real one.
+        if e.button == MouseButton::Left && self.cached_view() {
+            self.say_waiting(cx);
+            cx.stop_propagation();
+            return;
         }
         // Double middle click: zoom to fit (live navigation/45-46).
         if e.button == MouseButton::Middle && e.click_count >= 2 {

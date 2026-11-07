@@ -21,6 +21,11 @@ impl Render for Workspace {
     }
 }
 
+thread_local! {
+    /// The next test window's viewport draws real frames (`Gpu::headless_rendering`).
+    static RENDERING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// A fresh document's Part Studio in a test window, drawn once.
 fn part_studio(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<PartStudioView>) {
     part_studio_from(cx, name, None)
@@ -47,7 +52,7 @@ fn part_studio_from(cx: &mut TestAppContext, name: &str, start: Option<serde_jso
         None => crate::session::Session::create(&path, crate::user_units::new_document()).unwrap(),
     };
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::PartStudio(_))).unwrap().id;
-    let gpu = Gpu::headless().unwrap();
+    let gpu = if RENDERING.get() { Gpu::headless_rendering().unwrap() } else { Gpu::headless().unwrap() };
     let (window, view) = cx.update(|cx| {
         let doc = cx.new(|_| DocModel::new(session));
         let bounds = Bounds { origin: Point::default(), size: size(px(1200.), px(800.)) };
@@ -3039,7 +3044,7 @@ fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAp
     draw(cx, window);
     let (opened, said) = cx.update(|cx| (view.read(cx).edit.is_some(), view.read(cx).message.as_ref().map(|(_, m)| m.clone())));
     assert!(!opened, "no dialog on the cached model");
-    assert_eq!(said.as_deref(), Some(super::super::cached_open::WAITING));
+    assert_eq!(said.as_deref(), Some(crate::display_cache::WAITING));
     // The real regeneration lands: the same meshes, the dialog opens.
     cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
     wait_until(cx, window, |cx| view.read(cx).edit.is_some());
@@ -3047,3 +3052,90 @@ fn a_cached_display_stands_in_until_the_identical_real_one_lands(cx: &mut TestAp
     assert!(!cx.update(|cx| view.read(cx).ui.cached_view), "the model's own again");
     assert_eq!(meshes(&after), meshes(&real), "the regenerated display is the cached one");
 }
+
+/// Lead 11-07, the display cache frame by frame: from the first frame that draws the cached display, every presented
+/// frame is the model's own picture, through the real regeneration's arrival and after it (no blank frame, no flash).
+#[gpui::test]
+fn the_swap_from_the_cached_display_to_the_real_one_changes_no_frame(cx: &mut TestAppContext) {
+    let _gpu = noshape_ops::doc::gpu_lock();
+    // Rendering needs a GPU adapter; CI's Linux runner has none.
+    if let Err(e) = Gpu::headless_rendering() {
+        return eprintln!("frames skipped: {e}");
+    }
+    RENDERING.set(true);
+    let (window, view, _top, _) = block_part(cx, "display-cache-frames");
+    let real = cx.update(|cx| view.read(cx).display.clone());
+    let dir = std::env::temp_dir().join(format!("noshape-display-cache-frames-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    super::super::display_cache::store(&dir, "k", &real).unwrap();
+    let cached = super::super::display_cache::load(&dir, "k").expect("the cached display");
+    let _ = std::fs::remove_dir_all(&dir);
+    let vp = cx.update(|cx| view.read(cx).viewport.clone());
+    let pixels = |i: &std::sync::Arc<gpui_kit::RenderImage>| i.as_bytes(0).map(|b| b.to_vec()).unwrap_or_default();
+    // The picture of the regenerated model, settled.
+    let settled = |cx: &mut TestAppContext| {
+        cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+        // A software GPU's first frames compile their pipelines: up to seconds.
+        let t = std::time::Instant::now();
+        // Two full-detail frames (not navigation's reduced ones: the sketch's camera move ends first).
+        while (cx.update(|cx| vp.read(cx).recorded_frames().len()) < 2 || cx.update(|cx| vp.read(cx).interactive())) && t.elapsed() < std::time::Duration::from_secs(15) {
+            if cx.update(|cx| vp.read(cx).interactive()) {
+                cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+            }
+            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, window);
+            cx.executor().advance_clock(std::time::Duration::from_millis(20));
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        cx.update(|cx| vp.read(cx).recorded_frames()).last().map(pixels).expect("a presented frame")
+    };
+    let model = settled(cx);
+    // Reopened: nothing drawn yet.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.real_display_in = false;
+            v.apply_display(std::sync::Arc::new(noshape_model::display::StudioDisplay::default()), w, cx);
+        })
+    })
+    .unwrap();
+    let blank = settled(cx);
+    assert_ne!(blank, model, "the empty view differs from the model");
+    // The cached display, then the real regeneration, every presented frame recorded.
+    cx.update(|cx| vp.update(cx, |v, _| v.record_frames(true)));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.show_cached_display("k".into(), cached, w, cx))).unwrap();
+    // Frames drawn and handed over until `done` (at most 15 s).
+    let pump = |cx: &mut TestAppContext, done: &dyn Fn(&gpui_kit::App) -> bool| {
+        let t = std::time::Instant::now();
+        while !cx.update(|cx| done(cx)) && t.elapsed() < std::time::Duration::from_secs(15) {
+            cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+            cx.update(|cx| view.read(cx).gpu.deliver_frames());
+            draw(cx, window);
+            cx.executor().advance_clock(std::time::Duration::from_millis(20));
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    };
+    pump(cx, &|cx| vp.read(cx).recorded_frames().iter().any(|f| pixels(f) != blank));
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_regen(w, cx))).unwrap();
+    pump(cx, &|cx| !view.read(cx).ui.cached_view);
+    let at_swap = cx.update(|cx| vp.read(cx).recorded_frames().len());
+    // Later frames (each asked for, as the pointer or a highlight does).
+    let t = std::time::Instant::now();
+    while t.elapsed() < std::time::Duration::from_secs(15) {
+        if cx.update(|cx| vp.read(cx).recorded_frames().len()) >= at_swap + 3 {
+            break;
+        }
+        cx.update(|cx| vp.update(cx, |v, cx| v.request_frame(cx)));
+        cx.update(|cx| view.read(cx).gpu.deliver_frames());
+        draw(cx, window);
+        cx.executor().advance_clock(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    let frames: Vec<Vec<u8>> = cx.update(|cx| vp.read(cx).recorded_frames()).iter().map(pixels).collect();
+    let first = frames.iter().position(|f| *f != blank).expect("a frame of the cached model");
+    for (i, f) in frames.iter().enumerate().skip(first) {
+        assert!(*f == model, "frame {i} of {} (the swap after frame {at_swap}) isn't the model's picture", frames.len());
+    }
+    assert!(frames.len() >= at_swap + 3, "frames after the real display landed");
+}
+

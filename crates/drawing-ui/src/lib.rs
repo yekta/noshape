@@ -77,6 +77,7 @@ pub mod drawing_toolbar;
 pub mod drawing_tools;
 pub mod drawing_ui;
 pub mod drawing_view;
+mod drawing_open;
 pub mod drawing_view_sketches;
 pub mod drawing_watermark;
 pub mod drawing_weld;

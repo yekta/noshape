@@ -222,6 +222,10 @@ impl AssemblyView {
     // ------------------------------------------------------------ assembly mate connector dialog
 
     pub(super) fn open_mc(&mut self, existing: Option<AsmMateConnector>, window: &mut Window, cx: &mut Context<Self>) {
+        let again = existing.clone();
+        if self.wait_for_model(Box::new(move |this, window, cx| this.open_mc(again, window, cx)), cx) {
+            return;
+        }
         self.close_mate(window, cx);
         self.open_mc_inner(existing, None, window, cx);
     }
@@ -1022,6 +1026,9 @@ impl AssemblyView {
     }
 
     pub(super) fn open_pattern(&mut self, kind: PatternDialogKind, window: &mut Window, cx: &mut Context<Self>) {
+        if self.wait_for_model(Box::new(move |this, window, cx| this.open_pattern(kind, window, cx)), cx) {
+            return;
+        }
         self.close_mate(window, cx);
         self.insert_open = false;
         let mut s = self.new_pattern_session(kind, window, cx);
@@ -1036,6 +1043,10 @@ impl AssemblyView {
     }
 
     pub(super) fn open_pattern_edit(&mut self, pat: InstancePattern, window: &mut Window, cx: &mut Context<Self>) {
+        let again = pat.clone();
+        if self.wait_for_model(Box::new(move |this, window, cx| this.open_pattern_edit(again, window, cx)), cx) {
+            return;
+        }
         let kind = match pat.kind {
             PatternKind::Linear { .. } => PatternDialogKind::Linear,
             PatternKind::Circular { .. } => PatternDialogKind::Circular,

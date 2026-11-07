@@ -4622,6 +4622,8 @@ dependencies = [
  "ahash",
  "anyhow",
  "async-channel",
+ "bincode",
+ "blake3",
  "chrono",
  "dirs 6.0.0",
  "glam 0.34.1",
@@ -4653,6 +4655,7 @@ dependencies = [
  "tiny-skia",
  "windows 0.62.2",
  "x11rb",
+ "zstd",
 ]
 
 [[package]]
@@ -4978,8 +4981,6 @@ name = "noshape-part-studio-ui"
 version = "0.0.0-dev"
 dependencies = [
  "anyhow",
- "bincode",
- "blake3",
  "glam 0.34.1",
  "gpui-kit",
  "gpui-pre",
@@ -5000,7 +5001,6 @@ dependencies = [
  "parking_lot",
  "serde",
  "serde_json",
- "zstd",
 ]
 
 [[package]]

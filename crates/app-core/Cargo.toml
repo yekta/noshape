@@ -25,6 +25,10 @@ async-channel = "2"
 rust-embed = { version = "8", features = ["debug-embed"] }
 serde_json.workspace = true
 serde.workspace = true
+# The display cache (display_cache.rs).
+bincode.workspace = true
+blake3.workspace = true
+zstd.workspace = true
 # The documents library reads documents' metadata and thumbnails (start_library.rs).
 rusqlite.workspace = true
 # Drawing thumbnails (tab_thumbnail.rs).

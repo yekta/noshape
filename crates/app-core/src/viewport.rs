@@ -277,6 +277,8 @@ pub struct Viewport {
     /// `setUserIsAdjustingCamera`), and their timing (no rotation inertia
     /// below 20 fps).
     interactive_until: Option<Instant>,
+    /// The camera was set in one step since the last frame ([`Viewport::jump_camera`]): not navigation.
+    camera_jumped: bool,
     frame_timer: nav::FrameTimer,
     /// Onshape's interactive detail reduction, and whether the last frame
     /// drew less than full detail (a full one follows when interaction
@@ -419,6 +421,8 @@ pub struct Viewport {
     _theme: Subscription,
     /// Frames presented so far.
     frames_presented: u64,
+    /// Tests: every presented image, in order ([`Viewport::record_frames`]).
+    frame_log: Option<Vec<Arc<RenderImage>>>,
     /// Frames the renderer reported failed.
     frames_failed: u64,
     /// `NOSHAPE_PERF`: when the last frame was presented (paint latency).
@@ -594,6 +598,7 @@ impl Viewport {
             pointer_inside: false,
             in_flight: VecDeque::new(),
             interactive_until: None,
+            camera_jumped: false,
             frame_timer: nav::FrameTimer::default(),
             detail: nav::DetailManager::default(),
             reduced_frame: false,
@@ -666,6 +671,7 @@ impl Viewport {
                 cx.notify();
             }),
             frames_presented: 0,
+            frame_log: None,
             frames_failed: 0,
             presented_at: None,
             frame_milestones: Default::default(),
@@ -801,7 +807,7 @@ impl Viewport {
     /// Always deferred: GPUI ignores `notify` during a window draw (the view
     /// is marked dirty but no redraw is scheduled), so notifying here could
     /// leave a stale frame on screen until the mouse moves.
-    fn request_frame(&mut self, cx: &mut Context<Self>) {
+    pub fn request_frame(&mut self, cx: &mut Context<Self>) {
         self.dirty = true;
         if !self.submit_scheduled {
             self.submit_scheduled = true;
@@ -820,6 +826,16 @@ impl Viewport {
                 });
             });
         }
+    }
+
+    /// Tests: keep every presented image from now on (frame by frame checks), or stop.
+    pub fn record_frames(&mut self, on: bool) {
+        self.frame_log = on.then(Vec::new);
+    }
+
+    /// Tests: the images presented since [`Viewport::record_frames`].
+    pub fn recorded_frames(&self) -> Vec<Arc<RenderImage>> {
+        self.frame_log.clone().unwrap_or_default()
     }
 
     fn submit_if_ready(&mut self, cx: &mut Context<Self>) {
@@ -914,8 +930,21 @@ impl Viewport {
             self.animate_to(to, cx);
         } else {
             self.camera = to;
+            self.jump_camera();
             self.camera_changed(cx);
         }
+    }
+
+    /// The camera was set in one step (a fit when a model first shows, a restored view), not by navigation: the next
+    /// frame draws at full detail, not as an interactive frame (an opened model's first frames had no outline for
+    /// 0.5 s).
+    pub fn jump_camera(&mut self) {
+        self.camera_jumped = true;
+    }
+
+    /// Frames are drawn at navigation's reduced detail now (tests wait it out).
+    pub fn interactive(&self) -> bool {
+        self.interactive_until.is_some_and(|t| Instant::now() < t)
     }
 
     /// Zoom (animated) so the model box `lo`–`hi` fills the view, as
@@ -1132,7 +1161,7 @@ impl Viewport {
         // redraw (e.g. keyboard zoom).
         let view = (self.camera, w, h);
         let now = Instant::now();
-        if self.last_submitted_view.is_some_and(|v| v.0 != self.camera) {
+        if !std::mem::take(&mut self.camera_jumped) && self.last_submitted_view.is_some_and(|v| v.0 != self.camera) {
             self.interactive_until = Some(now + nav::INTERACTIVE_WINDOW);
         }
         let interactive = self.interactive_until.is_some_and(|t| now < t);
@@ -1301,6 +1330,9 @@ impl Viewport {
                 }
                 match image {
                     FrameImage::Image(image) => {
+                        if let Some(log) = &mut self.frame_log {
+                            log.push(image.clone());
+                        }
                         if let Some(old) = self.image.replace(image) {
                             let _ = window.drop_image(old);
                         }

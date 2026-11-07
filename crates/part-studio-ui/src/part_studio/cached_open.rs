@@ -5,28 +5,14 @@
 //! (its scene is built before it is swapped in: no flash).
 
 use super::{PartStudioView, display_cache};
+use crate::display_cache::{WAITING, enabled};
 use gpui_kit::*;
 use noshape_model::display::FeatureStatus;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-
-static ENABLED: AtomicBool = AtomicBool::new(false);
-
-/// The app keeps and uses the display cache (called once at startup; tests and the parity driver don't).
-pub fn enable() {
-    ENABLED.store(true, Ordering::Relaxed);
-}
-
-fn enabled() -> bool {
-    ENABLED.load(Ordering::Relaxed)
-}
 
 /// An action that waits for the real model.
 pub(super) type Deferred = Box<dyn FnOnce(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
-
-/// The message while an action waits for the regeneration.
-pub(super) const WAITING: &str = "Regenerating the model: this opens as soon as it is ready.";
 
 /// How long after a full display the cache is written (edits in a row write once).
 const SAVE_AFTER: Duration = Duration::from_secs(2);
@@ -155,22 +141,8 @@ impl PartStudioView {
         }));
     }
 
-    /// The feature list's top row while the cached display stands in: Onshape's spinner and "Regenerating…".
+    /// The feature list's top row while the cached display stands in.
     pub(super) fn render_regenerating_row(&self) -> Option<AnyElement> {
-        if !self.ui.cached_view {
-            return None;
-        }
-        let pal = crate::theme::p();
-        Some(
-            gpui_kit::component::h_flex()
-                .id("regenerating-row")
-                .h(px(crate::ui::ROW_H))
-                .flex_none()
-                .gap(px(6.))
-                .pl(px(9.))
-                .child(super::pending::spinner(18.))
-                .child(div().text_size(px(crate::ui::ROW_TEXT)).text_color(pal.text_muted).child("Regenerating…"))
-                .into_any_element(),
-        )
+        self.ui.cached_view.then(crate::display_cache::regenerating_row)
     }
 }

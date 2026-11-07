@@ -1171,6 +1171,7 @@ impl PartStudioView {
                     let size = vp.size();
                     crate::viewport::fit_camera_to_box(&mut vp.camera, lo, hi, size, 0.0);
                 }
+                vp.jump_camera();
                 vp.request_redraw(cx);
             });
         }

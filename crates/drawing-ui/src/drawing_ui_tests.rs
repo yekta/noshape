@@ -14,6 +14,11 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Value {
     registry::run(ctx, op, &args).unwrap_or_else(|e| panic!("{tool}: {e:?}")).value
 }
 
+thread_local! {
+    /// The next test drawing gets the source's suggested views.
+    static SUGGESTED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// A drawing of a block (Drawing 1) in a test window.
 fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<DrawingEditor>) {
     cx.update(gpui_kit::init);
@@ -31,7 +36,7 @@ fn drawing(cx: &mut TestAppContext, name: &str) -> (AnyWindowHandle, Entity<Draw
         let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }));
         let region = d["regions"][0]["id"].clone();
         call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "10 mm" } }));
-        call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3" }));
+        call(&mut ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": "ISO A3", "suggested_views": SUGGESTED.get() }));
     }
     let session = crate::session::Session::open(&path).unwrap();
     let tab = session.doc.tabs.iter().find(|t| matches!(t.content, noshape_model::TabContent::Drawing(_))).unwrap().id;
@@ -112,3 +117,49 @@ fn export_drawing_opens_with_the_last_exports_choices(cx: &mut TestAppContext) {
     press(cx, window, "modal-ok");
     assert_eq!(DrawingExportPrefs::load().as_ref(), Some(&saved));
 }
+
+/// Lead 11-06, the display cache: a drawing's sheet comes back from the cache as it was built; while it stands in
+/// (the sources regenerating) the sheet shows it, a tool asked for waits with the message at once, and the complete
+/// real sheet replaces it and starts the tool.
+#[gpui::test]
+fn a_cached_sheet_stands_in_until_the_real_one_is_complete(cx: &mut TestAppContext) {
+    SUGGESTED.set(true);
+    let (window, editor) = drawing(cx, "display-cache");
+    for _ in 0..200 {
+        if cx.update(|cx| editor.read(cx).real_sheet_in()) {
+            break;
+        }
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        draw(cx, window);
+    }
+    let real = cx.update(|cx| editor.read(cx).built.clone()).expect("the sheet built");
+    assert!(cx.update(|cx| editor.read(cx).real_sheet_in()) && real.placements.len() >= 3, "the suggested views computed");
+    let dir = std::env::temp_dir().join(format!("noshape-drawing-cache-ui-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    crate::drawing_open::store_sheet(&dir, "k", &real).unwrap();
+    let cached = crate::drawing_open::load_sheet(&dir, "k").expect("the cached sheet");
+    let _ = std::fs::remove_dir_all(&dir);
+    let lines = |b: &noshape_model::drawing::build::BuiltSheet| b.geometry.lines.iter().map(|l| (l.points.clone(), l.pick)).collect::<Vec<_>>();
+    assert_eq!(lines(&cached), lines(&real), "cached as it was");
+    // Reopened, the sources not in yet: the cached sheet is shown, view-only.
+    let empty = noshape_model::drawing::build::BuiltSheet { geometry: Default::default(), ..cached.clone() };
+    let sheet = cx.update(|cx| editor.read(cx).sheet);
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        e.stand_in(sheet, cached);
+        let shown = e.sheet_to_show(sheet, empty, false, cx);
+        assert_eq!(lines(&shown), lines(&real), "the cached sheet stands in");
+        assert!(e.cached_view() && e.render_regenerating().is_some(), "view-only, Regenerating… shown");
+        e.set_tool(noshape_scene::drawing_tools::Tool::Centermark, cx);
+        assert!(matches!(e.tool, noshape_scene::drawing_tools::Tool::Select), "no tool on the cached sheet");
+        assert_eq!(e.toast.as_ref().map(|t| t.to_string()).as_deref(), Some(crate::display_cache::WAITING));
+    }));
+    // The real sheet is complete: it replaces the cached one and the tool starts.
+    cx.update(|cx| editor.update(cx, |e, cx| {
+        let shown = e.sheet_to_show(sheet, (*real).clone(), true, cx);
+        assert_eq!(lines(&shown), lines(&real));
+        assert!(!e.cached_view(), "the sheet's own again");
+    }));
+    draw(cx, window);
+    assert!(cx.update(|cx| matches!(editor.read(cx).tool, noshape_scene::drawing_tools::Tool::Centermark)), "the tool started once the real sheet was in");
+}
+

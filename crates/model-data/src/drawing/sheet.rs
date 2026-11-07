@@ -7,7 +7,7 @@ use super::font;
 use super::format::DimText;
 use super::{Annotation, AnnotationKind, ArcCondition, DatumTargetArea, DimOrientation, Drawing, Projection, Sheet, TitleBlockStyle, ViewId};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum LineStyle {
     Visible,
     Hidden,
@@ -58,7 +58,7 @@ impl LineStyle {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Polyline2 {
     pub points: Vec<[f64; 2]>,
     pub style: LineStyle,
@@ -67,7 +67,7 @@ pub struct Polyline2 {
     pub pick: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Anchor {
     BottomLeft,
     BottomCenter,
@@ -76,7 +76,7 @@ pub enum Anchor {
     TopCenter,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Text2 {
     pub pos: [f64; 2],
     pub height: f64,
@@ -88,12 +88,12 @@ pub struct Text2 {
 }
 
 /// Filled triangle (arrowheads).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Fill2 {
     pub points: Vec<[f64; 2]>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SheetGeometry {
     /// Each annotation's fills (annotation id, fill range): a dangling
     /// one's arrowheads and triangles turn red with it.
@@ -157,16 +157,22 @@ pub struct SheetGeometry {
     pub pens: Vec<PenSpan>,
     /// What the elements are, for the DXF / DWG layers (`cad_layers`; last
     /// span wins, untagged ones by style).
+    #[serde(skip)]
     pub cad: Vec<super::cad_layers::CadSpan>,
     /// Text styles of the DXF / DWG export by kind of text (`cad_layers`).
+    #[serde(skip)]
     pub cad_text_styles: Vec<super::cad_layers::CadTextStyleSpan>,
     /// Texts the DXF / DWG export writes as one MTEXT (`cad_layers`).
+    #[serde(skip)]
     pub cad_mtext: Vec<super::cad_layers::CadMtext>,
     /// Hatched sections, written as HATCH entities by the DXF / DWG export.
+    #[serde(skip)]
     pub hatches: Vec<super::cad_layers::HatchRegion>,
     /// Element groups the DXF / DWG export writes as one object
     /// (dimensions), and their elements (`cad_objects`).
+    #[serde(skip)]
     pub cad_objects: Vec<super::cad_objects::CadObject>,
+    #[serde(skip)]
     pub cad_members: Vec<super::cad_objects::CadMember>,
     /// The projected edges of each view (its range of `lines`): a shaded
     /// view shows its picture instead, except while hovered or selected.
@@ -192,7 +198,7 @@ pub struct ChamferStyle {
 }
 
 /// Lines, texts and fills on a sheet layer.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LayerSpan {
     pub lines: std::ops::Range<usize>,
     pub texts: std::ops::Range<usize>,
@@ -337,7 +343,7 @@ fn migrated_family<'de, D: serde::Deserializer<'de>>(d: D) -> Result<String, D::
 }
 
 /// Texts drawn in a font.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FontSpan {
     pub texts: std::ops::Range<usize>,
     pub font: TextFont,
@@ -345,7 +351,7 @@ pub struct FontSpan {
 
 /// An image on the sheet: lower-left corner and size (mm), the encoded
 /// file, and (filled in by the app for PDF export) its decoded RGB pixels.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GeomImage {
     pub pos: [f64; 2],
     pub size: [f64; 2],
@@ -395,7 +401,7 @@ impl ArrowType {
 
 /// Text height (mm), arrowhead length (mm) and type, and color of
 /// dimensions and of other annotations.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SheetStyle {
     pub dim_text: f64,
     pub dim_arrow: f64,
@@ -453,7 +459,7 @@ pub struct SheetStyle {
 
 /// Revision callouts' border, fit (characters; 0: Tight Fit), font and text
 /// (Drawing properties › Tables › Revision tables).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RevisionCalloutStyle {
     pub shape: super::CalloutBorder,
     pub chars: u8,
@@ -528,7 +534,7 @@ impl Default for SheetStyle {
 }
 
 /// Lines drawn with their own width (mm) and dash pattern (last span wins).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PenSpan {
     pub lines: std::ops::Range<usize>,
     pub width_mm: f64,
@@ -560,7 +566,7 @@ pub fn centered_phase(len: f64, pattern: &[f64]) -> f64 {
 
 /// Lines, texts and fills drawn in a color (index ranges into the
 /// geometry's vectors).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ColorSpan {
     pub lines: std::ops::Range<usize>,
     pub texts: std::ops::Range<usize>,
@@ -572,7 +578,7 @@ pub struct ColorSpan {
 pub type GeomMark = (usize, usize, usize);
 
 /// A grip of an annotation (sheet mm).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Grip {
     pub pick: u32,
     pub pos: [f64; 2],
@@ -629,7 +635,7 @@ impl SheetGeometry {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum GripKind {
     /// Where a dimension attaches to the geometry (Onshape: light-blue dot).
     Origin,
@@ -3570,7 +3576,7 @@ pub fn wrap_text(text: &str, h: f64, w: f64) -> Vec<String> {
 /// A note leader's polyline (sheet mm): `head` points before its nodes (the
 /// side point and the bend, or the one branch point), then the nodes, then
 /// the target.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LeaderPath {
     pub points: Vec<[f64; 2]>,
     pub head: usize,

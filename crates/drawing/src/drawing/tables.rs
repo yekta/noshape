@@ -771,7 +771,7 @@ fn custom_data(kind: &TableKind, result: Option<&Result<Vec<CustomTable>, String
 }
 
 /// Table cell grid on the sheet.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TableLayout {
     /// Column boundaries (left to right), `columns + 1` values.
     pub xs: Vec<f64>,

@@ -11,6 +11,7 @@ pub mod config_visibility;
 pub mod cursor;
 pub mod custom_tables;
 pub mod derived;
+pub mod display_cache;
 pub mod doc_files;
 pub mod doc_model;
 pub mod export_naming;

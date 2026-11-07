@@ -40,38 +40,7 @@ impl Render for Spinner {
     }
 }
 
-/// The spinner in a `size` px box (the overlay's 41 px; a list row's smaller).
-pub(super) fn spinner(size: f32) -> impl IntoElement {
-    let scale = size / 41.;
-    div().size(px(size)).flex_none().with_animation(SharedString::from(format!("pending-spinner-{size}")), Animation::new(Duration::from_millis(900)).repeat(), move |d, t| {
-        d.child(
-            canvas(
-                |_, _, _| {},
-                move |bounds, _, window, _| {
-                    let c = bounds.center();
-                    let r = 13.5_f32 * scale;
-                    let ring = |from: f32, to: f32, color: Rgba, window: &mut Window| {
-                        let steps = 48;
-                        let mut pb = PathBuilder::stroke(px((3. * scale).max(1.5)));
-                        for i in 0..=steps {
-                            let a = from + (to - from) * i as f32 / steps as f32;
-                            let p = point(c.x + px(r * a.cos()), c.y + px(r * a.sin()));
-                            if i == 0 { pb.move_to(p) } else { pb.line_to(p) }
-                        }
-                        if let Ok(path) = pb.build() {
-                            window.paint_path(path, color);
-                        }
-                    };
-                    let tau = std::f32::consts::TAU;
-                    ring(0., tau, rgb(0xdddddd), window);
-                    let start = t * tau - tau / 4.;
-                    ring(start, start + tau / 4., rgb(0x1651b0), window);
-                },
-            )
-            .size_full(),
-        )
-    })
-}
+use crate::display_cache::spinner;
 
 impl PartStudioView {
     /// A regeneration started: pending from now (or still pending from an

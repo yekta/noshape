@@ -158,6 +158,8 @@ mod ui_state;
 mod config_panel;
 #[path = "assembly_toolbar.rs"]
 mod toolbar;
+#[path = "assembly_open.rs"]
+mod open;
 #[cfg(test)]
 #[path = "assembly_ui_tests.rs"]
 mod ui_tests;
@@ -735,6 +737,7 @@ impl AssemblyView {
     pub fn schedule_eval(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sync_implicit_mc(cx);
         let Some((asm, opts)) = self.effective(cx) else { return };
+        self.load_cached_result(&asm, window, cx);
         let doc = self.doc.read(cx).session.doc.clone();
         let evaluator = self.evaluator.clone();
         let explode = self.explode;
@@ -749,6 +752,8 @@ impl AssemblyView {
                     ev.retain_tabs(&doc);
                     // `NOSHAPE_PERF`: a.eval (evaluate after an edit), a.eval_catalog
                     // (the Insert catalog), a.eval_apply (UI thread).
+                    static FIRST: std::sync::Once = std::sync::Once::new();
+                    FIRST.call_once(|| noshape_render::perf::milestone("open: first regen started"));
                     let t = std::time::Instant::now();
                     let result = ev.evaluate(&doc, &asm, &opts, explode);
                     noshape_render::perf::record("a.eval", t.elapsed());
@@ -787,6 +792,8 @@ impl AssemblyView {
                 let t = std::time::Instant::now();
                 this.apply_result(Arc::new(result), window, cx);
                 noshape_render::perf::record("a.eval_apply", t.elapsed());
+                this.note_open_result(cx);
+                this.note_real_result(window, cx);
             });
         }));
         cx.notify();
@@ -1732,6 +1739,9 @@ impl AssemblyView {
     }
 
     fn start_mate(&mut self, t: MateType, window: &mut Window, cx: &mut Context<Self>) {
+        if self.wait_for_model(Box::new(move |this, window, cx| this.start_mate(t, window, cx)), cx) {
+            return;
+        }
         let started = std::time::Instant::now();
         self.start_mate_inner(t, window, cx);
         noshape_render::perf::record("a.mate_open", started.elapsed());
@@ -1750,6 +1760,9 @@ impl AssemblyView {
     }
 
     fn edit_mate(&mut self, id: MateId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.wait_for_model(Box::new(move |this, window, cx| this.edit_mate(id, window, cx)), cx) {
+            return;
+        }
         // Configure assembly features mode: the mate's parameters are picked.
         if self.ui.cfg_mode.is_some() {
             self.configure_pick_mate(id, window, cx);
@@ -1893,6 +1906,10 @@ impl AssemblyView {
     // ------------------------------------------------------------ relations
 
     fn open_relation(&mut self, kind: RelationType, existing: Option<Relation>, window: &mut Window, cx: &mut Context<Self>) {
+        let again = existing.clone();
+        if self.wait_for_model(Box::new(move |this, window, cx| this.open_relation(kind, again, window, cx)), cx) {
+            return;
+        }
         let kind = existing.as_ref().map(|r| r.relation_type).unwrap_or(kind);
         let text = existing.as_ref().map(|r| r.ratio.text.clone()).unwrap_or_else(|| noshape_ops::assembly::relation_default_ratio(kind).into());
         let ratio = cx.new(|cx| InputState::new(window, cx).default_value(text));
@@ -1950,6 +1967,9 @@ impl AssemblyView {
     // ------------------------------------------------------------ explode, positions
 
     fn toggle_explode_panel(&mut self, cx: &mut Context<Self>) {
+        if self.wait_for_model(Box::new(|this, _, cx| this.toggle_explode_panel(cx)), cx) {
+            return;
+        }
         self.panel = if self.panel == Some(SidePanel::Explode) { None } else { Some(SidePanel::Explode) };
         if self.panel.is_none() {
             self.explode_edit = false;
@@ -2619,6 +2639,11 @@ impl AssemblyView {
                 self.ui.ctx_menu = None;
                 self.ui.mini_toolbar = None;
                 if self.start_section_drag(*position, cx) {
+                    return;
+                }
+                // Dragging moves instances through the solver: the real evaluation's.
+                if self.ui.cached_view && (self.manip_hover.is_some() || self.hover.is_some() || self.placing.is_some() || !self.selected.is_empty()) {
+                    self.say_waiting(cx);
                     return;
                 }
                 if let (Some(h), Some(f)) = (self.manip_hover, self.manipulator(cx)) {
@@ -4289,6 +4314,9 @@ impl AssemblyView {
         let mut selected_row: Option<usize> = None;
         // Top-level nodes by instance (`AssemblyResult::node` searches them in turn).
         let top: HashMap<InstanceId, &InstanceNode> = result.nodes.iter().filter_map(|n| Some((*n.path.first()?, n))).filter(|(_, n)| n.path.len() == 1).collect();
+        if self.ui.cached_view {
+            rows.push(Rc::new(|this: &mut Self, _: &mut Context<Self>| this.render_regenerating_row().unwrap_or_else(|| div().into_any_element())));
+        }
         if !filtering || tree {
             rows.push(Rc::new(|this: &mut Self, cx: &mut Context<Self>| {
                 let row = this.assembly_row(cx);

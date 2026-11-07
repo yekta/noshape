@@ -392,3 +392,53 @@ fn enter_in_the_graphics_accepts_the_open_dialog(cx: &mut TestAppContext) {
         assert_eq!(v.assembly(cx).unwrap().groups.len(), 1);
     });
 }
+
+/// Lead 11-06, the display cache: an assembly's evaluation comes back from the cache with the same occurrences (meshes,
+/// placements) and instance tree; shown in its place the view is view-only (a mate asked for waits, the user told at
+/// once, "Regenerating…" at the top of the instance list), and the real evaluation replaces it and opens the mate.
+#[gpui::test]
+fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "display-cache");
+    let real = cx.update(|cx| view.read(cx).result.clone());
+    assert_eq!(real.occurrences.len(), 3, "the block, the pin and its copy");
+    type Occ = (Vec<InstanceId>, String, Vec<[f32; 3]>, Vec<u32>, glam::DMat4);
+    let occs = |r: &noshape_model::assembly::eval::AssemblyResult| -> Vec<Occ> {
+        r.occurrences.iter().map(|o| (o.path.clone(), o.instance_name.clone(), o.mesh.positions.clone(), o.mesh.indices.clone(), o.transform)).collect()
+    };
+    let names = |r: &noshape_model::assembly::eval::AssemblyResult| -> Vec<String> { r.nodes.iter().map(|n| n.name.clone()).collect() };
+    let dir = std::env::temp_dir().join(format!("noshape-asm-cache-ui-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cached = super::open::cache_round_trip(&real, &dir).expect("the cached evaluation");
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(occs(&cached), occs(&real), "cached as it was");
+    assert_eq!(names(&cached), names(&real));
+    // Reopened: the cached evaluation stands in.
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.ui.real_result_in = false;
+            v.show_cached_result("k".into(), cached, w, cx);
+        })
+    })
+    .unwrap();
+    cx.run_until_parked();
+    assert!(cx.update(|cx| view.read(cx).ui.cached_view && view.read(cx).render_regenerating_row().is_some()), "view-only, Regenerating… shown");
+    // A mate waits, with feedback at once.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_mate(MateType::Fastened, w, cx))).unwrap();
+    let (opened, said) = cx.update(|cx| (view.read(cx).mate.is_some(), view.read(cx).message.as_ref().map(|(_, m)| m.clone())));
+    assert!(!opened, "no mate dialog on the cached model");
+    assert_eq!(said.as_deref(), Some(crate::display_cache::WAITING));
+    // The real evaluation lands: the same occurrences, the mate dialog opens.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.schedule_eval(w, cx))).unwrap();
+    for _ in 0..100 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(50));
+        cx.run_until_parked();
+        if cx.update(|cx| view.read(cx).mate.is_some()) {
+            break;
+        }
+    }
+    let after = cx.update(|cx| view.read(cx).result.clone());
+    assert!(!cx.update(|cx| view.read(cx).ui.cached_view), "the model's own again");
+    assert!(cx.update(|cx| view.read(cx).mate.is_some()), "the mate dialog opened once the real model landed");
+    assert_eq!(occs(&after), occs(&real), "the evaluated assembly is the cached one");
+}
+

@@ -273,6 +273,41 @@ document's display mesh is under 0.5 s.
 | pins-assembly-1000 on perf.yml's macOS runners (real GPU) | 120 fps / a frame | 11-04 run 41840797973 (main 60f4813f, fixture pins-assembly-1000, variant `hov@hover:`): GPU 8.7 ms a frame mean, 13 ms p95 (over 8.3 ms: the renderer's next item); presented 33 fps (the runners cap a 1x window near 30); hover p50 23-32 ms (UI 10-15 ms), pick p50 106-113 ms (UI 11-15 ms; the rest the runner's pacing) |
 | open a document | ≤ 0.5 s | **11-06 23:19, with the display cache (vibe5, release, Xvfb + llvmpipe, median of 3; table "Document open with the display cache" below): a reopen shows the model within 0.5 s for 94/94 Part Studio documents (slowest 377 ms, c2-housing-draft; c2-rings-loft 5178 → 218 ms, cf-surface-pattern 10083 → 261 ms); a first open (no cache) 72/95, unchanged: regeneration-bound (OPEN-SLOW-SURFACE-PATTERN, OPEN-SLOW-SHELL-FILLET).** 11-06 20:44 (vibe5 idle, release, Xvfb + llvmpipe, median of 3; table below): 73/95 show their model within 0.5 s of opening (parity corpus 87 + tests/perf 8; pins-assembly-1000 is an assembly, not measured by the Part Studio script). Every slow one is regeneration (OCCT Shell / Fillet, Booleans of many tools, FeatureScript custom features), not scene build or upload. Floor ~170-200 ms (window + GPU init to the first frame ~120-165 ms).** Earlier: v0.4.11 warm: opening → first viewport frame 130–200 ms (an empty viewport, before the model) ✓; first launch 800 ms |
 
+### Assembly and drawing tabs with the display cache (11-07 02:36)
+
+Lead 11-07: the display cache for assembly and drawing tabs too (app-core `display_cache`: key, files, eviction,
+`regenerating_row`; assembly-ui `assembly_open.rs`: a snapshot of the evaluation, each mesh once, view-only until the
+real one, mates / connectors / relations / patterns / Insert / Explode wait with WAITING, a drag says so; drawing-ui
+`drawing_open.rs`: the opened sheet's `BuiltSheet` (JSON in the cache: the sheet data's serde attributes need it), shown
+until the real sheet is complete, a tool waits, a click says so). Measured as the Part Studios
+(`tools/perf/open-times.py --runs 3 --reopen 3`, vibe5, release): corpus copies whose first tab is "Assembly 1" with
+Part Studio 1 inserted (`-asm`) or a drawing of it with the suggested views (`-drw`), ~/agents/psui/open-tabs. Reopen
+within 0.5 s 12/15; over: cf-surface-pattern-asm 685 (its full meshes on llvmpipe: the cached result's frame 553 ms after
+it is in), cf-hose-routing-asm 512, pins-assembly-1000 1163 (llvmpipe draws the 1000 pins ~700-900 ms; its evaluation is
+5-120 ms and the UI thread's apply 9 ms; perf.yml's macOS runners draw it in ~9 ms a frame: not a cache case).
+Frame-level test of the swap (`the_swap_from_the_cached_display_to_the_real_one_changes_no_frame`, a real GPU via
+`Gpu::headless_rendering` + `deliver_frames`, skipped without an adapter): every presented frame from the cached model's
+first is the model's own picture. It found the opened model's first 0.5 s drawn at navigation's reduced detail (no
+outline: the first fit counted as navigation): `Viewport::jump_camera`.
+
+| document | open → model (ms) | reopen → model | open → full | regen starts | regen (preview) | regen (full) | display → frame | live regen |
+|---|---|---|---|---|---|---|---|---|
+| cf-surface-pattern-asm | 16573 | 685 | 16573 | 192 | 15360 | 15360 | 553 | – |
+| cf-surface-pattern-drw | 10589 | 191 | 11713 | 122 | 0 | 0 | 57 | – |
+| c2-impeller-loft-asm | 9593 | 383 | 9593 | 104 | 9270 | 9270 | 65 | – |
+| c2-impeller-loft-drw | 6771 | 143 | 7019 | 103 | 0 | 0 | 30 | – |
+| c2-rings-loft-drw | 5024 | 161 | 5025 | 124 | 0 | 0 | 34 | – |
+| c2-rings-loft-asm | 4881 | 229 | 4881 | 101 | 4731 | 4731 | 37 | – |
+| pins-assembly-1000 | 1151 | 1163 | 1151 | 172 | 14 | 14 | 914 | – |
+| cf-hose-routing-drw | 1021 | 196 | 3552 | 154 | 0 | 0 | 43 | – |
+| cf-hose-routing-asm | 856 | 512 | 856 | 150 | 257 | 257 | 278 | – |
+| c2-valve-config-asm | 770 | 207 | 770 | 108 | 605 | 605 | 44 | – |
+| c2-valve-config-drw | 766 | 177 | 858 | 104 | 0 | 0 | 30 | – |
+| c2-hunting-knife-asm | 347 | 187 | 347 | 104 | 196 | 196 | 36 | – |
+| c2-hunting-knife-drw | 342 | 154 | 346 | 102 | 0 | 0 | 25 | – |
+| bearing-block-takumi-asm | 182 | 183 | 182 | 105 | 16 | 16 | 47 | – |
+| bearing-block-takumi-drw | 170 | 148 | 198 | 99 | 0 | 0 | 26 | – |
+
 ### Document open with the display cache (11-06 23:19)
 
 Before / after (lead 11-06): `tools/perf/open-times.py --runs 3 --reopen 3` (release 5bb968de, vibe5 idle): each

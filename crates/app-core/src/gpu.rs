@@ -52,6 +52,8 @@ pub struct Gpu {
     worker: Arc<OnceLock<Result<(RenderWorker, Present), String>>>,
     routes: Arc<Mutex<Routes>>,
     next_target: Arc<AtomicU64>,
+    /// [`Gpu::headless_rendering`]: finished frames held for [`Gpu::deliver_frames`].
+    held: Option<Arc<Mutex<Vec<Completed>>>>,
 }
 
 impl Gpu {
@@ -78,7 +80,7 @@ impl Gpu {
             noshape_render::perf::milestone("GPU initialized");
             let _ = cell2.set(worker);
         })?;
-        Ok(Self { worker: cell, routes, next_target: Arc::new(AtomicU64::new(1)) })
+        Ok(Self { worker: cell, routes, next_target: Arc::new(AtomicU64::new(1)), held: None })
     }
 
     /// A GPU stand-in for UI tests on GPUI's test platform: the render
@@ -87,10 +89,34 @@ impl Gpu {
     /// (the render thread may not wake the test's deterministic scheduler).
     /// An error unless wgpu's `noop` feature is on (noshape-ui-test-support).
     pub fn headless() -> anyhow::Result<Self> {
+        Self::headless_with(noshape_render::Renderer::noop()?, false)
+    }
+
+    /// Tests that look at frames: [`Gpu::headless`] with a real renderer whose frames come back read back, held until
+    /// the test's thread takes them ([`Gpu::deliver_frames`]: GPUI's test scheduler may not be woken from the render
+    /// thread). Take `noshape_ops::doc::gpu_lock()` first.
+    pub fn headless_rendering() -> anyhow::Result<Self> {
+        Self::headless_with(noshape_render::Renderer::new()?, true)
+    }
+
+    fn headless_with(renderer: noshape_render::Renderer, frames_back: bool) -> anyhow::Result<Self> {
         let routes = Arc::new(Mutex::new(Routes { senders: HashMap::new(), viewport_senders: HashMap::new(), pick_senders: HashMap::new(), submitted: HashMap::new(), oneshots: HashMap::new() }));
-        let renderer = noshape_render::Renderer::noop()?;
-        let worker = RenderWorker::spawn_with(renderer, |_| {});
-        Ok(Self { worker: Arc::new(OnceLock::from(Ok((worker, Present::Readback)))), routes, next_target: Arc::new(AtomicU64::new(1)) })
+        let held = frames_back.then(|| Arc::new(Mutex::new(Vec::new())));
+        let worker = match held.clone() {
+            Some(h) => RenderWorker::spawn_with(renderer, move |c| h.lock().push(c)),
+            None => RenderWorker::spawn_with(renderer, |_| {}),
+        };
+        Ok(Self { worker: Arc::new(OnceLock::from(Ok((worker, Present::Readback)))), routes, next_target: Arc::new(AtomicU64::new(1)), held })
+    }
+
+    /// [`Gpu::headless_rendering`]: the frames finished so far, routed to their targets from this thread.
+    pub fn deliver_frames(&self) {
+        let Some(held) = &self.held else { return };
+        let done: Vec<Completed> = std::mem::take(&mut *held.lock());
+        let route = route_frames(self.routes.clone());
+        for c in done {
+            route(c);
+        }
     }
 
     /// The GPU adapter ("name (Backend)") once the renderer is up.

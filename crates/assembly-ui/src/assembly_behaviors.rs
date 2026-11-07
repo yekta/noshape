@@ -516,6 +516,18 @@ pub struct AsmUi {
     /// Isolate / Make transparent › Expand: (by connectivity, steps, the
     /// instances isolated before expanding).
     pub iso_expand: Option<(bool, usize, Vec<InstanceId>)>,
+    /// The opened assembly's first model is on screen (`NOSHAPE_PERF` open milestones).
+    pub open_noted: bool,
+    /// The display cache (assembly_open.rs): looked up once; its result shown (view-only) until a real one is in.
+    pub cache_checked: bool,
+    pub cached_view: bool,
+    pub real_result_in: bool,
+    pub cache_task: Option<Task<()>>,
+    pub cache_save_task: Option<Task<()>>,
+    /// The key the shown result is cached under.
+    pub cache_key: Option<String>,
+    /// An action asked for while the cached result stood in.
+    pub after_eval: Option<super::open::Deferred>,
 }
 
 impl AssemblyView {
@@ -2859,6 +2871,9 @@ impl AssemblyView {
 
     /// i / toolbar Insert: open the Insert dialog, or close it when open.
     pub(super) fn toggle_insert(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.insert_open && self.wait_for_model(Box::new(|this, window, cx| this.toggle_insert(window, cx)), cx) {
+            return;
+        }
         if self.insert_open {
             self.close_insert(window, cx);
         } else {
