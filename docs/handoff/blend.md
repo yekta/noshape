@@ -68,3 +68,18 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   corners): asked bool (bool.md "From blend 21:34").
 - Suite before / after on vibe5: 694 = 694 features; the four "slower" documents have no variable fillet (Mirror /
   Extrude / pattern times: load).
+
+**11-07 22:15 UTC: RING-BLEND-SPEED, what was tried (nothing landed).** c2-rings-loft's Fillet 1 ~340 ms (vibe5):
+the tools (two wedges, OCCT's lone-rim fillets, wedge minus round) ~25 ms, the final cut ~307 ms in OCCT
+(boolean.build; 212 ms of it "Edge-Face intersection", 152 calls: the rounds' B-spline contact edges lying on the
+plane and the bore, and the rims on the tools' strips). Tried:
+- The rims are mirror images about x = 4 (square to the bore's axis), their rounds meeting on that plane: each region
+  trimmed to its side (`mirror_pair`) so no blend-blend meeting curve is left to find. Same topology and volume, but the
+  cut stays ~309 ms (and the trims cost 60): the time isn't the meeting curve, it's the edges lying on the faces.
+- The cut at the working scale (`BooleanOptions::scaled`): 307 -> 156 ms, but Shell 1 then fails after 25 s on its
+  result (12 -> 9 features). Not usable as is; fuzzy 1e-7 x size changes nothing.
+- Next levers, in order of size: (a) the tool built with exact contact curves (both are ellipses: the spine, an
+  ellipse where the offset plane meets the offset cylinder, projected onto the plane and radially onto the cylinder),
+  only the blend face approximated: OCCT's edge-face work on exact conics is cheap; (b) no Boolean: the rims' faces
+  re-bounded by the contact curves and the blend faces inserted, the two rounds' meeting curve and run-outs computed
+  from their geometry (the lead's "built directly", crates/brep, gated). (a) is a day, (b) several.
