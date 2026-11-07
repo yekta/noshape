@@ -712,7 +712,7 @@ impl Prepared {
                 Some([x, y]) => (x, y),
                 None => (solver::mate_values(&poses0, &mates[ia])[r.values.0], solver::mate_values(&poses0, &mates[ib])[r.values.1]),
             };
-            rels.push(SolverRelation { kind: r.kind, mate_a: ia, mate_b: ib, ratio: r.ratio, reverse: r.reverse, base_a, base_b, value_a: r.values.0, value_b: r.values.1 });
+            rels.push(SolverRelation { kind: r.kind, mate_a: ia, mate_b: ib, ratio: r.ratio, reverse: r.reverse, base_a, base_b, value_a: r.values.0, value_b: r.values.1, a_start: 0.0, turns: 0.0 });
             rel_ids.push(r.id);
         }
         // Relations count towards the degrees of freedom but are not solved
@@ -3298,10 +3298,9 @@ impl AssemblyEvaluator {
             RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
             RelationType::RackAndPinion | RelationType::Screw => Dim::LENGTH,
         };
-        let mut ratio = noshape_units::evaluate_as(&r.ratio.text, dim, units, &EmptyScope)
-            .or_else(|_| noshape_units::evaluate_as(&r.ratio.text, Dim::UNITLESS, units, &EmptyScope))
-            .map(|q| q.value)
-            .unwrap_or(1.0);
+        // In the assembly's variables, as mate offsets; an expression that doesn't evaluate is the relation's error
+        // (it used to become 1 silently).
+        let mut ratio = eval_in(&r.ratio.text, dim, units).or_else(|| eval_in(&r.ratio.text, Dim::UNITLESS, units)).map(|q| q.value).ok_or_else(|| "Enter a valid expression.".to_string())?;
         // Screw / rack and pinion values are distances per revolution.
         if matches!(r.relation_type, RelationType::Screw | RelationType::RackAndPinion) {
             ratio /= std::f64::consts::TAU;

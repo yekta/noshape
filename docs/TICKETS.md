@@ -3470,6 +3470,71 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (crates/render shaders.wgsl `fs_section_cap`, `parts > 1.0`) with no per-scene switch; the assembly needs it on
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
+## Assemblies (asm)
+
+From asm's feature audit of 2026-11-07 01:5x (every assembly tool and option in Onshape's help pages,
+/root/onshape-research/docs-raw/md/Assembly__*.md, against crates/model-data, assembly, assembly-ui and ops). The P0s
+were checked in code by asm; "(verify)" ones need a live check first.
+
+- [ ] P0 ASM-RELATION-TURNS (asm) relations compare wrapped angle changes (`solver.rs` `relation_residual`:
+  `wrap_angle(v[0] - base)`, base never updated): a Screw or Rack and pinion travels at most ±½ distance per revolution
+  from where it was made (a vise jaw stops), and a Gear with a ratio that isn't whole jumps 180° when its driver
+  passes ±180°. The same wrapping caps a Revolute's angle (and its limits) at ±180°. Track turns instead.
+- [ ] P0 ASM-RELATION-RATIO-VARIABLES (asm) a relation's ratio / distance per revolution is evaluated with no
+  variables (`eval.rs` `prepare_relation`, `EmptyScope`) and silently becomes 1 when that fails: `#ratio` or a typo
+  gives a 1:1 relation with no error. Evaluate in the assembly's scope as mate offsets do; an invalid expression is an
+  error on the field (dialog and op), not 1.
+- [ ] P0 ASM-DRAWING-VIEW-INDEX (asm) a drawing view names its exploded view and named position by list position
+  (`DrawingView.explode`, `named_position: Option<usize>`); deleting or reordering one (Delete, Move up / down) leaves
+  drawing views showing another (or none). Refer to them by id, as Onshape.
+- [ ] P0 ASM-BOM-CONFIGURED-SUBASSEMBLY (asm) the BOM walks a subassembly instance without its configuration
+  (`assembly/bom.rs` `walk`: `InstanceSource::Assembly { assembly, .. }`): two instances in different configurations
+  are one row with the unconfigured children.
+- [ ] P0 ASM-BOM-CONFIGURED-PROPERTIES (asm, verify in code) BOM cells read `part_properties` as stored: configured
+  Part number / Description / Material / Exclude from all BOMs show one value for every configuration.
+- [ ] P0 ASM-MASS-OVERRIDES (asm, verify in code) assembly mass properties use material density only: a part's
+  mass override counts as "no material", a subassembly's override and configured materials are ignored, parts excluded
+  from BOMs are counted.
+- [ ] P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but
+  Fastened (`Mate::new`); live's Revolute dialog shows "Rotate about X" (behaviours 1256, 19950). Change the default
+  for new mates and the op (saved documents keep what they stored).
+- [ ] P1 ASM-FLEX-SUB-RIGID (asm) a subassembly with relations, patterns, tangent mates or a flexible subassembly is
+  forced rigid even when set flexible (`eval.rs` ~2456): a gearbox subassembly can't be driven from its parent.
+- [ ] P1 ASM-DISPLAY-STATE-NESTED (asm) display states save and apply only top-level instances' visibility
+  (`ops.rs` `save_display_state`): parts hidden inside a subassembly are lost.
+- [ ] P1 ASM-REPLICATE-SEEDS (asm) Replicate keeps only its first seed instance, in the dialog and the op, silently
+  (`assembly_panels.rs` `seeds[..1]`, `more.rs`); live replicates several.
+- [ ] P1 ASM-CONFIG-VARIABLE-NOOP (asm) an assembly's configuration variable input does nothing: `#name` isn't in
+  scope for mates.
+- [ ] P1 ASM-CONFIGURE-PATTERNS (asm) assembly patterns (count, distance, suppression) and mate connectors can't be
+  configured (`ConfigTarget` is Instance | Mate).
+- [ ] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is
+  ignored.
+- [ ] P1 ASM-STD-AUTOSIZE-HOLE (asm, verify) standard content's Auto-size uses the hole's cylinder diameter only:
+  no fine / coarse thread from a Hole feature, a tapped hole likely sizes a bolt one size down.
+- [ ] P1 ASM-LINEAR-PATTERN-SECOND (asm, verify) the second direction has no Centered and Equal spacing doesn't apply
+  to it; the defaults are 50 mm / 2 (live Part Studio 25 mm / 1); Onshape's help names a third direction.
+- [ ] P1 ASM-RELATION-DIRECTION (asm, verify) Gear couples opposite, Linear the same way (`db = ∓ratio·da`): check each
+  relation's default direction against live.
+- [ ] P1 ASM-API-GAPS (asm) agent API: no op for assembly Properties… (Subassembly BOM behavior, Exclude, Part
+  number); `part_set_properties` lacks Exclude from all BOMs / Unit of measure / Not revision managed / State; no
+  assembly mass or measure op; `assembly_replace` takes one instance and current-document sources only (no sketch,
+  other document, standard content; its text still says mates are re-pointed); no op updates references to other
+  documents; `assembly_exploded_view` can't Duplicate or Reset starting position (coverage.rs says it does) and
+  `assembly_explode_step` takes no explode-line entities; per-mate / group Show / Hide (coverage.rs maps "Show
+  mates" to an op that only takes connectors); mate value typing, mate reorder, a connector's move from the mate dialog.
+- [ ] P2 ASM-AUDIT-P2 (asm) the audit's P2s: drawing explode-line edges kept on a step's direction reference; Reset
+  starting position does nothing; Apply named position never reports "Some Mate values could not be applied"; a
+  subassembly locked to a renamed named position silently goes flexible; BOM header sort, row menu (Suppress / Exclude
+  / Switch to Assembly / Open linked document), cross-highlighting, custom property columns, CSV write errors silent;
+  subassembly / top-level BOM mass; Mirror of a subassembly (Derived "-Mirrored" assembly); other-document inserts
+  with a configuration; the op's Part Studio insert default (rigid) vs the dialog's (each part); rigid Part Studio
+  Edit… (include parts / sketches / surfaces); in-context Follow position to a named position, configuration of
+  context instances, edit in context of a nested part (op); reference pinning, recursive Update all; standard content
+  Part number / Description (op); relations: DOF chooser for Planar / Parallel, mates of subassemblies; tangent between
+  a circular edge or cylinder and a cylinder / cone / torus; limit and offset ranges drawn in the graphics;
+  interference of parts inside subassemblies; explode steps configured, red when their instance is missing.
+
 ## Sketch + assembly (skasm)
 - [ ] P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
   (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance

@@ -447,9 +447,8 @@ impl Mate {
             offset_x: None,
             offset_y: None,
             rotation: None,
-            // Live (qa5 MT6, live 585): a Fastened mate's offset rotates
-            // about X by default.
-            rotation_axis: if mate_type == MateType::Fastened { 0 } else { 2 },
+            // Live (qa5 MT6, live 585; Revolute: behaviours 1256, 19950): a new mate's offset rotates about X.
+            rotation_axis: 0,
             flip_primary: false,
             reorient_secondary: 0,
             limits: vec![],

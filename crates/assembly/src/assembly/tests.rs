@@ -3448,12 +3448,13 @@ fn derived_parts_are_insertable() {
     assert!(!r.display.bodies.is_empty(), "listed in the Insert dialog");
 }
 
-/// qa5 MT6: a new Fastened mate's Offset rotation defaults to "Rotate about X".
+/// A new mate's Offset rotation defaults to "Rotate about X" (qa5 MT6: Fastened; live behaviours 1256, 19950:
+/// Revolute too).
 #[test]
-fn fastened_offset_rotates_about_x_by_default() {
+fn a_new_mates_offset_rotates_about_x() {
     let c = |i: u64| MateConnectorRef::on(InstanceId(i), vec![], Reference::Origin);
     assert_eq!(Mate::new(MateId(1), "Fastened 1".into(), MateType::Fastened, c(1), c(2)).rotation_axis, 0);
-    assert_eq!(Mate::new(MateId(2), "Revolute 1".into(), MateType::Revolute, c(1), c(2)).rotation_axis, 2);
+    assert_eq!(Mate::new(MateId(2), "Revolute 1".into(), MateType::Revolute, c(1), c(2)).rotation_axis, 0);
 }
 
 
