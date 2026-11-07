@@ -1415,3 +1415,63 @@ fn copies_of_a_filleted_tool_cut_as_occt() {
     let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
     assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against OCCT's {w}");
 }
+
+/// A plate cut by two long rods through it 20 mm apart, tilted to cross 100 mm below it (big cutters of a pattern
+/// meeting past the part, as c2-valve-config's handles): ours one rod at a time, the same as OCCT's cut by both (its
+/// faces, volume, and which input faces it says Modified, kept or Deleted).
+#[test]
+fn rods_meeting_below_a_plate_cut_one_at_a_time_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.02, 0.01)).unwrap();
+    let rod = |x: f64, lean: f64| {
+        let a = DVec3::new(lean, 0.0, 1.0).normalize();
+        let c = DVec3::new(x, 0.01, 0.005);
+        k::make_cylinder(&k::Plane::new(c - a * 0.15, a, DVec3::Y), 0.003, 0.3, TAU).unwrap()
+    };
+    let tools = [rod(0.01, -0.1), rod(0.03, 0.1)];
+    let opts = k::BooleanOptions::default();
+    k::set_rust_boolean_only(true);
+    let ours = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), &tools, &opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let ours = ours.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    k::set_rust_boolean(Some(false));
+    let occt = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), &tools, &opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(ours.shape.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&ours.shape), counts(&occt.shape));
+    let (v, w) = (ours.shape.volume().unwrap(), occt.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+    let rel = |r: &k::OpResult| {
+        let mut v: Vec<(u32, u32, String)> = r.history.records.iter().filter(|h| h.input_kind == k::ShapeType::Face).map(|h| (h.arg, h.input_index, format!("{:?}", h.relation))).collect();
+        v.sort();
+        v.dedup();
+        v
+    };
+    assert_eq!(rel(&ours), rel(&occt));
+}
+
+/// Two rods crossing inside a plate (and past it): not one at a time (the second meets the first's walls), the cut by
+/// both at once, as OCCT's.
+#[test]
+fn rods_crossing_inside_a_plate_cut_at_once_as_occt() {
+    let _ = k::set_working_scale(1000.0);
+    let plate = k::make_box_corners(DVec3::ZERO, DVec3::new(0.04, 0.02, 0.01)).unwrap();
+    let rod = |lean: f64| {
+        let a = DVec3::new(lean, 0.0, 1.0).normalize();
+        let c = DVec3::new(0.02, 0.01, 0.005);
+        k::make_cylinder(&k::Plane::new(c - a * 0.15, a, DVec3::Y), 0.003, 0.3, TAU).unwrap()
+    };
+    let tools = [rod(-0.5), rod(0.5)];
+    let opts = k::BooleanOptions::default();
+    let ours = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), &tools, &opts).unwrap();
+    k::set_rust_boolean(Some(false));
+    let occt = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(&plate), &tools, &opts).unwrap();
+    k::set_rust_boolean(None);
+    assert!(ours.shape.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&ours.shape), counts(&occt.shape));
+    let (v, w) = (ours.shape.volume().unwrap(), occt.shape.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+}

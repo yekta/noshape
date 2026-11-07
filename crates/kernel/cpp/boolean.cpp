@@ -5095,6 +5095,130 @@ bool fuse_tree(const std::vector<TopoDS_Shape>& all, const BoolOpts& opts, TopoD
   return true;
 }
 
+// Whether some two of `tools` meet (their boxes) somewhere outside `target`'s box: big cutters of a pattern reaching
+// past the part into each other (c2-valve-config's handles, 2 m long cones meeting below it). A cut by them all at once
+// has their crossings out there to build; one at a time (rust_cut_one_by_one) has none.
+bool tools_meet_outside(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& tools)
+{
+  Bnd_Box tb;
+  BRepBndLib::Add(target, tb, false);
+  if (tb.IsVoid())
+    return false;
+  std::vector<Bnd_Box> boxes(tools.size());
+  for (size_t i = 0; i < tools.size(); ++i)
+    BRepBndLib::Add(tools[i], boxes[i], false);
+  double x0, y0, z0, x1, y1, z1;
+  tb.Get(x0, y0, z0, x1, y1, z1);
+  for (size_t i = 0; i < tools.size(); ++i)
+    for (size_t j = i + 1; j < tools.size(); ++j)
+    {
+      if (boxes[i].IsVoid() || boxes[j].IsVoid() || boxes[i].IsOut(boxes[j]))
+        continue;
+      double a0, b0, c0, a1, b1, c1, d0, e0, f0, d1, e1, f1;
+      boxes[i].Get(a0, b0, c0, a1, b1, c1);
+      boxes[j].Get(d0, e0, f0, d1, e1, f1);
+      const double lo[3] = {std::max(a0, d0), std::max(b0, e0), std::max(c0, f0)};
+      const double hi[3] = {std::min(a1, d1), std::min(b1, e1), std::min(c1, f1)};
+      if (lo[0] < x0 || lo[1] < y0 || lo[2] < z0 || hi[0] > x1 || hi[1] > y1 || hi[2] > z1)
+        return true;
+    }
+  return false;
+}
+
+// A cut by several tools as one cut each with noshape's Boolean, one after another, where their pieces inside the
+// target keep apart: each step taken by it, no step touching (removing or changing) a face, edge or vertex an earlier
+// tool left, and each tool's faces left in the part (its walls) clear of the earlier ones' boxes. Then the result is
+// the cut by them all at once, and the history (composed through the steps) is too. False (nothing done) otherwise.
+bool rust_cut_one_by_one(const TopoDS_Shape& target, const std::vector<TopoDS_Shape>& tools, const BoolOpts& opts, TopoDS_Shape& out, HHist& hist)
+{
+  const RustLenient               lenient;
+  TopoDS_Shape                    cur = target;
+  std::vector<std::vector<Stage>> stages;
+  std::vector<Bnd_Box>            walls;
+  ShapeIMap                       left; // what the earlier tools left in the part: faces, their edges and vertices
+  for (const TopoDS_Shape& tool : tools)
+  {
+    fail_if_cancelled();
+    const std::vector<TopoDS_Shape>       in{cur, tool};
+    std::vector<const OcShape*>           rs;
+    std::vector<std::unique_ptr<OcShape>> own;
+    TopoDS_Shape                          next;
+    HHist                                 h;
+    if (!rust_boolean(1, in, rs, own, next, h, opts.fuzzy, false))
+      return false;
+    for (int k = 1; k <= left.Extent(); ++k)
+      if (h->IsRemoved(left(k)) || !h->Modified(left(k)).IsEmpty())
+        return rust_decline("tools meeting inside the target");
+    // The tool's faces in the part: its walls.
+    ShapeIMap mine;
+    for (TopExp_Explorer f(tool, TopAbs_FACE); f.More(); f.Next())
+    {
+      if (h->IsRemoved(f.Current()))
+        continue;
+      const ShapeList& m = h->Modified(f.Current());
+      if (m.IsEmpty())
+        mine.Add(f.Current());
+      for (ShapeList::Iterator it(m); it.More(); it.Next())
+        mine.Add(it.Value());
+    }
+    Bnd_Box wall;
+    for (int k = 1; k <= mine.Extent(); ++k)
+    {
+      BRepBndLib::Add(mine(k), wall, false);
+      for (TopAbs_ShapeEnum t : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+        for (TopExp_Explorer x(mine(k), t); x.More(); x.Next())
+          left.Add(x.Current());
+    }
+    if (!wall.IsVoid())
+    {
+      wall.Enlarge(1e-6);
+      for (const Bnd_Box& w : walls)
+        if (!w.IsOut(wall))
+          return rust_decline("tools meeting inside the target");
+      walls.push_back(wall);
+    }
+    stages.push_back({stage_of(in, h)});
+    cur = next;
+  }
+  std::vector<TopoDS_Shape> all{target};
+  all.insert(all.end(), tools.begin(), tools.end());
+  out  = cur;
+  hist = compose(all, stages);
+  // (compose has faces, edges and vertices: the solids through the steps too, from the one that takes each in, as
+  // OCCT's cut by them all says: the target's Modified, a tool's Deleted.)
+  auto solids = [&](const TopoDS_Shape& in, size_t from) {
+    for (TopExp_Explorer x(in, TopAbs_SOLID); x.More(); x.Next())
+    {
+      std::vector<TopoDS_Shape> cur{x.Current()};
+      for (size_t k = from; k < stages.size() && !cur.empty(); ++k)
+      {
+        std::vector<TopoDS_Shape> next;
+        for (const TopoDS_Shape& y : cur)
+        {
+          const HHist& sh = stages[k][0].hist;
+          if (sh->IsRemoved(y))
+            continue;
+          const ShapeList& m = sh->Modified(y);
+          if (m.IsEmpty())
+            next.push_back(y);
+          for (ShapeList::Iterator it(m); it.More(); it.Next())
+            next.push_back(it.Value());
+        }
+        cur = std::move(next);
+      }
+      if (cur.empty())
+        hist->Remove(x.Current());
+      for (const TopoDS_Shape& y : cur)
+        if (!y.IsSame(x.Current()))
+          hist->AddModified(x.Current(), y);
+    }
+  };
+  solids(target, 0);
+  for (size_t i = 0; i < tools.size(); ++i)
+    solids(tools[i], i);
+  return true;
+}
+
 // Solids that meet only on shared faces (the same TShape in both, as the
 // splitter leaves the cuts between slabs) joined into one: their faces
 // without the shared ones, one closed shell. Null when the parts aren't
@@ -7129,7 +7253,8 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
     HHist                                 h;
     std::vector<const OcShape*>           rs = srcs;
     std::vector<std::unique_ptr<OcShape>> own;
-    bool                                  done = false;
+    bool                                  done       = false;
+    bool                                  one_by_one = false;
     {
       const KernelTimer timer("boolean.rust");
       // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch; where
@@ -7150,14 +7275,26 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
           rust_decline(nullptr);
       }
       else
-        done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
+      {
+        // (Big cutters meeting each other past the part: one at a time, where their pieces in it keep apart.)
+        if (op == 1 && a.size() == 1 && t.size() >= 2 && t.size() <= 16 && opts.glue == 0 && tools_meet_outside(a[0], t))
+        {
+          const KernelTimer one("boolean.rust.one_by_one");
+          done       = rust_cut_one_by_one(a[0], t, opts, out, h);
+          one_by_one = done;
+          if (done)
+            rs = srcs;
+        }
+        if (!done)
+          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
+      }
     }
     if (done)
     {
       t_bool_path = "rust";
       // A target known to have nothing to merge: the unify (here or op_unify's) looks only where it changed.
       std::shared_ptr<const UnifyScope> scope;
-      if (rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
+      if (!one_by_one && rs[0] != nullptr && rs[0]->myUnifyClean && unify_local_on())
         scope = rust_unify_scope(*rs[0]);
       bool clean = false;
       if (opts.unify)

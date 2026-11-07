@@ -110,6 +110,18 @@ capture filed 11-07 05:18).
     after 171 ms of ours (the 7th tool reaches 1.2 m out, z -2 m: its own faces' loops used once; and the y = -70
     handle keeps vertex pairs 0.07 mm apart), so the document got slower (Extrude 2 -30 ms, the pattern +150 ms):
     not landed. Take the 7-tool cut, or decline it early, before landing the first.
+- (07:15 UTC, lead: option 2) A cut by 2-16 tools that meet each other past the part (their boxes' overlap reaching
+  outside the target's box: big cutters of a pattern) is done one tool at a time by ours (boolean.cpp
+  rust_cut_one_by_one) where their pieces in the part keep apart: each step taken by ours, no step removing or changing
+  a face, edge or vertex an earlier tool left, each tool's walls (its faces in the part) clear of the earlier ones'
+  boxes; else the cut by them all at once as before. History composed through the steps (compose, plus the solids:
+  the target's Modified, the tools' Deleted, as OCCT's): the corpora's records exactly OCCT's (the first try, faces
+  only, left 2-tool cuts "equivalent"). T1 bool_patterns::rods_meeting_below_a_plate_cut_one_at_a_time_as_occt and
+  rods_crossing_inside_a_plate_cut_at_once_as_occt. c2-valve-config's 7-tool cut takes it only with the parked handle
+  fixes and the live exception for its tool 7 (capture filed 05:18).
+- c2-rings-loft on core's live-shaped body: 2 of its 23 Booleans (fuses of 1 tool, 20cab90d / d8fb6573) differ from
+  OCCT in volume (3.5e-14 m³, 3e-8 relative), on main too: recorded in vibe5 ~/agents/bool-corpora/rings1; next with
+  its Shell 1.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change
