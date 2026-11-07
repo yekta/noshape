@@ -36,6 +36,15 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 17:10: the parity suites job changed (lead 11-07: the 16:34 run held this machine at load ~80 for 30 min, slowing
+live's / live2's Chrome).** qa-suites.sh now runs the ui-parity shards here with 3 shards under `nice -n 10`, and the model
+suite on vibe2 through rb.sh (`NOSHAPE_RB_HOST=vibe2 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
+cargo test -q -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`, from the noshape-wt/qa-suite
+checkout at the green). Nothing builds on this machine any more; /root/target-qa deleted. The 16:34 run's local build was
+stopped and its model suite redone on vibe2 (bin/qa-suites-finish.sh <run dir>). The loop (pid 1619190) is unchanged. The
+comparison is bin/suites-diff.py (the old join compared out of sort order); worse.txt lists only real changes, and the
+drawing / assembly-menu scenarios that differ only under load are UIP-DRW-START-FLAKY (dx), UIP-ASM-FACE-MENU-FLAKY (asm).
+
 **11-07 08:49: v0.4.34 (published 08:40, run 42350272727, cut c373da6e3) checked: good, no blocker.** Linux files = the smoked
 artifact byte for byte, SHA256SUMS OK, 11 assets, every job green. Smoke = v0.4.33 (the vase's 1e-8 from a7f4c4f9 only); the 44
 ticket documents = green 6d194fa1 (SAVED-CHAMFER-CHANGE is after the cut). **Updater on all three:** Windows: the run's "update
