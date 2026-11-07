@@ -58,7 +58,7 @@ pub fn run_in_drawing(ed: &Entity<noshape_drawing_ui::drawing_view::DrawingEdito
         "Drawing properties panel" => ed.update(cx, |ed, cx| ed.open_drawing_props(cx)),
         "Format painter" => ed.update(cx, |ed, cx| ed.toggle_format_painter(cx)),
         "Hide inspection items" => ed.update(cx, |ed, cx| ed.toggle_hide_inspection(cx)),
-        "Inspection item" => ed.update(cx, |ed, cx| ed.open_inspection(cx)),
+        "Inspection item" => ed.update(cx, |ed, cx| ed.open_inspection(window, cx)),
         "Insert view" => ed.update(cx, |ed, cx| ed.open_insert_chooser(cx)),
         "Insert DXF or DWG" => ed.update(cx, |ed, cx| ed.insert_cad_file(window, cx)),
         _ => {}

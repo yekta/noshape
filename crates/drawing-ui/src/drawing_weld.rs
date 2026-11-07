@@ -371,6 +371,14 @@ impl DrawingEditor {
         let upper = side_rows(true);
         let lower = side_rows(false);
         let flip_ok = !s.symmetric;
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Weld symbol", "Flip symbol", if iso { "Flip identification line" } else { "Joint spacer" }, "Stagger", "Symmetric"];
+            if s.stagger {
+                text.extend(["Left", "Right"]);
+            }
+            text.extend(["Reference", "All around"]);
+            serde_json::json!({ "kind": "drawing-panel", "title": "Weld symbol", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-weld-dlg")

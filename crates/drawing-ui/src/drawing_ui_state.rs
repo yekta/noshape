@@ -186,6 +186,8 @@ impl DrawingEditor {
                 }
             }
         }
+        // An inspection item is an annotation of its own in live (an "inspectionsymbol" without text, hidden or not).
+        annotations.extend(sheet.annotations.iter().filter(|a| a.inspection.is_some()).map(|_| ("inspectionsymbol", String::new())));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it.
@@ -193,7 +195,9 @@ impl DrawingEditor {
         for s in &self.selection {
             match s {
                 Sel::View(id) => selection.push(("VIEW".into(), self.ui_view_name(*id))),
-                Sel::Annotation(id) => selection.push(("ANNOTATION".into(), self.ui_annotations().into_iter().find(|a| a.0 == *id).map(|a| a.2).unwrap_or_default())),
+                // Live's recorder can't read an annotation's selection (a clicked callout records []: live2's batch
+                // 9 and 10 recordings), so neither side records one.
+                Sel::Annotation(_) => {}
                 _ => {}
             }
         }
@@ -241,10 +245,10 @@ impl DrawingEditor {
             "sheet": sheet.name,
             "sheets": sheets,
             // (The Insert view panel before a part is chosen is the Insert view tool's, as live's toolbar shows it.)
-            "tool": ui_tool_name(&self.tool).or_else(|| (matches!(self.tool, Tool::Select) && (self.insert.panel || self.insert.chooser.is_some())).then_some("Insert view")),
+            "tool": ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name()),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp")).then_some(t) })).collect::<Vec<_>>(),
+            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "inspectionsymbol")).then_some(t) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }
@@ -294,6 +298,34 @@ impl DrawingEditor {
 }
 
 /// The active drawing tool's tooltip name (the toolbar's, without its shortcut); `None` for Select.
+impl DrawingEditor {
+    /// The tool a dialog stands for while the tool itself is Select, as live's toolbar shows it active (the Insert
+    /// view panel before a part is chosen, a placed weld symbol's dialog, Hatch region, Format painter…).
+    fn dialog_tool_name(&self) -> Option<&'static str> {
+        if !matches!(self.tool, Tool::Select) {
+            return None;
+        }
+        Some(if self.insert.panel || self.insert.chooser.is_some() {
+            "Insert view"
+        } else if self.weld_dlg.is_some() {
+            "Weld symbol"
+        } else if self.edge_condition_dlg.is_some() {
+            "Edge condition symbol"
+        } else if self.hatch_dlg.as_ref().is_some_and(|d| d.sections.is_none()) {
+            "Hatch region"
+        } else if self.painter.is_some() {
+            "Format painter"
+        } else if self.inspection.as_ref().is_some_and(|d| d.reorder.is_none() && d.edit.is_none()) {
+            "Inspection item"
+        } else if self.drawing.props.hide_inspection {
+            // The toolbar's pressed toggle.
+            "Hide inspection items"
+        } else {
+            return None;
+        })
+    }
+}
+
 fn ui_tool_name(t: &Tool) -> Option<&'static str> {
     Some(match t {
         Tool::Select => return None,

@@ -247,29 +247,15 @@ impl DrawingEditor {
             menu
         });
         let scale_field = h_flex().border_b_1().border_color(pal.accent).child(div().flex_1().child(Input::new(&st.scale).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small())).child(scale_menu).into_any_element();
-        // Format: Onshape's template (DWT) names; "Custom" when none matches.
-        let tmpl = templates::standard_templates();
-        let cur_tmpl = tmpl.iter().find(|t| t.size == sheet.size && t.style == sheet.title_style && t.inches != self.drawing.units_mm).map(|t| t.name);
-        let format_items: Vec<(String, bool, Act)> = tmpl
-            .iter()
-            .map(|&tp| {
-                let act: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| {
-                    t.edit(&format!("Template {}", tp.name), cx, |d| templates::apply_template(d, si, &tp));
-                    t.fitted = false;
-                });
-                (tp.name.replace(' ', "_") + ".dwt", Some(tp.name) == cur_tmpl, act)
-            })
-            .collect();
-        let mut format_label = cur_tmpl.map(|n| n.replace(' ', "_") + ".dwt").unwrap_or_else(|| "Custom".into());
-        // A picked DWT (live z2): Format shows it; its list is {the DWT, Custom}
-        // and Custom detaches it.
-        let format_items = match &sheet.dwt {
+        // Format: "Custom" (DWTs come from the picker button); a picked DWT
+        // lists {the DWT, Custom} and Custom detaches it (live z2, 2084).
+        let noop: Act = std::rc::Rc::new(|_: &mut DrawingEditor, _: &mut Window, _: &mut Context<DrawingEditor>| {});
+        let (format_label, format_items) = match &sheet.dwt {
             Some(name) => {
-                format_label = name.clone();
                 let detach: Act = std::rc::Rc::new(move |t: &mut DrawingEditor, _: &mut Window, cx: &mut Context<DrawingEditor>| t.edit("Format", cx, |d| d.detach_dwt(si)));
-                vec![(name.clone(), true, std::rc::Rc::new(|_: &mut DrawingEditor, _: &mut Window, _: &mut Context<DrawingEditor>| {}) as Act), ("Custom".to_string(), false, detach)]
+                (name.clone(), vec![(name.clone(), true, noop), ("Custom".to_string(), false, detach)])
             }
-            None => format_items,
+            None => ("Custom".to_string(), vec![("Custom".to_string(), true, noop)]),
         };
         let dwt = Button::new("sp-dwt")
             .ghost()
@@ -395,6 +381,22 @@ impl DrawingEditor {
                 .tooltip("Switch to reference")
                 .on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx))
                 .into_any_element(),
+        });
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec!["Sheet properties".into()];
+            if sheet.imported.as_ref().is_some_and(|m| m.model) {
+                text.extend(["Size".into(), "Letter (8.50 x 11.00 Inches)".into()]);
+            } else {
+                text.extend(["Scale".into(), "Format".into()]);
+                text.extend(format_items.iter().map(|i| i.0.clone()));
+                if sheet.dwt.is_none() {
+                    text.push("Size".into());
+                    text.extend(size_items.iter().map(|i| i.0.clone()));
+                }
+                text.push("Reference".into());
+                text.extend(ref_items.iter().map(|i| i.0.clone()));
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Sheet properties", "text": text })
         });
         Some(
             v_flex()

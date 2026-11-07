@@ -233,7 +233,7 @@ impl DrawingEditor {
         groups.push(vec![
             tb("dr-inspection", "inspection-item", "Inspection item", self.inspection.is_some(), |e, w, cx| {
                 w.focus(&e.focus, cx);
-                e.open_inspection(cx)
+                e.open_inspection(w, cx)
             }),
             tb("dr-inspection-hide", "inspection-hide", "Hide inspection items", self.drawing.props.hide_inspection, |e, _, cx| e.toggle_hide_inspection(cx)),
         ]);

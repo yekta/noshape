@@ -192,8 +192,10 @@ impl DrawingEditor {
             self.close_datum_dlg(false, cx);
             return;
         }
+        // Live: Esc closes Move to sheet and clears the selection.
         if self.move_sheet.take().is_some() {
-            cx.notify();
+            self.selection.clear();
+            self.redraw(cx);
             return;
         }
         if self.table_props.is_some() {

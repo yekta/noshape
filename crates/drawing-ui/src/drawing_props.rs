@@ -466,7 +466,9 @@ impl DrawingEditor {
     pub fn start_align_views(&mut self, id: ViewId, vertical: bool, cx: &mut Context<Self>) {
         self.align_views = Some((id, vertical));
         self.status = Some("Align views: select the view to align with".into());
-        cx.notify();
+        // Live: the views' selection clears while it waits for the target.
+        self.selection.clear();
+        self.redraw(cx);
     }
 
     /// Click while aligning views. True when the click was used.

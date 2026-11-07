@@ -452,7 +452,7 @@ impl DrawingEditor {
         };
         let small = |s: String| div().text_size(px(12.)).text_color(ink).child(s).into_any_element();
         // Units (D34): the drawing's entry "… (Drawing)" in the list.
-        let mut unit_items: Vec<(String, bool, Act)> = DimUnits::CALLOUT.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
+        let mut unit_items: Vec<(String, bool, Act)> = DimUnits::ALL.iter().map(|&u| (u.name().to_string(), units == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.units = Some(u)) as Act)).collect();
         let drawing_units = if self.drawing.units_mm { "Millimeters (Drawing)" } else { "Inches (Drawing)" };
         unit_items.insert(if self.drawing.units_mm { 1 } else { 4 }, (drawing_units.to_string(), units.is_none(), std::rc::Rc::new(|d: &mut PaletteDlg| d.cur.format.units = None) as Act));
         // Live: the drawing's own entry follows its Dual setting (asb 10-24:
@@ -620,8 +620,8 @@ impl DrawingEditor {
             let dprec = fmt.dual_fmt.precision;
             let prec_items: Vec<(String, bool, Act)> = PRECISIONS.iter().map(|&(l, v)| (l.to_string(), dprec == v, std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual_fmt.precision = v) as Act)).collect();
             let own = fmt.dual_fmt.units;
-            let mut unit_items: Vec<(String, bool, Act)> = DimUnits::CALLOUT.iter().map(|&u| (u.name().to_string(), own == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual_fmt.units = Some(u)) as Act)).collect();
-            let at = DimUnits::CALLOUT.iter().position(|&u| u == drawing_du).map_or(0, |i| i + 1);
+            let mut unit_items: Vec<(String, bool, Act)> = DimUnits::ALL.iter().map(|&u| (u.name().to_string(), own == Some(u), std::rc::Rc::new(move |d: &mut PaletteDlg| d.cur.format.dual_fmt.units = Some(u)) as Act)).collect();
+            let at = DimUnits::ALL.iter().position(|&u| u == drawing_du).map_or(0, |i| i + 1);
             unit_items.insert(at, (format!("{} (Drawing)", drawing_du.name()), own.is_none(), std::rc::Rc::new(|d: &mut PaletteDlg| d.cur.format.dual_fmt.units = None) as Act));
             let unit_label = if du.symbol().is_empty() { "(ft-in)".to_string() } else { format!("({})", du.symbol()) };
             let shown = nf::dual_shows_unit(&self.drawing, &fmt);

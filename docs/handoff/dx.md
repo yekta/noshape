@@ -29,6 +29,33 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   as many (`parts_by_count`).
 - 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
   profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+## 11-07 15:50 UTC: live's drawing recordings of batches 4-11 (lead's item 2)
+- Landed cc0b2c4d (the batch 4-10 fixes, Break view, tabs, the export fidelity first fixes). In this change:
+  - Selection as live's recorder reads it: no ANNOTATION items (it can't read them); a menu action in Select mode with
+    no dialog or mode clears the selection; Align views and Adjust linestyle clear it when they start; Esc out of Move
+    to sheet clears it. The selection scenarios: 0 -> 16/30 matching. Left: live reports the hovered edge as
+    selected after a dimension tool's last click or Esc (3-point angular, max/min), and the edge a dialog picked
+    (Edge condition, Crop view): its recorder, not a behaviour to copy.
+  - Panel records (README "### Drawings": every text in reading order, at most 30) for Drawing properties, Sheet
+    properties, Crop view, Custom table (and its properties), Edge condition, Format painter, Hatch region, Adjust
+    linestyle, Weld symbol, BOM table properties, Inspection item and the Sheets panel. Fixed on the way: Drawing
+    properties › Units lists live's 8 units (Inches fractional, Feet and inches, Yards were missing); Sheet properties ›
+    Format is "Custom" only (DWTs come from its button; it listed our built-in templates); Format painter's prompt is
+    live's field at the top; BOM table properties has Document / Workspace / Reference "BOM : <assembly>" with its badge
+    and the Sheet row; a cut list lists only studios with frames; the Sheets panel calls a corner view "Isometric"
+    (was "Projected view"); the dialog tools (Weld, Hatch region, Format painter, Edge condition, Inspection item)
+    report their tool while the dialog is open; an inspection item is recorded as live's `inspectionsymbol` annotation.
+  - Inspection item as live: the nine shapes (Circle, Diamond, Double Circle, Flag, Hexagon, Octagon, Rectangle,
+    Square Circle, Triangle; our Oval reads as Circle), drawn with the callout borders; the dialog's Number field and its
+    own shape / width selects with the drawing's entry repeated as "… (Drawing)"; each item keeps its shape and width
+    (`inspection_shape` / `inspection_chars`, ops `shape` / `border_size` on add). Asked live what the dialog's size
+    field ("2.0000 ▾") sets (REQUESTS, with the re-records).
+- Left from the recordings: Sheet properties › Reference lists "Unassigned" (needs a settable sheet reference; ours
+  is derived from the views); the Sheets panel's view order (live Front, Right, Top, Isometric: creation order of its
+  start, ours Front, Top, Right, Isometric); 12 scenarios to re-record (REQUESTS 15:45: sheets through the panel,
+  cells, break_line, "Edit hatch region..."); drw-inspection-item's step 7 (live closed the dialog and added no item on the
+  click that drw-hide-inspection-items records adding one) is worth a re-record too.
+
 ## 11-07 15:01 UTC: 2132 rerun (c2 by REST, sketch bodies in): 59/88 documents, 638/936 features
 Run on vibe5 at the merge of 46e48dc6 (report: vibe5 ~/parity/report.json, copy /root/dx-scratch/report-c2.json).
 c2 matching to the end: bottle-split, lofted-basic, sm-exhaust-clamp, steak-mold-draft. First differences, by owner:

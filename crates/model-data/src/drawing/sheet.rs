@@ -1250,18 +1250,12 @@ impl SheetGeometry {
         let w = if style.chars == 0 { w } else { w.max(style.chars as f64 * h * 0.6) };
         let (rx, ry) = (w * 0.5 + border, h * 0.5 + border);
         let c = [at[0] - rx - 0.8, at[1]];
-        let ring = |rx: f64, ry: f64| -> Vec<[f64; 2]> { (0..32).map(|i| {
-            let t = i as f64 / 32.0 * std::f64::consts::TAU;
-            [c[0] + rx * t.cos(), c[1] + ry * t.sin()]
-        }).collect() };
-        let pts = match shape {
-            S::Circle => ring(rx.max(ry), rx.max(ry)),
-            S::Oval => ring(rx + 1.0, ry),
-            S::Rectangle => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
-            S::Triangle => vec![[c[0] - rx - 1.5, c[1] - ry], [c[0] + rx + 1.5, c[1] - ry], [c[0], c[1] + ry + 2.0]],
-            S::Flag => vec![[c[0] - rx, c[1] - ry], [c[0] + rx, c[1] - ry], [c[0] + rx + 1.5, c[1]], [c[0] + rx, c[1] + ry], [c[0] - rx, c[1] + ry]],
-        };
-        if style.solid {
+        let round = matches!(shape, S::Circle | S::DoubleCircle | S::SquareCircle | S::Octagon | S::Triangle);
+        let (bx, by) = if round { (rx.max(ry), rx.max(ry)) } else { (rx, ry) };
+        let outlines = callout_outlines(shape.border(), c, bx, by);
+        if style.solid
+            && let Some((pts, _)) = outlines.first()
+        {
             // Solid fill: the shape filled in its own colour (live: orange
             // under a black border and number, drawing/1710).
             for i in 1..pts.len().saturating_sub(1) {
@@ -1271,9 +1265,11 @@ impl SheetGeometry {
             self.colors.push(fill);
         }
         let border = self.lines.len();
-        self.lines.push(Polyline2 { points: pts, style: LineStyle::Thin, closed: true, pick });
+        for (points, closed) in outlines {
+            self.lines.push(Polyline2 { points, style: LineStyle::Thin, closed, pick });
+        }
         if let Some(rgb) = style.color {
-            self.colors.push(ColorSpan { lines: border..border + 1, texts: 0..0, fills: 0..0, rgb });
+            self.colors.push(ColorSpan { lines: border..self.lines.len(), texts: 0..0, fills: 0..0, rgb });
         }
         let mt = self.mark();
         self.texts.push(Text2 { pos: c, height: h, text, angle: 0.0, anchor: Anchor::Center, pick });
@@ -2520,7 +2516,8 @@ impl SheetGeometry {
                     pts = self.lines[l0..l1].iter().flat_map(|l| l.points.iter().copied()).collect();
                 }
                 let at = if pts.is_empty() { a.position } else { [pts.iter().map(|p| p[0]).fold(f64::MAX, f64::min), pts.iter().map(|p| p[1]).fold(f64::MIN, f64::max)] };
-                self.inspection_bubble(at, n, &style, inspection_pick(a.id));
+                let own = InspectionStyle { shape: a.inspection_shape.unwrap_or(style.shape), chars: a.inspection_chars.unwrap_or(style.chars), ..style.clone() };
+                self.inspection_bubble(at, n, &own, inspection_pick(a.id));
             }
         }
     }
@@ -3762,6 +3759,22 @@ mod tests {
         let mut g = SheetGeometry::new(100.0, 100.0);
         g.inspection_bubble([50.0, 50.0], 3, &style(false, Some([10, 20, 30]), Some([1, 2, 3])), 1);
         assert!(g.fills.is_empty() && g.text_color(0) == Some([10, 20, 30]));
+    }
+
+    /// Live's nine inspection shapes: a double circle is two rings in the
+    /// border colour, a hexagon six corners.
+    #[test]
+    fn inspection_bubble_shapes() {
+        use super::super::InspectionShape as S;
+        let style = |shape| InspectionStyle { shape, text_height: 2.5, border: 1.2, chars: 2, color: Some([0, 0, 200]), solid: false, font: None, text_color: None, fill_color: None };
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.inspection_bubble([50.0, 50.0], 3, &style(S::DoubleCircle), 1);
+        assert_eq!(g.lines.len(), 2);
+        assert!((0..2).all(|i| g.line_color(i) == Some([0, 0, 200])));
+        let mut g = SheetGeometry::new(100.0, 100.0);
+        g.inspection_bubble([50.0, 50.0], 3, &style(S::Hexagon), 1);
+        assert_eq!((g.lines.len(), g.lines[0].points.len()), (1, 6));
+        assert_eq!(serde_json::from_str::<S>("\"Oval\"").ok(), Some(S::Circle), "an older document's Oval reads as Circle");
     }
 
     /// Tables › Revision callouts: the border shape, fit and text height;

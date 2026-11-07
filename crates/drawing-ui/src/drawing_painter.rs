@@ -8,6 +8,8 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::*;
 use noshape_model::drawing::painter::{PaintOptions, paint};
 
+const PROMPT: &str = "Select an annotation or dimension to apply style, tolerance/precision, and content";
+
 /// Format painter state: options and the source annotation.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PainterState {
@@ -60,6 +62,7 @@ impl DrawingEditor {
             })))
         };
         let o = st.options;
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Format painter", "text": ["Format painter", PROMPT, "Paste style", "Paste tolerance and precision", "Paste content"] }));
         Some(
             v_flex()
                 .id("dr-painter")
@@ -113,13 +116,13 @@ impl DrawingEditor {
                                 })),
                         ),
                 )
+                .child(div().mx(px(3.)).mt(px(3.)).px(px(7.)).py(px(4.)).bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(PROMPT))
                 .child(
                     v_flex()
                         .p(px(3.))
                         .child(check("fp-style", "Paste style", o.style, |o, v| o.style = v, cx))
                         .child(check("fp-tol", "Paste tolerance and precision", o.tolerance_precision, |o, v| o.tolerance_precision = v, cx))
-                        .child(check("fp-content", "Paste content", o.content, |o, v| o.content = v, cx))
-                        .child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child(if st.source.is_some() { "Select the destinations" } else { "Select the source dimension or annotation" })),
+                        .child(check("fp-content", "Paste content", o.content, |o, v| o.content = v, cx)),
                 )
                 .into_any_element(),
         )

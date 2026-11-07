@@ -10,7 +10,7 @@ use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
 use crate::{Ctx, OpenDoc, refs};
-use noshape_model::drawing::{AnnotationKind, SheetLayer, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, TableCorner, ViewId, ViewKind};
+use noshape_model::drawing::{AnnotationKind, SheetLayer, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, InspectionShape, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
 
@@ -496,7 +496,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "inspection",
             summary: "Inspection items: number annotations (manual, reorder, automatic), edit, move, remove, hide, border shape",
-            description: "The Inspection item tool and its menus. add: number `annotations` in order, from `number` (Reorder inspection items) or the drawing's next number (\"Inspection item\"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) (\"Inspection items\"). edit: annotation `id` gets `number` (\"Edit inspection item\"). move: `id`'s number moves to annotation `to` (\"Move inspection item\"). remove: `annotations` lose theirs (\"Remove inspection item\"); remove_all (\"Remove all inspection items\"). hide / show: the toolbar's Hide inspection items toggle (\"Hide inspection items\" / \"Show inspection items\"). shape: the bubbles' border `shape` (\"Inspection border shape\"). drawing_get lists each annotation's `inspection` number.",
+            description: "The Inspection item tool and its menus. add: number `annotations` in order, from `number` (the dialog's Number field, or Reorder inspection items) or the drawing's next number, with the dialog's `shape` and `border_size` (\"Inspection item\"). automatic: number every dimension and annotation of `scope` (drawing, sheet, or the view `view`) (\"Inspection items\"). edit: annotation `id` gets `number` (\"Edit inspection item\"). move: `id`'s number moves to annotation `to` (\"Move inspection item\"). remove: `annotations` lose theirs (\"Remove inspection item\"); remove_all (\"Remove all inspection items\"). hide / show: the toolbar's Hide inspection items toggle (\"Hide inspection items\" / \"Show inspection items\"). shape: the bubbles' border `shape` (\"Inspection border shape\"). drawing_get lists each annotation's `inspection` number (and its own `inspection_shape` / `inspection_border_size`).",
             fields: with(
                 common(),
                 vec![
@@ -507,7 +507,8 @@ pub fn ops() -> Vec<Op> {
                     opt("to", json!({ "type": "integer" }), "Annotation the number moves to (move)."),
                     opt("scope", json!({ "type": "string", "enum": ["drawing", "sheet", "view"], "default": "drawing" }), "Automatic scope."),
                     opt("view", json!({ "type": "integer" }), "View (scope view)."),
-                    opt("shape", json!({ "type": "string", "enum": ["circle", "oval", "rectangle", "triangle", "flag"] }), "Border shape (shape)."),
+                    opt("shape", json!({ "type": "string", "enum": ["circle", "diamond", "double_circle", "flag", "hexagon", "octagon", "rectangle", "square_circle", "triangle"] }), "Border shape: the drawing's (shape), or the added items' own (add; omitted: the drawing's)."),
+                    opt("border_size", json!({ "type": "integer", "minimum": 0, "maximum": 5 }), "Border size in characters, 0 Tight Fit (add; omitted: the drawing's)."),
                 ],
             ),
             mutates: true,
@@ -2312,8 +2313,19 @@ fn format_painter(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     done(od, t, "Format painter", "source", src)
 }
 
+const INSPECTION_SHAPES: [(&str, InspectionShape); 9] = [
+    ("circle", InspectionShape::Circle),
+    ("diamond", InspectionShape::Diamond),
+    ("double_circle", InspectionShape::DoubleCircle),
+    ("flag", InspectionShape::Flag),
+    ("hexagon", InspectionShape::Hexagon),
+    ("octagon", InspectionShape::Octagon),
+    ("rectangle", InspectionShape::Rectangle),
+    ("square_circle", InspectionShape::SquareCircle),
+    ("triangle", InspectionShape::Triangle),
+];
+
 fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    use noshape_model::drawing::InspectionShape;
     use noshape_model::drawing::inspection::Scope;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
@@ -2329,10 +2341,24 @@ fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let description = match a.str("action")? {
         "add" => {
             let first = a.opt_u64("number")?.map(|n| n as u32);
+            // The dialog's border shape and size (None: the drawing's).
+            let shape = match a.get("shape") {
+                Some(_) => Some(enum_arg(a, "shape", &INSPECTION_SHAPES, InspectionShape::Circle)?),
+                None => None,
+            };
+            let chars = match a.opt_u64("border_size")? {
+                Some(n) if n <= 5 => Some(n as u8),
+                Some(_) => return Err(OpError::param("border_size", "0 (Tight Fit) to 5 characters")),
+                None => None,
+            };
             for (k, id) in list(&t)?.into_iter().enumerate() {
-                // Reorder: the Number field counts up after each item.
+                // The Number field counts up after each item.
                 let n = first.map(|f| f + k as u32).unwrap_or_else(|| t.d.next_inspection_number());
                 dt::set_inspection(&mut t.d.sheets[si], id, Some(n));
+                if let Some(x) = t.d.sheets[si].annotations.iter_mut().find(|x| x.id == id) {
+                    x.inspection_shape = shape.or(x.inspection_shape);
+                    x.inspection_chars = chars.or(x.inspection_chars);
+                }
             }
             "Inspection item"
         }
@@ -2384,11 +2410,10 @@ fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "Show inspection items"
         }
         "shape" => {
-            let shapes = [("circle", InspectionShape::Circle), ("oval", InspectionShape::Oval), ("rectangle", InspectionShape::Rectangle), ("triangle", InspectionShape::Triangle), ("flag", InspectionShape::Flag)];
             if a.get("shape").is_none() {
                 return Err(OpError::param("shape", "required"));
             }
-            t.d.props.inspection_shape = enum_arg(a, "shape", &shapes, InspectionShape::Circle)?;
+            t.d.props.inspection_shape = enum_arg(a, "shape", &INSPECTION_SHAPES, InspectionShape::Circle)?;
             "Inspection border shape"
         }
         _ => return Err(OpError::param("action", "add, automatic, edit, move, remove, remove_all, hide, show or shape")),
@@ -2452,7 +2477,7 @@ fn edit_dimension(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         if let Some(u) = a.opt_str(k)? {
             *slot = match u {
                 "drawing" => None,
-                _ => Some(DimUnits::CALLOUT.iter().copied().find(|x| x.name().eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param(k, &format!("one of {} or \"drawing\"", DimUnits::CALLOUT.iter().map(|x| x.name()).collect::<Vec<_>>().join(", "))))?),
+                _ => Some(DimUnits::ALL.iter().copied().find(|x| x.name().eq_ignore_ascii_case(u)).ok_or_else(|| OpError::param(k, &format!("one of {} or \"drawing\"", DimUnits::ALL.iter().map(|x| x.name()).collect::<Vec<_>>().join(", "))))?),
             };
         }
     }

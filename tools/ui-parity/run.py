@@ -199,7 +199,7 @@ def normalize_live(state):
     # Live's runner works in a copy of the start, its Part Studio "start <name> Copy 1" in a drawing panel.
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "drawing-panel":
-        d["text"] = [re.sub(r"^start \S+ Copy \d+ ", "Part Studio 1 ", t) if isinstance(t, str) else t for t in d.get("text") or []]
+        d["text"] = [re.sub(r"^start \S+ Copy \d+( |$)", r"Part Studio 1\1", t) if isinstance(t, str) else t for t in d.get("text") or []]
     # The same name in a modal's File name ("start block Copy 1 - Sketch 1": Export as DXF/DWG; an assembly's instance
     # Export…: "start two-blocks - Part 2"), and as the focus' text.
     focus = (state or {}).get("focus")
@@ -368,7 +368,7 @@ def compare(live, ours):
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
                 d["text"] = [re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
                 # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own.
-                d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d["text"]]
+                d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d["text"]][:30]
                 if d.get("title") == "View properties" and len(d["text"]) > 2 and d["text"][1] == "Document":
                     d["text"][2] = "<document>"
             dr = side.get("drawing")

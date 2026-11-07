@@ -52,7 +52,8 @@ impl DrawingEditor {
             let Some(src) = self.sources.get(&key) else { continue };
             let fits = match kind {
                 TableTool::Bom => src.assembly,
-                TableTool::CutList => !src.assembly,
+                // A Part Studio with frames (live: none listed for a plain block).
+                TableTool::CutList => !src.assembly && !src.context.frame_members.is_empty(),
                 _ => false,
             };
             if fits && !seen.contains(&key) {
@@ -530,6 +531,11 @@ impl DrawingEditor {
                 }))
         };
         let corners: Vec<AnyElement> = CORNERS.iter().enumerate().map(|(i, k)| corner_btn(*k, i, cx).into_any_element()).collect();
+        let (doc_name, ws_name) = {
+            let doc = self.doc.read(cx);
+            (doc.name().to_string(), doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
+        };
+        let ref_text = if bom { format!("BOM : {source_label}") } else { source_label.clone() };
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options too.
             let title = match (bom, editing) {
@@ -538,9 +544,18 @@ impl DrawingEditor {
                 (true, true) => "BOM table properties",
                 (false, true) => "Cut list table properties",
             };
-            let mut text: Vec<String> = vec![title.into(), "Insert".into(), source_label.clone()];
+            let mut text: Vec<String> = vec![title.into()];
+            if editing {
+                text.extend(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone(), "Reference:".into(), ref_text.clone(), "In progress".into()]);
+            } else {
+                text.extend(["Insert".into(), source_label.clone()]);
+            }
             if let Some(c) = &config_line {
                 text.extend(["Configurations".into(), c.clone()]);
+            }
+            if editing {
+                text.push("Sheet".into());
+                text.extend(self.drawing.sheets.iter().map(|s| s.name.clone()));
             }
             if bom {
                 text.extend(["Template", "Follow assembly", "Onshape Default BOM", "BOM type", "Flattened", "Structured - Top level", "Structured - Multi level"].map(String::from));
@@ -584,18 +599,26 @@ impl DrawingEditor {
                 )
                 // Properties: the Reference link to the source tab (help TB18);
                 // inserting: Insert + the drawing's suitable sources.
+                // Live 2132: Document:, Workspace:, Reference: "BOM : <assembly>" with its "In progress" badge.
                 .when(editing, |v| {
-                    v.child(row(
-                        "Reference",
-                        div()
-                            .id("table-dlg-ref")
-                            .text_size(px(12.))
-                            .text_color(gpui_kit::rgb(0x1651b0))
-                            .cursor_pointer()
-                            .child(source_label.clone())
-                            .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)))
-                            .into_any_element(),
-                    ))
+                    v.child(row("Document:", div().text_size(px(12.)).child(crate::ui::user_text(doc_name.clone())).into_any_element()))
+                        .child(row("Workspace:", div().text_size(px(12.)).child(ws_name.clone()).into_any_element()))
+                        .child(row(
+                            "Reference:",
+                            h_flex()
+                                .gap(px(6.))
+                                .child(
+                                    div()
+                                        .id("table-dlg-ref")
+                                        .text_size(px(12.))
+                                        .text_color(gpui_kit::rgb(0x1651b0))
+                                        .cursor_pointer()
+                                        .child(ref_text.clone())
+                                        .when_some(source_tab, |l, tab| l.on_click(move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx))),
+                                )
+                                .child(div().px(px(4.)).rounded(px(3.)).bg(gpui_kit::rgb(0x9ccef0)).text_size(px(11.)).text_color(gpui_kit::rgb(0x333333)).child("In progress"))
+                                .into_any_element(),
+                        ))
                 })
                 .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
                 .when(!editing, |v| {
@@ -621,8 +644,7 @@ impl DrawingEditor {
                         )
                     })
                 })
-                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Onshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", type_label.clone(), 120., types).into_any_element())))
-                .when_some(d.table.filter(|_| editing && !bom), |v, id| {
+                .when_some(d.table.filter(|_| editing), |v, id| {
                     let names: Vec<String> = self.drawing.sheets.iter().map(|s| s.name.clone()).collect();
                     let cur = self.sheet;
                     let ed = ed.clone();
@@ -642,6 +664,7 @@ impl DrawingEditor {
                     });
                     v.child(row("Sheet", sheet.into_any_element()))
                 })
+                .when(bom, |v| v.child(row("Template", select("table-dlg-template", if d.default_template { "Onshape Default BOM".into() } else { "Follow assembly".into() }, 120., templates).into_any_element())).child(row("BOM type", select("table-dlg-type", type_label.clone(), 120., types).into_any_element())))
                 .child(row("Order", select("table-dlg-order", if d.bottom_to_top { "Bottom to top".into() } else { "Top to bottom".into() }, 120., orders).into_any_element()))
                 .child(div().px(px(8.)).pt(px(4.)).text_size(px(11.)).child("Select fixed corner"))
                 .child(h_flex().px(px(8.)).pt(px(4.)).gap(px(26.)).children(corners))

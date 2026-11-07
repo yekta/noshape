@@ -3109,9 +3109,14 @@ fn drawing_inspection_items() {
     call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[0], ids[1]] }));
     assert!(last(&mut ctx).ends_with(":: Inspection item"));
     assert_eq!(numbers(&mut ctx), vec![json!(1), json!(2), Value::Null]);
-    // Reorder from 5.
-    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[1], ids[0]], "number": 5 }));
+    // Reorder from 5, with the dialog's own shape and border size.
+    call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[1], ids[0]], "number": 5, "shape": "hexagon", "border_size": 3 }));
     assert_eq!(numbers(&mut ctx), vec![json!(6), json!(5), Value::Null]);
+    let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab, "edges": false }));
+    let first = g["annotations"].as_array().unwrap().iter().find(|x| x["id"] == ids[0]).unwrap().clone();
+    assert_eq!((first["inspection_shape"].clone(), first["inspection_border_size"].clone()), (json!("Hexagon"), json!(3)), "{first}");
+    let e = try_call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "add", "annotations": [ids[2]], "border_size": 6 })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("border_size"), "{e:?}");
     call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "edit", "id": ids[0], "number": 9 }));
     assert!(last(&mut ctx).ends_with(":: Edit inspection item"));
     call(&mut ctx, "drawing_inspection", json!({ "drawing": tab, "action": "move", "id": ids[0], "to": ids[2] }));

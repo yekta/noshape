@@ -1278,11 +1278,10 @@ pub enum DimUnits {
 }
 
 impl DimUnits {
-    /// Drawing properties › Units.
-    pub const ALL: [DimUnits; 5] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::Foot];
-    /// A hole callout's units list (live drawing/461, "Inches (Drawing)" is
-    /// the drawing's own and listed apart).
-    pub const CALLOUT: [DimUnits; 8] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::InchFraction, DimUnits::FeetInches, DimUnits::Foot, DimUnits::Yard];
+    /// Drawing properties › Units (live 2063's panel) and a hole callout's
+    /// units list (live drawing/461, "Inches (Drawing)" is the drawing's own
+    /// and listed apart).
+    pub const ALL: [DimUnits; 8] = [DimUnits::Millimeter, DimUnits::Centimeter, DimUnits::Meter, DimUnits::Inch, DimUnits::InchFraction, DimUnits::FeetInches, DimUnits::Foot, DimUnits::Yard];
     pub fn imperial(self) -> bool {
         matches!(self, DimUnits::Inch | DimUnits::Foot | DimUnits::Yard | DimUnits::InchFraction | DimUnits::FeetInches)
     }
@@ -2032,6 +2031,12 @@ pub struct Annotation {
     /// Inspection item number (Onshape's numbered bubble on the annotation).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inspection: Option<u32>,
+    /// The Inspection item dialog's border shape and size in characters
+    /// for this item (None: the drawing's, "Circle (Drawing)").
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_shape: Option<InspectionShape>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inspection_chars: Option<u8>,
     /// Arrows flipped to outside the extension lines (the selected
     /// dimension's flip node).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -2551,7 +2556,7 @@ impl AnnotationKind {
 
 impl Default for Annotation {
     fn default() -> Self {
-        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None, one_edge: false }
+        Self { id: 0, kind: AnnotationKind::note(String::new(), 3.5), position: [0.0, 0.0], refs: Vec::new(), format: DimFormat::default(), inspection: None, inspection_shape: None, inspection_chars: None, flip_arrows: false, text_along: None, loose: false, jogs: [None; 2], unbroken: false, group: None, layer: SheetLayer::Drawing, view_group: None, ann_group: None, style: None, hole: None, target: None, sketch_dim: None, model: None, title_field: None, one_edge: false }
     }
 }
 
@@ -4363,26 +4368,60 @@ fn inspection_border() -> f64 {
     1.2
 }
 
-/// Border shape of inspection items (Drawing properties › Inspection).
+/// Border shape of inspection items (Drawing properties › Inspection and
+/// the Inspection item dialog, live's list).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InspectionShape {
     #[default]
+    #[serde(alias = "Oval")]
     Circle,
-    Oval,
-    Rectangle,
-    Triangle,
+    Diamond,
+    DoubleCircle,
     Flag,
+    Hexagon,
+    Octagon,
+    Rectangle,
+    SquareCircle,
+    Triangle,
 }
 
 impl InspectionShape {
-    pub const ALL: [InspectionShape; 5] = [InspectionShape::Circle, InspectionShape::Oval, InspectionShape::Rectangle, InspectionShape::Triangle, InspectionShape::Flag];
+    pub const ALL: [InspectionShape; 9] = [
+        InspectionShape::Circle,
+        InspectionShape::Diamond,
+        InspectionShape::DoubleCircle,
+        InspectionShape::Flag,
+        InspectionShape::Hexagon,
+        InspectionShape::Octagon,
+        InspectionShape::Rectangle,
+        InspectionShape::SquareCircle,
+        InspectionShape::Triangle,
+    ];
     pub fn name(self) -> &'static str {
         match self {
             InspectionShape::Circle => "Circle",
-            InspectionShape::Oval => "Oval",
-            InspectionShape::Rectangle => "Rectangle",
-            InspectionShape::Triangle => "Triangle",
+            InspectionShape::Diamond => "Diamond",
+            InspectionShape::DoubleCircle => "Double Circle",
             InspectionShape::Flag => "Flag",
+            InspectionShape::Hexagon => "Hexagon",
+            InspectionShape::Octagon => "Octagon",
+            InspectionShape::Rectangle => "Rectangle",
+            InspectionShape::SquareCircle => "Square Circle",
+            InspectionShape::Triangle => "Triangle",
+        }
+    }
+    /// The callout border drawn for it.
+    pub fn border(self) -> CalloutBorder {
+        match self {
+            InspectionShape::Circle => CalloutBorder::Circle,
+            InspectionShape::Diamond => CalloutBorder::Diamond,
+            InspectionShape::DoubleCircle => CalloutBorder::DoubleCircle,
+            InspectionShape::Flag => CalloutBorder::Flag,
+            InspectionShape::Hexagon => CalloutBorder::Hexagon,
+            InspectionShape::Octagon => CalloutBorder::Octagon,
+            InspectionShape::Rectangle => CalloutBorder::Rectangle,
+            InspectionShape::SquareCircle => CalloutBorder::SquareCircle,
+            InspectionShape::Triangle => CalloutBorder::Triangle,
         }
     }
 }

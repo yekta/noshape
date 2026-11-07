@@ -389,20 +389,30 @@ impl DrawingEditor {
                     .into_any_element()
             })
             .collect();
-        let rows = match &d.sections {
-            Some(list) => list
-                .iter()
-                .enumerate()
-                .map(|(i, (v, _))| {
-                    let name = self.current_sheet().view(*v).map(|x| match &x.kind {
+        let section_names: Vec<String> = d
+            .sections
+            .iter()
+            .flatten()
+            .map(|(v, _)| {
+                self.current_sheet()
+                    .view(*v)
+                    .map(|x| match &x.kind {
                         noshape_model::drawing::ViewKind::Section { label, .. } | noshape_model::drawing::ViewKind::AlignedSection { label, .. } => format!("Section {label} - {label}"),
                         _ => crate::drawing_props::default_view_name(&self.drawing, self.current_sheet(), x),
-                    });
+                    })
+                    .unwrap_or_default()
+            })
+            .collect();
+        let rows = match &d.sections {
+            Some(_) => section_names
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
                     h_flex()
                         .id(("hd-section", i))
                         .h(px(20.))
                         .text_size(px(13.))
-                        .child(div().flex_1().child(name.unwrap_or_default()))
+                        .child(div().flex_1().child(name.clone()))
                         .child(div().id(("hd-section-x", i)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                             this.set_hatch(
                                 |d| {
@@ -577,6 +587,24 @@ impl DrawingEditor {
         };
         let ok_disabled = if section_mode { !picked } else { d.profiles.is_empty() };
         let show_style = !section_mode || picked;
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec![(if section_mode { "Edit hatch" } else { "Hatch region" }).into(), (if section_mode { "Hatches" } else { "Closed profiles" }).into()];
+            let names = if section_mode { section_names.clone() } else { (1..=d.profiles.len()).map(|i| format!("Hatch {i}")).collect() };
+            for n in names {
+                text.extend([n, "×".into()]);
+            }
+            if show_style {
+                text.extend(GROUPS.iter().map(|(g, _)| g.to_string()));
+                text.extend(["Pattern".into(), pat.into()]);
+                if !general && !none {
+                    text.extend(["Scale".into(), "Angle".into()]);
+                }
+                if !none {
+                    text.extend(["Color".into(), "Drawing properties".into()]);
+                }
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-hatch-dlg")

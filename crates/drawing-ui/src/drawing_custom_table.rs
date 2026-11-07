@@ -495,6 +495,27 @@ impl DrawingEditor {
                 (t.display.clone(), d.chosen.as_ref() == Some(t), std::rc::Rc::new(move |e: &mut DrawingEditor, cx: &mut Context<DrawingEditor>| e.pick_table(t2.clone(), cx)) as Set)
             })
             .collect();
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec![(if editing { "Custom table properties" } else { "Custom table" }).into()];
+            if editing {
+                let chosen = d.chosen.as_ref();
+                text.extend(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone()]);
+                text.extend(["Custom table:".into(), chosen.map(|t| t.display.clone()).unwrap_or_default(), "Feature Studio:".into(), chosen.map(|t| t.fs_name.clone()).unwrap_or_default()]);
+                text.extend(chosen.and_then(|t| t.version_label.clone()));
+                text.extend(["Sheet".into(), self.current_sheet().name.clone()]);
+            } else {
+                text.push("Add".into());
+                if studio_name.is_some() {
+                    text.extend(studio_items.iter().map(|i| i.0.clone()));
+                }
+                text.push("Insert".into());
+                if d.chosen.is_some() {
+                    text.extend(table_items.iter().map(|i| i.0.clone()));
+                }
+            }
+            text.extend(["Order", "Top to bottom", "Bottom to top", "Select fixed corner"].map(String::from));
+            serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text })
+        });
         let add_row = h_flex().px(px(4.)).pt(px(4.)).gap(px(4.)).child(action("ct-add", "insert", "Add", true, studio_name.is_none(), cx)).when_some(studio_name.clone(), |r, n| r.child(div().flex_1().child(select("ct-studio", n, studio_items))));
         let insert_row = h_flex()
             .px(px(4.))

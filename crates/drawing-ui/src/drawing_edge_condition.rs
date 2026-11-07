@@ -180,6 +180,7 @@ impl DrawingEditor {
                 cx.notify();
             }))
         };
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Edge condition", "text": ["Edge condition", "Direction", s.direction.label(), s.rows[0].sign.label(), s.rows[1].sign.label(), "All around", "( )"] }));
         Some(
             v_flex()
                 .id("dr-edge-condition-dlg")

@@ -163,7 +163,15 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
                 let act = act.clone();
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
-                    ed.update(cx, |t, cx| act(t, window, cx));
+                    ed.update(cx, |t, cx| {
+                        act(t, window, cx);
+                        // Live: a menu action that opens nothing leaves nothing selected (a view's Send to back, Show
+                        // hidden lines; View properties keeps its view until it closes).
+                        if matches!(t.tool, Tool::Select) && !t.dialog_or_mode_open() && !t.selection.is_empty() {
+                            t.selection.clear();
+                            t.redraw(cx);
+                        }
+                    });
                 });
                 let icon = icon.map(|n| crate::os_menu::MenuIcon::Named(SharedString::from(n)));
                 menu = menu.item(crate::os_menu::OsMenuItem::Item { label: label.clone(), icon, checked: *checked, disabled: *disabled, handler: Some(handler), keys: Vec::new(), user: false, note: None });
@@ -177,6 +185,56 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
         }
     }
     menu
+}
+
+impl DrawingEditor {
+    /// Whether a dialog, panel or pick mode of the editor's is open (what a menu action may have started).
+    pub fn dialog_or_mode_open(&self) -> bool {
+        self.panel.is_some()
+            || self.view_props.is_some()
+            || self.sheet_props.is_some()
+            || self.section_dlg.is_some()
+            || self.aligned_dlg.is_some()
+            || self.aux_dlg.is_some()
+            || self.detail_dlg.is_some()
+            || self.crop_dlg.is_some()
+            || self.revision_dlg.is_some()
+            || self.view_sketches.is_some()
+            || self.color_dlg.is_some()
+            || self.cell_panel.is_some()
+            || self.note_color.is_some()
+            || self.weld_dlg.is_some()
+            || self.edge_condition_dlg.is_some()
+            || self.callout_dlg.is_some()
+            || self.stack_dlg.is_some()
+            || self.table_dlg.is_some()
+            || self.hole_dlg.is_some()
+            || self.change_config.is_some()
+            || self.gdt_dlg.is_some()
+            || self.move_sheet.is_some()
+            || self.table_props.is_some()
+            || self.linestyle.is_some()
+            || self.hide_edges.is_some()
+            || self.replicate_dlg.is_some()
+            || self.palette.is_some()
+            || self.datum_dlg.is_some()
+            || self.table_tool.is_some()
+            || self.hide_parts.is_some()
+            || self.break_dlg.is_some()
+            || self.centermark_dlg.is_some()
+            || self.painter.is_some()
+            || self.hatch_dlg.is_some()
+            || self.inspection.is_some()
+            || self.align_views.is_some()
+            || self.rotate_to_edge.is_some()
+            || self.zoom_window.is_some()
+            || self.align_centermark.is_some()
+            || self.align_auto_centermark.is_some()
+            || self.row_rename.is_some()
+            || self.measure.is_some()
+            || self.insert.panel
+            || self.insert.chooser.is_some()
+    }
 }
 
 pub struct DrawingEditor {

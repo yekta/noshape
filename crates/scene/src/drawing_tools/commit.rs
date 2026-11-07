@@ -1071,13 +1071,20 @@ pub fn sketch_trim(sk: &mut noshape_sketch::Sketch, id: noshape_sketch::EntityId
 pub fn set_inspection(s: &mut Sheet, id: u64, n: Option<u32>) {
     if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
         a.inspection = n;
+        if n.is_none() {
+            (a.inspection_shape, a.inspection_chars) = (None, None);
+        }
     }
 }
 
-/// Drag an inspection item onto another annotation: the number moves.
+/// Drag an inspection item onto another annotation: the number moves with
+/// its shape and size.
 pub fn move_inspection(s: &mut Sheet, from: u64, to: u64) {
-    let n = s.annotations.iter_mut().find(|a| a.id == from).and_then(|a| a.inspection.take());
-    set_inspection(s, to, n);
+    let Some(a) = s.annotations.iter_mut().find(|a| a.id == from) else { return };
+    let moved = (a.inspection.take(), a.inspection_shape.take(), a.inspection_chars.take());
+    if let Some(b) = s.annotations.iter_mut().find(|a| a.id == to) {
+        (b.inspection, b.inspection_shape, b.inspection_chars) = moved;
+    }
 }
 
 /// A Drawing properties panel edit: with ☑ Lock drawing properties on

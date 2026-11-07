@@ -164,8 +164,12 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
   one of `dimension`, `note`, `centermark`, `centerline`, `callout`, `datum`, `gdt`, `table`; automatic centermarks
   are left out; a dimension's text is its value as live's recorder reads it (no Ø / R, a leading zero: "0.394" for
   "Ø.394"); a table's is `null` on live's side (it can't read cells), so the runner compares tables by kind there;
-  a hole table isn't listed (live's exports have no entry for it, live 2134).
-  `selection`: `VIEW` / `EDGE` / `ANNOTATION` items with the view or the annotation's text as `owner`.
+  a hole table isn't listed (live's exports have no entry for it, live 2134); an inspection item is an
+  `inspectionsymbol` of its own, with a `null` text (hidden or not). While a dialog tool's panel is open with nothing
+  else active, `tool` is that tool's ("Weld symbol", "Hatch region", "Format painter", "Inspection item"), and with
+  inspection items hidden "Hide inspection items" (the toolbar's pressed toggle).
+  `selection`: `VIEW` / `EDGE` items with the view as `owner` (live's recorder can't read an annotation's selection,
+  so neither side records one).
 - A drawing's dialogs and panels are the top-level `dialog`, in live's recorder's forms (live 2063): a modal (Create
   Drawing, Export Drawing) is `{"kind": "modal", "title", "fields": [{"label", "kind": "input" | "select" |
   "checkbox", "value"}], "buttons"}`, its label the label row's text ("File name View export rules"); a drawing panel

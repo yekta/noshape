@@ -945,6 +945,20 @@ impl DrawingEditor {
         // scrollbar at the right, the groups ending before it.
         let overflow = self.drawing_props.overflow.get();
         let mut body = v_flex().id("dr-dprops-body").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.drawing_props.scroll).when(overflow, |d| d.pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)));
+        crate::ui_script::note_dialog(|| {
+            let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
+            let mut text: Vec<String> = vec!["Drawing properties".into(), tab.into()];
+            if self.drawing_props.tab == 0 {
+                text.extend(["Primary", "Units"].map(String::from));
+                text.extend(DimUnits::ALL.iter().map(|u| u.name().to_string()));
+                text.extend(["Decimal separator", "Period", "Comma"].map(String::from));
+                for label in ["Precision", "Tolerance precision"] {
+                    text.push(label.into());
+                    text.extend((0..=6).map(precision_label));
+                }
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Drawing properties", "text": text })
+        });
         if self.drawing_props.tab == 0 {
             let unit_items: Vec<(String, bool, Act)> = DimUnits::ALL
                 .iter()

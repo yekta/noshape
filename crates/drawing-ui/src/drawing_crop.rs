@@ -245,6 +245,10 @@ impl DrawingEditor {
         } else {
             field.h(px(26.)).flex().items_center().child("Create closed profile")
         };
+        crate::ui_script::note_dialog(|| {
+            let text: &[&str] = if pending { &["Crop view", "Edit closed profile", "Profile", "×"] } else { &["Crop view", "Create closed profile"] };
+            serde_json::json!({ "kind": "drawing-panel", "title": "Crop view", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-crop-dlg")

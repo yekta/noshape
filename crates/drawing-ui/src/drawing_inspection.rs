@@ -27,13 +27,22 @@ pub struct InspectionDlg {
     pub edit: Option<(u64, Entity<InputState>)>,
     /// Manual: the hovered annotation previewed with the next number.
     pub hover: Option<u64>,
+    /// Manual: the Number field (the next number; it counts up per item).
+    pub number: Option<Entity<InputState>>,
+    /// The items' border shape and size in characters (None: the drawing's).
+    pub shape: Option<InspectionShape>,
+    pub chars: Option<u8>,
 }
 
 impl DrawingEditor {
-    pub fn open_inspection(&mut self, cx: &mut Context<Self>) {
+    pub fn open_inspection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.inspection = match self.inspection {
             Some(_) => None,
-            None => Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: None, hover: None }),
+            None => {
+                let next = self.drawing.next_inspection_number().to_string();
+                let number = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
+                Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: None, hover: None, number: Some(number), shape: None, chars: None })
+            }
         };
         self.set_preview(None, cx);
         self.tool = Tool::Select;
@@ -44,7 +53,7 @@ impl DrawingEditor {
     /// Context menu › Reorder inspection items: type a number, click items.
     pub fn start_reorder_inspection(&mut self, from: u32, window: &mut Window, cx: &mut Context<Self>) {
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(from.to_string()));
-        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None });
+        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None, number: None, shape: None, chars: None });
         self.status = Some("Reorder inspection items: click the items in their new order".into());
         cx.notify();
     }
@@ -54,7 +63,7 @@ impl DrawingEditor {
     pub fn edit_inspection(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
         let Some(n) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).and_then(|a| a.inspection) else { return };
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(n.to_string()));
-        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None });
+        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None, number: None, shape: None, chars: None });
         self.selection = vec![Sel::Annotation(id)];
         cx.notify();
     }
@@ -86,6 +95,8 @@ impl DrawingEditor {
             return;
         }
         let reorder = d.reorder.as_ref().map(|st| st.read(cx).value().trim().parse::<u32>().unwrap_or(1));
+        let typed = d.number.as_ref().and_then(|st| st.read(cx).value().trim().parse::<u32>().ok());
+        let (shape, chars) = (d.shape, d.chars);
         let prev = d.hover;
         let id = match self.sel_at(self.hover, self.cursor) {
             Some(Sel::Annotation(id)) if reorder.is_some() || self.drawing.sheets[self.sheet].annotations.iter().any(|a| a.id == id && a.inspection.is_none()) => Some(id),
@@ -98,10 +109,13 @@ impl DrawingEditor {
             d.hover = id;
         }
         let preview = id.map(|id| {
-            let n = reorder.unwrap_or_else(|| self.drawing.next_inspection_number());
+            let n = reorder.or(typed).unwrap_or_else(|| self.drawing.next_inspection_number());
             let mut dr = self.drawing.clone();
             if let Some(a) = dr.sheets[self.sheet].annotations.iter_mut().find(|a| a.id == id) {
                 a.inspection = Some(n);
+                if reorder.is_none() {
+                    (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                }
             }
             dr
         });
@@ -136,19 +150,28 @@ impl DrawingEditor {
             return d.automatic;
         }
         let reorder = d.reorder.clone();
+        let (field, shape, chars) = (d.number.clone(), d.shape, d.chars);
         self.update_hover(cx);
         let Some(Sel::Annotation(id)) = self.sel_at(self.hover, self.cursor) else { return true };
-        let number = match &reorder {
-            Some(st) => st.read(cx).value().trim().parse::<u32>().unwrap_or(1),
-            None => self.drawing.next_inspection_number(),
+        let typed = |st: &Entity<InputState>| st.read(cx).value().trim().parse::<u32>().ok();
+        let number = match (&reorder, &field) {
+            (Some(st), _) => typed(st).unwrap_or(1),
+            (None, Some(st)) => typed(st).unwrap_or_else(|| self.drawing.next_inspection_number()),
+            (None, None) => self.drawing.next_inspection_number(),
         };
         self.preview = None;
         if let Some(d) = &mut self.inspection {
             d.hover = None;
         }
-        self.edit_sheet("Inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, Some(number)));
-        if let Some(st) = reorder {
-            // The Number field increments after each item (Onshape).
+        let manual = reorder.is_none();
+        self.edit_sheet("Inspection item", cx, |s| {
+            noshape_scene::drawing_tools::set_inspection(s, id, Some(number));
+            if manual && let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+                (a.inspection_shape, a.inspection_chars) = (shape, chars);
+            }
+        });
+        // The Number field increments after each item (Onshape).
+        if let Some(st) = reorder.or(field) {
             st.update(cx, |s, cx| s.set_value((number + 1).to_string(), window, cx));
         }
         true
@@ -168,8 +191,19 @@ impl DrawingEditor {
             }
             _ => Scope::Drawing,
         };
+        let (shape, chars) = (d.shape, d.chars);
         let mut n = 0;
-        self.edit("Inspection items", cx, |dr| n = dr.auto_inspection(scope));
+        self.edit("Inspection items", cx, |dr| {
+            let before: Vec<Vec<bool>> = dr.sheets.iter().map(|s| s.annotations.iter().map(|a| a.inspection.is_some()).collect()).collect();
+            n = dr.auto_inspection(scope);
+            for (s, had) in dr.sheets.iter_mut().zip(&before) {
+                for (a, had) in s.annotations.iter_mut().zip(had) {
+                    if a.inspection.is_some() && !had {
+                        (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                    }
+                }
+            }
+        });
         self.status = Some(format!("{n} inspection items added").into());
         cx.notify();
     }
@@ -226,6 +260,7 @@ impl DrawingEditor {
         let (automatic, scope) = (d.automatic, d.scope);
         let reorder = d.reorder.clone();
         let edit = d.edit.as_ref().map(|e| e.1.clone());
+        let number = d.number.clone();
         let tab = |id: &'static str, label: &'static str, on: bool, value: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -249,24 +284,87 @@ impl DrawingEditor {
                 }))
         };
         let ed = cx.entity();
-        let shape = self.drawing.props.inspection_shape;
+        // Shape and Border size: the drawing's entry is listed again with
+        // " (Drawing)" right after it, and is the default (live 2132).
+        let (own_shape, own_chars) = (d.shape, d.chars);
+        let (drawing_shape, drawing_chars) = (self.drawing.props.inspection_shape, self.drawing.props.inspection_border_chars);
+        let shape_items: Vec<(String, Option<InspectionShape>)> = InspectionShape::ALL
+            .iter()
+            .flat_map(|&s| {
+                let mut v = vec![(s.name().to_string(), Some(s))];
+                if s == drawing_shape {
+                    v.push((format!("{} (Drawing)", s.name()), None));
+                }
+                v
+            })
+            .collect();
+        let chars_name = |n: u8| match n {
+            0 => "Tight Fit".to_string(),
+            1 => "1 Character".to_string(),
+            n => format!("{n} Characters"),
+        };
+        let chars_items: Vec<(String, Option<u8>)> = (0..=5u8)
+            .flat_map(|n| {
+                let mut v = vec![(chars_name(n), Some(n))];
+                if n == drawing_chars {
+                    v.push((format!("{} (Drawing)", chars_name(n)), None));
+                }
+                v
+            })
+            .collect();
+        let shape_label = shape_items.iter().find(|i| i.1 == own_shape).map(|i| i.0.clone()).unwrap_or_default();
+        let chars_label = chars_items.iter().find(|i| i.1 == own_chars).map(|i| i.0.clone()).unwrap_or_default();
         let ed2 = ed.clone();
-        let shapes = Button::new("insp-shape").label(shape.name()).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
-            for s in InspectionShape::ALL {
-                let e = ed2.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(s.name()).checked(s == shape).on_click(move |_, _, cx| e.update(cx, |t, cx| t.edit("Inspection border shape", cx, |d| d.props.inspection_shape = s))));
+        let items2 = shape_items.clone();
+        let shapes = Button::new("insp-shape").label(shape_label).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-shape-dd", true, move |mut m, _, _| {
+            for (label, v) in &items2 {
+                let (e, v) = (ed2.clone(), *v);
+                m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_shape).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| {
+                        if let Some(d) = &mut t.inspection {
+                            d.shape = v;
+                        }
+                        cx.notify();
+                    })
+                }));
+            }
+            m
+        });
+        let ed2 = ed.clone();
+        let items2 = chars_items.clone();
+        let widths = Button::new("insp-chars").label(chars_label).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-chars-dd", true, move |mut m, _, _| {
+            for (label, v) in &items2 {
+                let (e, v) = (ed2.clone(), *v);
+                m = m.item(crate::os_menu::OsMenuItem::new(label.clone()).checked(v == own_chars).on_click(move |_, _, cx| {
+                    e.update(cx, |t, cx| {
+                        if let Some(d) = &mut t.inspection {
+                            d.chars = v;
+                        }
+                        cx.notify();
+                    })
+                }));
             }
             m
         });
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let mut body = v_flex().p(px(3.));
+        let mut text: Vec<String> = vec![(if reorder.is_some() { "Reorder inspection items" } else { "Inspection item" }).into()];
         if let Some(st) = reorder.as_ref().or(edit.as_ref()) {
             body = body.child(row("Number", Input::new(st).small().into_any_element()));
+            text.extend(["Number".into(), st.read(cx).value().to_string()]);
         } else {
             body = body.child(h_flex().child(tab("insp-manual", "Manual", !automatic, false, cx)).child(tab("insp-auto", "Automatic", automatic, true, cx)));
-            body = body.child(row("Border shape", shapes.into_any_element()));
+            text.extend(["Manual".into(), "Automatic".into()]);
+            if let Some(st) = number.as_ref().filter(|_| !automatic) {
+                body = body.child(row("Number:", Input::new(st).small().into_any_element()));
+                text.extend(["Number:".into(), st.read(cx).value().to_string()]);
+            }
+            body = body.child(h_flex().px(px(6.)).gap(px(6.)).h(px(30.)).child(shapes).child(widths));
+            text.extend(shape_items.iter().map(|i| i.0.clone()));
+            text.extend(chars_items.iter().map(|i| i.0.clone()));
             if automatic {
-                let labels = ["Drawing", "Current sheet", "Selected view"];
+                // Live 2132: Scope ▾ (Drawing · Current sheet · Views) + Preview.
+                let labels = ["Drawing", "Current sheet", "Views"];
                 let ed3 = ed.clone();
                 let scope_btn = Button::new("insp-scope").label(labels[scope as usize]).ghost().small().w(px(120.)).dropdown_caret(true).os_dropdown_menu("insp-scope-dd", true, move |mut m, _, _| {
                     for (i, l) in labels.iter().enumerate() {
@@ -285,10 +383,12 @@ impl DrawingEditor {
                 body = body.child(row("Scope", scope_btn.into_any_element())).child(
                     div().px(px(6.)).py(px(4.)).child(Button::new("insp-preview").label("Preview").outline().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.inspection_preview(cx)))),
                 );
-            } else {
-                body = body.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child(format!("Next number: {}", self.drawing.next_inspection_number())));
+                text.push("Scope".into());
+                text.extend(labels.map(String::from));
+                text.push("Preview".into());
             }
         }
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": text[0], "text": text }));
         Some(
             v_flex()
                 .id("dr-inspection-dlg")

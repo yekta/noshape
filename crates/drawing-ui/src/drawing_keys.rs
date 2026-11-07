@@ -187,7 +187,7 @@ pub const SHORTCUT_CATALOGUE: [(&str, &str, Act); 65] = [
     ("Broken-out section", "broken-out-section", |e, _, cx| e.set_tool(Tool::BrokenOut { parent: None, points: vec![], done: false }, cx)),
     ("Break view", "broken-view", |e, _, cx| e.set_tool(Tool::Break { parent: None, first: None, vertical: true }, cx)),
     ("Crop view", "crop-view", |e, _, cx| e.start_crop(cx)),
-    ("Inspection item", "inspection-item", |e, _, cx| e.open_inspection(cx)),
+    ("Inspection item", "inspection-item", |e, w, cx| e.open_inspection(w, cx)),
     ("Hide inspection item", "inspection-hide", |e, _, cx| e.toggle_hide_inspection(cx)),
     ("Aligned section view", "drawing-aligned-section", |e, _, cx| e.set_tool(Tool::AlignedSection { parent: None, center: None, a: None, b: None }, cx)),
     ("Cut list table", "drawing-cutlist-table", |e, _, cx| e.set_tool(Tool::Table { kind: TableTool::CutList, view: None, origin: None }, cx)),

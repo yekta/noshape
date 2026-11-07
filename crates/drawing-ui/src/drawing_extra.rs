@@ -765,16 +765,25 @@ impl DrawingEditor {
                 }
             }
         } else {
+            // The tree's texts as live's recorder reads them (a reference's badge before its name).
+            let mut text: Vec<String> = Vec::new();
             for (i, s) in self.drawing.sheets.iter().enumerate() {
                 let active = i == self.sheet;
                 let popup = (self.row_rename.as_ref().map(|r| r.0) == Some(RowRename::Sheet(i))).then(|| self.row_rename_popup(cx));
                 list = list.child(sheet_row(i, s, active, self.sheet_rows.contains(&i), cx).when_some(popup, |row, p| row.child(p)));
+                text.push(match &s.imported {
+                    Some(m) if m.model => s.name.clone(),
+                    _ => format!("{} ({})", s.name, i + 1 - model_before(i)),
+                });
                 if active {
                     for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
                         let src = vs.first().and_then(|v| self.reference_source(s, v.id));
                         list = list.child(ref_row(self, format!("dr-sheet-ref-{k}"), r, src, 34., cx));
+                        let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
+                        text.extend([version.to_string(), name.to_string()]);
                         for v in vs {
                             list = list.child(self.sheet_view_row(s, v, 75., cx));
+                            text.push(self.view_row_label(s, v).0);
                         }
                     }
                     // BOM and cut list tables.
@@ -783,6 +792,7 @@ impl DrawingEditor {
                     }
                 }
             }
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": text.first(), "text": text }));
         }
         let tab = |id: &'static str, label: &'static str, selected: bool, cx: &mut Context<Self>| {
             div()

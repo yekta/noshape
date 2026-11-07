@@ -64,7 +64,7 @@ pub fn set_standard_orientation(v: &mut DrawingView, o: ViewOrientation) {
 pub fn default_view_name(drawing: &Drawing, sheet: &Sheet, v: &DrawingView) -> String {
     match &v.kind {
         ViewKind::Base { orientation, .. } => v.named_view.clone().unwrap_or_else(|| orientation_name(*orientation).to_string()),
-        ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, v.id).map(|o| orientation_name(o).to_string()).unwrap_or_else(|| "Projected view".into()),
+        ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, v.id).map(|o| orientation_name(o).to_string()).unwrap_or_else(|| "Isometric".into()),
         ViewKind::Auxiliary { .. } => "Auxiliary view".into(),
         ViewKind::Section { label, .. } | ViewKind::AlignedSection { label, .. } => format!("Section {label}-{label}"),
         ViewKind::Detail { label, .. } => format!("Detail {label}"),

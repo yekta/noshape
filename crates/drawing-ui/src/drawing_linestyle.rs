@@ -33,7 +33,9 @@ impl DrawingEditor {
     pub fn open_linestyle(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let dashes = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value("1.00"));
         self.linestyle = Some(LinestyleDlg { view, edges: Vec::new(), pattern: LinePattern::Solid, dashes, thickness: 0.35, color: None, revert: false });
-        cx.notify();
+        // Live: the view's selection clears; the dialog's Edges field takes the picks.
+        self.selection.clear();
+        self.redraw(cx);
     }
 
     /// The drawing with the dialog's styles on its edges.
@@ -135,6 +137,20 @@ impl DrawingEditor {
         let empty = chips.is_empty();
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(10.)).child(div().w(px(80.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let solid = d.pattern == LinePattern::Solid;
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec!["Adjust linestyle".into(), "Edges".into()];
+            if empty {
+                text.push("Select edges in a view to change linestyle".into());
+            }
+            for _ in &d.edges {
+                text.extend([format!("{view_name} : entity"), "×".into()]);
+            }
+            text.push("Linestyle".into());
+            text.extend(LinePattern::ALL.iter().map(|p| p.name().to_string()));
+            text.extend(["Dashes".into(), "Thickness".into()]);
+            text.extend(LINE_THICKNESSES.iter().map(|t| format!("{t:.2} mm")));
+            serde_json::json!({ "kind": "drawing-panel", "title": "Adjust linestyle", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-linestyle")
