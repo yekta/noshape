@@ -36,6 +36,17 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 23:30 (qa restarted 23:08 on a pinned account):** suites loop pid 1619190 still running (next run ~00:34); the
+20:34 run's flags are SUITE-REGRESSIONS-1107 (filed 22:56). Fuzz: v34 5961–6020 and nf b3f393b8 6021–6080 done, 0 deaths;
+new on vibe3: ~/qa/bin/v3cf16.sh (v0.4.35, 6081–6140), v3nf17.sh (green b9f855f0, fallback off, 6141–6200); b9f855f0's sweeps
+started (bin/v3sweep.sh, fetch with v3get.sh). Watch: bin/qa-watch.sh now also stops on SUITES (a new suites-status line)
+and LAND. **v0.4.36's footer-path check:** Linux: bin/footer-check.sh <app> <tag> (UI script on Xvfb :488 2560×1600, an
+xdg-open shim, a private session bus so the portal's fallback runs): green b9f855f0 OK (the footer link opens the folder,
+a row's "Show in folder" its folder, Details › Location shown; footer/shot-gb9f855f0-s.png). Windows / macOS: the new opt-in
+workflow qa-os.yml (.github/qa/footer.py: Explorer / Finder windows and their selection after the clicks, a screenshot);
+dispatch it on the release tag: `gh workflow run qa-os.yml -R yekta/noshape -f tag=v0.4.36`. Found: P2 DOCS-SELECT-LEAVES-WAL.
+Never point a page-start UI script at ~/Documents/noshape: it writes its uip documents there.
+
 **11-07 23:01:** agent session on green f87905ce (studios' "an agent's first MCP calls work or say what to do next"): the same
 task in 15 calls, 0 failed (v0.4.35: 3 of 14); the agent gave document_create a bare name and the server put it in
 ~/Documents/noshape. The quoted value wasn't tried this time (MCP-QUOTED-VALUE stays open). qa-scratch/agent/gf87905ce/.

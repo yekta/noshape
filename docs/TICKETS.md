@@ -761,6 +761,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - dx: drw-sheet-duplicate / drw-sheet-properties now differ because live2 re-recorded them through the Sheets panel
     (1eb7a579d): step 1 `.dialog.text[4]` live "Right" / ours "Top". A newly measured difference, not a regression.
   (qa 2026-11-07 22:56)
+- [ ] P2 DOCS-SELECT-LEAVES-WAL (studios) **selecting a document on the documents page leaves `<name>.noshape-wal` and
+  `-shm` beside it after the app quits** (green b9f855f0, Linux; d463d9e54 says no -wal/-shm stays beside a document).
+  The UI script on the docs-page start, quit by cx.quit(): no step → no files left; a click on "uip Bracket"'s row (or
+  its right-click, Escape) → `uip Bracket.noshape-wal` (0 bytes) and `uip Bracket.noshape-shm` (32 KB) stay. A user's
+  documents folder, which the footer now opens in Explorer / Finder, fills with them (here ~/Documents/noshape has a
+  -wal and -shm beside each of its 124 documents). Likely the row's details / thumbnail read opens the file and the
+  connection is never closed. Repro: qa-scratch/footer/sc/w-select.json with the green app (qa-scratch/footer/run.sh
+  as a model). (qa 2026-11-07 23:30)
 - [ ] P2 MCP-QUOTED-VALUE (ops) **a real agent's first sketch_dimension calls fail on a quoted value**: the release agent
   check (bin/agent-session.sh, `claude -p` on Haiku, v0.4.35's MCP server, the fixed block-with-hole task) sent
   `"value": "\"60 mm\""` (the expression in quotes) twice and got `expected a value, found `\"` at 0..1` (param value)
