@@ -1,0 +1,69 @@
+{
+  "name": "drw-section-hatch-edit",
+  "about": "A section view's menu › Edit hatch section...: the Edit hatch dialog",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items, most-used first)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            0,
+            15,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          81,
+          125
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit hatch section..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
