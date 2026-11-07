@@ -181,6 +181,72 @@ pub fn profile_of(value: &str) -> Option<Result<FrameProfile, String>> {
     Some(profile(&standard, &name, &size, rounded))
 }
 
+/// The library's preview of a profile (live: the profile's sketch seen from above, a pale region with its outline and
+/// the origin): an SVG `width` × `height` px, the profile fitted with a margin.
+pub fn preview_svg(p: &FrameProfile, width: f64, height: f64) -> String {
+    let (lo, hi) = (p.min.min(DVec2::ZERO), p.max.max(DVec2::ZERO));
+    let size = (hi - lo).max(DVec2::splat(1e-9));
+    let scale = ((width * 0.8) / size.x).min((height * 0.8) / size.y);
+    let centre = (lo + hi) / 2.0;
+    let at = |q: DVec2| DVec2::new(width / 2.0 + (q.x - centre.x) * scale, height / 2.0 - (q.y - centre.y) * scale);
+    let mut d = String::new();
+    let mut push = |s: String| {
+        d.push_str(&s);
+        d.push(' ');
+    };
+    for lp in std::iter::once(&p.outer).chain(p.holes.iter()) {
+        let mut first = true;
+        for seg in lp {
+            match seg {
+                k::Segment2d::Line { a, b } => {
+                    let (a, b) = (at(*a), at(*b));
+                    if first {
+                        push(format!("M{:.2},{:.2}", a.x, a.y));
+                    }
+                    push(format!("L{:.2},{:.2}", b.x, b.y));
+                }
+                k::Segment2d::Arc { center, radius, start_angle, end_angle } => {
+                    let end = if end_angle <= start_angle { end_angle + std::f64::consts::TAU } else { *end_angle };
+                    let (a, b) = (at(*center + DVec2::from_angle(*start_angle) * *radius), at(*center + DVec2::from_angle(end) * *radius));
+                    if first {
+                        push(format!("M{:.2},{:.2}", a.x, a.y));
+                    }
+                    // Counter-clockwise in the profile is clockwise on the y-down page: sweep 0.
+                    let r = radius * scale;
+                    push(format!("A{r:.2},{r:.2} 0 {} 0 {:.2},{:.2}", u8::from(end - start_angle > std::f64::consts::PI), b.x, b.y));
+                }
+                k::Segment2d::Circle { center, radius } => {
+                    let (c, r) = (at(*center), radius * scale);
+                    push(format!("M{:.2},{:.2} A{r:.2},{r:.2} 0 1 0 {:.2},{:.2} A{r:.2},{r:.2} 0 1 0 {:.2},{:.2}", c.x + r, c.y, c.x - r, c.y, c.x + r, c.y));
+                }
+                _ => {}
+            }
+            first = false;
+        }
+        push("Z".into());
+    }
+    let o = at(DVec2::ZERO);
+    format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\" viewBox=\"0 0 {width} {height}\"><path d=\"{}\" fill=\"#e3e9ea\" fill-rule=\"evenodd\" stroke=\"#55626a\" stroke-width=\"1.2\"/><circle cx=\"{:.2}\" cy=\"{:.2}\" r=\"2\" fill=\"none\" stroke=\"#55626a\" stroke-width=\"1\"/></svg>",
+        d.trim_end(),
+        o.x,
+        o.y
+    )
+}
+
+/// The library's profiles whose names hold `query` (case-insensitive), as live's search lists them: the earlier the
+/// match the higher ("tube": Round tube before Rectangular tube), then by standard.
+pub fn search(query: &str) -> Vec<(&'static str, &'static str)> {
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let q = q.as_str();
+    let mut hits: Vec<(usize, &'static str, &'static str)> = standards().into_iter().flat_map(|s| profiles(s).into_iter().filter_map(move |p| p.to_lowercase().find(q).map(|i| (i, s, p)))).collect();
+    hits.sort_by(|a, b| a.0.cmp(&b.0).then(a.2.cmp(b.2)).then(a.1.cmp(b.1)));
+    hits.into_iter().map(|(_, s, p)| (s, p)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,6 +274,17 @@ mod tests {
         assert!(near(&dims("0.375in OD X 16SWG").unwrap(), &[9.525, 1.6256]));
         assert!(near(&dims("0.5\" x 1\" x 0.035\"").unwrap(), &[12.7, 25.4, 0.889]));
         assert!(near(&dims("16mm DIA").unwrap(), &[16.0]));
+    }
+
+    #[test]
+    fn search_and_preview() {
+        assert_eq!(search("tube"), vec![("ANSI", "Round tube"), ("ISO", "Round tube"), ("ANSI", "Rectangular tube"), ("ISO", "Rectangular tube")]);
+        assert!(search(" ").is_empty());
+        let p = profile("ISO", "Rectangular tube", "30mm x 30mm x 2mm", true).unwrap();
+        let svg = preview_svg(&p, 240.0, 136.0);
+        // The outer loop and the hole, each four arcs and four lines.
+        assert_eq!(svg.matches('A').count(), 8, "{svg}");
+        assert_eq!(svg.matches('Z').count(), 2, "{svg}");
     }
 
     #[test]

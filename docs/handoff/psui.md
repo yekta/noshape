@@ -578,7 +578,10 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   dialog's field is the Select sketch panel (shows the profile name), opening on Libraries: Library / Type / Profile
   selects (a change updates the field at once), Size (+ Rounded) with Generate preview, Select closes it. Op
   `feature_frame_profiles`. To do: 8020, AISC, AS, Construction materials (asked live, REQUESTS 10:40, for their lists,
-  placement, Rounded radii, cut list text, fresh default); the picker's thumbnail and search; live's 1001 default.
+  placement, Rounded radii, cut list text, fresh default); live's 1001 default (fresh account; then the last pick, per account: behaviours 2216 (4)).
+  Search ("Search by name, folder, or configuration": matches as 55 px rows, earliest match first, Enter takes the
+  first) and the preview (`frame_library::preview_svg`: the section from above, pale fill, outline, origin) as live
+  D134 f19 / f23; the panel's three tabs on two lines.
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

@@ -168,6 +168,9 @@ pub struct SelectItemPanel {
     frame_profiles: bool,
     frame_pick: Option<(String, String)>,
     frame_selects: HashMap<&'static str, (Entity<crate::os_select::OsSelect>, Subscription)>,
+    /// Frame's library search box, and its previews by `profileSketch` value (with their size).
+    frame_search: Option<(Entity<InputState>, Subscription)>,
+    frame_previews: HashMap<(String, u32), Arc<gpui_kit::Image>>,
     _subs: Vec<Subscription>,
 }
 
@@ -326,6 +329,8 @@ impl SelectItemPanel {
             frame_profiles,
             frame_pick: None,
             frame_selects: HashMap::new(),
+            frame_search: None,
+            frame_previews: HashMap::new(),
             _subs: subs,
         };
         if features {
@@ -715,6 +720,32 @@ impl SelectItemPanel {
         self.pick(frame_library::value(&standard, &profile, size, false), cx);
     }
 
+    /// A search result (or Enter on the first): the levels jump to it, the field shows it (live D134).
+    fn jump_frame(&mut self, standard: &str, profile: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
+        self.cfg_edit.remove(&key);
+        self.lib_generated.remove(&key);
+        self.frame_pick = Some((standard.to_string(), profile.to_string()));
+        if let Some((st, _)) = &self.frame_search {
+            st.update(cx, |s, cx| s.set_value("", window, cx));
+        }
+        let size = frame_library::sizes(standard, profile).1;
+        self.pick(frame_library::value(standard, profile, size, false), cx);
+    }
+
+    /// A profile's preview `w` px wide (live: the profile's sketch from above), cached by value.
+    fn frame_preview(&mut self, value: &str, w: f32, h: f32) -> Option<Arc<gpui_kit::Image>> {
+        let k = (value.to_string(), w as u32);
+        if let Some(i) = self.frame_previews.get(&k) {
+            return Some(i.clone());
+        }
+        let p = frame_library::profile_of(value)?.ok()?;
+        let svg = frame_library::preview_svg(&p, w as f64, h as f64);
+        let img = Arc::new(gpui_kit::Image::from_bytes(gpui_kit::ImageFormat::Svg, svg.into_bytes()));
+        self.frame_previews.insert(k, img.clone());
+        Some(img)
+    }
+
     /// The (standard, profile) Frame's library shows: the last one picked here, else the field's, else the first.
     fn frame_choice(&self) -> (String, String) {
         if let Some(c) = &self.frame_pick {
@@ -734,12 +765,74 @@ impl SelectItemPanel {
         use noshape_model::configuration::{ConfigInput, ListOption};
         let pal = p();
         let (standard, profile) = self.frame_choice();
+        let search = match &self.frame_search {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|cx| InputState::new(window, cx));
+                let sub = cx.subscribe_in(&s, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+                    // Enter takes the first match (live D134: "angle" ↦ AISC › L-angle).
+                    InputEvent::PressEnter { .. } => {
+                        if let Some((s, p)) = frame_library::search(&st.read(cx).value()).first().copied() {
+                            this.jump_frame(s, p, window, cx);
+                        }
+                    }
+                    InputEvent::Change => cx.notify(),
+                    _ => {}
+                });
+                self.frame_search = Some((s.clone(), sub));
+                s
+            }
+        };
+        let query = search.read(cx).value().to_string();
+        let search_box = h_flex().h(px(38.)).flex_none().px(px(6.)).pt(px(4.)).child(
+            div()
+                .flex_1()
+                .relative()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(gpui_kit::rgb(0xcccccc))
+                .child(crate::ui::input_with_placeholder(&search, "Search by name, folder, or configuration", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(28.)).pl(px(5.))),
+        );
         let library = self.frame_select("library", "Library", vec![frame_library::LIBRARY.to_string()], frame_library::LIBRARY, cx);
         let types = frame_library::standards().into_iter().map(String::from).collect();
         let type_row = self.frame_select("type", frame_library::standard_label(&standard), types, &standard, cx);
         let profiles = frame_library::profiles(&standard).into_iter().map(String::from).collect();
         let profile_row = self.frame_select("profile", "Profile", profiles, &profile, cx);
         let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library).child(type_row).child(profile_row);
+        // The search's matches over the levels (live D134 f23): 55 px rows, a round preview, the name with the match
+        // in bold, "Onshape frame profiles - <standard>" grey and italic under it.
+        let hits = frame_library::search(&query);
+        let results = (!hits.is_empty()).then(|| {
+            let q = query.trim().to_lowercase();
+            let mut list = v_flex().id("sel-frame-results").absolute().top(px(38.)).left(px(6.)).right(px(6.)).max_h(px(330.)).overflow_y_scroll().bg(pal.panel).border_1().border_color(gpui_kit::rgb(0xcccccc)).shadow_md();
+            for (i, (s, p)) in hits.iter().copied().enumerate() {
+                let at = p.to_lowercase().find(&q).unwrap_or(0);
+                let (a, m, b) = (p[..at].to_string(), p[at..at + q.len()].to_string(), p[at + q.len()..].to_string());
+                let thumb = self.frame_preview(&frame_library::value(s, p, frame_library::sizes(s, p).1, false), 40., 40.);
+                list = list.child(
+                    h_flex()
+                        .id(("sel-frame-hit", i))
+                        .h(px(55.))
+                        .flex_none()
+                        .px(px(10.))
+                        .gap(px(14.))
+                        .cursor_pointer()
+                        .when(i == 0, |d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .hover(|d| d.bg(gpui_kit::rgb(0xdef1fb)))
+                        .child(div().size(px(44.)).flex_none().rounded_full().bg(gpui_kit::rgb(0xf3f3f3)).flex().items_center().justify_center().children(thumb.map(|t| gpui_kit::img(t).size(px(40.)))))
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(h_flex().text_size(px(14.)).child(a).child(div().font_weight(FontWeight::BOLD).child(m)).child(b))
+                                .child(div().truncate().italic().text_size(px(13.)).text_color(gpui_kit::rgb(0x999999)).child(format!("{} - {s}", frame_library::LIBRARY))),
+                        )
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.jump_frame(s, p, window, cx))),
+                );
+            }
+            list
+        });
         let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
         let (sizes, default) = frame_library::sizes(&standard, &profile);
         let mut inputs = vec![ConfigInput {
@@ -755,6 +848,11 @@ impl SelectItemPanel {
         let cfg = Configuration { inputs, configured: Vec::new() };
         col = col.child(div().mx(px(6.)).my(px(4.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7))).child(self.config_editor(&key, &cfg, Vec::new(), true, window, cx));
         let (changed, editing) = self.preview_changed(&key, &cfg);
+        // The preview is of the values Select would take (Generate preview updates it, live D134).
+        let shown = if changed { self.lib_generated.get(&key).cloned().unwrap_or_else(|| cfg.defaults()) } else { editing.clone() };
+        if let Some(img) = self.frame_preview(&join_value(&key, &shown), 240., 136.) {
+            col = col.child(div().flex().justify_center().pt(px(14.)).child(gpui_kit::img(img).w(px(240.)).h(px(136.))));
+        }
         let select_button = div()
             .id("sel-frame-select")
             .h(px(30.))
@@ -779,7 +877,15 @@ impl SelectItemPanel {
                 this.pick(join_value(&key, &editing), cx);
                 cx.emit(SelectItemEvent::Close);
             }));
-        v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_center().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button)).into_any_element()
+        v_flex()
+            .flex_1()
+            .min_h_0()
+            .relative()
+            .child(search_box)
+            .child(col)
+            .child(h_flex().flex_none().justify_center().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button))
+            .children(results)
+            .into_any_element()
     }
 
     /// The Libraries tab under Library / Type (live 1622 (d), psui/forms
@@ -1447,6 +1553,7 @@ impl Render for SelectItemPanel {
         let blue = gpui_kit::rgb(BLUE);
         let line = gpui_kit::rgb(0xeeeeee);
         let tab_w = if self.libraries { 100. } else { 150. };
+        let three = self.libraries;
         let tab = |id: &'static str, label: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
@@ -1455,12 +1562,16 @@ impl Render for SelectItemPanel {
                 .p(px(5.))
                 .flex()
                 .justify_center()
+                // Three 100 px tabs: "Current / document" on two lines, centred (live D134 f15).
+                .when(three, |d| d.items_center().text_center())
                 .text_size(px(12.))
                 .line_height(px(21.6))
                 .cursor_pointer()
                 .when(on, |d| d.text_color(blue).font_weight(FontWeight::MEDIUM).border_b_2().border_color(blue))
                 .when(!on, |d| d.text_color(p().text))
-                .child(label)
+                // Three tabs: a two-word label on two lines (live D134 f15: "Current / document").
+                .when(three, |d| d.child(v_flex().items_center().line_height(px(21.6)).children(label.split(' ').map(|w| div().child(w)))))
+                .when(!three, |d| d.child(label))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     let to_other = id == "sel-other";
                     let to_libraries = id == "sel-libraries";
@@ -1634,7 +1745,7 @@ impl Render for SelectItemPanel {
             )
             .child(
                 h_flex()
-                    .h(px(32.))
+                    .h(px(if three { 54. } else { 32. }))
                     .flex_none()
                     .border_t_1()
                     .border_color(line)
