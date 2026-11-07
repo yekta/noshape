@@ -1,18 +1,18 @@
 {
  "scenario": "key-mod-shift-f-featurescript-search",
- "recorded": "2026-11-07T01:23:24.948Z",
+ "recorded": "2026-11-07T03:05:51.980Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "962c9cfaabe9d7ad7dac9fa8",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "a739bc244218ea403255ffdf",
   "start": "block",
-  "startElement": "633a37b9892e81fc5b3c1563"
+  "startElement": "04f7e36901304a29cb05231d"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -82,6 +83,31 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": [
+     {
+      "id": "element-details-pane",
+      "title": null,
+      "text": "Match case Regex Find",
+      "inputs": [
+       {
+        "placeholder": "Find text",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": null,
+        "value": false
+       },
+       {
+        "placeholder": "Feature Studio name filter",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -123,7 +149,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 79879
+   "t": 22589
   },
   {
    "step": 2,
@@ -138,6 +164,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -179,7 +206,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 85034
+   "t": 26062
   }
  ]
 }

@@ -1,16 +1,16 @@
 {
  "scenario": "config-input-menu-visibility-conditions",
- "recorded": "2026-11-07T01:34:37.525Z",
+ "recorded": "2026-11-07T03:00:29.238Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.4 60ffcf95"
  },
  "live": {
   "document": "9dce67480392e086ccfce93e",
   "workspace": "03c053cf95cd7e4618c7012e",
-  "element": "ec9c3a281d0e0750ea5a5ec9",
+  "element": "a98ff6a26839378779a1b6c2",
   "start": "block",
   "startElement": "480df485cde1af7b8256deb8"
  },
@@ -122,7 +122,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 95789
+   "t": 49998
   },
   {
    "step": 2,
@@ -191,7 +191,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 100514
+   "t": 54841
   },
   {
    "step": 3,
@@ -216,20 +216,12 @@
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Edit FeatureScript IDs…",
       "Edit FeatureScript IDs…",
       "Exclude from properties",
-      "Exclude from properties",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -275,7 +267,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 104002
+   "t": 58782
   },
   {
    "step": 4,
@@ -297,12 +289,29 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "",
-     "fields": [],
+     "title": "Configuration visibility conditions",
+     "fields": [
+      {
+       "label": "Show hidden inputs",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Save"
+      },
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Cancel"
+      }
+     ],
      "buttons": [
-      "",
-      ""
-     ]
+      "icon:undo-button",
+      "icon:redo-button"
+     ],
+     "text": "Configuration Configurations Configuration Default Show hidden inputs"
     },
     "dialogs": [],
     "list": null,
@@ -346,7 +355,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 109301
+   "t": 61021
   },
   {
    "step": 5,
@@ -402,7 +411,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 113330
+   "t": 64385
   }
  ]
 }

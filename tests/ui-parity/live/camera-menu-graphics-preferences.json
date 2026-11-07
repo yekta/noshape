@@ -1,18 +1,18 @@
 {
  "scenario": "camera-menu-graphics-preferences",
- "recorded": "2026-11-07T02:11:37.806Z",
+ "recorded": "2026-11-07T03:07:47.410Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.1 5f5b5b21"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "7147323b88ac2a546ac00bf7",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "5e2e24712694221b186da7aa",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "04f7e36901304a29cb05231d"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -81,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-menu",
      "rows": [
@@ -179,7 +181,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 38232
+   "t": 45993
   },
   {
    "step": 2,
@@ -200,6 +202,75 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": [
+     {
+      "id": "cdk-overlay-container",
+      "title": "Graphics preferences",
+      "text": "Graphics preferences / General / Sketch / Viewport / Ambient occlusion / Field of view / Shaded bodies / Line width / Shininess / Specular color / Section interference color / Phantom edges / Phantom tangent edge width / Phantom tangent edge color / Mesh bodies / Mesh line width / Reset to default",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "37.5 %"
+       },
+       {
+        "placeholder": null,
+        "value": "38"
+       },
+       {
+        "placeholder": null,
+        "value": "45 deg"
+       },
+       {
+        "placeholder": null,
+        "value": "45"
+       },
+       {
+        "placeholder": null,
+        "value": "1 px"
+       },
+       {
+        "placeholder": null,
+        "value": "1"
+       },
+       {
+        "placeholder": null,
+        "value": "3 %"
+       },
+       {
+        "placeholder": null,
+        "value": "3"
+       },
+       {
+        "placeholder": null,
+        "value": "#999999"
+       },
+       {
+        "placeholder": null,
+        "value": "#dc0000"
+       },
+       {
+        "placeholder": null,
+        "value": "0.5 px"
+       },
+       {
+        "placeholder": null,
+        "value": "0.5"
+       },
+       {
+        "placeholder": null,
+        "value": "#232323"
+       },
+       {
+        "placeholder": null,
+        "value": "0.3 px"
+       },
+       {
+        "placeholder": null,
+        "value": "0.3"
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -241,7 +312,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 42049
+   "t": 48799
   },
   {
    "step": 3,
@@ -256,6 +327,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -297,7 +369,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 45961
+   "t": 52387
   }
  ]
 }

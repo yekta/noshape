@@ -1,18 +1,18 @@
 {
  "scenario": "shortcut-shift-v",
- "recorded": "2026-11-04T01:09:04.262Z",
+ "recorded": "2026-11-07T03:10:55.851Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "ded87065fe46d17367b5b0bb",
+  "document": "9dce67480392e086ccfce93e",
+  "workspace": "03c053cf95cd7e4618c7012e",
+  "element": "2db085e27e78befa2665e28b",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "480df485cde1af7b8256deb8"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -58,7 +59,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -80,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -118,9 +121,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 22686
+   "t": 53301
   },
   {
    "step": 2,
@@ -143,6 +147,19 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": [
+     {
+      "id": "namedviews-dialog",
+      "title": "Named views",
+      "text": "Named views / No views created",
+      "inputs": [
+       {
+        "placeholder": "New view name",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -181,9 +198,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 24407
+   "t": 55063
   }
  ]
 }

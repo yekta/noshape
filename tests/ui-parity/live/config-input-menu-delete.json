@@ -1,16 +1,16 @@
 {
  "scenario": "config-input-menu-delete",
- "recorded": "2026-11-07T01:28:17.613Z",
+ "recorded": "2026-11-07T02:57:20.900Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.4 60ffcf95"
  },
  "live": {
   "document": "9dce67480392e086ccfce93e",
   "workspace": "03c053cf95cd7e4618c7012e",
-  "element": "94ad82d9a3ec7501d4710b56",
+  "element": "4b3c0de1ae710110160f3c4a",
   "start": "block",
   "startElement": "480df485cde1af7b8256deb8"
  },
@@ -122,7 +122,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 93329
+   "t": 24950
   },
   {
    "step": 2,
@@ -191,7 +191,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 96849
+   "t": 29179
   },
   {
    "step": 3,
@@ -216,20 +216,12 @@
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Edit FeatureScript IDs…",
       "Edit FeatureScript IDs…",
       "Exclude from properties",
-      "Exclude from properties",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -275,7 +267,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 99044
+   "t": 31275
   },
   {
    "step": 4,
@@ -337,7 +329,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 102666
+   "t": 33743
   }
  ]
 }

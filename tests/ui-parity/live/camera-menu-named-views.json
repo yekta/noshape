@@ -1,18 +1,18 @@
 {
  "scenario": "camera-menu-named-views",
- "recorded": "2026-11-07T02:16:36.516Z",
+ "recorded": "2026-11-07T03:06:36.107Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.1 5f5b5b21"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "bf27bccf1603ce74928d2c2b",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "5d748aa65c0dc60b12af080d",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "04f7e36901304a29cb05231d"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -81,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "camera-menu",
      "rows": [
@@ -179,7 +181,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 26976
+   "t": 27304
   },
   {
    "step": 2,
@@ -208,6 +210,19 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": [
+     {
+      "id": "namedviews-dialog",
+      "title": "Named views",
+      "text": "Named views / No views created",
+      "inputs": [
+       {
+        "placeholder": "New view name",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -249,7 +264,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30932
+   "t": 29466
   },
   {
    "step": 3,
@@ -264,6 +279,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -305,7 +321,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 34203
+   "t": 33661
   }
  ]
 }

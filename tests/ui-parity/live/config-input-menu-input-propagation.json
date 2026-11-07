@@ -1,16 +1,16 @@
 {
  "scenario": "config-input-menu-input-propagation",
- "recorded": "2026-11-07T01:32:01.881Z",
+ "recorded": "2026-11-07T02:59:17.972Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.4 60ffcf95"
  },
  "live": {
   "document": "9dce67480392e086ccfce93e",
   "workspace": "03c053cf95cd7e4618c7012e",
-  "element": "2152cdfb01a487bbb9125cd5",
+  "element": "e3fb8fbb7ee29d42b78145d2",
   "start": "block",
   "startElement": "480df485cde1af7b8256deb8"
  },
@@ -122,7 +122,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 66190
+   "t": 50716
   },
   {
    "step": 2,
@@ -191,7 +191,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 80301
+   "t": 53889
   },
   {
    "step": 3,
@@ -216,20 +216,12 @@
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Edit FeatureScript IDs…",
       "Edit FeatureScript IDs…",
       "Exclude from properties",
-      "Exclude from properties",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -275,7 +267,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 82902
+   "t": 56025
   },
   {
    "step": 4,
@@ -337,7 +329,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 86652
+   "t": 58292
   },
   {
    "step": 5,
@@ -388,12 +380,12 @@
      "undo": true,
      "redo": false
     },
-    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them. / No references in the tab. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 90858
+   "t": 61557
   }
  ]
 }

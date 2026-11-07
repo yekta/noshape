@@ -1,16 +1,16 @@
 {
  "scenario": "config-panel-menu-copy-all-inputs",
- "recorded": "2026-11-07T01:38:56.577Z",
+ "recorded": "2026-11-07T03:02:34.532Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.4 60ffcf95"
  },
  "live": {
   "document": "9dce67480392e086ccfce93e",
   "workspace": "03c053cf95cd7e4618c7012e",
-  "element": "aec643342f618d1153daa4bf",
+  "element": "58fe2d33f0288f973b42586f",
   "start": "block",
   "startElement": "480df485cde1af7b8256deb8"
  },
@@ -122,7 +122,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 66823
+   "t": 38948
   },
   {
    "step": 2,
@@ -191,7 +191,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 73297
+   "t": 43646
   },
   {
    "step": 3,
@@ -216,10 +216,7 @@
      "kind": "menu",
      "rows": [
       "Copy all inputs",
-      "Copy all inputs",
       "Visibility conditions…",
-      "Visibility conditions…",
-      "Input propagation…",
       "Input propagation…"
      ],
      "highlighted": null,
@@ -265,7 +262,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 75793
+   "t": 45783
   },
   {
    "step": 4,
@@ -327,7 +324,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 79400
+   "t": 48308
   }
  ]
 }

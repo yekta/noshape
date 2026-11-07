@@ -1,18 +1,18 @@
 {
  "scenario": "shortcut-shift-v-escape",
- "recorded": "2026-11-04T01:09:44.641Z",
+ "recorded": "2026-11-07T03:11:38.831Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "058f52925a9622659aa980e0",
+  "document": "9dce67480392e086ccfce93e",
+  "workspace": "03c053cf95cd7e4618c7012e",
+  "element": "3f3389cc28a4d3b809e8f330",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "480df485cde1af7b8256deb8"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -58,7 +59,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -80,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -118,9 +121,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 28927
+   "t": 27546
   },
   {
    "step": 2,
@@ -143,6 +147,19 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": [
+     {
+      "id": "namedviews-dialog",
+      "title": "Named views",
+      "text": "Named views / No views created",
+      "inputs": [
+       {
+        "placeholder": "New view name",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -181,9 +198,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 30877
+   "t": 29293
   },
   {
    "step": 3,
@@ -198,6 +216,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -236,9 +255,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 34102
+   "t": 32523
   }
  ]
 }

@@ -1,18 +1,18 @@
 {
  "scenario": "sketch-diagnostics-profile-inspector",
- "recorded": "2026-11-07T00:11:30.397Z",
+ "recorded": "2026-11-07T03:08:50.545Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "b1316c66b3b9768bcf5e9dd4",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "00c111792e4dda0478c1f3c8",
   "start": "empty",
-  "startElement": "81fdc27e2aba0b3a105a0788"
+  "startElement": "5732bfe6073432e1fb326f2f"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -106,6 +107,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -142,7 +144,7 @@
     },
     "drawing": null
    },
-   "t": 71663
+   "t": 55048
   },
   {
    "step": 2,
@@ -155,7 +157,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    371
    ],
    "state": {
     "focus": {
@@ -213,6 +215,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -249,7 +252,7 @@
     },
     "drawing": null
    },
-   "t": 81609
+   "t": 68028
   },
   {
    "step": 3,
@@ -314,6 +317,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -350,7 +354,7 @@
     },
     "drawing": null
    },
-   "t": 84519
+   "t": 71339
   },
   {
    "step": 4,
@@ -427,6 +431,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -462,7 +467,7 @@
     },
     "drawing": null
    },
-   "t": 108518
+   "t": 89152
   },
   {
    "step": 5,
@@ -537,6 +542,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -577,7 +583,7 @@
     },
     "drawing": null
    },
-   "t": 120917
+   "t": 103687
   },
   {
    "step": 6,
@@ -642,6 +648,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -682,7 +689,7 @@
     },
     "drawing": null
    },
-   "t": 124394
+   "t": 106961
   },
   {
    "step": 7,
@@ -747,6 +754,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -787,7 +795,7 @@
     },
     "drawing": null
    },
-   "t": 127741
+   "t": 110304
   },
   {
    "step": 8,
@@ -858,6 +866,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -906,7 +915,7 @@
     },
     "drawing": null
    },
-   "t": 134681
+   "t": 116483
   },
   {
    "step": 9,
@@ -977,6 +986,14 @@
       "ok": "enabled"
      }
     ],
+    "panels": [
+     {
+      "id": "gap-analysis-tool-view",
+      "title": "Profile inspector",
+      "text": "Profile inspector / Loose ends / Loose end / Loose end / Previous / Next",
+      "inputs": []
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -1017,7 +1034,7 @@
     },
     "drawing": null
    },
-   "t": 138511
+   "t": 120954
   },
   {
    "step": 10,
@@ -1082,6 +1099,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1122,7 +1140,7 @@
     },
     "drawing": null
    },
-   "t": 141799
+   "t": 124221
   }
  ]
 }

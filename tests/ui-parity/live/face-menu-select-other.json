@@ -1,18 +1,18 @@
 {
  "scenario": "face-menu-select-other",
- "recorded": "2026-11-06T10:31:02.068Z",
+ "recorded": "2026-11-07T03:09:35.026Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.1 backfilled"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "39671760176c110576e0f0b5",
+  "document": "9dce67480392e086ccfce93e",
+  "workspace": "03c053cf95cd7e4618c7012e",
+  "element": "4b18d0af62b7e3d0e0cd7745",
   "start": "block",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "480df485cde1af7b8256deb8"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -88,6 +89,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -119,7 +121,7 @@
       "Edit appearance for Part 1…",
       "Add appearance to face…"
      ],
-     "highlighted": 21,
+     "highlighted": null,
      "disabled": []
     },
     "selection": {
@@ -162,7 +164,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 34076
+   "t": 55372
   },
   {
    "step": 2,
@@ -183,7 +185,28 @@
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": [
+     {
+      "id": "select-other-dialog",
+      "title": "Select other",
+      "text": "Select other / Front plane / Face of Extrude 1 / Part 1 / Edge of Extrude 1 / Face of Extrude 1 / Top plane / Face of Extrude 1 / Right plane",
+      "inputs": []
+     }
+    ],
+    "list": {
+     "kind": "select-other",
+     "rows": [
+      "Front plane",
+      "Face of Extrude 1",
+      "Part 1",
+      "Edge of Extrude 1",
+      "Face of Extrude 1",
+      "Top plane",
+      "Face of Extrude 1",
+      "Right plane"
+     ],
+     "highlighted": null
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -224,7 +247,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 37704
+   "t": 60102
   },
   {
    "step": 3,
@@ -239,6 +262,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -280,7 +304,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 40948
+   "t": 63352
   }
  ]
 }

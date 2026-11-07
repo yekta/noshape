@@ -1,18 +1,18 @@
 {
  "scenario": "sketch-dim-menu-delete",
- "recorded": "2026-11-07T00:13:57.470Z",
+ "recorded": "2026-11-07T03:07:49.542Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "681b6c3c8d696cc3c3cbe74f",
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "6a8c3af3e17d5f3cd69b627f",
   "start": "empty",
-  "startElement": "81fdc27e2aba0b3a105a0788"
+  "startElement": "16c3ef729d456774c1da81b8"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -106,6 +107,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -142,7 +144,7 @@
     },
     "drawing": null
    },
-   "t": 58364
+   "t": 64602
   },
   {
    "step": 2,
@@ -155,7 +157,7 @@
    "ok": true,
    "at": [
     1083,
-    667
+    568
    ],
    "state": {
     "focus": {
@@ -213,6 +215,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -249,7 +252,7 @@
     },
     "drawing": null
    },
-   "t": 69657
+   "t": 72844
   },
   {
    "step": 3,
@@ -314,6 +317,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -350,7 +354,7 @@
     },
     "drawing": null
    },
-   "t": 72763
+   "t": 77638
   },
   {
    "step": 4,
@@ -427,6 +431,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -462,7 +467,7 @@
     },
     "drawing": null
    },
-   "t": 98698
+   "t": 93176
   },
   {
    "step": 5,
@@ -537,6 +542,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -577,7 +583,7 @@
     },
     "drawing": null
    },
-   "t": 126592
+   "t": 120616
   },
   {
    "step": 6,
@@ -642,6 +648,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -682,7 +689,7 @@
     },
     "drawing": null
    },
-   "t": 130497
+   "t": 123907
   },
   {
    "step": 7,
@@ -747,6 +754,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -787,7 +795,7 @@
     },
     "drawing": null
    },
-   "t": 133861
+   "t": 127199
   },
   {
    "step": 8,
@@ -852,6 +860,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -892,7 +901,7 @@
     },
     "drawing": null
    },
-   "t": 136045
+   "t": 130066
   },
   {
    "step": 9,
@@ -969,10 +978,17 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": "SKETCH_ENTITY",
+       "owner": null,
+       "id": "JFB"
+      }
+     ]
     },
     "features": {
      "rows": [
@@ -981,9 +997,9 @@
        "state": "ok",
        "selected": true,
        "editing": true,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "edited selected"
+       "cls": "related-highlight edited selected"
       }
      ],
      "rollbackAfter": "Sketch 1"
@@ -1009,7 +1025,7 @@
     },
     "drawing": null
    },
-   "t": 155132
+   "t": 140375
   },
   {
    "step": 10,
@@ -1023,16 +1039,21 @@
     }
    },
    "ok": true,
-   "hover": [
-    "JCC"
-   ],
+   "hover": [],
    "at": [
     1113,
     544
    ],
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "input",
+     "text": "29.64196 mm",
+     "selection": [
+      0,
+      11
+     ],
+     "all": true
     },
     "dialog": {
      "title": "Sketch 1",
@@ -1086,16 +1107,11 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -1128,11 +1144,17 @@
       "COINCIDENT",
       "HORIZONTAL"
      ],
-     "dimensions": []
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.641965,
+       "expression": null
+      }
+     ]
     },
     "drawing": null
    },
-   "t": 183102
+   "t": 158606
   },
   {
    "step": 11,
@@ -1197,16 +1219,11 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
-     "count": 1,
-     "items": [
-      {
-       "kind": "PLANE",
-       "owner": "Front",
-       "id": "JCC"
-      }
-     ]
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -1239,11 +1256,17 @@
       "COINCIDENT",
       "HORIZONTAL"
      ],
-     "dimensions": []
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.641965,
+       "expression": null
+      }
+     ]
     },
     "drawing": null
    },
-   "t": 184872
+   "t": 160421
   },
   {
    "step": 12,
@@ -1308,6 +1331,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1344,11 +1368,17 @@
       "COINCIDENT",
       "HORIZONTAL"
      ],
-     "dimensions": []
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.641965,
+       "expression": null
+      }
+     ]
     },
     "drawing": null
    },
-   "t": 188264
+   "t": 163660
   },
   {
    "step": 13,
@@ -1362,9 +1392,7 @@
     }
    },
    "ok": true,
-   "hover": [
-    "JCC"
-   ],
+   "hover": [],
    "at": [
     1113,
     544
@@ -1425,22 +1453,21 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
+      "Change to driven dimension",
       "Confirm Sketch 1",
-      "Hide Top plane",
-      "Hide other planes",
-      "Hide all planes",
-      "Section view…",
-      "Clear selection",
+      "Copy sketch",
+      "Show all",
+      "Curve/surface analysis…",
       "Select",
       "Select other…",
       "Add comment",
       "Zoom to fit",
-      "Zoom to selection",
-      "View normal to",
-      "View normal to sketch plane"
+      "View normal to sketch plane",
+      "Delete dimension"
      ],
      "highlighted": null,
      "disabled": []
@@ -1480,11 +1507,17 @@
       "COINCIDENT",
       "HORIZONTAL"
      ],
-     "dimensions": []
+     "dimensions": [
+      {
+       "kind": "LINEAR",
+       "value": 29.641965,
+       "expression": null
+      }
+     ]
     },
     "drawing": null
    },
-   "t": 197587
+   "t": 171757
   },
   {
    "step": 14,
@@ -1494,8 +1527,11 @@
      "menu": "Delete dimension"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Delete dimension\"}",
+   "ok": true,
+   "at": [
+    1211,
+    784
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -1552,26 +1588,8 @@
       "ok": "enabled"
      }
     ],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Confirm Sketch 1",
-      "Hide Top plane",
-      "Hide other planes",
-      "Hide all planes",
-      "Section view…",
-      "Clear selection",
-      "Select",
-      "Select other…",
-      "Add comment",
-      "Zoom to fit",
-      "Zoom to selection",
-      "View normal to",
-      "View normal to sketch plane"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "panels": null,
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -1611,7 +1629,7 @@
     },
     "drawing": null
    },
-   "t": 199528
+   "t": 174767
   }
  ]
 }

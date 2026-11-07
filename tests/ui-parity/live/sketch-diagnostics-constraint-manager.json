@@ -1,18 +1,18 @@
 {
  "scenario": "sketch-diagnostics-constraint-manager",
- "recorded": "2026-11-07T00:08:51.413Z",
+ "recorded": "2026-11-07T03:07:05.591Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "089722f9e794805b05974fd9",
+  "document": "9dce67480392e086ccfce93e",
+  "workspace": "03c053cf95cd7e4618c7012e",
+  "element": "12e9289f409fe43882d9b2ff",
   "start": "empty",
-  "startElement": "81fdc27e2aba0b3a105a0788"
+  "startElement": "f86ac3923f1a861bea8ac117"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -106,6 +107,7 @@
       "ok": "disabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -142,7 +144,7 @@
     },
     "drawing": null
    },
-   "t": 52147
+   "t": 47175
   },
   {
    "step": 2,
@@ -213,6 +215,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -249,7 +252,7 @@
     },
     "drawing": null
    },
-   "t": 62761
+   "t": 55206
   },
   {
    "step": 3,
@@ -314,6 +317,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -350,7 +354,7 @@
     },
     "drawing": null
    },
-   "t": 65231
+   "t": 58112
   },
   {
    "step": 4,
@@ -427,6 +431,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -462,7 +467,7 @@
     },
     "drawing": null
    },
-   "t": 85524
+   "t": 78488
   },
   {
    "step": 5,
@@ -537,6 +542,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -577,7 +583,7 @@
     },
     "drawing": null
    },
-   "t": 112688
+   "t": 107233
   },
   {
    "step": 6,
@@ -642,6 +648,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -682,7 +689,7 @@
     },
     "drawing": null
    },
-   "t": 116001
+   "t": 110777
   },
   {
    "step": 7,
@@ -747,6 +754,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -787,7 +795,7 @@
     },
     "drawing": null
    },
-   "t": 119248
+   "t": 114267
   },
   {
    "step": 8,
@@ -858,6 +866,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -906,7 +915,7 @@
     },
     "drawing": null
    },
-   "t": 123529
+   "t": 117763
   },
   {
    "step": 9,
@@ -977,6 +986,14 @@
       "ok": "enabled"
      }
     ],
+    "panels": [
+     {
+      "id": "constraint-manager-view",
+      "title": "Constraint manager",
+      "text": "Constraint manager / Filters / Automatically select constraints / Type / Mode / Status / Sort by constraint / Sort by entity / Entities and constraints / Delete all",
+      "inputs": []
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -1017,7 +1034,7 @@
     },
     "drawing": null
    },
-   "t": 125924
+   "t": 119899
   },
   {
    "step": 10,
@@ -1082,6 +1099,7 @@
       "ok": "enabled"
      }
     ],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -1122,7 +1140,7 @@
     },
     "drawing": null
    },
-   "t": 129260
+   "t": 123167
   }
  ]
 }

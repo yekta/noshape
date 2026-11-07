@@ -1,18 +1,18 @@
 {
  "scenario": "key-s-shortcut-toolbar",
- "recorded": "2026-11-07T01:24:57.988Z",
+ "recorded": "2026-11-07T03:05:03.966Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403"
+  "recorder": "2026-11-07.5 53387b9e"
  },
  "live": {
-  "document": "ec10b45614d6fd203cecb5bd",
-  "workspace": "c9d6acb584fac8cbb40bad93",
-  "element": "469b750de88b28994463d0f9",
+  "document": "095b4566eca1e1a3a5b6b340",
+  "workspace": "ea75236f4599cc410588c328",
+  "element": "4010f86f91f305cca34cbe51",
   "start": "block",
-  "startElement": "633a37b9892e81fc5b3c1563"
+  "startElement": "04f7e36901304a29cb05231d"
  },
  "start": {
   "focus": {
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -88,6 +89,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -135,7 +137,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 71065
+   "t": 32979
   },
   {
    "step": 2,
@@ -150,7 +152,24 @@
     },
     "dialog": null,
     "dialogs": [],
-    "list": null,
+    "panels": null,
+    "list": {
+     "kind": "shortcut-toolbar",
+     "rows": [
+      "new-sketch",
+      "extrude",
+      "revolve",
+      "sweep",
+      "loft",
+      "fillet",
+      "chamfer",
+      "hole",
+      "boolean-bodies",
+      "transform"
+     ],
+     "disabled": [],
+     "highlighted": null
+    },
     "selection": {
      "count": 1,
      "items": [
@@ -197,7 +216,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 72865
+   "t": 34765
   },
   {
    "step": 3,
@@ -212,6 +231,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 1,
@@ -259,7 +279,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 76305
+   "t": 38022
   }
  ]
 }
