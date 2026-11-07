@@ -112,6 +112,14 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         build_assembly(ctx, asm)?;
         call(ctx, "tab_rename", json!({ "tab": "Assembly 1", "name": asm_tab }))?;
     }
+    // A Feature Studio (README "### start": a custom table's defineTable, a custom feature), committed.
+    if let Some(fs) = start.get("feature_studio") {
+        let name = fs["name"].as_str().unwrap_or("Feature Studio 1");
+        let source = fs["source"].as_str().ok_or("feature_studio: its source")?;
+        call(ctx, "tab_create", json!({ "kind": "featurestudio", "name": name }))?;
+        call(ctx, "featurestudio_edit", json!({ "tab": name, "source": source }))?;
+        call(ctx, "featurestudio_commit", json!({ "tab": name }))?;
+    }
     // A drawing of a part (README "### Drawings"): Create Drawing of it, the run opening on its tab ("Part 1 Drawing 1").
     if let Some(d) = start.get("drawing") {
         let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
@@ -214,6 +222,23 @@ mod tests {
         let v = 40.0 * 40.0 * 20.0 - std::f64::consts::PI * 25.0 * 20.0;
         assert!((mp["volume"].as_f64().unwrap() - v).abs() < 1.0, "{mp}");
         call(&mut ctx, "tab_activate", json!({ "tab": "start pin asm" })).unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A start's Feature Studio (README "### start"): block-drawing-table's custom table goes on its drawing.
+    #[test]
+    fn a_feature_studio_start_builds() {
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("noshape-uip-fs-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("table.noshape"), &starts["block-drawing-table"]).unwrap();
+        let r = call(&mut ctx, "drawing_custom_table", json!({ "drawing": "Part 1 Drawing 1", "table": "Part faces", "position": [150, 150] }));
+        assert!(r.is_ok(), "{r:?}");
+        // As the app opens it: from the saved file.
+        let mut again = Ctx::new();
+        call(&mut again, "document_open", json!({ "path": dir.join("table.noshape").to_str().unwrap() })).unwrap();
+        let r = call(&mut again, "drawing_custom_table", json!({ "drawing": "Part 1 Drawing 1", "table": "Part faces", "position": [150, 150] }));
+        assert!(r.is_ok(), "reopened: {r:?}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

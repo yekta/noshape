@@ -1,0 +1,80 @@
+{
+  "name": "drw-datum-target-show-all-dims",
+  "about": "A datum target's label › Show dimensions ▸ All targets",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Datum"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Datum target"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            10,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            30,
+            0,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            30,
+            0,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show dimensions"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "All targets"
+      }
+    }
+  ]
+}

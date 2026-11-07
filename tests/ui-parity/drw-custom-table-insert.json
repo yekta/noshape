@@ -1,0 +1,63 @@
+{
+  "name": "drw-custom-table-insert",
+  "about": "Custom table › Insert › \"Part faces\" › Done, placed at sheet (150, 150)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items; a start with a Feature Studio)",
+  "start": "block-drawing-table",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Custom table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Select a custom table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part faces"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Done"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

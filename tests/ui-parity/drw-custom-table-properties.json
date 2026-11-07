@@ -1,0 +1,87 @@
+{
+  "name": "drw-custom-table-properties",
+  "about": "A custom table's menu › Custom table properties...",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items; a start with a Feature Studio)",
+  "start": "block-drawing-table",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Custom table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Select a custom table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part faces"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Done"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          150,
+          150
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          140,
+          146
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Custom table properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

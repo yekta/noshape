@@ -278,7 +278,7 @@ impl DrawingEditor {
         let chars_body = table(&chars, "it-c", cx);
         v_flex()
             .size_full()
-            .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("View:")).child(view).child(div().flex_1()).child(more))
+            .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("View:")).child(view).child(div().flex_1()).child(div().map(|d| crate::ui_script::mark(d, || "panel_more:Inspection table".into())).child(more)))
             .child(
                 v_flex()
                     .id("it-scroll")

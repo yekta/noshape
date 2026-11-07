@@ -146,6 +146,10 @@ pub fn table_list(id: &'static str, mine: &[TableRef], workspace: &[TableRef], c
             list = list.child(
                 h_flex()
                     .id(SharedString::from(format!("{id}-{heading}-{i}")))
+                    .map(|d| {
+                        let shown = t.display.clone();
+                        crate::ui_script::mark(d, move || format!("list_row:{shown}"))
+                    })
                     .h(px(30.))
                     .px(px(6.))
                     .gap(px(5.))

@@ -1,0 +1,42 @@
+{
+  "name": "drw-inspection-table-export-csv",
+  "about": "The Inspection table panel's ⋯ › Export to CSV",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "button": "Inspection table"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 800
+    },
+    {
+      "do": "click",
+      "on": {
+        "panel_more": "Inspection table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Export to CSV"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

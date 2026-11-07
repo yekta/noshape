@@ -407,6 +407,7 @@ impl DrawingEditor {
             let on = t == tab;
             div()
                 .id(("dt-tab", t as usize))
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{name}")))
                 .flex_1()
                 .h(px(28.))
                 .flex()

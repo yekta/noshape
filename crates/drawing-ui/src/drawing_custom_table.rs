@@ -458,6 +458,7 @@ impl DrawingEditor {
         let action = |id: &'static str, icon: &'static str, label: &'static str, enabled: bool, full: bool, cx: &mut Context<Self>| {
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
                 .h(px(28.))
                 .when(full, |b| b.flex_1())
                 .when(!full, |b| b.w(px(64.)).flex_none())
@@ -613,6 +614,10 @@ impl DrawingEditor {
                 body = body.child(
                     h_flex()
                         .id("ct-pick-table")
+                        .map(|d| {
+                            let shown = label.clone();
+                            crate::ui_script::mark(d, move || format!("dropdown:{shown}"))
+                        })
                         .h(px(32.))
                         .px(px(6.))
                         .gap(px(5.))
@@ -646,7 +651,7 @@ impl DrawingEditor {
                 let ready = pending.clone();
                 body = body.child(
                     h_flex().justify_end().child(
-                        Button::new("ct-pick-done")
+                        crate::ui_script::mark(Button::new("ct-pick-done"), || "button:Done".to_string())
                             .label("Done")
                             .primary()
                             .small()

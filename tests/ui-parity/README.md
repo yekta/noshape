@@ -51,6 +51,10 @@ list's rows (the assembly's own, Origin, instances, "Mate features (n)", its row
 [{"name", "fixed", "transform"}], "mates": [{"name", "type", "status"}]}` as live's REST gives them (type
 "REVOLUTE", status "OK"); a mate selected in the list is a `FEATURE` item.
 
+A start's `"feature_studio"` (dx, 11-07): `{"name": "Feature Studio 1", "source": "FeatureScript 3095; …"}`, a Feature
+Studio made after the features (and before a drawing) and committed, as start `block-drawing-table` (its custom table
+"Part faces").
+
 A start's `"configuration"` (asm, 11-07): the Part Studio's configuration inputs, made after its features:
 `[{"type": "list", "name": "Size", "rows": ["Small", "Large"]}]` (the first row the default; nothing configured by
 them), as start `config-blocks`.
@@ -144,6 +148,7 @@ tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Cr
 - `{"sheet_tab": "Sheet2"}`: a sheet by its name: the active sheet's label at the drawing's top left (inert, live2
   2180), or its row in the Sheets panel (Ctrl+S) when that is open (click, double-click, rclick);
 - `{"break_line": {"view": "Front", "index": 0}}`: a break's first line (a model point there moves with the break);
+- `{"panel_more": "Inspection table"}`: the drawing's Inspection table panel's ⋯ (Export to CSV);
 - `{"leader": {"annotation": "TEMP", "at": 0.5}}`: the point that far (0..1, by length) along the first leader of the
   annotation shown as `annotation` (its stroke's menu: Add node; on a node: Remove node);
 - `{"hole_axis": "X"}` (or `"Y"`): the middle of the X (Y) arrow of the sheet's first hole table's origin indicator
