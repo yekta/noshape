@@ -858,7 +858,10 @@ impl DrawingEditor {
                 )
             }
             Panel::CellResize { width, height, .. } => (
-                "Resize",
+                {
+                    crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Resize", "text": ["Resize", "Column width", "Row height"] }));
+                    "Resize"
+                },
                 vec![
                     Self::label_row("Column width", h_flex().gap_2().child(Input::new(width).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child("mm")).into_any_element()),
                     Self::label_row("Row height", h_flex().gap_2().child(Input::new(height).xsmall().w(px(80.))).child(div().text_xs().text_color(pal.text_faint).child("mm")).into_any_element()),

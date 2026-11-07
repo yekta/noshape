@@ -305,6 +305,9 @@ impl DrawingEditor {
     }
 
     pub fn render_table_props(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.table_props.is_some() {
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Table properties", "text": ["Table properties", "Select fixed corner"] }));
+        }
         let d = self.table_props.as_ref()?;
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);

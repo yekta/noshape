@@ -843,20 +843,29 @@ fn cell_height(table: &Table, data: &TableData, r: usize, c: usize) -> f64 {
     table.cell_format(r, c).height.filter(|h| *h > 0.0).unwrap_or_else(|| data.row_text_height(table, r))
 }
 
-/// Natural column widths (mm) for content. Cells merged across columns do
-/// not widen single columns.
+/// Natural column widths (mm) for content. Each cell's own text sizes its
+/// column whether or not it is merged, so merging or unmerging never moves
+/// the columns; a merged cell's text wider than its columns widens the last.
 pub fn auto_widths(table: &Table, data: &TableData) -> Vec<f64> {
     let n = data.columns();
     let pad = data.padding[0] * 2.0;
     let mut w = vec![data.content_height(table) * 3.0; n];
-    for (ri, row) in data.all_rows().iter().enumerate() {
-        for (i, c) in row.iter().enumerate() {
-            if table.merge_at(ri, i).is_some_and(|m| m.cols > 1 || (m.row, m.col) != (ri, i)) {
-                continue;
-            }
-            let h = cell_height(table, data, ri, i);
-            let tw = c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.shown_cell_format(ri, i).bold { 1.05 } else { 1.0 };
-            w[i] = w[i].max(tw + pad);
+    let text_w = |ri: usize, i: usize, c: &str| {
+        let h = cell_height(table, data, ri, i);
+        c.lines().map(|l| font::text_width(l, h)).fold(0.0, f64::max) * if table.shown_cell_format(ri, i).bold { 1.05 } else { 1.0 }
+    };
+    let rows = data.all_rows();
+    for (ri, row) in rows.iter().enumerate() {
+        for (i, c) in row.iter().enumerate().take(n) {
+            w[i] = w[i].max(text_w(ri, i, c) + pad);
+        }
+    }
+    for m in table.merges.iter().filter(|m| m.cols > 1 && m.col + m.cols <= n) {
+        let Some(c) = rows.get(m.row).and_then(|r| r.get(m.col)) else { continue };
+        let need = text_w(m.row, m.col, c) + pad;
+        let have: f64 = w[m.col..m.col + m.cols].iter().sum();
+        if need > have {
+            w[m.col + m.cols - 1] += need - have;
         }
     }
     if let Some(t) = &data.title {

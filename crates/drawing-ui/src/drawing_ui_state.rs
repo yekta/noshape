@@ -210,7 +210,12 @@ impl DrawingEditor {
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
             // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
-            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. })) {
+            // (A table whose cell is in its Note editor isn't in live's state yet: it shows after the editor closes.)
+            let editing = match &self.panel {
+                Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) => Some(*table),
+                _ => None,
+            };
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. }) && Some(t.id) != editing) {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
                 annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
             }
@@ -351,6 +356,9 @@ impl DrawingEditor {
             "Hatch region"
         } else if self.painter.is_some() {
             "Format painter"
+        } else if matches!(self.panel, Some(crate::drawing_view::Panel::Cell { note: Some(_), .. })) {
+            // A new table's cell in its Note editor: still the Table tool (live 2184).
+            "Table"
         } else if self.inspection.as_ref().is_some_and(|d| d.reorder.is_none() && d.edit.is_none()) {
             "Inspection item"
         } else if self.drawing.props.hide_inspection {

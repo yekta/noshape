@@ -5144,3 +5144,23 @@ fn centerline_extends_past_its_picks() {
     assert!(((q[0] - p[0]) - 45.0).abs() < 1e-9 && (p[0] - 7.5).abs() < 1e-9, "{p:?} {q:?}");
     assert!(g.grips.iter().any(|gr| (gr.pos[0] - 10.0).abs() < 1e-9) && g.grips.iter().any(|gr| (gr.pos[0] - 50.0).abs() < 1e-9));
 }
+
+/// Merging cells doesn't move the columns: each cell's own text sizes its
+/// column (a merge hid DATE's text, the column shrank, the table shifted and
+/// the merged cell's menu then had no Unmerge cells under the same point).
+#[test]
+fn merging_cells_keeps_the_columns() {
+    let cells = vec![vec!["REV".into(), "DESCRIPTION".into(), "DATE".into(), "APPROVED".into()], vec!["A".into(), "First release".into(), "2026-11-07".into(), "".into()]];
+    let mut t = Table::new(1, TableKind::General { cells, title: None, header: true }, [300.0, 200.0]);
+    let widths = |t: &Table| tables::layout(t, &tables::table_data(&Drawing::default(), t, None, None, None, &[], &|s| s.to_string())).xs;
+    let before = widths(&t);
+    assert!(t.merge_cells((0, 1), (0, 2)));
+    assert_eq!(widths(&t), before);
+    // A merged text wider than its columns widens the last of them.
+    let long = "A MUCH LONGER MERGED HEADER THAN BOTH COLUMNS";
+    if let TableKind::General { cells, .. } = &mut t.kind {
+        cells[0][1] = long.into();
+    }
+    let xs = widths(&t);
+    assert!(xs[3] - xs[1] >= font::text_width(long, 2.5) - 1e-6, "{xs:?}");
+}

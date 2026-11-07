@@ -34,7 +34,9 @@ impl DrawingEditor {
     fn cell_panel_sel(&self) -> Option<CellSel> {
         let cs = self.cell_sel?;
         let t = self.current_sheet().table(cs.table)?;
-        (matches!(t.kind, TableKind::General { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select)).then_some(cs)
+        // Live: the Cell panel shows for one plain cell (none with a range or a merged cell selected).
+        let one = cs.a == cs.b && t.merge_at(cs.a.0, cs.a.1).is_none();
+        (matches!(t.kind, TableKind::General { .. }) && self.panel.is_none() && matches!(self.tool, Tool::Select) && one).then_some(cs)
     }
 
     /// Create / drop the panel's state as the cell selection changes (from render).
@@ -342,6 +344,7 @@ impl DrawingEditor {
             .child(popup_btn("cp-align", align_icon, "Horizontal alignment", true, cx).os_dropdown_menu("cp-align-dd", false, fmt_menu(align)))
             .child(popup_btn("cp-valign", valign_icon, "Vertical alignment", true, cx).os_dropdown_menu("cp-valign-dd", false, fmt_menu(valign)));
 
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Cell", "text": std::iter::once("Cell").chain(FONT_FAMILIES.iter().copied()).collect::<Vec<_>>() }));
         Some(
             v_flex()
                 .id("dr-cell-panel")

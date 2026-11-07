@@ -277,6 +277,25 @@ impl DrawingEditor {
                 ed.edit_table(id, label, cx, move |t| f(t));
             })
         };
+        // Remove ▸ Columns / Rows: one cell stays selected where the first removed one was (live: its Cell panel
+        // stays open).
+        let remove = |label: &'static str, f: Box<dyn Fn(&mut noshape_model::drawing::Table)>| {
+            let f = std::rc::Rc::new(f);
+            MenuEntry::item(label, move |ed, _, cx| {
+                let f = f.clone();
+                ed.cell_sel = None;
+                ed.edit_table(id, label, cx, move |t| f(t));
+                let dims = ed.current_sheet().table(id).and_then(|t| match &t.kind {
+                    noshape_model::drawing::TableKind::General { cells, .. } => Some((cells.len(), cells.first().map_or(0, Vec::len))),
+                    _ => None,
+                });
+                if let Some((rows, cols)) = dims.filter(|d| d.0 > 0 && d.1 > 0) {
+                    let at = (r0.min(rows - 1), c0.min(cols - 1));
+                    ed.cell_sel = Some(crate::drawing_cells::CellSel { table: id, a: at, b: at });
+                    cx.notify();
+                }
+            })
+        };
         let mut out = vec![
             MenuEntry::Submenu(
                 "Insert".into(),
@@ -290,12 +309,12 @@ impl DrawingEditor {
             MenuEntry::Submenu(
                 "Remove".into(),
                 vec![
-                    edit("Columns", Box::new(move |t| {
+                    remove("Columns", Box::new(move |t| {
                         for c in (c0..=c1).rev() {
                             t.delete_col(c);
                         }
                     })),
-                    edit("Rows", Box::new(move |t| {
+                    remove("Rows", Box::new(move |t| {
                         for r in (r0..=r1).rev() {
                             t.delete_row(r);
                         }

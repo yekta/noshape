@@ -441,9 +441,12 @@ impl DrawingEditor {
             // Every text shown, in reading order, at most 30 (README "### Drawings"; live 2063).
             let mut text: Vec<String> = vec!["Note".into()];
             text.extend(font_names);
-            text.push("Flag notes".into());
-            text.extend(shapes.iter().flatten().map(|e| e.0.clone()));
-            text.extend(sizes_names(4));
+            // A table cell's panel has no Flag notes row (live 743–750).
+            if !cell {
+                text.push("Flag notes".into());
+                text.extend(shapes.iter().flatten().map(|e| e.0.clone()));
+                text.extend(sizes_names(4));
+            }
             text.truncate(30);
             serde_json::json!({ "kind": "drawing-panel", "title": "Note", "text": text })
         });
