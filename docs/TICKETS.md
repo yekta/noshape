@@ -3642,7 +3642,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
   (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance
   point, shapes.rs `polygon`), 3 × COINCIDENT, HORIZONTAL. Same geometry; the constraint list (Constraint manager, the
   glyphs) differs. Needs Onshape's polygon by REST (its constraints and their parameters). (psui 2026-11-06)
-- [ ] P1 SKETCH-SCREEN-SPACE-REACH (skasm, P1 by the lead 11-06: users feel it every time they sketch) live measures a sketch's pick and inference reach on the screen, after the view's
+- [x] (skasm 11-07: live's rule from its code and 2155: inferences drawn 15 px wide, picked at the pointer's pixel, so 7.5 px from what they draw, measured across on screen; curve picks a 5 px square round the pointer reaching the 2 px line; sketch-horizontal-key, -offset, -offset-key, -vertical-key, -midpoint-key all match, sketch scenarios 141 -> 145/147, model suite nothing lower. Our runner's canvas is live's (1673 x 886 at (246, 76)) but our opening view is ~5 % more zoomed in (ours = live's zoom to fit; live's new Part Studio opens wider): psui's if wanted) P1 SKETCH-SCREEN-SPACE-REACH (skasm, P1 by the lead 11-06: users feel it every time they sketch) live measures a sketch's pick and inference reach on the screen, after the view's
   projection; ours in sketch units (`world_per_px` × px). In the default trimetric view a Top-plane sketch's y is foreshortened
   far more than its x, and live behaves accordingly (ui-parity, start `empty`, Sketch on Top): sketch-horizontal-key draws
   (0, 0) → (30, 3) and live infers HORIZONTAL (3 mm in y is inside its reach), sketch-vertical-key draws (0, 0) → (3, 30) and

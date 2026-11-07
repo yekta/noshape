@@ -74,6 +74,18 @@ impl Sketch {
         }
     }
 
+    /// How far entity `id` is from `p` by live's pick, the smallest square round `p` on screen that reaches it (its
+    /// half side): points and lines exactly, other curves from their point nearest `p` in the sketch.
+    pub fn screen_box_distance_to(&self, id: EntityId, p: DVec2, screen: &ScreenMetric) -> Option<f64> {
+        if let Some(q) = self.point(id) {
+            return Some(screen.box_len(q - p));
+        }
+        match self.curve(id)? {
+            Curve2::Line { a, b } => Some(screen.box_distance_to_segment(a, b, p)),
+            c => Some(screen.box_len(c.closest(p).1 - p)),
+        }
+    }
+
     fn pick_impl(&self, p: DVec2, radius: f64, report: Option<&SolveReport>, screen: Option<&ScreenMetric>) -> Option<EntityId> {
         let mut best: Option<(u8, f64, EntityId)> = None;
         let reach = screen.map_or(radius, |s| s.reach(radius));

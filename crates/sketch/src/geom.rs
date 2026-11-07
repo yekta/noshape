@@ -35,6 +35,32 @@ impl ScreenMetric {
         if d.length_squared() > 0.0 { v.perp_dot(d).abs() / d.length() } else { v.length() }
     }
 
+    /// `v`'s larger screen coordinate: how far it reaches out of a square round its start (live picks the pixels in
+    /// a square round the pointer).
+    pub fn box_len(&self, v: DVec2) -> f64 {
+        let w = self.0 * v;
+        w.x.abs().max(w.y.abs())
+    }
+
+    /// The smallest square round `p` on screen (its half side) that segment `a`–`b` reaches.
+    pub fn box_distance_to_segment(&self, a: DVec2, b: DVec2, p: DVec2) -> f64 {
+        let (u, w) = (self.0 * (a - p), self.0 * (b - p));
+        let d = w - u;
+        let at = |t: f64| {
+            let q = u + d * t;
+            q.x.abs().max(q.y.abs())
+        };
+        // The square's size along the segment is convex and piecewise straight: least at an end or a kink (a
+        // coordinate zero, or both equal in size).
+        let mut best = at(0.0).min(at(1.0));
+        for (num, den) in [(-u.x, d.x), (-u.y, d.y), (u.y - u.x, d.x - d.y), (-(u.x + u.y), d.x + d.y)] {
+            if den.abs() > 1e-300 && (0.0..=1.0).contains(&(num / den)) {
+                best = best.min(at(num / den));
+            }
+        }
+        best
+    }
+
     /// The point of segment `a`–`b` nearest `p` on screen.
     pub fn closest_on_segment(&self, a: DVec2, b: DVec2, p: DVec2) -> DVec2 {
         let (d, w) = (self.0 * (b - a), self.0 * (p - a));
@@ -526,6 +552,20 @@ fn refine(c: &Curve2, ta: f64, pa: DVec2, tb: f64, pb: DVec2, tol: f64, depth: u
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live's pick square round the pointer, in live's view of a Top sketch (x 3.0 / 0.87, y 1.7 / -1.5 px a mm):
+    /// the line along y = 0 is 4.6 px from a click 3 mm below it (ui-parity sketch-offset: hit) and 7.7 px from one
+    /// 5 mm below (sketch-offset-key: missed), though 5.8 and 9.6 px away straight across.
+    #[test]
+    fn the_pick_square_reaches_a_line_as_lives() {
+        let m = ScreenMetric(glam::DMat2::from_cols(DVec2::new(3.0, 0.867), DVec2::new(1.7, -1.5)));
+        let (a, b) = (DVec2::ZERO, DVec2::new(30.0, 0.0));
+        let near = m.box_distance_to_segment(a, b, DVec2::new(15.0, -3.0));
+        let far = m.box_distance_to_segment(a, b, DVec2::new(7.5, -5.0));
+        assert!((near - 4.635).abs() < 0.001 && (far - 7.724).abs() < 0.001, "{near} {far}");
+        // Past its end: the square reaches its end point.
+        assert!((m.box_distance_to_segment(a, b, DVec2::new(-2.0, 0.0)) - 6.0).abs() < 1e-9);
+    }
 
     #[test]
     fn arc_bbox_and_closest() {

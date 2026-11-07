@@ -759,13 +759,16 @@ impl PartStudioView {
                     let Some(ed) = this.sketch.as_ref() else { return false };
                     let Some(d) = this.sketch_data(cx) else { return false };
                     let r = ed.world_per_px * 10.0;
-                    // On screen, as the pick that hovered it (SKETCH-SCREEN-SPACE-REACH).
+                    // On screen, as live's pick (SKETCH-SCREEN-SPACE-REACH): a curve within the 5 px square round the
+                    // pointer (woolsthorpe MOUSE_PICK_RADIUS_PX), counting its 2 px drawn width (ui-parity
+                    // sketch-offset hits a line 3 mm off it, sketch-offset-key misses one 5 mm off).
+                    let curve_r = ed.world_per_px * 6.0;
                     let screen = ed.screen_metric();
                     match (d.sketch.point(e), screen) {
                         (Some(q), Some(m)) => m.len(q - p) <= r,
                         (Some(q), None) => (q - p).length() <= r,
                         // Text box lines stand for their glyphs; keep them.
-                        (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_distance_to(e, p, &m).is_some_and(|x| x <= r),
+                        (None, Some(m)) => d.text_of_entity(e).is_some() || d.sketch.screen_box_distance_to(e, p, &m).is_some_and(|x| x <= curve_r),
                         (None, None) => d.text_of_entity(e).is_some() || d.sketch.curve(e).is_some_and(|c| c.closest(p).2 <= r),
                     }
                 };
