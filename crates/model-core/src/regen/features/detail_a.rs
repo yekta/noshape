@@ -17,7 +17,7 @@ fn blend_role(n: &Name) -> Role {
 }
 
 /// Unit normals of the two faces of an edge at its midpoint.
-fn edge_normals(shape: &Shape, faces: &[Shape], edge_faces: &[Vec<u32>], ei: usize) -> Option<(DVec3, DVec3)> {
+pub(super) fn edge_normals(shape: &Shape, faces: &[Shape], edge_faces: &[Vec<u32>], ei: usize) -> Option<(DVec3, DVec3)> {
     let e = shape.sub_shape(ShapeType::Edge, ei).ok()?;
     let m = edge_mid(&e)?;
     let fs = edge_faces.get(ei)?;

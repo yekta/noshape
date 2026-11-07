@@ -331,7 +331,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             None
         }
     };
-    let groups = by_body(ev.resolve_edges(refs));
+    let groups = by_body(sharp_of_picked_faces(ev, refs));
     // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
@@ -597,6 +597,25 @@ fn param_on_edge(edge: &k::Shape, info: &k::EdgeInfo, p: glam::DVec3) -> Option<
 /// Variable fillet: Onshape's `vertexSettings` (vertex + radius) and
 /// `pointOnEdgeSettings` (edge, position, radius); a plain `vertices` query
 /// takes the main radius. Edges are filleted one at a time, found again by name.
+/// The edges a fillet's picks stand for: the edges picked, and a picked face's edges but those where it meets its
+/// neighbour tangentially (live 2202: cf-surface-pattern's Fillet 1 leaves the picked top's 0° edge to Extrude 6's cut
+/// face as it is and blends its sharp ones).
+fn sharp_of_picked_faces(ev: &EvalCtx, refs: &[crate::reference::Reference]) -> Vec<(usize, usize)> {
+    let edges: Vec<crate::reference::Reference> = refs.iter().filter(|r| !matches!(r, crate::reference::Reference::Face(_))).cloned().collect();
+    let picked = ev.resolve_edges(&edges);
+    let mut smooth: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    let mut is_smooth = |bi: usize, ei: usize| -> bool {
+        let body = &ev.ctx.bodies[bi];
+        if let std::collections::btree_map::Entry::Vacant(v) = smooth.entry(bi) {
+            let faces = body.shape.faces();
+            let ef = body.shape.edge_faces().unwrap_or_default();
+            v.insert((0..ef.len()).filter(|&e| super::detail_a::edge_normals(&body.shape, &faces, &ef, e).is_some_and(|(a, b)| a.dot(b) > 1.0 - 1e-9)).collect());
+        }
+        smooth[&bi].contains(&ei)
+    };
+    ev.resolve_edges(refs).into_iter().filter(|&(bi, ei)| picked.contains(&(bi, ei)) || !is_smooth(bi, ei)).collect()
+}
+
 fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
     use crate::params::NumKind;
     let mut at_vertex: Vec<(glam::DVec3, f64)> = Vec::new();
