@@ -11,6 +11,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## Parity translator changes by asm (assembly corpus; lead 11-07: one line each, so nobody fixes them twice)
+- 2026-11-07 09:35 UTC: `rebuild_assembly` synthesizes a studio's configuration variables from its instances' configuration strings
+  when live's fetch has none (standard-content studios: #Pitch, #HeadChamfer…), and inserts each instance with its own
+  values (`instance_config_values`). Assembly corpus: gearbox-std 11 → 23/23, config-assembly 1 → 16/25.
+- 2026-11-07 09:35 UTC: Translator `part_order` (`partOrder` in a studio's JSON, from `.mass.json` part ids): an id-only part query
+  without live's geometry maps to all our solid parts when the counts agree (only assembly corpus studios set it).
+- 2026-11-07 09:35 UTC: `rebuild_assembly` maps live part names to ours by name, the only part, or live's `.mass.json` volume band
+  (alike parts one each); the assembly suite reads part names from the assembly when no parts list was fetched.
+- 2026-11-07 09:46 UTC: a qSketchRegion query naming more regions than our sketch has (live's sketch split finer) gives all of ours
+  (was: not mapped); fewer named is still left to the parts it made.
+- 2026-11-07 09:46 UTC: a legacy Hole's `style` (no `styleV2`) maps to `styleV2`; shared sketch vertices within 1e-7 m (was 1e-9).
+- 2026-11-07 09:46 UTC: an id-only region query without live's geometry: the regions whose blind/symmetric NEW extrude has a final
+  part's `.mass.json` volume (`partVolumes`, `regions_by_volume`), else for one id the sketch's only region inside no
+  other's hole (`outer_region`).
+- 2026-11-07 09:46 UTC: an id-only `booleanScope` without live's geometry (studios with `partOrder`) is all our solid parts when it names
+  as many (`parts_by_count`).
+- 2026-11-07 10:28 UTC: an id-only revolve axis in a sketch without a centreline: the profile's longest line with all of the
+  profile on one side of it (`last_sketch_axis`; a screw's flat side along its axis).
+
 ## 11-06 20:57 UTC: drawing batch 3 and the exchange suite's P0
 - Drawings (70e75ac4): batch 3 30/35 scenarios (192 -> ~200/211 states). Left: drw-export-formats (live's runner
   couldn't pick the Format; re-record asked, REQUESTS 20:19), drw-hole-callout (does live place one on an extruded

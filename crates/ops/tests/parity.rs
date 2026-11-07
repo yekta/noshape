@@ -1690,7 +1690,14 @@ fn parity_assemblies() {
                 // With live's volume band (m³) from <element>.mass.json, to find the part when ours has another name.
                 let mass = read(&dir.join("studios").join(format!("{element}.mass.json")));
                 let band = |p: &str| mass.as_ref().and_then(|m| m["bodies"][p]["volume"].as_array().cloned()).filter(|v| v.len() >= 3).map(|v| serde_json::json!([v[1], v[2]]));
-                (!seen.is_empty()).then(|| Value::Array(seen.into_iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n, "volume": band(&p) })).collect()))
+                // Every final part of the studio (the instanced ones named), for the part ids' creation order.
+                let mut list: Vec<Value> = seen.iter().map(|(p, n)| serde_json::json!({ "partId": p, "name": n, "volume": band(p) })).collect();
+                for p in mass.as_ref().and_then(|m| m["bodies"].as_object()).into_iter().flat_map(|b| b.keys()) {
+                    if !seen.contains_key(p) {
+                        list.push(serde_json::json!({ "partId": p, "volume": band(p) }));
+                    }
+                }
+                (!seen.is_empty()).then_some(Value::Array(list))
             };
             let (Some(features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
             studios.push((element.to_string(), features, parts));

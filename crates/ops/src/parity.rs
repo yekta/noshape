@@ -133,6 +133,12 @@ pub struct Translator<'a> {
     placeholder: Option<String>,
     /// Each Feature Studio's pinned std and the one our host serves for it.
     pub std_pins: Vec<(String, u32, u32)>,
+    /// The Part Studio's final part ids (`partOrder`, an assembly corpus' studio without live's geometry): an id-only
+    /// query of those is a part query.
+    part_order: Vec<String>,
+    /// Live's final parts' volume bands (`partVolumes`, m³; an assembly corpus' studio): an id-only region query is
+    /// the regions whose extrude makes one of them.
+    part_volumes: Vec<[f64; 2]>,
     /// Import features' files (features.json `foreignFiles`: foreign id →
     /// `{ "path", "placed" }`, placed: live's export of the Part Studio).
     foreign: HashMap<String, Value>,
@@ -292,7 +298,7 @@ impl<'a> Translator<'a> {
             .flatten()
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str()?.to_string())))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1070,7 +1076,39 @@ impl<'a> Translator<'a> {
         if regions.len() == ids {
             return Some(regions);
         }
-        self.regions_of_new_bodies(k, &ours, &g, ids, true)
+        self.regions_of_new_bodies(k, &ours, &g, ids, true).or_else(|| self.regions_by_volume(k, &g, ids)).or_else(|| outer_region(&g, ids))
+    }
+
+    /// Without live's geometry: the `ids` regions of sketch `g` whose blind extrude (feature `k`, a new solid) has the
+    /// volume of one of live's final parts, when only one choice does.
+    fn regions_by_volume(&self, k: usize, g: &Value, ids: usize) -> Option<Vec<String>> {
+        let params = self.features.get(k)?["parameters"].as_array()?;
+        let get = |id: &str| params.iter().find(|p| p["parameterId"] == id);
+        let value = |id: &str| get(id).and_then(|p| p["value"].as_str());
+        if self.part_volumes.is_empty() || value("operationType") != Some("NEW") || value("bodyType").is_some_and(|b| b != "SOLID") || get("hasSecondDirection").is_some_and(|p| p["value"] == true) {
+            return None;
+        }
+        if !matches!(value("endBound"), Some("BLIND" | "SYMMETRIC")) {
+            return None;
+        }
+        let depth = noshape_units::evaluate_as(get("depth")?["expression"].as_str()?, noshape_units::Dim::LENGTH, &noshape_units::UnitPrefs::default(), &noshape_units::EmptyScope).ok()?.value;
+        let unit = per_unit(&g["units"]);
+        let regions: Vec<(&str, f64)> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).filter_map(|r| Some((r["id"].as_str()?, r["area"].as_f64()? * unit * unit))).collect();
+        if ids == 0 || ids > regions.len() || regions.len() > 16 {
+            return None;
+        }
+        let fits = |v: f64| self.part_volumes.iter().any(|&[lo, hi]| v >= lo - 1e-6 * hi.abs() && v <= hi + 1e-6 * hi.abs());
+        let mut found: Vec<Vec<String>> = Vec::new();
+        for mask in 0u32..1 << regions.len() {
+            if mask.count_ones() as usize != ids {
+                continue;
+            }
+            let picked: Vec<&(&str, f64)> = regions.iter().enumerate().filter(|(i, _)| mask >> i & 1 == 1).map(|(_, r)| r).collect();
+            if fits(picked.iter().map(|r| r.1).sum::<f64>() * depth) {
+                found.push(picked.iter().map(|r| r.0.to_string()).collect());
+            }
+        }
+        (found.len() == 1).then(|| found.remove(0))
     }
 
     /// Fewer regions named than the sketch has: the ones a part feature `k`
@@ -1168,6 +1206,17 @@ impl<'a> Translator<'a> {
         (set(&found) != set(ids)).then_some(found)
     }
 
+    /// Our solid parts, when `queries` are id-only and name as many (no live geometry to tell them apart).
+    fn parts_by_count(&mut self, queries: &[Value]) -> Option<Vec<String>> {
+        if self.part_order.is_empty() || queries.iter().any(|q| q["queryString"].as_str().is_some_and(|t| !t.trim().is_empty())) {
+            return None;
+        }
+        let ids: usize = queries.iter().map(|q| q["deterministicIds"].as_array().map_or(0, Vec::len)).sum();
+        let ours = self.call("query_parts", json!({})).ok()?;
+        let all: Vec<String> = ours["parts"].as_array()?.iter().filter(|p| p["kind"] == "Solid").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
+        (ids > 0 && all.len() == ids).then_some(all)
+    }
+
     /// A revolve's axis named by id alone: the last sketch's one
     /// construction line (the usual centreline), if it has exactly one.
     fn last_sketch_axis(&mut self, k: usize, queries: &[Value]) -> Option<Vec<String>> {
@@ -1177,8 +1226,51 @@ impl<'a> Translator<'a> {
         let sketch = self.features[..k].iter().rev().find(|f| f["btType"].as_str().is_some_and(|t| t.starts_with("BTMSketch")))?;
         let ours = self.feature_ids.get(sketch["featureId"].as_str()?)?.clone();
         let g = self.call("sketch_get", json!({ "sketch": ours })).ok()?;
-        let lines: Vec<String> = g["entities"].as_array()?.iter().filter(|e| e["type"] == "line" && e["construction"] == true && e.get("handle_of").is_none()).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
-        (lines.len() == 1).then_some(lines)
+        let entities = g["entities"].as_array()?;
+        let lines: Vec<String> = entities.iter().filter(|e| e["type"] == "line" && e["construction"] == true && e.get("handle_of").is_none()).filter_map(|e| e["id"].as_str().map(str::to_string)).collect();
+        if lines.len() == 1 {
+            return Some(lines);
+        }
+        if !lines.is_empty() {
+            return None;
+        }
+        // No centreline (an assembly corpus' studio, no live geometry): the profile's longest side with all of the
+        // profile on one side of it (a screw's flat along its axis).
+        let pt = |v: &Value| Some([v[0].as_f64()?, v[1].as_f64()?]);
+        let mut points: Vec<[f64; 2]> = Vec::new();
+        for e in entities.iter().filter(|e| e["construction"] != true) {
+            match e["type"].as_str() {
+                Some("line") => points.extend([pt(&e["start"])?, pt(&e["end"])?]),
+                Some("arc") => {
+                    let (c, a, b) = (pt(&e["center"])?, pt(&e["start"])?, pt(&e["end"])?);
+                    let r = (a[0] - c[0]).hypot(a[1] - c[1]);
+                    let (t0, mut t1) = ((a[1] - c[1]).atan2(a[0] - c[0]), (b[1] - c[1]).atan2(b[0] - c[0]));
+                    if t1 <= t0 {
+                        t1 += std::f64::consts::TAU;
+                    }
+                    points.extend((0..=16).map(|i| t0 + (t1 - t0) * i as f64 / 16.0).map(|t| [c[0] + r * t.cos(), c[1] + r * t.sin()]));
+                }
+                Some("point") => {}
+                _ => return None,
+            }
+        }
+        let tol = 1e-9 * points.iter().map(|p| p[0].abs().max(p[1].abs())).fold(1.0, f64::max);
+        let mut sides: Vec<(f64, String)> = entities
+            .iter()
+            .filter(|e| e["type"] == "line" && e["construction"] != true)
+            .filter_map(|e| {
+                let (a, b) = (pt(&e["start"])?, pt(&e["end"])?);
+                let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+                let side = |p: &[f64; 2]| ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) / len;
+                let one_side = points.iter().all(|p| side(p) > -tol) || points.iter().all(|p| side(p) < tol);
+                (len > 0.0 && one_side).then(|| (len, e["id"].as_str().unwrap_or("").to_string()))
+            })
+            .collect();
+        sides.sort_by(|a, b| b.0.total_cmp(&a.0));
+        match sides.as_slice() {
+            [(l, id), rest @ ..] if rest.first().is_none_or(|(m, _)| *m < 0.99 * l) => Some(vec![id.clone()]),
+            _ => None,
+        }
     }
 
     /// The one curve bounding a sketch region, if one does.
@@ -1249,6 +1341,14 @@ impl<'a> Translator<'a> {
                     && let Some(a) = self.last_sketch_axis(k, &queries)
                 {
                     return Ok(Some(json!(a)));
+                }
+                // A merge scope of part ids alone, without live's geometry (an assembly corpus' studio): as many parts as
+                // we have then are ours.
+                if p["parameterId"] == "booleanScope"
+                    && ids.is_empty()
+                    && let Some(all) = self.parts_by_count(&queries)
+                {
+                    return Ok(Some(json!(all)));
                 }
                 if ids.is_empty() {
                     return Err(first);
@@ -1461,6 +1561,15 @@ impl<'a> Translator<'a> {
         {
             return Ok(vec![p.to_string()]);
         }
+        // Part ids alone, without live's geometry (an assembly corpus' studio): when they can only be ours: our one
+        // part, or as many ids as we have parts (ranks among the final parts shift once a part merges away).
+        if !ids.is_empty() && ids.iter().all(|id| self.part_order.contains(id)) {
+            let ours = self.call("query_parts", json!({}))?;
+            let all: Vec<String> = ours["parts"].as_array().into_iter().flatten().filter(|p| p["kind"] == "Solid").filter_map(|p| p["id"].as_str().map(str::to_string)).collect();
+            if all.len() == ids.len() {
+                return Ok(all);
+            }
+        }
         // A Plane feature's plane (`dummyQuery(id+"F….planeOp", …)`).
         if let Some(fid) = text.split("id+\"").nth(1).and_then(|r| r.split(".planeOp\"").next()).filter(|f| !f.contains('"'))
             && let Some(ours) = self.feature_ids.get(fid)
@@ -1602,7 +1711,9 @@ impl<'a> Translator<'a> {
             let found: Vec<String> = regions.iter().filter(|r| !outer_only || !inner(r)).filter_map(|r| r["id"].as_str().map(str::to_string)).collect();
             // Some of the sketch's regions named by id (one id each): which
             // is left to the bodies they made.
-            if let Some(n) = named.filter(|n| *n != found.len()) {
+            // (Live naming more regions than ours has, without live's geometry: all of ours, which cover live's when
+            // its sketch splits them finer. asm 11-07, assembly corpus studios.)
+            if let Some(n) = named.filter(|n| *n < found.len()) {
                 return Err(format!("query not mapped (no live geometry for {n} of the sketch's {} regions)", found.len()));
             }
             return Ok(found);
@@ -2245,7 +2356,7 @@ impl<'a> Translator<'a> {
         let world = |p: [f64; 2]| [o[0] + p[0] * x[0] + p[1] * y[0], o[1] + p[0] * x[1] + p[1] * y[1], o[2] + p[0] * x[2] + p[1] * y[2]];
         let (kind, at, curve) = match name {
             "SWEPT_EDGE" => {
-                let shared = curves.get(1).and_then(|b| [first[0], first[first.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9)));
+                let shared = curves.get(1).and_then(|b| [first[0], first[first.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7)));
                 ("edges", world(shared.unwrap_or(first[0])), Some("circle"))
             }
             "SWEPT_FACE" => ("faces", world(if first.len() == 2 { [(first[0][0] + first[1][0]) / 2.0, (first[0][1] + first[1][1]) / 2.0] } else { first[first.len() / 2] }), None),
@@ -2303,7 +2414,7 @@ impl<'a> Translator<'a> {
         // (start) or farthest (end) along the extrude (cf-transform-pattern's Transform pattern 2).
         if name == "CAP_VERTEX" {
             let (a, b) = (curves.first().ok_or("CAP_VERTEX: no curves")?, curves.get(1).ok_or("CAP_VERTEX: one curve")?);
-            let corner = [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9)).ok_or("CAP_VERTEX: its curves share no vertex")?;
+            let corner = [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7)).ok_or("CAP_VERTEX: its curves share no vertex")?;
             let at = world(corner);
             let made = self.call("query_entities", json!({ "kind": "faces", "created_by": ours, "limit": 200 }))?;
             let parts: Vec<String> = made["faces"].as_array().into_iter().flatten().filter_map(|f| f["part"].as_str().map(str::to_string)).collect();
@@ -2325,7 +2436,7 @@ impl<'a> Translator<'a> {
             // The edge swept from the vertex the two curves share, else from
             // the `crossing`th point where they cross (an imprinted vertex).
             "SWEPT_EDGE" => {
-                let shared = curves.first().and_then(|a| curves.get(1).and_then(|b| [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-9))));
+                let shared = curves.first().and_then(|a| curves.get(1).and_then(|b| [a[0], a[a.len() - 1]].into_iter().find(|p| [b[0], b[b.len() - 1]].iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7))));
                 let crossed = || curves.first().zip(curves.get(1)).and_then(|(a, b)| crossings(a, b).get(crossing.unwrap_or(0)).copied());
                 ("edges", "midpoint", world(shared.or_else(crossed).ok_or("SWEPT_EDGE: its curves share no vertex")?))
             }
@@ -3880,8 +3991,9 @@ fn upgrade(ty: &str, params: &mut Map<String, Value>, unknown: &mut Vec<String>)
                     params.insert(new.into(), v);
                 }
             }
-            if !params.contains_key("styleV2")
-                && let Some(v) = params.get("style").cloned()
+            // (The legacy `style` goes either way: our dialog has only styleV2.)
+            if let Some(v) = done("style", params)
+                && !params.contains_key("styleV2")
             {
                 params.insert("styleV2".into(), v);
             }
@@ -4385,6 +4497,77 @@ fn ids(v: &Value) -> Vec<String> {
 
 /// `asm`: live's assembly.json (the assembly definition with "features", and "subAssemblyFeatures": element id →
 /// that subassembly's features body); `studios`: element id → (features.json of that Part Studio, its parts list).
+/// An instance's configuration as Onshape encodes a standard-content-like one (base-64 of
+/// "%40scp=…;Pitch=7.9248E-4+meter;…"): its variables (name, value, unit), in order.
+fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
+    let Some(enc) = i["configuration"].as_str().filter(|c| *c != "default") else { return Vec::new() };
+    const B: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut bytes = Vec::new();
+    let (mut acc, mut bits) = (0u32, 0);
+    for c in enc.chars().map(|c| match c { '-' => '+', '_' => '/', c => c }) {
+        let Some(v) = B.find(c) else { break };
+        acc = (acc << 6) | v as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            bytes.push((acc >> bits) as u8);
+            acc &= (1 << bits) - 1;
+        }
+    }
+    let Ok(text) = String::from_utf8(bytes) else { return Vec::new() };
+    let mut decoded = Vec::new();
+    let b = text.as_bytes();
+    let mut k = 0;
+    while k < b.len() {
+        if b[k] == b'%' && k + 2 < b.len() && let Ok(v) = u8::from_str_radix(&text[k + 1..k + 3], 16) {
+            decoded.push(v);
+            k += 3;
+        } else {
+            decoded.push(b[k]);
+            k += 1;
+        }
+    }
+    let text = String::from_utf8_lossy(&decoded).to_string();
+    text.split(';')
+        .filter_map(|kv| {
+            let (k, v) = kv.split_once('=')?;
+            if k.starts_with('@') {
+                return None;
+            }
+            let (num, unit) = v.split_once('+').unwrap_or((v, ""));
+            Some((k.to_string(), num.parse().ok()?, unit.to_string()))
+        })
+        .collect()
+}
+
+/// An Onshape deterministic id as the number its base-64 characters write (ids made later are larger).
+/// One region named by id alone, without live's geometry: the sketch's only region inside no other's hole (a plate
+/// around its holes, a ring around its bore).
+fn outer_region(g: &Value, ids: usize) -> Option<Vec<String>> {
+    let regions: Vec<&Value> = g["regions"].as_array()?.iter().filter(|r| r["imprinted"] != true).collect();
+    if ids != 1 || regions.len() < 2 {
+        return None;
+    }
+    let list = |r: &Value, k: &str| -> Vec<String> { r[k].as_array().into_iter().flatten().filter_map(|x| x.as_str().map(str::to_string)).collect() };
+    let inner = |r: &Value| {
+        let mine = list(r, "outer");
+        regions.iter().any(|o| {
+            let theirs = list(o, "outer");
+            let holes: Vec<String> = list(o, "boundary").into_iter().filter(|c| !theirs.contains(c)).collect();
+            o["id"] != r["id"] && !mine.is_empty() && mine.iter().all(|c| holes.contains(c))
+        })
+    };
+    match regions.iter().filter(|r| !inner(r)).collect::<Vec<_>>().as_slice() {
+        [only] => Some(vec![only["id"].as_str()?.to_string()]),
+        _ => None,
+    }
+}
+
+fn onshape_id_value(id: &str) -> u128 {
+    const B: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    id.chars().fold(0u128, |n, c| n.saturating_mul(64).saturating_add(B.find(c).unwrap_or(0) as u128))
+}
+
 pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(String, Value, Value)]) -> AssemblyResult {
     let mut res = AssemblyResult::default();
     let call = |ctx: &mut Ctx, tool: &str, args: Value| -> Result<Value, String> {
@@ -4465,6 +4648,38 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut entities: HashMap<Key, String> = HashMap::new();
     for (element, studio, parts) in studios {
         let name = format!("Studio {}", &element[..element.len().min(6)]);
+        // The studio's part ids in creation order (see Translator::part_order).
+        let mut studio = studio.clone();
+        // A studio fetched without its configuration whose instances carry variables (standard content's #Pitch…):
+        // its configuration variables from the first instance's values (asm 11-07).
+        let first_config = levels.iter().flat_map(|l| l.instances.iter()).filter(|i| i["elementId"] == element.as_str()).map(|i| instance_config_values(i)).find(|v| !v.is_empty());
+        if studio["configuration"].is_null()
+            && let Some(vars) = first_config
+        {
+            let params: Vec<Value> = vars
+                .iter()
+                .map(|(name, v, unit)| {
+                    let (kind, units) = match unit.as_str() {
+                        "meter" => ("LENGTH", "meter"),
+                        "radian" => ("ANGLE", "radian"),
+                        _ => ("REAL", ""),
+                    };
+                    json!({ "btType": "BTMConfigurationParameterQuantity-1826", "parameterId": name, "quantityType": kind, "rangeAndDefault": { "units": units, "defaultValue": v } })
+                })
+                .collect();
+            studio["configuration"] = json!({ "configurationParameters": params });
+        }
+        if studio["partOrder"].is_null() {
+            let mut order: Vec<String> = parts.as_array().into_iter().flatten().filter_map(|p| p["partId"].as_str().map(str::to_string)).collect();
+            order.sort_by_key(|id| onshape_id_value(id));
+            order.dedup();
+            studio["partOrder"] = json!(order);
+        }
+        if studio["partVolumes"].is_null() {
+            let bands: Vec<Value> = parts.as_array().into_iter().flatten().filter(|p| p["volume"].as_array().is_some_and(|v| v.len() == 2)).map(|p| p["volume"].clone()).collect();
+            studio["partVolumes"] = json!(bands);
+        }
+        let studio = &studio;
         let mut t = match Translator::open_in(ctx, &name, studio, HashMap::new()) {
             Ok(t) => t,
             Err(e) => {
@@ -4571,6 +4786,16 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 continue;
             };
             let mut args = json!({ "tab": l.tab, "source": source });
+            // Its configuration variables (see the studio's synthesized configuration).
+            let vars = instance_config_values(i);
+            if i["type"] == "Part" && !vars.is_empty() {
+                let unit = |u: &str| match u {
+                    "meter" => " m",
+                    "radian" => " rad",
+                    _ => "",
+                };
+                args["configuration"] = Value::Object(vars.iter().map(|(n, v, u)| (n.clone(), json!(format!("{v}{}", unit(u))))).collect());
+            }
             if i["type"] == "Part" {
                 match i["partId"].as_str().and_then(|p| part_names.get(&(element.to_string(), p.to_string()))) {
                     Some(n) => args["part"] = json!(n),
