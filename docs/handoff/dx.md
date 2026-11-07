@@ -69,8 +69,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
     text.
   - Fixture: the pin-block starts built the hole's disc as Part 1 ("Sketch 1 region 1" is the disc in our region
     order): now region 0, the block; the start test checks Part 1's volume. Every pin-block scenario ran on it.
-- Known, waiting on live (REQUESTS): the 2 point centerline's overshoot past its picks (~3/32 in); a section's Auto
-  hatch spacing (live 0.1804 in for the block, ours 2.5 mm). The detail view's circle is 3 % bigger in live: its
+- A centerline annotation runs past each picked point by the standard's extension (live 2230: 0.09 in ANSI, 2.5 mm
+  ISO; live stores first / second extension lengths per centerline, nothing edits them yet): drw-centerline-2-point
+  3/3, so 19/24. Known, waiting on live (REQUESTS): a section's Auto hatch spacing (live 0.1804 in for the block, ours 2.5 mm). The detail view's circle is 3 % bigger in live: its
   clicks, not ours.
 - An assembly's views get no automatic centermarks or centerlines (live: "Auto centermarks (Parts)"):
   `create::assembly_drawing_defaults` after Create Drawing (app and ops), and the Insert view tool's pending view.
