@@ -409,8 +409,10 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             continue;
         }
         // Rims whose rounds run off their plane or into each other: each round trimmed by what it meets, as live's.
-        let overflow = super::blend_section::rims_overflow(&body.shape, &edges, &radii, super::blend_section::RimBlend::Round);
-        if overflow && super::blend_section::ring_blend(ev, bi, &edges, &radii, super::blend_section::RimBlend::Round).is_ok() {
+        use super::blend_section::{RimBlend, ring_blend, rims, rims_overflow};
+        let rims = rims(&body.shape, &edges);
+        let overflow = rims.as_ref().is_some_and(|r| rims_overflow(r, &body.shape, &radii, RimBlend::Round));
+        if overflow && rims.as_ref().is_some_and(|r| ring_blend(ev, bi, r, &edges, &radii, RimBlend::Round).is_ok()) {
             continue;
         }
         // noshape's blend takes some of the edge groups but not all (knob-jason's Fillet 1: arcs it rounds exactly,
@@ -430,7 +432,7 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
             // Without propagation a single straight edge whose ball fits its faces
             // can still be filleted by booleans (F3: R4 after R2/R3 stopped at their edges).
             Err(_) if !propagate && edges.len() == 1 && super::blend_section::section_blend(ev, bi, &edges, &unpropagated(radius)).is_ok() => continue,
-            Err(_) if !overflow && super::blend_section::ring_blend(ev, bi, &edges, &radii, super::blend_section::RimBlend::Round).is_ok() => continue,
+            Err(_) if !overflow && rims.as_ref().is_some_and(|r| ring_blend(ev, bi, r, &edges, &radii, RimBlend::Round).is_ok()) => continue,
             Err(e) => return Err(fillet_failed(e)),
         };
         let t1 = std::time::Instant::now();
@@ -733,9 +735,11 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         // Arcs of slanted rims whose chamfers run off their plane: each chamfer as if alone, trimmed by what it meets.
+        use super::blend_section::{RimBlend, ring_blend, rims, rims_overflow};
         if let k::ChamferSpec::Equal(d) = spec
-            && super::blend_section::rims_overflow(&body.shape, &edges, &[d], super::blend_section::RimBlend::Chamfer)
-            && super::blend_section::ring_blend(ev, bi, &edges, &[d], super::blend_section::RimBlend::Chamfer).is_ok()
+            && let Some(rims) = rims(&body.shape, &edges)
+            && rims_overflow(&rims, &body.shape, &[d], RimBlend::Chamfer)
+            && ring_blend(ev, bi, &rims, &edges, &[d], RimBlend::Chamfer).is_ok()
         {
             continue;
         }
