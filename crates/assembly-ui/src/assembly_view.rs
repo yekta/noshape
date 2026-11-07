@@ -1786,11 +1786,14 @@ impl AssemblyView {
             return;
         }
         self.close_mate(window, cx);
-        if let Some(c) = self.assembly(cx).and_then(|a| a.connector(id).cloned()) {
+        // A configured connector or pattern opens with the chosen configuration's values (as a mate does).
+        let configured = self.assembly(cx).filter(|a| a.has_configured()).map(|a| a.configured(&self.ui.config_values));
+        let asm = configured.as_ref().or(self.assembly(cx));
+        if let Some(c) = asm.and_then(|a| a.connector(id).cloned()) {
             self.open_mc(Some(c), window, cx);
             return;
         }
-        if let Some(p) = self.assembly(cx).and_then(|a| a.pattern(id).cloned()) {
+        if let Some(p) = asm.and_then(|a| a.pattern(id).cloned()) {
             self.open_pattern_edit(p, window, cx);
             return;
         }

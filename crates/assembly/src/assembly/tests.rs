@@ -1041,6 +1041,22 @@ fn a_configured_pattern_count_makes_its_copies_in_that_configuration() {
     asm.set_config_cell(1, "long", ParamValue::Bool(false));
     assert!(asm.configured(&long).pattern(MateId(70)).unwrap().suppressed);
     assert!(!asm.configured(&ConfigValues::default()).pattern(MateId(70)).unwrap().suppressed);
+    // Editing the pattern in Long (count 7, distance 30 mm): the count goes to Long's row, the distance (not
+    // configured) to the pattern; Default keeps its 2.
+    let mut edited = asm.configured(&long).pattern(MateId(70)).unwrap().clone();
+    if let PatternKind::Linear { count, distance, .. } = &mut edited.kind {
+        *count = 7;
+        *distance = ExprValue::new("30 mm");
+    }
+    asm.store_pattern_edit(&mut edited, &long);
+    let i = asm.patterns.iter().position(|p| p.id == MateId(70)).unwrap();
+    asm.patterns[i].kind = edited.kind;
+    let count_of = |a: &Assembly| match &a.pattern(MateId(70)).unwrap().kind {
+        PatternKind::Linear { count, distance, .. } => (*count, distance.text.clone()),
+        _ => unreachable!(),
+    };
+    assert_eq!(count_of(&asm), (2, "30 mm".to_string()), "the pattern keeps its own count");
+    assert_eq!(count_of(&asm.configured(&long)), (7, "30 mm".to_string()));
 }
 
 /// Help "Assembly linear pattern" 7 / live qa5 dialog: Centered puts the

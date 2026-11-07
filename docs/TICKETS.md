@@ -3555,7 +3555,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
   configured (`ConfigTarget` is Instance | Mate). Fixed 2026-11-07 (live 2209): ConfigTarget Pattern / Connector; row
   menus' Configure suppression; the pattern and connector dialogs' fields' Configure (with the feature on ✓); a
   configured count makes that configuration's copies; config_configure / set_value take `pattern` / `connector`.
-  Left: a configured pattern's dialog edits its own value, not the active configuration's row (mates do).
+  Their dialogs open on the chosen configuration's values and store configured fields in its row (as mates).
 - [x] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is
   ignored. Fixed 2026-11-07: the result keeps each linked part's pinned document; the BOM reads its properties (in
   its configuration) and its Exclude from all BOMs (T1 assemblies_from_other_documents).

@@ -420,6 +420,46 @@ impl Assembly {
         }
     }
 
+    /// Accepting a pattern dialog in a configured assembly: configured values go to the active configuration's row;
+    /// the pattern keeps its own (as [`Self::store_mate_edit`]).
+    pub fn store_pattern_edit(&mut self, edited: &mut InstancePattern, values: &ConfigValues) {
+        let Some(base) = self.pattern(edited.id).cloned() else { return };
+        let target = ConfigTarget::Pattern(edited.id);
+        let cfg = self.configuration.clone();
+        for (i, c) in cfg.configured.iter().enumerate().filter(|(_, c)| c.target == target) {
+            if let (Some(key), Some(v)) = (cfg.value_of(values, &c.input), pattern_param(edited, &c.param)) {
+                self.configuration.configured[i].values.insert(key, v);
+            }
+            if let Some(own) = pattern_param(&base, &c.param) {
+                set_pattern_param(edited, &c.param, &own);
+            }
+        }
+    }
+
+    /// The same for a mate connector's dialog.
+    pub fn store_connector_edit(&mut self, edited: &mut AsmMateConnector, values: &ConfigValues) {
+        let Some(base) = self.connectors.iter().find(|c| c.id == edited.id).cloned() else { return };
+        let target = ConfigTarget::Connector(edited.id);
+        let cfg = self.configuration.clone();
+        for (i, c) in cfg.configured.iter().enumerate().filter(|(_, c)| c.target == target) {
+            if let (Some(key), Some(v)) = (cfg.value_of(values, &c.input), connector_param(edited, &c.param)) {
+                self.configuration.configured[i].values.insert(key, v);
+            }
+            match c.param.as_str() {
+                // Realign's entities come back with the connector's own.
+                param::REALIGN => {
+                    edited.primary_axis = base.primary_axis.clone();
+                    edited.secondary_axis = base.secondary_axis.clone();
+                }
+                p => {
+                    if let Some(own) = connector_param(&base, p) {
+                        set_connector_param(edited, p, &own);
+                    }
+                }
+            }
+        }
+    }
+
     /// A change to a configured parameter (e.g. Suppress on a configured
     /// instance) goes to the active configuration's row. False when the
     /// parameter is not configured (the caller changes the feature itself).

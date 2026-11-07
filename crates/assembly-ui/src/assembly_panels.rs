@@ -433,6 +433,7 @@ impl AssemblyView {
         let for_mate = s.for_mate;
         let pending = s.cfg_pending.clone();
         let input = self.cfg_input(cx).map(|i| i.id);
+        let values = self.ui.config_values.clone();
         self.mc = None;
         let desc = if editing { format!("Edit : {}", c.name) } else { format!("Insert : {}", c.name) };
         if let (Some(field), Some(d)) = (for_mate, self.mate.as_ref().map(|m| m.dialog.clone())) {
@@ -450,6 +451,8 @@ impl AssemblyView {
                 }
             }
             let id = c.id;
+            let mut c = c;
+            a.store_connector_edit(&mut c, &values);
             match a.connectors.iter().position(|x| x.id == c.id) {
                 Some(i) => a.connectors[i] = c,
                 None => a.connectors.push(c),
@@ -1357,7 +1360,12 @@ impl AssemblyView {
         let desc = noshape_ops::assembly::pattern_description(&pat.name, editing);
         // Live shows no message after accepting an assembly pattern (polled
         // 20 s; behaviours "qa5 (10-26 p6)" (1), qa5 P2-A8).
+        let values = self.ui.config_values.clone();
         let _created = self.edit(&desc, cx, move |a| {
+            let mut pat = pat;
+            if editing {
+                a.store_pattern_edit(&mut pat, &values);
+            }
             let created = noshape_ops::assembly::commit_pattern(a, pat, targets);
             for p in pending.iter().filter(|_| input.is_some()) {
                 noshape_ops::asm_config::configure(a, input.as_deref().unwrap_or_default(), noshape_model::assembly::config::ConfigTarget::Pattern(id), p);
