@@ -285,6 +285,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-07 17:00 release (qa list 16:14, checked on green 5baedbe4; the latest release is v0.4.34)
+- **qa 17:35: v0.4.35 is cut from 04b3eaa93 (run 42396148281), older than the greens above:** green b3f393b8 (swept: unchanged)
+  + the Windows installer without Restart Manager (1c5e1be5) + asm's parity translator; it has SAVED-CHAMFER-CHANGE, not
+  bool's Shell builder (73df9750). The list stands: no blocker. qa's release checks follow at publish.
 - **qa 17:01: still no blocker on green e9d0ce37** (core's prism-side offsets and ring-blend checks, skasm's transient queries in
   f159ebd4): its full CLI smoke = 5faa88b6's; the volume sweep, dx's cf corpus and the 47 ticket documents unchanged.
 - **qa 16:26: still no blocker on green 5faa88b6** (bool's Shell builder for offsets that change topology, 73df9750, back in):
