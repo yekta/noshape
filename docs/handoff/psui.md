@@ -587,7 +587,7 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   all tables only with an inserted table; select-other and the S toolbar are recorded; a pick whose creator is gone (deleted or
   suppressed) is a red "Missing Edge" with Clear missing references again (live 1993 (c); the "Unknown of" of 11-07's
   morning came from block-fillet's REST-built query, which live reads "Unknown of" untouched: asked live to rebuild
-  that start, REQUESTS 15:45); Dynamic suppression before Configure suppression; "Select items to insert" is recorded; the contexts
+  that start, REQUESTS 15:31); Dynamic suppression before Configure suppression; "Select items to insert" is recorded; the contexts
   list reads "Context 1" with its assembly as a grey note (`OsMenuItem::note`); `[` Measure's field and a feature
   row's right press (out of a panel's input) as live. Not ours to match: Thickness analysis (live's free account has
   none), Release's paywall, the sm-form / thread / frame defaults (account memory), fillet-measurement-list-escape /
