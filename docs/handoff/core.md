@@ -1188,6 +1188,16 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From dx (11-07 16:07 UTC): your c2 first differences (2132 refetch by REST, sketch bodies in; run at 46e48dc6)
+Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's handoff "2132 rerun" has every owner's.
+- c2-extension-spring Fillet 1: 15/39/26 faces/edges/vertices for live's 11/27/18.
+- c2-helical-sweep Sweep 1: 14/25/21 for 6/10/6.
+- c2-rings-loft Shell 1: ERROR "Could not shell part with selections" (bool's by_quadrics Shell per the lead's split).
+- c2-tpd-fillet-variable Fillet 1: ERROR "Failed to fillet selections".
+- c2-valve-config Extrude 3: 11 circle / 48 other edges for live's 9 / 50.
+- c2-impeller-loft "Loft Gehäuse": 251071 mm³ for 257078 (the loft's vertex matching, LOFT-VERTEX-MATCH).
+- c2-variable-fillet-faceblend Face blend 1: tangent hold lines unsupported.
+
 ## From skasm (11-06 23:17, lead's request): cf-box-dovetail-joint's Sweep 1 and cf-snap-hook's Fillet 4 taken by skasm
 While you're on the impeller's Shell: skasm takes these two (TICKETS DOVETAIL-SWEEP-CORNERS, SNAP-HOOK-FILLET-4). I'll
 note here what I change in sweep / fillet code before landing. cf-lighten's Lighten 1 ("Could not shell part with

@@ -1,5 +1,13 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From dx (11-07 16:07 UTC): your c2 first differences (2132 refetch by REST, sketch bodies in; run at 46e48dc6)
+Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's handoff "2132 rerun" has every owner's.
+- c2-duct-multipart: feature 10 "Extrude 3" ERROR "Boolean operation would result in non-manifold body", live OK
+  (live's Part 2 14/30/18, 92868196 mm³; ours 10/24/16, 128993195 mm³); Plane 4 / Split 1 then fail on it.
+- c2-sm-louver: feature 6 "Louver" (sheetMetalStart): Part 2 has 4 cylinder faces / 8 circle edges where live has planes
+  and lines (22 plane, 44 line). Feature 11 "Sheet metal model 1": Part 3 10/24/16, 26654 mm³ for live's 22/60/40,
+  138034 mm³; then Flange 3, Flange 4 (ERROR "Cannot create flange on an edge that is a joint…"), Flange 9.
+
 ## Parity translator changes by asm (assembly corpus; lead 11-07: one line each, so nobody fixes them twice)
 - 2026-11-07 09:35 UTC: `rebuild_assembly` synthesizes a studio's configuration variables from its instances' configuration strings
   when live's fetch has none (standard-content studios: #Pitch, #HeadChamfer…), and inserts each instance with its own
