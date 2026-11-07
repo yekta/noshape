@@ -114,10 +114,9 @@ impl DrawingEditor {
             ViewKind::Base { orientation, .. } => oriented(*orientation),
             ViewKind::Projected { .. } => views::standard_orientation(drawing, sheet, id).map(oriented).unwrap_or_else(|| "Isometric".into()),
             // Live's export names it "Section", its "SECTION A - A" a note (2063).
-            ViewKind::Section { .. } => "Section".to_string(),
+            ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => "Section".to_string(),
             ViewKind::Detail { .. } => "Detail".to_string(),
             ViewKind::Auxiliary { .. } => "Auxiliary".to_string(),
-            _ => v.label.clone().unwrap_or_else(|| self.ui_view_kind(id).to_string()),
         }
     }
 
@@ -129,10 +128,9 @@ impl DrawingEditor {
             ViewKind::Base { .. } => "base",
             ViewKind::Projected { .. } if self.ui_view_name(id) == "Isometric" => "isometric",
             ViewKind::Projected { .. } => "projected",
-            ViewKind::Section { .. } => "section",
+            ViewKind::Section { .. } | ViewKind::AlignedSection { .. } => "section",
             ViewKind::Detail { .. } => "detail",
             ViewKind::Auxiliary { .. } => "auxiliary",
-            _ => "other",
         }
     }
 
