@@ -2322,6 +2322,8 @@ fn drawing_section_detail_views_and_annotations() {
     assert!(last(&mut ctx).ends_with(":: Edge to edge centerline"));
     // Its end grip shortens it (to the middle: half as long), its middle
     // snap moves it (help A51); a 2 point one's ends stay on their points.
+    // Drawn 2.5 mm past each end (ISO, live 2230): the bounds include that.
+    let ext = 2.5;
     let eid = ec["annotation"].as_u64().unwrap();
     let span = |ctx: &mut Ctx| {
         let g = call(ctx, "drawing_get", json!({ "drawing": tab }));
@@ -2329,11 +2331,11 @@ fn drawing_section_detail_views_and_annotations() {
         ([num(&b["min"][0]), num(&b["min"][1])], [num(&b["max"][0]), num(&b["max"][1])])
     };
     let (lo, hi) = span(&mut ctx);
-    let (c, l0) = ([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0], (hi[0] - lo[0]).hypot(hi[1] - lo[1]));
+    let (c, l0) = ([(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0], (hi[0] - lo[0]).hypot(hi[1] - lo[1]) - 2.0 * ext);
     call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": eid, "action": "centerline_end", "end": 1, "point": c }));
     assert!(last(&mut ctx).ends_with(":: Resize centerline"));
     let (lo, hi) = span(&mut ctx);
-    assert!(((hi[0] - lo[0]).hypot(hi[1] - lo[1]) - l0 / 2.0).abs() < 1e-6, "{lo:?} {hi:?} {l0}");
+    assert!(((hi[0] - lo[0]).hypot(hi[1] - lo[1]) - (l0 / 2.0 + 2.0 * ext)).abs() < 1e-6, "{lo:?} {hi:?} {l0}");
     let m = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0];
     call(&mut ctx, "drawing_annotation_edit", json!({ "drawing": tab, "annotation": eid, "action": "move_centerline", "point": [m[0] + 3.0, m[1] + 4.0] }));
     let (lo2, hi2) = span(&mut ctx);
@@ -2349,11 +2351,11 @@ fn drawing_section_detail_views_and_annotations() {
     let fid = fc["annotation"].as_u64().unwrap();
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
     let b = g["annotations"].as_array().unwrap().iter().find(|a| a["id"] == fid).unwrap()["bounds"].clone();
-    assert!((num(&b["min"][0]) - f0[0]).abs() < 1e-6 && (num(&b["max"][0]) - f1[0]).abs() < 1e-6 && (num(&b["min"][1]) - f0[1]).abs() < 1e-6, "{b} {f0:?} {f1:?}");
+    assert!((num(&b["min"][0]) - (f0[0] - ext)).abs() < 1e-6 && (num(&b["max"][0]) - (f1[0] + ext)).abs() < 1e-6 && (num(&b["min"][1]) - f0[1]).abs() < 1e-6, "{b} {f0:?} {f1:?}");
     let fc2 = call(&mut ctx, "drawing_centerline", json!({ "drawing": tab, "kind": "two_point", "picks": [[f0[0] + 0.2, f0[1] - 0.15], [f0[0], f0[1] + 9.0]] }));
     let g = call(&mut ctx, "drawing_get", json!({ "drawing": tab }));
     let b = g["annotations"].as_array().unwrap().iter().find(|a| a["id"] == fc2["annotation"]).unwrap()["bounds"].clone();
-    assert!((num(&b["min"][0]) - f0[0]).abs() < 1e-6 && (num(&b["min"][1]) - f0[1]).abs() < 1e-6, "snapped to the first one's end: {b}");
+    assert!((num(&b["min"][0]) - f0[0]).abs() < 1e-6 && (num(&b["min"][1]) - (f0[1] - ext)).abs() < 1e-6, "snapped to the first one's end: {b}");
     call(&mut ctx, "drawing_virtual_sharp", json!({ "drawing": tab, "picks": [mid(h0), mid(vertical[0])] }));
     assert!(last(&mut ctx).ends_with(":: Virtual sharp"));
     let e = try_call(&mut ctx, "drawing_virtual_sharp", json!({ "drawing": tab, "picks": [mid(h0), mid(h1)] })).unwrap_err();
