@@ -175,6 +175,7 @@ impl DrawingEditor {
             let on = shape == i as u8;
             let btn = div()
                 .id(SharedString::from(format!("crop-shape-{i}")))
+                .map(|d| crate::ui_script::mark(d, || format!("button:{tip}")))
                 .size(px(30.))
                 .flex()
                 .items_center()
@@ -203,6 +204,7 @@ impl DrawingEditor {
                 tools = tools.child(
                     div()
                         .id("crop-spline-more")
+                        .map(|d| crate::ui_script::mark(d, || "dropdown:Spline".to_string()))
                         .w(px(12.))
                         .h(px(30.))
                         .flex()

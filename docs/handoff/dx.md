@@ -66,9 +66,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   runner's `sheet_tab` while the Sheets panel is open; the Detail tool snaps its radius pick.
 - Revision table scenarios (place, properties, callout, cell Format / Merge right, Delete table, Fit to content) wait
   on an account whose plan has the tool (REQUESTS); live's Free account has none.
-- Uncovered (16): Add spline point (Crop view's Spline ▾), Change
+- Uncovered (14): Change
   configuration..., Cut list table properties... (needs a frame start), Edit aligned section..., Edit section
-  (angular), Hide dimension (a datum target's dimension), Image properties..., Merge with cell below / Unmerge cells,
+  (angular), Hide dimension (a datum target's dimension), Image properties..., Merge with cell below,
   Open Feature Studio in linked document, Remove foreshorten (only on a radius foreshortened before: no UI makes one
   now, live's radial menu has no Foreshorten),
   Show (model annotations panel), Show all (display states), None, Unpin view reference.
