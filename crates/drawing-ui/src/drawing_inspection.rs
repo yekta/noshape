@@ -229,6 +229,7 @@ impl DrawingEditor {
         let tab = |id: &'static str, label: &'static str, on: bool, value: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .h(px(26.))
                 .px(px(9.))
                 .flex()

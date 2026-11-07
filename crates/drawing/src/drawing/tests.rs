@@ -396,6 +396,22 @@ fn offset_cut_lines_cross_the_hatch_at_the_jog() {
     assert!(count(&drawing) > off);
 }
 
+/// A section cut along one of the part's own planar faces (the demo plate's end at x = -50 mm; live's drw-section-view
+/// cuts its block at its end face and hatches it): that face is the cut.
+#[test]
+fn a_section_along_a_face_hatches_that_face() {
+    let (doc, mut drawing) = demo();
+    let sources = regenerate_sources(&doc, &drawing);
+    let cache = ViewCache::new();
+    if let ViewKind::Section { line, .. } = &mut drawing.sheets[0].view_mut(ViewId(5)).unwrap().kind {
+        *line = vec![[0.05, -0.04], [0.05, 0.04]];
+    }
+    let g = compute_view(&drawing, &drawing.sheets[0], ViewId(5), &sources, &cache, true);
+    assert!(g.error.is_none(), "{:?}", g.error);
+    let regions = views::section_regions(&g.section_segments).expect("the end face, closed");
+    assert_eq!(regions.len(), 1);
+}
+
 #[test]
 fn jogged_and_aligned_sections() {
     let (doc, mut drawing) = demo();

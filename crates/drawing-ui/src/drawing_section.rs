@@ -264,6 +264,7 @@ impl DrawingEditor {
             let on = mode == m;
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .h(px(26.))
                 .px(px(7.))
                 .flex()

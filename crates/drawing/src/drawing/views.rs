@@ -2926,6 +2926,14 @@ fn section_geometry(id: ViewId, ctx: &Context, part: Option<&BodyId>, frame: &Vi
             }
         }
     }
+    if g.section_segments.is_empty() && full {
+        // A cut along one of the part's planar faces: that face is the cut (live hatches it; drw-section-view's
+        // export, the block cut at its own end).
+        for b in &bodies {
+            let on: Vec<Shape> = b.shape.faces().into_iter().filter(|f| f.face_plane().ok().flatten().is_some_and(|p| plane.signed_distance(p.origin).abs() < tol.max(1e-9) && p.normal.cross(plane.normal).length() < 1e-9)).collect();
+            g.section_segments.extend(section_segments_of(&on, frame));
+        }
+    }
     if cut.cut_only {
         // Show cut geometry only: the outlines of the cut faces.
         let segs = &g.section_segments;

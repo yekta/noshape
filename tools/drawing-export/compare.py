@@ -89,6 +89,19 @@ def entity_length(e):
         steps = 64
         pts = [(a * math.cos(t0 + sweep * k / steps), b * math.sin(t0 + sweep * k / steps)) for k in range(steps + 1)]
         return sum(math.dist(p, q) for p, q in zip(pts, pts[1:]))
+    if t == "POLYLINE":
+        v = e.get("_verts", [])
+        closed = int(num(e, "70")) & 1
+        pairs = list(zip(v, v[1:] + (v[:1] if closed else [])))
+        total = 0.0
+        for (x0, y0, bulge), (x1, y1, _) in pairs:
+            chord = math.dist((x0, y0), (x1, y1))
+            if abs(bulge) < 1e-12:
+                total += chord
+            else:
+                theta = 4 * math.atan(abs(bulge))
+                total += theta * chord / (2 * math.sin(theta / 2))
+        return total
     if t in ("LWPOLYLINE", "SPLINE"):
         xs, ys = e.get("10", []), e.get("20", [])
         pts = [(float(x), float(y)) for x, y in zip(xs, ys)]
@@ -116,6 +129,16 @@ def dxf_summary(path):
     used_blocks = Counter(v for sec, blk, e in ents if sec == "ENTITIES" and e["type"] == "INSERT" for v in e.get("2", []))
     per = defaultdict(lambda: [0, 0.0])
     styles, texts = Counter(), Counter()
+    # An old-style POLYLINE's VERTEXes (Release 14): its length from them, bulges as arcs.
+    owner = None
+    for sec, blk, e in ents:
+        if e["type"] == "POLYLINE":
+            owner = e
+            e["_verts"] = []
+        elif e["type"] == "VERTEX" and owner is not None:
+            owner["_verts"].append((num(e, "10"), num(e, "20"), num(e, "42")))
+        elif e["type"] == "SEQEND":
+            owner = None
     for sec, blk, e in ents:
         times = 1 if sec == "ENTITIES" else used_blocks.get(blk, 0)
         if times == 0 or e["type"] in ("INSERT", "ATTDEF", "SEQEND", "VERTEX"):

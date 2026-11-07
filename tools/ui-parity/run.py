@@ -322,14 +322,21 @@ def drop_rows(state, drop):
 
 def compare(live, ours):
     """(matched steps, total steps, first difference or None)."""
-    pairs = [("start", live.get("start"), ours.get("start"))]
+    pairs = [("start", live.get("start"), ours.get("start"), None)]
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
     for s in live.get("steps", []):
         o = ours_steps.get(s.get("step"), {})
-        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state")))
+        # A step ours couldn't do (its target not found) while live did: a difference, whatever the state after.
+        failed = o.get("error") if o.get("ok") is False and s.get("ok") is not False else None
+        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state"), failed))
     matched, first = 0, None
-    for name, a, b in pairs:
+    for name, a, b, failed in pairs:
+        if failed:
+            if first is None:
+                first = (name, ".step", "ok", f"failed: {failed}")
+            CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
+            continue
         a = normalize_live(json.loads(json.dumps(a)))
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {})]
         if (a or {}).get("drawing"):

@@ -104,12 +104,26 @@ impl DrawingEditor {
 
     pub fn render_break_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.break_dlg.as_ref()?;
-        let Tool::Break { vertical, .. } = self.tool else { return None };
+        let Tool::Break { vertical, first, .. } = self.tool else { return None };
         let ready = d.pending.is_some();
+        // Live: the direction tabs go once the first line is placed (drw-break-view's step 3).
+        let tabs = first.is_none() && !ready;
+        // The panel as live's recorder reads it (live2's drw-break-view): its tabs, the line types, Gap distance and
+        // its unit.
+        let unit = if self.drawing.units_mm { "mm" } else { "in" };
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Break view"];
+            if tabs {
+                text.extend(["Vertical", "Horizontal"]);
+            }
+            text.extend(["Zig zag", "Small zig zag", "Curve", "Straight", "Gap distance", unit]);
+            serde_json::json!({ "kind": "drawing-panel", "title": "Break view", "text": text })
+        });
         let pal = p();
         let tab = |id: &'static str, label: &'static str, on: bool, v: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .h(px(26.))
                 .px(px(9.))
                 .flex()
@@ -189,7 +203,7 @@ impl DrawingEditor {
                 .child(
                     v_flex()
                         .p(px(3.))
-                        .child(h_flex().child(tab("brk-v", "Vertical", vertical, true, cx)).child(tab("brk-h", "Horizontal", !vertical, false, cx)))
+                        .when(tabs, |d| d.child(h_flex().child(tab("brk-v", "Vertical", vertical, true, cx)).child(tab("brk-h", "Horizontal", !vertical, false, cx))))
                         .child(row("Break line", styles.into_any_element()))
                         .child(row("Gap distance", div().w(px(130.)).child(Input::new(&d.gap_input).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(2.))).into_any_element()))
                         .child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).text_color(pal.text_muted).child("Click in the view to place the two break lines")),
