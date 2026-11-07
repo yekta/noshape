@@ -1,0 +1,27 @@
+{
+ "name": "ver-vrow-releases",
+ "about": "Releases (right-click a version row (Upgrade badge in live's Free plan))",
+ "area": "studios",
+ "source": "universe versions vrow-releases (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Releases"
+   },
+   "do": "click"
+  }
+ ]
+}

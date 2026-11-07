@@ -162,7 +162,19 @@
    "where": "Versions and history search box, type text + 🔍",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:54"
+   "source": "behaviours.md:54",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Search history"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "vh-search-filter-open",
@@ -171,7 +183,16 @@
    "where": "caret in the Search history box opens the 260×372 filter panel",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:73"
+   "source": "behaviours.md:73",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-tab",
@@ -180,7 +201,21 @@
    "where": "filter panel › Tab select (Any + every tab incl. deleted)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:74"
+   "source": "behaviours.md:74",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "field": "Tab"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-tab-types",
@@ -189,7 +224,21 @@
    "where": "filter panel › Part Studio / Assembly / Drawing / Feature Studio / File toggles",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:75"
+   "source": "behaviours.md:75",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "button": "re:Tab types:.*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-tab-types-clear",
@@ -198,7 +247,21 @@
    "where": "filter panel › Tab types › Clear (disabled until a type is picked)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:75"
+   "source": "behaviours.md:75",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "button": "Clear"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-modified-by",
@@ -207,7 +270,21 @@
    "where": "filter panel › Any / Only me / Not me",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:76"
+   "source": "behaviours.md:76",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "field": "Modified by"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-date-modified",
@@ -216,7 +293,21 @@
    "where": "filter panel › Start date / End date datetime inputs",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:77"
+   "source": "behaviours.md:77",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "field": "re:(Start|End) date"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-reset",
@@ -225,7 +316,21 @@
    "where": "filter panel footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:78"
+   "source": "behaviours.md:78",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "button": "Reset"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-filter-search",
@@ -234,7 +339,21 @@
    "where": "filter panel footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:78"
+   "source": "behaviours.md:78",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Search history filter"
+      }
+     },
+     {
+      "on": {
+       "button": "Search"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-toggle-merges",
@@ -243,7 +362,16 @@
    "where": "toggle under the search box (on by default)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:83"
+   "source": "behaviours.md:83",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Hide merges"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-toggle-auto-versions",
@@ -252,7 +380,16 @@
    "where": "toggle under the search box (on by default)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:84"
+   "source": "behaviours.md:84",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Hide automatic versions"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-click-version-row",

@@ -1,0 +1,27 @@
+{
+ "name": "vs-insert-all-toggle",
+ "about": "Insert into all Part Studios and Assemblies: untick, tick again",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  }
+ ]
+}

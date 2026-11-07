@@ -1,0 +1,21 @@
+{
+ "name": "docs-create-label",
+ "about": "Create › Label… (documents page › Create ▾)",
+ "area": "studios",
+ "source": "universe documents documents-page-create-label (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "on": {
+    "button": "Create"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Label…"
+   },
+   "do": "click"
+  }
+ ]
+}

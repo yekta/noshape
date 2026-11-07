@@ -1,0 +1,27 @@
+{
+ "name": "ver-vrow-publish-fs",
+ "about": "Publish FeatureScript… (right-click a version row)",
+ "area": "studios",
+ "source": "universe versions vrow-publish-fs (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Publish FeatureScript…"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "docs-folder-menu-open-in-new-browser-tab",
+ "about": "Folder menu › Open in new browser tab (documents page › right-click a folder tile)",
+ "area": "studios",
+ "source": "universe documents dp-folder-menu-open-in-new-browser-tab (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Folder"
+   }
+  },
+  {
+   "on": {
+    "menu": "Open in new browser tab"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-force",
+ "about": "Preferences › Units: Force default unit › Newton, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Force default unit",
+    "pick": "Newton"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

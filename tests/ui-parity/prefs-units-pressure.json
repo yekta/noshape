@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-pressure",
+ "about": "Preferences › Units: Pressure default unit › Megapascal, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Pressure default unit",
+    "pick": "Megapascal"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

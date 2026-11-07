@@ -1,0 +1,21 @@
+{
+ "name": "doc-tabmenu-open-in-new-browser-tab",
+ "about": "Open in new browser tab (right-click a tab: every tab kind except folder)",
+ "area": "studios",
+ "source": "universe documents tabmenu-open-in-new-browser-tab (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  },
+  {
+   "on": {
+    "menu": "Open in new browser tab"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "docs-folder-menu-move-to",
+ "about": "Folder menu › Move to… (documents page › right-click a folder tile)",
+ "area": "studios",
+ "source": "universe documents dp-folder-menu-move-to (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Folder"
+   }
+  },
+  {
+   "on": {
+    "menu": "Move to…"
+   },
+   "do": "click"
+  }
+ ]
+}

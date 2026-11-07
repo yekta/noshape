@@ -1,0 +1,19 @@
+{
+ "name": "vs-tab-menu",
+ "about": "right-click the Variable Studio 1 tab: its menu; Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

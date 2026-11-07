@@ -1,0 +1,22 @@
+{
+ "name": "prefs-language-save",
+ "about": "Language › Deutsch, Save language: the page re-renders in German",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Language › Display language",
+    "pick": "Deutsch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Language › Save language"
+   }
+  }
+ ]
+}

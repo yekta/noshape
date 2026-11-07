@@ -1,0 +1,29 @@
+{
+ "name": "ver-search-history",
+ "about": "Versions and history › Search history: 'V1' leaves the matching rows",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search history"
+   }
+  },
+  {
+   "do": "type",
+   "text": "V1"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

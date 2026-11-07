@@ -1,0 +1,21 @@
+{
+ "name": "fs-tb-forward-reference",
+ "about": "Forward reference → (and ▾) (Feature Studio toolbar right)",
+ "area": "studios",
+ "source": "universe feature-studio fs-tb-forward-reference (studios 11-08, coverage batch)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Forward reference"
+   }
+  }
+ ]
+}

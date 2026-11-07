@@ -176,10 +176,11 @@ impl HistoryPanel {
             let b = a.get();
             point(b.left(), b.bottom())
         };
-        let select = |id: &'static str, text: String, anchor: &BoundsCell| {
+        let select = |id: &'static str, name: &'static str, text: String, anchor: &BoundsCell| {
             let probe = anchor.clone();
             h_flex()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("field:{name}")))
                 .relative()
                 .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                 .w(px(148.))
@@ -198,7 +199,7 @@ impl HistoryPanel {
         let view = cx.entity();
         let tabs: Vec<(TabId, String)> = doc.tabs.iter().map(|t| (t.id, t.name.clone())).collect();
         let ta = tab_anchor.clone();
-        let tab_select = select("hist-f-tab", tab_name, &tab_anchor).on_click(move |_: &ClickEvent, window, cx| {
+        let tab_select = select("hist-f-tab", "Tab", tab_name.clone(), &tab_anchor).on_click(move |_: &ClickEvent, window, cx| {
             let (view, tabs) = (view.clone(), tabs.clone());
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                 m = m.select_list(148.);
@@ -220,7 +221,7 @@ impl HistoryPanel {
         });
         let view = cx.entity();
         let ba = by_anchor.clone();
-        let by_select = select("hist-f-by", edit.by.label().into(), &by_anchor).on_click(move |_: &ClickEvent, window, cx| {
+        let by_select = select("hist-f-by", "Modified by", edit.by.label().into(), &by_anchor).on_click(move |_: &ClickEvent, window, cx| {
             let view = view.clone();
             let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
                 m = m.select_list(148.);
@@ -238,7 +239,7 @@ impl HistoryPanel {
         let mut types = h_flex().w(px(148.)).flex_wrap().gap(px(6.)).pl(px(3.)).pt(px(4.));
         for (kind, icon, tip) in FILTER_KINDS {
             let on = edit.kinds.contains(&kind);
-            types = types.child(crate::ui::icon_button(SharedString::from(format!("hist-f-kind-{kind}")), icon, 30., on, cx).tooltip(tip).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
+            types = types.child(crate::ui::icon_button(SharedString::from(format!("hist-f-kind-{kind}")), icon, 30., on, cx).tooltip(tip).map(|d| crate::ui_script::mark(d, || format!("button:Tab types:{tip}"))).on_click(cx.listener(move |t, _: &ClickEvent, _, cx| {
                 if let Some(i) = t.filter_edit.kinds.iter().position(|k| *k == kind) {
                     t.filter_edit.kinds.remove(i);
                 } else {
@@ -248,7 +249,18 @@ impl HistoryPanel {
             })));
         }
         let any_kind = !edit.kinds.is_empty();
-        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().id(tip).tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
+        crate::ui_script::note_dialog(|| {
+            let kinds: Vec<&str> = FILTER_KINDS.iter().filter(|k| edit.kinds.contains(&k.0)).map(|k| k.2).collect();
+            let fields = serde_json::json!([
+                { "label": "Tab", "kind": "enum", "text": tab_name },
+                { "label": "Tab types", "kind": "list", "items": kinds },
+                { "label": "Modified by", "kind": "enum", "text": edit.by.label() },
+                { "label": "Start date", "kind": "string", "text": self.date_from.read(cx).value().to_string() },
+                { "label": "End date", "kind": "string", "text": self.date_to.read(cx).value().to_string() },
+            ]);
+            serde_json::json!({ "title": "Search history", "kind": "other", "tabs": [], "fields": fields, "error": null })
+        });
+        let date = |st: &Entity<InputState>, tip: &'static str, cx: &App| div().map(|d| crate::ui_script::mark(d, || format!("field:{tip}"))).w(px(148.)).h(px(34.)).pl(px(4.)).border_b_1().border_color(rgb(0xeaeaea)).flex().items_center().id(tip).tooltip(crate::ui::tooltip(tip)).child(div().flex_1().child(Input::new(st).appearance(false).text_size(px(14.)))).child(div().pr(px(6.)).child(crate::assets::icon("calendar", 16., cx)));
         v_flex()
             .id("hist-filter-panel")
             .occlude()
@@ -277,6 +289,7 @@ impl HistoryPanel {
                             h_flex().justify_end().pt(px(3.)).child(
                                 div()
                                     .id("hist-f-clear")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Clear".into()))
                                     .h(px(27.))
                                     .px(px(7.))
                                     .flex()
@@ -1451,10 +1464,11 @@ impl Render for HistoryPanel {
                             .border_1()
                             .border_color(rgb(0xaaaaaa))
                             .rounded_l(px(4.))
-                            .child(div().flex_1().child(Input::new(&self.search).appearance(false).text_size(px(14.)).pl(px(12.))))
+                            .child(div().flex_1().map(|d| crate::ui_script::mark(d, || "field:Search history".into())).child(Input::new(&self.search).appearance(false).text_size(px(14.)).pl(px(12.))))
                             .child(
                                 div()
                                     .id("hist-filter-caret")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Search history filter".into()))
                                     .w(px(24.))
                                     .h_full()
                                     .flex()
@@ -1477,11 +1491,11 @@ impl Render for HistoryPanel {
                     .pt(px(6.))
                     .gap(px(6.))
                     .flex_none()
-                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).tooltip(crate::ui::tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).map(|d| crate::ui_script::mark(d, || "button:Hide merges".into())).tooltip(crate::ui::tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_merges = !this.hide_merges;
                         cx.notify();
                     })))
-                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).tooltip(crate::ui::tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).map(|d| crate::ui_script::mark(d, || "button:Hide automatic versions".into())).tooltip(crate::ui::tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_auto_versions = !this.hide_auto_versions;
                         cx.notify();
                     }))),

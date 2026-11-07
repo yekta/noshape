@@ -1,0 +1,27 @@
+{
+ "name": "ver-wrow-open-new-tab",
+ "about": "Open in new browser tab (right-click another workspace row)",
+ "area": "studios",
+ "source": "universe versions wrow-open-new-tab (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Open in new browser tab"
+   },
+   "do": "click"
+  }
+ ]
+}

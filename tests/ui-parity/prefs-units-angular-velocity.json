@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-angular-velocity",
+ "about": "Preferences › Units: Angular velocity default unit › Radian per second, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Angular velocity default unit",
+    "pick": "Radian per second"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

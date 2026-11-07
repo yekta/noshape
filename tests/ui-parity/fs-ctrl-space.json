@@ -1,0 +1,29 @@
+{
+ "name": "fs-ctrl-space",
+ "about": "Ctrl+Space in the editor does nothing",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "ctrl+space"
+  }
+ ]
+}

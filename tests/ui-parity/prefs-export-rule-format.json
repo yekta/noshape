@@ -1,0 +1,28 @@
+{
+ "name": "prefs-export-rule-format",
+ "about": "User export rules › Add export rule…: Format › STEP, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Add export rule…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Format",
+    "pick": "STEP"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

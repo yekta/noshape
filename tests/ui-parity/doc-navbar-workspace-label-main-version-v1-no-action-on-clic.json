@@ -1,0 +1,15 @@
+{
+ "name": "doc-navbar-workspace-label-main-version-v1-no-action-on-clic",
+ "about": "Workspace label \"Main\" / version \"V1\" (no action on click) (document navbar after the name)",
+ "area": "studios",
+ "source": "universe documents navbar-workspace-label-main-version-v1-no-action-on-click (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "navbar": "workspace"
+   }
+  }
+ ]
+}

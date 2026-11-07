@@ -1,0 +1,45 @@
+{
+ "name": "fs-tb-redo",
+ "about": "type a comment, the toolbar's Undo, then Redo",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "// uip"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Undo"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Redo"
+   }
+  }
+ ]
+}

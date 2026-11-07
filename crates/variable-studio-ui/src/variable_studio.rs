@@ -92,10 +92,11 @@ impl VariableStudioView {
     /// the inserted studios' tables first, then this one's (`"title"`: its tab's name).
     pub fn ui_state(&self, cx: &App) -> serde_json::Value {
         let title = |t: TabId| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default();
-        let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "rows": v.read(cx).ui_drawn })).collect();
+        let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "collapsed": v.read(cx).collapsed, "rows": v.read(cx).ui_drawn })).collect();
         tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
-        tables.push(serde_json::json!({ "title": title(self.tab), "rows": self.ui_drawn }));
-        serde_json::json!({ "tables": tables })
+        tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": self.ui_drawn }));
+        let insert_into_all = self.studio(cx).is_some_and(|s| s.insert_into_all);
+        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "help": self.help_open })
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -448,6 +449,7 @@ impl VariableStudioView {
             .border_color(rgb(0xcccccc))
             .child(
                 Button::new("vs-insert-all")
+                    .map(|d| crate::ui_script::mark(d, || "checkbox:Insert into all Part Studios and Assemblies".into()))
                     .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     .custom(variant)
                     .h(px(35.))
@@ -468,6 +470,7 @@ impl VariableStudioView {
             )
             .child(
                 Button::new("vs-insert-all-help")
+                    .map(|d| crate::ui_script::mark(d, || "button:Insert into all help".into()))
                     .custom(variant)
                     .h(px(35.))
                     .w(px(49.))
@@ -822,6 +825,7 @@ impl Render for VariableStudioView {
             (self.doc.clone(), target, self.tab, title.clone(), k, list.len())
         });
         let group = self.group();
+        let (collapse_mark, menu_mark) = (format!("button:Collapse:{title}"), format!("button:Table menu:{title}"));
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
         let table = v_flex()
@@ -837,6 +841,7 @@ impl Render for VariableStudioView {
                     .child(
                         h_flex()
                             .id("vs-collapse")
+                            .map(|d| crate::ui_script::mark(d, || collapse_mark))
                             .gap(px(3.))
                             .cursor_pointer()
                             .child(crate::os_ui::glyph(if collapsed { crate::os_ui::GLYPH_COLLAPSED } else { crate::os_ui::GLYPH_EXPANDED }, 10., pal.text))
@@ -857,6 +862,7 @@ impl Render for VariableStudioView {
                     .child(div().flex_1())
                     .child(
                         Button::new("vs-more")
+                            .map(|d| crate::ui_script::mark(d, || menu_mark))
                             .custom(plain)
                             .w(px(25.))
                             .h(px(22.))
@@ -925,6 +931,7 @@ impl Render for VariableStudioView {
         let doc = self.doc.clone();
         let me = self.tab;
         let insert = Button::new("vs-insert")
+            .map(|d| crate::ui_script::mark(d, || "button:Insert Variable Studio".into()))
             .custom(ButtonCustomVariant::new(cx).color(rgb(0xffffff).into()).foreground(pal.text.into()).hover(pal.panel_hover.into()).active(pal.panel_active.into()).shadow(false))
             .h(px(35.))
             .px(px(10.5))

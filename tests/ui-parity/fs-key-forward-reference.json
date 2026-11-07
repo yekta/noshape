@@ -1,0 +1,29 @@
+{
+ "name": "fs-key-forward-reference",
+ "about": "Ctrl+[ then Ctrl+] (no references: nothing moves)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+["
+  },
+  {
+   "do": "key",
+   "key": "mod+]"
+  }
+ ]
+}

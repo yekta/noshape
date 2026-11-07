@@ -1,0 +1,29 @@
+{
+ "name": "vs-type-back-length",
+ "about": "Variable type › Angle, then back to Length: the value comes back",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Variable type",
+    "pick": "Angle"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Variable type",
+    "pick": "Length"
+   }
+  }
+ ]
+}

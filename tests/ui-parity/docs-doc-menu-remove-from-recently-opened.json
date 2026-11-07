@@ -1,0 +1,21 @@
+{
+ "name": "docs-doc-menu-remove-from-recently-opened",
+ "about": "Document row menu › Remove from recently opened (documents page › right-click a document row)",
+ "area": "studios",
+ "source": "universe documents dp-doc-menu-remove-from-recently-opened (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "on": {
+    "menu": "Remove from recently opened"
+   },
+   "do": "click"
+  }
+ ]
+}

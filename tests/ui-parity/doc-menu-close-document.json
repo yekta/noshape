@@ -1,0 +1,21 @@
+{
+ "name": "doc-menu-close-document",
+ "about": "☰ › Close document (document navbar ☰ (in a workspace))",
+ "area": "studios",
+ "source": "universe documents doc-menu-close-document (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Document menu"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Close document"
+   },
+   "do": "click"
+  }
+ ]
+}

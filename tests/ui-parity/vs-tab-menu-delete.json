@@ -1,0 +1,21 @@
+{
+ "name": "vs-tab-menu-delete",
+ "about": "the Variable Studio 1 tab › Delete (immediate)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  }
+ ]
+}

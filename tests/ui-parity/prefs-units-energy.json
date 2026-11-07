@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-energy",
+ "about": "Preferences › Units: Energy default unit › Joule, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Energy default unit",
+    "pick": "Joule"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

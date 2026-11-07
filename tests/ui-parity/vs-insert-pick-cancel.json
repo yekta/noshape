@@ -1,0 +1,33 @@
+{
+ "name": "vs-insert-pick-cancel",
+ "about": "Insert Variable Studio: pick Variable Studio 1 (previewed), then ✕ takes it back",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

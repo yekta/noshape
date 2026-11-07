@@ -1,0 +1,21 @@
+{
+ "name": "doc-plus-create-drawing",
+ "about": "+ › Create Drawing… (document tab bar › + (new tab inserted right after the active tab))",
+ "area": "studios",
+ "source": "universe documents plus-create-drawing (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Insert new tab"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Create Drawing…"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "prefs-units-frequency",
+ "about": "Preferences › Units: Frequency default unit opened (its one unit), Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Frequency default unit"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

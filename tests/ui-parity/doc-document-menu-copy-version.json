@@ -1,0 +1,21 @@
+{
+ "name": "doc-document-menu-copy-version",
+ "about": "☰ › Copy version… (document navbar ☰ while viewing a version (reduced menu))",
+ "area": "studios",
+ "source": "universe documents document-menu-copy-version (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Document menu"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Copy version…"
+   },
+   "do": "click"
+  }
+ ]
+}

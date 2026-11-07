@@ -1,0 +1,27 @@
+{
+ "name": "ver-toggle-merges",
+ "about": "Versions and history: Hide merges off (Show merges), then on",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Hide merges"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Hide merges"
+   }
+  }
+ ]
+}

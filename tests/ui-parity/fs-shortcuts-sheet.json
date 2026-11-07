@@ -1,0 +1,19 @@
+{
+ "name": "fs-shortcuts-sheet",
+ "about": "on the Feature Studio tab, Shift+/ opens the Keyboard shortcuts sheet",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "shift+/"
+  }
+ ]
+}

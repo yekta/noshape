@@ -1,0 +1,21 @@
+{
+ "name": "fs-tb-back-reference",
+ "about": "Back reference ← (and ▾ history list, most recent first) (Feature Studio toolbar right)",
+ "area": "studios",
+ "source": "universe feature-studio fs-tb-back-reference (studios 11-08, coverage batch)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Back reference"
+   }
+  }
+ ]
+}

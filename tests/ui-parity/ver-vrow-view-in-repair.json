@@ -1,0 +1,27 @@
+{
+ "name": "ver-vrow-view-in-repair",
+ "about": "View in repair (right-click a version row: Repair panel \"Viewing V2\")",
+ "area": "studios",
+ "source": "universe versions vrow-view-in-repair (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "on": {
+    "menu": "View in repair"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "fs-tab-copy-to-clipboard",
+ "about": "Copy to clipboard (Feature Studio tab right-click)",
+ "area": "studios",
+ "source": "universe feature-studio fs-tab-copy-to-clipboard (studios 11-08, coverage batch)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Copy to clipboard"
+   },
+   "do": "click"
+  }
+ ]
+}

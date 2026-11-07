@@ -665,8 +665,26 @@ pub fn start_page(cx: &mut App) {
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
             redraw(w, cx).await;
             let find = |t: &Value, cx: &mut AsyncApp| cx.update(|cx| locate(t, &None, &None, &None, cx));
+            // A control scrolled out of view is wheeled into it first, as a browser's click scrolls to it.
+            let mut found = Err(String::new());
+            if matches!(what, "click" | "dblclick" | "rclick" | "hover") {
+                found = find(&target, cx);
+                for _ in 0..12 {
+                    let Ok(at) = found else { break };
+                    let vh = w.update(cx, |_, window, _| f32::from(window.viewport_size().height)).unwrap_or(992.);
+                    let y = f32::from(at.y);
+                    if (60.0..vh - 20.0).contains(&y) {
+                        break;
+                    }
+                    let wheel = ScrollWheelEvent { position: point(px(960.), px(vh / 2.)), delta: ScrollDelta::Pixels(point(px(0.), px((vh / 2. - y).clamp(-600., 600.)))), ..Default::default() };
+                    let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
+                    sleep(cx, 120).await;
+                    redraw(w, cx).await;
+                    found = find(&target, cx);
+                }
+            }
             let result: Result<(), String> = match what {
-                "click" | "dblclick" | "rclick" | "hover" => match find(&target, cx) {
+                "click" | "dblclick" | "rclick" | "hover" => match found {
                     Ok(at) => {
                         let from = pointer.unwrap_or(at);
                         for k in 1..=3 {

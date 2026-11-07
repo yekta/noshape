@@ -1,0 +1,21 @@
+{
+ "name": "doc-dialog-properties-variable-studio-name-description-categ",
+ "about": "Properties › Variable Studio (Name*, Description, Category, Part number, Revision, State*, Title 1–3, Not revision managed) (Variable Studio tab › Properties…)",
+ "area": "studios",
+ "source": "universe documents dialog-properties-variable-studio-name-description-category-part-number-revision (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Properties…"
+   },
+   "do": "click"
+  }
+ ]
+}

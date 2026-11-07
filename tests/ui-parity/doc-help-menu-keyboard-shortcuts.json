@@ -1,0 +1,21 @@
+{
+ "name": "doc-help-menu-keyboard-shortcuts",
+ "about": "Help menu › Keyboard shortcuts (navbar › ? ▾)",
+ "area": "studios",
+ "source": "universe documents help-menu-keyboard-shortcuts (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Help"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Keyboard shortcuts"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "ver-vh-header-repair",
+ "about": "Repair (Versions and history header wrench: banner \"Select a history entry to repair this Part Studio\", then click an entry; click again to leave)",
+ "area": "studios",
+ "source": "universe versions vh-header-repair (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "on": {
+    "button": "Versions and history"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "button": "Repair"
+   },
+   "do": "click"
+  }
+ ]
+}

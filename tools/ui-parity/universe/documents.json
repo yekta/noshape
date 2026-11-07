@@ -6603,21 +6603,7 @@
     [
      {
       "on": {
-       "field": "Environment profile settings › Environment profile select"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Environment profile settings › Environment profile select"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Environment profile settings › Environment profile select"
+       "field": "Environment profile settings › Environment profile"
       }
      }
     ]
@@ -6635,21 +6621,7 @@
     [
      {
       "on": {
-       "field": "Environment profile settings › Create profile"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Environment profile settings › Create profile"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Environment profile settings › Create profile"
+       "button": "Create profile"
       }
      }
     ]
@@ -6667,21 +6639,7 @@
     [
      {
       "on": {
-       "field": "Environment profile settings › Delete profile"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Environment profile settings › Delete profile"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Environment profile settings › Delete profile"
+       "button": "Delete profile"
       }
      }
     ]
@@ -6699,21 +6657,7 @@
     [
      {
       "on": {
-       "field": "Environment profile settings › Match pixel density on high resolution displays"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Environment profile settings › Match pixel density on high resolution displays"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Environment profile settings › Match pixel density on high resolution displays"
+       "field": "re:Environment profile settings › Match pixel density.*"
       }
      }
     ]
@@ -6728,20 +6672,6 @@
    "cloud": false,
    "source": "behaviours.md:7688",
    "via": [
-    [
-     {
-      "on": {
-       "field": "Environment profile settings › Save profile settings"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Environment profile settings › Save profile settings"
-      }
-     }
-    ],
     [
      {
       "on": {
@@ -6891,21 +6821,7 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › tabs General / Part Studio / Assembly / 3D view / Sketch / Drawing"
+       "button": "re:Keyboard shortcuts › (General|Part Studio|Assembly|3D view|Sketch|Drawing)"
       }
      }
     ]
@@ -6923,21 +6839,7 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › row Edit (pencil) → Edit shortcut popup: press keys, ✓ / Enter saves, ✕ / Esc"
+       "button": "re:Keyboard shortcuts › Edit .*"
       }
      }
     ]
@@ -6955,22 +6857,12 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › Edit shortcut › conflict alert"
+       "button": "re:Keyboard shortcuts › Edit .*"
       }
-     }
-    ],
-    [
+     },
      {
-      "on": {
-       "checkbox": "Keyboard shortcuts › Edit shortcut › conflict alert"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › Edit shortcut › conflict alert"
-      }
+      "do": "key",
+      "key": "shift+f"
      }
     ]
    ]
@@ -6987,21 +6879,7 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › Edit shortcut › Disable shortcut"
+       "checkbox": "Keyboard shortcuts › Disable shortcut"
       }
      }
     ]
@@ -7019,21 +6897,7 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › Edit shortcut › Reset to default"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › Edit shortcut › Reset to default"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › Edit shortcut › Reset to default"
+       "button": "Keyboard shortcuts › Reset to default"
       }
      }
     ]
@@ -7051,21 +6915,7 @@
     [
      {
       "on": {
-       "field": "Keyboard shortcuts › row Reset ⟲"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › row Reset ⟲"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Keyboard shortcuts › row Reset ⟲"
+       "button": "re:Keyboard shortcuts › Reset (?!all$|to default$).*"
       }
      }
     ]
@@ -7080,20 +6930,6 @@
    "cloud": false,
    "source": "behaviours.md:1193",
    "via": [
-    [
-     {
-      "on": {
-       "field": "Keyboard shortcuts › Reset all"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Keyboard shortcuts › Reset all"
-      }
-     }
-    ],
     [
      {
       "on": {
@@ -7115,21 +6951,7 @@
     [
      {
       "on": {
-       "field": "Shortcut toolbars › toolbar select"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Shortcut toolbars › toolbar select"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Shortcut toolbars › toolbar select"
+       "field": "Shortcut toolbars › Toolbar"
       }
      }
     ]
@@ -7147,21 +6969,7 @@
     [
      {
       "on": {
-       "field": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Shortcut toolbars › Sketch tool checkboxes (56 tools) + 5-column preview"
+       "checkbox": "re:Shortcut toolbars › .*"
       }
      }
     ]
@@ -7179,21 +6987,8 @@
     [
      {
       "on": {
-       "field": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Shortcut toolbars › Part Studio tool checkboxes (80 tools) + 5-column preview"
+       "field": "Shortcut toolbars › Toolbar",
+       "pick": "Part Studio"
       }
      }
     ]
@@ -7211,21 +7006,8 @@
     [
      {
       "on": {
-       "field": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Shortcut toolbars › Assembly tool checkboxes (30 tools) + 5-column preview"
+       "field": "Shortcut toolbars › Toolbar",
+       "pick": "Assembly"
       }
      }
     ]
@@ -7243,21 +7025,8 @@
     [
      {
       "on": {
-       "field": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Shortcut toolbars › Drawing tool checkboxes (64 tools) + 5-column preview"
+       "field": "Shortcut toolbars › Toolbar",
+       "pick": "Drawing"
       }
      }
     ]
@@ -7304,20 +7073,6 @@
    "cloud": false,
    "source": "dom/preferences-full.txt",
    "via": [
-    [
-     {
-      "on": {
-       "field": "Toolbars › Reset to defaults"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Toolbars › Reset to defaults"
-      }
-     }
-    ],
     [
      {
       "on": {
@@ -7389,21 +7144,7 @@
     [
      {
       "on": {
-       "field": "Material libraries › Remove"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Material libraries › Remove"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "Material libraries › Remove"
+       "button": "re:Material libraries › Remove .*"
       }
      }
     ]
@@ -7418,20 +7159,6 @@
    "cloud": false,
    "source": "behaviours.md:224",
    "via": [
-    [
-     {
-      "on": {
-       "field": "Material libraries › Add material library…"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "Material libraries › Add material library…"
-      }
-     }
-    ],
     [
      {
       "on": {
@@ -7453,20 +7180,6 @@
     [
      {
       "on": {
-       "field": "User export rules › Add export rule…"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "User export rules › Add export rule…"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
        "button": "User export rules › Add export rule…"
       }
      }
@@ -7485,21 +7198,12 @@
     [
      {
       "on": {
-       "field": "User export rules › dialog Scope"
+       "button": "User export rules › Add export rule…"
       }
-     }
-    ],
-    [
+     },
      {
       "on": {
-       "checkbox": "User export rules › dialog Scope"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › dialog Scope"
+       "field": "Scope"
       }
      }
     ]
@@ -7517,21 +7221,12 @@
     [
      {
       "on": {
-       "field": "User export rules › dialog Format"
+       "button": "User export rules › Add export rule…"
       }
-     }
-    ],
-    [
+     },
      {
       "on": {
-       "checkbox": "User export rules › dialog Format"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › dialog Format"
+       "field": "Format"
       }
      }
     ]
@@ -7549,22 +7244,12 @@
     [
      {
       "on": {
-       "field": "User export rules › dialog Convention"
+       "button": "User export rules › Add export rule…"
       }
-     }
-    ],
-    [
+     },
      {
-      "on": {
-       "checkbox": "User export rules › dialog Convention"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › dialog Convention"
-      }
+      "do": "type",
+      "text": "re:.*\\$\\{.*"
      }
     ]
    ]
@@ -7581,21 +7266,24 @@
     [
      {
       "on": {
-       "field": "User export rules › dialog Add / Save changes / Cancel"
+       "button": "User export rules › Add export rule…"
+      }
+     },
+     {
+      "on": {
+       "button": "modal-ok"
       }
      }
     ],
     [
      {
       "on": {
-       "checkbox": "User export rules › dialog Add / Save changes / Cancel"
+       "button": "User export rules › Add export rule…"
       }
-     }
-    ],
-    [
+     },
      {
       "on": {
-       "button": "User export rules › dialog Add / Save changes / Cancel"
+       "button": "modal-cancel"
       }
      }
     ]
@@ -7613,21 +7301,7 @@
     [
      {
       "on": {
-       "field": "User export rules › Edit"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "User export rules › Edit"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › Edit"
+       "button": "re:User export rules › Edit \\d+"
       }
      }
     ]
@@ -7645,21 +7319,7 @@
     [
      {
       "on": {
-       "field": "User export rules › Remove"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "checkbox": "User export rules › Remove"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › Remove"
+       "button": "re:User export rules › Remove \\d+"
       }
      }
     ]

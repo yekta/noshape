@@ -1,0 +1,27 @@
+{
+ "name": "vs-insert-dialog",
+ "about": "Variable Studio 2 › Insert Variable Studio: the dialog (Variable Studio 1 listed, red title), ✕",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

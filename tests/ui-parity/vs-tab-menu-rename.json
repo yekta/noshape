@@ -1,0 +1,29 @@
+{
+ "name": "vs-tab-menu-rename",
+ "about": "the Variable Studio 1 tab › Rename: inline, a new name, Enter",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Sizes"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

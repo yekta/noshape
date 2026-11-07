@@ -1,0 +1,27 @@
+{
+ "name": "ver-toggle-auto-versions",
+ "about": "Versions and history: Hide automatic versions off, then on",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Hide automatic versions"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Hide automatic versions"
+   }
+  }
+ ]
+}

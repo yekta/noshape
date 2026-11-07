@@ -1,0 +1,21 @@
+{
+ "name": "doc-plus-create-material-library",
+ "about": "+ › Create Material Library (document tab bar › + (new tab inserted right after the active tab))",
+ "area": "studios",
+ "source": "universe documents plus-create-material-library (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Insert new tab"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Create Material Library"
+   },
+   "do": "click"
+  }
+ ]
+}

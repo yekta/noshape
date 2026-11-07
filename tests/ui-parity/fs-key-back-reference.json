@@ -1,0 +1,25 @@
+{
+ "name": "fs-key-back-reference",
+ "about": "ctrl/cmd [ — Back reference (editor)",
+ "area": "studios",
+ "source": "universe feature-studio fs-key-back-reference (studios 11-08, coverage batch)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "on": {
+    "editor": "code"
+   },
+   "do": "click"
+  },
+  {
+   "do": "key",
+   "key": "mod+["
+  }
+ ]
+}

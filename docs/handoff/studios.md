@@ -28,6 +28,22 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 00:0x UTC: batch 2 (147 scenarios), DOCS-SELECT-LEAVES-WAL fixed; batch 1 filed with live
+- Batch 1 (198 scenarios, 7a746fd8) filed in live/REQUESTS.md for live and live2 (23:40). Ours: 176 of 185 clean; the
+  failures were the driver (controls below the fold: now wheeled into view; the toolbar's Undo not named) and
+  ver-version-restore (ours restores at once, live's Restore to Main… dialog not captured: wait for its recording).
+- Batch 2: Preferences (Keyboard shortcuts incl. the Edit popup, Shortcut toolbars, export rules, material libraries,
+  every unit and decimals, env profile, language save, pen input), Versions and history (Search history, the filter
+  panel, Hide merges / automatic versions), Variable Studio (Insert Variable Studio dialog and its rows as
+  `panel_row`, table ⋯ `Table menu:<title>`, chevron `Collapse:<title>`, footer checkbox and ?, Configuration panel;
+  start vs-two), Feature Studio (Redo, commit all, references, Ctrl+Space, Shift+/, Alt+C), and one scenario for every
+  universe item whose `via` had none (/root/studios-scratch/bin/gen_via.py). File it once on main.
+- DOCS-SELECT-LEAVES-WAL (qa P2): a read-only handle's close removes the -wal / -shm it made (crates/store).
+- Coverage: documents 201/313 (64.2 %), versions 81/174 (46.6 %), Variable Studio 40/98 (40.8 %), Feature Studio
+  58/119 (48.7 %).
+- Next: run batch 2 on ours and file it; versions' release (31 items, mostly premium on live's Free plan: check which
+  are cloud), compare and merge items; Feature Studio's Import panel, Monitor ▾, notices panel; universes' `gaps`.
+
 ### 2026-11-07 23:26 UTC: restarted on a pinned account; the previous agent's work landed
 - Page driver (next-step 1): a document opened from the documents page is read as the document now (docs-create-document
   step 4: tabs Part Studio 1, Assembly 1, workspace Main); nothing left to fix there.

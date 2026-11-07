@@ -1,0 +1,21 @@
+{
+ "name": "doc-dialog-properties-feature-studio-name-description-catego",
+ "about": "Properties › Feature Studio (Name*, Description, Category) (Feature Studio tab › Properties…)",
+ "area": "studios",
+ "source": "universe documents dialog-properties-feature-studio-name-description-category (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Properties…"
+   },
+   "do": "click"
+  }
+ ]
+}

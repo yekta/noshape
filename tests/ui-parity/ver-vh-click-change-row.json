@@ -1,0 +1,27 @@
+{
+ "name": "ver-vh-click-change-row",
+ "about": "open history entry (row click) (click a change row under Show changes…)",
+ "area": "studios",
+ "source": "universe versions vh-click-change-row (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Part Studio 1 :: Insert feature : Extrude 2"
+   }
+  }
+ ]
+}

@@ -1,0 +1,19 @@
+{
+ "name": "fs-search-tools",
+ "about": "on the Feature Studio tab, Alt+C: Search tools",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Feature Studio batch 2)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+c"
+  }
+ ]
+}

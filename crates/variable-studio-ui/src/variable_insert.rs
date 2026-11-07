@@ -134,6 +134,11 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                 .cursor_pointer()
                 .relative()
                 .group(SharedString::from(format!("ivs-row-{id}")))
+                .map(|d| {
+                    let row = (name.clone(), whole);
+                    crate::ui_script::note_field(|| serde_json::json!({ "label": row.0, "kind": "boolean", "checked": row.1 }));
+                    crate::ui_script::mark(d, || format!("panel_row:{}", row.0))
+                })
                 .tooltip(crate::ui::user_tooltip(name.clone()))
                 // Live 159: the picked studio light blue from x 18 (not under
                 // the expander), no check mark.
@@ -415,6 +420,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
         let tab = |id: &'static str, label: &'static str, on: bool, st: Rc<RefCell<DialogState>>| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("button:{label}")))
                 .w(px(150.))
                 .h(px(32.))
                 .relative()
@@ -635,6 +641,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             .child(
                 div()
                     .id("ivs-cancel")
+                    .map(|d| crate::ui_script::mark(d, || "button:cancel".into()))
                     .size(px(28.))
                     .flex()
                     .items_center()
@@ -648,7 +655,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     }),
             );
         // Live: a 42 px search container (6 px above and below the box).
-        let search_row = div().flex_none().py(px(6.)).px(px(6.)).child(
+        let search_row = div().flex_none().py(px(6.)).px(px(6.)).map(|d| crate::ui_script::mark(d, || "field:Search Variable Studios".into())).child(
             h_flex()
                 .h(px(30.))
                 .rounded(px(3.))
@@ -658,6 +665,14 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 .child(gpui_kit::component::input::Input::new(&search).appearance(false).text_size(px(13.33)).pl(px(5.))),
         );
         let (doc_e, before_e) = (doc_c.clone(), before_c.clone());
+        // The studios' rows (noted as they were built) after the search box, as `state.dialog`.
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": "Search Variable Studios", "kind": "string", "text": search.read(cx).value().to_string() })];
+            fields.extend(crate::ui_script::take_fields());
+            let tabs = serde_json::json!([{ "label": "Current document", "selected": !other }, { "label": "Other documents", "selected": other }]);
+            let error = (!changed).then_some("Insert Variable Studio did not regenerate properly: Error regenerating.");
+            serde_json::json!({ "title": "Insert Variable Studio", "kind": "feature", "tabs": tabs, "fields": fields, "error": error })
+        });
         dialog
             .w(px(300.))
             .margin_left(px(246.))

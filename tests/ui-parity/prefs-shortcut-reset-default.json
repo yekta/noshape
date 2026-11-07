@@ -1,0 +1,43 @@
+{
+ "name": "prefs-shortcut-reset-default",
+ "about": "Keyboard shortcuts › Extrude: Alt+X confirmed, then its Edit popup's Reset to default",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "key",
+   "key": "alt+x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Confirm"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Edit Extrude"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Keyboard shortcuts › Reset to default"
+   }
+  }
+ ]
+}

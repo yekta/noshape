@@ -1,0 +1,21 @@
+{
+ "name": "doc-dialog-properties-assembly-name-description-category-par",
+ "about": "Properties › Assembly (Name*, Description, Category, Part number, Revision, State*, Vendor, Project, Product line, Title 1–3, Not revision managed, Exclude from all BOMs, Unit of measure, Mass, Subassembly BOM behavior*) (Assembly tab › Properties…)",
+ "area": "studios",
+ "source": "universe documents dialog-properties-assembly-name-description-category-part-number-revision-state- (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "on": {
+    "menu": "Properties…"
+   },
+   "do": "click"
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "vs-table-copy",
+ "about": "the table's ⋯ › Copy table",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Table menu:Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy table"
+   }
+  }
+ ]
+}

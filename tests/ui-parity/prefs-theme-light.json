@@ -1,0 +1,21 @@
+{
+ "name": "prefs-theme-light",
+ "about": "Theming › Dark mode, then Light mode again: Save theme off again",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Theming › Dark mode"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Theming › Light mode"
+   }
+  }
+ ]
+}

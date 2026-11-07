@@ -1,0 +1,15 @@
+{
+ "name": "doc-navbar-document-name-double-click-same-inline-rename",
+ "about": "Document name: double-click (same inline rename) (document navbar › name)",
+ "area": "studios",
+ "source": "universe documents navbar-document-name-double-click-same-inline-rename (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "navbar": "name"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "ver-vh-header-create-version",
+ "about": "Create version… (Versions and history header icon)",
+ "area": "studios",
+ "source": "universe versions vh-header-create-version (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "on": {
+    "button": "Versions and history"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "button": "Create version…"
+   },
+   "do": "click"
+  }
+ ]
+}

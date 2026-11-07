@@ -515,7 +515,20 @@
    "where": "Feature Studio toolbar",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2093"
+   "source": "behaviours.md:2093",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "do": "key",
+      "key": "alt+c"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-co-complete",
@@ -599,7 +612,20 @@
    "where": "Feature Studio toolbar right",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1572"
+   "source": "behaviours.md:1572",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+End"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-collapse-breakpoints",
@@ -979,7 +1005,20 @@
    "where": "editor",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:20391"
+   "source": "behaviours.md:20391",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "ctrl+space"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-backspace-refilter",
@@ -1373,7 +1412,20 @@
    "where": "editor",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+shift+s"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-key-dismiss-autocomplete",
@@ -1429,7 +1481,20 @@
    "where": "editor",
    "freq": 3,
    "cloud": false,
-   "source": "dom/keyboard-shortcuts.txt"
+   "source": "dom/keyboard-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "key",
+      "key": "mod+]"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-key-top-level-symbols",
@@ -1510,7 +1575,20 @@
    "where": "Shift+/",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:12286"
+   "source": "behaviours.md:12286",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "do": "key",
+      "key": "shift+/"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-search-pane",

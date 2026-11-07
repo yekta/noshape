@@ -1,0 +1,34 @@
+{
+ "name": "ver-filter-modified-by",
+ "about": "Search history ▾ › Modified by › Not me, Search (no rows)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search history filter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Modified by",
+    "pick": "Not me"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

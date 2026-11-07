@@ -1,0 +1,21 @@
+{
+ "name": "doc-plus-import",
+ "about": "+ › Import… (document tab bar › + (new tab inserted right after the active tab))",
+ "area": "studios",
+ "source": "universe documents plus-import (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Insert new tab"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Import…"
+   },
+   "do": "click"
+  }
+ ]
+}

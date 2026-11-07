@@ -1,0 +1,27 @@
+{
+ "name": "vs-config-panel",
+ "about": "the right edge's Configuration panel button: open, then close",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  }
+ ]
+}

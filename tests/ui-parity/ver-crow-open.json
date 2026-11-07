@@ -1,0 +1,33 @@
+{
+ "name": "ver-crow-open",
+ "about": "Open (right-click a history (change) row)",
+ "area": "studios",
+ "source": "universe versions crow-open (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Part Studio 1 :: Insert feature : Extrude 2"
+   }
+  },
+  {
+   "on": {
+    "menu": "Open"
+   },
+   "do": "click"
+  }
+ ]
+}

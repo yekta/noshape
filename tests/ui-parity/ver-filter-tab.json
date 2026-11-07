@@ -1,0 +1,34 @@
+{
+ "name": "ver-filter-tab",
+ "about": "Search history ▾ › Tab › Part Studio 1, Search",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search history filter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Tab",
+    "pick": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "ver-crow-restore",
+ "about": "Restore to Main… (right-click a history (change) row (how a deleted tab comes back))",
+ "area": "studios",
+ "source": "universe versions crow-restore (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Part Studio 1 :: Insert feature : Extrude 2"
+   }
+  },
+  {
+   "on": {
+    "menu": "Restore to Main…"
+   },
+   "do": "click"
+  }
+ ]
+}

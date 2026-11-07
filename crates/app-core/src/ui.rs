@@ -791,7 +791,7 @@ pub fn undo_redo_with(doc: &Entity<crate::doc_model::DocModel>, cell: f32, tips:
         .child(with_tooltip(
             "tt-undo",
             undo_tip,
-            tool_button("tb-undo", "undo", false, cx).w(px(cell)).h(px(cell)).opacity(if can_undo { 1.0 } else { 0.4 }).when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
+            crate::ui_script::mark(tool_button("tb-undo", "undo", false, cx), || "button:Undo".into()).w(px(cell)).h(px(cell)).opacity(if can_undo { 1.0 } else { 0.4 }).when(!can_undo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_undo {
                     d1.update(cx, |d, cx| d.undo(cx));
                 }
@@ -800,7 +800,7 @@ pub fn undo_redo_with(doc: &Entity<crate::doc_model::DocModel>, cell: f32, tips:
         .child(with_tooltip(
             "tt-redo",
             redo_tip,
-            tool_button("tb-redo", "redo", false, cx).w(px(cell)).h(px(cell)).opacity(if can_redo { 1.0 } else { 0.4 }).when(!can_redo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
+            crate::ui_script::mark(tool_button("tb-redo", "redo", false, cx), || "button:Redo".into()).w(px(cell)).h(px(cell)).opacity(if can_redo { 1.0 } else { 0.4 }).when(!can_redo, |b| b.cursor(CursorStyle::OperationNotAllowed)).on_click(move |_, _, cx| {
                 if can_redo {
                     d2.update(cx, |d, cx| d.redo(cx));
                 }

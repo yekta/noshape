@@ -1,0 +1,22 @@
+{
+ "name": "prefs-env-density",
+ "about": "Environment profile settings › Match pixel density › the second option, Save profile settings",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
+    "pick": "On"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Environment profile settings › Save profile settings"
+   }
+  }
+ ]
+}

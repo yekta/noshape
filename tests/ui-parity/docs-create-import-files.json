@@ -1,0 +1,21 @@
+{
+ "name": "docs-create-import-files",
+ "about": "Create › Import files… (documents page › Create ▾ (opens the OS file picker, multiple files))",
+ "area": "studios",
+ "source": "universe documents documents-page-create-import-files (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "on": {
+    "button": "Create"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Import files…"
+   },
+   "do": "click"
+  }
+ ]
+}

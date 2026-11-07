@@ -1,0 +1,21 @@
+{
+ "name": "prefs-env-profile-create-cancel",
+ "about": "Environment profile settings › Create profile: the New environment profile dialog, Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create profile"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

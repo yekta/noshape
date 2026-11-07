@@ -117,6 +117,7 @@ impl VariableStudioView {
         let pal = p();
         div()
             .id("vs-config-tab")
+            .map(|d| crate::ui_script::mark(d, || "button:Configuration panel".into()))
             .w(px(33.))
             .h(px(34.))
             .flex()

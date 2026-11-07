@@ -1,0 +1,33 @@
+{
+ "name": "ver-filter-types",
+ "about": "Search history ▾ › Tab types › Assembly, then Clear",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Versions batch 2)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search history filter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab types:Assembly"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Clear"
+   }
+  }
+ ]
+}

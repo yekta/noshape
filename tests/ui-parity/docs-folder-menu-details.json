@@ -1,0 +1,21 @@
+{
+ "name": "docs-folder-menu-details",
+ "about": "Folder menu › Details (documents page › right-click a folder tile)",
+ "area": "studios",
+ "source": "universe documents dp-folder-menu-details (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Folder"
+   }
+  },
+  {
+   "on": {
+    "menu": "Details"
+   },
+   "do": "click"
+  }
+ ]
+}

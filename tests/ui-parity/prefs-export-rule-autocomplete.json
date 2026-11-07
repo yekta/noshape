@@ -1,0 +1,25 @@
+{
+ "name": "prefs-export-rule-autocomplete",
+ "about": "User export rules › Add export rule…: typing _${ opens the property list; Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Add export rule…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "_${"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "name": "vs-insert-search-variable",
+ "about": "Insert Variable Studio: search by a variable's name ('height' finds Variable Studio 1), ✕",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search Variable Studios"
+   }
+  },
+  {
+   "do": "type",
+   "text": "height"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

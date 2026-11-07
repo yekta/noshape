@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-moment",
+ "about": "Preferences › Units: Moment default unit › Newton-meter, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Moment default unit",
+    "pick": "Newton-meter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

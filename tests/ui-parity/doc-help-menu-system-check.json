@@ -1,0 +1,21 @@
+{
+ "name": "doc-help-menu-system-check",
+ "about": "Help menu › System check (navbar › ? ▾)",
+ "area": "studios",
+ "source": "universe documents help-menu-system-check (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Help"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "System check"
+   },
+   "do": "click"
+  }
+ ]
+}

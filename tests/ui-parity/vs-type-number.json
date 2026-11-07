@@ -1,0 +1,22 @@
+{
+ "name": "vs-type-number",
+ "about": "Variable type ▾ › Number",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Variable type",
+    "pick": "Number"
+   }
+  }
+ ]
+}

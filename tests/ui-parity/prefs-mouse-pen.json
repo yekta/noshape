@@ -1,0 +1,21 @@
+{
+ "name": "prefs-mouse-pen",
+ "about": "Mouse controls: tick Use pen input as mouse, Save mouse controls",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Mouse controls › Use pen input as mouse"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Mouse controls › Save mouse controls"
+   }
+  }
+ ]
+}

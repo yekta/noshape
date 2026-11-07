@@ -1,0 +1,27 @@
+{
+ "name": "vs-collapse",
+ "about": "the table title's chevron: collapse, then expand",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Collapse:Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Collapse:Variable Studio 1"
+   }
+  }
+ ]
+}

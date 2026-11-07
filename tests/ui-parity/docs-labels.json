@@ -1,0 +1,15 @@
+{
+ "name": "docs-labels",
+ "about": "Labels (documents page › left nav (list documents by label))",
+ "area": "studios",
+ "source": "universe documents documents-page-labels (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "nav": "Labels"
+   }
+  }
+ ]
+}

@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-mass-decimals",
+ "about": "Preferences › Units: the mass's Display decimals › 0.1, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Mass default unit › Display decimals",
+    "pick": "0.1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

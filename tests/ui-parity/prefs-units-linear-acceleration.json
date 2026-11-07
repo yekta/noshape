@@ -1,0 +1,22 @@
+{
+ "name": "prefs-units-linear-acceleration",
+ "about": "Preferences › Units: Linear acceleration default unit › Meter per second squared, Save changes",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "field": "Units › Linear acceleration default unit",
+    "pick": "Meter per second squared"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Save changes"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "docs-doc-menu-labels",
+ "about": "Document row menu › Labels… (documents page › right-click a document row)",
+ "area": "studios",
+ "source": "universe documents dp-doc-menu-labels (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "on": {
+    "menu": "Labels…"
+   },
+   "do": "click"
+  }
+ ]
+}

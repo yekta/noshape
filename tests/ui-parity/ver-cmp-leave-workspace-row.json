@@ -1,0 +1,27 @@
+{
+ "name": "ver-cmp-leave-workspace-row",
+ "about": "leave compare (click the workspace row (no close button on the bar))",
+ "area": "studios",
+ "source": "universe versions cmp-leave-workspace-row (studios 11-08, coverage batch)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "on": {
+    "menu": "Compare"
+   },
+   "do": "click"
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "Main"
+   }
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "doc-units-workspace-units-frequency-unit",
+ "about": "Workspace units › Frequency unit (☰ › Workspace units… panel (Hertz))",
+ "area": "studios",
+ "source": "universe documents units-workspace-units-frequency-unit (studios 11-08, coverage batch)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Document menu"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Workspace units…"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "field": "Frequency default unit"
+   },
+   "do": "click"
+  }
+ ]
+}

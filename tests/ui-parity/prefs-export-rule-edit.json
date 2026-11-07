@@ -1,0 +1,43 @@
+{
+ "name": "prefs-export-rule-edit",
+ "about": "User export rules: add ${name}_x, then its Edit: the Edit export rule dialog; Cancel; Remove",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Preferences batch 3)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Add export rule…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "_x"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Edit 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "User export rules › Remove 1"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "docs-doc-menu-move-to",
+ "about": "Document row menu › Move to… (documents page › right-click a document row)",
+ "area": "studios",
+ "source": "universe documents dp-doc-menu-move-to (studios 11-08, coverage batch)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "on": {
+    "menu": "Move to…"
+   },
+   "do": "click"
+  }
+ ]
+}

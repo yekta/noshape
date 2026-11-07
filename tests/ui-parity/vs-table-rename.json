@@ -1,0 +1,39 @@
+{
+ "name": "vs-table-rename",
+ "about": "the table's ⋯ › Rename: a new title, Enter (the tab renamed too)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, Variable Studio batch 2)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Table menu:Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Rename"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Sizes"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}
