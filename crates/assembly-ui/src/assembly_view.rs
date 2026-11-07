@@ -4570,7 +4570,7 @@ impl AssemblyView {
         // origin is picked) is in the list while its dialog is open (not one opened from a mate's chip).
         let new_mc = self.mc.as_ref().filter(|s| !s.editing && s.for_mate.is_none() && !asm.connectors.iter().any(|c| c.id == s.id)).map(|s| (s.id, s.name.clone(), s.on.is_some()));
         if let Some((id, name, ok)) = new_mc.clone() {
-            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly").into(), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
+            let row = self.feature_row(FeatureRow { id, icon: icon_path("mate-connector-assembly"), name, ok, inactive: false, message: None, has_limits: false, hidden: None, tooltip: None, implicit: vec![] }, cx);
             mate_rows.push(div().bg(pal.accent_soft).child(row).into_any_element());
             mate_ids.push(id);
         }
