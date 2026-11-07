@@ -1881,3 +1881,8 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   second small flange over the 12.7 mm tab (x 394 -> 426; the tab's top edge sits 0.275 mm off the main edge, a step
   at x 426.06): std maps the side face to definition edges through our association attributes; look at which edges
   ours gives that face (host sheetmetal.rs `associations`) and why the tab's edge is among them.
+- 11-07 22:00, Flange 3 narrowed: std's flange surface is right (x 426 -> 1515) and so is the bend relief at x 426.06
+  (OBROUND 0.2035 x 1.628 mm, live's 425.85..426.06). The extra pieces are the bend built from x 394.31 (cylinders
+  37.2 / 74.3 mm² at x 407, end faces 3.573 mm² at 394.31 and 1515.08; live's bend ends at 426.06): look at the bend
+  solid's length in host sheetmetal.rs (update_sheet_metal_geometry's bends, `bend_side_back` / the wall's pulled
+  sides) where the bend's wall edge ends at the INNER-alignment step (0.275 mm connector) to the tab.
