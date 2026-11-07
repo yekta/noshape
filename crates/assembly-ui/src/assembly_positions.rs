@@ -81,9 +81,8 @@ impl AssemblyView {
         let mate_values = self.result.named_position_values(asm);
         self.edit(&format!("Insert : {name}"), cx, |a| a.named_positions.push(NamedPosition { name, placements, mate_values, sub_positions: Vec::new() }));
         self.panel = Some(SidePanel::Positions);
+        // Live (asm-named-position-apply): the new position is being edited, not applied (its menu keeps Apply).
         self.ui.np_editing = Some(n);
-        // Live 1671: the new position is the current one (blue, no Apply).
-        self.ui.np_applied = Some(n);
         cx.notify();
     }
 
@@ -251,13 +250,11 @@ impl AssemblyView {
     fn duplicate_np(&mut self, i: usize, cx: &mut Context<Self>) {
         let Some(asm) = self.assembly(cx) else { return };
         let Some(mut np) = asm.named_positions.get(i).cloned() else { return };
-        let mut k = 1;
-        while asm.named_positions.iter().any(|p| p.name == format!("{} ({k})", np.name)) {
-            k += 1;
-        }
-        np.name = format!("{} ({k})", np.name);
+        let source = np.name.clone();
+        np.name = noshape_ops::assembly::duplicate_position_name(asm, &np.name);
         let name = np.name.clone();
         self.edit_view_list(&format!("Duplicate named position : {name}"), AssemblyViewList::NamedPositions, ListChange::Inserted(i + 1), cx, |a| a.named_positions.insert(i + 1, np));
+        self.np_toast(format!("{source} has been duplicated"), 4400, cx);
     }
 
     fn move_np(&mut self, i: usize, down: bool, cx: &mut Context<Self>) {
@@ -491,7 +488,9 @@ impl AssemblyView {
             }
             let target = format!("panel_row:{name}");
             let entries = self.np_row_menu(r, name);
-            rows = rows.child(div().id(SharedString::from(format!("np-row-{r}"))).map(|d| crate::ui_script::mark(d, || target)).child(row).os_context_menu(move |menu, window, cx| fill_menu(menu, entries.clone(), view.clone(), window, cx)));
+            rows = rows.child(div().id(SharedString::from(format!("np-row-{r}"))).map(|d| crate::ui_script::mark(d, || target)).child(row).os_context_menu(move |menu, window, cx| fill_menu(menu, entries.clone(), view.clone(), window, cx))
+                // (After the menu's handler, so it runs first: the menu's stops the press.)
+                .on_mouse_down(MouseButton::Right, cx.listener(|this, _, _, _| this.ui.panel_focus = true)));
         }
         // The italic "Name" add row.
         let n = asm.named_positions.len();
@@ -578,7 +577,10 @@ impl AssemblyView {
                                 .cursor_pointer()
                                 .tooltip(crate::ui::tooltip("Add a new named position for this assembly"))
                                 .child("Add named position")
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_named_position_row(None, cx)))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    this.ui.panel_focus = this.assembly(cx).is_some_and(|a| !a.named_positions.is_empty());
+                                    this.add_named_position_row(None, cx);
+                                }))
                                 .map(|d| crate::ui_script::mark(d, || "button:Add a new named position for this assembly".into())),
                         ),
                     )

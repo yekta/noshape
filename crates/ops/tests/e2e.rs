@@ -2063,13 +2063,13 @@ fn assembly_named_positions_and_exploded_views() {
     call(&mut ctx, "assembly_named_position", json!({ "action": "rename", "position": "1", "name": "Closed" }));
     assert_eq!(last(&mut ctx), "Assembly 1 :: Rename named position : Closed");
     call(&mut ctx, "assembly_named_position", json!({ "action": "duplicate", "position": "Closed" }));
-    assert_eq!(last(&mut ctx), "Assembly 1 :: Duplicate named position : Closed (1)");
-    let np = call(&mut ctx, "assembly_named_position", json!({ "action": "set_value", "position": "Closed (1)", "mate": "Revolute 1", "dof": "rz", "value": "90 deg" }));
-    let v = np["named_positions"].as_array().unwrap().iter().find(|p| p["name"] == "Closed (1)").unwrap()["mate_values"][0]["rz_deg"].clone();
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Duplicate named position : Closed Copy 1");
+    let np = call(&mut ctx, "assembly_named_position", json!({ "action": "set_value", "position": "Closed Copy 1", "mate": "Revolute 1", "dof": "rz", "value": "90 deg" }));
+    let v = np["named_positions"].as_array().unwrap().iter().find(|p| p["name"] == "Closed Copy 1").unwrap()["mate_values"][0]["rz_deg"].clone();
     assert!((num(&v) - 90.0).abs() < 1e-6, "{np}");
-    call(&mut ctx, "assembly_named_position", json!({ "action": "apply", "position": "Closed (1)" }));
-    assert_eq!(last(&mut ctx), "Assembly 1 :: Apply named position : Closed (1)");
-    call(&mut ctx, "assembly_named_position", json!({ "action": "move_up", "position": "Closed (1)" }));
+    call(&mut ctx, "assembly_named_position", json!({ "action": "apply", "position": "Closed Copy 1" }));
+    assert_eq!(last(&mut ctx), "Assembly 1 :: Apply named position : Closed Copy 1");
+    call(&mut ctx, "assembly_named_position", json!({ "action": "move_up", "position": "Closed Copy 1" }));
     let np = call(&mut ctx, "assembly_named_position", json!({ "action": "delete", "position": "Closed" }));
     assert_eq!(np["named_positions"].as_array().unwrap().len(), 1, "{np}");
 
@@ -6481,4 +6481,32 @@ fn the_bom_follows_configurations() {
     let bom = call(&mut ctx, "assembly_bom", json!({ "tab": "Top", "type": "structured", "columns": ["Item", "Quantity"] }));
     let rows: Vec<(u64, String, u64)> = bom["rows"].as_array().unwrap().iter().map(|r| (r["depth"].as_u64().unwrap(), r["name"].as_str().unwrap().to_string(), r["quantity"].as_u64().unwrap())).collect();
     assert_eq!(rows, vec![(0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 2), (0, "Sub".to_string(), 1), (1, "Part 1".to_string(), 1)], "{bom}");
+}
+
+/// ASM-CONFIG-VARIABLE-NOOP: an assembly's configuration variable is a `#name` for mates, in each configuration.
+#[test]
+fn an_assembly_configuration_variable_drives_a_mate_offset() {
+    let mut ctx = Ctx::new();
+    let path = scratch("asm-config-variable.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sk = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].clone();
+    let d = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[0, 0], [40, 20]] }] }));
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [d["regions"][0]["id"]], "depth": "10 mm", "operationType": "NEW" } }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1" }));
+    call(&mut ctx, "assembly_insert", json!({ "tab": "Assembly 1", "source": "Part Studio 1" }));
+    call(&mut ctx, "assembly_set_state", json!({ "tab": "Assembly 1", "instances": ["Part Studio 1 <1>"], "fixed": true }));
+    let i = call(&mut ctx, "config_add_input", json!({ "tab": "Assembly 1", "kind": "variable", "name": "gap", "value": "5 mm" }));
+    let input = i["input"].as_str().unwrap().to_string();
+    let face = |ctx: &mut Ctx, instance: &str, z: f64| call(ctx, "assembly_entities", json!({ "tab": "Assembly 1", "instance": instance, "kind": "faces", "normal": [0, 0, z] }))["faces"][0].clone();
+    let top = face(&mut ctx, "Part Studio 1 <1>", 1.0)["id"].clone();
+    let bottom = face(&mut ctx, "Part Studio 1 <2>", -1.0)["id"].clone();
+    let m = call(&mut ctx, "assembly_mate", json!({ "tab": "Assembly 1", "type": "fastened", "a": { "instance": "Part Studio 1 <1>", "entity": top }, "b": { "instance": "Part Studio 1 <2>", "entity": bottom }, "offset": { "z": "#gap" } }));
+    assert_eq!(m["mate_ok"], true, "{m}");
+    // The moved block's bottom: 10 mm up on the fixed block's top, then the offset.
+    let gap = |ctx: &mut Ctx| (num(&face(ctx, "Part Studio 1 <2>", -1.0)["centroid"][2]) - 10.0).abs();
+    assert!((gap(&mut ctx) - 5.0).abs() < 1e-6, "the default 5 mm: {}", gap(&mut ctx));
+    call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "values": { input.clone(): "12 mm" } }));
+    assert!((gap(&mut ctx) - 12.0).abs() < 1e-6, "12 mm: {}", gap(&mut ctx));
+    call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "reset": true }));
+    assert!((gap(&mut ctx) - 5.0).abs() < 1e-6, "back to the default: {}", gap(&mut ctx));
 }

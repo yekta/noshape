@@ -54,6 +54,7 @@ pub fn fill_menu(m: OsMenu, entries: Vec<MenuEntry>, view: Entity<AssemblyView>,
                     let act = act.clone();
                     v.update(cx, |this, cx| {
                         this.ui.ctx_menu = None;
+                        this.ui.panel_focus = false;
                         act(this, window, cx);
                         cx.notify();
                     })
@@ -449,6 +450,9 @@ pub struct AsmUi {
     /// the toast is a green success one ("Inputs copied.").
     pub cfg_filter: Option<Entity<InputState>>,
     pub cfg_filter_sub: Option<Subscription>,
+    /// A side panel's button or row holds the keyboard as a web page's would (live: the Named positions footer's Add
+    /// once positions exist, a right-clicked row); any other click or a menu item clears it.
+    pub panel_focus: bool,
     pub cfg_only_kinds: [bool; 3],
     pub cfg_toast_ok: bool,
     pub cfg_props_tab: bool,
@@ -5515,14 +5519,32 @@ impl AssemblyView {
     /// Export… of occurrences by path (all: `None`).
     pub(super) fn open_occurrence_export(&mut self, ids: Option<Vec<Vec<InstanceId>>>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        let base = match ids.as_deref() {
-            Some([one]) => self.occurrence_instance(one, cx).map(|i| i.name.clone()).unwrap_or_default(),
-            _ => self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into()),
+        let tab_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        let one = match ids.as_deref() {
+            Some([one]) => self.occurrence_instance(one, cx),
+            _ => None,
+        };
+        // A part instance exports as the Part Studio's part does (live asm-menu-export: "<Part Studio> - <part>", no
+        // assembly checkboxes).
+        let part = one.as_ref().and_then(|i| match &i.source {
+            InstanceSource::Part { studio, .. } => {
+                let doc = &self.doc.read(cx).session.doc;
+                let part = i.name.rsplit_once(" <").map_or(i.name.as_str(), |(n, _)| n).to_string();
+                Some((doc.tab(*studio).map(|t| t.name.clone()).unwrap_or_default(), part))
+            }
+            _ => None,
+        });
+        let (element, base, values) = match (&part, &one) {
+            (Some((studio, name)), _) => (noshape_model::export_rules::ExportElement::Part, format!("{studio} - {name}"), crate::export_naming::values(&self.doc.read(cx).name(), studio, name, None)),
+            (None, Some(i)) => (noshape_model::export_rules::ExportElement::Assembly, i.name.clone(), crate::export_naming::values(&self.doc.read(cx).name(), &tab_name, &i.name, None)),
+            (None, None) => {
+                let base = if tab_name.is_empty() { "Assembly".to_string() } else { tab_name.clone() };
+                (noshape_model::export_rules::ExportElement::Assembly, base.clone(), crate::export_naming::values(&self.doc.read(cx).name(), &tab_name, &base, None))
+            }
         };
         // Through the user's export rules (Preferences › User export rules).
-        let tab_name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
-        let values = crate::export_naming::values(&self.doc.read(cx).name(), &tab_name, &base, None);
-        let base = crate::export_naming::default_name(noshape_model::export_rules::ExportElement::Assembly, noshape_ops::export::ExportSettings::default().format.label(), &values, base);
+        let base = crate::export_naming::default_name(element, noshape_ops::export::ExportSettings::default().format.label(), &values, base);
+        let parts_only = part.is_some();
         let run: crate::assembly_hooks::RunExport = std::rc::Rc::new(move |s, name, window, cx| {
             let (v, ids) = (view.clone(), ids.clone());
             if let Some(msg) = noshape_ops::export::missing_writer(s.format) {
@@ -5564,7 +5586,7 @@ impl AssemblyView {
                 });
             });
         });
-        crate::assembly_hooks::open_export_modal(base, true, run, window, cx);
+        crate::assembly_hooks::open_export_modal(base, true, parts_only, run, window, cx);
     }
 
     /// Tab › Export… of an Assembly tab: the whole assembly.

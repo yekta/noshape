@@ -72,8 +72,8 @@ pub struct Hooks {
     /// Preferences: the instance list shows properties.
     pub instance_list_properties: fn() -> bool,
     pub set_instance_list_properties: fn(bool),
-    /// The Export modal (file name, `assembly`: the Assembly's options).
-    pub open_export_modal: fn(String, bool, RunExport, &mut Window, &mut App),
+    /// The Export modal (file name, `assembly`: the Assembly's options, `parts_only`: without the assembly's checkboxes).
+    pub open_export_modal: fn(String, bool, bool, RunExport, &mut Window, &mut App),
     /// Options › Store file in a new tab: write the export to a temporary file and keep it as a file tab after a
     /// tab. Returns the stored file's name.
     pub store_export: StoreExport,
@@ -156,8 +156,8 @@ pub fn set_instance_list_properties(on: bool) {
     (hooks().set_instance_list_properties)(on)
 }
 
-pub fn open_export_modal(base: String, assembly: bool, run: RunExport, window: &mut Window, cx: &mut App) {
-    (hooks().open_export_modal)(base, assembly, run, window, cx)
+pub fn open_export_modal(base: String, assembly: bool, parts_only: bool, run: RunExport, window: &mut Window, cx: &mut App) {
+    (hooks().open_export_modal)(base, assembly, parts_only, run, window, cx)
 }
 
 pub fn store_export(doc: &Entity<DocModel>, tab: TabId, file: &str, write: impl FnOnce(&Path) -> anyhow::Result<PathBuf>, cx: &mut App) -> anyhow::Result<String> {
@@ -203,7 +203,7 @@ pub fn register_for_tests() {
         tab_properties: |_, _, _, _| {},
         instance_list_properties: || false,
         set_instance_list_properties: |_| {},
-        open_export_modal: |_, _, _, _, _| {},
+        open_export_modal: |_, _, _, _, _, _| {},
         store_export: |_, _, _, _, _| Err(anyhow::anyhow!("no stored exports in UI tests")),
         store_written: |_, _, _, _| String::new(),
         open_propagation_dialog: |_, _, _, _, _, _, _| {},

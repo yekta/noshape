@@ -276,6 +276,7 @@ impl AssemblyView {
             }),
             None => rename,
         };
+        let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
         let focus = focus.or_else(|| if self.mate.is_none() { active_field() } else { None });
         // The mate dialog's query box has the focus while it takes picks (live: field "Mate connectors").
         let focus = focus.or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } }))).unwrap_or_else(|| json!({ "kind": "none" }));
@@ -289,7 +290,7 @@ impl AssemblyView {
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
-            "message": self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.ui.cfg_toast.clone()).or_else(|| self.panel_info(cx)),
+            "message": self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.ui.cfg_toast.clone()).or_else(|| self.panel_info_and_toast(cx)),
             "undo": { "undo": history.0, "redo": history.1 },
             "sketch": null,
             "assembly": { "instances": instances.into_iter().chain(nested).collect::<Vec<_>>(), "mates": mates }
@@ -301,6 +302,15 @@ impl AssemblyView {
     /// The blue how-to box a right-hand panel shows, as live's recorder reads it into the message (its bold title,
     /// then its text): Exploded views with one view and no step, Named positions without driving mates, the
     /// Configuration panel with inputs and nothing configured.
+    /// The panel's how-to box, then a Named positions toast after it (live reads both: "<box> / <toast>").
+    fn panel_info_and_toast(&self, cx: &App) -> Option<String> {
+        let toast = self.ui.np_toast.clone();
+        match (self.panel_info(cx), toast) {
+            (Some(info), Some(t)) => Some(format!("{info} / {t}")),
+            (info, t) => info.or(t),
+        }
+    }
+
     fn panel_info(&self, cx: &App) -> Option<String> {
         let asm = self.assembly(cx)?;
         match self.panel {

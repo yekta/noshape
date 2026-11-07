@@ -640,13 +640,13 @@ pub fn lock_subs_to(a: &mut Assembly, i: usize) {
     }
 }
 
-/// Duplicate named position's name: "<name> (1)", "<name> (2)"...
+/// Duplicate named position's name: "<name> Copy 1", "<name> Copy 2"... (live asm-named-position-duplicate).
 pub fn duplicate_position_name(a: &Assembly, name: &str) -> String {
     let mut k = 1;
-    while a.named_positions.iter().any(|p| p.name == format!("{name} ({k})")) {
+    while a.named_positions.iter().any(|p| p.name == format!("{name} Copy {k}")) {
         k += 1;
     }
-    format!("{name} ({k})")
+    format!("{name} Copy {k}")
 }
 
 /// Set a driving value of position `row` (a mate's value index `ix`);

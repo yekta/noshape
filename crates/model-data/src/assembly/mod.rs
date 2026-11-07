@@ -925,6 +925,10 @@ pub struct Assembly {
     /// best available tessellation). A hidden occurrence hides what's in it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub occurrences: Vec<(Vec<InstanceId>, OccurrenceState)>,
+    /// The configuration a configured copy was made for (`apply_configuration`): its configuration variables are
+    /// `#name`s in mates. A stored assembly has none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_config: Option<crate::configuration::ConfigValues>,
 }
 
 /// Isolated / transparent occurrences: paths from a top-level instance (a

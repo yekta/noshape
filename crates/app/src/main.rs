@@ -259,7 +259,7 @@ fn register_assembly_hooks() {
         tab_properties: |doc, tab, window, cx| doc_dialogs::tab_properties(doc, tab, None, window, cx),
         instance_list_properties: || preferences_window::ListPrefs::load().instance_list_properties,
         set_instance_list_properties: preferences_window::set_instance_list_properties,
-        open_export_modal: part_studio::export::open_export_modal,
+        open_export_modal: part_studio::export::open_export_modal_with,
         store_export: |doc, tab, file, write, cx| part_studio::export::store_export(doc, tab, file, write, cx),
         store_written: part_studio::export::store_written,
         open_propagation_dialog: part_studio::input_propagation::open_propagation_dialog,

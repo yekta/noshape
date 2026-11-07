@@ -186,7 +186,7 @@ fn relation(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     let reverse = a.bool_or("reverse", editing.and_then(|id| asm.relations.iter().find(|r| r.id == id)).is_some_and(|r| r.reverse))?;
     // As the regeneration reads it: in the assembly's variables, a length per revolution or a plain ratio.
-    let vars = noshape_model::variables::refs_variables(od.doc(), &asm.variable_studios);
+    let vars = noshape_model::assembly::eval::assembly_variables(od.doc(), &asm);
     let units = od.doc().settings.units;
     let dim = if matches!(kind, RelationType::Screw | RelationType::RackAndPinion) { noshape_units::Dim::LENGTH } else { noshape_units::Dim::UNITLESS };
     if noshape_units::evaluate_as(&ratio, dim, &units, &vars).or_else(|_| noshape_units::evaluate_as(&ratio, noshape_units::Dim::UNITLESS, &units, &vars)).is_err() {

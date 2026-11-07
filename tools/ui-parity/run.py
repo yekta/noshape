@@ -191,7 +191,8 @@ def normalize_live(state):
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "drawing-panel":
         d["text"] = [re.sub(r"^start \S+ Copy \d+ ", "Part Studio 1 ", t) if isinstance(t, str) else t for t in d.get("text") or []]
-    # The same name in a modal's File name ("start block Copy 1 - Sketch 1": Export as DXF/DWG), and as the focus' text.
+    # The same name in a modal's File name ("start block Copy 1 - Sketch 1": Export as DXF/DWG; an assembly's instance
+    # Export…: "start two-blocks - Part 2"), and as the focus' text.
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and isinstance(focus.get("text"), str) and re.match(r"^start \S+ Copy \d+ - ", focus["text"]):
         n = len(focus["text"])
@@ -201,7 +202,7 @@ def normalize_live(state):
     if isinstance(d, dict) and d.get("kind") == "modal":
         for f in d.get("fields") or []:
             if isinstance(f, dict) and str(f.get("label", "")).startswith("File name") and isinstance(f.get("value"), str):
-                f["value"] = re.sub(r"^start \S+ Copy \d+ - ", "Part Studio 1 - ", f["value"])
+                f["value"] = re.sub(r"^start \S+( Copy \d+)? - ", "Part Studio 1 - ", f["value"])
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []

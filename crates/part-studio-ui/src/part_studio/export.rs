@@ -313,6 +313,15 @@ pub fn open_export_modal_with(base: String, assembly: bool, parts_only: bool, ru
             }
             rows.push(chk("ex-hidden", "Include hidden instances in export", s.hidden, |s, v| s.hidden = v));
         }
+        crate::ui_script::note_dialog(|| {
+            let mut fields = vec![serde_json::json!({ "label": "File name", "kind": "input", "value": file.read(cx).value().to_string() })];
+            fields.extend(rows.iter().map(|r| match r {
+                Row::Select { label, opts, cur, .. } => serde_json::json!({ "label": label, "kind": "select", "value": opts.get(*cur) }),
+                Row::Check { label, on, .. } => serde_json::json!({ "label": label, "kind": "checkbox", "value": on }),
+                Row::Number { label, input, .. } => serde_json::json!({ "label": label, "kind": "input", "value": input.read(cx).value().to_string() }),
+            }));
+            serde_json::json!({ "kind": "modal", "title": "Export", "fields": fields, "buttons": ["Export", "Cancel"] })
+        });
         // Live (dom g39-export-*): an empty name is an error under the field;
         // OBJ adds a note on spaces in names.
         let empty = file.read(cx).value().trim().is_empty();

@@ -654,9 +654,12 @@ impl AssemblyView {
     }
 
     /// The variables an assembly field's expression sees (its inserted
-    /// Variable Studios), for the number fields' evaluation.
+    /// Variable Studios, then its configuration variables in the chosen configuration), for the number fields' evaluation.
     pub(super) fn variable_scope(&self, cx: &App) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
-        self.assembly(cx).map(|a| noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios)).unwrap_or_default()
+        let Some(a) = self.assembly(cx) else { return Default::default() };
+        let mut vars = noshape_model::variables::refs_variables(&self.doc.read(cx).session.doc, &a.variable_studios);
+        vars.extend(a.configuration.inputs_only().variable_values(&self.ui.config_values, &self.units(cx)));
+        vars
     }
 
     // ------------------------------------------------------------ evaluation
@@ -2071,15 +2074,15 @@ impl AssemblyView {
     }
 
     /// An inactive view's "Duplicate" (live 1720): a copy after it, named
-    /// as a duplicated named position ("Explode 1 (1)").
+    /// as a duplicated named position ("Explode 1 Copy 1", live asm-explode-duplicate).
     fn duplicate_exploded_view(&mut self, i: usize, cx: &mut Context<Self>) {
         let Some(asm) = self.assembly(cx) else { return };
         let Some(mut v) = asm.exploded_views.get(i).cloned() else { return };
         let mut k = 1;
-        while asm.exploded_views.iter().any(|e| e.name == format!("{} ({k})", v.name)) {
+        while asm.exploded_views.iter().any(|e| e.name == format!("{} Copy {k}", v.name)) {
             k += 1;
         }
-        v.name = format!("{} ({k})", v.name);
+        v.name = format!("{} Copy {k}", v.name);
         let name = v.name.clone();
         self.edit_view_list(&format!("Duplicate : {name}"), noshape_model::drawing::AssemblyViewList::ExplodedViews, noshape_model::drawing::ListChange::Inserted(i + 1), cx, |a| a.exploded_views.insert(i + 1, v));
         if let Some(e) = self.explode.filter(|e| *e > i) {
@@ -6534,6 +6537,7 @@ impl Render for AssemblyView {
             .key_context("Assembly")
             .track_focus(&self.focus)
             .capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                this.ui.panel_focus = false;
                 // Keep keyboard shortcuts working after clicking the viewport or lists,
                 // without stealing focus from an input that just took it.
                 if !this.focus.contains_focused(window, cx) {

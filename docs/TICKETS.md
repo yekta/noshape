@@ -3500,12 +3500,15 @@ were checked in code by asm; "(verify)" ones need a live check first.
   for new mates and the op (saved documents keep what they stored).
 - [ ] P1 ASM-FLEX-SUB-RIGID (asm) a subassembly with relations, patterns, tangent mates or a flexible subassembly is
   forced rigid even when set flexible (`eval.rs` ~2456): a gearbox subassembly can't be driven from its parent.
+  Relations done 2026-11-07 (they join the parent's solve; T1 a_flexible_subassembly_keeps_its_relations); patterns,
+  tangent mates and nested flexible subassemblies still make it rigid.
 - [x] (asm 11-07: `DisplayState.hidden_occurrences`; T1 model-data a_display_state_keeps_parts_hidden_inside_subassemblies) P1 ASM-DISPLAY-STATE-NESTED (asm) display states save and apply only top-level instances' visibility
   (`ops.rs` `save_display_state`): parts hidden inside a subassembly are lost.
 - [x] (asm 11-07: every seed, the others placed against the first's copy with copies of their mates to it (`PatternInstance.more_mates`); T1 replicate_takes_several_seeds) P1 ASM-REPLICATE-SEEDS (asm) Replicate keeps only its first seed instance, in the dialog and the op, silently
   (`assembly_panels.rs` `seeds[..1]`, `more.rs`); live replicates several.
-- [ ] P1 ASM-CONFIG-VARIABLE-NOOP (asm) an assembly's configuration variable input does nothing: `#name` isn't in
-  scope for mates.
+- [x] P1 ASM-CONFIG-VARIABLE-NOOP (asm) an assembly's configuration variable input does nothing: `#name` isn't in
+  scope for mates. Fixed 2026-11-07: configuration variables (in the chosen configuration) join the Variable
+  Studios' `#name`s for mates, relations, dynamic suppression and the number fields.
 - [ ] P1 ASM-CONFIGURE-PATTERNS (asm) assembly patterns (count, distance, suppression) and mate connectors can't be
   configured (`ConfigTarget` is Instance | Mate).
 - [ ] P1 ASM-BOM-EXTERNAL (asm) a linked document's parts show blank BOM properties and their Exclude from all BOMs is

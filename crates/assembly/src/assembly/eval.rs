@@ -1363,7 +1363,7 @@ struct AsmVarsGuard;
 
 impl AsmVarsGuard {
     fn push(doc: &Document, asm: &Assembly) -> Self {
-        let vars = crate::variables::refs_variables(doc, &asm.variable_studios);
+        let vars = assembly_variables(doc, asm);
         ASM_VARS.with(|v| v.borrow_mut().push(vars));
         AsmVarsGuard
     }
@@ -1377,11 +1377,18 @@ impl Drop for AsmVarsGuard {
     }
 }
 
+/// The `#name`s an assembly's expressions see: its inserted Variable Studios', then its configuration variables.
+pub fn assembly_variables(doc: &Document, asm: &Assembly) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+    let mut vars = crate::variables::refs_variables(doc, &asm.variable_studios);
+    vars.extend(asm.configuration_variables(&doc.settings.units));
+    vars
+}
+
 /// `asm` with Dynamic suppression applied: an instance or mate whose
 /// "Unsuppressed if" expression evaluates to false (zero) is suppressed. An expression
 /// that doesn't evaluate leaves the instance as it is.
 pub fn dynamically_suppressed(doc: &Document, asm: &Assembly) -> Assembly {
-    let vars = crate::variables::refs_variables(doc, &asm.variable_studios);
+    let vars = assembly_variables(doc, asm);
     let mut out = asm.clone();
     let is_false = |e: Option<&str>| e.and_then(|e| noshape_units::evaluate(e, &vars).ok()).is_some_and(|q| q.value == 0.0);
     for i in &mut out.instances {
@@ -1415,6 +1422,17 @@ pub fn dynamically_suppressed(doc: &Document, asm: &Assembly) -> Assembly {
         }
     }
     out
+}
+
+/// A relation's ratio as the solver takes it: in the assembly's variables, as mate offsets (an expression that doesn't
+/// evaluate is the relation's error); screw / rack and pinion distances per revolution, per radian.
+fn relation_ratio(r: &Relation, units: &UnitPrefs) -> Result<f64, String> {
+    let dim = match r.relation_type {
+        RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
+        RelationType::RackAndPinion | RelationType::Screw => Dim::LENGTH,
+    };
+    let ratio = eval_in(&r.ratio.text, dim, units).or_else(|| eval_in(&r.ratio.text, Dim::UNITLESS, units)).map(|q| q.value).ok_or_else(|| "Enter a valid expression.".to_string())?;
+    Ok(if matches!(r.relation_type, RelationType::Screw | RelationType::RackAndPinion) { ratio / std::f64::consts::TAU } else { ratio })
 }
 
 fn eval_in(text: &str, dim: Dim, units: &UnitPrefs) -> Option<noshape_units::Quantity> {
@@ -2453,13 +2471,12 @@ impl AssemblyEvaluator {
             }
         };
         let (sub_leaves, sub_nodes, sub_prep, solved) = (done.0.clone(), done.1.clone(), &done.2, &done.3);
-        // Flexible (Onshape's default): its mates join this assembly's
-        // solve. Subassemblies with patterns, relations, tangent mates or
+        // Flexible (Onshape's default): its mates and relations join this
+        // assembly's solve. Subassemblies with patterns, tangent mates or
         // nested flexible subassemblies stay rigid.
         let flexible = inst.lock.is_flexible()
             && !suppressed
             && sub.patterns.is_empty()
-            && sub.relations.iter().all(|r| r.suppressed)
             && !sub.mates.iter().any(|m| m.mate_type == MateType::Tangent && !m.suppressed)
             && sub_prep.flexible.is_empty();
         node.rigid = solved.instance_dof.values().all(|d| *d == 0) && sub.fixed_instances().len() == 1 && sub_prep.failed_mates.is_empty();
@@ -3005,6 +3022,8 @@ impl AssemblyEvaluator {
         // Solved together with this assembly's (ids outside the assembly's range).
         let mut synth = 1u64 << 62;
         for (sid, sub, _) in &flex_subs {
+            // The subassembly's mates by their ids in this solve (for its relations).
+            let mut synth_of: HashMap<MateId, MateId> = HashMap::new();
             let sbody = prepared.body_of.get(sid).copied();
             let entity = |c: &MateConnectorRef| -> Result<(usize, Frame), String> {
                 if c.instance == InstanceId::ORIGIN {
@@ -3057,7 +3076,17 @@ impl AssemblyEvaluator {
                     continue;
                 }
                 fill_solver_mate(m, &mut sm, &units);
+                synth_of.insert(m.id, MateId(synth));
                 prepared.mates.push((MateId(synth), m.mate_type, sm));
+                synth += 1;
+            }
+            // Its relations, in its own variables (a gearbox driven from the parent).
+            let _vars = AsmVarsGuard::push(doc, sub);
+            for r in sub.relations.iter().filter(|r| !r.suppressed) {
+                let b_id = if r.relation_type == RelationType::Screw { r.mates[0] } else { r.mates[1] };
+                let (Some(&a), Some(&b), Some(ma), Some(mb)) = (synth_of.get(&r.mates[0]), synth_of.get(&b_id), sub.mate(r.mates[0]), sub.mate(b_id)) else { continue };
+                let (Ok(values), Ok(ratio)) = (relation_values(r.relation_type, ma.mate_type, mb.mate_type), relation_ratio(r, &units)) else { continue };
+                prepared.relations.push(PreparedRelation { id: MateId(synth), kind: relation_kind(r.relation_type), a, b, ratio, reverse: r.reverse, values, base: r.base });
                 synth += 1;
             }
         }
@@ -3294,17 +3323,7 @@ impl AssemblyEvaluator {
         if !prepared.mates.iter().any(|(id, _, _)| *id == ma.id) || !prepared.mates.iter().any(|(id, _, _)| *id == mb.id) {
             return Err("One or more mates in this relation are invalid.".into());
         }
-        let dim = match r.relation_type {
-            RelationType::Gear | RelationType::Linear => Dim::UNITLESS,
-            RelationType::RackAndPinion | RelationType::Screw => Dim::LENGTH,
-        };
-        // In the assembly's variables, as mate offsets; an expression that doesn't evaluate is the relation's error
-        // (it used to become 1 silently).
-        let mut ratio = eval_in(&r.ratio.text, dim, units).or_else(|| eval_in(&r.ratio.text, Dim::UNITLESS, units)).map(|q| q.value).ok_or_else(|| "Enter a valid expression.".to_string())?;
-        // Screw / rack and pinion values are distances per revolution.
-        if matches!(r.relation_type, RelationType::Screw | RelationType::RackAndPinion) {
-            ratio /= std::f64::consts::TAU;
-        }
+        let ratio = relation_ratio(r, units)?;
         Ok(PreparedRelation { id: r.id, kind: relation_kind(r.relation_type), a: ma.id, b: mb.id, ratio, reverse: r.reverse, values, base: r.base })
     }
 

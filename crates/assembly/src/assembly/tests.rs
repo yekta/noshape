@@ -2509,6 +2509,48 @@ fn folders_and_display_states() {
     assert!(asm.folders.iter().find(|f| f.id == mf).unwrap().features.is_empty());
 }
 
+/// ASM-FLEX-SUB-RIGID: a flexible subassembly with a relation stays flexible; the relation holds in the parent.
+#[test]
+fn a_flexible_subassembly_keeps_its_relations() {
+    let mut f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    // Blocks 2 and 3 slide on block 1; a Linear relation moves block 3 twice as far as block 2.
+    let sub = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.015), false),
+            part_instance(3, "Block <3>", f.studios[0], body.clone(), DVec3::new(0.0, 0.0, 0.015), false),
+        ],
+        mates: vec![
+            mate(10, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(2, bottom.clone(), Inference::Centroid)),
+            mate(11, MateType::Slider, conn(1, top.clone(), Inference::Centroid), conn(3, bottom.clone(), Inference::Centroid)),
+        ],
+        relations: vec![Relation { id: MateId(12), name: "Linear 1".into(), relation_type: RelationType::Linear, mates: [MateId(10), MateId(11)], ratio: ExprValue::new("2"), reverse: false, suppressed: false, base: None }],
+        ..Default::default()
+    };
+    let sub_tab = f.doc.add_tab("Sub", TabContent::Assembly(Box::new(sub)));
+    let mut sub_inst = Instance::new(InstanceId(5), "Sub <1>".into(), InstanceSource::Assembly { assembly: sub_tab, config: ConfigValues::default() }, Placement { translation: [0.0, 0.0, 0.01], rotation: [0.0, 0.0, 0.0, 1.0] });
+    sub_inst.lock = SubassemblyLock::Flexible;
+    let asm = Assembly {
+        instances: vec![part_instance(1, "Base <1>", f.studios[0], body.clone(), DVec3::ZERO, true), sub_inst],
+        mates: vec![mate(20, MateType::Fastened, conn(1, top, Inference::Centroid), MateConnectorRef::on(InstanceId(5), vec![InstanceId(1)], Reference::Implicit { on: Box::new(bottom), inference: Inference::Centroid }))],
+        ..Default::default()
+    };
+    let res = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert!(res.prepared.flexible.contains(&InstanceId(5)), "a relation no longer makes it rigid");
+    assert_eq!(res.solved.dof, 1, "two sliders and their relation: one freedom in all");
+    let z = |s: &eval::Solved, child: u64| s.nested_world(InstanceId(5), InstanceId(child)).unwrap().origin.z;
+    let (z2, z3) = (z(&res.solved, 2), z(&res.solved, 3));
+    // Drag block 2 up 10 mm from the parent: block 3 follows 20 mm.
+    let s = res.prepared.solve(&SolveOptions { nested_drags: vec![((InstanceId(5), InstanceId(2)), DVec3::ZERO, DVec3::new(0.0, 0.0, z2 + 0.01))], ..Default::default() });
+    let (d2, d3) = (z(&s, 2) - z2, z(&s, 3) - z3);
+    assert!(d2.abs() > 1e-3, "block 2 moved: {d2}");
+    assert!((d3.abs() - 2.0 * d2.abs()).abs() < 1e-4, "block 3 moves twice as far: {d2} / {d3}");
+}
+
 #[test]
 fn flexible_subassembly_moves_in_parent_and_locks() {
     let mut f = doc_with(vec![block_studio()]);
@@ -3204,6 +3246,45 @@ fn bom_flattened_structured_exclusion_and_cell_edits() {
     assert_eq!(rows.next(), Some("1,2,PRT-001,\"Block, 40 mm\""));
     let tsv = bom::table_text(&f.doc, &res, &lines, &s, false);
     assert!(tsv.starts_with("Item\tQuantity\tPart number\tDescription\n1\t2\tPRT-001\tBlock, 40 mm\n"));
+}
+
+#[test]
+fn a_configuration_variable_drives_a_mate_offset() {
+    use crate::configuration::{ConfigInput, ConfigInputKind, ConfigValues};
+    let f = doc_with(vec![block_studio()]);
+    let mut ev = AssemblyEvaluator::new();
+    let (body, r) = body_of(&mut ev, &f.doc, f.studios[0]);
+    let top = face_with(&r, "CapEnd");
+    let bottom = face_with(&r, "CapStart");
+    let mut fastened = mate(10, MateType::Fastened, conn(1, top, Inference::Centroid), conn(2, bottom, Inference::Centroid));
+    fastened.offset_z = Some(ExprValue::new("#gap"));
+    let mut asm = Assembly {
+        instances: vec![
+            part_instance(1, "Block <1>", f.studios[0], body.clone(), DVec3::ZERO, true),
+            part_instance(2, "Block <2>", f.studios[0], body.clone(), DVec3::new(0.07, 0.03, -0.02), false),
+        ],
+        mates: vec![fastened],
+        ..Default::default()
+    };
+    // Add configuration input › Configuration variable "gap", 5 mm.
+    let kind = ConfigInputKind::Variable { kind: crate::configuration::VariableKind::Length, default: ExprValue::new("5 mm"), min: None, max: None };
+    asm.configuration.inputs.push(ConfigInput { id: "gap".into(), name: "gap".into(), kind, visible_when: None, excluded: false });
+    assert!(asm.has_configured(), "a configuration variable changes the assembly");
+    let mut wide = ConfigValues::default();
+    wide.0.insert("gap".into(), "12 mm".into());
+    let z = |res: &super::eval::AssemblyResult| res.occurrences.iter().find(|o| o.path == vec![InstanceId(2)]).unwrap().transform.w_axis.z;
+    let mut plain = asm.clone();
+    plain.configuration = Default::default();
+    plain.mates[0].offset_z = None;
+    let none = ev.evaluate(&f.doc, &plain, &SolveOptions::default(), None);
+    let stored = ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    let default = ev.evaluate(&f.doc, &asm.configured(&ConfigValues::default()), &SolveOptions::default(), None);
+    let twelve = ev.evaluate(&f.doc, &asm.configured(&wide), &SolveOptions::default(), None);
+    // The first connector is the fixed block's top: the offset moves the second block down by #gap.
+    assert!((z(&none) - z(&stored) - 0.005).abs() < 1e-6, "the stored assembly uses the default: {} vs {}", z(&stored), z(&none));
+    assert!((z(&none) - z(&default) - 0.005).abs() < 1e-6, "default 5 mm: {} vs {}", z(&default), z(&none));
+    assert!((z(&none) - z(&twelve) - 0.012).abs() < 1e-6, "12 mm: {} vs {}", z(&twelve), z(&none));
+    assert!(!twelve.has_errors(), "{:?}", twelve.mates);
 }
 
 #[test]

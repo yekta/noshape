@@ -218,12 +218,20 @@ impl Assembly {
         out
     }
 
-    /// Whether `values` change anything (configured columns exist).
+    /// Whether `values` change anything (configured columns or configuration variables exist).
     pub fn has_configured(&self) -> bool {
-        !self.configuration.configured.is_empty()
+        !self.configuration.configured.is_empty() || self.configuration.inputs.iter().any(|i| matches!(i.kind, ConfigInputKind::Variable { .. }))
+    }
+
+    /// The configuration variables' values (`#name` → quantity) in this copy's configuration, else the defaults.
+    pub fn configuration_variables(&self, units: &noshape_units::UnitPrefs) -> std::collections::BTreeMap<String, noshape_units::Quantity> {
+        let cfg = self.configuration.inputs_only();
+        let values = self.active_config.clone().unwrap_or_else(|| cfg.defaults());
+        cfg.variable_values(&values, units)
     }
 
     pub fn apply_configuration(&mut self, values: &ConfigValues) {
+        self.active_config = Some(values.clone());
         let cfg = self.configuration.clone();
         for c in &cfg.configured {
             let Some(key) = cfg.value_of(values, &c.input) else { continue };
