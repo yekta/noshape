@@ -33,6 +33,25 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-07 21:02 UTC: the custom-feature failures (corpus 689/947 at the host fixes; custom 82/113).**
+- Seam-split faces: checked in the app (c2-helical-sweep: hover and selection outline the helical strip as one face, no
+  seam lines); counting, naming, measuring and finding were done at 18:03.
+- cf-t-slot-joint 6 -> 18 (to the end): its studios' imports fetched over REST into the corpus (studios/<eid>.fs;
+  scripts /root/core-scratch/fsfetch/get.mjs, read-only, one cookie per name); evRaycast's hit is one transient
+  query (a std before 2473 gets the id); a custom lookup path in its table's level order, a missing level at its
+  default.
+- cf-butt-joint-with-pin 1 -> 4 (to the end): Beam's import fetched; host evDistance honours extendSide0/1,
+  opReplaceFace oppositeSense, and a subtraction's kept tools aren't created by it (their faces left in the target
+  are the Boolean's own, Role::Generated).
+- cf-extrude-vertex 2 -> 9 (to the end): std 355, 559, 799, 1174 and 1494 shipped (every corpus pin now gets its own
+  release); a fit curve's vertex by ORDER in the translator.
+- cf-parametric-curve 0 -> 1: a typecheck type tags a function (`… as Expression`). Its curves need an isAnything
+  parameter's expression (`100*#t*cos(#t*200*180*degree)*inch`, `300 in`) evaluated as FeatureScript in the studio's
+  scope, so its overloaded operators and functions see `#t`; ours goes through the units evaluator.
+- cf-curved-text and cf-torus-dome-and-sphere unscored: their imports are 403 (no longer public).
+- cf-part-draft's Spur Gear: our gear is an exact prism with live's faces and area but 0.36% less volume; live's own
+  cap x depth gives ours, so live's volume looks inconsistent: asked live (REQUESTS core 21:02).
+
 **State 11-07 19:56 UTC: seam pieces shown as one edge; c2-housing-draft to the end.**
 - A section OCCT approximates on each side of a periodic face's seam (two B-splines, tangent, curvatures within 2%)
   shows as one edge with no vertex (common.cpp shown topology; Parasolid has no seams). The curvature test keeps the
