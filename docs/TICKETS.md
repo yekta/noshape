@@ -279,6 +279,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   both faces.
 
 ## Release blockers for the 2026-11-07 17:00 release (qa list 16:14, checked on green 5baedbe4; the latest release is v0.4.34)
+- **qa 17:01: still no blocker on green e9d0ce37** (core's prism-side offsets and ring-blend checks, skasm's transient queries in
+  f159ebd4): its full CLI smoke = 5faa88b6's; the volume sweep, dx's cf corpus and the 47 ticket documents unchanged.
 - **qa 16:26: still no blocker on green 5faa88b6** (bool's Shell builder for offsets that change topology, 73df9750, back in):
   its full CLI smoke, the volume sweep, dx's cf corpus and the 47 ticket documents = 5baedbe4.
 - **qa 16:14: no new blocker.** On green 5baedbe4 (vibe3): the full CLI smoke = v0.4.34's except the change below; the volume
