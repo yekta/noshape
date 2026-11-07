@@ -621,3 +621,58 @@ jobs:
           [ -s notes.md ] || echo "Release $GITHUB_REF_NAME." > notes.md
           gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
             --title "noshape $GITHUB_REF_NAME" --notes-file notes.md
+
+  # The previous release, installed as a user installs it on each system, updates itself to the newest release from
+  # GitHub through its own update card, Restart pressed on the screen (.github/release/check_restart.py: a release
+  # build has no test hook). After publishing, the release just published; in a dry run, the latest from the one
+  # before. It runs after the release is out, so a failure fails this job and says so in the run's summary.
+  restart:
+    name: Restart into ${{ matrix.name }}
+    needs: [verify, publish]
+    if: ${{ !cancelled() && needs.verify.result == 'success' && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-24.04
+          - name: macOS arm64
+            os: macos-latest
+          - name: Windows x86_64
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/release
+      - name: Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" --jq '[.[] | select(.draft | not) | select(.prerelease | not) | .tag_name] | .[0], .[1]' > releases.txt
+          want=$(sed -n 1p releases.txt) prev=$(sed -n 2p releases.txt)
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "${{ needs.publish.result }}" = success ] && [ "$want" != "$GITHUB_REF_NAME" ]; then
+            echo "### :x: The newest release on GitHub is $want, not $GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"; exit 1
+          fi
+          echo "WANT=${want#v}" >> "$GITHUB_ENV"; echo "PREV=${prev#v}" >> "$GITHUB_ENV"
+      - name: The previous release updates itself (macOS, Linux)
+        if: runner.os != 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .github/release/restart_unix.sh "$PREV" "$WANT"
+      - name: The previous release updates itself (Windows, across UAC)
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m pip install -q pillow
+          & .github/release/restart_windows.ps1 -From $env:PREV -Want $env:WANT
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: restart-${{ runner.os }}
+          path: ${{ runner.temp }}/restart-shots
