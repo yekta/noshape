@@ -26,6 +26,9 @@ pub(super) struct InContextUi {
     /// Context transparency slider position, 0..1.
     pub slider: f32,
     pub hide_show_open: bool,
+    /// Hide/show context instances: its filter box and the row clicked (selected).
+    hs_filter: Option<Entity<gpui_kit::component::input::InputState>>,
+    hs_selected: Option<InstanceId>,
     slider_bounds: Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// Top-level instance of each context body (in snapshot order).
     body_tops: Vec<InstanceId>,
@@ -34,6 +37,9 @@ pub(super) struct InContextUi {
     /// Insert and go to assembly's "Select items to insert" dialog is open.
     pub insert_go: bool,
 }
+
+/// A change to the hidden context instances (Hide/show context instances' menu).
+type HiddenEdit = Rc<dyn Fn(&mut HashSet<InstanceId>)>;
 
 /// A Part Studio menu action.
 type StudioAct = Rc<dyn Fn(&mut PartStudioView, &mut Window, &mut Context<PartStudioView>)>;
@@ -103,7 +109,7 @@ impl PartStudioView {
                 .context
                 .and_then(|id| self.studio(cx).and_then(|s| s.contexts.iter().find(|c| c.id == id)).map(|c| c.bodies.iter().map(|b| InstanceId(b.path.first().copied().unwrap_or(0))).collect()))
                 .unwrap_or_default();
-            InContextUi { ctx, gpu, hidden: HashSet::new(), show_internal: false, select_transparent: true, slider: DEFAULT_SLIDER, hide_show_open: false, slider_bounds: Default::default(), body_tops, split_go_to_assembly: false, insert_go: false }
+            InContextUi { ctx, gpu, hidden: HashSet::new(), show_internal: false, select_transparent: true, slider: DEFAULT_SLIDER, hide_show_open: false, hs_filter: None, hs_selected: None, slider_bounds: Default::default(), body_tops, split_go_to_assembly: false, insert_go: false }
         });
         self.refresh_scene(false, cx);
         cx.notify();
@@ -298,7 +304,7 @@ impl PartStudioView {
         let amber = self.shown_context_referenced(cx);
         let split_label = c.split_go_to_assembly;
         let insert_pending = c.ctx.insert_at.is_some() && !studio_in_assembly(&self.doc.read(cx).session.doc, assembly, self.tab);
-        let mut banner = v_flex()
+        let banner = v_flex()
             .id("ctx-banner")
             // Over the graphics: its clicks never reach the view under it (a press on ▾ selected the plane behind).
             .occlude()
@@ -456,38 +462,6 @@ impl PartStudioView {
                             })),
                     ),
             );
-        // Hide/show instances: the context's instances with their eyes.
-        if c.hide_show_open {
-            let mut list = v_flex().bg(rgb(0xffffff)).border_t_1().border_color(rgb(0xcccccc)).py(px(2.));
-            for o in &c.ctx.occurrences {
-                if list_has(&c.ctx.occurrences, o) {
-                    continue;
-                }
-                let top = o.top;
-                let hidden = c.hidden.contains(&top);
-                list = list.child(
-                    h_flex()
-                        .id(SharedString::from(format!("ctx-inst-{}", top.0)))
-                        .h(px(24.))
-                        .px(px(10.))
-                        .gap(px(6.))
-                        .cursor_pointer()
-                        .hover(|d| d.bg(rgb(0xf0f0f0)))
-                        .child(crate::ui::glyph(if hidden { "eye-off" } else { "eye" }, 14., rgb(0x666666)))
-                        .child(div().text_size(px(13.)).text_color(if hidden { rgb(0x999999) } else { rgb(0x333333) }).child(crate::ui::user_text(o.name.clone())))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            if let Some(c) = &mut this.ui.in_context
-                                && !c.hidden.remove(&top)
-                            {
-                                c.hidden.insert(top);
-                            }
-                            this.refresh_scene(false, cx);
-                            cx.notify();
-                        })),
-                );
-            }
-            banner = banner.child(list);
-        }
         Some(div().absolute().top(px(0.)).left_0().right_0().flex().justify_center().child(banner).into_any_element())
     }
 }
@@ -703,6 +677,120 @@ fn list_has(all: &[ContextOccurrence], o: &ContextOccurrence) -> bool {
 }
 
 impl PartStudioView {
+    /// Hide/show instances (live 2223): the floating "Hide/show context instances" panel at the feature list's
+    /// right edge, 250 × 379: a filter box, the context assembly's tree (its instances, "Mate features (n)"); a row's
+    /// right-click hides or shows it (Hide · Hide other instances · Hide all instances / Show · Show all instances),
+    /// a click selects it; only its × closes it (Escape doesn't).
+    pub(super) fn render_hide_show_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let c = self.ui.in_context.as_mut()?;
+        if !c.hide_show_open {
+            return None;
+        }
+        let filter = c.hs_filter.get_or_insert_with(|| cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx))).clone();
+        let query = filter.read(cx).value().trim().to_lowercase();
+        let c = self.ui.in_context.as_ref()?;
+        let mates = match self.doc.read(cx).session.doc.tab(c.ctx.assembly).map(|t| &t.content) {
+            Some(noshape_model::TabContent::Assembly(a)) => a.mates.len(),
+            _ => 0,
+        };
+        let view = cx.entity();
+        let row = |id: SharedString, indent: f32, icon: &'static str, name: String, hidden: bool, selected: bool, cx: &mut Context<Self>| {
+            h_flex()
+                .id(id)
+                .h(px(26.))
+                .flex_none()
+                .pl(px(indent))
+                .gap(px(4.))
+                .text_size(px(13.33))
+                .text_color(rgb(if hidden { 0x999999 } else { 0x333333 }))
+                .when(selected, |d| d.bg(rgb(0xb2ddf6)))
+                .when(!selected, |d| d.hover(|d| d.bg(rgb(0xdef1fb))))
+                .child(crate::assets::icon(icon, 16., cx))
+                .child(div().truncate().child(crate::ui::user_text(name)))
+        };
+        let mut tree = v_flex().id("hs-tree").flex_1().min_h_0().overflow_y_scroll().child(row("hs-root".into(), 6., "assembly", c.ctx.assembly_name.clone(), false, false, cx));
+        let tops: Vec<(InstanceId, String)> = c.ctx.occurrences.iter().filter(|o| !list_has(&c.ctx.occurrences, o)).map(|o| (o.top, o.name.clone())).collect();
+        let all: Vec<InstanceId> = tops.iter().map(|t| t.0).collect();
+        for (top, name) in tops.into_iter().filter(|(_, n)| query.is_empty() || n.to_lowercase().contains(&query)) {
+            let hidden = c.hidden.contains(&top);
+            let selected = c.hs_selected == Some(top);
+            let (v, all) = (view.clone(), all.clone());
+            tree = tree.child(
+                row(SharedString::from(format!("hs-inst-{}", top.0)), 26., "part", name, hidden, selected, cx)
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if let Some(c) = &mut this.ui.in_context {
+                            c.hs_selected = if c.hs_selected == Some(top) { None } else { Some(top) };
+                        }
+                        cx.notify();
+                    }))
+                    .os_context_menu(move |m, _, _| {
+                        let set = |label: &'static str, f: HiddenEdit| {
+                            let v = v.clone();
+                            crate::os_menu::OsMenuItem::new(label).on_click(move |_, _, cx| {
+                                v.update(cx, |this, cx| {
+                                    if let Some(c) = &mut this.ui.in_context {
+                                        f(&mut c.hidden);
+                                    }
+                                    this.refresh_scene(false, cx);
+                                    cx.notify();
+                                })
+                            })
+                        };
+                        let all = all.clone();
+                        if hidden {
+                            m.item(set("Show", Rc::new(move |h| { h.remove(&top); }))).item(set("Show all instances", Rc::new(|h| h.clear())))
+                        } else {
+                            let (others, every) = (all.clone(), all.clone());
+                            m.item(set("Hide", Rc::new(move |h| { h.insert(top); })).icon_name("menu-hide"))
+                                .item(set("Hide other instances", Rc::new(move |h| h.extend(others.iter().copied().filter(|i| *i != top)))))
+                                .item(set("Hide all instances", Rc::new(move |h| h.extend(every.iter().copied()))))
+                        }
+                    }),
+            );
+        }
+        tree = tree.child(row("hs-mates".into(), 6., "folder", format!("Mate features ({mates})"), false, false, cx));
+        let pal = crate::theme::p();
+        Some(
+            v_flex()
+                .id("hs-panel")
+                .occlude()
+                .absolute()
+                .top(px(3.))
+                .left_0()
+                .w(px(250.))
+                .h(px(379.))
+                .bg(gpui_kit::rgba(0xfffffff2))
+                .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
+                .child(
+                    h_flex()
+                        .h(px(28.))
+                        .flex_none()
+                        .pl(px(6.))
+                        .border_b_1()
+                        .border_color(rgb(0xd7d7d7))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x333333)).child("Hide/show context instances"))
+                        .child(div().id("hs-close").size(px(28.)).flex().items_center().justify_center().opacity(0.5).cursor_pointer().child(crate::assets::icon("panel-close", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(c) = &mut this.ui.in_context {
+                                c.hide_show_open = false;
+                            }
+                            cx.notify();
+                        }))),
+                )
+                .child(
+                    h_flex()
+                        .h(px(38.))
+                        .flex_none()
+                        .px(px(6.))
+                        .gap(px(6.))
+                        .child(div().id("hs-filter-btn").tooltip(crate::ui::tooltip("Filter assembly contents")).child(crate::ui::glyph("filter", 18., pal.text)))
+                        .child(div().flex_1().h(px(28.)).rounded(px(3.)).border_1().border_color(rgb(0xcccccc)).child(crate::ui::input_with_placeholder(&filter, "Filter by name", cx).appearance(false).cleanable(true).text_size(px(12.)).h(px(26.)).pl(px(5.))))
+                        .child(div().id("hs-list-btn").tooltip(crate::ui::tooltip("Show search results as list")).child(crate::assets::icon("list", 18., cx))),
+                )
+                .child(tree)
+                .into_any_element(),
+        )
+    }
+
     /// The arrow after a feature that references an Assembly context,
     /// tooltip the context's name; yellow while that context is shown.
     pub(super) fn context_arrow(&self, f: &noshape_model::partstudio::Feature, cx: &mut Context<Self>) -> Option<AnyElement> {

@@ -595,6 +595,14 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   none), Release's paywall, the sm-form / thread / frame defaults (account memory), fillet-measurement-list-escape /
   fillet-chip-edit-healthy-moment (live's start builds an "Unknown" query). Asked live: Hide/show instances in context
   (REQUESTS 15:14).
+- Speed, PLAN 2.7 rows on macOS (perf 42366320997, 11-07 11:00; lead: take the row furthest from its target): the
+  GPU rows pass (2× orbit / pan / zoom p95 ≤ 8.7 ms, NIST orbit mean 6.6 ms). Furthest: **cold start to first frame**
+  (the job's first launch: 2.5 s macOS 15, 3.6 s macOS 26, target 1 s; open 1.15 / 1.45 s, target 0.5 s), then the
+  dialog-open / row-click latency (action to painted frame p95 54 ms; its CPU gate, 9 ms, passes). The cold launch:
+  app created 0.56 s, gpui-kit 0.35 s, then 1.5 s unlogged between the session opening and the first workspace
+  render. Milestones added through the window's opening (window, document model, live server, workspace, Part
+  Studio view); on Linux the span is the window waiting for the renderer's device (0.5 s first run, 0.07 s warm), the
+  workspace builds in 10 ms. macOS bench on main dispatched with them (perf runs 42394224613, then the next).
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

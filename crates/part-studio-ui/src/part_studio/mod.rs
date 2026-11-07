@@ -6587,6 +6587,7 @@ impl PartStudioView {
         overlay.extend(self.render_select_other(cx));
         overlay.extend(self.render_mini_toolbar(cx));
         overlay.extend(self.render_context_banner(cx));
+        overlay.extend(self.render_hide_show_panel(window, cx));
         div().size_full().relative().children(overlay).into_any_element()
     }
 }
