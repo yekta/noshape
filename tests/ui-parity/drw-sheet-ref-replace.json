@@ -1,0 +1,35 @@
+{
+  "name": "drw-sheet-ref-replace",
+  "about": "The Sheets panel's reference row › Replace...: the chooser for its views",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-07: the remaining drawing menu items; the hole_axis and sheet_ref targets)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "key",
+      "key": "ctrl+s"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_ref": "Part 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Replace..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}
