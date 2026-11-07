@@ -779,6 +779,10 @@ pub struct PatternInstance {
     /// Target connector of the generated mate.
     #[serde(default)]
     pub target: Option<MateConnectorRef>,
+    /// A replicated instance after the first seed: the copies of its mates to the seeds before it (it follows the
+    /// first seed's copy through them, as the seeds do).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub more_mates: Vec<MateId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1100,12 +1104,12 @@ impl Assembly {
     }
     /// Pattern that generated a mate (part pattern / replicate).
     pub fn mate_generated_by(&self, id: MateId) -> Option<&InstancePattern> {
-        self.patterns.iter().find(|p| p.generated.iter().any(|g| g.mate == Some(id)))
+        self.patterns.iter().find(|p| p.generated.iter().any(|g| g.mate == Some(id) || g.more_mates.contains(&id)))
     }
     /// Mates a pattern generated: listed under its row in "Mate features (N)"
     /// (live qa5 asm-056), not in the top-level Mate features.
     pub fn pattern_mates<'a>(&'a self, p: &'a InstancePattern) -> impl Iterator<Item = &'a Mate> + 'a {
-        self.mates.iter().filter(move |m| p.generated.iter().any(|g| g.mate == Some(m.id)))
+        self.mates.iter().filter(move |m| p.generated.iter().any(|g| g.mate == Some(m.id) || g.more_mates.contains(&m.id)))
     }
     /// The top-level "Mate features (N)" count: connectors, mates (not those
     /// a pattern generated), relations and groups.
@@ -1321,9 +1325,55 @@ impl Assembly {
     /// its own target. `targets` are (code, target connector, initial placement).
     pub fn sync_matched_pattern(&mut self, id: MateId, targets: Vec<(u32, MateConnectorRef, Option<Placement>)>) -> Vec<InstanceId> {
         let Some(p) = self.pattern(id).cloned() else { return vec![] };
-        let seed = p.seeds.first().copied();
-        let Some(seed) = seed else { return vec![] };
-        self.apply_generated(id, targets.into_iter().map(|(code, t, pl)| (seed, code, Some(t), pl)).collect())
+        let Some(&seed) = p.seeds.first() else { return vec![] };
+        // The other seeds go where the first seed's copy goes, as they sit against the first seed (live: several
+        // instances replicated together, a bolt and its washer).
+        let first = self.instance(seed).map(|i| i.placement.to_dmat4()).unwrap_or_default();
+        let mut wanted = Vec::new();
+        for (code, t, pl) in targets {
+            wanted.push((seed, code, Some(t), pl));
+            for other in p.seeds.iter().skip(1) {
+                let at = pl.zip(self.instance(*other)).map(|(pl, o)| Placement::from_dmat4(&(pl.to_dmat4() * first.inverse() * o.placement.to_dmat4())));
+                wanted.push((*other, code, None, at));
+            }
+        }
+        let created = self.apply_generated(id, wanted);
+        self.copy_seed_mates(id);
+        created
+    }
+
+    /// The mates among a matched pattern's seeds, copied among each target's copies (once per copy: on the later
+    /// seed's).
+    fn copy_seed_mates(&mut self, id: MateId) {
+        let Some(p) = self.pattern(id).cloned() else { return };
+        if p.seeds.len() < 2 {
+            return;
+        }
+        let order = |i: InstanceId| p.seeds.iter().position(|s| *s == i);
+        let seed_mates: Vec<Mate> = self.mates.iter().filter(|m| self.mate_generated_by(m.id).is_none() && !m.instances().is_empty() && m.instances().iter().all(|i| order(*i).is_some())).cloned().collect();
+        for g in p.generated.iter().filter(|g| g.mate.is_none() && g.more_mates.is_empty() && order(g.seed).is_some_and(|k| k > 0)) {
+            let copy_of = |i: InstanceId| p.generated.iter().find(|x| x.seed == i && x.index == g.index).map(|x| x.instance);
+            let mut made = Vec::new();
+            for m in seed_mates.iter().filter(|m| m.instances().iter().filter_map(|i| order(*i)).max() == order(g.seed)) {
+                let mut c = m.clone();
+                c.id = MateId(self.next_id());
+                c.name = self.next_feature_name(m.mate_type.name());
+                let mut whole = true;
+                for r in std::iter::once(&mut c.a).chain(std::iter::once(&mut c.b)).chain(c.extra.iter_mut()) {
+                    match copy_of(r.instance) {
+                        Some(n) => r.instance = n,
+                        None => whole = false,
+                    }
+                }
+                if whole {
+                    made.push(c.id);
+                    self.mates.push(c);
+                }
+            }
+            if let Some(x) = self.patterns.iter_mut().find(|x| x.id == id).and_then(|pp| pp.generated.iter_mut().find(|x| x.instance == g.instance)) {
+                x.more_mates = made;
+            }
+        }
     }
 
     fn apply_generated(&mut self, id: MateId, wanted: Vec<(InstanceId, u32, Option<MateConnectorRef>, Option<Placement>)>) -> Vec<InstanceId> {
@@ -1336,9 +1386,9 @@ impl Assembly {
         let keep = |g: &PatternInstance| wanted.iter().any(|(s, i, t, _)| *s == g.seed && *i == g.index && (t.is_none() || g.target.as_ref() == t.as_ref()));
         let stale: Vec<PatternInstance> = p.generated.iter().filter(|g| !keep(g)).cloned().collect();
         for g in &stale {
-            if let Some(m) = g.mate {
-                self.mates.retain(|x| x.id != m);
-                self.relations.retain(|r| !r.mates.contains(&m));
+            for m in g.mate.iter().chain(&g.more_mates) {
+                self.mates.retain(|x| x.id != *m);
+                self.relations.retain(|r| !r.mates.contains(m));
             }
             if let Some(pp) = self.patterns.iter_mut().find(|x| x.id == id) {
                 pp.generated.retain(|x| x.instance != g.instance);
@@ -1376,7 +1426,7 @@ impl Assembly {
                 mate_id = Some(mid);
             }
             if let Some(pp) = self.patterns.iter_mut().find(|x| x.id == id) {
-                pp.generated.push(PatternInstance { seed, index, instance: nid, mate: mate_id, target });
+                pp.generated.push(PatternInstance { seed, index, instance: nid, mate: mate_id, target, more_mates: Vec::new() });
             }
             created.push(nid);
         }

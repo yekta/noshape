@@ -36,7 +36,7 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 asm_field(),
                 opt("kind", json!({ "type": "string", "enum": KINDS }), "Pattern type (required for a new pattern)."),
-                opt("seeds", json!({ "type": "array", "items": { "type": "string" } }), "Instances to pattern (ids or names); part pattern / replicate use the first."),
+                opt("seeds", json!({ "type": "array", "items": { "type": "string" } }), "Instances to pattern (ids or names); replicate: the first is the matched mate's, the others follow it through their mates to it (a bolt and its washer); a part pattern uses the first."),
                 opt("direction", connector.clone(), "Linear: the direction; circular: the axis; mirror: the plane. A mate connector, as in assembly_mate (an edge, a face or {\"connector\": ...})."),
                 opt("distance", json!({ "type": ["string", "number"] }), "Linear: the spacing (default 25 mm); circular: the angle (default 360 deg)."),
                 opt("count", json!({ "type": "integer", "minimum": 1 }), "Instance count, the seed included (default 2)."),
@@ -390,7 +390,7 @@ fn pattern(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => old.as_ref().map(|p| p.name.clone()).unwrap_or_else(|| asm.next_feature_name(title)),
     };
     let generated = old.as_ref().map(|p| p.generated.clone()).unwrap_or_default();
-    let seeds = if matched { seeds[..1].to_vec() } else { seeds };
+    let seeds = if kind == "part_pattern" { seeds[..1].to_vec() } else { seeds };
     let pat = InstancePattern { id, name: name.clone(), kind: pk, seeds, generated, suppressed: old.as_ref().is_some_and(|p| p.suppressed) };
     let targets = if matched { Some(matched_targets(&before, &asm, &pat, &units).map_err(|e| OpError::param("mate", &e))?) } else { None };
     let created = commit(od, tab, &sa::pattern_description(&name, editing), &before, |a| sa::commit_pattern(a, pat, targets))?;
