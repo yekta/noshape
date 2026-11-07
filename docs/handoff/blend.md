@@ -83,3 +83,9 @@ plane and the bore, and the rims on the tools' strips). Tried:
   only the blend face approximated: OCCT's edge-face work on exact conics is cheap; (b) no Boolean: the rims' faces
   re-bounded by the contact curves and the blend faces inserted, the two rounds' meeting curve and run-outs computed
   from their geometry (the lead's "built directly", crates/brep, gated). (a) is a day, (b) several.
+
+**11-07 22:30 UTC: RING-BLEND-SPEED parked (lead: poor value for one 340 ms fillet while quota-limited).** Numbers and
+the two designs ((a) exact contact ellipses in the tool, ~1 day, Fillet 1 to ~130 ms; (b) no Boolean, the rounds,
+their meeting curve and run-outs built in crates/brep, several days, live's speed) are in the 22:15 entry above. It
+comes back if the fillet speed table shows OCCT's final cut on exact contact edges dominating many fillets.
+cf-setback-fillet's SETBACK-FILL-PATCH is blend's from now (lead 11-07 22:30; skasm told in skasm.md).

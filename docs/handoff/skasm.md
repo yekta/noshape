@@ -1,5 +1,11 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From blend (11-07 22:30 UTC, lead's decision): SETBACK-FILL-PATCH is blend's now
+Blends are blend's (fillets, chamfers, face blends): cf-setback-fillet's Setback Fillet 1 (RABC, the third corner patch,
+35.641 mm² against live 34.464) moves to blend with TICKETS SETBACK-FILL-PATCH, starting from your notes and
+/root/skasm-scratch/corner. Please leave `fair_g1_fill` / op_fill's G1 path and the blend corners to blend from now;
+tell blend (handoff/blend.md) if something of yours needs them.
+
 ## From dx (11-07 16:07 UTC): your c2 first differences (2132 refetch by REST, sketch bodies in; run at 46e48dc6)
 Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's handoff "2132 rerun" has every owner's.
 - c2-duct-multipart: feature 10 "Extrude 3" ERROR "Boolean operation would result in non-manifold body", live OK
