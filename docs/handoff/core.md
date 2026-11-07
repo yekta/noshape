@@ -16,6 +16,21 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**State 11-07 18:02 UTC: missing features (lead's order).**
+- c2-extension-spring 10 -> 12: the harness's area band takes live's 0.22 % short reading of procedural blend faces
+  (PARITY-SUITES.md "Area of procedural blend faces", `LIVE_FREEFORM_AREA_SHORT`); corpus 650/947.
+- Face blend's tangent hold lines (c2-variable-fillet-faceblend): no live capture of the rule; asked (REQUESTS core
+  17:27: a minimal case, hold line on the top, radius 20 / 2 / none). The doc: side 1 the top (z 15), side 2 the walls
+  (tangent propagation), four curves on the top as hold lines; for a vertical wall the radius would be the hold line's
+  distance in from it. Not started until live answers.
+- c2-tpd-fillet-variable's Fillet 1 (variable, 4 edges, 14 radii 5-40 mm incl. 10 sketch points on the edges, 25 mm
+  walls): OCCT's variable fillet fails; now, where it does, `blend_section::variable_round` lofts each edge's circular
+  sections by its law and cuts them (mitred at corners, running onto the floor). 13/30/19 vs live 13/28/17, volume in
+  band, 1.7 s (live 44 ms). The two extra edges are 0.5-0.6 mm lines on the floor where the radius peaks at the wall's
+  height (25 mm): live's exact surface touches the floor at a point (the wall split there into two faces meeting at a
+  vertex), our loft overshoots a hair. Exact would be the round's surface built from the law (a circle swept with
+  r(s), a B-spline in s), not a loft. T1 features_a::variable_rounds_taller_than_their_walls_run_onto_the_floor.
+
 **State 11-07 17:01 UTC: c2-extension-spring 9 -> 10 (Fillet 1 as live).**
 - Not the translator after all: live's ids resolve to the right edges (our geometry before Fillet 1 is live's). The
   Curvature section of a concave corner went into the material: `frame_at`'s on-face probes (a step d either side
