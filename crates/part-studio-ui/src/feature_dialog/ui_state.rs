@@ -248,7 +248,7 @@ impl FeatureDialog {
                     let boxed = !(s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS));
                     let shown = self.shown_items(s.id, values.array(s.id).len());
                     if boxed && !shown.is_empty() {
-                        let inner: Vec<Value> = shown.iter().flat_map(|k| self.item_fields(s.id, *k, specs)).collect();
+                        let inner: Vec<Value> = shown.iter().filter(|k| !self.closed_items.contains(&format!("{}.{k}", s.id))).flat_map(|k| self.item_fields(s.id, *k, specs)).collect();
                         let first = inner.iter().find(|f| f["kind"] == "number").map(|f| f["text"].clone()).unwrap_or(Value::Null);
                         let state = if self.field_error(s.id).is_some() { "error" } else { "ok" };
                         fields.push(json!({ "label": label, "kind": "number", "text": first, "focused": false, "state": state }));

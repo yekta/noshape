@@ -292,6 +292,8 @@ pub struct FeatureDialog {
     reordering: std::collections::HashSet<String>,
     /// `COLLAPSE_ARRAY_ITEMS` entries opened with their › ("array.index").
     open_items: std::collections::HashSet<String>,
+    /// A box array's items folded by their ▾ (live 1722: "Point 0 (click to collapse)").
+    closed_items: std::collections::HashSet<String>,
     /// While a pick is dragged in reorder mode: list path, the row it would
     /// land next to, after it.
     pick_drop: Option<(String, usize, bool)>,
@@ -388,6 +390,7 @@ impl FeatureDialog {
             width: None,
             reordering: std::collections::HashSet::new(),
             open_items: std::collections::HashSet::new(),
+            closed_items: std::collections::HashSet::new(),
             pick_drop: None,
             configure_mode: false,
             nested: false,
@@ -3554,11 +3557,40 @@ impl FeatureDialog {
                     .border_1()
                     .border_color(if blamed { pal.error } else { pal.border })
                     .when(blamed, |d| d.bg(gpui_kit::rgb(0xf9ebec)))
-                    .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(crate::ui::spec_text(s.label)));
+                    .child(
+                        h_flex()
+                            .justify_between()
+                            .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(crate::ui::spec_text(s.label)))
+                            // Live 1722: Routing curve's Points has CLEAR ("Clear all items").
+                            .when(self.ty.id == "routingCurve" && arr_id == "points" && items > 0, |d| {
+                                d.child(
+                                    div()
+                                        .id(SharedString::from(format!("clear-{path}")))
+                                        .px(px(4.))
+                                        .text_size(px(11.))
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(gpui_kit::rgb(0x555555))
+                                        .cursor_pointer()
+                                        .tooltip(crate::ui::tooltip("Clear all items"))
+                                        .child("CLEAR")
+                                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            this.inputs.retain(|p, _| !p.starts_with(&format!("{arr_id}.")));
+                                            this.set_value(arr_id, ParamValue::Array(Vec::new()), cx);
+                                            cx.notify();
+                                        })),
+                                )
+                            }),
+                    );
                 // Routing curve, Single mode (live 1722): only the active
                 // point's row; a click on a point in the graphics switches it.
                 for k in self.shown_items(arr_id, items) {
-                    let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
+                    let key = format!("{arr_id}.{k}");
+                    let closed = self.closed_items.contains(&key);
+                    let inner = if closed { Vec::new() } else { self.render_params(item_specs, Some((arr_id, k)), window, cx) };
+                    let title = match (s.item_template, values.array(arr_id).get(k)) {
+                        (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
+                        _ => format!("{} {}", capitalize(item_label), k + 1),
+                    };
                     col = col.child(
                         v_flex()
                             .relative()
@@ -3568,10 +3600,22 @@ impl FeatureDialog {
                             .child(
                                 h_flex()
                                     .justify_between()
-                                    .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(match (s.item_template, values.array(arr_id).get(k)) {
-                                        (Some(t), Some(it)) => self.item_label(t, it, item_specs, arr_id, k),
-                                        _ => format!("{} {}", capitalize(item_label), k + 1),
-                                    }))
+                                    // ▾ / › folds the item (live 1722: "Point 0 (click to collapse)").
+                                    .child(
+                                        h_flex()
+                                            .id(SharedString::from(format!("fold-{path}-{k}")))
+                                            .gap(px(4.))
+                                            .cursor_pointer()
+                                            .tooltip(crate::ui::tooltip(format!("{title} (click to {})", if closed { "expand" } else { "collapse" })))
+                                            .child(crate::ui::glyph(if closed { "expander-right" } else { "expander-down" }, 10., pal.text))
+                                            .child(div().text_size(px(13.33)).text_color(pal.text_muted).child(title.clone()))
+                                            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                                if !this.closed_items.remove(&key) {
+                                                    this.closed_items.insert(key.clone());
+                                                }
+                                                cx.notify();
+                                            })),
+                                    )
                                     .child(
                                         div()
                                             .id(SharedString::from(format!("rm-{path}-{k}")))
