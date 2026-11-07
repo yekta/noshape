@@ -1445,7 +1445,8 @@ pub fn enclose(ev: &mut EvalCtx) -> FResult<()> {
         let empty: Vec<Shape> = solids.iter().filter(|r| !parts.iter().any(|s| is_material_of(r, s))).cloned().collect();
         if !empty.is_empty() && empty.len() < solids.len() {
             solids = empty;
-            res.shape = if solids.len() == 1 { solids[0].clone() } else { Shape::compound(&solids) };
+            let kept = if solids.len() == 1 { solids[0].clone() } else { Shape::compound(&solids) };
+            res = k::OpResult { history: res.history.onto(&res.shape, &kept), shape: kept };
         }
     }
     // Live L31: every enclosed region goes into one part.

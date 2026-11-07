@@ -8088,6 +8088,8 @@ OpOut op_offset_faces(const OcShape& s, const OcShapeList& faces,
   if (offsets.size() != 1 && offsets.size() != faces.items.size())
     fail_invalid("offsets must be one value or one per face");
   check_faces_in(s.shape, faces.items);
+  if (std::getenv("NOSHAPE_DUMP_OPS"))
+    dump_op("offsetfaces", s.shape, faces.items, "offset " + std::to_string(offsets.empty() ? 0.0 : offsets[0]));
   BRepOffset_MakeOffset mo;
   mo.Initialize(s.shape, 0.0, 1e-6, BRepOffset_Skin, false, false, GeomAbs_Intersection);
   bool any = false;

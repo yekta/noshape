@@ -795,6 +795,14 @@ impl<'a> QueryCx<'a> {
     /// from the part's bend edges (live dom/fs-smprobe3-4.txt).
     pub fn tracking(&self, id: &str) -> Vec<Ent> {
         let mut out = self.resolve_transient(id);
+        // The faces named after it: a shell's or thicken's offset of it, a region enclosed from those, their pieces
+        // (Parasolid's offsets keep their faces' lineage). A face a shell moved off its plane has nothing where it
+        // was: cf-lighten's Lighten tracks its tools' caps through shell, enclose and a Boolean.
+        if let Some(Reference::Face(n)) = self.st.transient_ref(id) {
+            for (bi, b) in self.st.ctx.bodies.iter().enumerate() {
+                out.extend(b.faces.iter().enumerate().filter(|(_, m)| ***m != *n && derives_from(m, n)).map(|(fi, _)| Ent::Face(bi, fi)));
+            }
+        }
         if let Some(snap) = self.st.snapshots.get(id) {
             out.extend(self.tracked(snap, true));
             // A face used to split faces: the edges it cut.
@@ -2681,4 +2689,15 @@ pub fn body_ids(q: &QueryCx, ents: &[Ent]) -> Vec<BodyId> {
 
 pub fn kernel_error(e: k::KernelError) -> String {
     kerr(e)
+}
+
+/// Whether face name `n` is made from `of`: an offset, a region generated from, a copy or a piece of it, at any depth.
+fn derives_from(n: &TopoName, of: &TopoName) -> bool {
+    if n == of {
+        return true;
+    }
+    match n {
+        TopoName::Face { role: Role::Offset(x) | Role::Generated(x) | Role::Copy { of: x, .. }, .. } | TopoName::Split { parent: x, .. } => derives_from(x, of),
+        _ => false,
+    }
 }

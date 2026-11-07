@@ -112,6 +112,23 @@ impl History {
         History { records }
     }
 
+    /// The history with its outputs in `new`, a shape made of some of `old`'s pieces (one solid of several): each
+    /// record's output re-indexed to the same sub-shape in `new`, records whose output isn't in it dropped.
+    pub fn onto(&self, old: &crate::Shape, new: &crate::Shape) -> History {
+        let mut subs: std::collections::HashMap<ShapeType, Vec<crate::Shape>> = std::collections::HashMap::new();
+        let records = self
+            .records
+            .iter()
+            .filter_map(|r| {
+                let olds = subs.entry(r.output_kind).or_insert_with(|| old.sub_shapes(r.output_kind));
+                let x = olds.get(r.output_index as usize)?;
+                let i = new.index_of(x, r.output_kind)?;
+                Some(HistoryRecord { output_index: i as u32, ..*r })
+            })
+            .collect();
+        History { records }
+    }
+
     /// Records whose input is (`arg`, `kind`, `index`).
     pub fn of_input(&self, arg: u32, kind: ShapeType, index: u32) -> impl Iterator<Item = &HistoryRecord> {
         self.records

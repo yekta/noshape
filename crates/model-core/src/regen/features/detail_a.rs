@@ -735,8 +735,24 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
                 supports.push((tangent[0], tangent[1], body.faces[ff].clone()));
             }
         }
+        // Fillets already as round as asked, within the modelling tolerance (std's 1e-5 m: cf-lighten's Lighten rounds
+        // its tools 1e-5 m, offsets them by the tool radius and then asks for that radius): kept as they are where they
+        // can't be rolled again (two faces nearly tangent heal into a slanted edge no fillet fits).
+        let as_asked = change
+            && fillet_faces.iter().all(|&f| {
+                let r = match faces[f].face_surface() {
+                    Ok(k::Surface::Cylinder { radius, .. } | k::Surface::Sphere { radius, .. }) => radius,
+                    Ok(k::Surface::Torus { minor_radius, .. }) => minor_radius,
+                    _ => return false,
+                };
+                (r - radius).abs() <= 1e-5 + 1e-9
+            });
         let del: Vec<Shape> = fillet_faces.iter().map(|f| faces[*f].clone()).collect();
-        let res = k::delete_faces(&body.shape, &del).map_err(kerr("Could not modify selected fillets."))?;
+        let res = match k::delete_faces(&body.shape, &del) {
+            Ok(r) => r,
+            Err(_) if as_asked => continue,
+            Err(e) => return Err(kerr("Could not modify selected fillets.")(e)),
+        };
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         if !change {
@@ -763,7 +779,11 @@ pub fn modify_fillet(ev: &mut EvalCtx) -> FResult<()> {
         }
         let healed = crate::regen::eval::names_for(&res.shape, face_names);
         let shapes: Vec<Shape> = edges.iter().filter_map(|e| res.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let res2 = k::fillet(&res.shape, &shapes, radius).map_err(kerr("Failed to fillet selections."))?;
+        let res2 = match k::fillet_checked(&res.shape, &shapes, &vec![radius; shapes.len()]) {
+            Ok(r) => r,
+            Err(_) if as_asked => continue,
+            Err(e) => return Err(kerr("Failed to fillet selections.")(e)),
+        };
         let mut names2 = ev.name_result(&[&healed], &res2.history, &res2.shape, &BTreeMap::new(), Some(&blend_role));
         // Blend(edge) -> original fillet face name.
         let map: BTreeMap<Name, Name> = keep_name.into_iter().filter_map(|(ei, old)| healed.edges.get(ei).map(|en| (Arc::new(TopoName::face(ev.feature, Role::Blend(en.clone()))), old))).collect();
