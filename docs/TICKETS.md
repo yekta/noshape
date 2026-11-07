@@ -278,6 +278,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for v0.4.34 (cut 11-07 ~07:10 from c373da6e3; qa list 07:16; the latest release is v0.4.33)
+- **qa 07:16: no new blocker.** (qa missed the 11-07 05:00 list: none was written; from now on one per cut, "no blocker" too.)
+  Greens since v0.4.33 swept on vibe3 through 6d194fa1 / 0dfa4c2d: the volume sweep, dx's cf corpus and the 44 ticket
+  documents unchanged; full CLI smokes on b114d55a, 4a88d8d9, a70b2698, 5c4ed12d = v0.4.33's results (the vase moved by 1e-8
+  with a7f4c4f9's exact loft edges, as expected); GUI rows on a70b2698 / e02e95e9 pixel-identical to v0.4.33; the display
+  cache shows a changed document's new state on reopen (bin/cachetest.sh). Parity suites (/tmp/lead/suites-status): models
+  58 → 59/86, features 593 → 622/924; scenarios 534/731 (245 new recordings); the only scenario worse is
+  face-menu-select-other, from live's re-recording, not our app (P2 UIP-SELECT-OTHER-LIST). Fuzz: 0 deaths since 21:00;
+  one hang. **Open P0, not new: SECTIONS-AHEAD-HANG** (a Shell's regeneration can run forever when OCCT's sections made
+  ahead on the thread pool walk forever; in every release since v0.4.17, so v0.4.34 is no worse). qa checks on the release:
+  smoke, the ticket documents, GUI rows, title bar, memory, and the updater on Linux plus the Release run's Windows / macOS
+  update checks.
+
 ## Release blockers for the 2026-11-06 17:00 release (qa list 16:47, checked on greens through f471368e; v0.4.33 is being re-run, v0.4.32 is the latest)
 - **qa 16:47: no new blocker in the code.** v0.4.33 (cut from d828008e1) failed to publish only because of its release check
   (P0 RELEASE-BUDGET-STEP-SPARSE, fixed by the lead, re-run 42249878030 in progress). On its first run's Linux artifact: the
@@ -2816,6 +2829,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 UIP-SELECT-OTHER-LIST (psui) **ui-parity face-menu-select-other: after the face menu's Select other…, ours reports
+  no list**, live (re-recorded 11-07 03:09, 43f4389bc) a select-other list ("Front plane / Face of Extrude 1 / Part 1 / Edge of
+  Extrude 1 / …") and a Select other panel. It matched before only because the old recording had no list either. Fails 4 / 4
+  run alone on green 917d4c4c. Either ours doesn't open the list or the state dump doesn't report it. (qa 2026-11-07 07:16)
+- [ ] P2 UIP-DRW-START-FLAKY (dx) **drawing scenarios differ at their start state in the 6-shard suite run, not alone**:
+  `.drawing.views[0].scale` live "1:1" / ours null at the start (the view not ready when the state is read). 10 drw-*
+  scenarios at 01:25 (green 04121633: bom-table, broken-out-section, centerline-circle-3-point, centermark, detail-view,
+  dimension point-to-line / point-to-point, hole-table, tool-shortcuts, view-properties), drw-note at 05:25; each matches
+  4 / 4 run alone. The start state should wait for the views. (qa 2026-11-07 07:16)
 - [x] P2 EXPORT-DXF-DIALOG (psui; done 11-06: flat_export.rs's modal for flats, sketches and planar faces; a face's
   File name "<studio> - <part>" is a guess, asked live) a sketch's (and a planar face's) "Export as DXF/DWG…" opens live's modal "Export as
   DXF/DWG" (ui-parity sketch-row-menu-export-dxf): File name (with "View export rules"), Format DXF / DWG, Version
