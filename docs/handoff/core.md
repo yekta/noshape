@@ -16,6 +16,17 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**Shell walls / slabs: one builder with bool (lead 11-07).** bool builds Shell's slabs itself (OCCT's offsets of
+c2-rings-loft come with 0.3-1.17 mm tolerances no Boolean fuses), which overlaps the parked walls path. Proposal for
+bool: one wall builder in shell.cpp, bool's; core hands over branch core-walls-wip (commit 1dad1804, not for main):
+`by_cut_walls` (offset walls of the removed faces' neighbours, cut where they meet), `join_in_u` (B-spline pieces
+joined along u), `cross_point` (two walls' crossing by both surfaces' parameters), the B-spline offset made by
+approximating the offset first and extending after (an extended surface's offset spiked), adaptive sampling at a loft's
+C0 run-on kinks, pcurves by interpolation (least squares wiggled: vertex tolerances 11-41 mm, self-intersecting walls)
+with a drift check of 2e-4 x size; T1 kernel shell::a_lofts_angled_sides_shell and its data
+tests/data/shell/impeller-loft-input.brep (c2-impeller-loft's Shell Gehäuse input). Core keeps Shell's other paths
+(regions, smooth, quadrics, offset, planes) calling the shared builder, and reviews.
+
 **State 11-07 06:18 UTC: c2-rings-loft's Chamfer 1 as live (8 -> 9 of 32).**
 - Fillet 1's ring route landed (f57807bd). Chamfer 1 (1 mm on the four notch arcs, plane / notch cylinder): live
   chamfers each arc as if alone, through the strip of side beside it (the side splits in three) and on past the arc's
