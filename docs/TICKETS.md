@@ -645,9 +645,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   edges from the circle's vertices to the D's corners are 16.594 mm, ours 16.848; the big side face 14,853 against
   15,106 mm², the part 251,071 against 257,078 mm³ (-2.3 %): our Normal-to-profile magnitude rule (m (0.9 h + 0.1 c) / 3,
   fitted on parallel sections) for perpendicular ones. Live's perpendicular test loft failed before its bodydetails
-  quota ran out; more cases after ~15:25 UTC 11-07 (live 2162). Also open: a single circle's cuts (live 2162: n equal
-  arcs from the other section's first vertex's angle about the circle's centre; ours where the corners point, right
-  for squares only: `split_closed_sections`).
+  quota ran out; more cases after ~15:25 UTC 11-07 (live 2162). A single circle's cuts: n equal arcs from the other
+  section's first corner's angle about the circle's own centre, as live 2162 (T1 features::a_circle_lofted_...).
 - [ ] P2 SEAM-SPLIT-FACE-GROUP (core, lead 11-06: take it if more documents show it) **a cylinder wall between a
   thread's turns is one face in live, one per turn here**: c2-helical-sweep's Sweep 1 (a V profile cut along an 8-turn
   helix round a Ø50.8 cylinder) gives 14/25/21 faces / edges / vertices, live 6/10/6: OCCT cuts the wall at the

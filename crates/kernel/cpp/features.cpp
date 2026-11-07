@@ -2091,11 +2091,19 @@ static bool split_closed_sections(std::vector<TopoDS_Wire>& wires, HHist& hist)
       t = t0 + std::fmod(std::fmod(t - t0, period) + period, period);
     std::sort(ts.begin() + 1, ts.end());
     // A circle in equal arcs from there (live 1788: a rounded rectangle's 8 segments to a Ø30 circle split it every
-    // 45° from the direction of the first corner, not at each corner's direction).
+    // 45° from the direction of the first corner, not at each corner's direction), the first corner's direction
+    // taken about the circle's own centre (live 2162: a 60 x 30 rectangle centred 20 mm off a Ø65 circle's axis cuts
+    // it at -123.69°, its first corner's angle about the circle's centre, not -153.4° about its own).
     if (GeomAdaptor_Curve(c).GetType() == GeomAbs_Circle)
+    {
+      GeomAPI_ProjectPointOnCurve pr(starts_of(before[ref])[0], c, f, l);
+      if (pr.NbPoints() == 0)
+        return false;
+      ts[0] = pr.LowerDistanceParameter();
       for (size_t k = 1; k < ts.size(); ++k)
-        ts[k] = t0 + period * (double)k / (double)ts.size();
-    ts.push_back(t0 + period);
+        ts[k] = ts[0] + period * (double)k / (double)ts.size();
+    }
+    ts.push_back(ts[0] + period);
     BRepBuilderAPI_MakeWire mk;
     TopoDS_Edge             key = own[0];
     key.Orientation(TopAbs_FORWARD);

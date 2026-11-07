@@ -125,6 +125,23 @@ fn a_lofts_added_vertices_split_their_edge_evenly() {
     assert!((arcs[0] - 81.36).abs() < 1e-6 && arcs[1..].iter().all(|x| (x - 92.88).abs() < 1e-6), "{arcs:?}");
 }
 
+/// Live 2162: a polygon lofted to a circle between parallel planes cuts the circle into as many equal arcs, one cut at
+/// the polygon's first corner's angle about the circle's centre (60 x 30 rectangles to a Ø65 circle 40 above: centred,
+/// -153.435 / -63.435 / 26.565 / 116.565 deg; centred at (20, 0), -123.69 / -33.69 / 56.31 / 146.31).
+#[test]
+fn a_circle_lofted_to_a_polygon_splits_from_its_first_corner_about_its_centre() {
+    for (cx, want) in [(0.0, [-153.435, -63.435, 26.565, 116.565]), (20.0, [-123.69, -33.69, 56.31, 146.31])] {
+        let p = [(-30.0, -15.0), (30.0, -15.0), (30.0, 15.0), (-30.0, 15.0)].map(|(x, y)| DVec2::new(x + cx, y));
+        let poly = make_wire_2d(&Plane::xy(), &(0..4).map(|i| Segment2d::Line { a: p[i], b: p[(i + 1) % 4] }).collect::<Vec<_>>()).unwrap();
+        let c = make_wire_2d(&Plane::xy().offset(40.0), &[Segment2d::Circle { center: DVec2::ZERO, radius: 32.5 }]).unwrap();
+        let l = loft(&[poly, c], &LoftOptions { solid: true, ..Default::default() }).unwrap();
+        assert!(l.shape.is_valid());
+        let mut got: Vec<f64> = l.shape.vertices().iter().filter_map(|v| v.vertex_point().ok()).filter(|p| (p.z - 40.0).abs() < 1e-6).map(|p| p.y.atan2(p.x).to_degrees()).collect();
+        got.sort_by(f64::total_cmp);
+        assert!(got.len() == 4 && got.iter().zip(want).all(|(g, w)| (g - w).abs() < 1e-2), "centre at {cx}: {got:?}");
+    }
+}
+
 #[test]
 fn extrude_variants() {
     let f = rect_face(&Plane::xy(), 2.0, 2.0);
