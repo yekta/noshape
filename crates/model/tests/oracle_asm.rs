@@ -242,7 +242,7 @@ fn cases(parts: &Parts) -> Vec<(&'static str, Assembly)> {
     asm.patterns.push(InstancePattern {
         id: MateId(20),
         name: "Linear pattern 1".into(),
-        kind: PatternKind::Linear { direction: conn(1, edge(parts, PLATE, 130.0, 0.0, 10.0), Inference::Midpoint).linear_direction(), distance: ExprValue::new("15 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false },
+        kind: PatternKind::Linear { direction: conn(1, edge(parts, PLATE, 130.0, 0.0, 10.0), Inference::Midpoint).linear_direction(), distance: ExprValue::new("15 mm"), count: 3, opposite: false, equal_spacing: false, second: None, centered: false, third: None },
         seeds: vec![InstanceId(2)],
         generated: vec![],
         suppressed: false,
