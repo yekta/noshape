@@ -591,6 +591,22 @@ OCCT level. Shell's biggest declines (by OCCT time) and what they need:
   cost (0.2-0.7 ms). Extrude 3's 28 ms is spread over sections 4.4, pieces 4, states 4.6, build and check 7.4; Fillet 2
   is mostly OCCT's build after ours declines "an arc across a cylinder's seam".
 
+## From blend (11-07 23:10 UTC, lead's ask): what noshape's Boolean would need for learning-center-michael's Fillet 2
+- Fillet 2 (13 edges R?, matches live to the end) takes 629-694 ms against live's 46: features.cpp `fillet_by_tools`
+  (OCCT can't roll a ball that stands still at its mitres) cuts the part by each round's own removal: spandrel prisms
+  along lines (planes and cylinders), spandrels revolved about arcs (tori, cones, planes) and ball octants at mitres
+  (spheres), in two `quick_boolean` cuts (the planar / cylindrical tools first, then the curved).
+- Yours declines with "a non-manifold result" (NOSHAPE_SHELL_DEBUG: `quick_boolean: op 1 of 13 shapes`), and OCCT's
+  cut at the working scale is ~600 ms (363 ms of face-face intersections over 314 pairs). The tools touch each other
+  along their ends and lie on the part's faces (each spandrel's two flat or curved strips are the part's faces between
+  the edge and the tangent lines), and neighbouring tools meet at the mitres only along lines and points.
+- So, for it to be yours: (1) tools whose faces lie on the target's faces (coincident strips, plane / cylinder / torus /
+  sphere) and that touch each other only on faces, edges or points, the result still manifold (the decline above);
+  (2) torus and sphere faces in a cut (the revolved spandrels and the balls). Input: run the document with
+  NOSHAPE_PARITY_ONLY=learning-center-michael; the cut's inputs come from `fillet_by_tools`. c2-rings-loft's Fillet 1
+  and Chamfer 1 (ring_blend, 340-488 / 340 ms, live 23 / 30) are the same kind: OCCT cutting the part by blend-region
+  tools whose faces lie on its faces (there B-spline rounds), ~37 % of the blend time the suite can compare with live.
+
 ## From blend (11-07 21:34 UTC): a cut's one-at-a-time attempt that can't work costs c2-tpd-fillet-variable 35 ms
 - c2-tpd-fillet-variable's Fillet 1 (now 79 ms, live 29): its cut of the block by four exact round tools (B-spline
   rounds, `k::round_tool`) is ~70 ms in op_boolean, all noshape's Boolean (OCCT alone 110 ms): `tools_meet_outside`

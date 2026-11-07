@@ -111,3 +111,18 @@ profile):
 So the final cut on exact contact edges (design (b)) is only rings-loft's two features (~700 ms). The bigger share is
 OCCT's own fillet falling into its slow fallbacks (the scaled retry, by_tools, past_end_faces: ~1.4 s over three
 features): those are next, the slowest first (michael's Fillet 2).
+
+**11-07 23:10 UTC: RABC parked; the speed table made fair; the fallback speeds.**
+- SETBACK-FILL-PATCH's RABC parked (lead): one patch, a numerical fit, no quick fix. Reproduced with skasm's
+  /root/skasm-scratch/corner/proto.py (RABC 35.66 mm², live 34.464; JcC / JuC within 0.08). Live's RABC is G1 along all
+  six edges (0.09° at most), as the other two, so it isn't a position-only edge. Untried idea: Parasolid fixing the
+  cross-boundary tangents' magnitudes (from the supports), not only their directions, which a free least-bending fit
+  can't show on the two that match.
+- Only blends before each document's first difference compare with live (after it the input already differs): 67
+  features, ours 2221 ms against live's 773. snap-hook's Fillet 6 (187 ms) fails in ours on a wrong input (Plane 1
+  fails upstream, Sweep 1 builds nothing), and the three c2-impeller-loft fillets run after its Loft Gehäuse
+  differs: neither is a fair speed case. The fair top: c2-rings-loft Fillet 1 + Chamfer 1 828 ms (live 53),
+  learning-center-michael Fillet 2 629 ms (live 46): both a cut of the part by blend-region tools lying on its faces
+  (66 % of the comparable blend time). michael's cut: `fillet_by_tools`, declined by noshape's Boolean ("a non-manifold
+  result"), OCCT ~600 ms: what the Boolean would need is in bool.md ("From blend 23:10").
+- Kernel timers added for the record (not landed): blend.checked.build / .valid / .shrunk, blend.scaled.finish.
