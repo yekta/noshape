@@ -14,6 +14,7 @@ use gpui_kit::*;
 use noshape_model::configuration::{ConfigInputKind, ConfigValues, Configuration};
 use noshape_model::file_tab::FileKind;
 use noshape_model::params::ReferenceKind;
+use noshape_model::regen::features::frame_library;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -78,6 +79,8 @@ pub struct PanelSetup {
     /// Offer the Libraries tab (a Form's Form Part Studio: the sheet metal
     /// form library, live psui/forms f-2).
     pub libraries: bool,
+    /// The Libraries tab is Frame's profile library (live D134) rather than the forms.
+    pub frame_profiles: bool,
 }
 
 /// The sheet metal form library's forms as configured sources.
@@ -161,6 +164,10 @@ pub struct SelectItemPanel {
     lib_image_thumb: Option<(&'static str, Arc<RenderImage>)>,
     /// Feature Studios whose features are hidden (Add custom features).
     collapsed: HashSet<String>,
+    /// Frame's profile library: offered, the (standard, profile) its selects show, and those selects.
+    frame_profiles: bool,
+    frame_pick: Option<(String, String)>,
+    frame_selects: HashMap<&'static str, (Entity<crate::os_select::OsSelect>, Subscription)>,
     _subs: Vec<Subscription>,
 }
 
@@ -253,8 +260,8 @@ fn texts(mode: PanelMode) -> (&'static str, &'static str, &'static str) {
 
 impl SelectItemPanel {
     pub fn new(setup: PanelSetup, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries } = setup;
-        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX));
+        let PanelSetup { mode, sources, doc_name, doc_path, except, gpu, value, libraries, frame_profiles } = setup;
+        let in_libraries = libraries && (value.is_empty() || value.starts_with(noshape_model::sheetmetal::forms::PREFIX) || value.starts_with(frame_library::PREFIX));
         let search = cx.new(|cx| InputState::new(window, cx));
         let url = cx.new(|cx| InputState::new(window, cx));
         let subs = vec![
@@ -316,6 +323,9 @@ impl SelectItemPanel {
             lib_image_select: None,
             lib_image_thumb: None,
             collapsed: HashSet::new(),
+            frame_profiles,
+            frame_pick: None,
+            frame_selects: HashMap::new(),
             _subs: subs,
         };
         if features {
@@ -662,6 +672,114 @@ impl SelectItemPanel {
             );
         }
         out
+    }
+
+    /// A labelled select of Frame's library (Library, Type, Profile: live D134's rows, 32 px apart).
+    fn frame_select(&mut self, key: &'static str, label: &'static str, items: Vec<String>, current: &str, cx: &mut Context<Self>) -> AnyElement {
+        let select = match self.frame_selects.get(key) {
+            Some((s, _)) => s.clone(),
+            None => {
+                let s = cx.new(|_| crate::os_select::OsSelect::new(SharedString::from(format!("sel-frame-{key}"))));
+                let sub = cx.subscribe(&s, move |this: &mut Self, _, ev: &crate::os_select::OsSelectEvent, cx| {
+                    let crate::os_select::OsSelectEvent::Picked(id) = ev;
+                    this.pick_frame_level(key, id, cx);
+                });
+                self.frame_selects.insert(key, (s.clone(), sub));
+                s
+            }
+        };
+        let items: Vec<(SharedString, SharedString)> = items.into_iter().map(|i| (SharedString::from(i.clone()), SharedString::from(i))).collect();
+        select.update(cx, |s, _| s.set_items(items, current.to_string()));
+        h_flex()
+            .h(px(32.))
+            .px(px(6.))
+            .gap(px(6.))
+            .child(div().w(px(56.)).flex_none().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child(label))
+            .child(div().flex_1().child(select))
+            .into_any_element()
+    }
+
+    /// A level of Frame's library changed: the levels below take their defaults and the field shows the new profile at
+    /// once, before Select (live D134).
+    fn pick_frame_level(&mut self, level: &'static str, id: &str, cx: &mut Context<Self>) {
+        let (standard, profile) = match level {
+            "type" => (id.to_string(), frame_library::profiles(id).first().map(|p| p.to_string()).unwrap_or_default()),
+            "profile" => (self.frame_choice().0, id.to_string()),
+            _ => return,
+        };
+        let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
+        self.cfg_edit.remove(&key);
+        self.lib_generated.remove(&key);
+        self.frame_pick = Some((standard.clone(), profile.clone()));
+        let size = frame_library::sizes(&standard, &profile).1;
+        self.pick(frame_library::value(&standard, &profile, size, false), cx);
+    }
+
+    /// The (standard, profile) Frame's library shows: the last one picked here, else the field's, else the first.
+    fn frame_choice(&self) -> (String, String) {
+        if let Some(c) = &self.frame_pick {
+            return c.clone();
+        }
+        if let Some((s, p, _, _)) = frame_library::parse_value(&self.value) {
+            return (s, p);
+        }
+        let standard = frame_library::standards().first().map(|s| s.to_string()).unwrap_or_default();
+        let profile = frame_library::profiles(&standard).first().map(|p| p.to_string()).unwrap_or_default();
+        (standard, profile)
+    }
+
+    /// Frame's Libraries tab (live D134): Library, Type and Profile, then the profile's Size (and Rounded) with
+    /// Generate preview, and Select, which takes them and closes the panel.
+    fn render_frame_library(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        use noshape_model::configuration::{ConfigInput, ListOption};
+        let pal = p();
+        let (standard, profile) = self.frame_choice();
+        let library = self.frame_select("library", "Library", vec![frame_library::LIBRARY.to_string()], frame_library::LIBRARY, cx);
+        let types = frame_library::standards().into_iter().map(String::from).collect();
+        let type_row = self.frame_select("type", frame_library::standard_label(&standard), types, &standard, cx);
+        let profiles = frame_library::profiles(&standard).into_iter().map(String::from).collect();
+        let profile_row = self.frame_select("profile", "Profile", profiles, &profile, cx);
+        let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library).child(type_row).child(profile_row);
+        let key = format!("{}{standard}/{profile}", frame_library::PREFIX);
+        let (sizes, default) = frame_library::sizes(&standard, &profile);
+        let mut inputs = vec![ConfigInput {
+            id: frame_library::SIZE.into(),
+            name: frame_library::SIZE.into(),
+            kind: ConfigInputKind::List { options: sizes.iter().map(|s| ListOption { id: (*s).into(), name: (*s).into() }).collect(), default: default.into() },
+            visible_when: None,
+            excluded: false,
+        }];
+        if frame_library::has_rounded(&standard, &profile) {
+            inputs.push(ConfigInput { id: frame_library::ROUNDED.into(), name: frame_library::ROUNDED.into(), kind: ConfigInputKind::Checkbox { default: false }, visible_when: None, excluded: false });
+        }
+        let cfg = Configuration { inputs, configured: Vec::new() };
+        col = col.child(div().mx(px(6.)).my(px(4.)).h(px(1.)).bg(gpui_kit::rgb(0xd7d7d7))).child(self.config_editor(&key, &cfg, Vec::new(), true, window, cx));
+        let (changed, editing) = self.preview_changed(&key, &cfg);
+        let select_button = div()
+            .id("sel-frame-select")
+            .h(px(30.))
+            .px(px(16.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(3.))
+            .border_1()
+            .border_color(gpui_kit::rgb(0x959595))
+            .text_size(px(14.67))
+            .text_color(pal.text)
+            .when(changed, |d| d.opacity(0.25))
+            .when(!changed, |d| d.cursor_pointer().hover(|d| d.bg(pal.panel_hover)))
+            .child("Select")
+            .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                if changed {
+                    return;
+                }
+                this.cfg_edit.remove(&key);
+                this.lib_generated.remove(&key);
+                this.pick(join_value(&key, &editing), cx);
+                cx.emit(SelectItemEvent::Close);
+            }));
+        v_flex().flex_1().min_h_0().child(col).child(h_flex().flex_none().justify_center().p(px(8.)).border_t_1().border_color(gpui_kit::rgb(0xd7d7d7)).child(select_button)).into_any_element()
     }
 
     /// The Libraries tab under Library / Type (live 1622 (d), psui/forms
@@ -1366,6 +1484,8 @@ impl Render for SelectItemPanel {
         let in_libraries = self.in_libraries;
         if in_libraries && mode == PanelMode::Reference(ReferenceKind::Image) {
             body = body.child(self.render_library_images(cx));
+        } else if in_libraries && self.frame_profiles {
+            body = body.child(self.render_frame_library(window, cx));
         } else if in_libraries {
             // Library ▾ / Type ▾ (one each), then the forms (live f-2, f-3).
             let pick_row = |label: &'static str, value: &'static str| {

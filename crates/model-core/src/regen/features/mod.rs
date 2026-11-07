@@ -29,6 +29,7 @@ pub mod surfaces;
 // --- end batch B modules ---
 // --- modules: batch SM (sheet metal operations, frames) ---
 pub mod frames;
+pub mod frame_library;
 pub mod frames_profiles;
 pub mod sheetmetal_flange;
 pub mod sheetmetal_ops;

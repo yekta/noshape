@@ -2613,7 +2613,15 @@ impl FeatureDialog {
                     .w_full()
                     .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(crate::ui::spec_text(s.label)))
                     .child(div().flex_1().child(e))
-                    .os_context_menu(move |m, _, _| {
+                    .os_context_menu(move |m, window, cx| {
+                        // The field keeps the keyboard with its text all selected (the input's own press put the caret
+                        // under the pointer; live dialog-checkbox-convert-back: [0, 5]).
+                        if let Some(st) = view.read(cx).inputs.get(&p2).cloned() {
+                            st.update(cx, |s, cx| {
+                                window.focus(&s.focus_handle(cx), cx);
+                                s.select_all(window, cx);
+                            });
+                        }
                         let v = view.clone();
                         let p = p2.clone();
                         m.item(crate::os_menu::OsMenuItem::new("Convert to checkbox").on_click(move |_, _, cx| {
@@ -2756,6 +2764,22 @@ impl FeatureDialog {
                             .child(Self::tab_stop_element(cb, &focus, Focus::Box))
                             // Right-click > Convert to expression (e.g. `#Length > 3`),
                             // and Unconfigure when configured (live psb 10-21 g).
+                            // A right press doesn't focus the checkbox: the page keeps no field (live dialog-checkbox-rclick-convert,
+                            // behaviours 2176 (4): activeElement is the body).
+                            .capture_any_mouse_down({
+                                let view = view.clone();
+                                move |e, window, cx| {
+                                    if e.button != MouseButton::Right {
+                                        return;
+                                    }
+                                    window.prevent_default();
+                                    let root = view.update(cx, |d, _| {
+                                        d.keyboard_left = true;
+                                        d.focus.clone()
+                                    });
+                                    window.focus(&root, cx);
+                                }
+                            })
                             .os_context_menu(move |m, _, _| {
                                 let v = view.clone();
                                 let p = p2.clone();
@@ -2889,6 +2913,11 @@ impl FeatureDialog {
             ParamKind::Text { .. } if s.id == "formPartStudio" && self.ty.id == "sheetMetalFormed" => {
                 let value = self.feature.params.text("formPartStudio").to_string();
                 self.render_reference_field("Form Part Studio", "formPartStudio", noshape_model::params::ReferenceKind::PartStudio, &value, cx)
+            }
+            // Frame's profile: the Select sketch panel, with the frame profile library (live D134).
+            ParamKind::Text { .. } if s.id == "profileSketch" && self.ty.id == "frame" => {
+                let value = self.feature.params.text("profileSketch").to_string();
+                self.render_reference_field("Sketch profile", "profileSketch", noshape_model::params::ReferenceKind::PartStudio, &value, cx)
             }
             ParamKind::Num(_) | ParamKind::Text { .. } => {
                 let e = self.render_inline_value(s, path, values, window, cx)?;
@@ -3814,6 +3843,18 @@ impl FeatureDialog {
             None => crate::quantity_field::INVALID_TIP.to_string(),
         };
         let field = v_flex().id(SharedString::from(format!("num-{path}")));
+        // A right press gives the field the keyboard, its text all selected, as a browser's input (live
+        // dialog-number-rclick-menu: "Depth", [0, 5]).
+        let st_r = state.clone();
+        let field = field.capture_any_mouse_down(move |e, window, cx| {
+            if e.button != MouseButton::Right {
+                return;
+            }
+            st_r.update(cx, |s, cx| {
+                window.focus(&s.focus_handle(cx), cx);
+                s.select_all(window, cx);
+            });
+        });
         let field = self.completion_keys(field, path, cx);
         // Enter in a changed field applies it; the next Enter commits.
         let (p_ent, st_ent) = (path.to_string(), state.clone());

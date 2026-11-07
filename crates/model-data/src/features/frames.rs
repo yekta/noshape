@@ -23,7 +23,9 @@ fn butt(v: &ParamValues, id: &str) -> bool {
 pub fn frame() -> FeatureType {
     let p = vec![
         // PartStudioData reference to a profile sketch (document/library + configuration).
-        ParamSpec::text("profileSketch", "Sketch profile", "").hints(Hints::REMEMBER_PREVIOUS_VALUE),
+        ParamSpec::text("profileSketch", "Sketch profile", "")
+            .hints(Hints::REMEMBER_PREVIOUS_VALUE)
+            .describe("A library profile (feature_frame_profiles gives its value: frame-library:<standard>/<profile>, a tab, Size=<size>), a sketch of this Part Studio by name, or a profile by kind and size (\"SHS 40x40x3\")"),
         ParamSpec::query("selections", "Selections", QueryFilter::ANY_FACE | QueryFilter::ANY_EDGE | QueryFilter::VERTEX | QueryFilter::WIRE_BODY).describe("Faces, edges, and vertices that define sweep paths")
             .hints(Hints::INITIAL_FOCUS),
         ParamSpec::bool("lockProfile", "Lock profile faces", false).hints(Hints::GROUP_HEADER),

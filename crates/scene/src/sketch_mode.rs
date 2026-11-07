@@ -1769,7 +1769,8 @@ impl SketchEditor {
         // sketch-dimension-edit, its value over the line's Horizontal glyph),
         // and so does a drawing tool (live ui-parity revolve-dialog-axis: a
         // Line started over a rectangle's glyph draws).
-        if (self.tool == Tool::Dimension && !self.picks.is_empty()) || self.tool.draws() {
+        // Mirror picks its entities through them too (its selected line's glyphs show).
+        if (self.tool == Tool::Dimension && !self.picks.is_empty()) || self.tool.draws() || (self.tool == Tool::Mirror && self.mirror_axis.is_some()) {
             self.pressed_label = None;
             self.pressed_glyph = None;
         }
@@ -2020,6 +2021,8 @@ impl SketchEditor {
                         self.mirror_axis = Some(axis);
                         let ids: Vec<EntityId> = self.selection.iter().copied().filter(|e| *e != axis).collect();
                         if ids.is_empty() {
+                            // Live (ui-parity sketch-mirror-tool): the mirror line stays selected while it asks.
+                            self.selection = vec![axis];
                             self.message = Some("Select entities to be mirrored.".into());
                             return EditOutcome::redraw();
                         }

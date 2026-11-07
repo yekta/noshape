@@ -2422,6 +2422,7 @@ impl PartStudioView {
                 // Live 1726: Insert image's Libraries (Onshape images ›
                 // Environment maps).
                 libraries: image,
+                frame_profiles: false,
             };
             let panel = cx.new(|cx| {
                 let mut p = crate::select_item::SelectItemPanel::new(setup, window, cx);

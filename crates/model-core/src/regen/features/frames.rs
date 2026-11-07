@@ -352,7 +352,11 @@ fn resolve_profile(ev: &EvalCtx, text: &str) -> FResult<(FrameProfile, Shape)> {
         let prof = FrameProfile { standard: String::new(), description: s.name.clone(), outer: Vec::new(), holes: Vec::new(), min: lo, max: hi };
         return Ok((prof, face));
     }
-    let p = frames_profiles::parse(text).map_err(fe)?;
+    // A Libraries pick (Onshape frame profiles), else a profile named by its kind and dimensions.
+    let p = match super::frame_library::profile_of(text) {
+        Some(p) => p.map_err(fe)?,
+        None => frames_profiles::parse(text).map_err(fe)?,
+    };
     let f = p.face()?;
     Ok((p, f))
 }

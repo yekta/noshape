@@ -571,12 +571,30 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   menu's Use takes the right-clicked edge (it used whatever was under the cursor at the row's click: nothing). Parts
   list: Surfaces and Curves start collapsed (live 2176). Asked live (REQUESTS 09:18): the circumscribed polygon's
   constraints, Flow's toolbar state, a pasted sketch's selection owner, Frame's 1001 default.
+- Frame's Sketch profile library (lead 11-07, P1): `regen/features/frame_library.rs`, profiles built from the
+  published dimensions their size names give (no Onshape geometry): ISO and ANSI (Rectangular bar / tube, Round bar /
+  tube; live's 1,076 size names and defaults, frame_library.json; ISO Rectangular tube's Rounded: outer r 2t, inner r t,
+  provisional until live measures). `profileSketch` = `frame-library:<standard>/<profile>\tSize=…;Rounded=…`. The
+  dialog's field is the Select sketch panel (shows the profile name), opening on Libraries: Library / Type / Profile
+  selects (a change updates the field at once), Size (+ Rounded) with Generate preview, Select closes it. Op
+  `feature_frame_profiles`. To do: 8020, AISC, AS, Construction materials (asked live, REQUESTS 10:40, for their lists,
+  placement, Rounded radii, cut list text, fresh default); the picker's thumbnail and search; live's 1001 default.
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
-  it; Add custom features' search box is recorded, Escape there drops the keyboard. Open: a right press on a number
-  field should focus it all selected (live dialog-number-rclick-menu) and on a checkbox leave the fields (focusing in
-  the menu's build or a capture handler didn't take, and blurring there lost Convert to expression); Mirror's line
-  stays selected while it asks (selecting it in the editor stopped the next pick mirroring in the app).
+  it; Add custom features' search box is recorded, Escape there drops the keyboard. 
+  Traced (lead 11-07, focus per press / menu open / frame / state read, env-gated, removed after):
+  - A number field's right press did focus it; then the text input's own Cut / Copy / Paste menu (gpui-component's
+    NativeMenu, drawn on Linux, native on macOS / Windows) took the keyboard. A browser's native menu leaves it on the
+    input: the driver now reads a state with the focus that menu hands its actions to
+    (`NativeMenu::open_fallback_context`, vendor gpui-component), as for our own menus. The press focuses the field
+    with its text all selected (capture phase); a converted checkbox's expression field likewise before its menu.
+  - A checkbox's right press: GPUI's auto-focus of a tracked element runs for any button; a capture handler now
+    `prevent_default`s it and leaves the keyboard to the dialog (live: the page body). The earlier blur inside the
+    menu's build had lost "Convert to expression": the recorder had never read a converted checkbox (now "number").
+  - Mirror: with its line selected, the line's constraint glyphs took the next press (overlay presses come first
+    for every tool but drawing ones); Mirror's picks now pass through them, and the line stays selected while it asks.
+    A mirrored line's own SYMMETRIC is recorded as live's model holds it.
+  - Left: dialog-number-rclick-menu's Escape (live's recorder sends it past the browser's native menu: focus none).
 
 **Lead 11-02 23:35, top items (milestone 11-03 evening):** (1) P1 VAR-AUTOCOMPLETE-ENTER, (2) the interaction parity
 suite's noshape side (docs/PARITY-SUITES.md §2): the driver (`NOSHAPE_UI_SCRIPT` / `NOSHAPE_UI_STATE_OUT`), the state

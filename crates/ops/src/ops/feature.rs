@@ -15,6 +15,16 @@ pub fn ops() -> Vec<Op> {
     vec![
         Op {
             group: "feature",
+            verb: "frame_profiles",
+            summary: "Frame's profile library (Sketch profile › Libraries): standards, profiles and sizes",
+            description: "Onshape frame profiles as the Frame dialog's Select sketch › Libraries tab lists them. Without arguments: the standards and their profiles; with `standard` and `profile`: that profile's sizes, its default, whether it has Rounded, and the `profileSketch` value for feature_add (`frame-library:<standard>/<profile>` then a tab and `Size=<size>`, `;Rounded=true`).",
+            fields: vec![opt("standard", s(), "A standard (Type), e.g. ISO."), opt("profile", s(), "A profile of it, e.g. Rectangular tube."), opt("size", s(), "A size of it (default: the profile's default)."), opt("rounded", json!({ "type": "boolean" }), "Rounded corners (profiles that have them).")],
+            mutates: false,
+            destructive: false,
+            run: frame_profiles,
+        },
+        Op {
+            group: "feature",
             verb: "types",
             summary: "List the Part Studio feature types",
             description: "Every feature of the Part Studio toolbar and tool search (Extrude, Revolve, Fillet, Hole, Sheet metal, Frames...), plus the document's custom FeatureScript features. Use the `type` id with `feature_add`.",
@@ -345,6 +355,28 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
         }
     }
     Ok(())
+}
+
+fn frame_profiles(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::regen::features::frame_library as fl;
+    let Some(standard) = a.opt_str("standard")? else {
+        let list: Vec<Value> = fl::standards().into_iter().map(|s| json!({ "standard": s, "profiles": fl::profiles(s) })).collect();
+        return Ok(json!({ "library": fl::LIBRARY, "standards": list }).into());
+    };
+    if !fl::standards().contains(&standard) {
+        return Err(OpError::param("standard", &format!("not in the library; standards: {}", fl::standards().join(", "))));
+    }
+    let profile = a.str("profile")?;
+    if !fl::profiles(standard).contains(&profile) {
+        return Err(OpError::param("profile", &format!("not a {standard} profile; profiles: {}", fl::profiles(standard).join(", "))));
+    }
+    let (sizes, default) = fl::sizes(standard, profile);
+    let size = a.opt_str("size")?.unwrap_or(default);
+    if !sizes.contains(&size) {
+        return Err(OpError::param("size", &format!("not a size of {standard} {profile}; see this op's sizes")));
+    }
+    let rounded = a.bool_or("rounded", false)? && fl::has_rounded(standard, profile);
+    Ok(json!({ "standard": standard, "profile": profile, "sizes": sizes, "default": default, "rounded_option": fl::has_rounded(standard, profile), "profileSketch": fl::value(standard, profile, size, rounded) }).into())
 }
 
 fn category_name(c: Category) -> String {

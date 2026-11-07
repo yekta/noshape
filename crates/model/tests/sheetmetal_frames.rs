@@ -698,6 +698,24 @@ fn frame_on(s: &mut Studio, sid: FeatureId, ids: &[u32], profile: &str, corner: 
     })
 }
 
+/// Frame › Sketch profile › Libraries (live D134): ISO › Rectangular tube › 30mm x 30mm x 2mm, Rounded, along a 200 mm
+/// line: the tube's section (outer corners r 4, inner r 2) times the length; ANSI's round bar by its inch size.
+#[test]
+fn frame_with_a_library_profile() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let ids = polyline(&mut sk, &[(0.0, 0.0), (200.0, 0.0)], false);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    frame_on(&mut s, sid, &ids, "frame-library:ISO/Rectangular tube\tSize=30mm x 30mm x 2mm;Rounded=true", "MITER");
+    let r = s.ok();
+    let section = 900.0 - 676.0 - (4.0 - std::f64::consts::PI) * (16.0 - 4.0);
+    assert!(near(volume(&r, 0) * 1e9, section * 200.0, 1e-3), "volume {}", volume(&r, 0) * 1e9);
+    s.ps.features.last_mut().unwrap().params.set("profileSketch", ParamValue::Text("frame-library:ANSI/Round bar\tSize=1/2in (0.5)".into()));
+    let r = s.ok();
+    let d = 12.7;
+    assert!(near(volume(&r, 0) * 1e9, std::f64::consts::PI * d * d / 4.0 * 200.0, 1e-3), "volume {}", volume(&r, 0) * 1e9);
+}
+
 /// Frame's manipulators as std's createFrameManipulators (audit-part-studio M15): on a straight 200 mm member of
 /// SHS 40x40, the nine alignment points of the profile's box around the centre (chosen) at the member's middle and
 /// the angle arc 40 mm out; a click on a corner runs std's change function, which picks it (index 0).

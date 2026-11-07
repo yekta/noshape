@@ -285,7 +285,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 // A menu takes our keyboard but not a browser's: read the state with the focus the menu returns to.
                 let mut s = cx
                     .update(|window, cx| {
-                        let ret = noshape_app_core::os_menu::open_return_focus(cx).or_else(|| ps.read(cx).context_menu_return_focus(cx));
+                        let ret = noshape_app_core::os_menu::open_return_focus(cx)
+                            .or_else(|| ps.read(cx).context_menu_return_focus(cx))
+                            .or_else(|| gpui_kit::component::native_menu::NativeMenu::open_fallback_context(window, cx));
                         let Some(ret) = ret else { return ps.read(cx).ui_state(window, cx) };
                         let menu = window.focused(cx);
                         window.focus(&ret, cx);

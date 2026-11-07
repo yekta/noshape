@@ -30,7 +30,7 @@ use crate::icon::IconSource;
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use gpui::AssetSource;
-use gpui::{Action, App, Pixels, Point, SharedString, Window};
+use gpui::{Action, App, FocusHandle, Pixels, Point, SharedString, Window};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 use gpui::{Image, ImageFormat};
 #[cfg(any(target_os = "macos", target_os = "windows"))]
@@ -191,6 +191,20 @@ impl NativeMenu {
     /// Whether the menu has no items.
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
+    }
+
+    /// While a drawn fallback menu (Linux) is open, the focus it hands its action to: a native menu (macOS,
+    /// Windows) leaves the keyboard there all along. `None` otherwise.
+    pub fn open_fallback_context(window: &Window, cx: &App) -> Option<FocusHandle> {
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        {
+            fallback::open_menu_context(window, cx)
+        }
+        #[cfg(any(target_os = "macos", target_os = "windows"))]
+        {
+            let _ = (window, cx);
+            None
+        }
     }
 
     /// Pop up the menu at `position` (window coordinates, in logical pixels).

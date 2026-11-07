@@ -1845,6 +1845,27 @@ export const block = defineFeature(function(context is Context, id is Id, defini
     assert!(r["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{r}");
 }
 
+/// Frame's profile library (live D134) through the agent API: the standards and profiles, a profile's sizes and value,
+/// and a Frame built with it; a wrong size names the parameter.
+#[test]
+fn a_frame_with_a_library_profile() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "frame-library.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "line", "points": [[0, 0], [200, 0]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    let l = call(&mut ctx, "feature_frame_profiles", json!({}));
+    let iso = l["standards"].as_array().unwrap().iter().find(|s| s["standard"] == "ISO").unwrap_or_else(|| panic!("{l}"));
+    assert!(iso["profiles"].as_array().unwrap().iter().any(|p| p == "Rectangular tube"), "{l}");
+    let p = call(&mut ctx, "feature_frame_profiles", json!({ "standard": "ISO", "profile": "Rectangular tube", "size": "30mm x 30mm x 2mm" }));
+    assert_eq!(p["default"], "20mm x 20mm x 2mm", "{p}");
+    let e = try_call(&mut ctx, "feature_frame_profiles", json!({ "standard": "ISO", "profile": "Rectangular tube", "size": "31mm" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("size"), "{e:?}");
+    let f = call(&mut ctx, "feature_add", json!({ "type": "frame", "params": { "profileSketch": p["profileSketch"], "selections": [line] } }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    let v = num(&call(&mut ctx, "query_parts", json!({}))["parts"][0]["volume"]);
+    assert!((v - (900.0 - 676.0) * 200.0).abs() < 1e-3, "volume {v}");
+}
+
 /// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
 /// feature_types with `document` and `version`, works in a document without Feature Studios.
 #[test]

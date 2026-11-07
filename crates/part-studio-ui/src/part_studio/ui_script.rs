@@ -323,6 +323,18 @@ impl PartStudioView {
                 k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
             }
         }
+        // A mirrored line: live's model holds the lines' symmetry besides their ends' (ui-parity sketch-mirror-tool).
+        let sym: Vec<(noshape_sketch::EntityId, noshape_sketch::EntityId, noshape_sketch::EntityId)> = sk.constraints().filter_map(|c| match c.kind { K::Symmetric { a, b, axis } => Some((a, b, axis)), _ => None }).collect();
+        let pair = |p: noshape_sketch::EntityId, q: noshape_sketch::EntityId, axis| sym.iter().any(|s| s.2 == axis && ((s.0 == p && s.1 == q) || (s.0 == q && s.1 == p)));
+        let lines: Vec<(noshape_sketch::EntityId, noshape_sketch::EntityId)> = sk.entities().filter(|e| e.kind() == EntityKind::Line && e.handle_of.is_none()).filter_map(|e| e.endpoints()).collect();
+        for (i, (p1, p2)) in lines.iter().enumerate() {
+            for (q1, q2) in &lines[i + 1..] {
+                let axes = sym.iter().map(|s| s.2).collect::<std::collections::HashSet<_>>();
+                if axes.into_iter().any(|ax| (pair(*p1, *q1, ax) && pair(*p2, *q2, ax)) || (pair(*p1, *q2, ax) && pair(*p2, *q1, ax))) {
+                    constraints.push("SYMMETRIC".into());
+                }
+            }
+        }
         constraints.sort();
         dimensions.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
         let dimensions: Vec<Value> = dimensions.into_iter().map(|(kind, value, expression)| json!({ "kind": kind, "value": value, "expression": expression })).collect();

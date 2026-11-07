@@ -34,6 +34,7 @@ impl PartStudioView {
             gpu: None,
             value: String::new(),
             libraries: false,
+            frame_profiles: false,
         };
         let panel = cx.new(|cx| SelectItemPanel::new(setup, window, cx));
         let sub = cx.subscribe_in(&panel, window, |this: &mut Self, _, ev: &SelectItemEvent, window, cx| match ev {

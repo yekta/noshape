@@ -21,6 +21,8 @@ pub(crate) struct FallbackMenuOverlay {
 
 struct ActiveMenu {
     menu: Entity<PopupMenu>,
+    /// The focus the menu's actions go to (the input it was opened on).
+    action_context: Option<FocusHandle>,
     position: Point<Pixels>,
     _subscription: Subscription,
 }
@@ -43,7 +45,7 @@ impl FallbackMenuOverlay {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let menu = build_popup(items, action_context, window, cx);
+        let menu = build_popup(items, action_context.clone(), window, cx);
 
         let subscription = cx.subscribe(&menu, |this, _, _: &DismissEvent, cx| {
             this.active = None;
@@ -53,6 +55,7 @@ impl FallbackMenuOverlay {
 
         self.active = Some(ActiveMenu {
             menu,
+            action_context,
             position,
             _subscription: subscription,
         });
@@ -126,6 +129,12 @@ impl Render for FallbackMenuOverlay {
         }
         root
     }
+}
+
+/// While a fallback popup menu is open: the focus its actions go to (where a native menu leaves the keyboard).
+pub(super) fn open_menu_context(window: &Window, cx: &App) -> Option<FocusHandle> {
+    let overlay = WindowState::native_menu_overlay(window, cx)?;
+    overlay.read(cx).active.as_ref()?.action_context.clone()
 }
 
 /// Show the fallback popup menu through [`crate::Root`]'s overlay.

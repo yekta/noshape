@@ -162,6 +162,13 @@ impl FeatureDialog {
                 ParamKind::Bool { .. } if s.hints.has(Hints::OPPOSITE_DIRECTION) || s.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR) => {
                     fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": values.bool(s.id), "state": "ok" }))
                 }
+                // A checkbox converted to an expression is its text field (live dialog-checkbox-rclick-convert: "number",
+                // "false").
+                ParamKind::Bool { .. } if matches!(values.get(s.id), Some(ParamValue::Expr(_))) => {
+                    let expr = values.expr(s.id).map(|e| e.text.clone()).unwrap_or_default();
+                    let (focused, text) = self.input_of(s.id, window, cx).map(|(f, t, _)| (f, t)).unwrap_or((false, expr));
+                    fields.push(json!({ "label": label, "kind": "number", "text": text, "focused": focused, "state": if self.field_error(s.id).is_some() { "error" } else { "ok" } }));
+                }
                 // A button (Routing curve's Reset triad): live reads it as a control with its text.
                 ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) => {
                     fields.push(json!({ "label": null, "kind": "other", "text": crate::i18n::spec(s.label), "state": "ok" }));
@@ -193,7 +200,7 @@ impl FeatureDialog {
                 }
                 // A Part Studio picker (Derived's, Form's): its label and what it shows, as one control (live ui-parity
                 // derived-tool: "Part Studio Select Part Studio…").
-                ParamKind::Text { .. } if (s.id == "partStudio" && self.ty.id == "importDerived") || (s.id == "formPartStudio" && self.ty.id == "sheetMetalFormed") => {
+                ParamKind::Text { .. } if (s.id == "partStudio" && self.ty.id == "importDerived") || (s.id == "formPartStudio" && self.ty.id == "sheetMetalFormed") || (s.id == "profileSketch" && self.ty.id == "frame") => {
                     let value = if s.id == "partStudio" { self.derived_reference_value() } else { values.text(s.id).to_string() };
                     let shown = self.reference_shown(noshape_model::params::ReferenceKind::PartStudio, &value);
                     fields.push(json!({ "label": label, "kind": "other", "text": format!("{} {shown}", crate::i18n::spec(s.label)), "state": "ok" }));

@@ -55,6 +55,14 @@ fn ext_key(value: &str) -> Option<crate::derived::ExternalRef> {
 /// document or version (the field shows only the file name, live 610, 628).
 fn value_name(sources: &[RefSource], value: &str) -> Option<String> {
     use noshape_model::sheetmetal::forms;
+    // A Frame library profile shows its profile's name alone (live D134: "Rectangular tube").
+    if let Some((_, profile, _, _)) = noshape_model::regen::features::frame_library::parse_value(value) {
+        return Some(profile);
+    }
+    // A profile named by its kind and dimensions (documents from before the library: "SHS 40x40x3").
+    if !value.contains('\t') && noshape_model::regen::features::frames_profiles::parse(value).is_ok() {
+        return Some(value.to_string());
+    }
     if let Some(id) = value.split('\t').next().and_then(|v| v.strip_prefix(forms::PREFIX)) {
         return forms::FORMS.iter().find(|f| f.id == id).map(|f| f.name.to_string());
     }
@@ -219,6 +227,7 @@ impl FeatureDialog {
     fn open_reference_picker(&mut self, path: String, kind: ReferenceKind, window: &mut Window, cx: &mut Context<Self>) {
         // Derived's source (psb): the studio, part and configuration params.
         let derived = self.ty.id == "importDerived" && path == "partStudio";
+        let frame = self.ty.id == "frame" && path == "profileSketch";
         let value = if derived { self.derived_reference_value() } else { self.values_text(&path) };
         let setup = PanelSetup {
             mode: PanelMode::Reference(kind),
@@ -228,9 +237,14 @@ impl FeatureDialog {
             except: self.ref_except.clone(),
             gpu: self.ref_gpu.clone(),
             value,
-            libraries: self.ty.id == "sheetMetalFormed" && path == "formPartStudio",
+            libraries: (self.ty.id == "sheetMetalFormed" && path == "formPartStudio") || frame,
+            frame_profiles: frame,
         };
         let panel = cx.new(|cx| SelectItemPanel::new(setup, window, cx));
+        // Live D134: Frame's picker is "Select sketch".
+        if frame {
+            panel.update(cx, |p, _| p.title = Some("Select sketch"));
+        }
         let p2 = path.clone();
         let sub = cx.subscribe(&panel, move |this: &mut Self, _, ev: &SelectItemEvent, cx| match ev {
             // Picking a file closes the panel (live 483, 610); a Part
