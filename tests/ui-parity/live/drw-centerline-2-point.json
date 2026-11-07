@@ -1,18 +1,19 @@
 {
  "scenario": "drw-centerline-2-point",
- "recorded": "2026-11-06T11:35:36.059Z",
+ "recorded": "2026-11-07T16:25:23.044Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.2 backfilled"
+  "recorder": "2026-11-07.7 cb0eee3a + live2 2026-11-07.8"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "ad190203977cb3a8105e8621",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "36408bd11b6260065d6c2618",
   "start": "block-drawing",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -21,6 +22,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -100,6 +102,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -158,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 217259
+   "t": 216302
   },
   {
    "step": 2,
@@ -187,6 +190,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -245,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 231980
+   "t": 231936
   },
   {
    "step": 3,
@@ -274,6 +278,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -337,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 246019
+   "t": 248073
   },
   {
    "step": 4,
@@ -353,6 +358,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -416,7 +422,195 @@
      "selection": []
     }
    },
-   "t": 261477
+   "t": 263345
   }
- ]
+ ],
+ "_meta": {
+  "export": [
+   {
+    "format": "DXF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centerline-2-point.dxf",
+    "bytes": 93864,
+    "error": null,
+    "formatBefore": "PDF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DXF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "Release 14"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "DWG",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centerline-2-point.dwg",
+    "bytes": 25630,
+    "error": null,
+    "formatBefore": "DXF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DWG"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "2018"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "PDF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-centerline-2-point.pdf",
+    "bytes": 77653,
+    "error": null,
+    "formatBefore": "DWG",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "PDF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "1.5"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": "drawing-export-text-dropdown",
+      "value": "Normal"
+     },
+     {
+      "label": "Color",
+      "id": "drawing-export-color-dropdown",
+      "value": "Color"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   }
+  ]
+ }
 }

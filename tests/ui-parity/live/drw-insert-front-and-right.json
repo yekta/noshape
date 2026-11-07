@@ -1,18 +1,19 @@
 {
  "scenario": "drw-insert-front-and-right",
- "recorded": "2026-11-05T17:33:45.400Z",
+ "recorded": "2026-11-07T16:29:43.933Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.1 backfilled"
+  "recorder": "2026-11-07.7 cb0eee3a + live2 2026-11-07.8"
  },
  "live": {
-  "document": "372245a4cbbdaa48cb0bdfdb",
-  "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "f6b726e93b9dbeec992868ba",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "1476ea8d1228305fe6566bf9",
   "start": "block-drawing-empty",
-  "startElement": "23614b0537e04a173a620e75"
+  "startElement": "7fc07371758a5353920f612d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -21,6 +22,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -94,6 +96,7 @@
      ]
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -123,7 +126,7 @@
      "selection": []
     }
    },
-   "t": 108266
+   "t": 147661
   },
   {
    "step": 2,
@@ -175,6 +178,19 @@
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSDRAWINGVIEW",
+      "title": "Select a part or assembly",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-blocks / star",
+      "inputs": [
+       {
+        "placeholder": "Search parts or sketches",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -204,7 +220,7 @@
      "selection": []
     }
    },
-   "t": 120508
+   "t": 160032
   },
   {
    "step": 3,
@@ -251,6 +267,19 @@
      ]
     },
     "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSDRAWINGVIEW",
+      "title": "Select a part or assembly",
+      "text": "Select a part or assembly / Current document / Other documents / noshape ui parity live2-2 / Main / Part Studios / Assemblies / audit 1943 parts / audit 1990 / block 1995 / frames 1989 c1 / frames 1989 c2 / frames 1989 c3 / frames 1989 c4 / frames 1989 c5 / hole 1987 A / Sketch audit 1969 / start block / start block Copy 1 / Part 1 / start block-broken / start block-fillet / start config-blocks / start hole-plate / start overlap / start pin-block / start plate / start plate (ui) / start two-bloc",
+      "inputs": [
+       {
+        "placeholder": "Search parts or sketches",
+        "value": ""
+       }
+      ]
+     }
+    ],
     "list": null,
     "selection": {
      "count": 0,
@@ -280,7 +309,7 @@
      "selection": []
     }
    },
-   "t": 132630
+   "t": 173105
   },
   {
    "step": 4,
@@ -327,6 +356,7 @@
      ]
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -356,7 +386,7 @@
      "selection": []
     }
    },
-   "t": 146872
+   "t": 185907
   },
   {
    "step": 5,
@@ -381,6 +411,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -410,7 +441,8 @@
        "name": "Front",
        "kind": "base",
        "parent": null,
-       "scale": "2:1"
+       "scale": "2:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
@@ -422,7 +454,7 @@
      ]
     }
    },
-   "t": 161186
+   "t": 200505
   },
   {
    "step": 6,
@@ -447,6 +479,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -476,20 +509,22 @@
        "name": "Front",
        "kind": "base",
        "parent": null,
-       "scale": "2:1"
+       "scale": "2:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
        "parent": "Front",
-       "scale": "2:1"
+       "scale": "2:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
      "selection": []
     }
    },
-   "t": 176575
+   "t": 216200
   },
   {
    "step": 7,
@@ -505,6 +540,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -534,20 +570,210 @@
        "name": "Front",
        "kind": "base",
        "parent": null,
-       "scale": "2:1"
+       "scale": "2:1",
+       "brokenOut": 0
       },
       {
        "name": "Right",
        "kind": "projected",
        "parent": "Front",
-       "scale": "2:1"
+       "scale": "2:1",
+       "brokenOut": 0
       }
      ],
      "annotations": [],
      "selection": []
     }
    },
-   "t": 192476
+   "t": 232658
   }
- ]
+ ],
+ "_meta": {
+  "export": [
+   {
+    "format": "DXF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-insert-front-and-right.dxf",
+    "bytes": 92157,
+    "error": null,
+    "formatBefore": "PDF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DXF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "Release 14"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "DWG",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-insert-front-and-right.dwg",
+    "bytes": 24959,
+    "error": null,
+    "formatBefore": "DXF",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "DWG"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "2018"
+     },
+     {
+      "label": "Sheets",
+      "id": null,
+      "value": "All sheets"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": null,
+      "value": "Export as text"
+     },
+     {
+      "label": "Units",
+      "id": "drawing-units-dropdown",
+      "value": "Use drawing units"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Export splines as polylines",
+      "checked": false
+     },
+     {
+      "label": "Set z-height to zero and normals to positive",
+      "checked": true
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     },
+     {
+      "label": "Exclude off-sheet content",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   },
+   {
+    "format": "PDF",
+    "via": "dialog (tab › Export…)",
+    "file": "drw-insert-front-and-right.pdf",
+    "bytes": 77519,
+    "error": null,
+    "formatBefore": "DWG",
+    "fields": [
+     {
+      "label": "File name View export rules",
+      "id": "drawing-export-filename-input",
+      "value": "Part 1 Drawing 1"
+     },
+     {
+      "label": "Format",
+      "id": "drawing-export-format-dropdown",
+      "value": "PDF"
+     },
+     {
+      "label": "Version",
+      "id": null,
+      "value": "1.5"
+     },
+     {
+      "label": "Overridden dimensions",
+      "id": "drawing-export-overriddenDimensions-dropdown",
+      "value": "Show underlines"
+     },
+     {
+      "label": "Text",
+      "id": "drawing-export-text-dropdown",
+      "value": "Normal"
+     },
+     {
+      "label": "Color",
+      "id": "drawing-export-color-dropdown",
+      "value": "Color"
+     },
+     {
+      "label": "Options",
+      "id": "export-options-dropdown",
+      "value": "Download"
+     },
+     {
+      "label": "Hide inspection items",
+      "checked": false
+     }
+    ],
+    "note": "Export dialog from the drawing tab's context menu after the last step; only Format changed, every other field as the dialog showed it"
+   }
+  ]
+ }
 }
