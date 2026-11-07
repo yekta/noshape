@@ -1076,7 +1076,15 @@ impl<'a> Translator<'a> {
         if regions.len() == ids {
             return Some(regions);
         }
-        self.regions_of_new_bodies(k, &ours, &g, ids, true).or_else(|| self.regions_by_volume(k, &g, ids)).or_else(|| outer_region(&g, ids))
+        if let Some(r) = self.regions_of_new_bodies(k, &ours, &g, ids, true) {
+            return Some(r);
+        }
+        // Guessed only without live's geometry (an assembly corpus' studio), for a feature that takes regions.
+        let kind = self.features.get(k).and_then(|f| f["featureType"].as_str()).unwrap_or("");
+        if self.part_order.is_empty() || !["extrude", "revolve"].contains(&kind) {
+            return None;
+        }
+        self.regions_by_volume(k, &g, ids).or_else(|| outer_region(&g, ids))
     }
 
     /// Without live's geometry: the `ids` regions of sketch `g` whose blind extrude (feature `k`, a new solid) has the
@@ -1231,7 +1239,7 @@ impl<'a> Translator<'a> {
         if lines.len() == 1 {
             return Some(lines);
         }
-        if !lines.is_empty() {
+        if !lines.is_empty() || self.part_order.is_empty() {
             return None;
         }
         // No centreline (an assembly corpus' studio, no live geometry): the profile's longest side with all of the
