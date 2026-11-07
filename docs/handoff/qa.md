@@ -36,6 +36,10 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 23:01:** agent session on green f87905ce (studios' "an agent's first MCP calls work or say what to do next"): the same
+task in 15 calls, 0 failed (v0.4.35: 3 of 14); the agent gave document_create a bare name and the server put it in
+~/Documents/noshape. The quoted value wasn't tried this time (MCP-QUOTED-VALUE stays open). qa-scratch/agent/gf87905ce/.
+
 **11-07 22:29: new release check (lead 11-07, the user's): one real agent session per release.** bin/agent-session.sh
 <release noshape-cli> <tag>: `claude -p` on Haiku (claude-haiku-5-5) in an empty folder, only noshape's MCP server
 (--strict-mcp-config, other tools disallowed), the fixed task "create a 60×40×10 mm block with a 10 mm hole in the documents folder
