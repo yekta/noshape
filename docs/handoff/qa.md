@@ -36,6 +36,17 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-07 19:30: new standing job (lead 11-07, the user's): the parity index (docs/parity/INDEX.md).** tools/parity/index.py
+(landing c00891cb) computes it from one suite run's folder: models-report.json (features matching; speed's regeneration cases),
+uip/score.log (states by area: asm-*, drw-*, the rest Part Studio / sketch) × tools/ui-parity/coverage*.py, assemblies.log
+(occurrences), exchange.log (mean of both directions), export-compare.txt (tools/drawing-export/compare.py, live's files in
+/root/parity/ui/live, drawn-by LOOPELF LOOPELF / ROOT), open-times.json (tools/perf/open-times.py with the latest release app,
+qa-scratch/rel/latest-app: update it at each release; live's in onshape-research/live/open-times.json). Weights from INDEX.md's
+table. qa-suites.sh runs it after each run → /tmp/lead/parity-index (one line) and <run>/index.json / index.txt; vibe2 runs
+models + assemblies + exchange (vibe2:qa-parity/run-suites.sh = bin/vibe2-suites.sh). Speed leaves out cases without a live time
+(no live latency times yet). SCORE.md: one line a day in the "Parity index" table. Preliminary on the 16:34 run (no assembly,
+exchange or open cases in it): 49.7.
+
 **11-07 18:54: v0.4.35 (published 18:49, run 42396148281, cut 04b3eaa93 = b3f393b8 + the installer without Restart Manager +
 asm's translator) checked: good, no blocker.** Linux files = the smoked artifact, SHA256SUMS OK, 11 assets, every job green. Smoke =
 v0.4.34 except cli-fillet-segv (P2 SAVED-CHAMFER-CHANGE, shipped here as the 17:00 list said); the 47 ticket documents =
