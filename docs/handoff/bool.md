@@ -89,6 +89,14 @@ scratch /root/bool-scratch.
   shfall 8b25831a (a Fuse of 12 tools: history differs from OCCT with only the reversed order). Its gate had run on a
   main with skasm's torus/sphere copies in it, and that case's difference was taken for theirs. Valve's 60 ms back.
   To try instead: stop the retry where the reversed order merged nothing for the same cone pieces.
+- (04:37 UTC) c2-valve-config's Extrude 2 cut (81493b18) is ours: the apex fix again (a plane past a cone's apex meets
+  nothing), an OCCT section's end at its own bound is a vertex on both faces within the section's tolerance and its
+  own where none is within the floor's (OCCT puts such vertices on the curve; the handle's section of 0.206 mm ended
+  0.2065 mm off the cone's rim vertex, and our two vertices left a 0.2 mm sliver), and the inside test's boundary
+  closed across a tolerant vertex's gap (Pool::near_tol: no regroup on the way; with find_tol's regroups the knurl
+  k25-25 differed). T1 bool_patterns::a_valve_handle_cut_past_a_cones_apex_as_occt. Circular pattern 1's 7-tool cut
+  (42cf7278) still declines, now "a non-manifold result": the same rim with vertex pairs 0.07 mm apart past the
+  section's tolerance, per tool.
 
 ## Parked (11-06 13:49 UTC, lead): Shell's stress corpus; real documents first
 P2 (slot corners, /root/bool-scratch/p2-wip-1106.patch), P3 (the merge rounds in one pass) and the arrangement change

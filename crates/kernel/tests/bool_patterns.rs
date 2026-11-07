@@ -1415,3 +1415,12 @@ fn copies_of_a_filleted_tool_cut_as_occt() {
     let (v, w) = (r.shape.volume().unwrap(), o.shape.volume().unwrap());
     assert!((v - w).abs() <= 1e-9 * w.abs(), "volume {v} against OCCT's {w}");
 }
+
+/// c2-valve-config's Extrude 2 (recorded): a valve body cut by a handle whose end plane crosses the seat cone's axis
+/// past its apex, and whose face's section with the body's chamfer cone (OCCT's, of 0.206 mm) ends 0.2065 mm off where
+/// it leaves the cone's rim: no section on the other nappe, the section's end the rim's vertex (OCCT's bound pave);
+/// taken, as OCCT's (it declined "a plane through a cone's apex", then "an invalid result" from a 0.2 mm sliver).
+#[test]
+fn a_valve_handle_cut_past_a_cones_apex_as_occt() {
+    valid_as_occt("81493b18e2677a24", 1e-9);
+}
