@@ -1327,6 +1327,11 @@ impl<'a> Translator<'a> {
         {
             return Ok(found);
         }
+        // A sketch entity named in the text is that entity, before anything lying where live's id is (c2-rings-loft's
+        // Revolve 1 axis: the Axis sketch's line, not a construction point of the profile's sketch on it).
+        if let Some(e) = q["queryString"].as_str().and_then(|t| self.sketch_entity_from_query(t)) {
+            return Ok(vec![e]);
+        }
         self.query_with(k, q, true)
     }
 
