@@ -1866,3 +1866,12 @@ sheet-metal differences, SPUR-GEAR-SPEED and SKETCH-SCREEN-SPACE-REACH. Open ass
   propagation, no overflow; `k::fillet_rust_accepts` refuses them): each arc lies between the bottom plane and a drafted
   corner's cone about the same axis, so the exact blend is a torus; crates/brep's blend would need that case (bool's
   area and gate). Handed back to the lead 11-07 (lead: skasm stays on sketches and sheet metal).
+- 11-07 20:40: live 2249 says collinear sketch lines end to end are always one edge (Extrude and SM Thicken), and ours
+  already does it for a plain extrude (a five-line rectangle extrudes to 6 faces / 12 edges, legacy or not: the region
+  profile joins them). So the louver's extra Part 3 face is NOT from qTubuc8Y6xsg / pIGznHdo2PDZ: find the split
+  edge first (the 408.73 + 1364.20 mm² pair on the plane through (551.6, -110.6, 18.8) and (1096.1, -110.6, 18.8),
+  normal (0, -0.784, -0.621)): which two definition-sheet edges make them, and why live's sheet has one. A region-level
+  merge (ScopeRule 14) was tried and reverted (no effect). Also landed 20:13 queue: a polygon's snap2 and the state's
+  pattern count (sketch scenarios 146/147; sketch-row-copy-paste-onto-front's owner null is live's reader, not a
+  behaviour). learning-center-michael 7 -> 5 (Fillet 2 "Failed to fillet") came from main between 19:44 and 20:10, not
+  from skasm's changes (same without them).
