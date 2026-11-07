@@ -16,7 +16,7 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
-**Review of bool's de4907d9 (by_quadrics stage 1 + the repair), core 11-07 16:39 UTC (lead's ask).**
+**Review of bool's de4907d9 (by_quadrics stage 1 + the repair), core 11-07 16:27 UTC (lead's ask).**
 - Sound: every new loop has a fixed iteration cap (the march 400 steps, solves 16-100), so a failing case gives up the
   same way everywhere and falls back; no unordered containers; the repair runs only on an invalid inward wall, inside
   a Standard_Failure catch, and its wall still goes through BRepCheck, the crossing check and the volume check; traced
