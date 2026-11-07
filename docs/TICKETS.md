@@ -3492,7 +3492,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
   are one row with the unconfigured children.
 - [x] (asm 11-07: confirmed; `configured_properties::properties_in` for the cells and Exclude from all BOMs; e2e the_bom_follows_configurations) P0 ASM-BOM-CONFIGURED-PROPERTIES (asm) BOM cells read `part_properties` as stored: configured
   Part number / Description / Material / Exclude from all BOMs show one value for every configuration.
-- [ ] P0 ASM-MASS-OVERRIDES (asm, verify in code) assembly mass properties use material density only: a part's
+- [ ] (asm 11-07: confirmed; part and subassembly Mass overrides now count (`analysis::part_densities`, T1 assembly_mass_properties_combine_parts_where_they_sit); left: configured materials (need the library's density), and whether Onshape leaves BOM-excluded parts out: P2 now) P0 ASM-MASS-OVERRIDES (asm) assembly mass properties use material density only: a part's
   mass override counts as "no material", a subassembly's override and configured materials are ignored, parts excluded
   from BOMs are counted.
 - [x] (asm 11-07: Mate::new and the op default X; saved mates keep theirs) P1 ASM-MATE-OFFSET-ROTATE-AXIS (asm) a new mate's offset "Rotate about" defaults to Z on every type but

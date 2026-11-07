@@ -3380,6 +3380,17 @@ fn assembly_mass_properties_combine_parts_where_they_sit() {
     let missing = super::analysis::assembly_mass_properties(&res, &[], &|o| (o.top() == InstanceId(1)).then_some(1000.0)).unwrap();
     assert!(missing.props.mass.is_none());
     assert_eq!(missing.without_material.len(), 1);
+    // A part's Mass override counts as its mass without a material (Onshape): each instance of the block weighs 1 kg
+    // (it used to count as "no material").
+    let mut doc = f.doc.clone();
+    if let Some(TabContent::PartStudio(ps)) = doc.tab_mut(f.studios[0]).map(|t| &mut t.content) {
+        let p = ps.part_properties.entry(body.clone()).or_default();
+        p.density = None;
+        p.mass_override = Some(1.0);
+    }
+    let dens = super::analysis::part_densities(&doc, &asm, &res);
+    let both = super::analysis::assembly_mass_properties(&res, &[], &|o| dens.get(&(o.path.clone(), o.body.clone())).copied().flatten()).unwrap();
+    assert!(both.without_material.is_empty() && (both.props.mass.unwrap() - 2.0).abs() < 1e-9, "{:?}", both.props.mass);
     // Show calculation variance: every value gets a small, positive bound (live's floors: the centre's 1e-3 mm, one
     // bound for every inertia entry).
     let v = super::analysis::assembly_mass_variance(&res, &[], &|_| Some(1000.0)).expect("bounds");

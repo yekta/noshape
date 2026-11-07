@@ -134,10 +134,9 @@ impl AssemblyView {
     /// Computed mass of the whole assembly (kg), for its Properties….
     pub(super) fn assembly_total_mass(&self, cx: &App) -> Option<f64> {
         let doc = &self.doc.read(cx).session.doc;
-        let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
-            Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
-            _ => None,
-        };
+        // Mass overrides count (a part's, a subassembly's), as Onshape weighs them.
+        let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
+        let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
         let all: Vec<InstanceId> = self.assembly(cx).map(|a| a.instances.iter().map(|i| i.id).collect()).unwrap_or_default();
         assembly_mass_properties(&self.result, &all, &density).and_then(|m| m.props.mass)
     }
@@ -176,10 +175,9 @@ impl AssemblyView {
             return None;
         }
         let doc = &self.doc.read(cx).session.doc;
-        let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
-            Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
-            _ => None,
-        };
+        // Mass overrides count (a part's, a subassembly's), as Onshape weighs them.
+        let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
+        let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
         assembly_mass_properties(&self.result, &self.selected, &density)
     }
 
@@ -195,10 +193,8 @@ impl AssemblyView {
         }
         let v = {
             let doc = &self.doc.read(cx).session.doc;
-            let density = |o: &noshape_model::assembly::eval::PartOccurrence| match doc.tab(o.studio).map(|t| &t.content) {
-                Some(TabContent::PartStudio(ps)) => ps.part_properties.get(&o.body).and_then(|p| p.density),
-                _ => None,
-            };
+            let densities = self.assembly(cx).map(|a| noshape_model::assembly::analysis::part_densities(doc, a, &self.result)).unwrap_or_default();
+            let density = |o: &noshape_model::assembly::eval::PartOccurrence| densities.get(&(o.path.clone(), o.body.clone())).copied().flatten();
             noshape_model::assembly::analysis::assembly_mass_variance(&self.result, &self.selected, &density)
         };
         if let Some(m) = &mut self.ui.mass {
