@@ -29,6 +29,15 @@ area 1e-6 relative or live's band; centre and box 1e-6 m). Per document: the fir
 Score: documents that match to the end, and features that match, out of all. Each difference that isn't the
 translator's becomes a ticket for its area.
 
+**Area of procedural blend faces (core, lead 11-07).** Live measures the area of its procedural (OTHER) blend faces
+about 0.22 % low, so a part's area band is widened above by 0.22 % of the area of our faces on other surfaces
+(`LIVE_FREEFORM_AREA_SHORT`, `PartState::freeform_area`). Evidence: c2-extension-spring's Curvature rounds
+(magnitude 0.5) read 0.8113 mm² (R 0.5 × 1 mm) and 2.4341 mm² (R 1.5 × 1 mm) in live, ours 0.8131 / 2.4393. Live's own
+exact section for a Curvature fillet of magnitude 0.5 (behaviours.md G11 (a): poles (1, 0) (0.85, 0) (0.7, 0)
+(1/3, 0.1) (0.1, 1/3) (0, 0.7) (0, 0.85) (0, 1) in setbacks, degree 5, knots 0⁶ ½² 1⁶) has an arc length of 1.62622 per
+unit setback: × R × depth gives 0.8131 and 2.4393 to four digits, and live's face boxes show the full setbacks. So
+ours is the exact area; live's reading of it is 0.22 % short.
+
 ## 2. Interaction suite: the same steps in live and in noshape
 
 **Scenarios (qa, live).** `tests/ui-parity/<name>.json`: short scripts of what a user does: keys, typed text, clicks

@@ -2417,3 +2417,16 @@ fn a_face_two_parts_have_is_the_one_on_lives_part() {
     let on_tall = t.call("query_entities", json!({ "kind": "faces", "part": tall, "limit": 20 })).unwrap();
     assert!(on_tall["faces"].as_array().unwrap().iter().any(|x| x["id"] == picked.as_str()), "{picked} not on {tall}: {on_tall}");
 }
+
+/// Live measures its procedural blend faces' area 0.22 % low (c2-extension-spring's Curvature rounds: PARITY-SUITES.md):
+/// a part's area may exceed live's band by that share of our faces on other surfaces, not more, and not below it.
+#[test]
+fn area_allows_lives_short_reading_of_blend_faces() {
+    let part = |area: f64, freeform: Option<f64>| PartState { name: "Spring".into(), faces: 12, edges: 30, vertices: 20, area: Some(area), area_band: Some([206.37e-6, 206.372e-6]), freeform_area: freeform, ..Default::default() };
+    let live = [part(206.371e-6, None)];
+    // Ours 0.027 mm² over, with 12.5 mm² of rounds: 0.22 % of them is 0.0275.
+    assert!(differences(&live, &[part(206.398e-6, Some(12.5e-6))]).is_empty());
+    assert!(!differences(&live, &[part(206.398e-6, None)]).is_empty(), "no rounds: live's band");
+    assert!(!differences(&live, &[part(206.41e-6, Some(12.5e-6))]).is_empty(), "past the rounds' share");
+    assert!(!differences(&live, &[part(206.34e-6, Some(12.5e-6))]).is_empty(), "under live's band: not widened");
+}
