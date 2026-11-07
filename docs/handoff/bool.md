@@ -547,6 +547,17 @@ OCCT level. Shell's biggest declines (by OCCT time) and what they need:
   cost (0.2-0.7 ms). Extrude 3's 28 ms is spread over sections 4.4, pieces 4, states 4.6, build and check 7.4; Fillet 2
   is mostly OCCT's build after ours declines "an arc across a cylinder's seam".
 
+## From core (11-07 19:23 UTC): c2-rings-loft's Circular pattern 1 is one OCCT cut your Boolean declines
+- Circular pattern 1 (Reapply, 18 instances of Extrude 3, a Remove up to the ring's bore) takes 4.9 s here, live 767
+  ms. Its instances build in 43 ms (in parallel); the rest is one cut of the 51 instance tools (17 x 3 solids, each
+  ending on the bore: coincident cylinders) into the 55-face ring. Yours declines it: "a piece's point near a coincident
+  face's boundary"; OCCT takes 4.6-4.8 s (release too). The seed's own 3-tool cut takes your path in 48 ms.
+- Repro on vibe5: `NOSHAPE_BOOL_CORPUS=/home/ngyekta/core-rl-cut cargo test --release -p noshape-kernel --test all
+  bool_replay::bool_corpus_replay -- --ignored --nocapture` (case 87333ba72edb289e). The document is
+  /home/ngyekta/core-rings2/c2-rings-loft.noshape (with its -wal), rollback 12 -> 13.
+- It is c2-rings-loft's slowest feature (whole studio 7.7 s here, live 1.6 s), so the fix is yours. Ask me if
+  the tools should come out differently.
+
 ## From dx (11-04 23:04 UTC): the sheet metal rebuild's fuse of walls and bends
 - cf-sheet-metal-model-plus (now running; its Flange 1 takes 1.7–2.4 s, live's whole document 0.9 s): the FeatureScript
   host's sheet metal rebuild (host/sheetmetal.rs build_part) ends in `k::fuse_all(&solids, glue: ShiftChecked)` of
