@@ -853,6 +853,16 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   integral along u from u0 for each Gauss point, capped (20,000 segments a piece), so the time is flat in the size
   but large. Wants an area quadrature over the knot cells inside the trim instead, or inner integrals shared along
   the boundary. Repro: T2 model custom_features::displacement_map_scales (its "volume" column).
+- [ ] P2 SAVED-CHAMFER-CHANGE (core) **saved documents' chamfers regenerate differently since 07384946a / f57807bd0 (after
+  v0.4.34's cut), with no ScopeRule** (core.md: a change that alters saved documents goes under legacy_topology or its own
+  ScopeRule). Green 6d194fa1 → d973df07, the 44 ticket documents: a chamfer that failed with "Distance of chamfer on face too
+  large." now succeeds, and the Shells after it change: bop-pairs-gpf-5267 Chamfer 3 Error → Ok, Shell 4 Ok → "Could not shell
+  part with selections." (Part 1 82839.0246 / 13 faces → 67732.7411 / 15); cli-shell-hang-pre Chamfer 6 → Warning "1 missing
+  selection", Shell 5 Ok → Error; draft-pool-hang-2133 / -b184 Chamfer 3 → Ok (Part 1 88826 → 73720 mm³); cli-fillet-segv
+  Chamfer 6 → Ok (Part 4 44034.2343 / 26 → 43710.5082 / 33; the volume sweep's row too). v0.4.34 still gives the old results
+  (Chamfer 3 Error on draft-pool-hang-2133), so the change is 07384946a (a notch's arc chamfer run on past the arc's ends) or
+  f57807bd0 (slanted rim rounds). Fuzz documents, so no live value: which result is live's for these chamfers is open; but
+  documents saved before shouldn't change on open. (qa 2026-11-07 08:09, greens 6d194fa1 / d973df07, v0.4.34)
 - [ ] P2 SAVED-MIRROR-REF-CHANGE (core) **a saved document's Mirror resolves differently on green 8cc1b766**: qa-scratch/tickets/
   cli-suppress-stall.noshape (a fuzz document), Mirror 10: 7bb99058 "No merge scope selected." (Error, 6 parts) → 8cc1b766 "1
   missing selection" (Warning) and a mirrored part more (7 parts: an extra 4984.2537 mm³ / 3 faces). Everything else in the 44
