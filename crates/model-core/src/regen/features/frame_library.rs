@@ -26,32 +26,87 @@ struct SizeList {
     sizes: Vec<String>,
 }
 
-/// Live's size lists by standard and profile (dom/psui-d134-frame-profile-sizes-*.json).
+/// Live's size lists by standard and profile (dom/psui-d134-frame-profile-sizes-*.json): ANSI and ISO.
 static LISTS: LazyLock<BTreeMap<String, BTreeMap<String, SizeList>>> = LazyLock::new(|| serde_json::from_str(include_str!("frame_library.json")).unwrap_or_default());
 
-/// A standard of the library, in the picker's order, and how its second level is labelled: ANSI and ISO have no Type
-/// level, their select reads "Type" (live D134).
+/// AISC's shapes, smallest first as live lists them (C3x3.5 first): each size's name and its dimensions in inches
+/// from the AISC Shapes Database v15.0 (W / M / S / HP / C / MC / tees: d, bf, tw, tf; L: d, b, t; Pipe and round
+/// HSS: OD, t design; rectangular and square HSS: Ht, B, t design).
+type SizeTable = Vec<(String, Vec<f64>)>;
+static AISC: LazyLock<BTreeMap<String, SizeTable>> = LazyLock::new(|| {
+    let raw: BTreeMap<String, Vec<Vec<serde_json::Value>>> = serde_json::from_str(include_str!("frame_library_aisc.json")).unwrap_or_default();
+    raw.into_iter()
+        .map(|(p, rows)| (p, rows.into_iter().filter_map(|r| Some((r.first()?.as_str()?.to_string(), r[1..].iter().filter_map(|v| v.as_f64()).collect()))).collect()))
+        .collect()
+});
+
+/// AISC's one Type and its profiles in live's order (D134).
+const AISC_TYPE: &str = "AISC profiles";
+const AISC_PROFILES: [&str; 14] = ["C-shape", "HP-shape", "L-angle", "M-shape", "MC-shape", "MT-shape", "Pipe", "Rectangular", "Round", "S-shape", "Square", "ST-shape", "W-shape", "WT-shape"];
+
+/// The library's standards we build, in the picker's order (live: 8020, AISC, ANSI, AS, Construction materials, ISO).
 pub fn standards() -> Vec<&'static str> {
-    LISTS.keys().map(|s| s.as_str()).collect()
+    std::iter::once("AISC").chain(LISTS.keys().map(|s| s.as_str())).collect()
 }
 
-/// The second level's label for `standard`.
-pub fn standard_label(_standard: &str) -> &'static str {
-    "Type"
+/// A standard's Type level (live: AISC › "AISC profiles"); none for ANSI and ISO, whose second level is itself
+/// labelled "Type".
+pub fn types(standard: &str) -> Vec<&'static str> {
+    if standard == "AISC" { vec![AISC_TYPE] } else { Vec::new() }
+}
+
+/// The second level's label for `standard`: "Standard" above a Type level, else "Type" (live D134).
+pub fn standard_label(standard: &str) -> &'static str {
+    if types(standard).is_empty() { "Type" } else { "Standard" }
 }
 
 /// A standard's profiles, in live's order.
 pub fn profiles(standard: &str) -> Vec<&'static str> {
+    if standard == "AISC" {
+        return AISC_PROFILES.iter().copied().filter(|p| AISC.contains_key(*p)).collect();
+    }
     const ORDER: [&str; 4] = ["Rectangular bar", "Rectangular tube", "Round bar", "Round tube"];
     let Some(s) = LISTS.get(standard) else { return Vec::new() };
     ORDER.iter().copied().filter(|p| s.contains_key(*p)).collect()
 }
 
-/// A profile's sizes and the default one.
+/// A profile's sizes and the default one (AISC's: the first).
 pub fn sizes(standard: &str, profile: &str) -> (Vec<&'static str>, &'static str) {
+    if standard == "AISC" {
+        let list: Vec<&'static str> = AISC.get(profile).map(|l| l.iter().map(|(n, _)| n.as_str()).collect()).unwrap_or_default();
+        let first = list.first().copied().unwrap_or("");
+        return (list, first);
+    }
     match LISTS.get(standard).and_then(|s| s.get(profile)) {
         Some(l) => (l.sizes.iter().map(|s| s.as_str()).collect(), l.default.as_str()),
         None => (Vec::new(), ""),
+    }
+}
+
+/// A tee: the flange `bf` × `tf` on top, the stem `tw` wide down to the bottom, `d` deep (mm).
+fn tee(d: f64, bf: f64, tw: f64, tf: f64) -> Result<FrameProfile, String> {
+    if tw >= bf || tf >= d {
+        return Err("Tee stem or flange is too thick".into());
+    }
+    let m = |v: f64| v * 1e-3;
+    let pts = [(-tw / 2.0, 0.0), (tw / 2.0, 0.0), (tw / 2.0, d - tf), (bf / 2.0, d - tf), (bf / 2.0, d), (-bf / 2.0, d), (-bf / 2.0, d - tf), (-tw / 2.0, d - tf)];
+    let p: Vec<DVec2> = pts.iter().map(|&(x, y)| DVec2::new(m(x), m(y))).collect();
+    let outer = (0..p.len()).map(|i| k::Segment2d::Line { a: p[i], b: p[(i + 1) % p.len()] }).collect();
+    Ok(FrameProfile { standard: String::new(), description: String::new(), outer, holes: Vec::new(), min: DVec2::new(m(-bf / 2.0), 0.0), max: DVec2::new(m(bf / 2.0), m(d)) })
+}
+
+/// An AISC shape from its published dimensions (inches).
+fn aisc_profile(profile: &str, d: &[f64]) -> Result<FrameProfile, String> {
+    let mm: Vec<f64> = d.iter().map(|v| v * 25.4).collect();
+    match (profile, mm.as_slice()) {
+        ("W-shape" | "M-shape" | "S-shape" | "HP-shape", [d, bf, tw, tf]) => fp::ibeam(*d, *bf, *tw, *tf),
+        ("C-shape" | "MC-shape", [d, bf, tw, tf]) => fp::channel(*d, *bf, *tw, *tf),
+        ("WT-shape" | "MT-shape" | "ST-shape", [d, bf, tw, tf]) => tee(*d, *bf, *tw, *tf),
+        ("L-angle", [a, b, t]) => fp::angle(*a, *b, *t),
+        ("Pipe" | "Round", [od, t]) => fp::round_tube(*od, *t),
+        // HSS: AISC's outside corner radius is twice the design wall.
+        ("Rectangular" | "Square", [ht, b, t]) => rounded_tube(*b, *ht, *t),
+        _ => Err(format!("No dimensions for AISC {profile}")),
     }
 }
 
@@ -161,6 +216,13 @@ fn rounded_tube(w: f64, h: f64, t: f64) -> Result<FrameProfile, String> {
 /// The profile of a library pick.
 pub fn profile(standard: &str, profile: &str, size: &str, rounded: bool) -> Result<FrameProfile, String> {
     let bad = || format!("Unknown frame profile size \"{size}\"");
+    if standard == "AISC" {
+        let d = AISC.get(profile).and_then(|l| l.iter().find(|(n, _)| n == size)).map(|(_, d)| d.clone()).ok_or_else(bad)?;
+        let mut p = aisc_profile(profile, &d)?;
+        p.standard = standard.to_string();
+        p.description = format!("{profile} {size}");
+        return Ok(p);
+    }
     let d = dims(size).ok_or_else(bad)?;
     let mut p = match (profile, d.as_slice()) {
         ("Rectangular bar", [w, t]) => fp::flat_bar(*w, *t),
@@ -260,9 +322,27 @@ mod tests {
                 for size in list {
                     let r = profile(s, p, size, false);
                     assert!(r.is_ok(), "{s} › {p} › {size}: {r:?}", r = r.err());
+                    // AISC's sections (tees, rounded HSS) are faces the kernel builds.
+                    if s == "AISC" {
+                        assert!(r.unwrap().face().is_ok_and(|f| f.area().is_ok_and(|a| a > 0.0)), "{s} › {p} › {size}: no face");
+                    }
                 }
             }
         }
+    }
+
+    #[test]
+    fn aisc_lists_and_shapes() {
+        assert_eq!(standards()[0], "AISC");
+        assert_eq!((types("AISC"), standard_label("AISC"), standard_label("ISO")), (vec!["AISC profiles"], "Standard", "Type"));
+        assert_eq!(profiles("AISC").len(), 14);
+        let (c, default) = sizes("AISC", "C-shape");
+        assert_eq!((c.len(), default, &c[..4]), (32, "C3x3.5", &["C3x3.5", "C3x4.1", "C3x5", "C3x6"][..]));
+        // W8x31: d 8.0, bf 8.0, tw 0.285, tf 0.435 in: its I section's area.
+        let w = profile("AISC", "W-shape", "W8x31", false).unwrap();
+        let a = w.face().unwrap().area().unwrap() / (0.0254 * 0.0254);
+        let expected = 2.0 * 8.0 * 0.435 + (8.0 - 2.0 * 0.435) * 0.285;
+        assert!((a - expected).abs() < 1e-6, "{a} vs {expected}");
     }
 
     #[test]
@@ -279,6 +359,8 @@ mod tests {
     #[test]
     fn search_and_preview() {
         assert_eq!(search("tube"), vec![("ANSI", "Round tube"), ("ISO", "Round tube"), ("ANSI", "Rectangular tube"), ("ISO", "Rectangular tube")]);
+        // Live D134: "angle" ↦ AISC › L-angle first.
+        assert_eq!(search("angle").first(), Some(&("AISC", "L-angle")));
         assert!(search(" ").is_empty());
         let p = profile("ISO", "Rectangular tube", "30mm x 30mm x 2mm", true).unwrap();
         let svg = preview_svg(&p, 240.0, 136.0);

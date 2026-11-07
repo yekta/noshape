@@ -799,7 +799,10 @@ impl SelectItemPanel {
         let type_row = self.frame_select("type", frame_library::standard_label(&standard), types, &standard, cx);
         let profiles = frame_library::profiles(&standard).into_iter().map(String::from).collect();
         let profile_row = self.frame_select("profile", "Profile", profiles, &profile, cx);
-        let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library).child(type_row).child(profile_row);
+        // A standard with a Type level (AISC › "AISC profiles") shows it between (live D134).
+        let types: Vec<String> = frame_library::types(&standard).into_iter().map(String::from).collect();
+        let group_row = types.first().cloned().map(|t| self.frame_select("group", "Type", types, &t, cx));
+        let mut col = v_flex().id("sel-frame-library").flex_1().min_h_0().overflow_y_scroll().pt(px(2.)).child(library).child(type_row).children(group_row).child(profile_row);
         // The search's matches over the levels (live D134 f23): 55 px rows, a round preview, the name with the match
         // in bold, "Onshape frame profiles - <standard>" grey and italic under it.
         let hits = frame_library::search(&query);

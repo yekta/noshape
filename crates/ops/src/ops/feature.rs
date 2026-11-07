@@ -360,7 +360,7 @@ fn dialog_logic(od: &mut crate::OpenDoc, tab: noshape_model::document::TabId, fe
 fn frame_profiles(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use noshape_model::regen::features::frame_library as fl;
     let Some(standard) = a.opt_str("standard")? else {
-        let list: Vec<Value> = fl::standards().into_iter().map(|s| json!({ "standard": s, "profiles": fl::profiles(s) })).collect();
+        let list: Vec<Value> = fl::standards().into_iter().map(|s| json!({ "standard": s, "types": fl::types(s), "profiles": fl::profiles(s) })).collect();
         return Ok(json!({ "library": fl::LIBRARY, "standards": list }).into());
     };
     if !fl::standards().contains(&standard) {

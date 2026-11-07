@@ -577,7 +577,9 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   provisional until live measures). `profileSketch` = `frame-library:<standard>/<profile>\tSize=…;Rounded=…`. The
   dialog's field is the Select sketch panel (shows the profile name), opening on Libraries: Library / Type / Profile
   selects (a change updates the field at once), Size (+ Rounded) with Generate preview, Select closes it. Op
-  `feature_frame_profiles`. To do: 8020, AISC, AS, Construction materials (asked live, REQUESTS 10:40, for their lists,
+  `feature_frame_profiles`. AISC (11-07 16:20): its 14 shapes, 1,461 sizes from the AISC Shapes Database v15.0
+  (dimensions only, `frame_library_aisc.json`, smallest first as live's C-shape list), Standard › Type "AISC profiles"
+  › Profile; I / C / tee / L sections sharp-cornered, HSS with a 2t outside radius. To do: 8020, AS, Construction materials (asked live, REQUESTS 10:40, for their lists,
   placement, Rounded radii, cut list text, fresh default); live's 1001 default (fresh account; then the last pick, per account: behaviours 2216 (4)).
   Search ("Search by name, folder, or configuration": matches as 55 px rows, earliest match first, Enter takes the
   first) and the preview (`frame_library::preview_svg`: the section from above, pale fill, outline, origin) as live
