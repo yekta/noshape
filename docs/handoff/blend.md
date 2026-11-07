@@ -89,3 +89,25 @@ the two designs ((a) exact contact ellipses in the tool, ~1 day, Fillet 1 to ~13
 their meeting curve and run-outs built in crates/brep, several days, live's speed) are in the 22:15 entry above. It
 comes back if the fillet speed table shows OCCT's final cut on exact contact edges dominating many fillets.
 cf-setback-fillet's SETBACK-FILL-PATCH is blend's from now (lead 11-07 22:30; skasm told in skasm.md).
+
+**11-07 22:40 UTC: fillet speed table (lead's ask).** Every fillet / chamfer of the model suite with a live time, one
+run on vibe5 (main 11-07 ~22:00; `NOSHAPE_PARITY_ONLY=<all>` prints per-feature times; script
+/root/blend-scratch/bin/blend-table.py, full table /root/blend-scratch/blend-table.txt): 91 features, ours 4584 ms
+against live's 2031 in all; 22 slower than live, 69 level or faster. The worst, with what their time is (kernel
+profile):
+
+| document › feature | ours | live | where the time goes |
+|---|---|---|---|
+| cf-snap-hook › Fillet 6 | 187 | 8 | OCCT's fillet: the as-is try fails (14 ms), the scaled retry builds (175) |
+| c2-rings-loft › Fillet 1 | 340-488 | 23 | ring_blend's cut: OCCT's edge-face work on the rounds' contact edges (RING-BLEND-SPEED) |
+| learning-center-michael › Fillet 2 | 629-694 | 46 | OCCT's fillet falls back to `by_tools` (685; 363 of it face-face intersections) |
+| motor-mount-jack › Fillet 2 | 39 | 3 | an OCCT cut (17) and properties |
+| c2-rings-loft › Chamfer 1 | 340 | 30 | ring_blend's cut, as Fillet 1 |
+| cf-snap-hook › Fillet 5 | 64 | 6 | coaxial_round: its checks (~7 ms an edge) and the glued fuse (38) |
+| c2-impeller-loft › Fillet 1 | 374 | 38 | not the fillet (87): resolving its live-id query by geometry before it runs (eval.rs, ~114 `k::distance` against the body, 234 ms): the translator's |
+| c2-impeller-loft › Fillet 4 | 541 | 102 | OCCT's fillet falls back to `past_end_faces` (defeaturing, 500) |
+| c2-impeller-loft › Fillet Ansaugflansch | 940 | 321 | (not profiled yet) |
+
+So the final cut on exact contact edges (design (b)) is only rings-loft's two features (~700 ms). The bigger share is
+OCCT's own fillet falling into its slow fallbacks (the scaled retry, by_tools, past_end_faces: ~1.4 s over three
+features): those are next, the slowest first (michael's Fillet 2).
