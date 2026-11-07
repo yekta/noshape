@@ -2297,3 +2297,58 @@ fn ambient_occlusion_darkens_a_corner_unless_the_scene_has_none() {
     scene.no_occlusion = true;
     assert_eq!(lum(&scene, 0.375), off, "no occlusion when the scene has none");
 }
+
+/// A spline handle tip (PointSprite::HANDLE_TIP), as live draws it: at rest a 10 px hollow handle (white inside a
+/// grey ring); hovered or selected a 14 px disc in the highlight colour with a slightly lighter centre where the
+/// handle lies under it; sizes in CSS pixels at any device pixel ratio.
+#[test]
+fn a_handle_tip_is_drawn_as_lives_in_each_state() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let pts = r.upload_points(&PointData { points: vec![PointSprite { position: [0.0; 3], color: [0x60, 0x60, 0x60, 255], pick_id: 1, size: 10.0, style: PointSprite::HANDLE_TIP | 2, _pad: 0 }] });
+    let mut cam = Camera::default();
+    cam.fit_sphere(glam::DVec3::ZERO, 0.01, 1.0);
+    let style = Style { msaa: 1, ..Style::default() };
+    for dpr in [1.0f32, 2.0] {
+        let n = (64.0 * dpr) as u32;
+        let shot = |r: &mut Renderer, st: u32| -> Vec<[u8; 3]> {
+            let mut scene = Scene::default();
+            scene.instances.push(Instance::new(Drawable::Points(pts.clone())).per_primitive_color());
+            if st != 0 {
+                scene.set_state(1, st);
+            }
+            let f = r.render(RenderParams { scene: &scene, camera: &cam, width: n, height: n, device_pixel_ratio: dpr, style: &style, pick: false }).unwrap();
+            // The middle row, left to right (BGRA → RGB).
+            let y = n / 2;
+            (0..n).map(|x| { let i = ((y * n + x) * 4) as usize; [f.bgra[i + 2], f.bgra[i + 1], f.bgra[i]] }).collect()
+        };
+        // Drawn width (pixels not white) in CSS px, and the colour at `css` px from the centre.
+        // (From the first to the last pixel that isn't white: the hollow handle is white inside.)
+        let width = |row: &[[u8; 3]]| {
+            let ink = |p: &&[u8; 3]| p.iter().any(|c| *c < 250);
+            let first = row.iter().position(|p| ink(&p)).unwrap_or(0);
+            let last = row.iter().rposition(|p| ink(&p)).unwrap_or(0);
+            (last + 1 - first) as f32 / dpr
+        };
+        let at = |row: &[[u8; 3]], css: f32| row[(n as f32 / 2.0 + css * dpr) as usize];
+        let near = |p: [u8; 3], want: [u8; 3], tol: i32| p.iter().zip(want).all(|(a, b)| (*a as i32 - b as i32).abs() <= tol);
+        let rest = shot(&mut r, 0);
+        assert!((width(&rest) - 10.0).abs() <= 1.0, "dpr {dpr}: at rest {} px", width(&rest));
+        assert!(near(at(&rest, 0.5), [255, 255, 255], 6), "dpr {dpr}: white inside {:?}", at(&rest, 0.5));
+        assert!(at(&rest, 4.2).iter().all(|c| *c < 160), "dpr {dpr}: grey ring {:?}", at(&rest, 4.2));
+        for (st, colour) in [(state::HOVER, [255, 198, 133]), (state::SELECTED, [255, 169, 10])] {
+            let lit = shot(&mut r, st);
+            assert!((width(&lit) - 14.0).abs() <= 1.0, "dpr {dpr} state {st}: {} px", width(&lit));
+            assert!(near(at(&lit, 6.0), colour, 6), "dpr {dpr} state {st}: disc {:?}", at(&lit, 6.0));
+            // (The centre a little lighter: the handle's white under 90 % of the colour.)
+            let c = at(&lit, 0.5);
+            assert!(c[1] > colour[1] && c[2] > colour[2] && near(c, colour, 40), "dpr {dpr} state {st}: centre {c:?}");
+        }
+    }
+}

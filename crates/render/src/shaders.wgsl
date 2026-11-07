@@ -122,6 +122,8 @@ fn highlight_stroke(base: vec3<f32>, st: u32) -> vec3<f32> {
 // (229,163,34) (was (227,158,0)). Under a plane live blends in sRGB and we
 // in linear light, so the plane adds more blue there (ours (224,176,114)
 // vs live (229,170,56)).
+// A spline handle tip's ring (palette SKETCH_HANDLE #606060, linear).
+const HANDLE_GREY: vec3<f32> = vec3<f32>(0.117, 0.117, 0.117);
 const FACE_SELECTED: vec3<f32> = vec3<f32>(0.887, 0.414, 0.018);
 // A whole selected part / instance (state BODY): live (242,182,72) lit,
 // outlined (state OUTLINE) in (255,192,76), 2 px (live ins-902); a part
@@ -1105,6 +1107,8 @@ fn vs_point(@builtin(vertex_index) index: u32, p: PointIn) -> PointOut {
     // Live (behaviours "icons2 plane/origin highlight"): the hovered or
     // selected origin (style 4) is a 13 px filled disc; other points grow.
     if ((st & (HOVER | SELECTED)) != 0u) { size = select(size * 1.5 + 1.0, size + 2.0, (p.style & 4u) != 0u); }
+    // A lit spline handle tip (style 64): a 14 px disc (live), whatever its size at rest.
+    if ((st & (HOVER | SELECTED)) != 0u && (p.style & 64u) != 0u) { size = 14.0 + g.viewport.w; }
     let half = size * g.viewport.z * 0.5;
     c = vec4(c.xy + uv * (half + 0.75) / (g.viewport.xy * 0.5) * c.w, c.z, c.w);
     // Onshape's offsets: points 9 units, faces 27.
@@ -1155,6 +1159,20 @@ fn fs_point(i: PointOut) -> @location(0) vec4<f32> {
     if ((i.style & 8u) != 0u) {
         let inner = select(0.55, 0.45, (i.style & 32u) != 0u);
         rgb = mix(rgb, vec3<f32>(1.0), clamp(inner * i.rpx - d + 0.5, 0.0, 1.0));
+    }
+    // Style bit 64: a spline's handle tip. At rest hollow, white inside 0.7 of the radius; lit, the state colour over
+    // the whole 14 px disc, at 90 % over the handle at rest (10 px: its 0.6 grey ring, white inside 7 px) where that
+    // lies under it (live: the hovered tip's lighter centre and faint ring).
+    if ((i.style & 64u) != 0u) {
+        if ((state_of(i.pick) & (HOVER | SELECTED)) == 0u) {
+            rgb = mix(rgb, vec3<f32>(1.0), clamp(0.7 * i.rpx - d + 0.5, 0.0, 1.0));
+        } else {
+            // (Blended in sRGB, as the browser does: live's hovered centre (255,204,145) is 90 % of #ffc686 over white.)
+            let rest = i.rpx * 5.0 / 7.0;
+            let under = mix(HANDLE_GREY, vec3<f32>(1.0), clamp(0.7 * rest - d + 0.5, 0.0, 1.0));
+            let top = linear_to_srgb(rgb);
+            rgb = srgb_to_linear(mix(top, mix(top, linear_to_srgb(under), 0.1), clamp(rest - d + 0.5, 0.0, 1.0)));
+        }
     }
     // Style bit 16: a ring only, see-through inside (live midpoint markers:
     // a 9 px ring with a 1.75 px stroke, inner radius 0.6).

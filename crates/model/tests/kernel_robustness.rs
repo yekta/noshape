@@ -615,6 +615,22 @@ fn sweep_round_tight_bend() {
     }
 }
 
+/// A spline's two handle tips are marked in its sketch's display (drawn as Onshape's handle: hollow at rest, a 14 px
+/// disc lit; render offscreen::a_handle_tip_is_drawn_as_lives_in_each_state), its other points aren't.
+#[test]
+fn a_splines_handle_tips_are_marked_in_the_display() {
+    let mut t = T::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let s = sk.add_fit_spline_with_handles(&[DVec2::new(0.0, 0.0), DVec2::new(0.03, 0.02), DVec2::new(0.06, 0.0)]).unwrap();
+    let (h0, h1) = sk.entity(s).unwrap().spline_handles().unwrap();
+    let f = t.add("sketch", &[("sketchPlane", q(vec![Reference::Plane(DatumPlane::Top)])), ("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })))]);
+    let r = t.regen();
+    let d = r.display.sketches.iter().find(|x| x.feature == f).unwrap();
+    let mut tips: Vec<u32> = d.points.iter().filter(|p| p.tip).map(|p| p.entity).collect();
+    tips.sort();
+    assert_eq!(tips, vec![h0.0, h1.0]);
+}
+
 /// A profile swept round a closed path with sharp corners (a rectangle, cf-box-dovetail-joint's dovetail round a
 /// board's rim): the pieces meet mitred at the corners, as Onshape's: one valid solid, its volume the profile's area
 /// times the path's length (centred on the path, the mitres add what they take; OCCT's transformed sections made it

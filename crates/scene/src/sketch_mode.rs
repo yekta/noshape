@@ -5625,11 +5625,10 @@ impl SketchEditor {
             for (end, h) in [(s, h0), (en, h1)] {
                 if let (Some(a), Some(b)) = (data.sketch.point(end), data.sketch.point(h)) {
                     // (An arm missing, a spline from before arms: its line drawn here.)
+                    // (The tip itself is the sketch's point, drawn with its hover and selection states.)
                     if !data.sketch.handle_arms(e.id).iter().flatten().any(|arm| data.sketch.endpoints(*arm).is_some_and(|(p, q)| (p, q) == (end, h))) {
-                        lines.push_polyline(&[w(a), w(b)], [0x80, 0x80, 0x80, 255], 0, 1.0, on_top);
+                        lines.push_polyline(&[w(a), w(b)], crate::palette::rgb8(crate::palette::viewport::SKETCH_HANDLE_LINE), 0, 1.0, on_top);
                     }
-                    points.points.push(PointSprite { position: w(b), color: [0x60, 0x60, 0x60, 255], pick_id: 0, size: 10.0, style: on_top, _pad: 0 });
-                    points.points.push(PointSprite { position: w(b), color: [0xff, 0xff, 0xff, 255], pick_id: 0, size: 7.0, style: on_top, _pad: 0 });
                 }
             }
         }

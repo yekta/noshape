@@ -959,7 +959,7 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 let color = match sk.color.filter(|_| !editing) {
                     Some(c) => lin_to_u8(c),
                     // (A handle arm: Onshape's thin grey handle line, sketch/100–101.)
-                    None if c.handle => [0x80, 0x80, 0x80, 255],
+                    None if c.handle => theme::rgb8(theme::viewport::SKETCH_HANDLE_LINE),
                     None => sketch_color(&opts.graphics, c.state, c.construction, editing, c.external),
                 };
                 // Hovered / selected it keeps a dark core like a part edge
@@ -985,9 +985,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
                 // the edited sketch are 6.7 px dots while under-defined (blue),
                 // 6 px once defined.
                 let vertex = if p.state == SketchEntityState::Under { 6.7 } else { 6.0 };
-                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.handle { 5.0 } else { vertex };
+                // (A spline's handle tip: Onshape's 10 px hollow handle, on top; lit, its 14 px disc.)
+                let size = if p.standalone { 7.0 } else if !editing { 0.0 } else if p.tip { 10.0 } else if p.handle { 5.0 } else { vertex };
                 // Standalone points and spline handles are hollow (live sketch/100, Point tool).
-                let style = if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
+                let style = if p.tip { PointSprite::HANDLE_TIP | LineSegment::ON_TOP } else if p.standalone || p.handle { PointSprite::HOLLOW } else { 0 };
+                let color = if p.tip { theme::rgb8(theme::viewport::SKETCH_HANDLE) } else { color };
                 points.points.push(PointSprite { position: p.position, color, pick_id: id, size, style, _pad: 0 });
             }
             for d in &sk.dimensions {

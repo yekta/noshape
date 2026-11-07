@@ -193,6 +193,8 @@ pub struct SketchPointDisplay {
     pub standalone: bool,
     /// Interior control point of a spline (drawn smaller).
     pub handle: bool,
+    /// A fit spline's end handle tip (drawn as Onshape's handle).
+    pub tip: bool,
     /// Projected outside geometry (the origin a point was inferred from,
     /// Use): not one of the sketch's own vertices.
     pub external: bool,
