@@ -131,12 +131,17 @@ fn end_for(ev: &EvalCtx, bound: &str, depth_id: &str, face_id: &'static str, bod
                     let face = ev.face_shape(bi, fi)?;
                     // A planar face: its plane (live ends a profile reaching past the face's edges on its surface:
                     // dx's EXTRUDE-UP-TO-FACE-BEYOND).
-                    match face.face_plane()? {
-                        Some(pl) => {
-                            let ext = ev.model_extent() * 4.0;
-                            k::make_plane_face(&pl, -ext, ext, -ext, ext)?
+                    // A cylinder: the whole cylinder, as live ends a profile reaching past the face round it (c2-rings-loft's
+                    // Extrude 3: up to the bore, of which its rounds left the top).
+                    let ext = ev.model_extent() * 4.0;
+                    match (face.face_plane()?, face.face_surface()?) {
+                        (Some(pl), _) => k::make_plane_face(&pl, -ext, ext, -ext, ext)?,
+                        (None, k::Surface::Cylinder { origin, axis, x_dir, radius }) => {
+                            let axis = axis.normalize();
+                            let whole = k::make_cylinder(&k::Plane::new(origin - axis * ext, axis, x_dir), radius, 2.0 * ext, std::f64::consts::TAU)?;
+                            whole.faces().into_iter().find(|f| matches!(f.face_surface(), Ok(k::Surface::Cylinder { .. }))).unwrap_or(face)
                         }
-                        None => face,
+                        _ => face,
                     }
                 }
                 _ => {

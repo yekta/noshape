@@ -2474,3 +2474,30 @@ fn variable_rounds_taller_than_their_walls_run_onto_the_floor() {
     let floor_front = after[0].shape.edges().into_iter().filter(|e| e.edge_info().is_ok_and(|i| i.start.y.abs() < 1e-9 && i.end.y.abs() < 1e-9 && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9)).map(|e| e.edge_info().unwrap().length).fold(0.0, f64::max);
     assert!(floor_front < 0.14 - 1e-3, "{floor_front}");
 }
+
+/// Up to a cylindrical face a profile reaches past: the whole cylinder bounds it, as live's (c2-rings-loft's Extrude
+/// 3: up to the bore, of which its rounds left only the top). A 10 x 10 profile on Top up to a half cylinder (R 10, axis
+/// x, 30 mm up, its y > 0 half cut away): 10 x the integral of 30 - sqrt(100 - y^2) over y in [-5, 5].
+#[test]
+fn up_to_a_cylinder_face_takes_the_whole_cylinder() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(0.0, 0.03), 0.01));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "40 mm", "NEW");
+    t.set(x, "symmetric", b(true));
+    let s = t.sketch(Reference::Plane(DatumPlane::Right), rect(0.0, 0.0, 0.02, 0.05));
+    let r = t.regions(s)[0].clone();
+    let cut = t.extrude(r, "60 mm", "REMOVE");
+    t.set(cut, "symmetric", b(true));
+    let res = t.ok();
+    let body = solids(&res.context)[0].clone();
+    let half = body.shape.faces().iter().position(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).expect("the half cylinder");
+    let face = Reference::Face((*body.faces[half]).clone());
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(-0.005, -0.005, 0.005, 0.005));
+    let r = t.regions(s)[0].clone();
+    t.add("extrude", &[("entities", q(vec![r])), ("operationType", en("NEW")), ("endBound", en("UP_TO_SURFACE")), ("endBoundEntityFace", q(vec![face]))]);
+    let res = t.ok();
+    let block = solids(&res.context).into_iter().find(|b| b.shape.bounding_box(true).is_ok_and(|bb| bb.min.z.abs() < 1e-9)).expect("the up-to block").clone();
+    let v = block.shape.volume().unwrap() * 1e9;
+    assert!((v - 2043.39).abs() < 0.01, "{v} mm³");
+}
