@@ -1,16 +1,16 @@
 {
  "scenario": "in-context-caret-hide-show",
- "recorded": "2026-11-07T16:13:02.251Z",
+ "recorded": "2026-11-07T17:32:50.008Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.7 cb0eee3a"
+  "recorder": "2026-11-07.8 50b19f57"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "f26d076f7be8eba88c3193da",
+  "element": "f83cfa71f9335560cb1a9517",
   "start": "two-blocks",
   "startElement": "94efa1d13f38aa3acb2f1952"
  },
@@ -280,7 +280,7 @@
     },
     "drawing": null
    },
-   "t": 62199
+   "t": 46495
   },
   {
    "step": 2,
@@ -460,7 +460,7 @@
     },
     "drawing": null
    },
-   "t": 68747
+   "t": 49338
   },
   {
    "step": 3,
@@ -551,7 +551,7 @@
     },
     "drawing": null
    },
-   "t": 81698
+   "t": 71616
   },
   {
    "step": 4,
@@ -651,7 +651,7 @@
     },
     "drawing": null
    },
-   "t": 84883
+   "t": 74595
   },
   {
    "step": 5,
@@ -716,12 +716,7 @@
      "rows": [],
      "rollbackAfter": "Default geometry"
     },
-    "parts": [
-     "start two-blocks asm",
-     "Part 1 <1>",
-     "Part 2 <1>",
-     "Mate features (0)"
-    ],
+    "parts": [],
     "partsHeading": "Parts (0)",
     "undo": {
      "undo": false,
@@ -781,7 +776,7 @@
     },
     "drawing": null
    },
-   "t": 90637
+   "t": 77181
   }
  ]
 }
