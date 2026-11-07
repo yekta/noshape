@@ -476,37 +476,53 @@ env -u NOSHAPE_UPDATE_AUTORESTART setsid "$bin" --reopen "$list" > /dev/null 2>&
 const WINDOWS_HELPER: &str = r#"# noshape's update helper (crates/update): once the app has quit, run the new installer silently (the install
 # folder, its PATH entry and the agents' connections stay) or swap the portable exe, then start noshape with the
 # documents that were open. If the update can't be installed, the old noshape starts again and says why.
-param([int]$AppPid, [string]$Mode, [string]$Exe, [string]$Payload, [string]$List)
+param([int]$AppPid, [string]$Mode, [string]$Exe, [string]$Payload, [string]$List, [string]$Version)
 $HelperLog = Join-Path (Split-Path $Payload) 'update-helper.log'
+$InstallLog = Join-Path (Split-Path $Payload) 'update-install.log'
 function Log($m) {
   Add-Content -Path $HelperLog -Value "$(Get-Date -Format o) helper: $m" -ErrorAction SilentlyContinue
   if ($env:NOSHAPE_UPDATE_LOG) { Add-Content -Path $env:NOSHAPE_UPDATE_LOG -Value "helper: $m" }
 }
-function Failed($why) {
-  Log "failed: $why"
+function Start-Noshape($a) {
   Remove-Item Env:NOSHAPE_UPDATE_AUTORESTART -ErrorAction SilentlyContinue
-  Start-Process -FilePath $Exe -ArgumentList '--update-failed', ('"' + $why + '"'), '--reopen', ('"' + $List + '"')
+  Start-Process -FilePath $Exe -ArgumentList ($a + @('--reopen', ('"' + $List + '"')))
+}
+function Failed($why) {
+  if ($script:failing) { exit 1 }
+  $script:failing = $true
+  Log "failed: $why"
+  Start-Noshape @('--update-failed', ('"' + $why + '"'))
   exit 1
 }
+# Whatever goes wrong, the old noshape starts again and says so.
+trap { Failed "The update was not installed: $_. Details: $HelperLog" }
 while (Get-Process -Id $AppPid -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 200 }
 # Other copies from the install folder (a coding agent's `noshape mcp`, a terminal's `noshape`) hold the files Windows
-# won't replace; the agents start them again when they need them.
+# won't replace; the agents start them again when they need them. The installer closes the elevated ones.
 $dir = Split-Path $Exe
 Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Split-Path $_.Path) -eq $dir } | ForEach-Object { Log "closing $($_.Path) ($($_.Id))"; Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
 if ($Mode -eq 'installer') {
-  try {
-    $p = Start-Process -FilePath $Payload -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NOCANCEL', '/FORCECLOSEAPPLICATIONS' -Verb RunAs -Wait -PassThru -ErrorAction Stop
-  } catch { Failed "The update was not installed: Windows' permission prompt was declined or failed. Restart from the update card to try again." }
-  if ($p.ExitCode -ne 0) { Failed "The update was not installed: its installer stopped (code $($p.ExitCode)). Close noshape everywhere it runs, then restart from the update card. Details: $HelperLog" }
+  # Elevated through Windows' permission prompt; waited on by its handle (not Start-Process -Wait, which waits for
+  # everything the installer starts), then judged by the version it installed.
+  $si = New-Object System.Diagnostics.ProcessStartInfo $Payload
+  $si.Arguments = "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /NOCANCEL /FORCECLOSEAPPLICATIONS `"/LOG=$InstallLog`""
+  $si.Verb = 'runas'
+  $si.UseShellExecute = $true
+  try { $p = [System.Diagnostics.Process]::Start($si) } catch { Failed "The update was not installed: Windows' permission prompt was declined or failed. Restart from the update card to try again." }
+  # Its handle kept: ExitCode reads through it.
+  $null = $p.Handle
+  if (-not $p.WaitForExit(15 * 60 * 1000)) { Failed "The update was not installed: its installer hasn't finished after 15 minutes. Details: $InstallLog" }
+  $code = try { $p.ExitCode } catch { '?' }
+  $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{6E0B3C55-2D7A-4C4B-9C8E-5F1A4E2B7D10}_is1'
+  $got = (Get-ItemProperty $key -ErrorAction SilentlyContinue).DisplayVersion
+  Log "installer exit $code, installed $got"
+  if ($got -ne $Version) { Failed "The update was not installed: its installer stopped (code $code). Close noshape everywhere it runs, then restart from the update card. Details: $InstallLog" }
 } else {
-  try {
-    Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force -ErrorAction Stop
-    if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force -ErrorAction Stop }
-  } catch { Failed "The update was not installed: $_" }
+  Copy-Item (Join-Path $Payload 'noshape.exe') $Exe -Force -ErrorAction Stop
+  if (Test-Path (Join-Path $Payload 'noshape.com')) { Copy-Item (Join-Path $Payload 'noshape.com') (Join-Path $dir 'noshape.com') -Force -ErrorAction Stop }
 }
 Log "swapped $Exe"
-Remove-Item Env:NOSHAPE_UPDATE_AUTORESTART -ErrorAction SilentlyContinue
-Start-Process -FilePath $Exe -ArgumentList '--reopen', ('"' + $List + '"')
+Start-Noshape @()
 "#;
 
 /// Start the helper that applies `staged` once process `pid` (the app) has quit, then starts the new version with
@@ -534,7 +550,7 @@ pub fn apply(staged: &Staged, list: &Path, pid: u32) -> Result<(), String> {
         Kind::WindowsInstalled { exe } | Kind::WindowsPortable { exe } => {
             let mut c = quiet(r"WindowsPowerShell\v1.0\powershell.exe");
             let mode = if matches!(staged.kind, Kind::WindowsInstalled { .. }) { "installer" } else { "portable" };
-            c.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File"]).arg(write("update-helper.ps1", WINDOWS_HELPER)?).arg(&pid).arg(mode).arg(exe).arg(&staged.payload).arg(list);
+            c.args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File"]).arg(write("update-helper.ps1", WINDOWS_HELPER)?).arg(&pid).arg(mode).arg(exe).arg(&staged.payload).arg(list).arg(&staged.version);
             c
         }
         Kind::Unsupported(why) => return Err(why.clone()),

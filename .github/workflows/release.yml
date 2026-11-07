@@ -382,6 +382,7 @@ jobs:
             .github/release
             tests/perf
             tests/budget
+            crates/update/src/lib.rs
       - uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.asset }}
@@ -549,6 +550,29 @@ jobs:
           Expand-Archive (Get-ChildItem dl\noshape-cli-*-windows-x86_64.zip).FullName -DestinationPath "$env:RUNNER_TEMP\cli"
           python $check (Get-ChildItem "$env:RUNNER_TEMP\cli\noshape-cli-*\noshape-cli.exe").FullName noshape-cli
           if ($LASTEXITCODE -ne 0) { throw "CLI check failed" }
+
+      # This installer updating installs across UAC, as for a user with UAC on (.github/release/uac): the helper of an
+      # older release's Restart at Medium integrity, the installer elevated by UAC, a copy running from the install
+      # folder (v0.4.28's helper with one met exit code 5 and ended in silence, 11-06). The old helpers (v0.4.28-29,
+      # v0.4.30-33: they run every user's next update) and today's. A dry run only.
+      - name: Windows update across UAC
+        if: runner.os == 'Windows' && github.ref_type != 'tag'
+        timeout-minutes: 30
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = (Get-ChildItem dl\noshape-*-windows-x86_64-setup.exe).FullName
+          $want = (Split-Path $setup -Leaf) -replace '^noshape-(.*)-windows-x86_64-setup\.exe$', '$1'
+          $latest = (gh release view --repo $env:GITHUB_REPOSITORY --json tagName --jq .tagName).TrimStart('v')
+          python .github/release/uac/extract_helper.py crates/update/src/lib.rs "$env:RUNNER_TEMP\helper-today.ps1"
+          $uac = '.github/release/uac/update_across_uac.ps1'
+          & $uac -From 0.4.28 -Helper .github/release/uac/helpers/0.4.28.ps1 -Setup $setup -Want $want -Mcp
+          if ($LASTEXITCODE -ne 0) { throw "v0.4.28's helper didn't update" }
+          & $uac -From $latest -Helper .github/release/uac/helpers/0.4.32.ps1 -Setup $setup -Want $want -ElevatedMcp
+          if ($LASTEXITCODE -ne 0) { throw "v0.4.32's helper didn't update" }
+          & $uac -From $latest -Helper "$env:RUNNER_TEMP\helper-today.ps1" -Setup $setup -Want $want -Version $want -Mcp
+          if ($LASTEXITCODE -ne 0) { throw "today's helper didn't update" }
 
       # The release's speed on each platform, through its CLI-only download (qa's 1.5x between green and v0.4.32 on
       # release-fillet-hang was green's x86-64-v3 OCCT, 11-06). Not a gate: a table in the job summary.

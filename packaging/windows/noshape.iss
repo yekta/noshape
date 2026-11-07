@@ -36,6 +36,11 @@ UninstallDisplayIcon={app}\noshape.exe
 Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
+; Copies running from the install folder (a coding agent's `noshape mcp`) are closed, never left to fail the install
+; (exit code 5, which v0.4.28-0.4.29's update helper met in silence). PrepareToInstall closes them first when silent.
+CloseApplications=force
+RestartApplications=no
+SetupLogging=yes
 
 [Files]
 Source: "{#Source}\noshape.exe"; DestDir: "{app}"; Flags: ignoreversion
@@ -130,6 +135,22 @@ begin
   Grown := WizardForm.AdjustLabelHeight(WizardForm.FinishedLabel);
   WizardForm.RunList.Top := WizardForm.RunList.Top + Grown;
   WizardForm.RunList.Height := WizardForm.RunList.Height - Grown;
+end;
+
+// A silent install (the in-app update) first ends every noshape running from the install folder, whoever started it
+// and however elevated: Windows won't replace a running exe, and an update helper can't end an elevated copy.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Code: Integer;
+  Dir: String;
+begin
+  Result := '';
+  if not WizardSilent then
+    exit;
+  Dir := ExpandConstant('{app}');
+  StringChangeEx(Dir, '''', '''''', True);
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "$d = ''' + Dir + '''; foreach ($i in 1..40) { $p = @(Get-Process -Name noshape -ErrorAction SilentlyContinue | Where-Object { $_.Path -and (Split-Path $_.Path) -eq $d }); if ($p.Count -eq 0) { exit 0 }; $p | Stop-Process -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 250 }; exit 1"', '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Log('Closing noshape copies in ' + ExpandConstant('{app}') + ': exit ' + IntToStr(Code));
 end;
 
 // Uninstall: the install folder off the user's PATH.

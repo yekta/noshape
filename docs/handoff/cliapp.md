@@ -146,6 +146,16 @@ PATH, a never-answering check times out, the menu action opens the dialog: it fa
   PATH entry and agent connections stay); the portable zip copies noshape.exe and noshape.com over; Linux tar.gz
   (install.sh) swaps the binary (pkexec when not writable); the .deb runs `pkexec apt-get install` (no pkexec: a
   Download link).
+- **Windows across UAC (11-06, P0).** A user's v0.4.28 updated to nothing: UAC's prompt, then no installer, no
+  noshape, still v0.4.28. Reproduced on a runner (`update-uac.yml` on agent/updater-uac, run 42313888625): with
+  Claude Desktop's `noshape mcp` running from the install folder, the silent installer exits 5 (its files in use)
+  and v0.4.28-29's helper exits without a word. v0.4.30-33's helper closes copies it can (not an elevated one) first.
+  The installer now closes every copy in its folder itself when silent (`PrepareToInstall`, `CloseApplications=force`),
+  so the old helpers, which run each user's next update, install it. Today's helper also waits on the installer's
+  handle with a 15-minute limit, judges by the version the registry says was installed (not the exit code alone),
+  writes the installer's log beside the download (`update-install.log`), and on any error (a `trap`) starts the old
+  noshape with the reason. Runners' own account is the built-in administrator (no UAC split): the test logs a second
+  admin account on runas-style to get UAC's Medium token (`.github/release/uac`, in release.yml's dry run).
 - **Tests.** crates/update/tests/update.rs (T1): real Sigstore fixtures (tests/fixtures, made by update-test-fixtures.yml
   on a runner; `identity.txt` is that run's workflow identity) verify, and a changed SHA256SUMS, signature, digest,
   certificate, signed entry timestamp or log time, another signer (a release tag's, a fork's, a prefix), a trust root
