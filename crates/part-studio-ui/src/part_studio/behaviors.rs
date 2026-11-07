@@ -2856,7 +2856,11 @@ impl PartStudioView {
             Some((IsolateMode::Transparent, gone)) => gone.contains(b),
             None => false,
         };
-        let found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
+        let mut found = interaction::entities_along_ray(&self.display, origin, dir, tol, &skip, SELECT_OTHER_MAX);
+        // The planes the pointer is over join them by depth (live face-menu-select-other: "Front plane" first).
+        found.extend(interaction::planes_along_ray(&self.display, origin, dir));
+        found.sort_by(|a, b| a.depth.total_cmp(&b.depth));
+        found.truncate(SELECT_OTHER_MAX);
         let point = found.first().map(|h| origin + dir.normalize_or_zero() * h.depth);
         // Live: each part follows its nearest face ("Face of Extrude 1",
         // "Part 1", "Face of Extrude 1" behind it).

@@ -410,8 +410,9 @@ pub fn routing_curve() -> FeatureType {
                 ParamSpec::num("dy", "Y offset", ZERO_DEFAULT_LENGTH),
                 ParamSpec::num("dz", "Z offset", ZERO_DEFAULT_LENGTH),
                 hidden(ParamSpec::text("rotationMatrix", "Rotation matrix", "")),
-                ParamSpec::bool("overrideBendRadius", "Override bend radius", false),
-                ParamSpec::num("pointBendRadius", "Bend radius", NONNEGATIVE_ZERO_DEFAULT).visible(|v| v.bool("overrideBendRadius")),
+                // A polyline's: the dialog's items see the feature's values (live 1722: not on a spline's points).
+                ParamSpec::bool("overrideBendRadius", "Override bend radius", false).visible(|v| !v.is("curveType", "INTERPOLATED_SPLINE")),
+                ParamSpec::num("pointBendRadius", "Bend radius", NONNEGATIVE_ZERO_DEFAULT).visible(|v| !v.is("curveType", "INTERPOLATED_SPLINE") && v.bool("overrideBendRadius")),
                 ParamSpec::bool("hasDerivative", "Derivative", false),
                 ParamSpec::enum_(
                     "derivativeAlignment",

@@ -438,6 +438,31 @@ pub fn entities_along_ray(display: &StudioDisplay, origin: DVec3, dir: DVec3, ed
     hits
 }
 
+/// The shown planes (default and construction) the ray passes through inside their drawn rectangles, nearest first
+/// (Select other lists them among the parts' entities: live ui-parity face-menu-select-other).
+pub fn planes_along_ray(display: &StudioDisplay, origin: DVec3, dir: DVec3) -> Vec<RayHit> {
+    let dir = dir.normalize_or_zero();
+    let mut hits: Vec<RayHit> = Vec::new();
+    for pl in display.planes.iter().filter(|p| !p.hidden) {
+        let f = &pl.frame;
+        let den = dir.dot(f.normal);
+        if den.abs() < 1e-12 {
+            continue;
+        }
+        let depth = (f.origin - origin).dot(f.normal) / den;
+        if depth < 0.0 {
+            continue;
+        }
+        let q = origin + dir * depth - f.origin;
+        let (u, v) = (q.dot(f.x) - pl.center.x, q.dot(f.y) - pl.center.y);
+        if u.abs() <= pl.half_width && v.abs() <= pl.half_height {
+            hits.push(RayHit { reference: pl.reference.clone(), depth });
+        }
+    }
+    hits.sort_by(|a, b| a.depth.total_cmp(&b.depth));
+    hits
+}
+
 /// Möller–Trumbore; distance along the ray (both sides of the triangle).
 fn ray_triangle(o: DVec3, d: DVec3, a: DVec3, b: DVec3, c: DVec3) -> Option<f64> {
     let (e1, e2) = (b - a, c - a);
@@ -1334,6 +1359,21 @@ mod tests {
         vars.insert("w".to_string(), noshape_units::Quantity::new(0.004, Dim::LENGTH));
         let h = evaluated_hint("#w / 2", Dim::LENGTH, &mm, &vars).unwrap();
         assert!(h.starts_with('2'), "{h}");
+    }
+
+    /// Select other's planes (live face-menu-select-other): those the ray crosses inside their drawn rectangle, by depth.
+    #[test]
+    fn planes_along_a_ray() {
+        use crate::display::{PlaneDisplay, PlaneFrame};
+        use crate::reference::DatumPlane;
+        let plane = |d: DatumPlane, origin: DVec3, x: DVec3, y: DVec3| PlaneDisplay { reference: Reference::Plane(d), name: String::new(), frame: PlaneFrame { origin, x, y, normal: x.cross(y) }, half_width: 1.0, half_height: 1.0, center: glam::DVec2::ZERO, hidden: false };
+        let d = StudioDisplay { planes: vec![plane(DatumPlane::Top, DVec3::ZERO, DVec3::X, DVec3::Y), plane(DatumPlane::Front, DVec3::new(0.0, 0.0, 2.0), DVec3::X, DVec3::Y), plane(DatumPlane::Right, DVec3::new(5.0, 0.0, 0.0), DVec3::Y, DVec3::Z)], ..Default::default() };
+        let hits = planes_along_ray(&d, DVec3::new(0.2, 0.3, 5.0), DVec3::NEG_Z);
+        // The z = 2 plane, then z = 0; the x = 5 plane is edge-on to the ray (and its rectangle elsewhere).
+        assert_eq!(hits.iter().map(|h| h.reference.clone()).collect::<Vec<_>>(), vec![Reference::Plane(DatumPlane::Front), Reference::Plane(DatumPlane::Top)]);
+        assert!((hits[0].depth - 3.0).abs() < 1e-12 && (hits[1].depth - 5.0).abs() < 1e-12);
+        // Outside a plane's rectangle: not crossed.
+        assert!(planes_along_ray(&d, DVec3::new(3.0, 0.0, 5.0), DVec3::NEG_Z).is_empty());
     }
 
     #[test]

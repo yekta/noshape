@@ -243,6 +243,18 @@ impl FeatureDialog {
                 // An array: live reads its box's text (its label, its entries and an item array's add button).
                 ParamKind::Array { item, item_label } => {
                     let specs = item_slice(item);
+                    // A box of shown items (live routing-curve-tool, Point 0 open): live reads the box as a number
+                    // field with its first input's text, then each shown item's fields.
+                    let boxed = !(s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS));
+                    let shown = self.shown_items(s.id, values.array(s.id).len());
+                    if boxed && !shown.is_empty() {
+                        let inner: Vec<Value> = shown.iter().flat_map(|k| self.item_fields(s.id, *k, specs)).collect();
+                        let first = inner.iter().find(|f| f["kind"] == "number").map(|f| f["text"].clone()).unwrap_or(Value::Null);
+                        let state = if self.field_error(s.id).is_some() { "error" } else { "ok" };
+                        fields.push(json!({ "label": label, "kind": "number", "text": first, "focused": false, "state": state }));
+                        fields.extend(inner);
+                        continue;
+                    }
                     let q = specs.iter().find(|p| matches!(p.kind, ParamKind::Query { .. }));
                     let mut text = vec![crate::i18n::spec(s.label).to_string()];
                     for (k, it) in values.array(s.id).iter().enumerate() {
@@ -267,6 +279,41 @@ impl FeatureDialog {
         // ✓ (none in configure mode or a nested dialog).
         let ok = (!self.configure_mode && !self.nested).then(|| if self.ok_blocked() { "disabled" } else { "enabled" });
         json!({ "title": self.title_text(), "titleState": if red { "error" } else { "ok" }, "kind": kind, "tabs": tabs, "fields": fields, "error": null, "ok": ok })
+    }
+
+    /// An array item's shown fields as the parity suite records them (selects, numbers with their icon rows unlabelled,
+    /// checkboxes, flips, selections).
+    fn item_fields(&self, arr: &str, k: usize, specs: &'static [ParamSpec]) -> Vec<Value> {
+        let mut values = self.feature.params.clone();
+        values.0.shift_remove(arr);
+        for (key, x) in self.feature.params.array(arr).get(k).map(|it| it.0.clone()).unwrap_or_default() {
+            values.0.insert(key, x);
+        }
+        let mut out = Vec::new();
+        for s in specs.iter().filter(|s| s.is_visible(&values) && !s.hints.has(Hints::ALWAYS_HIDDEN)) {
+            let label = if param_icon(self.ty.id, s.id).is_some() { json!("") } else { json!(crate::i18n::spec(s.label)) };
+            match &s.kind {
+                ParamKind::Enum { options, .. } => {
+                    let cur = values.enum_(s.id);
+                    let text = options.iter().find(|(id, _)| *id == cur).map(|(_, l)| crate::i18n::spec(l)).unwrap_or_default();
+                    out.push(json!({ "label": s.hints.has(Hints::SHOW_LABEL).then_some(label), "kind": "enum", "text": text, "state": "ok" }));
+                }
+                ParamKind::Bool { .. } if s.hints.has(Hints::OPPOSITE_DIRECTION) || s.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR) => {
+                    out.push(json!({ "label": "toggle", "kind": "toggle", "checked": values.bool(s.id), "state": "ok" }))
+                }
+                ParamKind::Bool { .. } => out.push(json!({ "label": label, "kind": "boolean", "checked": values.bool(s.id), "state": "ok" })),
+                ParamKind::Num(_) => {
+                    let text = values.expr(s.id).map(|e| e.text.clone()).unwrap_or_default();
+                    out.push(json!({ "label": label, "kind": "number", "text": text, "focused": false, "state": "ok" }));
+                }
+                ParamKind::Query { .. } => {
+                    let items: Vec<String> = values.query(s.id).iter().map(|r| (self.labeler)(r)).collect();
+                    out.push(json!({ "label": label, "kind": "query", "items": items, "active": self.active_query.as_deref() == Some(item_path(arr, k, s.id).as_str()), "state": "ok" }));
+                }
+                _ => {}
+            }
+        }
+        out
     }
 
     /// `state.list` for the open autofill list.

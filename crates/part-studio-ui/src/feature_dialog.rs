@@ -3541,6 +3541,9 @@ impl FeatureDialog {
                 }
                 // Live (dialogs/fillet-12): a bordered box captioned with the
                 // array's name, its items, and a full-width "Add <item>" button.
+                // Red with a pink fill while the feature's error blames it (live 1722: "Create at least two
+                // non-coincident points.").
+                let blamed = self.field_error(arr_id).is_some();
                 let mut col = v_flex()
                     .mx(px(1.))
                     .mt(px(5.))
@@ -3549,16 +3552,12 @@ impl FeatureDialog {
                     .gap(px(4.))
                     .rounded(px(2.))
                     .border_1()
-                    .border_color(pal.border)
+                    .border_color(if blamed { pal.error } else { pal.border })
+                    .when(blamed, |d| d.bg(gpui_kit::rgb(0xf9ebec)))
                     .child(div().px(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x555555)).child(crate::ui::spec_text(s.label)));
                 // Routing curve, Single mode (live 1722): only the active
                 // point's row; a click on a point in the graphics switches it.
-                let only: Option<usize> = (self.feature.type_id == "routingCurve" && arr_id == "points" && self.feature.params.is("pointsEditType", "SINGLE"))
-                    .then(|| self.feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| (v.max(0.0) as usize).min(items.saturating_sub(1))));
-                for k in 0..items {
-                    if only.is_some_and(|o| o != k) {
-                        continue;
-                    }
+                for k in self.shown_items(arr_id, items) {
                     let inner = self.render_params(item_specs, Some((arr_id, k)), window, cx);
                     col = col.child(
                         v_flex()
@@ -4058,7 +4057,26 @@ fn param_icon(feature: &str, param: &str) -> Option<&'static str> {
         ("transform", "dx") => Some("xyz-along-x"),
         ("transform", "dy") => Some("xyz-along-y"),
         ("transform", "dz") => Some("xyz-along-z"),
+        // Live 1722: a Routing curve point's X / Y / Z offsets.
+        ("routingCurve", "dx") => Some("xyz-along-x"),
+        ("routingCurve", "dy") => Some("xyz-along-y"),
+        ("routingCurve", "dz") => Some("xyz-along-z"),
         _ => None,
+    }
+}
+
+impl FeatureDialog {
+    /// The items of an array's box that show: all, except Routing curve's Single mode, only the active point
+    /// (live 1722; a click on a point in the graphics switches it).
+    pub(crate) fn shown_items(&self, arr: &str, items: usize) -> Vec<usize> {
+        if self.feature.type_id == "routingCurve" && arr == "points" && self.feature.params.is("pointsEditType", "SINGLE") {
+            if items == 0 {
+                return Vec::new();
+            }
+            let at = self.feature.params.expr("pointIndex").and_then(|x| x.cached.map(|q| q.value).or_else(|| x.text.trim().parse().ok())).map_or(0, |v| (v.max(0.0) as usize).min(items - 1));
+            return vec![at];
+        }
+        (0..items).collect()
     }
 }
 
