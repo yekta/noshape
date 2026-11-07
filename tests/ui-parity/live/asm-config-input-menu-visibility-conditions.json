@@ -1,19 +1,19 @@
 {
  "scenario": "asm-config-input-menu-visibility-conditions",
- "recorded": "2026-11-07T01:51:32.413Z",
+ "recorded": "2026-11-07T03:57:37.791Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "597fa3406ae4bf48dd56e947",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "4d9fa8ca432f85fbc7d2c7af",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -274,7 +276,7 @@
      "banner": null
     }
    },
-   "t": 46047
+   "t": 31185
   },
   {
    "step": 2,
@@ -302,6 +304,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -426,7 +429,7 @@
      "banner": null
     }
    },
-   "t": 51418
+   "t": 34957
   },
   {
    "step": 3,
@@ -447,20 +450,15 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -589,7 +587,7 @@
      "banner": null
     }
    },
-   "t": 54323
+   "t": 37551
   },
   {
    "step": 4,
@@ -611,14 +609,32 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "",
-     "fields": [],
+     "title": "Configuration visibility conditions",
+     "fields": [
+      {
+       "label": "Show hidden inputs",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Save"
+      },
+      {
+       "label": null,
+       "kind": "input",
+       "value": "Cancel"
+      }
+     ],
      "buttons": [
-      "",
-      ""
-     ]
+      "icon:undo-button",
+      "icon:redo-button"
+     ],
+     "text": "Configuration Configurations Configuration Default Show hidden inputs"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -743,7 +759,7 @@
      "banner": null
     }
    },
-   "t": 57627
+   "t": 40420
   },
   {
    "step": 5,
@@ -758,6 +774,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -882,7 +899,7 @@
      "banner": null
     }
    },
-   "t": 61584
+   "t": 44247
   }
  ]
 }

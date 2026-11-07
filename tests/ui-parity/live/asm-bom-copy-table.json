@@ -1,19 +1,19 @@
 {
  "scenario": "asm-bom-copy-table",
- "recorded": "2026-11-07T01:55:52.130Z",
+ "recorded": "2026-11-07T03:59:09.427Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "4ac297d297db7c398ddb563c",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "4d66fa93ee3cfcba447e10df",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -283,7 +285,7 @@
      "banner": null
     }
    },
-   "t": 31476
+   "t": 27014
   },
   {
    "step": 2,
@@ -304,16 +306,13 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Show excluded/suppressed",
       "Show excluded/suppressed",
       "Show top level assembly row",
-      "Show top level assembly row",
-      "Export to CSV",
       "Export to CSV"
      ],
      "highlighted": null,
@@ -446,7 +445,7 @@
      "banner": null
     }
    },
-   "t": 34187
+   "t": 29510
   },
   {
    "step": 3,
@@ -467,6 +466,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -595,7 +595,7 @@
      "banner": null
     }
    },
-   "t": 36845
+   "t": 32071
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "asm-config-input-menu-input-propagation",
- "recorded": "2026-11-07T01:50:23.370Z",
+ "recorded": "2026-11-07T03:56:46.948Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "a3ddff5cc14ce0c8a577af58",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "c8bcf6b90ce09291a5a1cfd4",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -274,7 +276,7 @@
      "banner": null
     }
    },
-   "t": 36574
+   "t": 30032
   },
   {
    "step": 2,
@@ -302,6 +304,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -426,7 +429,7 @@
      "banner": null
     }
    },
-   "t": 40104
+   "t": 32595
   },
   {
    "step": 3,
@@ -447,20 +450,15 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -589,7 +587,7 @@
      "banner": null
     }
    },
-   "t": 42979
+   "t": 35144
   },
   {
    "step": 4,
@@ -611,13 +609,15 @@
     },
     "dialog": {
      "kind": "modal",
-     "title": "",
+     "title": "Input propagation for start two-blocks asm Copy 2",
      "fields": [],
      "buttons": [
       "Confirm"
-     ]
+     ],
+     "text": "No input in the current tab matches any references."
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -742,7 +742,7 @@
      "banner": null
     }
    },
-   "t": 45796
+   "t": 37679
   },
   {
    "step": 5,
@@ -757,6 +757,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -881,7 +882,7 @@
      "banner": null
     }
    },
-   "t": 49789
+   "t": 41479
   }
  ]
 }

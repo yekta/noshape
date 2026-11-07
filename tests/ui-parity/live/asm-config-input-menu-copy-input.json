@@ -1,19 +1,19 @@
 {
  "scenario": "asm-config-input-menu-copy-input",
- "recorded": "2026-11-07T01:53:45.222Z",
+ "recorded": "2026-11-07T03:55:57.998Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-07.5 53387b9e + live2 2026-11-07.4"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "3fb6f6430f58df454cd725d1",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "bd1b2325392cedbc384a3e0e",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -274,7 +276,7 @@
      "banner": null
     }
    },
-   "t": 41337
+   "t": 30166
   },
   {
    "step": 2,
@@ -302,6 +304,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -426,7 +429,7 @@
      "banner": null
     }
    },
-   "t": 46234
+   "t": 33214
   },
   {
    "step": 3,
@@ -447,20 +450,15 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "menu",
      "rows": [
       "Copy table",
-      "Copy table",
-      "Copy input",
       "Copy input",
       "Rename",
-      "Rename",
-      "Visibility conditions…",
       "Visibility conditions…",
       "Input propagation…",
-      "Input propagation…",
-      "Delete",
       "Delete"
      ],
      "highlighted": null,
@@ -589,7 +587,7 @@
      "banner": null
     }
    },
-   "t": 49383
+   "t": 35912
   },
   {
    "step": 4,
@@ -610,6 +608,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -734,7 +733,7 @@
      "banner": null
     }
    },
-   "t": 52606
+   "t": 38759
   }
  ]
 }
