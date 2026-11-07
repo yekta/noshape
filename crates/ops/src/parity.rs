@@ -2369,13 +2369,24 @@ impl<'a> Translator<'a> {
     /// An end of a curve a custom feature fit (`VERTEX` created by `<feature>.….opFitSpline`, ORDER 0 its start, 1 its
     /// end: cf-extrude-vertex's Symmetric on the end of Extruded vertex along line): our vertex there.
     fn fit_spline_vertex_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
-        let strings = packed_strings_of(text);
-        if !strings.iter().any(|s| s == "VERTEX") {
-            return None;
-        }
-        let feature = strings.iter().find(|s| s.ends_with(".opFitSpline")).and_then(|s| s.split('.').next())?.to_string();
-        let packed = text.split("qCompressed(1.0,\"").nth(1).and_then(|t| t.split('"').next())?;
-        let order = packed_order(&noshape_model::custom::host::packed::unpack(packed).ok()?)?;
+        // Written (`dummyQuery(id+"F….opFitSpline",EntityType.VERTEX,0.0)`: cf-3d-spline's Plane 1) or packed.
+        let written = text.split("dummyQuery(id+\"").nth(1).and_then(|r| {
+            let (op, rest) = r.split_once("\",EntityType.VERTEX,")?;
+            let n: f64 = rest.split(')').next()?.trim().parse().ok()?;
+            Some((op.strip_suffix(".opFitSpline")?.split('.').next()?.to_string(), n as usize))
+        });
+        let (feature, order) = match written {
+            Some(w) => w,
+            None => {
+                let strings = packed_strings_of(text);
+                if !strings.iter().any(|s| s == "VERTEX") {
+                    return None;
+                }
+                let feature = strings.iter().find(|s| s.ends_with(".opFitSpline")).and_then(|s| s.split('.').next())?.to_string();
+                let packed = text.split("qCompressed(1.0,\"").nth(1).and_then(|t| t.split('"').next())?;
+                (feature, packed_order(&noshape_model::custom::host::packed::unpack(packed).ok()?)?)
+            }
+        };
         let Some(ours) = self.feature_ids.get(&feature).cloned() else { return Some(Err(format!("opFitSpline vertex: feature {feature} was not built"))) };
         let found = (|| -> Result<String, String> {
             let edges = self.call("query_entities", json!({ "kind": "edges", "created_by": ours, "limit": 2 }))?;
