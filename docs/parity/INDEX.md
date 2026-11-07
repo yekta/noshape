@@ -1,0 +1,44 @@
+# The parity index: one number for "how much of Onshape do we match" (lead, 2026-11-07 19:26 UTC)
+
+The user asked for a single tracked percentage. This is it. qa computes it after every 4-hourly suite run
+(`tools/parity/index.py`, from the suites' own outputs) and writes one line a day to the table at the end of
+docs/parity/SCORE.md and the latest to /tmp/lead/parity-index.
+
+## How it is made
+
+Twelve areas, weighted by how much of a user's time and trust they carry. Each area scores 0–1:
+
+- **Result suites** (a fixed corpus of real Onshape documents): the share that matches live.
+- **Interaction areas:** `match × coverage`.
+  - match: the share of recorded states that match live;
+  - coverage: the share of that area's tools, menu items and shortcuts that have a scenario at all. What we don't
+    test doesn't count as matching.
+- **An area with no suite yet scores 0.** The index is a lower bound: it rises when we measure more, not only when we
+  fix more. Writing the missing suites is part of the work.
+
+| Area | Weight | Score from | Owner |
+|---|---|---|---|
+| Part Studio geometry | 25 | model suite: features matching live (`parity_models`) | core, blend, bool, dx, skasm |
+| Part Studio and sketch interaction | 15 | ui-parity `ps-*`/`sketch-*` states × coverage (tools, menus, shortcuts) | psui, skasm |
+| Assembly results | 8 | assembly suite: occurrences placed as live (`parity_assemblies`) | asm |
+| Assembly interaction | 7 | ui-parity `asm-*` states × coverage | asm |
+| Drawing interaction | 5 | ui-parity `drw-*` states × coverage | dx |
+| Drawing export | 5 | exports matching live's files (tools/drawing-export/compare.py) | dx |
+| Data exchange | 5 | exchange suite: mean of "ours imports live's" and "live imports ours" | dx |
+| Speed against Onshape | 10 | share of timed cases at or under live's time: corpus regenerations, document opens, the interaction suite's dialog and click latencies (each case 1 if ours ≤ live, else live/ours) | everyone; bool and psui first |
+| Feature Studio and FeatureScript editor | 5 | no suite yet: 0 | dx |
+| Variable Studio | 3 | no suite yet: 0 | psui |
+| Versions, branches, history, release | 5 | no suite yet: 0 | skasm |
+| Documents, tabs, start page, preferences | 7 | no suite yet: 0 | psui |
+
+**Index = Σ weight × score.** A suite for an area that has none starts as soon as its first scenarios are recorded by
+live and run in qa's 4-hourly run; coverage then grows as the owner writes more.
+
+## Rules
+
+- The weights don't change without the user. New areas take weight from "Documents, tabs, start page, preferences" until
+  that is re-split with the user.
+- A live quirk excluded from a suite (live's plan limits, account memory, a recorder artefact, an under-measured area)
+  is written next to the exclusion with its evidence, as PARITY-SUITES.md already requires.
+- The index never goes up by changing the scoring alone: a scoring change is landed with the index recomputed for the
+  day before it, both written down.

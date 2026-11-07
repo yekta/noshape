@@ -93,6 +93,10 @@ Matched: an occurrence ours places within 1e-6 m / 1e-6 of live's that our mates
 live's; a BOM row equal to live's. Score per day in docs/parity/SCORE.md ("Assemblies"); each difference that isn't
 the translator's becomes a ticket.
 
+## The parity index (lead 11-07)
+
+One overall percentage, weighted over twelve areas, computed by qa from these suites: docs/parity/INDEX.md.
+
 ## Score (qa, daily, docs/parity/SCORE.md)
 One line per day: models matched / total, features matched / total, scenarios matched / total, and the five biggest
 causes of difference with their tickets.
