@@ -194,6 +194,9 @@ pub struct Ctx {
     /// One call per process (`noshape-cli call` / `<group> <verb>`): session
     /// state such as the active configuration ends with it.
     pub one_shot: bool,
+    /// The documents folder `document_create` defaults to: `noshape_scene::documents_dir` when `None` (a test's own
+    /// folder otherwise).
+    pub documents: Option<PathBuf>,
 }
 
 pub use crate::window::UiRequest;
@@ -206,6 +209,30 @@ impl Ctx {
     pub fn new() -> Self {
         init_once();
         Ctx::default()
+    }
+
+    /// Closes every open document's file until [`Ctx::resume_files`] (the MCP server between calls): no `-wal` or
+    /// `-shm` stays beside a document, so its `.noshape` alone is complete; the sessions stay as they are.
+    pub fn suspend_files(&mut self) {
+        for (_, od) in &mut self.docs {
+            od.session.store.suspend();
+        }
+    }
+
+    /// Opens the files [`Ctx::suspend_files`] closed. A document whose file is gone (moved, deleted) is dropped:
+    /// the next call naming it opens it again, or says it isn't there.
+    pub fn resume_files(&mut self) {
+        let mut gone = Vec::new();
+        for (p, od) in &mut self.docs {
+            if let Err(e) = od.session.store.resume() {
+                log::warn!("{}: could not open it again: {e}", p.display());
+                gone.push(p.clone());
+            }
+        }
+        self.docs.retain(|(p, _)| !gone.contains(p));
+        if self.current.as_ref().is_some_and(|c| gone.contains(c)) {
+            self.current = None;
+        }
     }
 
     /// Create a new document file (Onshape's new document: Part Studio 1 and Assembly 1).

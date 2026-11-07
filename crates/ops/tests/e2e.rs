@@ -6859,3 +6859,27 @@ fn assembly_patterns_and_connectors_are_configured() {
     call(&mut ctx, "config_activate", json!({ "tab": "Assembly 1", "reset": true }));
     assert_eq!(pins(&mut ctx), 2);
 }
+
+/// document_create puts a document where the app lists documents unless given a folder (user 11-07: an agent's
+/// document was in the documents list but not in the folder the page names): no path, a new "Untitled <n>" there; a
+/// bare name, that name there (".noshape" added); a full path, that path. The reply's path is always absolute.
+#[test]
+fn document_create_defaults_to_the_documents_folder() {
+    let documents = std::env::temp_dir().join(format!("noshape-ops-e2e-documents-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&documents);
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(documents.clone());
+    let made = call(&mut ctx, "document_create", json!({}));
+    assert_eq!(std::path::Path::new(made["path"].as_str().unwrap()), documents.join("Untitled 1.noshape"), "{made}");
+    let made = call(&mut ctx, "document_create", json!({}));
+    assert_eq!(std::path::Path::new(made["path"].as_str().unwrap()), documents.join("Untitled 2.noshape"), "{made}");
+    let made = call(&mut ctx, "document_create", json!({ "path": "AppleWatchDock" }));
+    assert_eq!(std::path::Path::new(made["path"].as_str().unwrap()), documents.join("AppleWatchDock.noshape"), "{made}");
+    assert!(documents.join("AppleWatchDock.noshape").exists());
+    let elsewhere = scratch("document-create-elsewhere.noshape");
+    let made = call(&mut ctx, "document_create", json!({ "path": elsewhere.to_str().unwrap() }));
+    assert_eq!(std::path::Path::new(made["path"].as_str().unwrap()), elsewhere, "{made}");
+    assert!(std::path::Path::new(made["path"].as_str().unwrap()).is_absolute());
+    drop(ctx);
+    let _ = std::fs::remove_dir_all(&documents);
+}

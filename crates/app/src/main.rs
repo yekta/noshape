@@ -28,6 +28,8 @@ use noshape_start_ui::start_window;
 mod about;
 mod agent_setup;
 mod updates;
+#[cfg(test)]
+mod start_links_tests;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;

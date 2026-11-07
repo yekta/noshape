@@ -1093,6 +1093,7 @@ fn foreign_side_files_are_moved_aside_on_open() {
     drop(Document::create(&other, &[("tab/x", vec![7u8; 40_000])]).unwrap());
     {
         let mut o = Document::open(&other).unwrap();
+        o.keep_log();
         let b = o.default_branch().unwrap();
         o.commit(b, &[("tab/y", Some(vec![9u8; 30_000]))], "w").unwrap();
         std::fs::copy(side(&other, "-wal"), side(&path, "-wal")).unwrap();
@@ -1114,6 +1115,7 @@ fn a_log_that_belongs_to_the_document_is_kept() {
     let dir = TempDir::new();
     let path = dir.file("doc.noshape");
     let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    d.keep_log();
     let main = d.default_branch().unwrap();
     d.commit(main, &[("tab/a", Some(b"two".as_slice()))], "edit").unwrap();
     assert!(side(&path, "-wal").exists());
@@ -1133,4 +1135,112 @@ fn creating_over_leftover_side_files_moves_them_aside() {
     let head = d.head(d.default_branch().unwrap()).unwrap();
     assert_eq!(d.read_all(head).unwrap()["tab/a"], b"new");
     assert_eq!(std::fs::read(side(&path, "-wal.stale")).unwrap(), b"left from an earlier file");
+}
+
+/// A user copies or sends the `.noshape` alone while it is open (user 11-07: a friend's folder held a 3.7 MB
+/// `-wal` the file lacked): once the document has been idle a moment, its log is folded into the file and emptied, so
+/// the file alone holds every edit.
+#[test]
+fn an_idle_open_document_is_whole_in_its_file() {
+    let dir = TempDir::new();
+    let path = dir.file("Panda.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    let main = d.default_branch().unwrap();
+    for k in 0..20 {
+        d.commit(main, &[("tab/a", Some(format!("edit {k}").into_bytes())), ("tab/big", Some(vec![k as u8; 50_000]))], "edit").unwrap();
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    while std::fs::metadata(side(&path, "-wal")).is_ok_and(|m| m.len() > 0) {
+        assert!(std::time::Instant::now() < deadline, "the log is still not folded into the file");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    let copy = TempDir::new();
+    std::fs::copy(&path, copy.file("Panda.noshape")).unwrap();
+    let alone = Document::open_read_only(copy.file("Panda.noshape")).unwrap();
+    let head = alone.head(alone.default_branch().unwrap()).unwrap();
+    let all = alone.read_all(head).unwrap();
+    assert_eq!(all["tab/a"], b"edit 19");
+    assert_eq!(all["tab/big"], vec![19u8; 50_000]);
+    // The document goes on as before.
+    d.commit(main, &[("tab/a", Some(b"after".as_slice()))], "edit").unwrap();
+    assert_eq!(d.read_all(d.head(main).unwrap()).unwrap()["tab/a"], b"after");
+}
+
+/// A process that keeps documents between calls (the MCP server) closes their files in between: no `-wal` or
+/// `-shm` beside them, and the next call goes on where the last one left off.
+#[test]
+fn a_suspended_document_leaves_no_side_files_and_resumes() {
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    let main = d.default_branch().unwrap();
+    d.commit(main, &[("tab/a", Some(b"two".as_slice()))], "edit").unwrap();
+    d.suspend();
+    assert!(d.is_suspended());
+    assert!(!side(&path, "-wal").exists() && !side(&path, "-shm").exists(), "no side files while suspended");
+    assert!(matches!(d.head(main), Err(StoreError::Suspended)));
+    d.resume().unwrap();
+    d.commit(main, &[("tab/a", Some(b"three".as_slice()))], "edit").unwrap();
+    assert_eq!(d.read_all(d.head(main).unwrap()).unwrap()["tab/a"], b"three");
+    d.suspend();
+    let copy = TempDir::new();
+    std::fs::copy(&path, copy.file("doc.noshape")).unwrap();
+    let alone = Document::open_read_only(copy.file("doc.noshape")).unwrap();
+    assert_eq!(alone.read_all(alone.head(main).unwrap()).unwrap()["tab/a"], b"three");
+}
+
+/// Duplicate and Copy workspace… copy a document that is open with edits still in its log (no checkpoint yet): the
+/// copy has every edit (`backup_to` reads through the log).
+#[test]
+fn a_copy_of_an_open_document_has_the_edits_in_its_log() {
+    let dir = TempDir::new();
+    let path = dir.file("doc.noshape");
+    let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+    d.keep_log();
+    let main = d.default_branch().unwrap();
+    d.commit(main, &[("tab/a", Some(b"in the log".as_slice()))], "edit").unwrap();
+    assert!(std::fs::metadata(side(&path, "-wal")).is_ok_and(|m| m.len() > 0), "the edit is in the log");
+    let reader = Document::open_read_only(&path).unwrap();
+    reader.backup_to(dir.file("copy.noshape")).unwrap();
+    drop(reader);
+    let copy = Document::open_read_only(dir.file("copy.noshape")).unwrap();
+    assert_eq!(copy.read_all(copy.head(main).unwrap()).unwrap()["tab/a"], b"in the log");
+}
+
+/// What an idle checkpoint costs (T2, timed): folding a 4 MB and a 40 MB log into the file, off the UI thread; and
+/// how long a commit waits when it comes in during one.
+#[test]
+#[ignore = "T2: timed (wall clock)"]
+fn idle_checkpoint_cost() {
+    for mb in [4usize, 40] {
+        let dir = TempDir::new();
+        let path = dir.file("big.noshape");
+        let mut d = Document::create(&path, &[("tab/a", b"one".as_slice())]).unwrap();
+        d.keep_log();
+        let main = d.default_branch().unwrap();
+        for k in 0..mb {
+            let blob: Vec<u8> = (0..1_000_000u32).map(|i| (i.wrapping_mul(2_654_435_761).wrapping_add(k as u32) >> 13) as u8).collect();
+            d.commit(main, &[(format!("tab/{k}"), Some(blob))], "edit").unwrap();
+        }
+        let wal = std::fs::metadata(side(&path, "-wal")).map(|m| m.len()).unwrap_or(0);
+        let t = Instant::now();
+        crate::document::checkpoint_truncate(&path).unwrap();
+        let fold = t.elapsed();
+        // A commit right as another checkpoint starts.
+        for k in 0..mb {
+            d.commit(main, &[(format!("tab/{k}"), Some(vec![k as u8; 1_000_000]))], "again").unwrap();
+        }
+        let p2 = path.clone();
+        let cp = std::thread::spawn(move || {
+            let t = Instant::now();
+            let r = crate::document::checkpoint_truncate(&p2);
+            (t.elapsed(), r.is_ok())
+        });
+        std::thread::sleep(Duration::from_millis(1));
+        let t = Instant::now();
+        d.commit(main, &[("tab/a", Some(b"during".as_slice()))], "edit").unwrap();
+        let commit = t.elapsed();
+        let (cp_time, cp_ok) = cp.join().unwrap();
+        eprintln!("idle checkpoint {mb} MB (log {:.1} MB): fold {:.1} ms; a commit during the next checkpoint ({:.1} ms, ok {cp_ok}) took {:.1} ms", wal as f64 / 1e6, fold.as_secs_f64() * 1e3, cp_time.as_secs_f64() * 1e3, commit.as_secs_f64() * 1e3);
+    }
 }

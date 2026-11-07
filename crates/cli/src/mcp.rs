@@ -14,12 +14,6 @@ const PROTOCOL_VERSIONS: [&str; 4] = ["2025-06-18", "2025-03-26", "2024-11-05", 
 
 const INSTRUCTIONS: &str = include_str!("mcp_instructions.md");
 
-/// The app's documents folder (app-core's `documents_dir`), the one its documents list shows.
-fn documents_dir() -> std::path::PathBuf {
-    let base = dirs::document_dir().or_else(|| dirs::home_dir().map(|h| h.join("Documents"))).unwrap_or_else(|| ".".into());
-    base.join("noshape")
-}
-
 /// Run the server on stdin/stdout until stdin closes.
 pub fn serve(mut ctx: Ctx, all_tools: bool) -> anyhow::Result<()> {
     let stdin = std::io::stdin();
@@ -89,7 +83,7 @@ const LISTED_NOTE: &str = "The tool list shows the common tools with short descr
 const ALL_NOTE: &str = "The tool list shows every tool in full.";
 
 fn instructions(all_tools: bool) -> String {
-    let s = INSTRUCTIONS.replace("{documents}", &documents_dir().display().to_string());
+    let s = INSTRUCTIONS.replace("{documents}", &noshape_ops::documents_dir().display().to_string());
     if all_tools { s.replace(LISTED_NOTE, ALL_NOTE) } else { s }
 }
 
@@ -164,10 +158,15 @@ fn call_tool(ctx: &mut Ctx, params: &Value) -> Value {
     let Some(op) = registry::by_tool_name(name) else {
         return tool_error(&registry::unknown_tool_message(name));
     };
-    match registry::run(ctx, op, &args) {
+    // Documents stay open between calls, their files closed: a user can copy or send a .noshape alone at any time
+    // and have all of it (no -wal / -shm beside it).
+    ctx.resume_files();
+    let reply = match registry::run(ctx, op, &args) {
         Ok(out) => tool_result(out),
         Err(e) => tool_error(&serde_json::to_string(&e.to_json()).unwrap_or_else(|_| e.to_string())),
-    }
+    };
+    ctx.suspend_files();
+    reply
 }
 
 fn tool_result(out: OpOutput) -> Value {

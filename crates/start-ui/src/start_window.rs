@@ -1769,6 +1769,8 @@ impl StartView {
                 )
                 .child(section("Owner", vec!["me".into()]))
                 .child(section("Document description", if d.description.is_empty() { vec![] } else { vec![d.description.clone()] }))
+                // Where the file is on this computer: a link that shows it in its folder.
+                .child(section("Location", vec![]).child(div().text_size(px(13.33)).line_height(px(20.)).child(folder_link("details-location", e.path.clone(), true))))
                 .child(
                     v_flex()
                         .py(px(6.))
@@ -2244,6 +2246,7 @@ impl StartView {
             .item(item("Labels…", &view, &d, |t, d, w, cx| t.labels_dialog(d, w, cx)))
             .separator()
             .item(item("Move to…", &view, &d, |t, d, w, cx| t.move_to(d, w, cx)))
+            .item(item(crate::file_dialogs::show_in_folder_label(), &view, &d, |_, d, _, cx| open_in_file_manager(&d.path, true, cx)))
             .separator();
         let menu = if d.recent_rank.is_some() { menu.item(item("Remove from recently opened", &view, &d, |t, d, _, cx| t.forget(d, cx))) } else { menu };
         menu.item(item("Send to trash", &view, &d, |t, d, w, cx| t.trash(d, w, cx)))
@@ -3480,7 +3483,8 @@ impl StartView {
             .border_color(pal.border)
             .text_size(px(11.))
             .text_color(pal.text_muted)
-            .child(div().flex_1().child(format!("Documents are stored on this computer in {}", display_path(&crate::file_dialogs::documents_dir()))))
+            // The folder in the OS's own form, a link that opens it in Explorer / Finder / the file manager.
+            .child(h_flex().flex_1().min_w_0().child("Documents are stored on this computer in\u{a0}").child(folder_link("documents-folder", crate::file_dialogs::documents_dir(), false)))
             // Live documents/90: the build, in parentheses, at the right end.
             .child(format!("({})", crate::start_hooks::build_label()))
             .into_any_element()
@@ -3776,13 +3780,29 @@ fn folder_label(f: &Path) -> String {
 }
 
 /// Path for display, with the home directory shortened to `~`.
-fn display_path(p: &Path) -> String {
-    if let Some(home) = dirs::home_dir()
-        && let Ok(rest) = p.strip_prefix(&home)
-    {
-        return format!("~/{}", rest.display());
+/// `path` as the OS shows it, as a link: a folder opens in the OS's file manager; a document (`reveal`) shows in its
+/// folder, selected.
+pub fn folder_link(id: &'static str, path: PathBuf, reveal: bool) -> Stateful<Div> {
+    div()
+        .id(id)
+        .debug_selector(move || id.into())
+        .map(|d| crate::ui_script::mark(d, || format!("button:{id}")))
+        .min_w_0()
+        .truncate()
+        .cursor_pointer()
+        .text_color(p().link)
+        .hover(|d| d.underline())
+        .child(crate::file_dialogs::display_path(&path))
+        .on_click(move |_, _, cx| open_in_file_manager(&path, reveal, cx))
+}
+
+/// Opens `path` in the OS's file manager: a folder itself, a file (`reveal`) shown in its folder.
+pub fn open_in_file_manager(path: &Path, reveal: bool, cx: &mut App) {
+    if reveal {
+        cx.reveal_path(path);
+    } else {
+        cx.open_with_system(path);
     }
-    p.display().to_string()
 }
 
 /// Where a new document goes: the documents folder ("Owned by me") or one

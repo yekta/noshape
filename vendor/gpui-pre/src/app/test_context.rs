@@ -431,6 +431,16 @@ impl TestAppContext {
         self.test_platform.opened_url.borrow().clone()
     }
 
+    /// The paths opened with cx.open_with_system() during this test, in order.
+    pub fn opened_paths(&self) -> Vec<std::path::PathBuf> {
+        self.test_platform.opened_paths.borrow().clone()
+    }
+
+    /// The paths shown in their folder with cx.reveal_path() during this test, in order.
+    pub fn revealed_paths(&self) -> Vec<std::path::PathBuf> {
+        self.test_platform.revealed_paths.borrow().clone()
+    }
+
     /// Returns the application identity configured during this test.
     pub fn app_identity(&self) -> Option<(SharedString, SharedString)> {
         self.test_platform.app_identity()

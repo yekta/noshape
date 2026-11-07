@@ -250,11 +250,87 @@ pub struct StoreStats {
 /// [`Document::open_read_only`] (or [`Document::reader`]) on other threads;
 /// WAL mode lets them read concurrently with commits.
 pub struct Document {
-    conn: Connection,
+    /// The SQLite connection; `None` while suspended (see [`Document::suspend`]).
+    db: Option<Connection>,
     path: PathBuf,
     read_only: bool,
     author: String,
     manifest_cache: RefCell<HashMap<MicroversionId, Arc<Manifest>>>,
+    /// `set_durable`'s choice, kept for a resumed connection.
+    durable: std::cell::Cell<bool>,
+    /// A writable document's idle checkpointer (see [`IdleCheckpoint`]).
+    _idle_checkpoint: Option<IdleCheckpoint>,
+    /// Suspended with its checkpointer running: [`Document::resume`] starts it again.
+    resume_checkpoints: bool,
+}
+
+/// Keeps a writable document's file complete on its own: once its write-ahead log has stopped changing for
+/// [`IDLE_CHECKPOINT`], a thread of its own copies the log into the file and empties it (`wal_checkpoint(TRUNCATE)`,
+/// over its own connection, never waiting on a reader), so the `.noshape` alone can be copied or sent at any time.
+struct IdleCheckpoint {
+    stop: Option<std::sync::mpsc::Sender<()>>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+/// How long the write-ahead log must stay unchanged before it is checkpointed.
+pub const IDLE_CHECKPOINT: std::time::Duration = std::time::Duration::from_millis(1000);
+
+impl IdleCheckpoint {
+    fn start(path: &Path) -> Option<Self> {
+        let (stop, rx) = std::sync::mpsc::channel::<()>();
+        let path = path.to_path_buf();
+        let wal = side_files(&path)[0].clone();
+        let thread = std::thread::Builder::new()
+            .name("noshape-checkpoint".into())
+            .spawn(move || {
+                let poll = std::time::Duration::from_millis(250);
+                // The log as last seen (size, modified) and since when it has looked so.
+                let mut seen: Option<((u64, std::time::SystemTime), std::time::Instant)> = None;
+                while let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = rx.recv_timeout(poll) {
+                    let now = std::fs::metadata(&wal).ok().map(|m| (m.len(), m.modified().unwrap_or(std::time::UNIX_EPOCH))).filter(|(len, _)| *len > 0);
+                    let Some(now) = now else {
+                        seen = None;
+                        continue;
+                    };
+                    match seen {
+                        Some((s, since)) if s == now => {
+                            if since.elapsed() >= IDLE_CHECKPOINT {
+                                if let Err(e) = checkpoint_truncate(&path) {
+                                    log::debug!("{}: idle checkpoint: {e}", path.display());
+                                }
+                                // Busy (a reader on an older snapshot): another idle period first.
+                                seen = None;
+                            }
+                        }
+                        _ => seen = Some((now, std::time::Instant::now())),
+                    }
+                }
+            })
+            .ok()?;
+        Some(Self { stop: Some(stop), thread: Some(thread) })
+    }
+}
+
+impl Drop for IdleCheckpoint {
+    fn drop(&mut self) {
+        // Its connection is closed before the document's own, so the document's close removes the log.
+        drop(self.stop.take());
+        if let Some(t) = self.thread.take() {
+            let _ = t.join();
+        }
+    }
+}
+
+/// `wal_checkpoint(TRUNCATE)` over a connection of its own that doesn't wait: a reader still on an older snapshot
+/// makes it give up (it is tried again later), so it never holds up the document's writer for long.
+pub(crate) fn checkpoint_truncate(path: &Path) -> Result<()> {
+    let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
+    conn.busy_timeout(std::time::Duration::ZERO)?;
+    let busy: i64 = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |r| r.get(0))?;
+    if busy != 0 {
+        return Err(StoreError::Io(std::io::Error::other("busy: a reader holds an older snapshot")));
+    }
+    Ok(())
 }
 
 impl std::fmt::Debug for Document {
@@ -506,11 +582,14 @@ impl Document {
         }
         tx.commit()?;
         Ok(Document {
-            conn,
+            db: Some(conn),
             path: path.to_path_buf(),
             read_only: false,
             author,
             manifest_cache: RefCell::default(),
+            durable: Default::default(),
+            _idle_checkpoint: IdleCheckpoint::start(path),
+            resume_checkpoints: false,
         })
     }
 
@@ -558,11 +637,14 @@ impl Document {
         })?;
         schema::check_and_migrate(&mut conn, !read_only)?;
         Ok(Document {
-            conn,
+            db: Some(conn),
             path: path.to_path_buf(),
             read_only,
             author: local_user_name(),
             manifest_cache: RefCell::default(),
+            durable: Default::default(),
+            _idle_checkpoint: if read_only { None } else { IdleCheckpoint::start(path) },
+            resume_checkpoints: false,
         })
     }
 
@@ -593,7 +675,7 @@ impl Document {
         let mut conn = Connection::open_with_flags(uri, flags)?;
         schema::configure(&conn, false)?;
         schema::check_and_migrate(&mut conn, false)?;
-        Ok(Document { conn, path: path.to_path_buf(), read_only: true, author: local_user_name(), manifest_cache: RefCell::default() })
+        Ok(Document { db: Some(conn), path: path.to_path_buf(), read_only: true, author: local_user_name(), manifest_cache: RefCell::default(), durable: Default::default(), _idle_checkpoint: None, resume_checkpoints: false })
     }
 
     /// The document's default branch and everything at its head can be read.
@@ -625,9 +707,51 @@ impl Document {
     /// is still corruption-free after a crash but may lose the most recent
     /// commits on power failure.
     pub fn set_durable(&self, durable: bool) -> Result<()> {
-        self.conn
+        self.conn()?
             .pragma_update(None, "synchronous", if durable { "FULL" } else { "NORMAL" })?;
+        self.durable.set(durable);
         Ok(())
+    }
+
+    fn conn(&self) -> Result<&Connection> {
+        self.db.as_ref().ok_or(StoreError::Suspended)
+    }
+
+    /// Closes the file until [`Document::resume`] (a process that keeps documents between calls, the MCP server):
+    /// with no other connection on it, SQLite folds the write-ahead log into the file and removes the `-wal` and
+    /// `-shm` beside it, so the `.noshape` alone is the whole document.
+    pub fn suspend(&mut self) {
+        // The checkpointer's connection first, so the document's is the last to close.
+        let checkpointing = self._idle_checkpoint.take().is_some();
+        self.db = None;
+        self.resume_checkpoints = checkpointing;
+    }
+
+    /// Opens the file again after [`Document::suspend`] (nothing when it is open).
+    pub fn resume(&mut self) -> Result<()> {
+        if self.db.is_some() {
+            return Ok(());
+        }
+        let flags = if self.read_only { OpenFlags::SQLITE_OPEN_READ_ONLY } else { OpenFlags::SQLITE_OPEN_READ_WRITE } | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        let conn = Connection::open_with_flags(&self.path, flags)?;
+        schema::configure(&conn, !self.read_only)?;
+        if self.durable.get() {
+            conn.pragma_update(None, "synchronous", "FULL")?;
+        }
+        self.db = Some(conn);
+        if std::mem::take(&mut self.resume_checkpoints) {
+            self._idle_checkpoint = IdleCheckpoint::start(&self.path);
+        }
+        Ok(())
+    }
+
+    /// No more idle checkpoints for this handle (a test that needs the log as the last commit left it).
+    pub fn keep_log(&mut self) {
+        self._idle_checkpoint = None;
+    }
+
+    pub fn is_suspended(&self) -> bool {
+        self.db.is_none()
     }
 
     /// Writes a compacted, self-contained copy of the document to `dest`
@@ -637,7 +761,7 @@ impl Document {
         if dest.exists() {
             return Err(StoreError::AlreadyExists(dest.to_path_buf()));
         }
-        self.conn
+        self.conn()?
             .execute("VACUUM INTO ?1", [dest.to_string_lossy()])?;
         Ok(())
     }
@@ -645,7 +769,7 @@ impl Document {
     /// Moves WAL content into the main file (done automatically too).
     pub fn checkpoint(&self) -> Result<()> {
         self.writable()?;
-        self.conn
+        self.conn()?
             .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))?;
         Ok(())
     }
@@ -664,7 +788,7 @@ impl Document {
 
     /// Manifest (name -> blob hash) of a microversion. Cached in memory.
     pub fn manifest(&self, mv: MicroversionId) -> Result<Arc<Manifest>> {
-        let m = load_manifest_cached(&self.conn, &self.manifest_cache, mv)?;
+        let m = load_manifest_cached(self.conn()?, &self.manifest_cache, mv)?;
         self.cache_manifest(mv, m.clone());
         Ok(m)
     }
@@ -688,14 +812,14 @@ impl Document {
         match m.get(name) {
             None => Ok(None),
             Some(&h) => Ok(Some(
-                get_blob(&self.conn, h)?.ok_or(StoreError::MissingBlob(h))?,
+                get_blob(self.conn()?, h)?.ok_or(StoreError::MissingBlob(h))?,
             )),
         }
     }
 
     /// Content of a blob by hash.
     pub fn read_blob(&self, hash: BlobHash) -> Result<Option<Vec<u8>>> {
-        get_blob(&self.conn, hash)
+        get_blob(self.conn()?, hash)
     }
 
     /// Every blob of a microversion.
@@ -705,7 +829,7 @@ impl Document {
             .map(|(name, &h)| {
                 Ok((
                     name.clone(),
-                    get_blob(&self.conn, h)?.ok_or(StoreError::MissingBlob(h))?,
+                    get_blob(self.conn()?, h)?.ok_or(StoreError::MissingBlob(h))?,
                 ))
             })
             .collect()
@@ -717,7 +841,7 @@ impl Document {
     }
 
     pub fn microversion(&self, id: MicroversionId) -> Result<MicroversionInfo> {
-        self.conn
+        self.conn()?
             .prepare_cached(&format!(
                 "SELECT {MV_COLS} FROM microversions m WHERE m.id = ?1"
             ))?
@@ -728,7 +852,7 @@ impl Document {
 
     /// Current head of a (live) branch.
     pub fn head(&self, branch: BranchId) -> Result<MicroversionId> {
-        live_head(&self.conn, branch)
+        live_head(self.conn()?, branch)
     }
 
     /// History of a branch, newest first, following first parents from its
@@ -758,7 +882,7 @@ impl Document {
             )
             SELECT {MV_COLS} FROM h JOIN microversions m ON m.id = h.id ORDER BY h.depth"
         );
-        let mut stmt = self.conn.prepare_cached(&sql)?;
+        let mut stmt = self.conn()?.prepare_cached(&sql)?;
         let rows = stmt.query_map(params![mv, limit], mv_from_row)?;
         let out = rows.collect::<rusqlite::Result<Vec<_>>>()?;
         if out.is_empty() {
@@ -774,7 +898,7 @@ impl Document {
             ancestors_cte("a", 1)
         );
         Ok(self
-            .conn
+            .conn()?
             .prepare_cached(&sql)?
             .query_row(params![of, ancestor], |r| r.get(0))?)
     }
@@ -796,7 +920,7 @@ impl Document {
             ancestors_cte("b", 2)
         );
         Ok(self
-            .conn
+            .conn()?
             .prepare_cached(&sql)?
             .query_row(params![a, b], |r| r.get(0))
             .optional()?)
@@ -804,13 +928,13 @@ impl Document {
 
     /// The full DAG: all microversions, branches and versions.
     pub fn graph(&self) -> Result<VersionGraph> {
-        let mut stmt = self.conn.prepare_cached(&format!(
+        let mut stmt = self.conn()?.prepare_cached(&format!(
             "SELECT {MV_COLS} FROM microversions m ORDER BY m.seq"
         ))?;
         let microversions = stmt
             .query_map([], mv_from_row)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
-        let mut stmt = self.conn.prepare_cached(&format!(
+        let mut stmt = self.conn()?.prepare_cached(&format!(
             "SELECT {BRANCH_COLS} FROM branches ORDER BY is_default DESC, created, rowid"
         ))?;
         let branches = stmt
@@ -842,7 +966,7 @@ impl Document {
     ) -> Result<MicroversionId> {
         self.writable()?;
         let tx = self
-            .conn
+            .db.as_mut().ok_or(StoreError::Suspended)?
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let head = live_head(&tx, branch)?;
         let base = load_manifest_cached(&tx, &self.manifest_cache, head)?;
@@ -885,7 +1009,7 @@ impl Document {
     ) -> Result<MicroversionId> {
         self.writable()?;
         let tx = self
-            .conn
+            .db.as_mut().ok_or(StoreError::Suspended)?
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let head = live_head(&tx, branch)?;
         if extra_parent.is_none() {
@@ -916,7 +1040,7 @@ impl Document {
     pub fn restore(&mut self, branch: BranchId, to: MicroversionId) -> Result<MicroversionId> {
         let target = self.microversion(to)?;
         let version_name: Option<String> = self
-            .conn
+            .conn()?
             .prepare_cached(
                 "SELECT name FROM versions WHERE microversion = ?1 ORDER BY seq LIMIT 1",
             )?
@@ -1015,7 +1139,7 @@ impl Document {
         let mut taken = Vec::new();
         let mut conflicts = Vec::new();
         let tx = self
-            .conn
+            .db.as_mut().ok_or(StoreError::Suspended)?
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         if live_head(&tx, into)? != ours_head || from_branch.map(|f| live_head(&tx, f)).transpose()?.is_some_and(|h| h != theirs_head) {
             return Err(StoreError::Corrupt("branch moved during merge".into()));
@@ -1081,14 +1205,14 @@ impl Document {
     /// The default ("Main") branch.
     pub fn default_branch(&self) -> Result<BranchId> {
         Ok(self
-            .conn
+            .conn()?
             .prepare_cached("SELECT id FROM branches WHERE is_default = 1 LIMIT 1")?
             .query_row([], |r| r.get(0))?)
     }
 
     /// Live branches, default first, then by creation.
     pub fn list_branches(&self) -> Result<Vec<BranchInfo>> {
-        let mut stmt = self.conn.prepare_cached(&format!(
+        let mut stmt = self.conn()?.prepare_cached(&format!(
             "SELECT {BRANCH_COLS} FROM branches WHERE deleted = 0
              ORDER BY is_default DESC, created, rowid"
         ))?;
@@ -1099,7 +1223,7 @@ impl Document {
 
     /// Branch by id (also returns deleted branches).
     pub fn branch(&self, id: BranchId) -> Result<BranchInfo> {
-        self.conn
+        self.conn()?
             .prepare_cached(&format!("SELECT {BRANCH_COLS} FROM branches WHERE id = ?1"))?
             .query_row([id], branch_from_row)
             .optional()?
@@ -1109,7 +1233,7 @@ impl Document {
     /// Live branch by name.
     pub fn branch_by_name(&self, name: &str) -> Result<Option<BranchInfo>> {
         Ok(self
-            .conn
+            .conn()?
             .prepare_cached(&format!(
                 "SELECT {BRANCH_COLS} FROM branches WHERE name = ?1 AND deleted = 0"
             ))?
@@ -1126,7 +1250,7 @@ impl Document {
             return Err(StoreError::BranchNameTaken(name.to_string()));
         }
         let id = BranchId::generate();
-        self.conn.execute(
+        self.conn()?.execute(
             "INSERT INTO branches (id, name, head, created, created_from, is_default)
              VALUES (?1, ?2, ?3, ?4, ?3, 0)",
             params![id, name, from, now_ms()],
@@ -1143,7 +1267,7 @@ impl Document {
         {
             return Err(StoreError::BranchNameTaken(name.to_string()));
         }
-        self.conn.execute(
+        self.conn()?.execute(
             "UPDATE branches SET name = ?1 WHERE id = ?2",
             params![name, id],
         )?;
@@ -1161,7 +1285,7 @@ impl Document {
         if b.is_default {
             return Err(StoreError::CannotDeleteDefaultBranch);
         }
-        self.conn
+        self.conn()?
             .execute("UPDATE branches SET deleted = 1 WHERE id = ?1", [id])?;
         Ok(())
     }
@@ -1179,7 +1303,7 @@ impl Document {
         {
             return Err(StoreError::BranchNameTaken(b.name));
         }
-        self.conn
+        self.conn()?
             .execute("UPDATE branches SET deleted = 0 WHERE id = ?1", [id])?;
         Ok(())
     }
@@ -1199,7 +1323,7 @@ impl Document {
         let name = check_name(name)?;
         self.microversion(mv)?;
         let id = VersionId::generate();
-        self.conn.execute(
+        self.conn()?.execute(
             "INSERT INTO versions (id, name, description, microversion, created, author)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             params![id, name, description, mv, now_ms(), self.author],
@@ -1210,7 +1334,7 @@ impl Document {
     /// All versions in creation order.
     pub fn list_versions(&self) -> Result<Vec<VersionInfo>> {
         let mut stmt = self
-            .conn
+            .conn()?
             .prepare_cached(&format!("SELECT {VERSION_COLS} FROM versions ORDER BY seq"))?;
         Ok(stmt
             .query_map([], version_from_row)?
@@ -1223,12 +1347,12 @@ impl Document {
         self.writable()?;
         let name = check_name(name)?;
         self.version(id)?;
-        self.conn.execute("UPDATE versions SET name = ?2, description = ?3 WHERE id = ?1", params![id, name, description])?;
+        self.conn()?.execute("UPDATE versions SET name = ?2, description = ?3 WHERE id = ?1", params![id, name, description])?;
         Ok(())
     }
 
     pub fn version(&self, id: VersionId) -> Result<VersionInfo> {
-        self.conn
+        self.conn()?
             .prepare_cached(&format!(
                 "SELECT {VERSION_COLS} FROM versions WHERE id = ?1"
             ))?
@@ -1244,7 +1368,7 @@ impl Document {
     /// Raw metadata value.
     pub fn get_meta(&self, key: &str) -> Result<Option<Vec<u8>>> {
         Ok(self
-            .conn
+            .conn()?
             .prepare_cached("SELECT value FROM meta WHERE key = ?1")?
             .query_row([key], |r| r.get(0))
             .optional()?)
@@ -1256,11 +1380,11 @@ impl Document {
         self.writable()?;
         match value {
             Some(v) => self
-                .conn
+                .conn()?
                 .prepare_cached("INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)")?
                 .execute(params![key, v])?,
             None => self
-                .conn
+                .conn()?
                 .prepare_cached("DELETE FROM meta WHERE key = ?1")?
                 .execute([key])?,
         };
@@ -1289,7 +1413,7 @@ impl Document {
     /// The documents page's "Owned by" and "Modified by": the author of the
     /// first and of the latest microversion.
     pub fn owner_and_last_author(&self) -> Result<(String, String)> {
-        Ok(owner_and_last_author(&self.conn)?)
+        Ok(owner_and_last_author(self.conn()?)?)
     }
 
     pub fn set_name(&mut self, name: &str) -> Result<()> {
@@ -1312,9 +1436,9 @@ impl Document {
     /// Storage statistics.
     pub fn stats(&self) -> Result<StoreStats> {
         let microversions: i64 =
-            self.conn
+            self.conn()?
                 .query_row("SELECT COUNT(*) FROM microversions", [], |r| r.get(0))?;
-        let (blobs, raw, stored): (i64, i64, i64) = self.conn.query_row(
+        let (blobs, raw, stored): (i64, i64, i64) = self.conn()?.query_row(
             "SELECT COUNT(*), COALESCE(SUM(size), 0), COALESCE(SUM(length(data)), 0) FROM blobs",
             [],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),

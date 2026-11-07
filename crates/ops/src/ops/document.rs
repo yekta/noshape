@@ -18,7 +18,7 @@ pub fn ops() -> Vec<Op> {
             summary: "Create a new document file",
             description: "Creates a .noshape document (one SQLite file holding every tab and the whole edit history). Like a new Onshape document it has \"Part Studio 1\" and \"Assembly 1\". Becomes the current document. Every later edit is saved immediately as a microversion (there is no Save).",
             fields: vec![
-                req("path", s(), "Where to create it, e.g. \"/tmp/bracket.noshape\". Must not exist."),
+                opt("path", s(), "Where to create it: a full path (\"/home/ann/parts/bracket.noshape\"), or a file name (\"bracket\", \"bracket.noshape\") for the documents folder the app lists (noshape's documents folder in the user's Documents). Default: a new \"Untitled <n>.noshape\" there. Must not exist. The reply's `path` is where it is."),
                 opt("length_unit", json!({ "type": "string", "enum": ["mm", "cm", "m", "in", "ft", "yd", "um"] }), "Workspace length unit (default mm): bare numbers in length fields use it."),
                 opt("angle_unit", json!({ "type": "string", "enum": ["deg", "rad"] }), "Workspace angle unit (default deg)."),
             ],
@@ -285,6 +285,27 @@ pub(crate) fn describe(od: &OpenDoc) -> Value {
     v
 }
 
+/// Where `document_create` makes its file: `path` as given when it has a folder, a bare name (".noshape" added) in
+/// the documents folder, nothing: a free "Untitled <n>.noshape" there; always absolute.
+pub fn new_document_path(path: Option<&str>, documents: &Path) -> Result<std::path::PathBuf, OpError> {
+    let p = match path.map(str::trim).filter(|p| !p.is_empty()) {
+        None => (1..).map(|n| documents.join(format!("Untitled {n}.noshape"))).find(|p| !p.exists()).expect("a free name"),
+        Some(p) => {
+            let given = Path::new(p);
+            let bare = given.parent().is_none_or(|d| d.as_os_str().is_empty());
+            let mut p = if bare { documents.join(given) } else { given.to_path_buf() };
+            if p.extension().is_none() {
+                p.set_extension("noshape");
+            }
+            p
+        }
+    };
+    if p.is_absolute() {
+        return Ok(p);
+    }
+    std::env::current_dir().map(|d| d.join(&p)).map_err(|e| OpError::new("io", format!("the current folder: {e}")).with_param("path"))
+}
+
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut d = Document::new();
     if let Some(u) = a.opt_str("length_unit")? {
@@ -293,7 +314,9 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if let Some(u) = a.opt_str("angle_unit")? {
         d.settings.units.angle = angle_unit(u)?;
     }
-    let od = ctx.create(Path::new(a.str("path")?), d)?;
+    let documents = ctx.documents.clone().unwrap_or_else(noshape_scene::documents_dir);
+    let path = new_document_path(a.opt_str("path")?, &documents)?;
+    let od = ctx.create(&path, d)?;
     Ok(describe(od).into())
 }
 

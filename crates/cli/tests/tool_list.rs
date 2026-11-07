@@ -29,7 +29,7 @@ fn instructions_name_the_apps_documents_folder() {
     for all in [false, true] {
         let text = rpc(&mut ctx, "initialize", json!({ "protocolVersion": "2025-06-18" }), all)["instructions"].as_str().unwrap().to_string();
         assert!(!text.contains("{documents}"), "placeholder left in the instructions");
-        let line = text.lines().find(|l| l.contains("Save new documents in")).expect("the documents folder line");
+        let line = text.lines().find(|l| l.contains("Create documents in the documents folder")).expect("the documents folder line");
         assert!(line.contains("noshape") && line.contains(std::path::MAIN_SEPARATOR), "{line}");
     }
 }
@@ -63,4 +63,43 @@ fn every_tool_stays_reachable() {
     // A tool the short list doesn't show is still callable directly too.
     let direct = rpc(&mut ctx, "tools/call", json!({ "name": "drawing_templates", "arguments": {} }), false);
     assert!(!direct.to_string().contains("unknown tool"), "{direct}");
+}
+
+/// A document the MCP server (kept running by the agent's app) touched has nothing beside it once a call returns
+/// (user 11-07: a friend's folder held a 3.7 MB Panda.noshape-wal): its `.noshape` alone, copied or sent, has every
+/// edit, and the server goes on with the document at the next call.
+#[test]
+fn a_document_the_server_touched_has_no_side_files_between_calls() {
+    let dir = std::env::temp_dir().join(format!("noshape-cli-mcp-files-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("Panda.noshape");
+    let side = |suffix: &str| dir.join(format!("Panda.noshape{suffix}"));
+    let mut ctx = Ctx::new();
+    let call = |ctx: &mut Ctx, tool: &str, args: Value| {
+        let r = rpc(ctx, "tools/call", json!({ "name": tool, "arguments": args }), false);
+        assert_eq!(r["isError"], false, "{tool}: {r}");
+        r["structuredContent"].clone()
+    };
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    let sketch = call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    for suffix in ["-wal", "-shm"] {
+        assert!(!side(suffix).exists(), "{suffix} left after a call");
+    }
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sketch, "tool": "corner_rectangle", "points": [[0, 0], [40, 30]] }));
+    for suffix in ["-wal", "-shm"] {
+        assert!(!side(suffix).exists(), "{suffix} left after a call");
+    }
+    // The file alone, elsewhere, has the sketch.
+    let copy = dir.join("copy");
+    std::fs::create_dir_all(&copy).unwrap();
+    std::fs::copy(&path, copy.join("Panda.noshape")).unwrap();
+    let mut other = Ctx::new();
+    let opened = registry::run(&mut other, registry::by_tool_name("document_open").unwrap(), &json!({ "path": copy.join("Panda.noshape").to_str().unwrap() })).unwrap().value;
+    assert!(opened["tabs"].is_array(), "{opened}");
+    let list = registry::run(&mut other, registry::by_tool_name("feature_list").unwrap(), &json!({})).unwrap().value;
+    assert!(list.to_string().contains("Sketch 1"), "{list}");
+    drop(other);
+    drop(ctx);
+    let _ = std::fs::remove_dir_all(&dir);
 }

@@ -8,6 +8,8 @@
 //! app re-exports it. See `docs/AGENT_API.md`.
 
 pub use noshape_kernel::{OCCT_PATCHES, VERSION};
+/// The documents folder the app lists ("Owned by me"): where `document_create` puts a document by default.
+pub use noshape_scene::documents_dir;
 
 pub mod about;
 pub mod analysis;

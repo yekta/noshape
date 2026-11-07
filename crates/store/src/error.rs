@@ -35,6 +35,8 @@ pub enum StoreError {
     Corrupt(String),
     #[error("the branch was changed outside the undo stack; undo history was cleared")]
     UndoStale,
+    #[error("the document's file is closed between calls (resume it first)")]
+    Suspended,
 }
 
 pub type Result<T, E = StoreError> = std::result::Result<T, E>;

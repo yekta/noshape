@@ -28,6 +28,25 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-07 20:58 UTC: P0 "a Windows user can't find their documents" (lead), then paused again
+- One documents folder for everything: `noshape_scene::documents_dir` (`NOSHAPE_DOCUMENTS_DIR`, else the OS's
+  Documents Known Folder's `noshape`), used by app-core (`file_dialogs::documents_dir`), ops (`noshape_ops::documents_dir`,
+  `document_create`) and the MCP server's instructions (its own copy is gone; the CLI doesn't depend on app-core).
+- The documents page's footer shows the folder as the OS writes it (`file_dialogs::display_path`: Windows the full
+  path with backslashes, macOS / Linux "~/…" under home) as a link that opens it in the file manager; a document's
+  Details panel has its Location (a link that shows the file in its folder); the row menu has "Show in Explorer" /
+  "Show in Finder" / "Show in folder" (`show_in_folder_label`). GPUI's test platform records open_with_system /
+  reveal_path (vendor/gpui-pre: `opened_paths`, `revealed_paths`); app test `start_links_tests`.
+- `document_create`: no path → "Untitled <n>.noshape" in the documents folder; a bare name → that name there
+  (".noshape" added); a full path as given; the reply's `path` is absolute (`Ctx::documents` overrides the folder for
+  tests). mcp_instructions.md tells agents to create there unless the user asks otherwise and to tell the user the path.
+- The .noshape alone is the whole document (user: a friend's 3.7 MB Panda.noshape-wal): crates/store's
+  `IdleCheckpoint` folds the log into the file (`wal_checkpoint(TRUNCATE)`, its own connection, never waiting on a
+  reader) once the log has been unchanged 1 s; `Document::suspend` / `resume` close the file between MCP calls
+  (`Ctx::suspend_files` / `resume_files` around every tools/call), so no -wal / -shm stays; every copy path already
+  used VACUUM INTO or a fresh create. Cost (T2 `idle_checkpoint_cost`, vibe3): folding takes 4–7 ms off the UI thread;
+  a commit arriving during one waits ≤ 10 ms, and only after a second of idle.
+
 ### 2026-11-07 20:05 UTC: paused (quota) until 11-10; where everything stands
 
 Coverage (tools/ui-parity/coverage_<area>.py; non-cloud items; scenarios exercising them, own and others'):
