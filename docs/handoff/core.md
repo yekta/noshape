@@ -16,6 +16,21 @@ default (097f9750) and reusing more; (3) Shell "too thick" as live (std_oracle);
 with CRASH-1388 (watching CI). Also fixed: P1 CRASH-1388, P1 NF-CHAMFER-HANG-1212 (patch 0018: lib sync asked), P1
 COMPOSITE-LATER-FEATURE, the feature audit's batches 11-13. Open tickets: SHELL-HANG-5, FILL-G1-DOME (P2).
 
+**Review of bool's de4907d9 (by_quadrics stage 1 + the repair), core 11-07 16:39 UTC (lead's ask).**
+- Sound: every new loop has a fixed iteration cap (the march 400 steps, solves 16-100), so a failing case gives up the
+  same way everywhere and falls back; no unordered containers; the repair runs only on an invalid inward wall, inside
+  a Standard_Failure catch, and its wall still goes through BRepCheck, the crossing check and the volume check; traced
+  vertices / edges at 1e3 x tol = 1e-6 x size (tight). Tests: the four pinch / strip cases against the slab route and
+  analytic volumes, rings-loft's Shell 1 input against live.
+- Should fix: after the repair the wall's volume is only bounded above (`vw <= vs * (1 + 1e-3)`, `vw > 0`). A repair
+  that drops a piece it shouldn't ("nearer a kept face than the wall or out of the part") leaves a valid, uncrossed
+  wall that is too small, and it is accepted: the shell comes out too thick there. On the repair path, bound it below
+  too (e.g. the removed volume vs the kept faces' area x thickness within a band, or against the unrepaired wall's
+  volume).
+- Nit: `make_edge`'s `while (pts.size() < 8)` never ends on one point (the inner loop adds nothing); every caller goes
+  through `finish`, which leaves two, but a `pts.size() < 2` fail costs nothing.
+- Speed is bool's next (rings-loft 2.1 s, live 235 ms: base build and crossing check 1.3 s each).
+
 **State 11-07 16:23 UTC: dx's c2 list (2132 rerun).**
 - c2-valve-config Extrude 3 (11 circle / 48 other for 9 / 50): Sketch 3 is a text entity; one glyph segment, 0.039 mm,
   is a circle in live and a B-spline in ours, top and bottom of the extruded letters. Text glyph curves (skasm's / the
