@@ -22,6 +22,8 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 opt("category", s(), "Only this category: Sketch, Solid (Create), Detail, Pattern, Transform, Direct, Surface, Curve, Reference, SheetMetal, Frame, Variable, Import, Custom."),
                 opt("search", s(), "Only types whose name has every word of this (case-insensitive, word starts: \"move face\", \"fill\"), or whose id it is; when none, those whose description contains the words."),
+                opt("document", s(), "List the custom features of this document's `version` instead (Add custom features: the current document's path or another .noshape file); their `type` ids work in any document's `feature_add`."),
+                opt("version", s(), "The named version of `document` (custom features come only from a version)."),
             ],
             mutates: false,
             destructive: false,
@@ -350,6 +352,9 @@ fn category_name(c: Category) -> String {
 }
 
 fn types(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    if let Some(document) = a.opt_str("document")? {
+        return version_types(document, a.str("version")?);
+    }
     // Custom features need the document's Feature Studios compiled.
     let custom = match ctx.doc(a.opt_str("doc")?) {
         Ok(od) => noshape_model::custom::DocumentScripts::from_document(od.doc()).feature_types(),
@@ -375,6 +380,19 @@ fn types(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .collect();
     out.sort_by(|x, y| x["category"].as_str().cmp(&y["category"].as_str()).then(x["name"].as_str().cmp(&y["name"].as_str())));
     Ok(json!({ "feature_types": out }).into())
+}
+
+/// The custom features of a document's version, by Feature Studio (Add custom features).
+fn version_types(document: &str, version: &str) -> Result<OpOutput, OpError> {
+    let (path, v, snapshot) = crate::derived::named_version(document, version)?;
+    let mut out = Vec::new();
+    for t in snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::TabContent::FeatureStudio(_))) {
+        let key = crate::derived::ExternalRef { path: path.clone(), microversion: v.microversion, tab: t.id.to_string() }.key();
+        let Some(studio) = noshape_model::custom::external_studio(&key) else { continue };
+        let features: Vec<Value> = studio.features.iter().map(|f| json!({ "type": f.type_id, "name": f.display_name, "description": f.description })).collect();
+        out.push(json!({ "feature_studio": t.name, "errors": studio.has_errors(), "features": features }));
+    }
+    Ok(json!({ "version": v.label, "feature_studios": out }).into())
 }
 
 /// A feature type by id, compiling the document's Feature Studios for `custom:` ids.

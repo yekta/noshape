@@ -326,13 +326,14 @@ pub fn edit_curve() -> FeatureType {
         .hints(Hints::COLLAPSE_ARRAY_ITEMS | Hints::PREVENT_ARRAY_REORDER)
         .visible(cps),
         ParamSpec::bool("showDetails", "Show details", true).hints(Hints::GROUP_HEADER | Hints::GROUP_OPEN),
-        ParamSpec::num("curveDegree", "Degree", NumSpec::integer(3, 0, 1000))
+        // The selected curve's (computed); 0 without one (std's bounds, live edit-curve-tool).
+        ParamSpec::num("curveDegree", "Degree", NumSpec::integer(0, 0, 1000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
-        ParamSpec::num("curveNumCPs", "Control points", NumSpec::integer(4, 0, 100_000))
+        ParamSpec::num("curveNumCPs", "Control points", NumSpec::integer(0, 0, 100_000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
-        ParamSpec::num("curveNumSpans", "Spans", NumSpec::integer(1, 0, 100_000))
+        ParamSpec::num("curveNumSpans", "Spans", NumSpec::integer(0, 0, 100_000))
             .hints(Hints::READ_ONLY | Hints::UNCONFIGURABLE)
             .visible(|v| v.bool("showDetails")),
         ParamSpec::bool("approximationShowDeviation", "Show deviation", false).hints(Hints::GROUP_HEADER),

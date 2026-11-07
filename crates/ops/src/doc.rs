@@ -324,6 +324,8 @@ fn init_once() {
     ONCE.call_once(|| {
         // Regeneration evaluates custom features and the features std runs through the FeatureScript host.
         noshape_model::custom::register();
+        // Feature Studios importing other documents' versions, and custom features from them (the app sets the same).
+        noshape_model::custom::set_external_tab_loader(crate::derived::external_tab);
         // Variable Studios inserted from other documents read those
         // documents' versions (the app sets the same loader).
         noshape_model::variables::set_external_loader(|path, mv| mv.parse().ok().and_then(|mv| crate::derived::external_snapshot(path, mv).ok()));

@@ -45,7 +45,7 @@ pub fn ops() -> Vec<Op> {
             group: "ui",
             verb: "toolbar",
             summary: "The Part Studio's or Assembly's toolbar customization (Customize toolbar…) and the S shortcut toolbars",
-            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do. With `tab` an Assembly, the assembly toolbar's: `removed` (its tool ids, `sets` lists them), `order` (the tool sets' order), `hide_search`, `shortcut_tools` (Preferences › Shortcut toolbars › Assembly: tool ids; null: Onshape's eleven). With the app open the windows' toolbars follow.",
+            description: "The user's toolbar settings (per user, for every document): `removed` (tool ids taken off the Part Studio toolbar), `group_order` (the tool sets' order, indices of the default sets), `hide_search` (Hide \"Search tools\"), `shortcut_tools` (the S toolbar's feature tool ids; null: Onshape's ten), `sketch_shortcut_tools` / `drawing_shortcut_tools` (the sketch and drawing S toolbars' tools by name; null: the defaults), `custom_features` (Add custom features: the custom features of document versions on the ⊞ tool, their `type` ids from feature_types with `document` and `version`; set the list to add or Remove one). Without `set` replies with them; `set` changes the given ones and saves them, as Customize toolbar… and Preferences › Shortcut toolbars do. With `tab` an Assembly, the assembly toolbar's: `removed` (its tool ids, `sets` lists them), `order` (the tool sets' order), `hide_search`, `shortcut_tools` (Preferences › Shortcut toolbars › Assembly: tool ids; null: Onshape's eleven). With the app open the windows' toolbars follow.",
             fields: vec![doc_field(), opt("tab", s(), "An Assembly tab for the assembly toolbar (default: the Part Studio toolbar)."), opt("set", json!({ "type": "object" }), "Settings to change (see the reply).")],
             mutates: false,
             destructive: false,
@@ -264,7 +264,10 @@ fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 "shortcut_tools" => prefs.shortcut_tools = if v.is_null() { None } else { Some(tool_ids(k, v)?) },
                 "sketch_shortcut_tools" => prefs.sketch_shortcut_tools = names(k, v)?,
                 "drawing_shortcut_tools" => prefs.drawing_shortcut_tools = names(k, v)?,
-                _ => return Err(OpError::param(&format!("set.{k}"), "removed, group_order, hide_search, shortcut_tools, sketch_shortcut_tools or drawing_shortcut_tools")),
+                "custom_features" => {
+                    prefs.custom_features = tool_ids(k, v)?.into_iter().filter_map(|id| noshape_model::features::get(&id).map(|t| crate::prefs::CustomTool { type_id: id, name: t.name.to_string() })).collect();
+                }
+                _ => return Err(OpError::param(&format!("set.{k}"), "removed, group_order, hide_search, shortcut_tools, sketch_shortcut_tools, drawing_shortcut_tools or custom_features")),
             }
         }
         prefs.save();

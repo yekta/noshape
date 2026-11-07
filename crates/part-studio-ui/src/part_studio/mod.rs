@@ -13,6 +13,7 @@ mod triad;
 mod material_data;
 mod material_panel;
 mod config_panel;
+mod custom_features;
 mod custom_tables;
 pub mod input_propagation;
 mod config_ids;
@@ -435,6 +436,10 @@ pub struct PartStudioView {
     sketch_pending_options: Option<crate::sketch_mode::SketchOptions>,
     context: Option<Arc<noshape_model::regen::context::Context>>,
     context_menu: Option<(Point<Pixels>, Entity<crate::os_menu::OsMenu>, Subscription)>,
+    /// A right panel's row pressed (a configuration's, a variable's), or the Assembly contexts selector: what live's
+    /// focusable rows hold (the ui-parity recorder's "other").
+    pub(super) panel_row_focus: FocusHandle,
+    pub(super) context_select_focus: FocusHandle,
     measure_cache: Option<MeasureCache>,
     show_mass: bool,
     right_panel: Option<config_panel::RightPanel>,
@@ -583,6 +588,8 @@ impl PartStudioView {
             sketch_pending_options: None,
             context: None,
             context_menu: None,
+            panel_row_focus: cx.focus_handle(),
+            context_select_focus: cx.focus_handle(),
             measure_cache: None,
             show_mass: false,
             right_panel: None,
@@ -2969,13 +2976,14 @@ impl PartStudioView {
     /// collapsed set 56 (38 for a single tool); Undo / Redo 70, "Search
     /// tools…" 173, 7 px at the end; room = the window minus the 40 px rail
     /// column. Returns the index in `order` from which sets collapse.
-    fn toolbar_collapse_from(order: &[usize], removed: &[String], custom: usize, search_hidden: bool, viewport_w: f32) -> usize {
+    fn toolbar_collapse_from(order: &[usize], removed: &[String], custom: usize, add_split: bool, search_hidden: bool, viewport_w: f32) -> usize {
         let is_removed = |id: &str| removed.iter().any(|r| r == id);
         let widths: Vec<(f32, f32)> = order
             .iter()
             .map(|&gi| {
                 if gi == ADD_CUSTOM_SET {
-                    let w = if is_removed(ADD_CUSTOM[0]) { 0. } else { 38. } + if custom > 0 { 56. } else { 0. };
+                    // ⊞ is a split tool once custom features are added to it.
+                    let w = if is_removed(ADD_CUSTOM[0]) { 0. } else if add_split { 38. + crate::ui::TOOL_CARET_W } else { 38. } + if custom > 0 { 56. } else { 0. };
                     return (w, w);
                 }
                 let items: Vec<Vec<&str>> = TOOLBAR[gi].iter().map(|it| it.iter().copied().filter(|id| !is_removed(id)).collect::<Vec<_>>()).filter(|v| !v.is_empty()).collect();
@@ -3028,7 +3036,7 @@ impl PartStudioView {
         };
         let is_removed = |id: &str| removed.iter().any(|r| r == id);
         let custom = self.doc.read(cx).custom_features().feature_types();
-        let collapse_from = if customizing { usize::MAX } else { Self::toolbar_collapse_from(&order, &removed, custom.len(), hidden, viewport_w) };
+        let collapse_from = if customizing { usize::MAX } else { Self::toolbar_collapse_from(&order, &removed, custom.len(), !self.ui.toolbar.custom_features.is_empty(), hidden, viewport_w) };
         fn field(v: &mut PartStudioView) -> Option<&mut crate::toolbar_customize::Customize> {
             v.ui.tb_custom.as_mut()
         }
@@ -3041,7 +3049,7 @@ impl PartStudioView {
             // part-studio/495: ⊞ at x 1637, the {cube} ▾ at 1675).
             if gi == ADD_CUSTOM_SET {
                 if !is_removed(ADD_CUSTOM[0]) {
-                    let btn = self.add_custom_features_button(custom.clone(), cx);
+                    let btn = self.add_custom_features_button(cx);
                     let el = if customizing {
                         let t = crate::toolbar_customize::tool(btn, &ADD_CUSTOM, crate::assets::icon_path("add-custom-features"), cx);
                         crate::toolbar_customize::toolset(gi, t, true, field, cx)
@@ -3396,26 +3404,6 @@ impl PartStudioView {
                     .child(help),
             )
             .into_any_element()
-    }
-
-    /// ⊞ "Add custom features": the document's Feature Studio features.
-    fn add_custom_features_button(&mut self, custom: Vec<&'static FeatureType>, cx: &mut Context<Self>) -> AnyElement {
-        let view = cx.entity();
-        let btn = crate::ui::tool_button("tb-add-custom", "add-custom-features", false, cx).on_click(move |e: &ClickEvent, window, cx| {
-            let (v, custom) = (view.clone(), custom.clone());
-            let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                if custom.is_empty() {
-                    return m.item(crate::os_menu::OsMenuItem::new("No custom features in this document").disabled(true));
-                }
-                for t in &custom {
-                    let (v, id): (_, &'static str) = (v.clone(), t.id);
-                    m = m.item(crate::os_menu::OsMenuItem::new(t.name).on_click(move |_, window, cx| v.update(cx, |this, cx| this.start_feature(id, window, cx))));
-                }
-                m
-            });
-            crate::os_menu::open(e.position(), menu, window, cx);
-        });
-        crate::ui_script::wrap(crate::ui::with_tooltip("tt-add-custom", "Add custom features", btn).into_any_element(), || "tool:Add custom features".into())
     }
 
     /// The workspace's custom features: one {cube} ▾ dropdown after ⊞ (live
@@ -7033,7 +7021,9 @@ impl Render for PartStudioView {
                             // Slow regeneration: the working overlay (pending.rs).
                             .children(self.render_pending_overlay(cx))
                             // Compare mode: the Main ○—— V3 blend slider, top centre (live 953).
-                            .children(crate::part_studio_hooks::compare_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider))),
+                            .children(crate::part_studio_hooks::compare_slider(&self.doc, cx).map(|slider| div().absolute().top(px(4.)).left_0().right_0().flex().justify_center().child(slider)))
+                            // Add custom features, right-aligned under the toolbar (live 2213).
+                            .children(self.render_add_custom_features()),
                     )
                     // Versions and history › View in repair (repair_mode.rs, live
                     // rp-906): the 567 px Repair panel right of the graphics; its

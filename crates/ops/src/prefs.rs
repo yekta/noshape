@@ -108,6 +108,17 @@ pub struct ToolbarPrefs {
     /// Shortcut toolbars › Drawing; `drawing_keys::SHORTCUT_CATALOGUE`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drawing_shortcut_tools: Option<Vec<String>>,
+    /// Custom features of document versions added through Add custom features, oldest first: the ⊞ tool's ▾.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub custom_features: Vec<CustomTool>,
+}
+
+/// A custom feature on the toolbar: its type id (`custom:ext:…`) and name (shown without reading its version).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CustomTool {
+    #[serde(rename = "type")]
+    pub type_id: String,
+    pub name: String,
 }
 
 impl ToolbarPrefs {

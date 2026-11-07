@@ -1551,7 +1551,8 @@ fn op_extract_wires(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     run_op(i, &cx, &id, "REGEN_ERROR", |ev| {
         let edges = crate::regen::features::bshared::curve_edges(ev, &refs)?;
         if edges.is_empty() {
-            return err("Select edges");
+            // std's Edit curve reads this code as "no selection" (its Curves field faulty, live edit-curve-tool).
+            return Err(super::code_error("EXTRACT_WIRES_NEEDS_EDGES"));
         }
         for w in k::edges_to_wires(&Shape::compound(&edges), 1e-7)? {
             add_wire(ev, w)?;

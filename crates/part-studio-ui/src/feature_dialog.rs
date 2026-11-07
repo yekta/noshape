@@ -740,6 +740,9 @@ impl FeatureDialog {
                     return true;
                 }
                 ParamKind::Query { .. } => return false,
+                // A selection-driven array first keeps the focus as the active field (live constrained-surface-tool:
+                // Vertices, not Tolerance).
+                ParamKind::Array { .. } if first.is_none() && (s.hints.has(Hints::DRIVEN_QUERY) || s.hints.has(Hints::ALLOW_ARRAY_FOCUS)) => return false,
                 ParamKind::Text { .. } if first.is_none() => first = Some((s.id, params.text(s.id).to_string())),
                 ParamKind::Num(_) if first.is_none() => first = Some((s.id, params.expr(s.id).map(|e| e.text.clone()).unwrap_or_default())),
                 _ => {}
@@ -1481,13 +1484,9 @@ impl FeatureDialog {
             return None;
         }
         let (FeatureStatus::Error, msg) = self.status.as_ref()? else { return None };
-        if !self.faulty.is_empty() {
-            return self.faulty.iter().any(|f| f == id).then(|| msg.clone());
-        }
-        // Features that don't name the parameter: the first empty
-        // selection field is the one Onshape marks.
-        let first_empty = self.ty.params.iter().find(|s| s.is_visible(&self.feature.params) && matches!(s.kind, ParamKind::Query { .. }) && self.feature.params.query(s.id).is_empty());
-        first_empty.is_some_and(|s| s.id == id).then(|| msg.clone())
+        // Onshape marks the fields its error names (std's faultyParameters), and no other (live tag-tool,
+        // finish-flex-pcb-model-tool: an error naming none marks none).
+        self.faulty.iter().any(|f| f == id).then(|| msg.clone())
     }
 
     // ------------------------------------------------------------ inputs
@@ -2393,8 +2392,26 @@ impl FeatureDialog {
                 if menu {
                     let view = cx.entity();
                     let query = matches!(s.kind, ParamKind::Query { .. });
+                    let field_path = path.clone();
                     let path = path.clone();
-                    let build = move |m: crate::os_menu::OsMenu, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| {
+                    let is_bool = matches!(s.kind, ParamKind::Bool { .. });
+                    let build = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                        // Before the menu opens (it returns the keyboard there): a right press gives a number field the
+                        // keyboard, its text all selected (a browser's input; live dialog-number-rclick-menu: "Depth",
+                        // [0, 5]); on a checkbox it leaves the dialog's fields (live dialog-checkbox-rclick-convert).
+                        if !query {
+                            match view.read(cx).inputs.get(&field_path).cloned() {
+                                Some(st) => st.update(cx, |s, cx| {
+                                    window.focus(&s.focus_handle(cx), cx);
+                                    s.select_all(window, cx);
+                                }),
+                                None if is_bool => {
+                                    view.update(cx, |d, _| d.keyboard_left = true);
+                                    window.blur(cx);
+                                }
+                                None => {}
+                            }
+                        }
                         let mut m = m;
                         if query {
                             let (v, p) = (view.clone(), path.clone());

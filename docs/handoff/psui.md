@@ -541,6 +541,34 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-07 08:58 UTC, lead's order (the 121's final count, then Add custom features, the std tool dialogs, the sketch tool
+diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 2937/3069.
+- Add custom features (live 2213): ⊞ opens `SelectItemPanel` in its new `PanelMode::CustomFeatures` (300 × 581,
+  right-aligned under the toolbar; Current document | Other documents, opening on Other documents with "Search or paste
+  URL" focused; FeatureScript samples, Community spotlight, Owned by me, … Public; Current document at its latest
+  version with the changes box, Feature Studio rows (fold) and feature rows (initials); a click adds the feature to
+  the toolbar at once and stays light blue; only ✕ closes it). Added features live in the toolbar prefs
+  (`ToolbarPrefs::custom_features`, ops `ui_toolbar` `set.custom_features`); ⊞ is then a split tool, its ▾ the features
+  and Add custom features, the face the one last picked; a feature face's right-click: Open linked document, Remove.
+- Model: a custom feature type can name a Feature Studio of another document's version: `custom:ext:<mv>|<tab>|<path>:<name>`
+  (`studio_type_id`, `parse_type_id` splits at the last colon), compiled once by `custom::external_studio` (versions
+  never change) and found by `features::get`; ops sets the external tab loader too (it didn't: `ext:` imports failed in
+  the CLI). Ops `feature_types` takes `document` + `version` (e2e `a_custom_feature_from_another_documents_version`).
+  Left: the ▾ menu's Sort custom features, Update… / Update all… (a newer version), the search box's sort button, the
+  live face default (live showed the first added feature as the face in other documents), an external studio's own
+  imports of its document's tabs by tab id (not resolved). Other documents grey the documents without custom features.
+- The faulty field: `field_error` no longer falls back to the first empty selection field (fixed tag-tool and
+  finish-flex-pcb-model-tool; Face blend now names its empty side, as live). Compare: tooltips' whitespace collapsed.
+- Std tool dialogs (in this change): Ruled surface's Use cubic interpolation off (live 2212); Edit curve's empty Curves
+  field faulty (opExtractWires fails with EXTRACT_WIRES_NEEDS_EDGES, which std's Edit curve maps), its Degree / Control
+  points / Spans 0 without a curve and read-only fields recorded "disabled"; a dialog's button (Reset triad) recorded as
+  live's control; Constrained surface opens with its Vertices array active, not Tolerance. Left: Frame's Sketch profile
+  picker (live: a library pick, 8020 › 10 Series › 1001 by default; our profiles are text names, no 8020 profiles),
+  Routing curve's Points array (live shows Point 0 expanded), Offset surface's parts.
+- Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
+  the panel doesn't), the contexts selector does; a right press on a number field focuses it, all selected, on a
+  checkbox leaves the fields; the driver reads a state with the keyboard where the open menu returns it.
+
 **Lead 11-02 23:35, top items (milestone 11-03 evening):** (1) P1 VAR-AUTOCOMPLETE-ENTER, (2) the interaction parity
 suite's noshape side (docs/PARITY-SUITES.md §2): the driver (`NOSHAPE_UI_SCRIPT` / `NOSHAPE_UI_STATE_OUT`), the state
 dump, the runner, live's first 20 scenarios run in ours and a first score.

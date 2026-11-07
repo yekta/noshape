@@ -171,7 +171,8 @@ pub fn ruled_surface() -> FeatureType {
         )
         .item_template("#vertex")
         .hints(Hints::DRIVEN_QUERY),
-        ParamSpec::bool("useCubicInterpolation", "Use cubic interpolation", true),
+        // Live 2212: off for a new Ruled surface (std's annotation has no Default).
+        ParamSpec::bool("useCubicInterpolation", "Use cubic interpolation", false),
         ParamSpec::bool("showRuledLines", "Show ruled lines", false),
         ParamSpec::num("ruledLineCount", "Count", NumSpec::integer(40, 1, 100)).visible(|v| v.bool("showRuledLines")),
         ParamSpec::enum_(

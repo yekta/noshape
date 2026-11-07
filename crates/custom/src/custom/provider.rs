@@ -24,6 +24,9 @@ pub(super) struct Latest;
 
 impl CustomFeatureProvider for Latest {
     fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>> {
+        if tab.starts_with("ext:") {
+            return external_studio(tab);
+        }
         LATEST.read().get(tab).cloned()
     }
     fn file(&self, tab: &str) -> Option<crate::file_tab::FileTab> {
@@ -56,6 +59,28 @@ pub fn set_external_tab_loader(f: fn(&str) -> Option<crate::document::Tab>) {
 /// A tab of another document or version, by its `ext:` key.
 pub fn external_tab(key: &str) -> Option<crate::document::Tab> {
     EXTERNAL_TABS.get().and_then(|f| f(key))
+}
+
+static EXTERNAL_STUDIOS: LazyLock<RwLock<HashMap<String, Option<Arc<CompiledStudio>>>>> = LazyLock::new(Default::default);
+
+/// The Feature Studio of another document or version by its `ext:` key, compiled once (a version never changes),
+/// its features (`custom:<key>:<name>`) known to `features::get`. None: not a Feature Studio, or unreadable.
+pub fn external_studio(key: &str) -> Option<Arc<CompiledStudio>> {
+    if let Some(c) = EXTERNAL_STUDIOS.read().get(key) {
+        return c.clone();
+    }
+    let compiled = external_tab(key).and_then(|tab| {
+        let TabContent::FeatureStudio(fs) = &tab.content else { return None };
+        // Its own imports of std and of versions resolve; one of a tab of its document by tab id does not.
+        let resolver = DocResolver { studios: &[], compiled: &HashMap::new(), others: &[] };
+        Some(Arc::new(super::studio::compile_external(tab.id, key, &fs.source, &resolver)))
+    });
+    if let Some(c) = compiled.as_ref().filter(|c| !c.has_errors()) {
+        let types: Vec<&'static FeatureType> = c.features.iter().map(|f| f.feature_type).collect();
+        super::studio::activate(key, &types);
+    }
+    EXTERNAL_STUDIOS.write().insert(key.to_string(), compiled.clone());
+    compiled
 }
 
 /// A non-FeatureScript tab that can be imported.
@@ -206,7 +231,7 @@ impl DocumentScripts {
             // features using it stay editable while the source is fixed.
             if !c.has_errors() {
                 let types: Vec<&'static FeatureType> = c.features.iter().map(|f| f.feature_type).collect();
-                super::studio::activate(*tab, &types);
+                super::studio::activate(&tab.to_string(), &types);
             }
             LATEST.write().insert(tab.to_string(), c.clone());
             compiled.insert(*tab, c.clone());
@@ -246,6 +271,9 @@ impl DocumentScripts {
 
 impl CustomFeatureProvider for DocumentScripts {
     fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>> {
+        if tab.starts_with("ext:") {
+            return external_studio(tab);
+        }
         self.studios.iter().find(|(t, _, _)| t.to_string() == tab).map(|(_, _, c)| c.clone())
     }
     fn file(&self, tab: &str) -> Option<crate::file_tab::FileTab> {

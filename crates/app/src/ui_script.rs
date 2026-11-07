@@ -282,7 +282,20 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
         // assembly scenarios.)
         let state = |cx: &mut AsyncWindowContext| -> Value {
             if let Some(ps) = studio(cx) {
-                let mut s = cx.update(|window, cx| ps.read(cx).ui_state(window, cx)).unwrap_or(Value::Null);
+                // A menu takes our keyboard but not a browser's: read the state with the focus the menu returns to.
+                let mut s = cx
+                    .update(|window, cx| {
+                        let ret = noshape_app_core::os_menu::open_return_focus(cx).or_else(|| ps.read(cx).context_menu_return_focus(cx));
+                        let Some(ret) = ret else { return ps.read(cx).ui_state(window, cx) };
+                        let menu = window.focused(cx);
+                        window.focus(&ret, cx);
+                        let s = ps.read(cx).ui_state(window, cx);
+                        if let Some(m) = menu {
+                            window.focus(&m, cx);
+                        }
+                        s
+                    })
+                    .unwrap_or(Value::Null);
                 // Edit in context: the assembly's instances as live reads them (asm-menu-edit-in-context).
                 if s.is_object()
                     && let Some(a) = ws.update(cx, |w, _| w.any_assembly()).ok().flatten()

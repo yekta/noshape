@@ -207,9 +207,14 @@ pub fn tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App)
 /// group hover (`#d7d7d7`) and only the left corners rounded. Put it in a
 /// [`tool_group`] with a [`tool_caret`].
 pub fn split_tool_button(id: impl Into<ElementId>, icon: &str, active: bool, cx: &App) -> Button {
+    split_tool_button_with(id, assets::icon(icon, TOOL_ICON, cx), active, cx)
+}
+
+/// [`split_tool_button`] showing `content` (a custom feature's initials) in place of an icon.
+pub fn split_tool_button_with(id: impl Into<ElementId>, content: impl IntoElement, active: bool, cx: &App) -> Button {
     Button::new(id)
         .custom(tool_variant(cx, active, true))
-        .child(assets::icon(icon, TOOL_ICON, cx))
+        .child(content)
         .w(px(TOOL_CELL))
         .h(px(TOOL_CELL))
         .p_0()

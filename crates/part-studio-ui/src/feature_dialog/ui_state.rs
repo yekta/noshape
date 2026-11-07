@@ -162,9 +162,18 @@ impl FeatureDialog {
                 ParamKind::Bool { .. } if s.hints.has(Hints::OPPOSITE_DIRECTION) || s.hints.has(Hints::OPPOSITE_DIRECTION_CIRCULAR) => {
                     fields.push(json!({ "label": "toggle", "kind": "toggle", "checked": values.bool(s.id), "state": "ok" }))
                 }
+                // A button (Routing curve's Reset triad): live reads it as a control with its text.
+                ParamKind::Bool { .. } if s.hints.has(Hints::BUTTON) => {
+                    fields.push(json!({ "label": null, "kind": "other", "text": crate::i18n::spec(s.label), "state": "ok" }));
+                }
                 // A plain group title (Loft's "End conditions") is no control: live's state doesn't list it.
                 ParamKind::Bool { .. } if s.hints.has(Hints::GROUP_HEADER) && s.hints.has(Hints::GROUP_LABEL) => {}
                 ParamKind::Bool { .. } => fields.push(json!({ "label": label, "kind": "boolean", "checked": values.bool(s.id), "state": "ok" })),
+                // A read-only output (Edit curve's Degree): the computed value, disabled (live edit-curve-tool).
+                ParamKind::Num(_) if s.hints.has(Hints::READ_ONLY) => {
+                    let text = self.computed.get(s.id).cloned().or_else(|| values.expr(s.id).map(|e| e.text.clone())).unwrap_or_default();
+                    fields.push(json!({ "label": label, "kind": "number", "text": text, "focused": false, "state": "disabled" }));
+                }
                 ParamKind::Num(n) => {
                     let expr = values.expr(s.id).map(|e| e.text.clone()).unwrap_or_default();
                     let (focused, text) = match self.input_of(s.id, window, cx) {

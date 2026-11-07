@@ -555,8 +555,12 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     }
     let side1 = ev.resolve_faces(ev.query("side1"));
     let side2 = ev.resolve_faces(ev.query("side2"));
-    if side1.is_empty() || side2.is_empty() {
-        return err("Select faces to blend.");
+    // Live face-blend-tool: the empty side is the faulty field, Side 1 first.
+    if side1.is_empty() {
+        return crate::regen::eval::err_at(&["side1"], "Select faces to blend.");
+    }
+    if side2.is_empty() {
+        return crate::regen::eval::err_at(&["side2"], "Select faces to blend.");
     }
     let width = ev.is("blendControlType", "WIDTH");
     let asym = ev.bool("asymmetric");

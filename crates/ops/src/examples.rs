@@ -43,7 +43,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_move", &[r##"{"tab": "Part Studio 1", "folder": "Folder 1"}"##, r##"{"tab": "Part Studio 1", "to_parent": true}"##, r##"{"tab": "Assembly 1", "before": "Part Studio 1"}"##]),
     ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
     // features
-    ("feature_types", &[r##"{"search": "move face"}"##, r##"{"category": "Detail"}"##]),
+    ("feature_types", &[r##"{"search": "move face"}"##, r##"{"category": "Detail"}"##, r##"{"document": "/home/me/Documents/noshape/Gears.noshape", "version": "V2"}"##]),
     ("feature_schema", &[r##"{"type": "extrude"}"##, r##"{"type": "hole"}"##]),
     (
         "feature_add",

@@ -312,7 +312,9 @@ impl PartStudioView {
                     // Appearances: "Add face appearance" at the title's right (live).
                     .when(panel == RightPanel::Appearance, |d| d.child(div().absolute().right(px(10.)).top(px(2.)).child(self.render_add_face_appearance(cx)))),
                 )
-                .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().child(body))
+                // Its rows take the keyboard on a right press, as live's focusable rows (`panel_row_focus`, tracked off
+                // the rows: a left click in the panel takes no focus).
+                .child(v_flex().id("right-panel-body").flex_1().p(px(5.)).gap_2().overflow_y_scroll().child(div().absolute().size_0().track_focus(&self.panel_row_focus)).child(body))
                 .child(
                     h_flex()
                         .h(px(40.))
@@ -760,7 +762,9 @@ impl PartStudioView {
                     // menu also over the cells' inputs (qa4 Fixed 11).
                     .child({
                         let target = format!("panel_row:{}", r.name);
-                        crate::ui_script::mark(h_flex().child(name_el).child(kind_select).child(value_cell), move || target)
+                        // The row takes the keyboard before its menu opens (and keeps it to return to).
+                        let row = h_flex().on_mouse_down(MouseButton::Right, cx.listener(|this, _, window, cx| window.focus(&this.panel_row_focus, cx)));
+                        crate::ui_script::mark(row.child(name_el).child(kind_select).child(value_cell), move || target)
                             .os_context_menu_over_inputs(move |menu, _, _| var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable))
                     })
                     // Right-clicking the Description adds Copy | Convert to
@@ -1603,6 +1607,7 @@ impl PartStudioView {
                     let mut row = h_flex()
                         .id(SharedString::from(format!("cfg-row-{iid}-{rk}")))
                         .map(|d| crate::ui_script::mark(d, || format!("config_row:{rname}")))
+                        .on_mouse_down(MouseButton::Right, cx.listener(|this, _, window, cx| window.focus(&this.panel_row_focus, cx)))
                         .border_l_1()
                         .border_color(grid)
                         .child(

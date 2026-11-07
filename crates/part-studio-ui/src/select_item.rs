@@ -20,14 +20,18 @@ use std::sync::Arc;
 
 const BLUE: u32 = 0x1651b0;
 
-/// What the panel picks: a reference parameter of this kind.
+/// What the panel picks: a reference parameter of this kind, or the toolbar's custom features (Add custom
+/// features: a Feature Studio's features at a document version, by type id).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PanelMode {
     Reference(ReferenceKind),
+    CustomFeatures,
 }
 
 /// Document filters of the Other documents tab (live 602).
 const FILTERS: [(&str, &str); 6] = [("Recent", "recent"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
+/// Add custom features' filters (live 2213).
+const FEATURE_FILTERS: [(&str, &str); 7] = [("FeatureScript samples", "custom-feature"), ("Community spotlight", "custom-feature"), ("Owned by me", "src-owned"), ("Recently opened", "src-recent"), ("Created by me", "src-created"), ("Shared with me", "src-shared"), ("Public", "src-public")];
 
 pub enum SelectItemEvent {
     /// A tab (`tab`, `tab#part`, or `ext:` key of another document / version).
@@ -155,6 +159,8 @@ pub struct SelectItemPanel {
     lib_image: &'static str,
     lib_image_select: Option<(Entity<crate::os_select::OsSelect>, Subscription)>,
     lib_image_thumb: Option<(&'static str, Arc<RenderImage>)>,
+    /// Feature Studios whose features are hidden (Add custom features).
+    collapsed: HashSet<String>,
     _subs: Vec<Subscription>,
 }
 
@@ -198,8 +204,40 @@ fn version_sources(path: &std::path::Path, mv: noshape_store::MicroversionId, ex
         .collect()
 }
 
+/// The Feature Studios of a document at a version with their features (Add custom features), keyed by `ext:`
+/// references.
+fn feature_sources(path: &std::path::Path, mv: noshape_store::MicroversionId) -> Vec<RefSource> {
+    let Ok(doc) = crate::derived::external_snapshot(path, mv) else { return Vec::new() };
+    doc.ordered_tabs()
+        .into_iter()
+        .filter(|t| matches!(t.content, noshape_model::document::TabContent::FeatureStudio(_)))
+        .filter_map(|t| {
+            let key = crate::derived::ExternalRef { path: path.to_path_buf(), microversion: mv, tab: t.id.to_string() }.key();
+            let studio = noshape_model::custom::external_studio(&key).filter(|s| !s.has_errors())?;
+            let features = studio.features.iter().map(|f| (f.type_id.clone(), f.display_name.clone())).collect();
+            Some(RefSource { tab: key, name: t.name.clone(), what: RefSourceKind::FeatureStudio(features), configuration: None })
+        })
+        .collect()
+}
+
+/// What a panel in `mode` lists of a document at a version.
+fn sources_at(mode: PanelMode, path: &std::path::Path, mv: noshape_store::MicroversionId, except: &str) -> Vec<RefSource> {
+    match mode {
+        PanelMode::Reference(_) => version_sources(path, mv, except),
+        PanelMode::CustomFeatures => feature_sources(path, mv),
+    }
+}
+
+fn mode_accepts(mode: PanelMode, s: &RefSource) -> bool {
+    match mode {
+        PanelMode::Reference(kind) => crate::fs_reference::accepts(kind, s),
+        PanelMode::CustomFeatures => matches!(&s.what, RefSourceKind::FeatureStudio(f) if !f.is_empty()),
+    }
+}
+
 /// Title, search placeholder and "No … available." text.
-fn texts(PanelMode::Reference(kind): PanelMode) -> (&'static str, &'static str, &'static str) {
+fn texts(mode: PanelMode) -> (&'static str, &'static str, &'static str) {
+    let PanelMode::Reference(kind) = mode else { return ("Add custom features", "Search features", "No features found.") };
     match kind {
         ReferenceKind::Csv => ("Select CSV file", "Search CSV files", "No CSV files available."),
         ReferenceKind::Image => ("Select image", "Search image files", "No image files available."),
@@ -236,8 +274,14 @@ impl SelectItemPanel {
         ];
         let picked = source_of(split_value(&value).0);
         let focused = (matches!(mode, PanelMode::Reference(ReferenceKind::PartStudio)) && picked_studio_exists(&picked, &sources)).then_some(picked);
-        let current = doc_path.as_deref().and_then(document_versions).map(|(name, versions)| VersionedDoc { path: doc_path.clone().unwrap_or_default(), name, versions, version: None, changes: 0, sources: None });
-        SelectItemPanel {
+        let features = mode == PanelMode::CustomFeatures;
+        // Custom features come only from a version (live 2213): this document opens at its latest.
+        let current = doc_path.as_deref().and_then(document_versions).map(|(name, versions)| VersionedDoc { path: doc_path.clone().unwrap_or_default(), name, version: (features && !versions.is_empty()).then_some(0), versions, changes: 0, sources: None });
+        if features {
+            // Live 2213: it opens on Other documents with the search box focused.
+            url.update(cx, |s, cx| s.focus(window, cx));
+        }
+        let mut panel = SelectItemPanel {
             mode,
             sources,
             doc_name,
@@ -248,7 +292,7 @@ impl SelectItemPanel {
             value,
             ok: None,
             title: None,
-            other_documents: false,
+            other_documents: features,
             libraries,
             in_libraries,
             search,
@@ -271,13 +315,32 @@ impl SelectItemPanel {
             lib_image: noshape_scene::environment_maps::NAMES[0],
             lib_image_select: None,
             lib_image_thumb: None,
+            collapsed: HashSet::new(),
             _subs: subs,
+        };
+        if features {
+            panel.load_version_sources(false, cx);
         }
+        panel
+    }
+
+    /// Its search box with the keyboard, if one has it.
+    pub fn focused_input(&self, window: &Window, cx: &App) -> Option<Entity<InputState>> {
+        [&self.url, &self.search].into_iter().find(|i| i.read(cx).focus_handle(cx).is_focused(window)).cloned()
+    }
+
+    /// Other documents' filter list is shown (no document or search open).
+    pub fn shows_document_filters(&self) -> bool {
+        self.other_documents && self.other.is_none() && self.category.is_none() && self.doc_query.is_none()
     }
 
     fn accepts(&self, s: &RefSource) -> bool {
-        let PanelMode::Reference(kind) = self.mode;
-        crate::fs_reference::accepts(kind, s)
+        mode_accepts(self.mode, s)
+    }
+
+    /// The document filters of Other documents.
+    fn filters(&self) -> &'static [(&'static str, &'static str)] {
+        if self.mode == PanelMode::CustomFeatures { &FEATURE_FILTERS } else { &FILTERS }
     }
 
     /// Load the tabs of the shown document at its chosen version.
@@ -292,8 +355,9 @@ impl SelectItemPanel {
         let path = d.path.clone();
         let path2 = path.clone();
         let except = if Some(&path) == me.as_ref() { except_tab } else { String::new() };
+        let mode = self.mode;
         cx.spawn(async move |this, cx| {
-            let (list, changes) = cx.background_spawn(async move { (version_sources(&path, v.microversion, &except), changes_since(&path, v.microversion)) }).await;
+            let (list, changes) = cx.background_spawn(async move { (sources_at(mode, &path, v.microversion, &except), changes_since(&path, v.microversion)) }).await;
             let _ = this.update(cx, |this, cx| {
                 if let Some(d) = if other { this.other.as_mut() } else { this.current.as_mut() }
                     && d.version.and_then(|i| d.versions.get(i)).is_some_and(|x| x.microversion == v.microversion)
@@ -334,7 +398,7 @@ impl SelectItemPanel {
             return;
         }
         self.docs = Some(Vec::new());
-        let PanelMode::Reference(kind) = self.mode;
+        let mode = self.mode;
         cx.spawn(async move |this, cx| {
             let (docs, info) = cx
                 .background_spawn(async move {
@@ -344,7 +408,7 @@ impl SelectItemPanel {
                         .filter_map(|d| {
                             let (_, versions) = document_versions(&d.path)?;
                             let latest = versions.first()?;
-                            let any = version_sources(&d.path, latest.microversion, "").iter().any(|s| crate::fs_reference::accepts(kind, s));
+                            let any = sources_at(mode, &d.path, latest.microversion, "").iter().any(|s| mode_accepts(mode, s));
                             Some((d.path.clone(), (latest.label.clone(), any)))
                         })
                         .collect();
@@ -426,6 +490,10 @@ impl SelectItemPanel {
         let mut out = Vec::new();
         let accepted: Vec<RefSource> = list.iter().filter(|s| self.accepts(s) && (self.other_documents || self.focused.as_ref().is_none_or(|f| *f == s.tab))).cloned().collect();
         for s in &accepted {
+            if let RefSourceKind::FeatureStudio(features) = &s.what {
+                out.extend(self.feature_rows(s, features, query, cx));
+                continue;
+            }
             let parts = match &s.what {
                 RefSourceKind::PartStudio(parts) if expandable => Some(parts.clone()),
                 _ => None,
@@ -441,6 +509,7 @@ impl SelectItemPanel {
                 RefSourceKind::File(..) => "file",
                 RefSourceKind::PartStudio(_) => "part-studio",
                 RefSourceKind::VariableStudio => "variable-studio",
+                RefSourceKind::FeatureStudio(_) => "feature-studio",
             };
             let key = s.tab.clone();
             let open = parts.is_some() && (self.expanded.contains(&s.tab) || !query.is_empty());
@@ -536,6 +605,61 @@ impl SelectItemPanel {
                     })).into_any_element());
                 }
             }
+        }
+        out
+    }
+
+    /// A Feature Studio's row (▾, its icon and name; a click folds it), then its features (initials and name; a
+    /// click picks the type id, which stays light blue), those matching the search (live 2213).
+    fn feature_rows(&self, s: &RefSource, features: &[(String, String)], query: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let pal = p();
+        let studio_hit = query.is_empty() || s.name.to_lowercase().contains(query);
+        let hits: Vec<&(String, String)> = features.iter().filter(|(_, n)| studio_hit || n.to_lowercase().contains(query)).collect();
+        if hits.is_empty() {
+            return Vec::new();
+        }
+        let open = !self.collapsed.contains(&s.tab) || !query.is_empty();
+        let key = s.tab.clone();
+        let mut out = vec![
+            h_flex()
+                .id(SharedString::from(format!("sel-fs-{}", s.tab)))
+                .h(px(40.))
+                .flex_none()
+                .cursor_pointer()
+                .child(div().w(px(31.)).pl(px(9.)).flex_none().child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 10., pal.text)))
+                .child(div().ml(px(9.)).flex_none().child(crate::assets::icon("feature-studio", 28., cx)))
+                .child(div().flex_1().min_w_0().ml(px(28.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(s.name.clone())))
+                .tooltip(crate::ui::user_tooltip(s.name.clone()))
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if !this.collapsed.remove(&key) {
+                        this.collapsed.insert(key.clone());
+                    }
+                    cx.notify();
+                }))
+                .into_any_element(),
+        ];
+        if !open {
+            return out;
+        }
+        for (type_id, name) in hits {
+            let on = self.value == *type_id;
+            let t = type_id.clone();
+            out.push(
+                h_flex()
+                    .id(SharedString::from(format!("sel-feature-{type_id}")))
+                    .h(px(40.))
+                    .flex_none()
+                    .pl(px(80.))
+                    .gap(px(14.))
+                    .cursor_pointer()
+                    .when(on, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
+                    .when(!on, |d| d.hover(|d| d.bg(gpui_kit::rgb(0xdef1fb))))
+                    .tooltip(crate::ui::user_tooltip(name.clone()))
+                    .child(crate::ui::initials_icon(name))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(name.clone())))
+                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.pick(t.clone(), cx)))
+                    .into_any_element(),
+            );
         }
         out
     }
@@ -843,7 +967,7 @@ impl SelectItemPanel {
                 .tooltip(crate::ui::tooltip(tip))
                 .child(crate::assets::icon(icon, 20., cx))
         };
-        let back_tip = self.doc_query.clone().map(|q| format!("Results for \"{q}\"")).or_else(|| self.category.map(|c| FILTERS[c].0.to_string())).unwrap_or_else(|| "Go to document filters".into());
+        let back_tip = self.doc_query.clone().map(|q| format!("Results for \"{q}\"")).or_else(|| self.category.map(|c| self.filters()[c].0.to_string())).unwrap_or_else(|| "Go to document filters".into());
         h_flex()
             .h(px(40.))
             .flex_none()
@@ -935,17 +1059,19 @@ impl SelectItemPanel {
                 .child("Version"),
         );
         let main_on = d.version.is_none();
+        // Custom features come only from a version (live 2213).
+        let main_pickable = !other && self.mode != PanelMode::CustomFeatures;
         col = col.child(
             h_flex()
                 .id("sel-v-main")
                 .h(px(36.))
                 .flex_none()
-                .when(main_on && !other, |r| r.bg(gpui_kit::rgb(0xb2ddf6)))
-                .when(!other, |r| r.cursor_pointer())
+                .when(main_on && main_pickable, |r| r.bg(gpui_kit::rgb(0xb2ddf6)))
+                .when(main_pickable, |r| r.cursor_pointer())
                 .child(node(true, true, n == 0))
-                .child(div().flex_1().text_size(px(14.)).when(other, |d| d.italic().text_color(gpui_kit::rgb(0x999999))).child("Main"))
+                .child(div().flex_1().text_size(px(14.)).when(!main_pickable, |d| d.italic().text_color(gpui_kit::rgb(0x999999))).child("Main"))
                 .tooltip(crate::ui::tooltip("Main"))
-                .when(!other, |r| {
+                .when(main_pickable, |r| {
                     r.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         if let Some(d) = this.current.as_mut() {
                             d.version = None;
@@ -992,7 +1118,7 @@ impl SelectItemPanel {
         let (category, query, url) = (self.category, self.doc_query.clone(), self.url.clone());
         let url_empty = url.read(cx).value().is_empty();
         let placeholder = match (category, &query) {
-            (Some(c), None) => format!("Search in \"{}\"", FILTERS[c].0),
+            (Some(c), None) => format!("Search in \"{}\"", self.filters()[c].0),
             _ => "Search or paste URL".to_string(),
         };
         let col = v_flex().flex_1().min_h_0().child(
@@ -1039,7 +1165,7 @@ impl SelectItemPanel {
         if category.is_none() && query.is_none() {
             // The filters: 32 px rows, 20 px icons.
             let mut list = v_flex().pt(px(10.)).pl(px(10.));
-            for (i, (label, icon)) in FILTERS.iter().enumerate() {
+            for (i, (label, icon)) in self.filters().iter().enumerate() {
                 list = list.child(
                     h_flex()
                         .id(SharedString::from(format!("sel-filter-{i}")))
@@ -1061,7 +1187,8 @@ impl SelectItemPanel {
             }
             return col.child(list).into_any_element();
         }
-        let title = query.clone().map(|q| format!("Results for \"{q}\"")).or_else(|| category.map(|c| FILTERS[c].0.to_string())).unwrap_or_default();
+        let filter = category.map(|c| self.filters()[c].0);
+        let title = query.clone().map(|q| format!("Results for \"{q}\"")).or_else(|| filter.map(str::to_string)).unwrap_or_default();
         let home = |this: &mut Self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>| {
             this.category = None;
             this.doc_query = None;
@@ -1082,11 +1209,11 @@ impl SelectItemPanel {
         let me = self.doc_path.clone();
         let mut docs: Vec<crate::library::DocEntry> = self.docs.clone().unwrap_or_default().into_iter().filter(|d| !d.trashed && !d.broken && Some(&d.path) != me.as_ref()).collect();
         let q = query.as_ref().map(|q| q.to_lowercase());
-        match (category, &q) {
+        match (filter, &q) {
             (_, Some(q)) => docs.retain(|d| d.name.to_lowercase().contains(q.as_str())),
-            // Local documents are all the user's own; none are shared or public.
-            (Some(4 | 5), _) => docs.clear(),
-            (Some(0 | 2), _) => {
+            // Local documents are all the user's own; none are shared, public or Onshape's samples.
+            (Some("Shared with me" | "Public" | "FeatureScript samples" | "Community spotlight"), _) => docs.clear(),
+            (Some("Recent" | "Recently opened"), _) => {
                 docs.retain(|d| d.recent_rank.is_some());
                 docs.sort_by_key(|d| d.recent_rank);
             }
@@ -1094,7 +1221,7 @@ impl SelectItemPanel {
         }
         let mut list = v_flex().id("sel-docs").flex_1().min_h_0().overflow_y_scroll();
         // Owned by me: the folders first (folder outline, bold name).
-        if category == Some(1) && q.is_none() {
+        if filter == Some("Owned by me") && q.is_none() {
             let mut dirs: Vec<PathBuf> = docs.iter().map(|d| d.folder().to_path_buf()).collect();
             dirs.sort();
             dirs.dedup();
@@ -1227,7 +1354,7 @@ impl Render for SelectItemPanel {
                         this.other_documents = to_other;
                         this.graph = false;
                         // Live: switching to Other documents clears a reference field.
-                        if to_other {
+                        if to_other && this.mode != PanelMode::CustomFeatures {
                             this.pick(String::new(), cx);
                         }
                         cx.notify();
@@ -1329,11 +1456,12 @@ impl Render for SelectItemPanel {
                 body = body.child(rows.children(items));
             }
         }
+        let features = mode == PanelMode::CustomFeatures;
         v_flex()
             .id("select-item-panel")
             .occlude()
             .w(px(300.))
-            .h(px(559.))
+            .h(px(if features { 581. } else { 559. }))
             .bg(pal.dialog_bg)
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(5.), spread_radius: px(0.), inset: false }])
             .text_color(pal.text)
@@ -1362,6 +1490,7 @@ impl Render for SelectItemPanel {
                         .child(
                             div()
                                 .id("sel-close")
+                                .debug_selector(|| "sel-close".into())
                                 .size(px(28.))
                                 .flex()
                                 .items_center()
@@ -1385,6 +1514,19 @@ impl Render for SelectItemPanel {
                     .when(self.libraries, |d| d.child(tab("sel-libraries", "Libraries", in_libraries, cx))),
             )
             .child(body)
+            // Live 2213: "Learn about FeatureScript" and a help dot.
+            .when(features, |d| {
+                d.child(
+                    h_flex()
+                        .h(px(23.))
+                        .flex_none()
+                        .px(px(4.))
+                        .border_t_1()
+                        .border_color(line)
+                        .child(div().id("sel-learn-fs").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/FsDoc/")))
+                        .child(crate::ui::glyph("help-dot", 12., crate::theme::help_dot(0xaaaaaa))),
+                )
+            })
             // Live 1726: no Import… on the Libraries tab.
             .when(import_file && !self.in_libraries, |d| {
                 d.child(

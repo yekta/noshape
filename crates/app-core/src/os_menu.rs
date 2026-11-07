@@ -827,6 +827,24 @@ pub fn click_closed_menu(e: &ClickEvent, cx: &mut App) -> bool {
     cx.default_global::<PressClosedMenu>().0.take() == Some(m.down.position)
 }
 
+/// Where the keyboard goes back to when `menu` (or the menu it is a submenu of) closes.
+pub fn return_focus_of(menu: &Entity<OsMenu>, cx: &App) -> Option<FocusHandle> {
+    let mut m = menu.read(cx);
+    let mut ret = m.return_focus.clone();
+    while let Some(pm) = m.parent.as_ref().and_then(|p| p.upgrade()) {
+        m = pm.read(cx);
+        ret = m.return_focus.clone();
+    }
+    ret
+}
+
+/// The open menu's [`return_focus_of`] (the ui-parity driver reads a state with it: a browser's menu leaves the
+/// keyboard where it was).
+pub fn open_return_focus(cx: &App) -> Option<FocusHandle> {
+    let (_, _, _, menu, _) = cx.try_global::<OsMenuHost>()?.0.as_ref()?;
+    return_focus_of(menu, cx)
+}
+
 /// A right-click menu is open (hover tooltips under it should not show).
 pub fn is_open(cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().is_some_and(|h| h.0.is_some())

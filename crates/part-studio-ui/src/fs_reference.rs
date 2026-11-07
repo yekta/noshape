@@ -31,6 +31,8 @@ pub enum RefSourceKind {
     File(FileKind, String),
     PartStudio(Vec<(noshape_model::BodyId, String)>),
     VariableStudio,
+    /// A Feature Studio at a version: its features (type id, name), for Add custom features.
+    FeatureStudio(Vec<(String, String)>),
 }
 
 /// The open "Select …" panel of a reference parameter.

@@ -636,6 +636,25 @@ fn a_check_click_with_typed_text_only_applies_it(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| view.read(cx).edit.is_none()), "the second ✓ accepts");
 }
 
+/// Live 2213: ⊞ opens Add custom features on Other documents (its filters); Escape leaves it open, its ✕ closes it.
+#[gpui::test]
+fn add_custom_features_stays_until_its_close_button(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "add-custom-features");
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_add_custom_features(w, cx))).unwrap();
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.add_features.is_some()), "the panel opened");
+    let filters = cx.update(|cx| view.read(cx).ui.add_features.as_ref().map(|a| a.panel.read(cx).shows_document_filters()));
+    assert_eq!(filters, Some(true), "on Other documents, its filters");
+    keys(cx, window, &["escape"]);
+    assert!(cx.update(|cx| view.read(cx).ui.add_features.is_some()), "Escape leaves it open");
+    let mut vcx = gpui_kit::VisualTestContext::from_window(window, cx);
+    let b = vcx.debug_bounds("sel-close").expect("its ✕");
+    vcx.simulate_click(b.center(), Modifiers::default());
+    draw(cx, window);
+    assert!(cx.update(|cx| view.read(cx).ui.add_features.is_none()), "✕ closes it");
+}
+
 /// Live (ui-parity extrude-remove-tab): Extrude opened on a part's face takes Add by itself, and that isn't an undo
 /// step (Undo off); a change after it is, and undoing it keeps Add.
 #[gpui::test]

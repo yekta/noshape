@@ -373,6 +373,10 @@ def compare(live, ours):
             for x in anns[1]:
                 if x.get("kind") == "table":
                     x["text"] = None
+        # Live's tooltip text reads its line breaks as spaces ("…to fillet. 1 missing selection").
+        for side in (a, b):
+            if isinstance(side.get("tooltip"), str):
+                side["tooltip"] = " ".join(side["tooltip"].split())
         drawn_sizes(a, b)
         placed_alike(a, b)
         cloud_menu(a, b)

@@ -9,6 +9,11 @@ use gpui_kit::component::input::InputState;
 use serde_json::{Value, json};
 
 impl PartStudioView {
+    /// The graphics' context menu's return focus (the ui-parity driver reads a state with it).
+    pub fn context_menu_return_focus(&self, cx: &App) -> Option<FocusHandle> {
+        self.context_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::return_focus_of(m, cx))
+    }
+
     /// `state` after a step.
     pub fn ui_state(&self, window: &Window, cx: &App) -> Value {
         let dialog = self.edit.as_ref().map(|e| e.dialog.read(cx));
@@ -37,6 +42,14 @@ impl PartStudioView {
             f["kind"] = "other".into();
             f["label"] = Value::Null;
             f
+        } else if let Some(st) = self.ui.add_features.as_ref().and_then(|a| a.panel.read(cx).focused_input(window, cx)) {
+            // Add custom features' search box (live custom-features-menu-empty: a field without a label).
+            let mut f = crate::feature_dialog::field_focus("", st.read(cx));
+            f["label"] = Value::Null;
+            f
+        } else if self.panel_row_focus.is_focused(window) || self.context_select_focus.is_focused(window) {
+            // A pressed panel row, the contexts selector (live: a focused div, "other").
+            json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
         } else if let Some(st) = self.palette.as_ref().map(|p| p.0.read(cx)).filter(|s| s.focus_handle(cx).is_focused(window)) {
             let mut f = crate::feature_dialog::field_focus("", st);
             f["kind"] = "search-tools".into();
@@ -253,7 +266,8 @@ impl PartStudioView {
         let owned: std::collections::HashSet<_> = sk.entities().filter(|e| e.kind() != EntityKind::Point).flat_map(|e| e.point_refs()).collect();
         let mut entities: Vec<String> = sk
             .entities()
-            .filter(|e| !e.external && !e.reference_only && !(e.kind() == EntityKind::Point && owned.contains(&e.id)))
+            // (A spline's tangent handles are part of it in live's model: not listed.)
+            .filter(|e| !e.external && !e.reference_only && e.handle_of.is_none() && !(e.kind() == EntityKind::Point && owned.contains(&e.id)))
             .map(|e| {
                 let kind = match e.kind() {
                     EntityKind::Line => "line",
@@ -271,7 +285,7 @@ impl PartStudioView {
         entities.sort();
         // A point the tools share between curves is a Coincident in live.
         let mut users: std::collections::HashMap<_, usize> = std::collections::HashMap::new();
-        for e in sk.entities().filter(|e| e.kind() != EntityKind::Point && !e.external) {
+        for e in sk.entities().filter(|e| e.kind() != EntityKind::Point && !e.external && e.handle_of.is_none()) {
             let mut pts = e.point_refs().to_vec();
             pts.sort();
             pts.dedup();
@@ -291,6 +305,8 @@ impl PartStudioView {
                 K::Radius { value, .. } => dimensions.push(("RADIUS".into(), mm(*value), length)),
                 K::Diameter { value, .. } => dimensions.push(("DIAMETER".into(), mm(*value), length)),
                 K::Angle { value, .. } | K::ArcAngle { value, .. } => dimensions.push(("ANGLE".into(), (value.to_degrees() * 1e6).round() / 1e6, typed(units.angle.symbol()))),
+                // A conic's Rho is one of its constraints in live's model (sketch-tool-conic: "RHO").
+                K::Rho { .. } => constraints.push("RHO".into()),
                 k if k.is_dimension() => dimensions.push((k.name().to_uppercase().replace(' ', "_"), c.kind.value().unwrap_or(0.0), length)),
                 k => constraints.push(k.name().to_uppercase().replace(' ', "_")),
             }

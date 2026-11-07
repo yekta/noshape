@@ -59,7 +59,13 @@ pub const TYPE_PREFIX: &str = "custom:";
 
 /// Feature type id of a custom feature: `custom:<tab id>:<feature name>`.
 pub fn type_id(tab: TabId, name: &str) -> String {
-    format!("{TYPE_PREFIX}{tab}:{name}")
+    studio_type_id(&tab.to_string(), name)
+}
+
+/// Feature type id of a feature of the Feature Studio `studio`: a tab id, or the `ext:` key of a Feature Studio in
+/// another document or version (Add custom features).
+pub fn studio_type_id(studio: &str, name: &str) -> String {
+    format!("{TYPE_PREFIX}{studio}:{name}")
 }
 
 /// Whether a feature type id names a custom feature.
@@ -67,9 +73,11 @@ pub fn is_custom(type_id: &str) -> bool {
     type_id.starts_with(TYPE_PREFIX)
 }
 
-/// Split a custom type id into (tab id string, feature name).
+/// Split a custom type id into (Feature Studio: tab id string or `ext:` key, feature name).
 pub fn parse_type_id(type_id: &str) -> Option<(&str, &str)> {
-    type_id.strip_prefix(TYPE_PREFIX)?.split_once(':')
+    let rest = type_id.strip_prefix(TYPE_PREFIX)?;
+    // An `ext:` key holds colons (its prefix, a Windows path); a feature name never does.
+    if rest.starts_with("ext:") { rest.rsplit_once(':') } else { rest.split_once(':') }
 }
 
 /// Onshape's new Feature Studio: the version header and the common.fs

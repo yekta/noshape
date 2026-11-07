@@ -52,7 +52,7 @@ pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64
     if let Some(c) = CACHE.lock().get(&(tab.0, hash)) {
         return c.clone();
     }
-    let compiled = Arc::new(compile_uncached(tab, source, hash, resolver));
+    let compiled = Arc::new(compile_uncached(tab, &tab.to_string(), source, hash, resolver));
     let mut cache = CACHE.lock();
     if cache.len() > 128 {
         cache.clear();
@@ -61,7 +61,18 @@ pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64
     compiled
 }
 
-fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver) -> CompiledStudio {
+/// Feature Studio `tab` of another document's version, its features named after `key` (its `ext:` key); uncached
+/// (the caller keeps it: a version never changes).
+pub(super) fn compile_external(tab: TabId, key: &str, source: &str, resolver: &dyn Resolver) -> CompiledStudio {
+    crate::register();
+    host::register();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    std::hash::Hash::hash(&key, &mut h);
+    compile_uncached(tab, key, source, source_hash(source) ^ std::hash::Hasher::finish(&h), resolver)
+}
+
+/// `studio`: what the features' type ids name the studio by (its tab id, or an `ext:` key).
+fn compile_uncached(tab: TabId, studio: &str, source: &str, hash: u64, resolver: &dyn Resolver) -> CompiledStudio {
     let path = module_path(tab);
     let mut out = CompiledStudio { tab, hash, features: Vec::new(), tables: Vec::new(), diagnostics: Vec::new(), module: None };
     let diagnostic = |e: &noshape_featurescript::CompileError| Diagnostic {
@@ -118,7 +129,7 @@ fn compile_uncached(tab: TabId, source: &str, hash: u64, resolver: &dyn Resolver
         if let Some(p) = precondition {
             collect_params(&module, p, &mut params);
         }
-        let type_id = super::type_id(tab, &d.name);
+        let type_id = super::studio_type_id(studio, &d.name);
         let description = ann.str("Feature Type Description").unwrap_or("").to_string();
         let icon = "custom-feature".to_string();
         let feature_type = build_type(&type_id, &display, &icon, &description, &params, hash);
@@ -905,8 +916,8 @@ static ACTIVE: LazyLock<parking_lot::RwLock<HashMap<String, &'static FeatureType
 
 /// Make `types` the active custom features of a Feature Studio tab
 /// (replacing what it declared before).
-pub(super) fn activate(tab: TabId, types: &[&'static FeatureType]) {
-    let prefix = super::type_id(tab, "");
+pub(super) fn activate(studio: &str, types: &[&'static FeatureType]) {
+    let prefix = super::studio_type_id(studio, "");
     let mut active = ACTIVE.write();
     let unchanged = active.keys().filter(|k| k.starts_with(&prefix)).count() == types.len() && types.iter().all(|t| active.get(t.id).is_some_and(|x| std::ptr::eq(*x, *t)));
     if unchanged {
@@ -923,5 +934,11 @@ pub fn lookup(type_id: &str) -> Option<&'static FeatureType> {
     if !super::is_custom(type_id) {
         return None;
     }
+    if let Some(t) = ACTIVE.read().get(type_id).copied() {
+        return Some(t);
+    }
+    // A feature of another document's version is known once its studio is read.
+    let (studio, _) = super::parse_type_id(type_id).filter(|(s, _)| s.starts_with("ext:"))?;
+    super::provider::external_studio(studio)?;
     ACTIVE.read().get(type_id).copied()
 }

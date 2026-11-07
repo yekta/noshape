@@ -875,6 +875,8 @@ impl PartStudioView {
         let shown = current.as_ref().map_or_else(|| "None".to_string(), |c| c.1.clone());
         let dropdown = h_flex()
             .id("ctx-select")
+            .track_focus(&self.context_select_focus)
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| window.focus(&this.context_select_focus, cx)))
             .map(|d| crate::ui_script::mark(d, move || format!("dropdown:{shown}")))
             .w(px(153.))
             .h(px(30.))

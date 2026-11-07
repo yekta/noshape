@@ -1845,6 +1845,47 @@ export const block = defineFeature(function(context is Context, id is Id, defini
     assert!(r["notices"].as_array().unwrap().iter().all(|n| n["severity"] != "error"), "{r}");
 }
 
+/// Add custom features (live 2213): a Feature Studio's feature at another document's version, listed by
+/// feature_types with `document` and `version`, works in a document without Feature Studios.
+#[test]
+fn a_custom_feature_from_another_documents_version() {
+    let mut ctx = Ctx::new();
+    let lib = scratch("custom-feature-lib.noshape");
+    call(&mut ctx, "document_create", json!({ "path": lib.to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "featurestudio", "name": "Blocks" }));
+    let src = r#"FeatureScript 3095;
+import(path : "onshape/std/geometry.fs", version : "3095.0");
+
+annotation { "Feature Type Name" : "Slab" }
+export const slab = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Width" }
+        isLength(definition.width, { (millimeter) : [1, 30, 1000] } as LengthBoundSpec);
+    }
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(definition.width, 20 * millimeter, 10 * millimeter) });
+    });
+"#;
+    call(&mut ctx, "featurestudio_edit", json!({ "source": src }));
+    call(&mut ctx, "featurestudio_commit", json!({}));
+    let e = try_call(&mut ctx, "feature_types", json!({ "document": lib.to_str().unwrap(), "version": "V1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "custom features come only from a version: {e:?}");
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let user = scratch("custom-feature-user.noshape");
+    call(&mut ctx, "document_create", json!({ "path": user.to_str().unwrap() }));
+    let l = call(&mut ctx, "feature_types", json!({ "document": lib.to_str().unwrap(), "version": "V1" }));
+    assert_eq!(l["feature_studios"][0]["feature_studio"], "Blocks", "{l}");
+    let f = &l["feature_studios"][0]["features"][0];
+    assert_eq!(f["name"], "Slab", "{l}");
+    let ty = f["type"].as_str().unwrap().to_string();
+    assert!(ty.starts_with("custom:ext:"), "{ty}");
+    let r = call(&mut ctx, "feature_add", json!({ "tab": "Part Studio 1", "type": ty, "params": { "width": "40 mm" } }));
+    assert_eq!(r["feature_status"]["status"], "Ok", "{r}");
+    let v = num(&call(&mut ctx, "query_parts", json!({ "tab": "Part Studio 1" }))["parts"][0]["volume"]);
+    assert!((v - 8000.0).abs() < 1e-3, "volume {v}");
+}
+
 /// Every format the Import dialog takes that we can write: the block is
 /// exported in each and imported back. B-rep formats keep the volume;
 /// mesh formats come back as one mesh part.

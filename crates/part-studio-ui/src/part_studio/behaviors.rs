@@ -277,6 +277,8 @@ pub struct UiState {
     pub insp: super::default_tolerances::InspectionView,
     /// Custom tables panel (selected table, its result, the hovered row).
     pub ct: super::custom_tables::CtState,
+    /// The Add custom features panel while open.
+    pub add_features: Option<super::custom_features::AddFeatures>,
     /// Variable Studio tables shown in the Variable table panel.
     pub var_tables: std::collections::HashMap<noshape_model::document::TabId, AnyView>,
     /// Section view planes (Shift+X).
@@ -687,6 +689,7 @@ impl UiState {
             inspection_more: false,
             insp: Default::default(),
             ct: Default::default(),
+            add_features: None,
             var_tables: Default::default(),
             section: Vec::new(),
             section_dialog: None,
