@@ -158,29 +158,50 @@ impl AssemblyView {
 
     /// Dynamic suppression ▸ Add expression…: the "Dynamic suppression"
     /// dialog with its "Unsuppressed if" field (instances and mates).
+    /// The stored "Unsuppressed if" expression of `target`.
+    fn stored_unsuppressed_if(&self, target: DynTarget, cx: &App) -> Option<String> {
+        self.assembly(cx).and_then(|a| match target {
+            DynTarget::Instance(id) => a.instance(id).and_then(|i| i.unsuppressed_if.clone()),
+            DynTarget::Mate(id) => a.mate(id).and_then(|m| m.unsuppressed_if.clone()).or_else(|| a.unsuppressed_if.get(&id).cloned()),
+            DynTarget::Folder(id) => a.folders.iter().find(|f| f.id == id).and_then(|f| f.unsuppressed_if.clone()),
+        })
+    }
+
     pub(super) fn open_dynamic_suppression(&mut self, target: DynTarget, window: &mut Window, cx: &mut Context<Self>) {
-        let current = self
-            .assembly(cx)
-            .and_then(|a| match target {
-                DynTarget::Instance(id) => a.instance(id).and_then(|i| i.unsuppressed_if.clone()),
-                DynTarget::Mate(id) => a.mate(id).and_then(|m| m.unsuppressed_if.clone()).or_else(|| a.unsuppressed_if.get(&id).cloned()),
-                DynTarget::Folder(id) => a.folders.iter().find(|f| f.id == id).and_then(|f| f.unsuppressed_if.clone()),
-            })
-            .unwrap_or_default();
+        let current = self.stored_unsuppressed_if(target, cx).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
-        let sub = cx.subscribe(&st, move |this: &mut Self, _, ev: &InputEvent, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                this.accept_dynamic_suppression(cx);
+        // Live (asm-menu-add-expression): Enter on a changed expression applies it and selects it (the panel stays);
+        // the next Enter closes the panel.
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if !matches!(ev, InputEvent::PressEnter { .. }) {
+                return;
             }
+            let typed = Some(st.read(cx).value().trim().to_string()).filter(|t| !t.is_empty());
+            let applied = this.ui.dyn_applied.clone().unwrap_or_else(|| this.stored_unsuppressed_if(target, cx));
+            if typed == applied {
+                this.accept_dynamic_suppression(cx);
+                return;
+            }
+            // Applied in the panel; committed when it closes (live: no history step yet).
+            this.ui.dyn_applied = Some(typed);
+            st.update(cx, |s, cx| s.select_all(window, cx));
+            cx.notify();
         });
+        self.ui.dyn_applied = None;
+        self.message = None;
         st.update(cx, |s, cx| s.focus(window, cx));
         self.ui.dynamic_suppression = Some((target, st, sub));
         cx.notify();
     }
 
     pub(super) fn accept_dynamic_suppression(&mut self, cx: &mut Context<Self>) {
+        self.ui.dyn_applied = None;
         let Some((target, st, _)) = self.ui.dynamic_suppression.take() else { return };
         let text = Some(st.read(cx).value().trim().to_string()).filter(|t| !t.is_empty());
+        // Live asm-menu-add-expression: "Dynamic suppression added." once an expression is set.
+        if text.is_some() && self.stored_unsuppressed_if(target, cx).is_none() {
+            self.message = Some((false, "Dynamic suppression added.".into()));
+        }
         self.set_dynamic_suppression(target, text, cx);
     }
 

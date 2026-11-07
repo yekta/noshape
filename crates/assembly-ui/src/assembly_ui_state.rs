@@ -145,8 +145,12 @@ impl AssemblyView {
                 }
             }
             // Related through a selected mate (live: a selected row alone isn't).
-            let selected = self.selected.contains(&i.id) || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id));
-            rows.push(row(&i.name, if i.suppressed { "suppressed" } else { "ok" }, selected, false, related.contains(&i.id), i.hidden));
+            let selected = self.selected.contains(&i.id)
+                || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id))
+                || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id);
+            // (Dynamically suppressed too: the evaluation's node, live asm-menu-add-expression.)
+            let suppressed = i.suppressed || self.result.node(&[i.id]).is_some_and(|n| n.suppressed);
+            rows.push(row(&i.name, if suppressed { "suppressed" } else { "ok" }, selected, false, related.contains(&i.id), i.hidden));
             if let Some(n) = self.result.node(&[i.id]) {
                 self.nested_state_rows(n, &mut rows, cx);
             }
@@ -244,6 +248,12 @@ impl AssemblyView {
         // Check interference… of the whole assembly: its root is selected (live asm-root-menu-check-interference).
         if self.ui.interference.as_ref().is_some_and(|d| d.whole) {
             items.push(json!({ "kind": "INSTANCE", "owner": null }));
+        }
+        // Dynamic suppression's instance is selected while its panel is open (live asm-menu-add-expression).
+        if let Some((super::props::DynTarget::Instance(id), _, _)) = &self.ui.dynamic_suppression
+            && !self.selected.contains(id)
+        {
+            items.push(json!({ "kind": "INSTANCE", "owner": asm.instance(*id).map(|i| i.name.clone()) }));
         }
         // The Group dialog's members are selected (live asm-group-two-instances).
         let group: &[InstanceId] = self.ui.group.as_ref().map_or(&[], |(_, ids)| ids.as_slice());
@@ -564,8 +574,10 @@ impl AssemblyView {
         // Panels live's recorder reads as their title and text (asm-menu-add-expression, -add-selection-to-folder,
         // asm-face-menu-select-other).
         let panel = |title: &str, text: Vec<String>| json!({ "kind": "panel", "title": title, "text": text });
-        if self.ui.dynamic_suppression.is_some() {
-            out.push(panel("Dynamic suppression", vec!["Unsuppressed if".into()]));
+        // With what's typed (live asm-menu-add-expression: ["Unsuppressed if", "1 > 2"]).
+        if let Some((_, input, _)) = &self.ui.dynamic_suppression {
+            let typed = input.read(cx).value().to_string();
+            out.push(panel("Dynamic suppression", std::iter::once("Unsuppressed if".to_string()).chain((!typed.is_empty()).then_some(typed)).collect()));
         }
         if let Some(f) = &self.ui.folder_name {
             out.push(panel("Folder name", vec![f.input.read(cx).value().to_string()]));

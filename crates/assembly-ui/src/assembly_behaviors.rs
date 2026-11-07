@@ -302,6 +302,8 @@ pub struct AsmUi {
     pub tb_custom: Option<crate::toolbar_customize::Customize>,
     /// The open Dynamic suppression dialog (instance, "Unsuppressed if").
     pub dynamic_suppression: Option<(super::props::DynTarget, Entity<InputState>, Subscription)>,
+    /// The expression the panel's first Enter applied (committed when it closes).
+    pub dyn_applied: Option<Option<String>>,
     /// Show instance list properties (state pills after the names).
     pub list_properties: bool,
     /// The instance list collapsed with the toggle at the viewport's left edge.
@@ -1081,7 +1083,8 @@ impl AssemblyView {
         let Some(inst) = asm.instance(top).cloned() else { return vec![] };
         let targets = self.targets(Some(top));
         let multi = targets.len() > 1;
-        let (fixed, hidden, suppressed) = (inst.fixed, inst.hidden, inst.suppressed);
+        // Dynamically suppressed counts as suppressed (live asm-menu-edit-dynamic-suppression).
+        let (fixed, hidden, suppressed) = (inst.fixed, inst.hidden, inst.suppressed || self.result.node(&[inst.id]).is_some_and(|n| n.suppressed));
         let is_asm = matches!(inst.source, InstanceSource::Assembly { .. }) || self.linked_assembly(top).is_some();
         let isolating = self.isolate.is_some() || self.ui.transparent.is_some();
         let name = inst.name.clone();

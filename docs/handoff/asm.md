@@ -10,7 +10,18 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
-## Latest (2026-11-07 05:01 UTC)
+## Latest (2026-11-07 08:00 UTC)
+- Since 05:01: every P1 but ASM-CONFIGURE-PATTERNS (waiting on live2) and the rest of ASM-API-GAPS is fixed:
+  relation directions (B = −ratio·A), linear pattern Second/Third direction, tapped-hole auto-size, BOM of linked
+  parts, configuration variables, flexible subassemblies with relations. New ops: assembly_properties,
+  assembly_measure, assembly_mass_properties, assembly_update_references; assembly_replace takes several instances,
+  sketches and other documents.
+- ui-parity: 107/140 at 06:20; the triad ring axis, Dynamic suppression panel (two-stage Enter, message, selection),
+  Reset / unlock messages, folders "(n)" since.
+- Model suite: live's corpus arrived (24 assemblies): 4/24, occurrences 181/1731, mates 19/23. Most failures are Part
+  Studio translation gaps in big public documents (their instances "not inserted"); next to dig into.
+
+## Earlier (2026-11-07 05:01 UTC)
 - Round 4 (lead): the three P0s (BOM ×2, mass overrides) and the face-click P1 are done. P1s fixed since:
   ASM-DISPLAY-STATE-NESTED, ASM-REPLICATE-SEEDS, ASM-CONFIG-VARIABLE-NOOP, ASM-BOM-EXTERNAL, ASM-FLEX-SUB-RIGID
   (relations only: patterns / tangent mates / nested flexible subassemblies still make a subassembly rigid).

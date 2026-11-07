@@ -168,6 +168,13 @@ def normalize_live(state):
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
         focus["text"], focus["selection"] = None, None
+    # Live's recorder leaves an instance's owner empty when a command selected it (Select instances with same
+    # configuration, Dynamic suppression's panel), not a click: compared by kind.
+    sel = (state or {}).get("selection")
+    if isinstance(sel, dict):
+        for it in sel.get("items") or []:
+            if isinstance(it, dict) and it.get("kind") == "INSTANCE" and it.get("owner") is None and it.get("id") != "assemblyRoot":
+                it.pop("owner", None)
     # The bubble's close button is part of live's text ("Select a sketch plane × Close").
     if isinstance((state or {}).get("message"), str):
         state["message"] = state["message"].removesuffix("× Close").strip()
@@ -346,8 +353,8 @@ def compare(live, ours):
             for i in ((side.get("assembly") or {}).get("instances") or []):
                 i["name"] = new_asm(i.get("name"))
             for i in ((side.get("selection") or {}).get("items") or []):
-                if isinstance(i, dict):
-                    i["owner"] = new_asm(i.get("owner"))
+                if isinstance(i, dict) and "owner" in i:
+                    i["owner"] = new_asm(i["owner"])
         # Both runners name the start's assembly after it ("start pin-block asm Copy 2" / "start pin-block-asm-drawing asm").
         for side in (a, b):
             d = side.get("dialog")
