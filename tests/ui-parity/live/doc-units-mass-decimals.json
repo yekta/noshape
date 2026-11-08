@@ -1,0 +1,970 @@
+{
+ "scenario": "doc-units-mass-decimals",
+ "recorded": "2026-11-08T02:53:49.295Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+ },
+ "live": {
+  "document": "248164482c7b50812aeb5f34",
+  "workspace": "e3c565cc6b46c54faadd6a6a",
+  "element": "4696f4051586ee83216c2d38",
+  "start": "doc-tabs",
+  "startElement": "4696f4051586ee83216c2d38",
+  "runner": "live2 "
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Part Studio 2",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Variable Studio 1",
+     "kind": "variablestudio",
+     "active": false
+    },
+    {
+     "name": "Feature Studio 1",
+     "kind": "featurestudio",
+     "active": false
+    },
+    {
+     "name": "Folder 1",
+     "kind": "folder",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Document menu"
+    }
+   },
+   "ok": true,
+   "at": [
+    155,
+    20
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename document",
+      "Move to…",
+      "Document details…",
+      "Restore deleted workspaces…",
+      "Copy workspace…",
+      "Update workspace…",
+      "Workspace units…",
+      "Workspace properties…",
+      "Switch to view only mode",
+      "Print…",
+      "Close document"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "menu",
+      "rows": [
+       "Rename document",
+       "Move to…",
+       "Document details…",
+       "Restore deleted workspaces…",
+       "Copy workspace…",
+       "Update workspace…",
+       "Workspace units…",
+       "Workspace properties…",
+       "Switch to view only mode",
+       "Print…",
+       "Close document"
+      ],
+      "highlighted": null,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Rename document",
+       "Move to…",
+       "Document details…",
+       "Restore deleted workspaces…",
+       "Copy workspace…",
+       "Update workspace…",
+       "Workspace units…",
+       "Workspace properties…",
+       "Switch to view only mode",
+       "Print…",
+       "Close document"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 107119
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Workspace units…"
+    }
+   },
+   "ok": true,
+   "at": [
+    252,
+    236
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Workspace units",
+     "text": [
+      "Length",
+      "Length default unit",
+      "Display decimals",
+      "Linear acceleration default unit",
+      "Display decimals",
+      "Angle",
+      "Angle default unit",
+      "Display decimals",
+      "Angular velocity default unit",
+      "Display decimals",
+      "Mechanical",
+      "Mass default unit",
+      "Display decimals",
+      "Density default unit",
+      "Display decimals",
+      "Force default unit",
+      "Display decimals",
+      "Frequency default unit",
+      "Display decimals",
+      "Moment default unit",
+      "Display decimals",
+      "Pressure default unit",
+      "Display decimals",
+      "Energy default unit",
+      "Display decimals"
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "model-settings-content",
+      "title": "Workspace units",
+      "text": "Workspace units / Length / Length default unit / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / Linear acceleration default unit / Foot per second squared / Inch per second squared / Meter per second squared / Millimeter per second squared / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.123456 / Angle / Angle default unit / Degree / Radian / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.1",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Workspace units",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 110171
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Mass display decimals",
+     "pick": "0.1"
+    }
+   },
+   "ok": true,
+   "at": [
+    525,
+    489
+   ],
+   "via": "native select: the Display decimals after \"Mass default unit\", option picked by its label",
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Workspace units",
+     "text": [
+      "Length",
+      "Length default unit",
+      "Display decimals",
+      "Linear acceleration default unit",
+      "Display decimals",
+      "Angle",
+      "Angle default unit",
+      "Display decimals",
+      "Angular velocity default unit",
+      "Display decimals",
+      "Mechanical",
+      "Mass default unit",
+      "Display decimals",
+      "Density default unit",
+      "Display decimals",
+      "Force default unit",
+      "Display decimals",
+      "Frequency default unit",
+      "Display decimals",
+      "Moment default unit",
+      "Display decimals",
+      "Pressure default unit",
+      "Display decimals",
+      "Energy default unit",
+      "Display decimals"
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "model-settings-content",
+      "title": "Workspace units",
+      "text": "Workspace units / Length / Length default unit / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / Linear acceleration default unit / Foot per second squared / Inch per second squared / Meter per second squared / Millimeter per second squared / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.123456 / Angle / Angle default unit / Degree / Radian / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.1",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Workspace units",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 120312
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    542,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 124265
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Document menu"
+    }
+   },
+   "ok": true,
+   "at": [
+    155,
+    20
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "context-menu",
+     "rows": [
+      "Rename document",
+      "Move to…",
+      "Document details…",
+      "Restore deleted workspaces…",
+      "Copy workspace…",
+      "Update workspace…",
+      "Workspace units…",
+      "Workspace properties…",
+      "Switch to view only mode",
+      "Print…",
+      "Close document"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "lists": [
+     {
+      "kind": "menu",
+      "rows": [
+       "Rename document",
+       "Move to…",
+       "Document details…",
+       "Restore deleted workspaces…",
+       "Copy workspace…",
+       "Update workspace…",
+       "Workspace units…",
+       "Workspace properties…",
+       "Switch to view only mode",
+       "Print…",
+       "Close document"
+      ],
+      "highlighted": null,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Rename document",
+       "Move to…",
+       "Document details…",
+       "Restore deleted workspaces…",
+       "Copy workspace…",
+       "Update workspace…",
+       "Workspace units…",
+       "Workspace properties…",
+       "Switch to view only mode",
+       "Print…",
+       "Close document"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 135071
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Workspace units…"
+    }
+   },
+   "ok": true,
+   "at": [
+    252,
+    236
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": {
+     "kind": "panel",
+     "title": "Workspace units",
+     "text": [
+      "Length",
+      "Length default unit",
+      "Display decimals",
+      "Linear acceleration default unit",
+      "Display decimals",
+      "Angle",
+      "Angle default unit",
+      "Display decimals",
+      "Angular velocity default unit",
+      "Display decimals",
+      "Mechanical",
+      "Mass default unit",
+      "Display decimals",
+      "Density default unit",
+      "Display decimals",
+      "Force default unit",
+      "Display decimals",
+      "Frequency default unit",
+      "Display decimals",
+      "Moment default unit",
+      "Display decimals",
+      "Pressure default unit",
+      "Display decimals",
+      "Energy default unit",
+      "Display decimals"
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "model-settings-content",
+      "title": "Workspace units",
+      "text": "Workspace units / Length / Length default unit / Centimeter / Foot / Inch / Meter / Millimeter / Yard / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / Linear acceleration default unit / Foot per second squared / Inch per second squared / Meter per second squared / Millimeter per second squared / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.123456 / Angle / Angle default unit / Degree / Radian / Display decimals / 0 / 0.1 / 0.12 / 0.123 / 0.1234 / 0.12345 / 0.1",
+      "inputs": []
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "partsHeading": "Parts (1)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Feature Studio 1",
+       "kind": "featurestudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": "Workspace units",
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 141956
+  }
+ ]
+}

@@ -1,0 +1,1031 @@
+{
+ "scenario": "prefs-mouse-reverse-scroll",
+ "recorded": "2026-11-08T02:24:51.990Z",
+ "app": {
+  "name": "live",
+  "version": "1.223.92697.90c317e616c3",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.2 e35e115e"
+ },
+ "live": {
+  "page": "preferences"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": null,
+  "features": null,
+  "parts": [],
+  "undo": null,
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": null,
+  "preferences": {
+   "fields": [
+    {
+     "label": "Language › Display language",
+     "kind": "select",
+     "value": "English"
+    },
+    {
+     "label": "Language › Save language",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Theming › Light mode",
+     "kind": "radio",
+     "value": true
+    },
+    {
+     "label": "Theming › Dark mode",
+     "kind": "radio",
+     "value": false
+    },
+    {
+     "label": "Theming › Save theme",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Decimal format › Use comma as decimal separator",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Decimal format › Save decimal format",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Units › Length default unit",
+     "kind": "select",
+     "value": "Millimeter"
+    },
+    {
+     "label": "Units › Length default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Linear acceleration default unit",
+     "kind": "select",
+     "value": "Inch per second squared"
+    },
+    {
+     "label": "Units › Linear acceleration default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Angle default unit",
+     "kind": "select",
+     "value": "Degree"
+    },
+    {
+     "label": "Units › Angle default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Angular velocity default unit",
+     "kind": "select",
+     "value": "Degree per second"
+    },
+    {
+     "label": "Units › Angular velocity default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Mass default unit",
+     "kind": "select",
+     "value": "Pound"
+    },
+    {
+     "label": "Units › Mass default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Density default unit",
+     "kind": "select",
+     "value": "Pound per cubic inch"
+    },
+    {
+     "label": "Units › Density default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Force default unit",
+     "kind": "select",
+     "value": "Pound-force"
+    },
+    {
+     "label": "Units › Force default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Frequency default unit",
+     "kind": "select",
+     "value": "Hertz"
+    },
+    {
+     "label": "Units › Frequency default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Moment default unit",
+     "kind": "select",
+     "value": "Inch-pound"
+    },
+    {
+     "label": "Units › Moment default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Pressure default unit",
+     "kind": "select",
+     "value": "Pound per square inch"
+    },
+    {
+     "label": "Units › Pressure default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Energy default unit",
+     "kind": "select",
+     "value": "Foot-pound force"
+    },
+    {
+     "label": "Units › Energy default unit › Display decimals",
+     "kind": "select",
+     "value": "0.123"
+    },
+    {
+     "label": "Units › Time format",
+     "kind": "select",
+     "value": "12 hour"
+    },
+    {
+     "label": "Units › Save changes",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Mouse controls › View settings",
+     "kind": "select",
+     "value": "Onshape (default)"
+    },
+    {
+     "label": "Mouse controls › Reverse scroll wheel zoom direction",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Mouse controls › Set default rotation behavior to constrained rotate",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Mouse controls › Use pen input as mouse",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Mouse controls › Save mouse controls",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Environment profile settings › Environment profile",
+     "kind": "select",
+     "value": "Onshape (default)"
+    },
+    {
+     "label": "Environment profile settings › Create profile",
+     "kind": "button",
+     "value": true
+    },
+    {
+     "label": "Environment profile settings › Delete profile",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
+     "kind": "select",
+     "value": "Automatic (default)"
+    },
+    {
+     "label": "Environment profile settings › Save profile settings",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Part Studio settings › Display parts list properties",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Part Studio settings › Save Part Studio settings",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Assembly settings › Display instance list properties",
+     "kind": "checkbox",
+     "value": false
+    },
+    {
+     "label": "Assembly settings › Save assembly settings",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Keyboard shortcuts › Tab",
+     "kind": "select",
+     "value": "General"
+    },
+    {
+     "label": "Keyboard shortcuts › Reset all",
+     "kind": "button",
+     "value": true
+    },
+    {
+     "label": "Shortcut toolbars › Toolbar",
+     "kind": "select",
+     "value": "Sketch"
+    },
+    {
+     "label": "Shortcut toolbars › Tools",
+     "kind": "list",
+     "value": [
+      "Line",
+      "Corner rectangle",
+      "Center point rectangle",
+      "Center point circle",
+      "3 point arc",
+      "Spline",
+      "Point",
+      "Use",
+      "Trim",
+      "Dimension"
+     ]
+    },
+    {
+     "label": "Shortcut toolbars › Save shortcut toolbar settings",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Toolbars › Reset to defaults",
+     "kind": "button",
+     "value": true
+    },
+    {
+     "label": "Drawings › Background color of model space (imported DWG and DXF files)",
+     "kind": "select",
+     "value": "Dark view (default)"
+    },
+    {
+     "label": "Drawings › Save drawing settings",
+     "kind": "button",
+     "value": false
+    },
+    {
+     "label": "Material libraries › Libraries",
+     "kind": "list",
+     "value": [
+      "Onshape Material Library"
+     ]
+    },
+    {
+     "label": "Material libraries › Add material library…",
+     "kind": "button",
+     "value": true
+    },
+    {
+     "label": "User export rules › Rules",
+     "kind": "list",
+     "value": []
+    },
+    {
+     "label": "User export rules › Add export rule…",
+     "kind": "button",
+     "value": true
+    },
+    {
+     "label": "Onshape Labs › Enable users to access experimental, proof of concept features.",
+     "kind": "checkbox",
+     "value": false
+    }
+   ]
+  },
+  "url": "/user/settings"
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "checkbox": "Mouse controls › Reverse scroll wheel zoom direction"
+    }
+   },
+   "ok": true,
+   "at": [
+    267,
+    558
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "input",
+     "text": "on",
+     "selection": [
+      null,
+      null
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "preferences": {
+     "fields": [
+      {
+       "label": "Language › Display language",
+       "kind": "select",
+       "value": "English"
+      },
+      {
+       "label": "Language › Save language",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Theming › Light mode",
+       "kind": "radio",
+       "value": true
+      },
+      {
+       "label": "Theming › Dark mode",
+       "kind": "radio",
+       "value": false
+      },
+      {
+       "label": "Theming › Save theme",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Decimal format › Use comma as decimal separator",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Decimal format › Save decimal format",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Units › Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Units › Length default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Units › Linear acceleration default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Units › Angle default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Units › Angular velocity default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Units › Mass default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Units › Density default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Units › Force default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Units › Frequency default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Units › Moment default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Units › Pressure default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Units › Energy default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Time format",
+       "kind": "select",
+       "value": "12 hour"
+      },
+      {
+       "label": "Units › Save changes",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › View settings",
+       "kind": "select",
+       "value": "Onshape (default)"
+      },
+      {
+       "label": "Mouse controls › Reverse scroll wheel zoom direction",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Mouse controls › Set default rotation behavior to constrained rotate",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › Use pen input as mouse",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › Save mouse controls",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Environment profile settings › Environment profile",
+       "kind": "select",
+       "value": "Onshape (default)"
+      },
+      {
+       "label": "Environment profile settings › Create profile",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Environment profile settings › Delete profile",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
+       "kind": "select",
+       "value": "Automatic (default)"
+      },
+      {
+       "label": "Environment profile settings › Save profile settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Part Studio settings › Display parts list properties",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Part Studio settings › Save Part Studio settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Assembly settings › Display instance list properties",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Assembly settings › Save assembly settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Keyboard shortcuts › Tab",
+       "kind": "select",
+       "value": "General"
+      },
+      {
+       "label": "Keyboard shortcuts › Reset all",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Shortcut toolbars › Toolbar",
+       "kind": "select",
+       "value": "Sketch"
+      },
+      {
+       "label": "Shortcut toolbars › Tools",
+       "kind": "list",
+       "value": [
+        "Line",
+        "Corner rectangle",
+        "Center point rectangle",
+        "Center point circle",
+        "3 point arc",
+        "Spline",
+        "Point",
+        "Use",
+        "Trim",
+        "Dimension"
+       ]
+      },
+      {
+       "label": "Shortcut toolbars › Save shortcut toolbar settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Toolbars › Reset to defaults",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Drawings › Background color of model space (imported DWG and DXF files)",
+       "kind": "select",
+       "value": "Dark view (default)"
+      },
+      {
+       "label": "Drawings › Save drawing settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Material libraries › Libraries",
+       "kind": "list",
+       "value": [
+        "Onshape Material Library"
+       ]
+      },
+      {
+       "label": "Material libraries › Add material library…",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "User export rules › Rules",
+       "kind": "list",
+       "value": []
+      },
+      {
+       "label": "User export rules › Add export rule…",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Onshape Labs › Enable users to access experimental, proof of concept features.",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "url": "/user/settings"
+   },
+   "t": 2529
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Mouse controls › Save mouse controls"
+    }
+   },
+   "ok": true,
+   "at": [
+    336,
+    557
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": null,
+    "features": null,
+    "parts": [],
+    "undo": null,
+    "message": "Mouse controls updated. × Close",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": null,
+    "preferences": {
+     "fields": [
+      {
+       "label": "Language › Display language",
+       "kind": "select",
+       "value": "English"
+      },
+      {
+       "label": "Language › Save language",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Theming › Light mode",
+       "kind": "radio",
+       "value": true
+      },
+      {
+       "label": "Theming › Dark mode",
+       "kind": "radio",
+       "value": false
+      },
+      {
+       "label": "Theming › Save theme",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Decimal format › Use comma as decimal separator",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Decimal format › Save decimal format",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Units › Length default unit",
+       "kind": "select",
+       "value": "Millimeter"
+      },
+      {
+       "label": "Units › Length default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Linear acceleration default unit",
+       "kind": "select",
+       "value": "Inch per second squared"
+      },
+      {
+       "label": "Units › Linear acceleration default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Angle default unit",
+       "kind": "select",
+       "value": "Degree"
+      },
+      {
+       "label": "Units › Angle default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Angular velocity default unit",
+       "kind": "select",
+       "value": "Degree per second"
+      },
+      {
+       "label": "Units › Angular velocity default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Mass default unit",
+       "kind": "select",
+       "value": "Pound"
+      },
+      {
+       "label": "Units › Mass default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Density default unit",
+       "kind": "select",
+       "value": "Pound per cubic inch"
+      },
+      {
+       "label": "Units › Density default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Force default unit",
+       "kind": "select",
+       "value": "Pound-force"
+      },
+      {
+       "label": "Units › Force default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Frequency default unit",
+       "kind": "select",
+       "value": "Hertz"
+      },
+      {
+       "label": "Units › Frequency default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Moment default unit",
+       "kind": "select",
+       "value": "Inch-pound"
+      },
+      {
+       "label": "Units › Moment default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Pressure default unit",
+       "kind": "select",
+       "value": "Pound per square inch"
+      },
+      {
+       "label": "Units › Pressure default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Energy default unit",
+       "kind": "select",
+       "value": "Foot-pound force"
+      },
+      {
+       "label": "Units › Energy default unit › Display decimals",
+       "kind": "select",
+       "value": "0.123"
+      },
+      {
+       "label": "Units › Time format",
+       "kind": "select",
+       "value": "12 hour"
+      },
+      {
+       "label": "Units › Save changes",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › View settings",
+       "kind": "select",
+       "value": "Onshape (default)"
+      },
+      {
+       "label": "Mouse controls › Reverse scroll wheel zoom direction",
+       "kind": "checkbox",
+       "value": true
+      },
+      {
+       "label": "Mouse controls › Set default rotation behavior to constrained rotate",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › Use pen input as mouse",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Mouse controls › Save mouse controls",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Environment profile settings › Environment profile",
+       "kind": "select",
+       "value": "Onshape (default)"
+      },
+      {
+       "label": "Environment profile settings › Create profile",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Environment profile settings › Delete profile",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
+       "kind": "select",
+       "value": "Automatic (default)"
+      },
+      {
+       "label": "Environment profile settings › Save profile settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Part Studio settings › Display parts list properties",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Part Studio settings › Save Part Studio settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Assembly settings › Display instance list properties",
+       "kind": "checkbox",
+       "value": false
+      },
+      {
+       "label": "Assembly settings › Save assembly settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Keyboard shortcuts › Tab",
+       "kind": "select",
+       "value": "General"
+      },
+      {
+       "label": "Keyboard shortcuts › Reset all",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Shortcut toolbars › Toolbar",
+       "kind": "select",
+       "value": "Sketch"
+      },
+      {
+       "label": "Shortcut toolbars › Tools",
+       "kind": "list",
+       "value": [
+        "Line",
+        "Corner rectangle",
+        "Center point rectangle",
+        "Center point circle",
+        "3 point arc",
+        "Spline",
+        "Point",
+        "Use",
+        "Trim",
+        "Dimension"
+       ]
+      },
+      {
+       "label": "Shortcut toolbars › Save shortcut toolbar settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Toolbars › Reset to defaults",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Drawings › Background color of model space (imported DWG and DXF files)",
+       "kind": "select",
+       "value": "Dark view (default)"
+      },
+      {
+       "label": "Drawings › Save drawing settings",
+       "kind": "button",
+       "value": false
+      },
+      {
+       "label": "Material libraries › Libraries",
+       "kind": "list",
+       "value": [
+        "Onshape Material Library"
+       ]
+      },
+      {
+       "label": "Material libraries › Add material library…",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "User export rules › Rules",
+       "kind": "list",
+       "value": []
+      },
+      {
+       "label": "User export rules › Add export rule…",
+       "kind": "button",
+       "value": true
+      },
+      {
+       "label": "Onshape Labs › Enable users to access experimental, proof of concept features.",
+       "kind": "checkbox",
+       "value": false
+      }
+     ]
+    },
+    "url": "/user/settings"
+   },
+   "t": 6509
+  }
+ ],
+ "tabsOpened": 13
+}
