@@ -205,6 +205,9 @@ pub struct CtxState {
     pub dependencies: HashMap<FsId, Vec<Reference>>,
     /// Bodies each `opSplitPart` left and its tool plane (`qSplitBy`).
     pub splits: HashMap<FsId, SplitRecord>,
+    /// The body each `opSplitPart` piece was split from (a reference to that body finds its pieces too, as live's
+    /// history-based body queries do).
+    pub split_from: HashMap<BodyId, BodyId>,
     /// Where each attributed face, edge or vertex was (Parasolid attributes
     /// follow the topology; our references follow names, which an operation
     /// can change: [`CtxState::remap_attributes`]).
@@ -334,6 +337,7 @@ impl FsContext {
                 holes: HashMap::new(),
                 dependencies: HashMap::new(),
                 splits: HashMap::new(),
+                split_from: HashMap::new(),
                 split_edges: HashMap::new(),
                 pattern_instances: HashMap::new(),
                 feature_defs: Vec::new(),

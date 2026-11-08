@@ -1647,7 +1647,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         _ => None,
     };
     let before_ids: Vec<BodyId> = cx.state.lock().ctx.bodies.iter().map(|b| b.id.clone()).collect();
-    let (split_targets, plane, mids) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
+    let (split_targets, plane, mids, centres) = run_op(i, &cx, &id, "SPLIT_FAILED", |ev| {
         // Onshape's opSplitPart texts (std splitpart.fs leaves them to it).
         if ev.resolve_bodies(&targets).is_empty() {
             return Err(super::code_error_faulty("SPLIT_SELECT_TARGETS", &["targets"]));
@@ -1671,6 +1671,8 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
         let target_ids: Vec<BodyId> = ev.resolve_bodies(&targets).into_iter().map(|b| ev.ctx.bodies[b].id.clone()).collect();
         let mut changed = false;
+        // Each target's pieces by their boxes' centres (which piece came from which target, once their ids are set).
+        let mut centres: Vec<(BodyId, DVec3)> = Vec::new();
         // The edges the split made (midpoints on none of the target's old ones): qCreatedBy(id, EDGE).
         let mut mids = Vec::new();
         for bi in ev.resolve_bodies(&targets).into_iter().rev() {
@@ -1714,6 +1716,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let kept: Vec<Shape> = solids.into_iter().filter(|s| s.bounding_box(false).is_ok_and(|b| ((b.center() - o).dot(n) > 0.0) == front)).collect();
                 res.shape = Shape::compound(&kept);
             }
+            centres.extend(res.shape.solids().iter().filter_map(|s| s.bounding_box(false).ok()).map(|b| (body.id.clone(), b.center())));
             let names = body.shape_names();
             let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, faces);
@@ -1727,7 +1730,7 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let ids: Vec<BodyId> = tool_bodies.iter().filter_map(|b| ev.ctx.bodies.get(*b).map(|x| x.id.clone())).collect();
             ev.ctx.bodies.retain(|b| !ids.contains(&b.id));
         }
-        Ok((target_ids, plane, mids))
+        Ok((target_ids, plane, mids, centres))
     })?;
     // Split pieces are "created by" the split and by the original's creator
     // (std query.fs, qCreatedBy).
@@ -1735,6 +1738,10 @@ fn op_split_part(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let pieces: Vec<BodyId> = st.ctx.bodies.iter().map(|b| b.id.clone()).filter(|b| !split_targets.contains(b) && st.body_creator(b).as_deref() == Some(&id[..])).collect();
     for piece in &pieces {
         st.record_merge(piece, &split_targets, &id);
+        let centre = st.ctx.bodies.iter().find(|b| &b.id == piece).and_then(|b| b.shape.bounding_box(false).ok()).map(|b| b.center());
+        if let Some((from, _)) = centre.and_then(|c| centres.iter().find(|(_, x)| x.distance(c) < 1e-9)) {
+            st.split_from.insert(piece.clone(), from.clone());
+        }
     }
     let all: Vec<BodyId> = split_targets.iter().chain(&pieces).cloned().collect();
     // Pieces of a hidden body (a sheet metal definition) are hidden as it is.
@@ -1798,6 +1805,7 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let angle = def_angle(i, &def, "angle")?;
     // std passes `pullVec` (extrude's draft flips it for the second side).
     let pull = vec3_of(def.get("pullVec")).or_else(|| vec3_of(def.get("pullDirection")));
+    let (refillet, tangent) = (def_bool(&def, "reFillet", false), def_bool(&def, "tangentPropagation", false));
     run_op(i, &cx, &id, "DRAFT_FAILED", |ev| {
         if neutral.is_empty() {
             return Err(super::code_error_faulty("DRAFT_SELECT_NEUTRAL", &["neutralPlane"]));
@@ -1811,15 +1819,12 @@ fn op_draft(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if super::trace_ops() {
             eprintln!("[fs op] draft faces {:?} -> {} bodies, angle {angle}, pull {dir:?}, neutral {:?}", faces.len(), groups.len(), np.origin);
         }
-        for (bi, fs) in groups.into_iter().rev() {
-            let body = ev.ctx.bodies[bi].clone();
-            let shapes: Vec<Shape> = fs.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-            let res = k::draft(&body.shape, &shapes, dir, &kernel_plane(&np), angle)?;
-            let names = body.shape_names();
-            let new = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
-            ev.replace_body(bi, res.shape, new);
+        // (Live L3: a 0° draft succeeds and changes nothing.)
+        if angle.abs() < 1e-12 {
+            return Ok(());
         }
-        Ok(())
+        // As the Draft feature: Reapply fillet, tangent propagation, steep fillets beside the faces drafted with them.
+        crate::regen::features::detail_a::draft_faces(ev, groups, dir, &kernel_plane(&np), angle, refillet, tangent)
     })?;
     Ok(Value::Undefined)
 }

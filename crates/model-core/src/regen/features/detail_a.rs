@@ -55,10 +55,16 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["draftFaces"], "Select faces to draft.");
     }
-    let refillet = ev.bool("reFillet");
+    let (refillet, tangent) = (ev.bool("reFillet"), ev.bool("tangentPropagation"));
+    draft_faces(ev, groups, pull, &neutral, angle, refillet, tangent)
+}
+
+/// A neutral plane draft of each body's `faces` (by body, as [`by_body`] groups them): the Draft feature's and
+/// FeatureScript's opDraft (Parasolid's draft under both in live).
+pub fn draft_faces(ev: &mut EvalCtx, groups: BTreeMap<usize, Vec<usize>>, pull: DVec3, neutral: &k::Plane, angle: f64, refillet: bool, tangent: bool) -> FResult<()> {
     for (bi, faces) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
-        let faces = if ev.bool("tangentPropagation") {
+        let faces = if tangent {
             propagate_tangent_faces(&body.shape, &faces, pull, angle)
         } else if !refillet {
             // Without Reapply, steep fillets beside the drafted faces are
@@ -85,11 +91,11 @@ pub fn draft(ev: &mut EvalCtx) -> FResult<()> {
         // rebuilt (Onshape D3: 7335.59 / 7353.62 mm³).
         let blends = blends_to_reapply(&body.shape, &body.faces, &faces, refillet)?;
         if !blends.is_empty() {
-            draft_reblend(ev, bi, &faces, &blends, pull, &neutral, angle)?;
+            draft_reblend(ev, bi, &faces, &blends, pull, neutral, angle)?;
             continue;
         }
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
-        let res = draft_robust(&body.shape, &shapes, pull, &neutral, angle).map_err(|_| fe(DRAFT_FAILED))?;
+        let res = draft_robust(&body.shape, &shapes, pull, neutral, angle).map_err(|_| fe(DRAFT_FAILED))?;
         let names = body.shape_names();
         let face_names = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), None);
         ev.replace_body(bi, res.shape, face_names);

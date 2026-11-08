@@ -4246,3 +4246,59 @@ export const movedFace = defineFeature(function(context is Context, id is Id, de
     lows.sort_by(f64::total_cmp);
     assert_eq!(lows, vec![0.0, 0.0, 30.0], "the board and the copy stay at z 0; the pin's face moved 20 and 10 mm up");
 }
+
+const SPLIT_DRAFT: &str = r#"
+annotation { "Feature Type Name" : "Rounded block" }
+export const roundedBlock = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {}
+    {
+        fCuboid(context, id + "box", { "corner1" : vector(-20, -15, -10) * millimeter, "corner2" : vector(20, 15, 10) * millimeter });
+        opFillet(context, id + "round", { "entities" : qParallelEdges(qCreatedBy(id + "box", EntityType.EDGE), Z_DIRECTION), "radius" : 3 * millimeter });
+    });
+
+annotation { "Feature Type Name" : "Two-sided draft" }
+export const twoSidedDraft = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+        annotation { "Name" : "Part", "Filter" : EntityType.BODY && BodyType.SOLID }
+        definition.part is Query;
+    }
+    {
+        const top = qCreatedBy(makeId("Top"), EntityType.FACE);
+        splitPart(context, id + "split", { "targets" : definition.part, "tool" : top });
+        draft(context, id + "front", { "neutralPlane" : top, "draftFaces" : qSplitBy(id + "split", EntityType.FACE, false), "angle" : 5 * degree, "pullDirection" : false, "reFillet" : true });
+        draft(context, id + "back", { "neutralPlane" : top, "draftFaces" : qSplitBy(id + "split", EntityType.FACE, true), "angle" : 5 * degree, "pullDirection" : true, "reFillet" : true });
+        booleanBodies(context, id + "union", { "tools" : definition.part, "operationType" : BooleanOperationType.UNION });
+    });
+"#;
+
+/// A part split in two, each side drafted by std `draft` with Reapply fillet, then the part's own query unioned (as
+/// the community "Part Draft" feature, cf-part-draft, whose Part Draft 1 / 2 are live's to their counts and volume
+/// bands): opDraft re-rolls the fillets it drafts past (R3 cylinders again, not cones), and the part's query finds both
+/// halves the split made (live unions them; ours found only the half that kept the part's id).
+#[test]
+fn a_split_part_drafted_both_sides_with_reapplied_fillets_unions_again() {
+    let fx = Fixture::new(&studio(SPLIT_DRAFT));
+    let mut ps = PartStudio::new();
+    ps.features.push(ps.new_feature(&fx.ty("roundedBlock"), &fx.units).unwrap());
+    let mut reg = Regenerator::new();
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    let mut f = ps.new_feature(&fx.ty("twoSidedDraft"), &fx.units).unwrap();
+    f.params.set("part", ParamValue::Query(vec![Reference::Body(r.context.bodies[0].id.clone())]));
+    ps.features.push(f);
+    let r = fx.regen(&mut reg, &ps);
+    assert_ok(&r);
+    assert_eq!(r.context.bodies.len(), 1, "the two drafted halves unioned");
+    let radii: Vec<f64> = r.context.bodies[0].shape.faces().iter().filter_map(|f| match f.face_surface().unwrap() {
+        noshape_kernel::Surface::Cylinder { radius, .. } => Some(radius),
+        _ => None,
+    }).collect();
+    assert_eq!(radii.len(), 8, "4 rounds a side, re-rolled: {radii:?}");
+    assert!(radii.iter().all(|r| (r - 0.003).abs() < 1e-9), "{radii:?}");
+    // Each half narrows away from the split, 5°: the section (40 - 2 z t) x (30 - 2 z t), less its rounds.
+    let (a, b, h, t) = (40.0, 30.0, 10.0, 5f64.to_radians().tan());
+    let half = a * b * h - (a + b) * t * h * h + 4.0 / 3.0 * t * t * h.powi(3) - (4.0 - PI) * 9.0 * h;
+    let v = total_volume(&r) * 1e9;
+    assert!((v / (2.0 * half) - 1.0).abs() < 1e-3, "{v} mm³, about {}", 2.0 * half);
+}

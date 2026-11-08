@@ -419,7 +419,15 @@ impl<'a> QueryCx<'a> {
     pub fn from_ref(&self, r: &Reference) -> Vec<Ent> {
         let ctx = &self.st.ctx;
         match r {
-            Reference::Body(id) => ctx.bodies.iter().position(|b| &b.id == id).map(Ent::Body).into_iter().collect(),
+            Reference::Body(id) => {
+                let mut out: Vec<Ent> = ctx.bodies.iter().position(|b| &b.id == id).map(Ent::Body).into_iter().collect();
+                // The pieces a split made of it.
+                if !self.st.split_from.is_empty() {
+                    let from = |b: &BodyId| std::iter::successors(self.st.split_from.get(b), |x| self.st.split_from.get(*x)).take(64).any(|x| x == id);
+                    out.extend(ctx.bodies.iter().enumerate().filter(|(_, b)| &b.id != id && from(&b.id)).map(|(i, _)| Ent::Body(i)));
+                }
+                out
+            }
             // Only the bodies that may hold it ([`NameIndex`]): a lookup asks every body otherwise, each without the
             // name scanning all its entities for split relatives (thousands of bodies after a pattern).
             Reference::Face(n) => {
