@@ -14,36 +14,6 @@ use gpui_kit::*;
 use noshape_model::TabContent;
 use std::rc::Rc;
 
-/// A modal with one name field (and an optional description), OK runs `then`.
-fn name_modal(title: &'static str, ok: &'static str, name: String, description: Option<String>, window: &mut Window, cx: &mut App, then: impl Fn(String, Option<String>, &mut Window, &mut App) -> bool + 'static) {
-    let name_st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-    let desc_st = description.map(|d| cx.new(|cx| TextareaState::new(window, cx).rows(4).placeholder("Description").default_value(d)));
-    let then = Rc::new(then);
-    let focus = name_st.clone();
-    window.open_dialog(cx, move |dialog, _, cx| {
-        let (n, d, then) = (name_st.clone(), desc_st.clone(), then.clone());
-        os::modal(dialog, title, 460.)
-            .child(
-                os::modal_body()
-                    .child(os::field_label("Name"))
-                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
-                    .when_some(desc_st.clone(), |b, d| b.child(os::field_label("Description")).child(Textarea::new(&d).h(px(96.)).text_size(px(14.)))),
-            )
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", ok))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
-            .on_ok(move |_, window, cx| {
-                let name = n.read(cx).value().trim().to_string();
-                let desc = d.as_ref().map(|d| d.read(cx).value().to_string());
-                !name.is_empty() && then(name, desc, window, cx)
-            })
-    });
-    window.defer(cx, move |window, cx| {
-        focus.update(cx, |s, cx| {
-            s.focus(window, cx);
-            s.select_all(window, cx);
-        })
-    });
-}
-
 fn report(doc: &Entity<DocModel>, r: anyhow::Result<()>, cx: &mut App) -> bool {
     match r {
         Ok(()) => {
@@ -55,15 +25,6 @@ fn report(doc: &Entity<DocModel>, r: anyhow::Result<()>, cx: &mut App) -> bool {
             false
         }
     }
-}
-
-/// ☰ › Rename document.
-pub fn rename_document(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
-    let name = doc.read(cx).name();
-    name_modal("Rename document", "Rename", name, None, window, cx, move |name, _, _, cx| {
-        let r = doc.update(cx, |d, _| d.session.store.set_name(&name).map_err(Into::into));
-        report(&doc, r, cx)
-    });
 }
 
 /// The document's "Not revision managed" (store meta).
@@ -482,17 +443,21 @@ impl Render for WorkspaceUnits {
         // Moment 8, the rest 9).
         let dec = |cur: u8, n: usize| (DECIMALS[..n].iter().map(|s| s.to_string()).collect::<Vec<_>>(), (cur as usize).min(n - 1));
         let mut groups: [Vec<AnyElement>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+        // Each group's row labels, for the ui-parity state (live records the panel's texts).
+        let mut labels: [Vec<String>; 3] = [Vec::new(), Vec::new(), Vec::new()];
         // Length and angle (the units expressions use), in Onshape's lists.
         let lu = LENGTH_UNITS_SHOWN.iter().position(|u| *u == d.length).unwrap_or(0);
         let (dl, dc) = dec(d.length_precision, 6);
         let unit = self.select("Length default unit".into(), 210., LENGTH_UNITS_SHOWN.iter().map(|u| u.name().to_string()).collect(), lu, |p, i| p.length = LENGTH_UNITS_SHOWN[i], cx);
         let decimals = self.select("Length display decimals".into(), 100., dl, dc, |p, i| p.length_precision = i as u8, cx);
         groups[0].push(self.row("wu-row-length", "Length default unit".into(), unit, decimals));
+        labels[0].push("Length default unit".into());
         let au = AngleUnit::ALL.iter().position(|u| *u == d.angle).unwrap_or(0);
         let (al, ac) = dec(d.angle_precision, 7);
         let unit = self.select("Angle default unit".into(), 210., AngleUnit::ALL.iter().map(|u| u.name().to_string()).collect(), au, |p, i| p.angle = AngleUnit::ALL[i], cx);
         let decimals = self.select("Angle display decimals".into(), 100., al, ac, |p, i| p.angle_precision = i as u8, cx);
         groups[1].push(self.row("wu-row-angle", "Angle default unit".into(), unit, decimals));
+        labels[1].push("Angle default unit".into());
         for (k, (label, group, names, _, _)) in OTHER_UNITS.iter().enumerate() {
             let (dl, dc) = dec(d.other[k].1, OTHER_DECIMALS[k]);
             let shown = OTHER_UNITS_SHOWN[k];
@@ -501,10 +466,16 @@ impl Render for WorkspaceUnits {
             let decimals = self.select(format!("{label} display decimals"), 100., dl, dc, move |p, i| p.other[k].1 = i as u8, cx);
             let key: &'static str = ["wu-r0", "wu-r1", "wu-r2", "wu-r3", "wu-r4", "wu-r5", "wu-r6", "wu-r7", "wu-r8"][k];
             groups[*group as usize].push(self.row(key, format!("{label} default unit"), unit, decimals));
+            labels[*group as usize].push(format!("{label} default unit"));
         }
         // Onshape's order inside a group: the base quantity first.
-        noshape_app_core::ui_script::note_dialog_fields("Workspace units");
         let titles = ["Length", "Angle", "Mechanical"];
+        // Live's recorder reads the panel's texts in order: a group's title, then per row its label and "Display decimals".
+        noshape_app_core::ui_script::note_dialog(|| {
+            let fields = noshape_app_core::ui_script::take_fields();
+            let text: Vec<String> = (0..3).flat_map(|g| std::iter::once(titles[g].to_string()).chain(if self.collapsed[g] { Vec::new() } else { labels[g].iter().flat_map(|l| [l.clone(), "Display decimals".to_string()]).collect() })).collect();
+            serde_json::json!({ "kind": "panel", "title": "Workspace units", "text": text, "tabs": [], "fields": fields, "error": null, "ok": "enabled" })
+        });
         let mut body = v_flex().id("wu-body").max_h(px(760.)).overflow_y_scroll();
         for (g, rows) in groups.into_iter().enumerate() {
             let open = !self.collapsed[g];

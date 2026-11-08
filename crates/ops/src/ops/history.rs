@@ -80,9 +80,9 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "history",
             verb: "create_branch",
-            summary: "Create a branch (workspace) from the current state and switch to it",
+            summary: "Create a branch (workspace) from the current state, or from a version (Branch to create workspace…), and switch to it",
             description: "",
-            fields: vec![doc_field(), req("name", s(), "Branch name.")],
+            fields: vec![doc_field(), req("name", s(), "Branch name."), opt("version", s(), "The version (name or id) to branch from, as its row's Branch to create workspace…; default: the current state.")],
             mutates: true,
             destructive: false,
             run: create_branch,
@@ -186,8 +186,11 @@ pub(super) fn branch_id(od: &crate::OpenDoc, key: &str) -> Result<noshape_store:
 
 fn create_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let head = od.session.head()?;
-    let b = od.session.branch_from(head, a.str("name")?)?;
+    let from = match a.opt_str("version")? {
+        Some(v) => version_info(od, v)?.microversion,
+        None => od.session.head()?,
+    };
+    let b = od.session.branch_from(from, a.str("name")?)?;
     Ok(json!({ "branch": b.to_string(), "name": a.str("name")? }).into())
 }
 

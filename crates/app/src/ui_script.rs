@@ -107,8 +107,8 @@ fn opens_on_tab() -> Option<String> {
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let start = read_json(&starts).ok()?[name].clone();
     // A scenario that first clicks a document tab opens on it (live's runner: appearance-part-row-configure's start is
-    // config-blocks' Part Studio).
-    if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()) {
+    // config-blocks' Part Studio); studios' whole-document starts open on the first tab and click it (live2's runner).
+    if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()).filter(|_| scenario["area"] != "studios") {
         return Some(tab.to_string());
     }
     if let Some(d) = start.get("drawing") {
@@ -847,7 +847,7 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
 fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) -> Value {
     let focus = match ws.ui_rename_focus(window, cx) {
         Some(f) => f,
-        None if window.focused(cx).is_some() => json!({ "kind": "other" }),
+        None if window.focused(cx).is_some() && !ws.ui_variables_hold_focus(window, cx) => json!({ "kind": "other" }),
         None => json!({ "kind": "none" }),
     };
     let list = noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list);
@@ -860,7 +860,7 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
         "parts": [],
         "message": null,
         "tooltip": null,
-        "undo": null,
+        "undo": { "undo": ws.doc.read(cx).can_undo(), "redo": ws.doc.read(cx).can_redo() },
         "sketch": null,
         "drawing": null,
         "variables": ws.ui_variables_state(cx),
@@ -868,6 +868,9 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
     // A Feature Studio: its editor, and its autocomplete as the list.
     if let Some(fs) = ws.ui_feature_studio_state(cx) {
         s["featurestudio"] = fs["featurestudio"].clone();
+        if fs["unsaved"] == true {
+            s["undo"]["undo"] = json!(true);
+        }
         if !fs["list"].is_null() {
             s["list"] = fs["list"].clone();
         }

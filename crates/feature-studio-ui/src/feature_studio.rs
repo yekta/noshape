@@ -468,6 +468,8 @@ pub struct FsUiState {
     pub line: String,
     pub lines: usize,
     pub committed: bool,
+    /// Edits not yet saved into the document (the toolbar's Undo already undoes them).
+    pub unsaved: bool,
     pub notices: usize,
     pub completion: Option<Vec<String>>,
 }
@@ -524,11 +526,18 @@ impl FeatureStudioView {
         let text = ed.value().to_string();
         let caret = ed.cursor_position();
         let menu = ed.completion_menu_state();
+        // Committed: the text Part Studios use (Onshape saves as you type, applies on Commit).
+        let committed = match self.doc.read(cx).session.doc.tab(self.tab).map(|t| &t.content) {
+            Some(TabContent::FeatureStudio(f)) => text == f.source,
+            _ => true,
+        };
+        // Lines as the editor shows them (a trailing newline starts an empty last line).
         FsUiState {
             caret: (caret.line, caret.character),
-            line: text.lines().nth(caret.line as usize).unwrap_or("").to_string(),
-            lines: text.lines().count(),
-            committed: text == self.synced,
+            line: text.split('\n').nth(caret.line as usize).unwrap_or("").to_string(),
+            lines: text.split('\n').count(),
+            committed,
+            unsaved: text != self.synced,
             notices: self.notices.len(),
             completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
         }
@@ -560,10 +569,6 @@ impl FeatureStudioView {
             st.lsp_mut().completion_menu.max_width = px(300.);
             st
         });
-        // Onshape opens a new studio with the caret on line 4, under the import.
-        if source == FS_TEMPLATE {
-            editor.update(cx, |e, cx| e.set_cursor_position(Position { line: 3, character: 0 }, window, cx));
-        }
         let mut subs = Vec::new();
         subs.push(cx.subscribe_in(&editor, window, |this: &mut Self, _, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::Change) {

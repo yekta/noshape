@@ -240,7 +240,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   `tabs`: the bar as shown, left to right (with a folder open, the folder's tabs), `kind` one of `partstudio`,
   `assembly`, `drawing`, `variablestudio`, `featurestudio`, `materiallibrary`, `file` (an imported or stored file),
   `folder`; `folder`: the open folder's name (the crumbs), `null` at the top; `renaming`: the tab or folder whose name
-  is an inline field, by its name before the edit; `panel`: the open left panel, `"Tab manager"`, `"Versions and
+  is an inline field, by its name before the edit; `panel`: the open left panel by its header, `"Tabs"`, `"Versions and
   history"`, `"Workspace units"` (☰ › Workspace units…'s panel), `"Document notes"`, `null`; `switcher`: the Ctrl+Space
   switcher while Ctrl is held, `{"rows": [names, most recent first], "selected": n}`.
   The tab's inline rename field with the keyboard is `focus` `{"kind": "other", "text", "selection", "all"}`.
@@ -273,7 +273,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   compare panel's rows on a Part Studio, `change` modified | removed | added | moved | null; `null` elsewhere); targets
   `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`;
   `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
-  from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  from the latest version (live's REST can only branch there; else Main's head), its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
   (`"Versions and history"`, `"Create version…"`).

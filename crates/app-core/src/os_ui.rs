@@ -96,6 +96,7 @@ pub fn label_add_glyph(size: f32, color: impl Into<Hsla>) -> Div {
 pub fn primary_button(id: impl Into<ElementId>, label: impl Into<SharedString>) -> Button {
     let label: SharedString = label.into();
     let name = label.clone();
+    crate::ui_script::note_button(&name);
     crate::ui_script::mark(Button::new(id).primary().child(div().text_size(px(14.)).child(label)).h(px(34.)).px(px(11.)).rounded(px(3.)), || format!("button:{name}"))
 }
 
@@ -111,6 +112,7 @@ pub fn danger_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.));
+    crate::ui_script::note_button(&name);
     crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
@@ -128,6 +130,7 @@ pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.));
+    crate::ui_script::note_button(&name);
     crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
@@ -153,6 +156,7 @@ pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.));
+    crate::ui_script::note_button(&name);
     crate::ui_script::mark(button, || format!("button:{name}"))
 }
 

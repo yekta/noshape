@@ -127,6 +127,7 @@ pub fn note_dialog(dialog: impl FnOnce() -> serde_json::Value) {
     if !active() || DIALOG_PINNED.load(std::sync::atomic::Ordering::Relaxed) {
         return;
     }
+    TITLE_ONLY_MODAL.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut d) = dialog_slot().lock() {
         *d = Some(dialog());
     }
@@ -231,15 +232,33 @@ pub fn note_dialog_fields(title: &str) {
     note_dialog(|| serde_json::json!({ "title": title, "kind": "other", "tabs": [], "fields": fields, "error": null, "ok": "enabled" }));
 }
 
-/// A modal drawn now by its title alone, unless the frame noted it (or another) in full with [`note_dialog`].
+/// Whether the noted dialog is a [`note_modal`] one, which takes the buttons drawn after it ([`note_button`]).
+static TITLE_ONLY_MODAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A modal drawn now by its title and the buttons drawn after it ([`note_button`]), unless the frame noted it (or
+/// another) in full with [`note_dialog`]. Its fields aren't read (not compared).
 pub fn note_modal(title: &str) {
     if !active() {
         return;
     }
+    let Ok(mut d) = dialog_slot().lock() else { return };
+    // Each frame of the same modal draws its buttons again.
+    let redrawn = TITLE_ONLY_MODAL.load(std::sync::atomic::Ordering::Relaxed) && d.as_ref().is_some_and(|d| d["title"] == title);
+    if d.is_none() || redrawn {
+        *d = Some(serde_json::json!({ "kind": "modal", "title": title, "buttons": [] }));
+        TITLE_ONLY_MODAL.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// A modal's button drawn now (os_ui's buttons): listed in the [`note_modal`] modal being drawn.
+pub fn note_button(label: &str) {
+    if !active() || !TITLE_ONLY_MODAL.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
     if let Ok(mut d) = dialog_slot().lock()
-        && d.is_none()
+        && let Some(b) = d.as_mut().and_then(|d| d["buttons"].as_array_mut())
     {
-        *d = Some(serde_json::json!({ "kind": "modal", "title": title, "fields": [], "buttons": [] }));
+        b.push(serde_json::json!(label));
     }
 }
 
@@ -252,6 +271,7 @@ pub fn clear_dialog() {
     if let Ok(mut d) = dialog_slot().lock() {
         *d = None;
     }
+    TITLE_ONLY_MODAL.store(false, std::sync::atomic::Ordering::Relaxed);
     DIALOG_PINNED.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut f) = fields_slot().lock() {
         f.clear();

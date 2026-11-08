@@ -5613,7 +5613,7 @@ Examples:
 
 #### history_create_branch
 
-Create a branch (workspace) from the current state and switch to it (edits the document (one undoable history entry)).
+Create a branch (workspace) from the current state, or from a version (Branch to create workspace…), and switch to it (edits the document (one undoable history entry)).
 
 Examples:
 
@@ -5625,6 +5625,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `name` | string | required | Branch name. |
+| `version` | string |  | The version (name or id) to branch from, as its row's Branch to create workspace…; default: the current state. |
 
 #### history_switch_branch
 

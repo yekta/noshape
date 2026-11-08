@@ -410,6 +410,8 @@ impl Render for EnvProfilePrefsView {
         let view_c = cx.entity();
         let view_d = cx.entity();
         let to_delete = selected.clone();
+        crate::ui_script::note_control("Create profile", "button", serde_json::json!(true));
+        crate::ui_script::note_control("Delete profile", "button", serde_json::json!(to_delete.is_some()));
         let buttons = h_flex()
             .gap(px(4.))
             .child(os::primary_button("env-create-profile", tr("Create profile")).on_click(move |_, window, cx| Self::create_dialog(view_c.clone(), window, cx)))

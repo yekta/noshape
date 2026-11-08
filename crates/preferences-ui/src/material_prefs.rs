@@ -39,6 +39,7 @@ impl Render for MaterialLibrariesView {
         }
         listed.extend(libs.iter().map(|l| l.name.clone()));
         crate::ui_script::note_control("Libraries", "list", serde_json::json!(listed));
+        crate::ui_script::note_control("Add material library…", "button", serde_json::json!(true));
         // Live's 425 px columns (1919 px window) share the width here, so the
         // Remove buttons stay in view in narrower windows.
         let cell = |t: String| div().w(px(LIB_COL)).flex_shrink(1.).min_w_0().pl(px(22.)).pr(px(8.)).truncate().child(t);

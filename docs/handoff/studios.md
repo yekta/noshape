@@ -28,6 +28,30 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 06:44 UTC: first match numbers; fixes from live's batch 1
+- live and live2 recorded 341 studios scenarios (doc 91, docs 32, prefs 54, ver 67, vs 43, fs 54; live 7eb40cea,
+  live2 68ce2674). First compare (before these fixes, doc/docs/fs/prefs): 19/96 doc-docs scenarios clean.
+- Fixed in ours from the recordings: the navbar's document name renames inline (click, double-click, ☰ › Rename
+  document; the modal is gone); the documents page's Rename (rows and folder tiles) is inline; Folders folds only by
+  its chevron and is remembered; + menu's "Paste tab" last; history rows (current workspace: no Open / Delete; the
+  head change: no Restore; version rows always list Releases, greyed with none; toggles read "Show merges" once
+  clicked); a tab dropped on a folder tab goes into it (the bar's gap moved it back); Workspace units isn't an undo
+  step; Preferences lists its sections in page order with Create / Delete profile, Reset all, Add material
+  library…, Add export rule…; Feature Studio's `committed` is against the committed text, `lines` counts the
+  trailing empty line, the caret starts at 0,0; `history_create_branch` takes a `version` (Branch to create
+  workspace…), and doc-branches' B1 is V1 as live's.
+- Recorder: Workspace units as a panel (live's form), document modals list their buttons (os_ui buttons after a
+  title-only modal), the Tabs panel is "Tabs", the documents page / Preferences / a Variable Studio holding the focus
+  read "none"; studios' whole-document starts open on Part Studio 1. run.py: cloud rows (Copy link, Share…,
+  Applications, CAM / PCB / Render Studio, tutorials, Explore Onshape, What's new, Forums, Report a bug) dropped;
+  live's "Add feature" history rows and "live2 uip <start> <time>" names normalized.
+- Asked live (REQUESTS, batch 2+3 request): Export… missing on tab menus (export quota throttled?), tab double-click
+  rename, the drag drop point, the Tabs panel left open at some starts.
+- Open decisions (lead): Help menu (live: Help, FeatureScript documentation, System check are web pages; ours has
+  Install command line tool / Connect to coding agents instead); ☰ › Update workspace… (live: the feature library
+  version, a toast "Workspace is already at the latest feature library version."; ours: updates references to
+  other documents' versions); the std version in a new Feature Studio (live 3112, ours 3095: dx's).
+
 ### 2026-11-08 05:30 UTC: driver below-the-fold fix, batch 3 (55 scenarios), coverage up in all four areas
 - Driver: a control in an inner scrolling list (Keyboard shortcuts, material libraries) is wheeled into view inside its
   own clip (app-core `ui_script::clip_of`); all 61 prefs-* run clean. The docs-page start puts its documents in

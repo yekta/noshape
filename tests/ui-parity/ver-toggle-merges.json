@@ -20,7 +20,7 @@
   {
    "do": "click",
    "on": {
-    "button": "Hide merges"
+    "button": "Show merges"
    }
   }
  ]

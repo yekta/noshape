@@ -31,7 +31,7 @@
   {
    "do": "click",
    "on": {
-    "menu": "Paste Part Studio 2"
+    "menu": "Paste tab"
    }
   }
  ]

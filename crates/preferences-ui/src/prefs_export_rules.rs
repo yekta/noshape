@@ -39,6 +39,7 @@ impl Render for ExportRulesPrefsView {
         let rules = saved_rules();
         crate::ui_script::set_section("User export rules");
         crate::ui_script::note_control("Rules", "list", serde_json::json!(rules.iter().map(|r| serde_json::json!([r.element.label(), r.format, r.template])).collect::<Vec<_>>()));
+        crate::ui_script::note_control("Add export rule…", "button", serde_json::json!(true));
         let help = div()
             .id("er-help")
             .child(crate::assets::icon("help-gray", 18., cx))

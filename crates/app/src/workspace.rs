@@ -83,6 +83,8 @@ pub struct Workspace {
     doc_panel: Option<(DocPanel, Vec<Subscription>)>,
     /// Tab being renamed (tab › Rename, double-click).
     renaming_tab: Option<(TabId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// The navbar's document name being renamed inline (a click on it, ☰ › Rename document).
+    renaming_doc: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// A tab being dragged along the bar (live qa5 TABS1).
     tab_gap: Option<TabGap>,
     /// ☰ › Workspace units… panel.
@@ -144,7 +146,7 @@ impl Workspace {
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
         noshape_render::perf::milestone("workspace: thumbnailers");
-        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
+        let mut this = Self { behind: Default::default(), behind_refs: Vec::new(), behind_task: None, tab_thumbs, tab_scroll: ScrollHandle::new(), reveal_active_tab: true, navbar_hovered: false, cursor_sync: Default::default(), doc, gpu, active, views: HashMap::new(), focus: cx.focus_handle(), slices: None, logo_focus: cx.focus_handle().tab_stop(true), notices_focus: cx.focus_handle().tab_stop(true), chrome_focus: [cx.focus_handle(), cx.focus_handle()], history: None, release_drafts: None, recent: Vec::new(), switcher: None, tab_manager: None, doc_panel: None, renaming_tab: None, renaming_doc: None, tab_gap: None, units_panel: None, open_folder: None, fs_notices: None, notifications_open: false, fs_search: None, create_drawing: None, _thumbnailer: thumbnailer, toast: None, _subs: subs };
         this._subs.push(focus_lost);
         // Another document may have a new version when the window comes back.
         this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
@@ -443,7 +445,7 @@ impl Workspace {
             .collect();
         let renaming = self.renaming_tab.as_ref().and_then(|(id, ..)| d.tab(*id).map(|t| t.name.clone()).or_else(|| d.folder(*id).map(|f| f.name.clone())));
         let panel = if self.tab_manager.is_some() {
-            Some("Tab manager")
+            Some("Tabs")
         } else if self.history.is_some() {
             Some("Versions and history")
         } else if self.units_panel.is_some() {
@@ -484,6 +486,14 @@ impl Workspace {
         }
     }
 
+    /// Whether the active Variable Studio holds the focus itself, no field of it (ui-parity: live's page body).
+    pub(crate) fn ui_variables_hold_focus(&self, window: &Window, cx: &App) -> bool {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::Variables(v)) => v.read(cx).focus_handle(cx).is_focused(window),
+            _ => false,
+        }
+    }
+
     /// The active Feature Studio's editor state (ui-parity driver), if it is one.
     pub(crate) fn ui_feature_studio_state(&self, cx: &App) -> Option<serde_json::Value> {
         match self.active.and_then(|t| self.views.get(&t)) {
@@ -492,6 +502,7 @@ impl Workspace {
                 let list = st.completion.map(|rows| serde_json::json!({ "kind": "autocomplete", "rows": rows, "highlighted": null, "disabled": [] }));
                 Some(serde_json::json!({
                     "featurestudio": { "caret": [st.caret.0, st.caret.1], "line": st.line, "lines": st.lines, "committed": st.committed, "notices": st.notices },
+                    "unsaved": st.unsaved,
                     "list": list,
                 }))
             }
@@ -530,6 +541,16 @@ impl Workspace {
     /// The active tab's text field with the keyboard (the inline tab rename): `state.focus` for the ui-parity driver
     /// when no studio reads it.
     pub(crate) fn ui_rename_focus(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
+        // The navbar's name field (live: a "field" with the name, all selected).
+        if let Some((st, _)) = self.renaming_doc.as_ref() {
+            let st = st.read(cx);
+            if st.focus_handle(cx).is_focused(window) {
+                let mut f = noshape_app_core::ui_script::field_focus("", st);
+                f["kind"] = serde_json::json!("field");
+                f["label"] = serde_json::Value::Null;
+                return Some(f);
+            }
+        }
         let (_, st, _) = self.renaming_tab.as_ref()?;
         let st = st.read(cx);
         st.focus_handle(cx).is_focused(window).then(|| {
@@ -703,6 +724,38 @@ impl Workspace {
         cx.notify();
     }
 
+    /// The navbar's name becomes a field, all selected (live: a click on it, ☰ › Rename document); Enter or leaving
+    /// it renames the document, Esc keeps the name.
+    fn start_doc_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use gpui_kit::component::input::{InputEvent, InputState};
+        if self.renaming_doc.is_some() {
+            return;
+        }
+        let name = self.doc.read(cx).name();
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, _, cx| {
+            if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) || this.renaming_doc.is_none() {
+                return;
+            }
+            this.renaming_doc = None;
+            let name = st.read(cx).value().trim().to_string();
+            if !name.is_empty() && name != this.doc.read(cx).name() {
+                let r = this.doc.update(cx, |d, _| d.session.store.set_name(&name));
+                this.doc.update(cx, |d, cx| match r {
+                    Ok(()) => d.reloaded(cx),
+                    Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
+                });
+            }
+            cx.notify();
+        });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.renaming_doc = Some((st, sub));
+        cx.notify();
+    }
+
     /// Tab › Select as document thumbnail.
     fn select_thumbnail(&mut self, tab: TabId, cx: &mut Context<Self>) {
         self.doc.update(cx, |d, cx| {
@@ -801,7 +854,37 @@ impl Workspace {
                             .child(div().text_size(px(21.)).font_weight(FontWeight::NORMAL).text_color(crate::theme::themed(0x4a4a4a, 0xffffff)).child("noshape")),
                     )
                     .child(self.render_doc_menu(cx))
-                    .child(div().flex_none().pr(px(4.)).py(px(2.)).text_size(px(22.)).font_weight(FontWeight::BOLD).text_color(pal.text).truncate().cursor_text().child(crate::ui::user_text(name)).map(|d| noshape_app_core::ui_script::mark(d, || "navbar:name".into())))
+                    .child(match self.renaming_doc.as_ref() {
+                        Some((st, _)) => div()
+                            .flex_none()
+                            .w(px(300.))
+                            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                                // Esc keeps the name: the field goes before its blur would rename.
+                                if ev.keystroke.key == "escape" {
+                                    cx.stop_propagation();
+                                    this.renaming_doc = None;
+                                    window.focus(&this.focus, cx);
+                                    cx.notify();
+                                }
+                            }))
+                            .child(gpui_kit::component::input::Input::new(st).h(px(30.)).text_size(px(22.)).font_weight(FontWeight::BOLD).px(px(3.)).text_color(pal.text))
+                            .map(|d| noshape_app_core::ui_script::mark(d, || "navbar:name".into()))
+                            .into_any_element(),
+                        None => div()
+                            .id("navbar-doc-name")
+                            .flex_none()
+                            .pr(px(4.))
+                            .py(px(2.))
+                            .text_size(px(22.))
+                            .font_weight(FontWeight::BOLD)
+                            .text_color(pal.text)
+                            .truncate()
+                            .cursor_text()
+                            .child(crate::ui::user_text(name))
+                            .when(!read_only && viewing_version.is_none(), |d| d.on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.start_doc_rename(window, cx))))
+                            .map(|d| noshape_app_core::ui_script::mark(d, || "navbar:name".into()))
+                            .into_any_element(),
+                    })
                     // Live: on the name's baseline, 11 px after it. The name and this
                     // label show the I-beam (dom/cursors-controls.json).
                     // Live (navigation/301): a version shows its name ("V1", #999) in the
@@ -905,13 +988,16 @@ impl Workspace {
                 use crate::os_menu::OsMenuItem as I;
                 let doc = ws.read(cx).doc.clone();
                 let x = e.position().x;
-                let (d1, d2, d3, d4, d5, d6, d7, d8) = (doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone());
-                let (w, w2) = (ws.clone(), ws.clone());
+                let (d2, d3, d4, d5, d6, d7, d8) = (doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone(), doc.clone());
+                let (w, w2, w3) = (ws.clone(), ws.clone(), ws.clone());
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                     if let Some((mv, version)) = at_version {
                         let m = m
                             .dropdown()
-                            .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
+                            .item(I::new("Rename document").on_click({
+                                let w3 = w3.clone();
+                                move |_, wi, cx| w3.update(cx, |t, cx| t.start_doc_rename(wi, cx))
+                            }))
                             .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))
                             .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
                             .separator()
@@ -927,7 +1013,10 @@ impl Workspace {
                             .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
                     }
                     m.dropdown()
-                        .item(I::new("Rename document").on_click(move |_, wi, cx| dd::rename_document(d1.clone(), wi, cx)))
+                        .item(I::new("Rename document").on_click({
+                                let w3 = w3.clone();
+                                move |_, wi, cx| w3.update(cx, |t, cx| t.start_doc_rename(wi, cx))
+                            }))
                         .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))
                         .item(I::new("Document details…").on_click(move |_, wi, cx| dd::document_details(d3.clone(), wi, cx)))
                         .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
@@ -1281,15 +1370,11 @@ impl Workspace {
             }
             let (v1, v2, v3, v4, v5, v6, v7) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view.clone());
             let (v8, v9) = (view.clone(), view.clone());
-            let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().and_then(|c| c.0.as_ref().map(|t| t.name.clone()));
+            let copied = cx.try_global::<crate::doc_dialogs::CopiedTab>().is_some_and(|c| c.0.is_some());
             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
                 use crate::os_menu::OsMenuItem as I;
-                let m = m.dropdown();
-                let m = match &copied {
-                    Some(n) => m.item(I::new(format!("Paste {n}")).icon_name("paste").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.paste_tab(w, cx)))).separator(),
-                    None => m,
-                };
-                m
+                let m = m
+                    .dropdown()
                     .item(I::new("Create Material Library").icon_name("material-library").on_click(move |_, w, cx| v9.update(cx, |t, cx| t.add_tab("materiallibrary", w, cx))))
                     .item(I::new("Create Feature Studio").icon_name("feature-studio").on_click(move |_, w, cx| v5.update(cx, |t, cx| t.add_tab("featurestudio", w, cx))))
                     .separator()
@@ -1298,7 +1383,12 @@ impl Workspace {
                     .item(I::new("Create Variable Studio").icon_name("variable-studio").on_click(move |_, w, cx| v4.update(cx, |t, cx| t.add_tab("variables", w, cx))))
                     .item(I::new("Create Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))))
                     .item(I::new("Create folder").icon_name("folder").on_click(move |_, w, cx| v8.update(cx, |t, cx| t.create_folder(w, cx))))
-                    .item(I::new("Import…").icon_name("import-file").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))))
+                    .item(I::new("Import…").icon_name("import-file").on_click(move |_, w, cx| v6.update(cx, |t, cx| t.import(w, cx))));
+                // After a tab's Copy to clipboard: "Paste tab", last (live doc-tab-menu-copy-paste).
+                if !copied {
+                    return m;
+                }
+                m.separator().item(I::new("Paste tab").icon_name("paste").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.paste_tab(w, cx))))
             });
             let h = window.viewport_size().height;
             crate::os_menu::open_anchored(point(px(crate::ui::RAIL_W), h - px(crate::ui::TAB_BAR_H)), Anchor::BottomLeft, menu, window, cx);
@@ -1349,7 +1439,7 @@ impl Workspace {
                     .tooltip(crate::ui::tooltip("All tabs"))
                     .map(|d| noshape_app_core::ui_script::mark(d, || "button:All tabs".into()))
                     .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
-                    .on_drop(cx.listener(|this, drag: &TabDrag, _, cx| this.move_into(drag.id, None, cx)))
+                    .on_drop(cx.listener(|this, drag: &TabDrag, _, cx| this.drop_into(drag.id, None, cx)))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.open_folder = None;
                         cx.notify();
@@ -2368,7 +2458,15 @@ impl Workspace {
         }
     }
 
-    /// Drop on a folder (or on "All tabs": the root).
+    /// A tab dropped on a folder (or on "All tabs": the root): the bar under it takes the same drop, whose gap must
+    /// not move the tab back out.
+    fn drop_into(&mut self, id: TabId, folder: Option<TabId>, cx: &mut Context<Self>) {
+        self.tab_gap = None;
+        cx.stop_propagation();
+        self.move_into(id, folder, cx);
+    }
+
+    /// `id` into `folder` (None: the root).
     fn move_into(&mut self, id: TabId, folder: Option<TabId>, cx: &mut Context<Self>) {
         if Some(id) == folder {
             return;
@@ -2423,7 +2521,7 @@ impl Workspace {
             .child(self.folder_label(id, &name))
             .on_drag(TabDrag { id, name: name.clone(), icon: None, width: px(0.) }, start_tab_drag(cx.entity().downgrade()))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
-            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
+            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.drop_into(drag.id, Some(id), cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.click_count() >= 2 {
                     this.start_tab_rename(id, window, cx);
@@ -2444,7 +2542,7 @@ impl Workspace {
             .pr(px(12.))
             .child(h_flex().max_w(px(100.)).overflow_hidden().gap(px(5.)).child(div().flex_none().child(folder_glyph(20., pal.text_muted))).child(self.folder_label(id, &name)))
             .drag_over::<TabDrag>(|st, _, _, _| st.bg(gpui_kit::rgb(0xdef1fb)))
-            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.move_into(drag.id, Some(id), cx)))
+            .on_drop(cx.listener(move |this, drag: &TabDrag, _, cx| this.drop_into(drag.id, Some(id), cx)))
             .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                 if e.click_count() >= 2 {
                     this.start_tab_rename(id, window, cx);

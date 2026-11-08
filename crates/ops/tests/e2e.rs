@@ -712,6 +712,32 @@ fn workspace_protection() {
     call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 0], [25, 0]] }));
 }
 
+/// ☰ › Workspace units… isn't an undo step (live doc-units-*: Undo stays off after ✓); the edit before it still is.
+#[test]
+fn workspace_units_are_not_an_undo_step() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "units-undo.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "document_set_units", json!({ "length_unit": "in" }));
+    let r = call(&mut ctx, "history_undo", json!({}));
+    assert_ne!(r["description"], "Change workspace units", "{r}");
+    assert_eq!(call(&mut ctx, "document_info", json!({}))["units"]["length"], "in", "the units stay");
+}
+
+/// A version row's Branch to create workspace…: the workspace starts at that version, not at the current state.
+#[test]
+fn a_workspace_branches_from_a_version() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "branch-from-version.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[0, 0], [5, 0]] }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 0], [25, 0]] }));
+    call(&mut ctx, "history_create_branch", json!({ "name": "B1", "version": "V1" }));
+    assert_eq!(entities(&mut ctx, &sk, "circle").len(), 1, "B1 starts at V1");
+    let e = try_call(&mut ctx, "history_create_branch", json!({ "name": "B2", "version": "V9" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{}", e.to_json());
+}
+
 // ------------------------------------------------------------ drawings
 
 /// A block 80 x 40 x 20 with a Ø10 through hole at its center.

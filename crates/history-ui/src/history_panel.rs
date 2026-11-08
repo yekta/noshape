@@ -944,6 +944,7 @@ impl Render for HistoryPanel {
         let current_branch = session.branch;
         let viewing = session.viewing;
         let current_name = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main".into());
+        let current_head = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.head);
         let mut lanes: Vec<BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
         let rows = build_rows(&graph, &lanes);
@@ -955,6 +956,9 @@ impl Render for HistoryPanel {
         let mut y = 0.;
         let filtering = self.filter.is_active();
         let hide_merges = self.hide_merges;
+        // The toggles' tooltips (and names) say what a click does (live: "Hide merges", then "Show merges").
+        let merges_tip = if self.hide_merges { "button:Hide merges" } else { "button:Show merges" };
+        let auto_tip = if self.hide_auto_versions { "button:Hide automatic versions" } else { "button:Show automatic versions" };
         for r in rows.iter().filter(|r| q.is_empty() || r.name.to_lowercase().contains(&q)) {
             placed.push(Placed { row: r.clone(), y, change: false });
             y += ROW_H;
@@ -1302,9 +1306,10 @@ impl Render for HistoryPanel {
                 // to create workspace…, Compare, Restore to <ws>…, Properties…,
                 // Releases ▸, Publish FeatureScript… (Copy link is web-only).
                 let (dr0, row_packages) = (d.clone(), row_packages.clone());
-                let releases = move |m: crate::os_menu::OsMenu, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
+                // A version row always lists Releases (live ver-version-menu), greyed with none.
+                let releases = move |m: crate::os_menu::OsMenu, version_row: bool, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
                     if row_packages.is_empty() {
-                        return m;
+                        return if version_row { m.item(crate::os_menu::OsMenuItem::new("Releases").disabled(true)) } else { m };
                     }
                     let (pk, dr) = (row_packages.clone(), dr0.clone());
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
@@ -1323,10 +1328,12 @@ impl Render for HistoryPanel {
                 let d1 = d.clone();
                 match kind {
                     RowKind::Workspace(b) => {
-                        let m = m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| if b == current_branch { t.view_mv(None, cx) } else { t.switch_branch(b, cx) })));
                         // Live wp-901: Open · Open in new browser tab · Compare · Merge
                         // into current workspace… · Workspace protection… · Properties…
-                        // | Delete. A new browser tab is another window here (as the tab
+                        // | Delete; the current workspace's row (ver-wrow-cur-delete): no
+                        // Open, Compare, Merge or Delete.
+                        let m = if b == current_branch { m } else { m.item(crate::os_menu::OsMenuItem::new("Open").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.switch_branch(b, cx)))) };
+                        // A new browser tab is another window here (as the tab
                         // menu's): the current workspace's shares its edits, another's
                         // edits that workspace. Copy link is web-only.
                         let dn = d5.clone();
@@ -1348,8 +1355,11 @@ impl Render for HistoryPanel {
                         let dp = d5.clone();
                         let m = m.item(crate::os_menu::OsMenuItem::new("Workspace protection…").on_click(move |_, window, cx| crate::history_hooks::workspace_protection(dp.clone(), b, window, cx)));
                         let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Workspace(b), window, cx)));
-                        // Live (qa5 DOC4): Delete on every workspace row; Main can't be
-                        // deleted (help), so it is greyed there.
+                        // Live (qa5 DOC4): Delete on every other workspace's row; Main can't
+                        // be deleted (help), so it is greyed there.
+                        if b == current_branch {
+                            return m;
+                        }
                         let (vd, nd) = (v4.clone(), name.clone());
                         m.separator().item(crate::os_menu::OsMenuItem::new("Delete").disabled(!deletable).on_click(move |_, window, cx| confirm_delete_workspace(vd.clone(), b, nd.to_string(), window, cx)))
                     }
@@ -1377,16 +1387,18 @@ impl Render for HistoryPanel {
                                     v5r.update(cx, |t, cx| t.error(e, cx));
                                 }
                             }))
-                            .item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx))));
+                            ;
+                        // The workspace's latest change has nothing to restore (live ver-crow-restore).
+                        let m = if kind == RowKind::Change && Some(mv) == current_head { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx)))) };
                         // Live rp-904: a change row ends with "Create version here…".
                         let dc = d.clone();
                         let m = if kind == RowKind::Change { m.item(crate::os_menu::OsMenuItem::new("Create version here…").on_click(move |_, window, cx| open_create_version_at(dc.clone(), mv, window, cx))) } else { m };
                         match version_id {
                             Some(id) => {
                                 let m = m.item(crate::os_menu::OsMenuItem::new("Properties…").on_click(move |_, window, cx| crate::version_properties::open(d5.clone(), crate::version_properties::Item::Version(id), window, cx)));
-                                releases(m, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
+                                releases(m, true, window, cx).item(crate::os_menu::OsMenuItem::new("Publish FeatureScript…").on_click(move |_, window, cx| open_publish_dialog(d6.clone(), id, window, cx)))
                             }
-                            None => releases(m, window, cx),
+                            None => releases(m, false, window, cx),
                         }
                     }
                 }
@@ -1496,11 +1508,11 @@ impl Render for HistoryPanel {
                     .pt(px(6.))
                     .gap(px(6.))
                     .flex_none()
-                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).map(|d| crate::ui_script::mark(d, || "button:Hide merges".into())).tooltip(crate::ui::tooltip(if self.hide_merges { "Hide merges" } else { "Show merges" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-merges", "hide-merges", self.hide_merges, cx).map(|d| crate::ui_script::mark(d, || merges_tip.into())).tooltip(crate::ui::tooltip(merges_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_merges = !this.hide_merges;
                         cx.notify();
                     })))
-                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).map(|d| crate::ui_script::mark(d, || "button:Hide automatic versions".into())).tooltip(crate::ui::tooltip(if self.hide_auto_versions { "Hide automatic versions" } else { "Show automatic versions" })).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(filter_toggle("hist-auto", "hide-auto-versions", self.hide_auto_versions, cx).map(|d| crate::ui_script::mark(d, || auto_tip.into())).tooltip(crate::ui::tooltip(auto_tip.trim_start_matches("button:"))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.hide_auto_versions = !this.hide_auto_versions;
                         cx.notify();
                     }))),

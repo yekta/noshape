@@ -182,6 +182,9 @@ struct Prefs {
     /// The right panel shown (Onshape keeps Details open by default).
     #[serde(default = "default_panel")]
     panel: Option<DocPanel>,
+    /// Owned by me's Folders section is open (collapsed by default; live remembers it).
+    #[serde(default)]
+    folders_open: bool,
 }
 
 /// The documents table's optional columns (live documents/81).
@@ -236,7 +239,7 @@ fn default_panel() -> Option<DocPanel> {
 
 impl Default for Prefs {
     fn default() -> Self {
-        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel() }
+        Self { view: ViewMode::Grid, sort: SortKey::Modified, descending: true, source: None, columns: default_columns(), folder_sort: FolderSort::NameAsc, panel: default_panel(), folders_open: false }
     }
 }
 
@@ -248,9 +251,10 @@ fn load_prefs() -> Prefs {
     std::fs::read(prefs_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
-/// The documents page opens on Owned by me next time (the ui-parity driver's page starts).
+/// The documents page opens on Owned by me with its Folders open next time (the ui-parity driver's page starts: live's
+/// account).
 pub fn open_on_owned_by_me() {
-    let prefs = Prefs { source: Some(Source::All), ..load_prefs() };
+    let prefs = Prefs { source: Some(Source::All), folders_open: true, ..load_prefs() };
     let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(&prefs).unwrap_or_default());
 }
 
@@ -306,6 +310,8 @@ pub struct StartView {
     history_filter_edit: noshape_ops::history_filter::HistoryFilter,
     history_dates: [Entity<InputState>; 2],
     /// The "Folders" section of "Owned by me" is expanded.
+    /// A document's name being renamed inline in its row (row menu › Rename; live: no modal).
+    renaming: Option<(PathBuf, Entity<InputState>, Subscription)>,
     folders_open: bool,
     /// "Last opened by me" is expanded.
     recent_open: bool,
@@ -496,7 +502,8 @@ impl StartView {
             history_filter: Default::default(),
             history_filter_edit: Default::default(),
             history_dates,
-            folders_open: false,
+            folders_open: prefs.folders_open,
+            renaming: None,
             recent_open: true,
             sub_open: true,
             columns: prefs.columns.clone(),
@@ -528,7 +535,7 @@ impl StartView {
     }
 
     fn save_prefs(&self) {
-        let prefs = Prefs { view: self.view, sort: self.sort, descending: self.descending, source: Some(self.source.clone()), columns: self.columns.clone(), folder_sort: self.folder_sort, panel: self.panel };
+        let prefs = Prefs { view: self.view, sort: self.sort, descending: self.descending, source: Some(self.source.clone()), columns: self.columns.clone(), folder_sort: self.folder_sort, panel: self.panel, folders_open: self.folders_open };
         let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(&prefs).unwrap_or_default());
     }
 
@@ -925,25 +932,69 @@ impl StartView {
             Self::notify(window, cx, AlertKind::Warning, format!("{}: Close the document's window before renaming it", d.name));
             return;
         }
-        let view = cx.entity();
-        let hint = format!("Renames {}", d.path.file_name().map(|f| f.to_string_lossy().to_string()).unwrap_or_default());
-        let prompt = NamePrompt { title: "Rename document", ok_label: "Rename", label: "Document name", default: d.name.clone(), hint: Some(hint), location: None, labels: None };
-        prompt_name(prompt, window, cx, move |name, window, cx| match lib::rename_document(&d.path, &name) {
-            Ok(dest) => {
-                crate::doc_files::replace_recent(&d.path, &dest);
-                view.update(cx, |this, cx| {
+        let old = d.name.clone();
+        self.start_inline_rename(d.path.clone(), d.name.clone(), move |this, name, window, cx| {
+            if name == old {
+                return;
+            }
+            match lib::rename_document(&d.path, &name) {
+                Ok(dest) => {
+                    crate::doc_files::replace_recent(&d.path, &dest);
                     this.labels.moved(&d.path, &dest);
                     this.labels.save();
                     this.selected = Some(dest.canonicalize().unwrap_or(dest));
                     this.force_rescan(cx);
-                });
-                true
+                }
+                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Rename failed: {e:#}")),
             }
-            Err(e) => {
-                Self::notify(window, cx, AlertKind::Error, format!("Rename failed: {e:#}"));
-                false
+        }, window, cx);
+    }
+
+    /// A row's or folder tile's inline rename (live docs-row-menu-rename, docs-folder-menu-rename: no modal): the
+    /// name becomes a field, all selected; Enter or leaving it runs `commit` with the new name, Esc keeps it.
+    fn start_inline_rename(&mut self, path: PathBuf, name: String, commit: impl Fn(&mut Self, String, &mut Window, &mut Context<Self>) + 'static, window: &mut Window, cx: &mut Context<Self>) {
+        let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            if !matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) || this.renaming.is_none() {
+                return;
+            }
+            this.renaming = None;
+            cx.notify();
+            let name = st.read(cx).value().trim().to_string();
+            if !name.is_empty() {
+                commit(this, name, window, cx);
             }
         });
+        st.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        });
+        self.selected = None;
+        self.renaming = Some((path, st, sub));
+        cx.notify();
+    }
+
+    /// The inline rename's field when `path` is being renamed.
+    fn inline_rename_field(&self, path: &Path, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (_, st, _) = self.renaming.as_ref().filter(|r| r.0 == path)?;
+        Some(
+            div()
+                .id("inline-rename")
+                .flex_1()
+                .min_w_0()
+                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                    // Esc keeps the name: the field goes before its blur would rename.
+                    if ev.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.renaming = None;
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }
+                }))
+                .on_click(|_, _, cx| cx.stop_propagation())
+                .child(os::input_h(Input::new(st).text_size(px(14.)), 28.))
+                .into_any_element(),
+        )
     }
 
     fn duplicate(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
@@ -1234,34 +1285,30 @@ impl StartView {
 
     /// Folder menu › Rename: Onshape's name prompt.
     fn rename_folder(&mut self, f: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
-        let view = cx.entity();
-        let prompt = NamePrompt { title: "Rename folder", ok_label: "Rename", label: "Folder name", default: folder_label(&f), hint: None, location: None, labels: None };
-        prompt_name(prompt, window, cx, move |name, window, cx| {
+        let name = folder_label(&f);
+        self.start_inline_rename(f.clone(), name, move |this, name, window, cx| {
             let clean = lib::sanitize_name(&name);
-            let Some(parent) = f.parent() else { return false };
+            let Some(parent) = f.parent() else { return };
             if clean.is_empty() {
                 Self::notify(window, cx, AlertKind::Warning, "Enter a name for the folder");
-                return false;
+                return;
             }
             let dest = parent.join(&clean);
             if dest == f {
-                return true;
+                return;
             }
             if dest.exists() {
                 Self::notify(window, cx, AlertKind::Warning, format!("\"{clean}\" already exists in this folder"));
-                return false;
+                return;
             }
             if let Err(e) = std::fs::rename(&f, &dest) {
                 Self::notify(window, cx, AlertKind::Error, format!("{}: {e}", "Rename failed"));
-                return false;
+                return;
             }
-            view.update(cx, |this, cx| {
-                this.folder_moved(&f, &dest);
-                this.selected = Some(canon(&dest));
-                this.force_rescan(cx);
-            });
-            true
-        });
+            this.folder_moved(&f, &dest);
+            this.selected = Some(canon(&dest));
+            this.force_rescan(cx);
+        }, window, cx);
     }
 
     /// Folder menu › Move to…: the folder browser (not into itself).
@@ -2465,14 +2512,21 @@ impl StartView {
 
     /// The ui-parity state of the documents page (tests/ui-parity/README.md "Documents page and Preferences").
     fn ui_state(&self, window: &Window, cx: &App) -> serde_json::Value {
-        let focus = if self.search.read(cx).focus_handle(cx).is_focused(window) {
+        let renaming = self.renaming.as_ref().map(|r| r.1.read(cx)).filter(|st| st.focus_handle(cx).is_focused(window));
+        let focus = if let Some(st) = renaming {
+            let mut f = crate::ui_script::field_focus("", st);
+            f["kind"] = "other".into();
+            f["label"] = serde_json::Value::Null;
+            f
+        } else if self.search.read(cx).focus_handle(cx).is_focused(window) {
             let mut f = crate::ui_script::field_focus("", self.search.read(cx));
             f["kind"] = "other".into();
             f["label"] = serde_json::Value::Null;
             f
-        } else if window.focused(cx).is_some() {
+        } else if window.focused(cx).is_some() && !self.focus.is_focused(window) {
             serde_json::json!({ "kind": "other" })
         } else {
+            // The page itself holding the focus is live's body: none.
             serde_json::json!({ "kind": "none" })
         };
         let selected = self.selected.as_ref().map(|p| self.docs.iter().find(|d| d.path == *p).map(|d| d.name.clone()).unwrap_or_else(|| folder_label(p)));
@@ -2685,7 +2739,7 @@ impl StartView {
                     .text_size(px(14.))
                     .text_color(pal.text)
                     .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-                    .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())))
+                    .child(self.inline_rename_field(&f, cx).unwrap_or_else(|| div().flex_1().min_w_0().truncate().child(crate::ui::user_text(name.clone())).into_any_element()))
                     .on_click(cx.listener(move |this, ev: &ClickEvent, _, cx| {
                         this.selected = Some(f1.clone());
                         if ev.click_count() >= 2 && !this.trash.items.iter().any(|t| t.stored() == f1) {
@@ -2745,14 +2799,13 @@ impl StartView {
                                         .h_full()
                                         .pl(px(23.))
                                         .gap(px(7.))
-                                        .cursor_pointer()
                                         .text_size(px(14.))
                                         .font_weight(FontWeight::MEDIUM)
                                         .text_color(pal.text)
-                                        .child(os::glyph(if expanded { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text))
+                                        // Only the chevron folds it (live: a click on the word does nothing).
+                                        .child(div().id("folders-chevron").cursor_pointer().child(os::glyph(if expanded { os::GLYPH_EXPANDED } else { os::GLYPH_COLLAPSED }, 10., pal.text)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_folders(cx))))
                                         .child(os::glyph(os::GLYPH_FOLDER, 20., pal.text))
-                                        .child(div().ml(px(1.)).child(caption))
-                                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_folders(cx))),
+                                        .child(div().ml(px(1.)).child(caption)),
                                 )
                                 .child(div().flex_1())
                                 .when(expanded, |d| d.child(self.render_view_toggles(cx))),
@@ -2812,6 +2865,7 @@ impl StartView {
             self.sub_open = !self.sub_open;
         } else {
             self.folders_open = !self.folders_open;
+            self.save_prefs();
         }
         cx.notify();
     }
@@ -3355,7 +3409,7 @@ impl StartView {
                             .pr(px(15.))
                             .gap(px(14.))
                             .child(self.thumbnail(d, 64.0, 36.0, false))
-                            .child(div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(crate::ui::user_text(d.name.clone())))
+                            .child(self.inline_rename_field(&d.path, cx).unwrap_or_else(|| div().min_w_0().truncate().text_color(if d.broken { pal.warning } else { pal.text }).child(crate::ui::user_text(d.name.clone())).into_any_element()))
                             // The workspace chip (live documents-list: 14 px workspace icon, 11 px name).
                             .when(!d.workspace.is_empty(), |r| {
                                 r.child(h_flex().flex_none().ml(px(-7.)).gap(px(1.)).text_size(px(11.)).text_color(pal.text).child(os::glyph(os::GLYPH_WORKSPACE, 14., pal.text)).child(crate::ui::user_text(d.workspace.clone())))

@@ -351,7 +351,8 @@ impl Session {
         let old = self.doc.settings.units;
         let tabs = if old.length != units.length || old.angle != units.angle { noshape_model::quantity_text::pin_sketch_units(&mut self.doc, &old) } else { Vec::new() };
         self.doc.settings.units = units;
-        self.commit(&tabs, true, description)?;
+        // Not an undo step (live doc-units-*: Undo stays off after the panel's ✓).
+        self.commit_tabs(&tabs, true, description, Undo::No)?;
         Ok(())
     }
 

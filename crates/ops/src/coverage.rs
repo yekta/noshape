@@ -342,6 +342,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("document:Paste inputs", Op("config_copy_inputs")),
     ("document:Properties…", Op("history_version_properties")),
     ("document:Publish FeatureScript…", Op("history_publish")),
+    ("document:Releases", Op("release_revision_history")),
     ("document:Remove reference", Op("variable_remove_studio")),
     ("document:Rename", Op("config_edit_input")),
     ("document:Reset to default", Op("variable_insert_studio")),

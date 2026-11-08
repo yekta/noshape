@@ -122,13 +122,18 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "history_create_version", json!({ "name": name })).map_err(|e| format!("start version {name}: {e}"))?;
         add_features(ctx, &v["features"])?;
     }
-    // Workspaces (README "Variable Studio and Versions"): each branched from Main's head with its own `features`, the
-    // run back on Main.
+    // Workspaces (README "Variable Studio and Versions"): each branched from the latest version (live's REST can only
+    // branch there), else Main's head, with its own `features`, the run back on Main.
     let branches = start["branches"].as_array().cloned().unwrap_or_default();
+    let latest = start["versions"].as_array().and_then(|v| v.last()).and_then(|v| v["name"].as_str());
     for b in &branches {
         let name = b["name"].as_str().ok_or_else(|| format!("a start workspace without a name: {b}"))?;
         call(ctx, "history_switch_branch", json!({ "branch": "Main" })).map_err(|e| format!("start workspace {name}: {e}"))?;
-        call(ctx, "history_create_branch", json!({ "name": name })).map_err(|e| format!("start workspace {name}: {e}"))?;
+        let args = match latest {
+            Some(v) => json!({ "name": name, "version": v }),
+            None => json!({ "name": name }),
+        };
+        call(ctx, "history_create_branch", args).map_err(|e| format!("start workspace {name}: {e}"))?;
         add_features(ctx, &b["features"])?;
     }
     if !branches.is_empty() {
@@ -341,7 +346,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
-    /// A start's workspaces (`branches`): doc-branches' B1 is Main's head and its own hole, the run on Main.
+    /// A start's workspaces (`branches`): doc-branches' B1 is V1 (the latest version, as live's) and its own hole, the
+    /// run on Main.
     #[test]
     fn a_start_with_a_workspace_builds() {
         let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
@@ -354,7 +360,7 @@ mod tests {
         call(&mut ctx, "history_switch_branch", json!({ "branch": "B1" })).unwrap();
         let b1 = names(&mut ctx);
         assert_eq!(b1.last().map(String::as_str), Some("Extrude 3"), "B1: {b1:?}");
-        assert_eq!(b1[..b1.len() - 2], main[..], "B1 from Main's head: {b1:?}");
+        assert!(!b1.iter().any(|n| n == "Extrude 2") && b1.iter().any(|n| n == "Extrude 1"), "B1 from V1: {b1:?}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

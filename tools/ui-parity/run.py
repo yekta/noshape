@@ -161,7 +161,8 @@ def all_differences(a, b, path=""):
 
 
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
-CLOUD_ONLY = {"Add comment"}
+CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
+              "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug"}
 
 
 def normalize_live(state):
@@ -214,6 +215,19 @@ def normalize_live(state):
         for f in d.get("fields") or []:
             if isinstance(f, dict) and str(f.get("label", "")).startswith("File name") and isinstance(f.get("value"), str):
                 f["value"] = re.sub(r"^start \S+( Copy \d+)? - ", "Part Studio 1 - ", f["value"])
+    # A REST-built start's history reads "Add feature" where the UI's (ours) reads "Insert feature" (live2 2258).
+    doc = (state or {}).get("document")
+    if isinstance(doc, dict):
+        for h in doc.get("history") or []:
+            if isinstance(h, dict) and isinstance(h.get("name"), str):
+                h["name"] = h["name"].replace(" :: Add feature : ", " :: Insert feature : ")
+    # A studios run's document is "live2 uip <start> <time>" in live, "<start>" in ours (the navbar's rename field).
+    focus = (state or {}).get("focus")
+    if isinstance(focus, dict) and isinstance(focus.get("text"), str) and re.match(r"^live2 uip \S+ \d{4}-\d\d-\d\dT[\d:]+", focus["text"]):
+        n = len(focus["text"])
+        focus["text"] = re.sub(r"^live2 uip (\S+) \d{4}-\d\d-\d\dT[\d:]+", r"\1", focus["text"])
+        if focus.get("selection") == [0, n]:
+            focus["selection"] = [0, len(focus["text"])]
     lst = (state or {}).get("list")
     if isinstance(lst, dict):
         rows = lst.get("rows") or []
