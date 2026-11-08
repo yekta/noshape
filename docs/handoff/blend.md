@@ -13,14 +13,19 @@ Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
 ## Feature audit (lead 11-08 ~11:00): Fillet / Chamfer / Face blend options, tickets in TICKETS.md "Blends (blend)"
-- Landing in order: FACEBLEND-EMPTY-OPTIONS + FILLET-PARTIAL-PLANE (8daa56047), FILLET-FULLROUND-GENERAL (ba819c8c5),
-  then CHAMFER-METHOD + CHAMFER-DA-DIRECTION (live 2304: Tangent and Offset's distance-and-angle on a round face
-  converted to OCCT's two distances by a 2D section solve, `blend_section::chamfer_offsets`; T1
-  features_c a_chamfer_on_a_round_face_measures_as_live, all 10 cases to 1e-6 of live).
-- In progress: FACEBLEND-HOLD-TANGENT (live 2233): `Sides.hold`, `hold_ranges` splits the chain where the hold line's
-  radius passes the entered one; held ranges lofted (64 sections, radius per section), the rest the plain round. T1
-  features_a a_face_blend_follows_its_tangent_hold_line_as_live (4 live cases). Then c2-variable-fillet-faceblend.
-- Waiting on live 2306 (A-E): FACEBLEND-PROP-ADJACENT, -DETACH, -TRIM, -SURFACES, tapered-rib full round.
+- Queued 0c20bd03 (5 commits; suites audit2-4 on vibe5 clean, "slower" reruns noise): face blend empty options,
+  partial plane end, drafted-rib full round, CHAMFER-METHOD + DA direction (`blend_section::chamfer_offsets`),
+  FACEBLEND-HOLD-TANGENT (`Sides.hold`, `hold_ranges`), stopped chamfer setbacks + two distances, face blend
+  Adjacent / Custom propagation (`grow_side`), Detached, Long / No trim error (live 2306 A-C).
+- Committed, not landed (needs a suite): tapered-rib full round as a cone (`tapered_round_tool`, live 2306 E).
+- Parked: FACEBLEND-HOLD-RIM (c2-variable-fillet-faceblend's Face blend 1, the only blend first-difference in the
+  suite), branch `hold-rim-wip` (patch /root/blend-scratch/patches/hold-rim-wip.patch, ZZ_HOLD_RIM / ZZ_ONE_BY_ONE
+  debug env). Radii match live (13.858 at (50, 25): live's JPC down to z 1.14) and the tool removes 5897 mm³ (live
+  5898.7). One closed loft: 5 solids. Pieces split where another hold line takes over (5 lofts) + sections reaching
+  0.1 r past the hold line into the pocket (`rim_section_face`): valid, main solid 136951.04 (live 136943.82) but 32
+  faces and two stray solids; cut one by one, piece 3 (round the y 25..75 end, r up to 13.9) breaks it: its loft's
+  box is ±230 mm. Next: that piece's sections (twist / a jump in r at the chain's vertex at (50, 25)).
+- Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
 - Corpus on vibe5, my tree rebased onto main: learning-center-michael 7 -> 5 (Fillet 2 now fails, "Failed to fillet
