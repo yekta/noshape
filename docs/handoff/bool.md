@@ -97,6 +97,36 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   two other declines ("an edge on another argument's free-form face", 091580a4 and c22ea361) and c2-housing-draft's
   Rotieren 1 (526 ms cut: past "a face of revolution" now; a straight edge tangent to the revolved face at its end,
   then "a piece's point on another solid's face"; WIP /root/bool-scratch/wip/housing-rotieren-1108.patch) next.
+- **Tried 11-08, not kept: the cut by all tools at once first** (one at a time only after it declines; blend's tpd
+  note). bool_replay over every corpus + tpd + valve2: the same differences; tpd 123 -> 97 ms, but valve2's 7-tool cut
+  331 -> 814 ms (at once is slower there than one at a time). The order stays; no cheap test tells them apart.
+- **Plan: sections refined onto both faces where OCCT's are coarse (cf-surface-pattern, 11-08 16:45 UTC; next).**
+  Its sphere cut (vibe4 ~/agents/bool-corpora/sp-cut) declines "a section touching a face's boundary" because the
+  sections' tolerances (OCCT's IntTools_FaceFace, sphere against the part's B-spline faces) are 2e-5..2.6e-1 m
+  reported; measured on 17 points against both surfaces most are 10-100x smaller (5.4e-4 -> 2.0e-5, 0.26 -> 6.4e-5)
+  but one is truly 2.4e-4 off (a coarse walking line); our grey band follows the tolerance, so 1-2 mm about each
+  boundary. OCCT's own result is invalid (6 pieces, one inside out; psui's export check too); live 131 faces,
+  108,150.5 mm3 (core). Plan: (1) a section whose reported tolerance is past 1e-5 is measured (its points' distances
+  to both faces); (2) past 1e-6 measured, its points brought onto both surfaces by the alternating projection that
+  seeded_sections uses (rust_boolean.cpp) and refitted (and its curves on the faces), tolerance the refit's measured
+  one; (3) only where at least one face is free-form (analytic pairs stay OCCT's exact curves). It changes results
+  against OCCT only where OCCT's tolerance was coarse: the gate shows which; cases where OCCT's result is invalid and
+  ours valid go into a corpus `live` list with live's capture (core's numbers; a capture filed for the parts' counts).
+- **Plan: tangent contact along a curve (lead 11-08: yes, plan first; after the sections).** c2-housing-draft's
+  Rotieren 1: the revolved tool face touches the part's z = 0 plane along a circle (r ~15.24 mm); near it every
+  point of the plane's piece is within the grey band of the tool face (13 tried), so the piece can't be classified
+  ("a piece's point on another solid's face"); the straight edges ending on the circle are tangent to the tool
+  face at one end. Plan: (1) a pair of faces tangent along a curve is found where their section (OCCT's or ours)
+  comes back as a curve with the faces' normals parallel along it (or the section is empty but a point of one lies
+  within the band of the other with parallel normals): that curve is marked touching; (2) a touching curve splits
+  nothing and makes no edge (OCCT keeps neither, the faces just touch), but the classifier treats the band about it
+  as known: a piece's point within the band of a face it touches only tangentially is classified from a point
+  moved along its own face away from the touching curve until clear of the band (in its outline: other_points in
+  /root/bool-scratch/wip/housing-rotieren-1108c.patch), or by the side of the touching surface it lies on (the sign
+  of the distance where it grows quadratically); (3) edges tangent at an end (distance from 0 rising steadily past
+  the tolerance) are off the face (in the WIP). Newly taken: Rotieren 1's cut (vibe4 hd/39bba82f), and corpus
+  cases declining "a piece's point on another solid's face" / "an edge nearly on another argument's face" where a
+  face touches another tangentially (to be listed by a decline census over the corpora before coding).
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
