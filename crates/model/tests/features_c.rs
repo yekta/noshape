@@ -1273,6 +1273,41 @@ fn a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top() {
     assert!(near(v0 - volume(&r, 0), mm(1.0).powi(3) * removed, 1e-6), "{} vs {}", (v0 - volume(&r, 0)) * 1e9, removed);
 }
 
+/// Live 2306 E: a full round on a rib tapering along its length (Top (0,−5) (40,−3) (40,3) (0,5), 20 up; sides the two
+/// slanted long faces, center the top) is one CONE, 6,119.2357 mm³ (the drafted rib above: 6,251.0565).
+#[test]
+fn a_full_round_on_a_tapered_rib_is_a_cone_as_live() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(0.0, -5.0), (40.0, -3.0), (40.0, 3.0), (0.0, 5.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("20 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let pick = |want: DVec3| -> Reference {
+        let i = b.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().dot(want.normalize()) > 0.999)).unwrap();
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let (s1, s2, top) = (pick(DVec3::new(2.0, -40.0, 0.0)), pick(DVec3::new(2.0, 40.0, 0.0)), pick(DVec3::Z));
+    s.add("fillet", move |p| {
+        p.set("filletType", en("FULL_ROUND"));
+        p.set("side1Face", q(s1));
+        p.set("side2Face", q(s2));
+        p.set("centerFaces", q(top));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert_eq!(shape.faces().len(), 6);
+    let cones: Vec<f64> = shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cone { .. }))).map(|f| f.area().unwrap() * 1e6).collect();
+    assert!(cones.len() == 1 && (cones[0] - 503.1114).abs() < 1e-3, "{cones:?}");
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - 6119.2357).abs() < 1e-2, "{v} mm³, live 6119.2357");
+}
+
 #[test]
 fn full_round_fillet_parting_draft_swept_blend() {
     // Full round on a 100 x 10 x 25 rib: the top becomes a half cylinder of R5.

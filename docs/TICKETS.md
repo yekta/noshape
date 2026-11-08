@@ -3887,6 +3887,12 @@ P1
   Live 2306 C: attached Long / No trim refused as live (done); detached No trim runs on past the ends by the radius
   (not yet: P2 FACEBLEND-NOTRIM-DETACHED).
 - [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
+  Live 2306 D (two Extrude Surface walls, R 5): one sheet body after (walls trimmed at the touch lines, the cylinder
+  sewn between). Touching walls (wall 1 (0,0)-(40,0), wall 2 (0,0)-(0,30)): default "Side 1 direction is invalid.",
+  flip 2 "Both side 1 and side 2 directions are invalid.", both "Side 2 direction is invalid.", flip 1 OK (cylinder in
+  x 0..5, y 0..5; a side is valid when its normal points toward the other wall). Apart (wall 2 (5,5)-(5,30)): default
+  OK, cylinder x 5..10, y 0..5 bridging the gap, wall 1 trimmed to x 10..40: there wall 1's default normal (−y) points
+  away from the blend, so the rule for walls apart differs: ask live (normals of both walls in D2) before building.
 - [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
   Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
 - [ ] P1 FACEBLEND-HOLD-RIM (blend) c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's
@@ -3900,6 +3906,7 @@ P1
   which side walks (ours: side 2 only).
 - [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
   tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
+  Drafted rib (a cylinder) and tapered rib (a cone, live 2306 E: 6,119.2357 mm³, one CONE 503.1114 mm²) done.
 
 P2
 - [ ] P2 FILLET-PARTIAL-CAP (blend) Entity bounds cut at the face's surface (MC's XY plane) and trim the end by it, not a

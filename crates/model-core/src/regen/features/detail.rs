@@ -1098,9 +1098,7 @@ fn on_faces(shape: &k::Shape, p: glam::DVec3, tol: f64) -> bool {
 /// faces become a half cylinder tangent to both sides (radius = half the
 /// distance between them).
 fn full_round(ev: &mut EvalCtx) -> FResult<()> {
-    use super::sheetmetal_util::{bool_named, body_named, plane_of, tool_named};
-    use crate::reference::TopoName;
-    use std::sync::Arc;
+    use super::sheetmetal_util::plane_of;
     let s1 = ev.resolve_faces(ev.query("side1Face"));
     let s2 = ev.resolve_faces(ev.query("side2Face"));
     let center = ev.resolve_faces(ev.query("centerFaces"));
@@ -1143,7 +1141,10 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             let Some((cc, nc)) = plane_of(&cf) else { return err(UNSUPPORTED) };
             let Some(e) = n1.cross(nc).try_normalize() else { return err(UNSUPPORTED) };
             if n2.dot(e).abs() > 1e-9 {
-                return err(UNSUPPORTED);
+                // A rib tapering along its length (live 2306 E): a cone.
+                let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
+                let Some(tool) = tapered_round_tool(&faces, [(p1, n1), (p2, n2), (cc, nc)]) else { return err(UNSUPPORTED) };
+                return finish_full_round(ev, bi, &body, center[0].1, tool);
             }
             // The section's plane: x along nc, y along e x nc, origin on the center face.
             let (ax, ay) = (nc, e.cross(nc));
@@ -1195,15 +1196,91 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             k::extrude(&profile, e * (hi - lo + 2.0 * margin))?.shape
         }
     };
+    finish_full_round(ev, bi, &body, center[0].1, tool)
+}
+
+/// Cuts a full round's tool from the body, its faces named after the (first) center face.
+fn finish_full_round(ev: &mut EvalCtx, bi: usize, body: &crate::regen::context::Body, center: usize, tool: Shape) -> FResult<()> {
+    use super::sheetmetal_util::{bool_named, body_named, tool_named};
+    use crate::reference::TopoName;
+    use std::sync::Arc;
     let feature = ev.feature;
-    let key = body.faces[center[0].1].clone();
+    let key = body.faces[center].clone();
     let tool = tool_named(tool, |i| Arc::new(TopoName::face(feature, Role::Blend(Arc::new(TopoName::Split { parent: key.clone(), by: feature, ordinal: i as u16 })))));
-    let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(&body), &[tool])?;
+    let (shape, names) = bool_named(ev, k::BooleanOp::Cut, &body_named(body), &[tool])?;
     let un = k::unify_same_domain(&shape)?;
     let rn = crate::regen::eval::names_for(&shape, names);
     let names = ev.name_result(&[&rn], &un.history, &un.shape, &BTreeMap::new(), None);
     ev.replace_body(bi, un.shape, names);
     Ok(())
+}
+
+/// The tool a full round takes off a rib whose planar sides and center don't run along one direction: the spheres
+/// touching all three planes have their centres on a line from the planes' common point, so the round is the cone
+/// they sweep (live 2306 E: a rib 10 → 6 wide, a CONE). The tool is the region above the plane of the cone's two
+/// touch lines, between the sides and up past the center, less the cone; its ends past the center faces' vertices.
+fn tapered_round_tool(center: &[Shape], planes: [(DVec3, DVec3); 3]) -> Option<Shape> {
+    let m = glam::DMat3::from_cols(planes[0].1, planes[1].1, planes[2].1).transpose();
+    if m.determinant().abs() < 1e-12 {
+        return None;
+    }
+    let minv = m.inverse();
+    let apex = minv * DVec3::new(planes[0].1.dot(planes[0].0), planes[1].1.dot(planes[1].0), planes[2].1.dot(planes[2].0));
+    // n_i . c + r = n_i . p_i: c = apex + r w.
+    let w = minv * DVec3::splat(-1.0);
+    let [(_, n1), (_, n2), (pc, nc)] = planes;
+    let along = (w - nc * w.dot(nc)).try_normalize()?;
+    // The r at which each touch line passes each center vertex's station along the rib.
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for f in center {
+        for v in f.vertices() {
+            let at = (v.vertex_point().ok()? - apex).dot(along);
+            for n in [n1, n2] {
+                let per_r = (w + n).dot(along);
+                if per_r.abs() < 1e-12 {
+                    return None;
+                }
+                lo = lo.min(at / per_r);
+                hi = hi.max(at / per_r);
+            }
+        }
+    }
+    if lo <= 0.0 {
+        return None;
+    }
+    let margin = (hi - lo) * 1e-3;
+    let (lo, hi) = (lo - margin, hi + margin);
+    let touch = |n: DVec3, r: f64| apex + w * r + n * r;
+    let up = hi;
+    // A point on side i, on the plane `up` above the center, in the end plane through both touch points and nc.
+    let corner = |n: DVec3, r: f64| -> Option<DVec3> {
+        let (a, b) = (touch(n1, r), touch(n2, r));
+        let ne = (b - a).cross(nc).try_normalize()?;
+        let side_p = touch(n, r);
+        let top_p = pc + nc * up;
+        let mm = glam::DMat3::from_cols(n, nc, ne).transpose();
+        (mm.determinant().abs() > 1e-12).then(|| mm.inverse() * DVec3::new(n.dot(side_p), nc.dot(top_p), ne.dot(a)))
+    };
+    let (t1l, t2l, t1h, t2h) = (touch(n1, lo), touch(n2, lo), touch(n1, hi), touch(n2, hi));
+    let (q1l, q2l, q1h, q2h) = (corner(n1, lo)?, corner(n2, lo)?, corner(n1, hi)?, corner(n2, hi)?);
+    let quad = |p: [DVec3; 4]| -> Option<Shape> { k::make_face_from_wire(&k::make_polyline(&p, true).ok()?, true).ok() };
+    let faces = vec![
+        quad([t1l, q1l, q2l, t2l])?,
+        quad([t1h, t2h, q2h, q1h])?,
+        quad([t1l, t1h, q1h, q1l])?,
+        quad([t2l, q2l, q2h, t2h])?,
+        quad([q1l, q1h, q2h, q2l])?,
+        quad([t1l, t2l, t2h, t1h])?,
+    ];
+    let region = k::sew(&faces, 1e-9, true).ok()?.shape;
+    // The cone: half angle from sin = 1 / |w|, apex to past both ends.
+    let axis = w.normalize();
+    let tan = (1.0 / (w.length_squared() - 1.0).max(1e-300)).sqrt();
+    let (s0, s1) = (lo * w.length() * 0.5, hi * w.length() * 1.5 + hi);
+    // Its seam toward the center (the other way the round came out in two faces).
+    let x = (nc - axis * nc.dot(axis)).try_normalize()?;
+    let cone = k::make_cone(&k::Plane::new(apex + axis * s0, axis, x), s0 * tan, s1 * tan, s1 - s0, std::f64::consts::TAU).ok()?;
+    k::cut(&region, &cone).ok().map(|o| o.shape)
 }
 
 /// The tool a full round of a whole cylinder (`faces`, on `cyl`'s axis, radius `rc`) between two planes through
