@@ -3,6 +3,13 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Heads-up from core (2026-11-08 10:42 UTC, lead's go-ahead)
+- core is editing boolean.cpp's **OCCT path in op_boolean_built** (after `cancellable_history`, where the OCCT result is
+  returned without opts.unify): the result gets a `myUnifyScope` built from the OCCT history (the faces the cut made or
+  changed, and their neighbours), so op_unify looks only there, as after a local Boolean. Nothing else in the file;
+  a small separate commit. Also landed today in the same function (bc3f3961): InsideChecked's unglued rerun keeps
+  CutByFaces, and a checked glued cut goes by its compound tools' solids (FACE-PATTERN-30-CUT-SLOW).
+
 ## Where things stand (2026-11-08 05:20 UTC)
 - **Landed 11-08:** c2-rings-loft's 51-tool cut ours (42ae0d85: Circular pattern 1 13.3 -> 1.17 s, live 767 ms);
   P0 CRASH-6297 (3f3fe564: free::apart's halving 64 deep at most) and P0 SECTIONS-AHEAD-HANG (f210258f: a pool job's
