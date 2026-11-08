@@ -597,13 +597,16 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
     let focus = name.clone();
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
-        let title = if in_document { version_dialog_title_in(&doc_name, &branch) } else { version_dialog_title("Create version from", &branch) };
-        let text = if in_document { format!("Create version in {doc_name} {branch}") } else { format!("Create version from {branch}") };
+        // Live ver-crow-create-version-here: a history entry's version is "from history".
+        let source = if at.is_some() { "history" } else { branch.as_str() };
+        let title = if in_document { version_dialog_title_in(&doc_name, &branch) } else { version_dialog_title("Create version from", source) };
+        let text = if in_document { format!("Create version in {doc_name} {branch}") } else { format!("Create version from {source}") };
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, text, 950.)
             .title(title)
             .child(version_dialog_body(&name, &desc, None, cx))
-            .when(has_fs, |d| d.child(publish_row(publish.clone(), cx)))
+            // Live ver-crow-create-version-here: a history entry's version always offers it.
+            .when(has_fs || at.is_some(), |d| d.child(publish_row(publish.clone(), cx)))
             .children(stale_drawings_warning(&doc, &stale, cx))
             .footer(
                 os::modal_footer()
@@ -1157,9 +1160,11 @@ impl Render for HistoryPanel {
             let compare_side = comparing.map(|(base, target)| (is_row(base), is_row(target))).filter(|(b, t)| *b || *t);
             // Compare history entries: the first pick is selected (live cmp2-902).
             let picked = first_pick.is_some_and(is_row);
-            // While picking entries to compare only the picks are selected (live ver-compare-entries).
+            // While picking entries to compare only the picks are selected (live ver-compare-entries); while picking
+            // one to repair none is (live ver-vh-header-repair).
             let selected = comparing.is_none()
                 && !picking
+                && !repair_picking
                 && match r.kind {
                     RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
                     _ => viewing == Some(r.mv),
@@ -1474,7 +1479,7 @@ impl Render for HistoryPanel {
                 d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select two history entries to compare.").map(|d| crate::ui_script::mark_message(d, || "Select two history entries to compare.".into())))
             })
             .when(repair_picking, |d| {
-                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio").map(|d| crate::ui_script::mark_message(d, || "Select a history entry to repair this Part Studio".into())))
+                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio.").map(|d| crate::ui_script::mark_message(d, || "Select a history entry to repair this Part Studio.".into())))
             })
             .child(
                 // Live document/22: the box with its ▾ (filter panel) and the

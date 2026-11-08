@@ -475,12 +475,12 @@ impl Workspace {
                 None => None,
             }
         };
-        // The navbar's label after the name: the version viewed, "History" (a history entry), else the workspace.
+        // The navbar's label after the name: the version viewed, else the workspace (a history entry and view only mode too:
+        // live ver-crow-open, doc-menu-view-only).
         let session = &self.doc.read(cx).session;
-        let workspace = match (session.viewing_version(), session.read_only()) {
-            (Some(v), _) => v,
-            (None, true) => "History".to_string(),
-            (None, false) => session.store.branch(session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()),
+        let workspace = match session.viewing_version() {
+            Some(v) => v,
+            None => session.store.branch(session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()),
         };
         let history = self.history.as_ref().map(|h| h.read(cx).ui_rows(cx));
         let compare = noshape_history_ui::compare_mode::ui_state(&self.doc, self.active, cx);
@@ -926,11 +926,10 @@ impl Workspace {
                     // branch's place and no banner (its view-only bar is in the toolbar row).
                     // A protected workspace: a lock before its name (live wp-929).
                     .when(protected && viewing_version.is_none(), |d| d.child(div().flex_none().mt(px(6.)).child(crate::assets::icon("lock", 14., cx))))
-                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match (&viewing_version, read_only) {
-                        // Version and workspace names are the user's.
-                        (Some(v), _) => crate::ui::user_text(v.clone()).into_any_element(),
-                        (None, true) => "History".into_any_element(),
-                        (None, false) => crate::ui::user_text(branch_name).into_any_element(),
+                    .child(div().flex_none().mt(px(6.)).text_size(px(16.)).text_color(pal.text_faint).cursor_text().map(|d| noshape_app_core::ui_script::mark(d, || "navbar:workspace".into())).child(match &viewing_version {
+                        // Version and workspace names are the user's; a history entry keeps the workspace's.
+                        Some(v) => crate::ui::user_text(v.clone()).into_any_element(),
+                        None => crate::ui::user_text(branch_name).into_any_element(),
                     }))
                     .when(read_only && viewing_version.is_none(), |d| d.child(div().ml_2().px_2().rounded(px(2.)).bg(pal.warning).text_xs().text_color(pal.text).child("VIEWING HISTORY")))
                     .child(div().flex_1())
@@ -1044,6 +1043,22 @@ impl Workspace {
                             .separator()
                             .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
                     }
+                    // View only mode (live doc-menu-view-only): only what doesn't edit the workspace.
+                    if view_only {
+                        return m
+                            .dropdown()
+                            .item(I::new("Copy workspace…").on_click(move |_, wi, cx| dd::copy_workspace(d5.clone(), wi, cx)))
+                            .item(I::new("Switch to edit mode").on_click(move |_, _, cx| {
+                                d8.update(cx, |d, cx| {
+                                    d.session.view_only = false;
+                                    cx.notify();
+                                })
+                            }))
+                            .separator()
+                            .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
+                            .separator()
+                            .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
+                    }
                     m.dropdown()
                         .item(I::new("Rename document").on_click({
                                 let w3 = w3.clone();
@@ -1057,9 +1072,9 @@ impl Workspace {
                         .item(I::new("Update workspace…").on_click(move |_, _, cx| dd::update_workspace(d6.clone(), cx)))
                         .item(I::new("Workspace units…").on_click(move |_, wi, cx| w.update(cx, |t, cx| t.open_units_panel(wi, cx))))
                         .item(I::new("Workspace properties…").on_click(move |_, wi, cx| dd::workspace_properties(d7.clone(), wi, cx)))
-                        .item(I::new(if view_only { "Switch to edit mode" } else { "Switch to view only mode" }).on_click(move |_, _, cx| {
+                        .item(I::new("Switch to view only mode").on_click(move |_, _, cx| {
                             d8.update(cx, |d, cx| {
-                                d.session.view_only = !d.session.view_only;
+                                d.session.view_only = true;
                                 cx.notify();
                             })
                         }))

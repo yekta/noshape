@@ -28,7 +28,22 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
-### 2026-11-08 17:58 UTC: Preferences 49/56 scenarios (from 43)
+### 2026-11-08 18:29 UTC: versions 52/91 (from 46), documents page and ☰ menu fixes
+- Versions: workspace / version Properties records its fields; a history entry's Create version is "from history"
+  and offers Publish custom features and tables; the repair hint ends with "."; no row is selected while picking an
+  entry to repair; the navbar keeps the workspace's name on a history entry and in view only mode (no "History");
+  view only mode's ☰ is Copy workspace…, Switch to edit mode, Print…, Close document. run.py: history rows' native
+  title tooltips aren't compared; "Add feature" (REST-built starts) reads as "Insert feature" in the compare bar too.
+- Documents page: the breadcrumb leaf (`place`) is the folder's name inside a folder; Create › Folder… goes into the
+  new folder; the search runs on Enter (the breadcrumb stays while typing); Remove from recently opened drops the
+  selection; a trashed row's tooltip "This document is in the trash and cannot be opened.". About and the Keyboard
+  shortcuts sheet are recorded as live's modals.
+- Open (asked of live, REQUESTS 18:11 / 18:15): ☰ › Print… in a Part Studio does nothing in ours (live: a Print setup
+  panel); Restore to Main… restores at once (live: a "Restoring changes into Main from V1" dialog); the Merge toast's
+  "Revert to before this merge" link (needs a DocEvent with an action: Part Studio, Assembly and the workspace each
+  draw their own toast).
+
+### 2026-11-08 17:56 UTC: Preferences 49/56 scenarios (from 43)
 - Add / Edit export rule records the body's text as live reads it; Toolbars › Reset to defaults greys after a click;
   Edit shortcut: Disable shortcut hides the hint and Reset to default; a Part Studio action's conflicts include the
   Sketch's (Extrude on shift+f: "multiple shortcuts … Fillet Sketch fillet"); a disabled row has no reset icon and

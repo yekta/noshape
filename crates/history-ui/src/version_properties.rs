@@ -336,6 +336,12 @@ impl Render for ItemProperties {
         }
         // A tab: its name and type, read-only here.
         let tab = self.selected.and_then(|id| self.tabs.iter().find(|t| t.id == id));
+        // Live's reader: the name, Category's (empty) typeahead, no Description; Undo and Redo are icon buttons.
+        crate::ui_script::note_dialog(|| {
+            let name = tab.map(|t| t.name.clone()).unwrap_or_else(|| self.name.read(cx).value().to_string());
+            let fields = serde_json::json!([{ "label": "Name *", "kind": "input", "value": name }, { "label": "Category", "kind": "input", "value": "" }]);
+            serde_json::json!({ "kind": "modal", "title": "Properties", "fields": fields, "buttons": ["", "", "Apply", "Save", "Close"] })
+        });
         let heading = tab.map(|t| t.name.clone()).unwrap_or_else(|| self.saved.0.clone());
         let form = match tab {
             Some(t) => v_flex()

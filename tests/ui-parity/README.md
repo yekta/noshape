@@ -524,6 +524,9 @@ caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
 A native `<select>` of a page (Preferences' units) opens the OS's popup, which live's recorder can't read: while live's
 focus is such a select and its `list` null, ours' open dropdown isn't compared.
 
+A tooltip live draws as a native `title` (a history row's "Open version V1") is the OS's, which live's recorder can't
+read: ours' is compared as none while live's is (`NATIVE_TITLE_TOOLTIPS`).
+
 The Tabs panel's Sort menu hangs inside the panel's header, so live's recorder reads its rows into
 `document.panel` ("Tabs Tab order Name: A → Z …"): read as "Tabs" while that menu is the open list.
 

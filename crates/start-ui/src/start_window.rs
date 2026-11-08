@@ -403,27 +403,25 @@ impl StartView {
             cx.subscribe_in(&search, window, |this: &mut Self, state, ev: &InputEvent, _, cx| {
                 let text = state.read(cx).value().to_string();
                 match ev {
+                    // The search runs on Enter, plain or written (`type:part name:pvz`, live documents/130-135;
+                    // docs-search: the breadcrumb stays while typing); clearing the box ends it.
                     InputEvent::Change => {
-                        // No `cx.notify()`: the field's own notification
-                        // re-renders the title bar; only the body shows the query.
-                        // A written query (`type:part name:pvz`, live
-                        // documents/130-135) runs on Enter; clearing the box
-                        // ends the search.
-                        let written = crate::start_search::Query::parse_text(&text, &Default::default()).is_some();
-                        this.query = if written { String::new() } else { text.clone() };
                         if text.trim().is_empty() {
+                            this.query = String::new();
                             this.adv_query = None;
-                        }
-                        if let Some(b) = &this.body {
-                            b.update(cx, |_, cx| cx.notify());
+                            this.refresh_body(cx);
                         }
                     }
                     InputEvent::PressEnter { .. } => {
-                        if let Some(q) = crate::start_search::Query::parse_text(&text, this.adv_query.as_ref().unwrap_or(&Default::default())) {
-                            this.adv_query = Some(q).filter(|q| *q != crate::start_search::Query::default());
-                            this.load_facts(cx);
-                            cx.notify();
+                        match crate::start_search::Query::parse_text(&text, this.adv_query.as_ref().unwrap_or(&Default::default())) {
+                            Some(q) => {
+                                this.query = String::new();
+                                this.adv_query = Some(q).filter(|q| *q != crate::start_search::Query::default());
+                                this.load_facts(cx);
+                            }
+                            None => this.query = text.clone(),
                         }
+                        this.refresh_body(cx);
                     }
                     _ => {}
                 }
@@ -901,12 +899,17 @@ impl StartView {
         let prompt = NamePrompt { title: "New folder", ok_label: "Create", label: "Folder name", default, hint: None, location: Some(("Folder location", location)), labels: None };
         prompt_name(prompt, window, cx, move |name, window, cx| {
             let place = chosen.borrow().clone();
-            if let Err(e) = lib::create_folder(&place, &name) {
-                Self::notify(window, cx, AlertKind::Warning, format!("{e:#}"));
-                return false;
-            }
+            let made = match lib::create_folder(&place, &name) {
+                Ok(made) => made,
+                Err(e) => {
+                    Self::notify(window, cx, AlertKind::Warning, format!("{e:#}"));
+                    return false;
+                }
+            };
+            // Live docs-create-folder: the page goes into the new folder.
             view.update(cx, |this, cx| {
                 this.folders_open = true;
+                this.set_source(Source::Folder(made), cx);
                 this.force_rescan(cx);
             });
             Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Folder created.".into(), restore: None, brief: false });
@@ -1296,8 +1299,19 @@ impl StartView {
         });
     }
 
+    /// The page and its cached body drawn again (a search started or ended).
+    fn refresh_body(&self, cx: &mut Context<Self>) {
+        if let Some(b) = &self.body {
+            b.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
+    }
+
     fn forget(&mut self, d: DocEntry, cx: &mut Context<Self>) {
         crate::doc_files::remove_recent(&d.path);
+        if self.selected.as_ref() == Some(&d.path) {
+            self.selected = None;
+        }
         self.force_rescan(cx);
     }
 
@@ -2501,7 +2515,7 @@ impl StartView {
             "documents": {
                 "place": self.ui_place(),
                 "selected": selected,
-                "search": self.query,
+                "search": self.search.read(cx).value().to_string(),
                 "panel": panel,
                 "advanced": self.adv_open,
                 "columns": self.cols_open,
@@ -2509,14 +2523,13 @@ impl StartView {
         })
     }
 
-    /// The ui-parity state's `place`: the highlighted left-nav entry (live: Owned by me inside its folders, none
-    /// over search results).
+    /// The ui-parity state's `place`: live's breadcrumb leaf (a folder's name inside it, none over search results).
     fn ui_place(&self) -> Option<String> {
         if !self.query.trim().is_empty() || self.adv_query.is_some() {
             return None;
         }
         Some(match &self.source {
-            Source::Folder(_) => "Owned by me".into(),
+            Source::Folder(f) if canon(f) == canon(&crate::file_dialogs::documents_dir()) => "Owned by me".into(),
             _ => self.source_title(),
         })
     }
@@ -3364,6 +3377,7 @@ impl StartView {
                     .border_color(rgb(0xececec))
                     .when(selected, |r| r.bg(pal.accent_soft))
                     .when(!selected, |r| r.hover(|r| r.bg(pal.row_hover)))
+                    .when(d.trashed, |r| r.tooltip(crate::ui::tooltip("This document is in the trash and cannot be opened.")))
                     .child(
                         h_flex()
                             .w(px(350.))

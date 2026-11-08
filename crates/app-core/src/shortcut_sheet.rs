@@ -82,6 +82,11 @@ impl Render for ShortcutSheet {
         let pal = p();
         let query = self.query.clone();
         let tab = self.tab.min(Tab::SHEET.len() - 1);
+        // Live's reader: a modal without a title whose one input is labelled by the header's two lines run together.
+        crate::ui_script::note_dialog(|| {
+            let field = serde_json::json!({ "label": "Keyboard shortcutsCustomize keyboard shortcuts", "kind": "input", "value": query });
+            serde_json::json!({ "kind": "modal", "title": "", "fields": [field], "buttons": [] })
+        });
         // Keys as chips (`span.key`); customized blue, disabled struck through.
         let keys_el = |r: &SheetRow| {
             let mut row = h_flex().gap(px(4.)).justify_end();

@@ -39,6 +39,8 @@ pub fn help_item(menu: OsMenu) -> OsMenu {
 /// The About modal in `window`.
 pub fn open(window: &mut Window, cx: &mut App) {
     window.open_dialog(cx, |dialog, _, cx| {
+        // Live's reader: a modal with no title, fields or buttons (its content is an iframe).
+        noshape_app_core::ui_script::note_dialog(|| serde_json::json!({ "kind": "modal", "title": "", "fields": [], "buttons": [] }));
         // Live's colours: text #131313, links #0000ee, the version #666, the footer's rule #dee2e6, the ✕ #999.
         let link = rgb(0x0000ee);
         dialog

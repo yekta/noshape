@@ -168,6 +168,10 @@ def all_differences(a, b, path=""):
 
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
 INPUT_BUTTONS = {"Apply", "Cancel", "Save", "OK"}
+
+# Tooltips live draws as an element's native `title` (the OS's tooltip, which its recorder can't read): ours' is read as
+# none while live's is (dom/panel-versions-history.txt: a history row's tip="Open version V1").
+NATIVE_TITLE_TOOLTIPS = re.compile(r"^Open (version|workspace) ")
 CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
               "Import from", "Create task…"}
@@ -272,6 +276,11 @@ def normalize_live(state):
         for h in doc.get("history") or []:
             if isinstance(h, dict) and isinstance(h.get("name"), str):
                 h["name"] = h["name"].replace(" :: Add feature : ", " :: Insert feature : ")
+        cmp = doc.get("compare")
+        if isinstance(cmp, dict):
+            for k in ("target", "source"):
+                if isinstance(cmp.get(k), str):
+                    cmp[k] = cmp[k].replace(" :: Add feature : ", " :: Insert feature : ")
     # A studios run's document is "live2 uip <start> <time>" in live, "<start>" in ours (the navbar's rename field).
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and isinstance(focus.get("text"), str) and re.match(r"^live2 uip \S+ \d{4}-\d\d-\d\dT[\d:]+", focus["text"]):
@@ -473,6 +482,8 @@ def compare(live, ours, whole_document=True):
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         b = same_fieldless_focus(a, b)
+        if a.get("tooltip") is None and isinstance(b.get("tooltip"), str) and NATIVE_TITLE_TOOLTIPS.match(b["tooltip"]):
+            b["tooltip"] = None
         # A page's native <select> holding the keyboard: its open list is the OS's popup, which live's recorder can't read.
         if isinstance(a.get("focus"), dict) and a["focus"].get("tag") == "select" and a.get("list") is None:
             b["list"] = None
