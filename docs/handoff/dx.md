@@ -11,6 +11,9 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## From the lead (2026-11-08 13:40 UTC), for when dx resumes
+- From studios: Create Drawing still records no fields (its comment cites the README's drawing rule), but newer live recordings have the "New drawing name" field. Record it as live's recorder does.
+
 ## Parity translator changes by asm (assembly corpus; lead 11-07: one line each, so nobody fixes them twice)
 - 2026-11-07 09:35 UTC: `rebuild_assembly` synthesizes a studio's configuration variables from its instances' configuration strings
   when live's fetch has none (standard-content studios: #Pitch, #HeadChamfer…), and inserts each instance with its own
