@@ -541,6 +541,17 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 10:20 UTC (lead: focus differences, face-appearance menu, cap hover in assemblies, cold start ours < 1 s).**
+Suite 514/530 (SCORE). Cold start: bench.sh STARTUP (end of each job: our caches cleared, then warm; analyze.py
+"Cold start split"); startup fixes landed: font probes without listing every font (065c55f7), the command line's
+document read on a thread from process start (fdb1e521). Perf 42468464451 (065c55f7: the split, fonts) and 42470955223
+(0fd8cabd: + prefetch) running: read the split and "noshape's own cold start" against 1 s. The 07:25 perf
+(42458734521) flagged 2× pan / zoom GPU p95 +10% vs v0.4.35 in the job, confirmed on re-measure; the 00:02 run's
+main had the same values (2× pan 8.80 there, 8.55 here): likely the runner, check against these two runs. Coverage:
+shortcuts 84/89 (5 new scenarios filed with live, REQUESTS 10:19); menus 115/121 left: Delete annotation, Delete
+column, Edit definition…, Open linked document, Revision history, a configured sketch dimension's Unconfigure.
+
+
 **11-08 08:13 UTC, FRAME-PROFILE-OTHER-STUDIO (lead):** done, see TICKETS (value `<tab>#<sketch>.4294967295`); the
 variable table's Filter feature list leaves the parts list alone and its row's hover ends under its menu
 (variable-table-row-filter matches). Live asked (REQUESTS 07:57) for the field text / configuration / placement.
