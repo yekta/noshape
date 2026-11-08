@@ -572,7 +572,6 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         ("Caps", ev.bool("hasCaps") && items("caps", "entity")),
         ("Limits", ev.bool("hasLimits") && (picked(&["limitPlane1", "limitPlane2", "faceLimits"]) || items("edgeLimits", "edge"))),
         ("Help point", ev.bool("hasHelpPoint") && picked(&["helpPoint"])),
-        ("Detached face blends", ev.bool("detach")),
     ];
     if let Some((what, _)) = used.iter().find(|(_, on)| *on) {
         return err(format!("{what} are not supported yet"));
@@ -586,6 +585,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     if side2.is_empty() {
         return crate::regen::eval::err_at(&["side2"], "Select faces to blend.");
     }
+    let detach = ev.bool("detach");
     let width = ev.is("blendControlType", "WIDTH");
     let asym = ev.bool("asymmetric");
     let radius = if width { ev.length("width")? } else { ev.length("radius")? };
@@ -615,11 +615,20 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let s1 = by_body(side1);
     let s2 = by_body(side2);
     let mut done = false;
+    // Detached (live 2306 B): the parts stay as they are and each blend is a new surface.
+    let before = detach.then(|| ev.ctx.bodies.clone());
     let bodies: BTreeSet<usize> = s1.keys().chain(s2.keys()).copied().collect();
     for bi in bodies.into_iter().rev() {
         let (Some(a0), Some(b0)) = (s1.get(&bi), s2.get(&bi)) else { continue };
         let (mut a, mut b) = (a0.clone(), b0.clone());
         let mut body = ev.ctx.bodies[bi].clone();
+        if !detach && matches!(ev.enum_("trim"), "LONG" | "NO_TRIM") && body.shape.count(ShapeType::Solid) > 0 {
+            return err("Cannot attach long and no-trim blends to solid parts.");
+        }
+        if ev.bool("propagation") && !ev.is("propagationType", "TANGENT") {
+            let max = if ev.is("propagationType", "CUSTOM") { ev.angle("propagationAngle")? } else { std::f64::consts::PI };
+            grow_side(&body.shape, &mut b, &a, max)?;
+        }
         let between = |shape: &Shape, a: &[usize], b: &[usize]| -> FResult<Vec<usize>> {
             Ok(shape
                 .edge_faces()?
@@ -714,6 +723,27 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         ev.replace_body(bi, res.shape, face_names);
         done = true;
     }
+    if let Some(before) = before
+        && done
+    {
+        let feature = ev.feature;
+        let mut sheets = Vec::new();
+        for body in ev.ctx.bodies.iter() {
+            let all = body.shape.faces();
+            let picked: Vec<(Shape, Name)> = body.faces.iter().enumerate().filter(|(_, n)| matches!(n.root(), TopoName::Face { feature: f, role: Role::Blend(_) } if *f == feature)).map(|(i, n)| (all[i].clone(), n.clone())).collect();
+            if !picked.is_empty() {
+                sheets.push(picked);
+            }
+        }
+        ev.ctx.bodies = before;
+        for (i, picked) in sheets.into_iter().enumerate() {
+            let shapes: Vec<Shape> = picked.iter().map(|(f, _)| f.clone()).collect();
+            let sheet = if shapes.len() == 1 { shapes[0].clone() } else { k::sew(&shapes, 1e-7, false).map_err(kerr("Failed to blend faces."))?.shape };
+            let names: Vec<Name> = sheet.faces().iter().map(|f| picked.iter().find(|(p, _)| p.is_same(f)).map_or_else(|| picked[0].1.clone(), |(_, n)| n.clone())).collect();
+            push_body(ev, crate::reference::BodyId { feature, index: i as u32 }, crate::display::BodyKind::Surface, sheet, names);
+        }
+        return Ok(());
+    }
     if !done {
         // Live (psb 10-26 b FB6): sides on different parts can't attach.
         if s1.keys().all(|b| !s2.contains_key(b)) {
@@ -722,6 +752,36 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         return err("Face blend between faces that don't share an edge is not supported yet");
     }
     Ok(())
+}
+
+/// Live 2306 A: Adjacent and Custom propagation carry side 2 on round side 1 through the faces beside it that meet it
+/// within the maximum angle (a block's 90° walls: all four top edges with Adjacent or 95°, only the picked one at 45°).
+fn grow_side(shape: &Shape, side: &mut Vec<usize>, other: &[usize], max: f64) -> FResult<()> {
+    let faces = shape.faces();
+    let ef = shape.edge_faces()?;
+    let touches_other = |f: usize| ef.iter().any(|fs| fs.len() == 2 && fs.contains(&(f as u32)) && fs.iter().any(|g| other.contains(&(*g as usize))));
+    loop {
+        let mut grew = false;
+        for (ei, fs) in ef.iter().enumerate() {
+            let &[f, g] = fs.as_slice() else { continue };
+            let next = match (side.contains(&(f as usize)), side.contains(&(g as usize))) {
+                (true, false) => g as usize,
+                (false, true) => f as usize,
+                _ => continue,
+            };
+            if other.contains(&next) || !touches_other(next) {
+                continue;
+            }
+            let Some((n1, n2)) = edge_normals(shape, &faces, &ef, ei) else { continue };
+            if n1.dot(n2).clamp(-1.0, 1.0).acos() <= max + 1e-9 {
+                side.push(next);
+                grew = true;
+            }
+        }
+        if !grew {
+            return Ok(());
+        }
+    }
 }
 
 // ------------------------------------------------------------------ modify fillet

@@ -791,6 +791,52 @@ fn a_face_blend_follows_its_tangent_hold_line_as_live() {
     }
 }
 
+/// Live 2306 A–C: a 40 × 30 × 20 block, Face blend R 4 from its top (side 1) to its front (side 2). Adjacent
+/// propagation (or Custom past 90°) walks round all four top edges; Tangent or Custom 45° only the front one.
+/// Detached leaves the block and adds the blend as a surface; attached Long / No trim are refused.
+#[test]
+fn face_blend_propagation_detach_and_trim_as_live() {
+    let run = |extra: Vec<(&str, ParamValue)>| {
+        let mut t = T::new();
+        t.block(-0.02, -0.015, 0.02, 0.015, "20 mm");
+        let res = t.ok();
+        let b0 = &res.context.bodies[0];
+        let mut params = vec![("side1", q(vec![face_with_normal(b0, DVec3::Z)])), ("side2", q(vec![face_with_normal(b0, -DVec3::Y)])), ("radius", e("4 mm"))];
+        params.extend(extra);
+        t.add("faceBlend", &params);
+        t.regen()
+    };
+    let solid = |res: &RegenResult| {
+        let st = res.display.features.last().unwrap();
+        assert_eq!(st.status, FeatureStatus::Ok, "{:?}", st.message);
+        let b = &res.context.bodies[0];
+        (b.shape.volume().unwrap() * 1e9, b.faces.len())
+    };
+    let near_mm3 = |(v, faces): (f64, usize), want: f64, want_faces: usize| (v - want).abs() < 1e-3 && faces == want_faces;
+    let prop = |kind: &str| vec![("propagation", b(true)), ("propagationType", en(kind))];
+    for (what, extra, want, faces) in [
+        ("tangent", prop("TANGENT"), 23862.6548, 7),
+        ("adjacent", prop("ADJACENT"), 23543.8346, 10),
+        ("custom 45", [prop("CUSTOM"), vec![("propagationAngle", e("45 deg"))]].concat(), 23862.6548, 7),
+        ("custom 95", [prop("CUSTOM"), vec![("propagationAngle", e("95 deg"))]].concat(), 23543.8346, 10),
+        ("short", vec![("trim", en("SHORT"))], 23862.6548, 7),
+    ] {
+        let got = solid(&run(extra));
+        assert!(near_mm3(got, want, faces), "{what}: {got:?}, live {want} mm³ {faces} faces");
+    }
+    for trim in ["LONG", "NO_TRIM"] {
+        let res = run(vec![("trim", en(trim))]);
+        let st = res.display.features.last().unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some("Cannot attach long and no-trim blends to solid parts.")), "{trim}");
+    }
+    let res = run(vec![("detach", b(true))]);
+    assert!(near_mm3(solid(&res), 24000.0, 6), "detached: the block stays");
+    let sheet = &res.context.bodies[1];
+    assert_eq!(sheet.kind, noshape_model::display::BodyKind::Surface);
+    assert_eq!(sheet.faces.len(), 1);
+    assert!((sheet.shape.area().unwrap() * 1e6 - 251.3274).abs() < 1e-3, "{}", sheet.shape.area().unwrap() * 1e6);
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).

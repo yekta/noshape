@@ -3857,10 +3857,14 @@ P1
 - [ ] P2 CHAMFER-METHOD-MIXED (blend) Tangent (and Offset's distance and angle on a round reference face) on edges
   of changing section, or several edges that come to different distances: OCCT's Offset reading still (needs
   per-edge distances in op_chamfer).
-- [ ] P1 FACEBLEND-PROP-ADJACENT (blend) Propagation Adjacent does nothing (same as off).
-- [ ] P1 FACEBLEND-DETACH (blend) Detached ("the blend a new surface") fails "not supported yet".
-- [ ] P1 FACEBLEND-TRIM (blend) Trim Walls / Short / Long / No trim never read; with "Cannot attach long and no-trim
+- [x] P1 FACEBLEND-PROP-ADJACENT (blend) Propagation Adjacent does nothing (same as off). Live 2306 A: side 2 walks
+  round side 1 through faces within the angle (Adjacent: any; Custom: its maximum); tested on the block.
+- [x] P1 FACEBLEND-DETACH (blend) Detached ("the blend a new surface") fails "not supported yet". Live 2306 B: the
+  part stays, the blend face is a new surface body.
+- [x] P1 FACEBLEND-TRIM (blend) Trim Walls / Short / Long / No trim never read; with "Cannot attach long and no-trim
   blends to solid parts." on a solid without Detached.
+  Live 2306 C: attached Long / No trim refused as live (done); detached No trim runs on past the ends by the radius
+  (not yet: P2 FACEBLEND-NOTRIM-DETACHED).
 - [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
 - [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
   Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
@@ -3869,6 +3873,10 @@ P1
   pocket's floor (live 20 faces, 136943.82 mm³); ours errs "not supported yet" up front (the plain held cut split the
   part in three).
 - [ ] P2 FACEBLEND-HOLD-INVERSE (blend, live) Inverse tangent hold lines.
+- [ ] P2 FACEBLEND-NOTRIM-DETACHED (blend) a detached No trim blend runs on past the chain's ends by the radius (live
+  2306 C: 301.5929 mm², x −24…24 on the 40 mm block); ours stops at the ends.
+- [ ] P2 FACEBLEND-PROP-SIDE1 (blend, live) Adjacent / Custom propagation with the picks swapped (side 1 the wall):
+  which side walks (ours: side 2 only).
 - [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
   tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
 
