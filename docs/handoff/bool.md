@@ -11,6 +11,9 @@ its Cut changes nothing, though its Fuse loses the right 102 mm³ (live cuts 101
 "a non-manifold result"; fuzzy 1e-9 / 1e-7, glue and scaled change nothing. Case (bool_corpus format):
 /root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt}. It holds c2-sm-louver at 30/36 (Extrude 3, then
 Extrude 4 / Flange 7 on the same part). Yours when you're back; nothing of mine waits on a change in crates/brep.
+Also yours (lead 11-07 had it as mine; live 2229 settled it): c2-valve-config 5/10 stops at Extrude 3, where a sketch
+text's straight segment runs up to Revolve 1's revolved face: a plane square to the axis cuts it in a circle (live's two
+0.0391 mm CIRCLE edges), OCCT's splitter in op_prism_until gives a B-spline (ours 9 circle / 50 other, live 11 / 48).
 
 ## Where things stand (2026-11-07 20:05 UTC; paused for the quota until 11-10)
 - **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure

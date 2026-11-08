@@ -59,6 +59,12 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   /root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt} (bool_corpus format). The regions themselves are
   right now (646 + 159.77 + 341.49 mm², the split at y -46.537 as live's).
 - Louver otherwise: feature 6 and Sketch 9 are the UI fetch's (dx / live).
+- Not mine, told: c2-valve-config's Extrude 3 circle (the cut's, op_prism_until: bool), c2-sm-corner-break's Corner break 1
+  (its 40 vertex queries have no live geometry: dx / live), cf-snap-hook's Plane 1 (its point, a fillet's BLEND_VERTEX
+  without live geometry, translated to Sketch 1's arc: dx's translator).
+- SKETCH-SPLINE-HANDLE-ARM's last part, a constraint a selection can't take: ours dims the button (an early guess, no
+  live evidence) where live (2187) dims none and refuses with std's message; asked live for every constraint's
+  message and what the tool does after (REQUESTS 01:05).
 
 ## Resume here (2026-11-07 23:40 UTC, restarted on a pinned account)
 - c2-sm-louver: Flange 4's "Cannot create flange with selected alignment" was fixed before the restart (b933b1d3).
