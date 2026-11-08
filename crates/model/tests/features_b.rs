@@ -605,6 +605,30 @@ fn bridging_curve_matches_curvature_as_std() {
     }
 }
 
+/// A bridging curve matching only position at both ends is a line, as live's (c2-hunting-knife's Bridging curve 1 between
+/// two vertices: live LINE), not a B-spline of degree 1.
+#[test]
+fn a_bridging_curve_of_positions_is_a_line() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let a = sk.add_point(DVec2::new(0.0, 0.0));
+    let b = sk.add_point(DVec2::new(0.03, 0.04));
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let se = |e: u32| Reference::SketchEntity { sketch: sid, entity: e };
+    s.add("bridgingCurve", |p| {
+        p.set("side1", ParamValue::Query(vec![se(a.0)]));
+        p.set("side2", ParamValue::Query(vec![se(b.0)]));
+        p.set("match1", ParamValue::Enum("POSITION".into()));
+        p.set("match2", ParamValue::Enum("POSITION".into()));
+    });
+    let r = s.ok();
+    let edges = r.context.bodies[0].shape.edges();
+    assert_eq!(edges.len(), 1);
+    let info = edges[0].edge_info().unwrap();
+    assert!(matches!(info.curve, noshape_kernel::Curve::Line { .. }), "{:?}", info.curve);
+    assert!(near(info.length, 0.05, 1e-12));
+}
+
 #[test]
 fn curves_from_sketch_and_edges() {
     let mut s = Studio::new();

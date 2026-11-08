@@ -1909,6 +1909,11 @@ fn op_create_bspline_curve(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         if poles.len() < 2 || degree == 0 {
             return err("Invalid B-spline curve");
         }
+        // One straight span (degree 1, two poles) is a line, as Parasolid makes it (live: c2-hunting-knife's Bridging
+        // curve 1 between two vertices, matched by position at both ends).
+        if degree == 1 && poles.len() == 2 && !periodic && poles[0].distance(poles[1]) > 0.0 {
+            return add_wire(ev, k::make_line(poles[0], poles[1])?);
+        }
         add_wire(ev, k::make_bspline(&poles, weights.as_deref(), &knots, &mults, degree, periodic)?)
     })?;
     Ok(Value::Undefined)

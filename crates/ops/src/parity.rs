@@ -1707,6 +1707,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.blend_vertex_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.imprinted_vertex_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
@@ -2208,6 +2211,71 @@ impl<'a> Translator<'a> {
             return Ok(Some(whole(&id)));
         }
         best.map(|b| Some(whole(&b.1))).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
+    }
+
+    /// A vertex a Split imprinted onto a face where two curves of a sketch meet (packed `opSplitFace` `IMPRINT_ON_FACE`,
+    /// EntityType.VERTEX, derived from the sketch's curves; c2-hunting-knife's Bridging curve sides): ours nearest the
+    /// line through that meeting point along the sketch's normal. `None`: not such a query.
+    fn imprinted_vertex_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        if !text.contains("qCompressed(") {
+            return None;
+        }
+        let strings = packed_strings_of(text);
+        if !strings.iter().any(|s| s == "IMPRINT_ON_FACE") || strings.last().map(String::as_str) != Some("IMPRINT_ON_FACE") || !strings.iter().any(|s| s == "VERTEX") {
+            return None;
+        }
+        // Each sketch's curves the query names (each named with its sketch), the sketch named last first: the vertex's
+        // own come after the face's.
+        let mut groups: Vec<(String, Vec<String>)> = Vec::new();
+        let mut current: Option<String> = None;
+        for w in strings.windows(2) {
+            if let Some(sk) = w[1].strip_suffix(".wireOp").filter(|_| w[0] == "operationId") {
+                current = Some(sk.to_string());
+            } else if w[0] == "sketchEntityId"
+                && let Some(sk) = &current
+            {
+                let ids = match groups.iter().position(|(g, _)| g == sk) {
+                    Some(i) => {
+                        let g = groups.remove(i);
+                        groups.push(g);
+                        &mut groups.last_mut().expect("just pushed").1
+                    }
+                    None => {
+                        groups.push((sk.clone(), Vec::new()));
+                        &mut groups.last_mut().expect("just pushed").1
+                    }
+                };
+                ids.push(w[1].clone());
+            }
+        }
+        let ends = |c: &Vec<[f64; 2]>| [c[0], c[c.len() - 1]];
+        let meeting = groups.iter().rev().find_map(|(sk, ids)| {
+            let curves: Vec<Vec<[f64; 2]>> = ids.iter().filter_map(|e| self.curve_of(sk, e)).filter(|c| c.len() >= 2).collect();
+            curves.iter().enumerate().find_map(|(i, a)| {
+                curves[i + 1..].iter().find_map(|b| ends(a).into_iter().find(|p| ends(b).iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7)))
+            }).map(|p| (sk.clone(), p))
+        });
+        let Some((sk, corner)) = meeting else { return Some(Err("IMPRINT_ON_FACE vertex: no two of its sketch curves meet".into())) };
+        let Some([o, x, y]) = self.frames.get(&sk).copied() else { return Some(Err(format!("IMPRINT_ON_FACE vertex: sketch {sk}'s frame"))) };
+        let at: [f64; 3] = std::array::from_fn(|i| o[i] + x[i] * corner[0] + y[i] * corner[1]);
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let found = match self.call("query_entities", json!({ "kind": "vertices" })) {
+            Ok(f) => f,
+            Err(e) => return Some(Err(e)),
+        };
+        let unit = per_unit(&found["units"]);
+        let best = found["vertices"].as_array().into_iter().flatten().filter_map(|v| {
+            let p = f3(&v["position"])?;
+            let w: [f64; 3] = std::array::from_fn(|i| p[i] * unit - at[i]);
+            let t = w[0] * n[0] + w[1] * n[1] + w[2] * n[2];
+            let off: f64 = (0..3).map(|i| (w[i] - t * n[i]).powi(2)).sum::<f64>().sqrt();
+            Some((off, t.abs(), v["id"].as_str()?.to_string()))
+        }).min_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        Some(match best {
+            Some((off, _, id)) if off < 1e-6 => Ok(id),
+            Some((off, _, _)) => Err(format!("IMPRINT_ON_FACE vertex: none of ours on sketch {sk}'s point {:?} mm along its normal (nearest {:.4} mm off)", mm(at), off * 1e3)),
+            None => Err("IMPRINT_ON_FACE vertex: no vertices of ours".into()),
+        })
     }
 
     /// A fillet's vertex by Onshape's written name (`makeQuery(id+"F….opFillet","BLEND_VERTEX",EntityType.VERTEX,
