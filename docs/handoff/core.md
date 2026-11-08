@@ -33,6 +33,21 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 22:13 UTC: fan blade source studio: the thread's split face; impeller side faces don't pay.**
+- Live 2389: the 0.15 mm band on Poti2's boss comes from External thread 1's Split face (edge JaB, circle at x -13.8,
+  r 3.4), and Extrude 7 (only touching the cap) leaves it. Ours splits it too, then Extrude 7's Rust Boolean result
+  goes through the whole-part unify ("unify.bands" joins the two bands): 10 faces, live 11.
+- Tried: the unify scoped to the faces the Boolean made or changed (+ their neighbours) on every Boolean, also when
+  the target wasn't clean (rust_unify_scope / occt_unify_scope without the myUnifyClean gate, patch
+  /root/core-scratch/unify-scope-occt.patch + the rust gate): the source studio 15 -> 18/22 (next: Chamfer 2, 90 vs 91
+  faces: our chamfer drops the band, blend's), but cf-fix-pcb's Fix PCB 2 146 vs live 140 faces (12 -> 11): live
+  does merge untouched faces there. Not landed. A targeted rule would protect only splits a feature made (thread's
+  Split face, Split feature, imprints) through later unifies (USD KeepShape / our unify steps): asked the lead.
+- Impeller: per-face arc-length rows (TMP_ARC_ROWS) move away from live at both rules (today 263,385 vs ours 263,136,
+  live 263,076; V255 257,467 vs 257,273, live 257,078) and break the face merge; live itself changes 0.03 % at V386.
+  Not pursued.
+- Live 2380 (knife guided-loft cases 12-14) answered 20:4x: not read yet.
+
 **State 11-08 21:08 UTC: NEXT (lead 21:1x, in order): (1) c2-fan-blade-sweep's source studio fb207f79 at Extrude 7
 (feature 15): ours 10 faces, live 11 (one edge short), blocks Derived 1 and 53 features (blend's note with b3f3df84e);
 also feature 13 External thread 1's missing info message. Run alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/
