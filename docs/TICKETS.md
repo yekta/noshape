@@ -290,6 +290,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document dead on open with a stack overflow, in v0.4.33–v0.4.35) **and SECTIONS-AHEAD-HANG** (a Shell that never ended on
   vibe3, since v0.4.33). DOCS-SELECT-LEAVES-WAL verified (1cd8f6685). Fuzz since v0.4.35: v0.4.35 120 seeds (one death:
   seed 6297 = CRASH-6297), greens b9f855f0 / 56603985 / a07f6a3b 180 seeds, 0 deaths.
+- **qa 04:38: still no blocker on green ae515421** (core's drafted prism walls): sweeps = a25df4cd.
 - **New in this cut, not a blocker by the SAVED-CHAMFER-CHANGE precedent (lead's call): P1 SAVED-SKETCH-PLANE-LOST**
   (blend 4fee814c): a fillet that OCCT built with corners far off is rebuilt at the working scale; in qa's ticket document
   cli-fillet2-segv that changes Fillet 1 by 0.13 mm³ and then two sketches on later faces lose their planes ("Select a
