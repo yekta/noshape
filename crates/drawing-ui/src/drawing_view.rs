@@ -440,8 +440,9 @@ pub struct DrawingEditor {
     pub frame_menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
     /// The Sheets panel's reference row under the pointer (its key): live's hover popup of its name and version.
     pub sheets_ref_hover: Option<String>,
-    /// The ordinate group Add to ordinate dimension group is adding to.
-    pub ordinate_extending: Option<u64>,
+    /// The ordinate group Add to ordinate dimension group is adding to, and its values as they were (live lists
+    /// those until the tool ends).
+    pub ordinate_extending: Option<(u64, String)>,
     pub move_sheet: Option<crate::drawing_move_sheet::MoveSheetDlg>,
     pub table_props: Option<crate::drawing_move_sheet::TablePropsDlg>,
     pub linestyle: Option<crate::drawing_linestyle::LinestyleDlg>,

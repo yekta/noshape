@@ -141,6 +141,11 @@ impl DrawingEditor {
         }
     }
 
+    /// Annotation `id`'s text as the runner records it.
+    pub(crate) fn ui_annotation_text(&self, id: u64) -> Option<String> {
+        self.ui_annotations().into_iter().find(|a| a.0 == id).map(|a| a.2)
+    }
+
     /// The sheet's annotations: id, kind and the text drawn for it.
     fn ui_annotations(&self) -> Vec<(u64, &'static str, String)> {
         // What is placed (not a tool's preview: the note on the pointer).
@@ -153,7 +158,7 @@ impl DrawingEditor {
         // The ordinate group being placed is listed once the tool ends (live drw-ordinate-dimension); one being added
         // to stays listed (live2 drw-ordinate-add-to-group).
         let placing = match self.tool {
-            Tool::Ordinate { group, .. } if group != self.ordinate_extending => group,
+            Tool::Ordinate { group, .. } if group != self.ordinate_extending.as_ref().map(|e| e.0) => group,
             _ => None,
         };
         sheet
@@ -190,6 +195,11 @@ impl DrawingEditor {
                     // drw-note-edit).
                     AnnotationKind::Note { text: saved, .. } if text(a.id).is_empty() => saved.split_whitespace().collect::<Vec<_>>().join(" "),
                     _ => text(a.id),
+                };
+                // An ordinate group being added to: its values as they were (live2 drw-ordinate-add-to-group).
+                let t = match (&self.ordinate_extending, &self.tool) {
+                    (Some((g, before)), Tool::Ordinate { group: Some(cur), .. }) if *g == a.id && *cur == a.id => return (a.id, k, before.clone()),
+                    _ => t,
                 };
                 let t = match k {
                     "dimension" => dimension_value(&t),
@@ -232,7 +242,8 @@ impl DrawingEditor {
                 Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) => Some(*table),
                 _ => None,
             };
-            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. }) && Some(t.id) != editing) {
+            // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one.)
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. }) && Some(t.id) != editing) {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
                 annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
             }
@@ -379,7 +390,8 @@ impl DrawingEditor {
         if !matches!(self.tool, Tool::Select) {
             return None;
         }
-        Some(if self.insert.panel || self.insert.chooser.is_some() {
+        // (Replace...'s chooser is no tool: live2 drw-sheet-ref-replace.)
+        Some(if (self.insert.panel || self.insert.chooser.is_some()) && self.insert.replace.is_none() {
             "Insert view"
         } else if self.weld_dlg.is_some() {
             "Weld symbol"

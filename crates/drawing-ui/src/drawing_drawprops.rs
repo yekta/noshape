@@ -813,6 +813,12 @@ impl DrawingEditor {
                 r.append(&mut pending.borrow_mut());
             }
         };
+        // A group header or checkbox: its text alone (the options waiting are the next row's).
+        let rec_text = |label: &str| {
+            if recording {
+                rec.borrow_mut().push(label.to_string());
+            }
+        };
         let sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
             if recording {
                 pending.borrow_mut().extend(items.iter().map(|i| i.0.clone()));
@@ -960,7 +966,7 @@ impl DrawingEditor {
                 .into_any_element()
         };
         let section = |title: &'static str| {
-            rec_label(title);
+            rec_text(title);
             div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element()
         };
         let precision_items = |cur: Option<u8>, max: usize, set: fn(&mut DrawingProps, Option<u8>)| -> Vec<(String, bool, Act)> {
@@ -986,7 +992,7 @@ impl DrawingEditor {
             ];
             // Live (1710): the box 9 px in and 11 px down a 37 px row, a 13.33 px #666 label.
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1030,7 +1036,7 @@ impl DrawingEditor {
                 ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
             ];
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1096,7 +1102,7 @@ impl DrawingEditor {
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1197,7 +1203,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 3 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1426,7 +1432,7 @@ impl DrawingEditor {
                 .map(|&s| (point_size_label(s), (vt.sketch_point_size - s).abs() < 1e-9, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.sketch_point_size = s) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(44.)).flex_none().pl(px(8.)).pb(px(3.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1604,7 +1610,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
-                rec_label(label);
+                rec_text(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);

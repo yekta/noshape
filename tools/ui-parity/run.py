@@ -411,7 +411,7 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             d = side.get("dialog")
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
-                d["text"] = [re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
+                d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
                 # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
                 d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
                 # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own.

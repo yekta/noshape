@@ -1241,7 +1241,7 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `entities` | array of string | required | One or two sketch entity ids (`entity:…`) or `origin`. |
-| `value` | string or number |  | Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged. |
+| `value` | string or number |  | Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged. A distance is no coordinate: as in Onshape a negative value flips the geometry to the other side of its reference, a positive one keeps the side it is on. |
 | `kind` | one of `auto`, `distance`, `horizontal_distance`, `vertical_distance`, `length`, `radius`, `diameter`, `angle`, `arc_angle`, `centerline` |  | Dimension kind (default auto). |
 | `mode` | one of `center`, `minimum`, `maximum` |  | Distance to a circle/arc measured to its center (default), nearest or farthest point. |
 | `label` | array of number or string |  | Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one; between two lines, the quadrant an angle measures). |
@@ -1264,7 +1264,7 @@ Examples:
 | `tab` | string |  | Part Studio tab, by name ("Part Studio 1") or id. Default: the tab the window shows if it is a Part Studio (tab_activate, an import), else the first Part Studio. |
 | `sketch` | string | required | Sketch feature id or name. |
 | `dimension` | string | required | Dimension id (`dim:…` from sketch_get / sketch_dimension). |
-| `value` | string or number | required | Value or expression. |
+| `value` | string or number | required | Value or expression; a negative distance flips the geometry to the other side of its reference (Onshape), a positive one keeps the side. |
 
 #### sketch_dimension_options
 

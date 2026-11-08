@@ -148,6 +148,10 @@ impl DrawingEditor {
                 self.tool = Tool::Sketch { tool, pts, from: None };
             }
             SkTool::SplinePoint => {
+                // On one of its points already: nothing to add (live2 drw-sketch-spline-point).
+                if self.sketch_point_at(self.cursor).is_some() {
+                    return true;
+                }
                 if let Some(id) = self.sketch_entity_at() {
                     self.edit_sketch("Spline point", cx, |s| {
                         let _ = s.sketch.insert_spline_point(id, v2(p));

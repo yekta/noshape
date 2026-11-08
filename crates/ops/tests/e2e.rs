@@ -6993,3 +6993,16 @@ fn document_create_defaults_to_the_documents_folder() {
     drop(ctx);
     let _ = std::fs::remove_dir_all(&documents);
 }
+
+/// qa's agent session v0.4.36: Symmetric about "origin" (a point) is refused, saying what it takes and how to centre a
+/// shape on the origin instead.
+#[test]
+fn symmetric_about_a_point_says_what_it_takes() {
+    let mut ctx = Ctx::new();
+    let sk = new_sketch(&mut ctx, "symmetric-origin.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "shapes": [{ "tool": "corner_rectangle", "points": [[-30, -20], [30, 20]] }] }));
+    let pts: Vec<Value> = r["created"].as_array().unwrap().iter().filter(|e| e["type"] == "point").map(|e| e["id"].clone()).collect();
+    let e = try_call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "symmetric", "entities": [pts[0], pts[2], "origin"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("entities"), "{e:?}");
+    assert!(e.message.contains("about a line") && e.message.contains("horizontal_distance"), "{e:?}");
+}

@@ -144,7 +144,7 @@ pub fn ops() -> Vec<Op> {
                 tab_field(),
                 req("sketch", s(), "Sketch feature id or name."),
                 req("entities", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1, "maxItems": 2 }), "One or two sketch entity ids (`entity:…`) or `origin`."),
-                opt("value", json!({ "type": ["string", "number"] }), "Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged."),
+                opt("value", json!({ "type": ["string", "number"] }), "Value or expression. Without it the dimension keeps the measured value, as when the Dimension tool's value box is accepted unchanged. A distance is no coordinate: as in Onshape a negative value flips the geometry to the other side of its reference, a positive one keeps the side it is on."),
                 opt("kind", json!({ "type": "string", "enum": ["auto", "distance", "horizontal_distance", "vertical_distance", "length", "radius", "diameter", "angle", "arc_angle", "centerline"] }), "Dimension kind (default auto)."),
                 opt("mode", json!({ "type": "string", "enum": ["center", "minimum", "maximum"] }), "Distance to a circle/arc measured to its center (default), nearest or farthest point."),
                 opt("label", point.clone(), "Label position in sketch coordinates (also picks the auto kind: above/below two points gives a horizontal distance, beside them a vertical one; between two lines, the quadrant an angle measures)."),
@@ -158,7 +158,7 @@ pub fn ops() -> Vec<Op> {
             verb: "set_dimension",
             summary: "Change a sketch dimension's value or expression",
             description: "Like double-clicking a dimension and typing a value. Negative distances and angles flip the geometry, as in Onshape.",
-            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name."), req("dimension", s(), "Dimension id (`dim:…` from sketch_get / sketch_dimension)."), req("value", json!({ "type": ["string", "number"] }), "Value or expression.")],
+            fields: vec![doc_field(), tab_field(), req("sketch", s(), "Sketch feature id or name."), req("dimension", s(), "Dimension id (`dim:…` from sketch_get / sketch_dimension)."), req("value", json!({ "type": ["string", "number"] }), "Value or expression; a negative distance flips the geometry to the other side of its reference (Onshape), a positive one keeps the side.")],
             mutates: true,
             destructive: false,
             run: set_dimension,
@@ -886,6 +886,12 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 format!("{name} doesn't apply to these entities")
             }
         });
+        // What it takes (the constraints' table), and for Symmetric what to do instead of a point (qa's agent session
+        // v0.4.36: Symmetric about "origin").
+        let takes = CONSTRAINTS.iter().find(|x| x.0 == name).map(|x| x.2).unwrap_or_default();
+        let tip = if name == "symmetric" { "; a point such as \"origin\" is no mirror line: to centre a shape on the origin, dimension its corners from \"origin\" (horizontal_distance / vertical_distance)" } else { "" };
+        // (Live's own refusals say what the constraint requires already: "A parallel constraint requires two lines.")
+        let why = if why.contains("requires") { why } else { format!("{why} ({name}: {takes}{tip})") };
         return Err(OpError::invalid(why).with_param("entities"));
     }
     let added: Vec<String> = t.data.sketch.constraints().filter(|c| !before.contains(&c.id)).map(|c| constraint_id(c.id, false)).collect();
