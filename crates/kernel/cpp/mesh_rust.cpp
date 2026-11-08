@@ -11,6 +11,9 @@
 #include <Geom_BezierCurve.hxx>
 #include <Geom_SurfaceOfLinearExtrusion.hxx>
 #include <Geom_SurfaceOfRevolution.hxx>
+#include <Precision.hxx>
+#include <gp_Ax3.hxx>
+#include <gp_Circ.hxx>
 #include <Geom_Ellipse.hxx>
 #include <GeomConvert.hxx>
 #include <BRepTools.hxx>
@@ -250,6 +253,54 @@ occ::handle<Geom_BSplineSurface> bspline_of(occ::handle<Geom_Surface> s, const T
 
 // A surface of revolution's curve as a B-spline (a B-spline's or Bezier's, open) and its axis, when the curve lies in
 // a plane through the axis (noshape's mesher finds a point's parameters so: its angle, then the curve's nearest).
+// A circle turned round an axis in its plane and clear of it: a torus (cf-o-ring-generator's rings, whose surfaces
+// of revolution close both ways and so weren't meshed here). Its frame left-handed where the revolution's own
+// normal points into the tube, so the face keeps its side.
+bool revolution_torus(const occ::handle<Geom_Surface>& s, gp_Ax3& frame, double& major, double& minor)
+{
+  const occ::handle<Geom_SurfaceOfRevolution> rev = occ::down_cast<Geom_SurfaceOfRevolution>(s);
+  if (rev.IsNull())
+    return false;
+  occ::handle<Geom_Curve> c = rev->BasisCurve();
+  while (const occ::handle<Geom_TrimmedCurve> t = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = t->BasisCurve();
+  gp_Circ circ;
+  if (const occ::handle<Geom_Circle> ci = occ::down_cast<Geom_Circle>(c); !ci.IsNull())
+    circ = ci->Circ();
+  else if (const occ::handle<Geom_Ellipse> el = occ::down_cast<Geom_Ellipse>(c); !el.IsNull() && std::abs(el->MajorRadius() - el->MinorRadius()) <= 1e-12 * el->MajorRadius())
+    circ = gp_Circ(el->Position(), el->MajorRadius());
+  else
+    return false;
+  const gp_Ax1 axis = rev->Axis();
+  const gp_Vec d(axis.Direction());
+  const gp_Vec oc(axis.Location(), circ.Location());
+  const gp_Vec along = d * oc.Dot(d);
+  const gp_Vec off   = oc - along;
+  const gp_Vec cn(circ.Axis().Direction());
+  if (off.Magnitude() <= circ.Radius() * (1.0 + 1e-9) || std::abs(cn.Dot(d)) > 1e-9 || std::abs(cn.Dot(off.Normalized())) > 1e-9)
+    return false;
+  const gp_Pnt origin = axis.Location().Translated(along);
+  major              = off.Magnitude();
+  minor              = circ.Radius();
+  // The revolution's normal at a point, against the way out of the tube there.
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  rev->Bounds(u0, u1, v0, v1);
+  const double v = Precision::IsInfinite(v0) || Precision::IsInfinite(v1) ? 0.3 : v0 + 0.37 * (v1 - v0);
+  gp_Pnt       p;
+  gp_Vec       du, dv;
+  rev->D1(0.3, v, p, du, dv);
+  const gp_Vec op(origin, p);
+  const gp_Vec radial = op - d * op.Dot(d);
+  if (radial.Magnitude() < 1e-12)
+    return false;
+  const gp_Pnt centre  = origin.Translated(radial.Normalized() * major);
+  const bool   outward = du.Crossed(dv).Dot(gp_Vec(centre, p)) > 0.0;
+  frame                = gp_Ax3(origin, axis.Direction(), gp_Dir(off));
+  if (!outward)
+    frame.YReverse();
+  return true;
+}
+
 occ::handle<Geom_BSplineCurve> revolved_curve(const occ::handle<Geom_Surface>& s, gp_Ax1& axis)
 {
   const occ::handle<Geom_SurfaceOfRevolution> rv = occ::down_cast<Geom_SurfaceOfRevolution>(s);
@@ -446,9 +497,12 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
     const occ::handle<Geom_BSplineSurface>     bss = mf ? occ::handle<Geom_BSplineSurface>() : bspline_of(s, f);
     r.nurbs                                        = bss;
     gp_Ax1                                     rev_axis;
-    if (!mf && bss.IsNull())
+    gp_Ax3                                     rtor_frame;
+    double                                     rtor_major = 0, rtor_minor = 0;
+    const bool rtor = !mf && tor.IsNull() && bss.IsNull() && revolution_torus(s, rtor_frame, rtor_major, rtor_minor);
+    if (!mf && bss.IsNull() && !rtor)
       r.revolved = revolved_curve(s, rev_axis);
-    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || !sph.IsNull() || ((!bss.IsNull() || !r.revolved.IsNull()) && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
+    bool ok = (!pl.IsNull() || !cyl.IsNull() || !con.IsNull() || !tor.IsNull() || rtor || !sph.IsNull() || ((!bss.IsNull() || !r.revolved.IsNull()) && bspline_faces_on())) && (f.Orientation() == TopAbs_FORWARD || f.Orientation() == TopAbs_REVERSED);
     // Its loops, meshed here or not (a face BRepMesh meshes tells which edges it splits its own way).
     for (TopoDS_Iterator wi(f); wi.More(); wi.Next())
     {
@@ -490,16 +544,16 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       sv[10] = sph->Radius();
       sv[12] = a.Direct() ? 1.0 : 0.0;
     }
-    else if (ok && !tor.IsNull())
+    else if (ok && (!tor.IsNull() || rtor))
     {
       // Kind, origin, axis, x direction, major and minor radius, whether the frame is right-handed.
-      const gp_Ax3 a = tor->Position().Transformed(loc.Transformation());
+      const gp_Ax3 a = (rtor ? rtor_frame : tor->Position()).Transformed(loc.Transformation());
       sv[0]          = 3;
       put3(sv + 1, a.Location().XYZ());
       put3(sv + 4, a.Direction().XYZ());
       put3(sv + 7, a.XDirection().XYZ());
-      sv[10] = tor->MajorRadius();
-      sv[11] = tor->MinorRadius();
+      sv[10] = rtor ? rtor_major : tor->MajorRadius();
+      sv[11] = rtor ? rtor_minor : tor->MinorRadius();
       sv[12] = a.Direct() ? 1.0 : 0.0;
     }
     else if (ok && !bss.IsNull())

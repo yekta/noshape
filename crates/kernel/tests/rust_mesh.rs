@@ -601,3 +601,17 @@ fn a_revolved_spline_meshes_here() {
     }
 }
 
+
+/// A disc turned round an axis in its plane: an o-ring, its surface of revolution closed both ways (cf-o-ring-
+/// generator's seven: BRepMesh's 1.3 s of its 1.5 s), meshed here as the torus it is: within BRepMesh's area,
+/// watertight, its triangles facing out.
+#[test]
+fn an_o_ring_revolved_from_a_disc_meshes_here_as_a_torus() {
+    // (Its circle an ellipse with equal radii, as the generator's: OCCT turns a true circle into a torus itself.)
+    let profile = Segment2d::Ellipse { center: DVec2::new(10.0, 0.0) * MM, major_radius: 2.0 * MM, minor_radius: 2.0 * MM, rotation: 0.0 };
+    let disc = make_face_from_wire(&make_wire_2d(&Plane::new(DVec3::ZERO, DVec3::Y, DVec3::X), &[profile]).unwrap(), true).unwrap();
+    let ring = revolve(&disc, DVec3::ZERO, DVec3::Z, TAU).unwrap().shape;
+    let kinds: Vec<String> = ring.faces().iter().map(|f| format!("{:?}", f.face_surface()).chars().take(24).collect()).collect();
+    assert!(kinds.iter().any(|k| k.contains("Revolution")), "a surface of revolution: {kinds:?}");
+    assert_hose_meshes_here(&ring);
+}

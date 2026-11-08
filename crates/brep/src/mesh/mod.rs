@@ -354,9 +354,29 @@ pub fn mesh_body_with(vertices: &[DVec3], edges: &[MeshEdge], faces: &[MeshFace]
         }
     }
     let used: Vec<usize> = (0..edges.len()).filter(|&e| used[e]).collect();
+    // A face closed both ways (an o-ring's torus: every edge a seam of its own, used twice by it and never drawn
+    // as an edge) has its seams split as its rows, by the deflections themselves, not half of them as an edge: it
+    // took 144 × 144 rows, four times BRepMesh's triangles. (A fillet's band keeps BRepMesh's split of its seam:
+    // its rims are its neighbours' too.)
+    let mut owner: Vec<Option<(usize, bool)>> = vec![None; edges.len()];
+    for (i, f) in faces.iter().enumerate() {
+        for u in f.loops.iter().flatten() {
+            if let Some(o) = owner.get_mut(u.edge as usize) {
+                *o = match *o {
+                    None => Some((i, false)),
+                    Some((j, _)) if j == i => Some((i, true)),
+                    _ => Some((usize::MAX, false)),
+                };
+            }
+        }
+    }
+    let own_seam = |e: usize| owner[e].is_some_and(|(i, twice)| twice && i != usize::MAX);
+    let closed: Vec<bool> = faces.iter().map(|f| f.loops.iter().flatten().all(|u| own_seam(u.edge as usize))).collect();
+    let seam = |e: usize| own_seam(e) && owner[e].is_some_and(|(i, _)| closed[i]);
+    let seam_defl = Deflection { linear: 2.0 * defl.linear, angular: 2.0 * defl.angular };
     // In parallel only for many (a small part's edges sample in microseconds, less than starting threads).
     let run = if used.len() < 512 { used.len().max(1) } else { 64 };
-    for (e, n) in in_parallel(used.len(), run, |k| edge_nodes_with(vertices, &edges[used[k]], defl, nurbs)) {
+    for (e, n) in in_parallel(used.len(), run, |k| edge_nodes_with(vertices, &edges[used[k]], if seam(used[k]) { seam_defl } else { defl }, nurbs)) {
         out.edges[used[e]] = n;
     }
     out.took[0] = t.elapsed();
