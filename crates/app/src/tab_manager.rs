@@ -615,7 +615,7 @@ impl Render for TabManager {
                         cx.notify();
                     })))
                     // Live document/63: `a.os-help-link`, no tooltip; opens "Document Tabs".
-                    .child(div().id("tm-help").cursor_pointer().child(crate::assets::icon("help-faint", 16., cx)).on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/Document/document_tabs.htm?cshid=elementtabs"))),
+                    .child(div().id("tm-help").cursor_pointer().child(crate::assets::icon("help-faint", 16., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Tabs", cx))),
             )
     }
 }

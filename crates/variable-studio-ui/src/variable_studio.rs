@@ -661,7 +661,7 @@ impl VariableStudioView {
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .underline()
                                     .child("Learn more about Variable Studios")
-                                    .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
+                                    .on_click(|_, _, cx| noshape_app_core::help::open("Variable Studios", cx)),
                             ),
                     ),
             ),

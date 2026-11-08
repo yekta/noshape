@@ -7138,13 +7138,17 @@ Examples:
 
 noshape's user guide, as Help › Help shows it (Markdown).
 
-`guide`: the guide's Markdown. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.
+`guide`: the guide's Markdown; with `section`, that section (what a dialog's ? opens), and `sections` lists them all. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.
 
 Examples:
 
 ```json
 {}
 ```
+
+| field | type | | description |
+|---|---|---|---|
+| `section` | string |  | A section's title ("Compare", "Variable Studios"…). |
 
 #### app_system_check
 

@@ -222,7 +222,7 @@ impl Render for UnitsPrefsView {
                                     .underline()
                                     .cursor_pointer()
                                     .child("Learn more about default units.")
-                                    .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
+                                    .on_click(|_, _, cx| noshape_app_core::help::open("Default units", cx)),
                             ),
                     )
                     .child(v_flex().mt(px(20.)).children(rows))

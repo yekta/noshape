@@ -524,7 +524,8 @@ impl Render for LabsPrefsView {
             let name = crate::ui_script::note_control(&label, "checkbox", serde_json::json!(checked));
             crate::ui_script::mark(d, || format!("checkbox:{name}"))
         }).h(px(21.)).gap(px(3.)).text_size(px(13.33)).text_color(pal.text).cursor_pointer().child(PreferencesView::checkbox_box(checked)).child(label);
-        let external = |id: &'static str, label: &'static str, url: &'static str, cx: &App| {
+        // (A guide section: noshape links to its offline guide, not Onshape's help.)
+        let external = |id: &'static str, label: &'static str, help: &'static str, cx: &App| {
             div()
                 .id(id)
                 .ml(px(4.))
@@ -533,7 +534,7 @@ impl Render for LabsPrefsView {
                 .tooltip(crate::ui::tooltip(tr(label)))
                 .on_click(move |_, _, cx| {
                     cx.stop_propagation();
-                    cx.open_url(url);
+                    noshape_app_core::help::open(help, cx);
                 })
         };
         section(
@@ -545,7 +546,7 @@ impl Render for LabsPrefsView {
                     check_row("pref-labs", on, tr("Enable users to access experimental, proof of concept features."))
                         .child(div().id("pref-labs-learn").ml(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x1651b0)).underline().child(tr("Learn more.")).on_click(|_, _, cx| {
                             cx.stop_propagation();
-                            cx.open_url("https://cad.onshape.com/help/index.htm#cshid=onshape_labs");
+                            noshape_app_core::help::open("Onshape Labs", cx);
                         }))
                         .on_click(cx.listener(move |_, _: &ClickEvent, window, cx| {
                             if on {
@@ -566,7 +567,7 @@ impl Render for LabsPrefsView {
                     d.child(
                         v_flex().pl(px(14.)).pt(px(23.)).child(
                             check_row("pref-labs-co", co, tr("FeatureScript Co-complete"))
-                                .child(external("pref-labs-co-help", "FeatureScript Co-complete", "https://cad.onshape.com/help/index.htm#cshid=co_complete", cx))
+                                .child(external("pref-labs-co-help", "FeatureScript Co-complete", "Onshape Labs", cx))
                                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                                     let mut prefs = ListPrefs::load();
                                     prefs.labs_co_complete = !co;

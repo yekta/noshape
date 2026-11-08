@@ -20,6 +20,7 @@ pub mod file_dialogs;
 pub mod file_tab_view;
 pub mod gpu;
 pub mod graphics_prefs;
+pub mod help;
 pub mod graphics_prefs_dialog;
 pub mod i18n;
 pub mod isolate_ui;

@@ -277,3 +277,39 @@ fn no_ui_only_entries() {
     let ui: Vec<&str> = SHORTCUTS.iter().chain(MENUS.iter()).filter(|(_, c)| matches!(c, Cover::Ui(_))).map(|(id, _)| *id).collect();
     assert!(ui.is_empty(), "{} UI-only entries: an agent must be able to do what a user can; give each an operation (live mode doing the same in the window)\n{}", ui.len(), ui.join("\n"));
 }
+
+/// Every help link in the app (`help::open("<section>", cx)`) opens a section of the offline user guide (no links to
+/// Onshape's website: lead 11-08).
+#[test]
+fn every_help_link_names_a_guide_section() {
+    let crates = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut files = Vec::new();
+    let mut stack = vec![crates];
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).into_iter().flatten().flatten() {
+            let p = e.path();
+            if p.is_dir() && !p.ends_with("target") && !p.ends_with("tests") {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x == "rs") {
+                files.push(p);
+            }
+        }
+    }
+    let mut bad = Vec::new();
+    let mut seen = 0;
+    for f in files {
+        let text = std::fs::read_to_string(&f).unwrap_or_default();
+        for (i, _) in text.match_indices("help::open(\"") {
+            let rest = &text[i + "help::open(\"".len()..];
+            let Some(end) = rest.find('"') else { continue };
+            let section = &rest[..end];
+            seen += 1;
+            if section != "noshape help" && noshape_ops::about::guide_section(section).is_none() {
+                bad.push(format!("{}: \"{section}\"", f.display()));
+            }
+        }
+        assert!(!text.contains("cad.onshape.com/help"), "{}: links to Onshape's help (use help::open with a guide section)", f.display());
+    }
+    assert!(seen > 10, "found {seen} help links");
+    assert!(bad.is_empty(), "help links to sections the guide doesn't have:\n{}", bad.join("\n"));
+}

@@ -4,6 +4,7 @@
 use crate::Ctx;
 use crate::about::{COPYRIGHT, NOTICES, OCCT_NOTICE, notices_file};
 use crate::error::OpError;
+use super::s;
 use crate::registry::{Args, Op, OpOutput, opt};
 use serde_json::json;
 
@@ -85,10 +86,19 @@ fn help_op() -> Op {
         group: "app",
         verb: "user_guide",
         summary: "noshape's user guide, as Help › Help shows it (Markdown)",
-        description: "`guide`: the guide's Markdown. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.",
-        fields: vec![],
+        description: "`guide`: the guide's Markdown; with `section`, that section (what a dialog's ? opens), and `sections` lists them all. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.",
+        fields: vec![opt("section", s(), "A section's title (\"Compare\", \"Variable Studios\"…).")],
         mutates: false,
         destructive: false,
-        run: |_, _| Ok(json!({ "guide": crate::about::USER_GUIDE }).into()),
+        run: |_, a| {
+            let sections = crate::about::guide_sections();
+            match a.opt_str("section")? {
+                None => Ok(json!({ "guide": crate::about::USER_GUIDE, "sections": sections }).into()),
+                Some(t) => match crate::about::guide_section(t) {
+                    Some(text) => Ok(json!({ "guide": text }).into()),
+                    None => Err(OpError::param("section", &format!("no section \"{t}\"; sections: {}", sections.join(", ")))),
+                },
+            }
+        },
     }
 }

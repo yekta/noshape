@@ -440,7 +440,7 @@ impl PartStudioView {
                         .px(px(4.))
                         .border_t_1()
                         .border_color(gpui_kit::rgb(0xeeeeee))
-                        .child(div().id("cta-learn").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/FsDoc/")))
+                        .child(div().id("cta-learn").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| noshape_app_core::help::open("Custom tables", cx)))
                         .child(div().size(px(12.)).rounded_full().bg(gpui_kit::rgb(GRID)).flex().items_center().justify_center().text_size(px(9.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::white()).child("?")),
                 )
                 .into_any_element(),

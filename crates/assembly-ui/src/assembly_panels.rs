@@ -2550,7 +2550,7 @@ impl AssemblyView {
                             .text_size(px(13.33))
                             .text_color(pal.text_muted)
                             .child(div().text_center().child("Add exploded views to visualize how components fit together in an assembly by moving instances from their mated positions."))
-                            .child(div().id("ex-learn").mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about exploded views.").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/exploded_views.htm"))),
+                            .child(div().id("ex-learn").mt(px(4.)).font_weight(FontWeight::BOLD).text_color(rgb(0x094174)).underline().cursor_pointer().child("Learn more about exploded views.").on_click(|_, _, cx| noshape_app_core::help::open("Exploded views", cx))),
                     ),
             );
         } else {

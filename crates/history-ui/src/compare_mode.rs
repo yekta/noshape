@@ -421,7 +421,7 @@ pub fn render_bar(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
                     .cursor_pointer()
                     .text_color(pal.text_muted)
                     .child(crate::assets::icon("help-filled", 22., cx))
-                    .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/index.htm#cshid=compare")),
+                    .on_click(|_, _, cx| noshape_app_core::help::open("Compare", cx)),
             )
             .into_any_element(),
     )

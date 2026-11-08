@@ -580,7 +580,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             .text_size(px(13.))
             .font_weight(FontWeight::BOLD)
             .child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)))
-            .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/index.htm#cshid=merge"));
+            .on_click(|_, _, cx| noshape_app_core::help::open("Merging", cx));
         let (doc, plan2, state2) = (doc.clone(), plan.clone(), state.clone());
         os::modal(dialog, format!("Merging changes into {} from {}", plan.target, plan.source), W)
             .title(title)

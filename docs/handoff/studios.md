@@ -28,6 +28,14 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 15:50 UTC: help links open the offline guide (lead 11-08)
+- No link to Onshape's website from the app: every "?" and "Learn more" (compare, merge, Workspace protection,
+  Variable Studios, Variable tables, Configurations, Custom tables, Inspection data, Custom features, Custom materials,
+  Exploded views, Document notes, Performance, Tabs, Default units, Onshape Labs, the documents page's Learning Center)
+  calls `noshape_app_core::help::open(section)`: the app's guide window (`help_menu::open_section`) at that section of
+  crates/app/assets/help/user-guide.md (sections added), "Whole guide" for the rest. Op `app_user_guide` `section`.
+  Guard: coverage::every_help_link_names_a_guide_section (and no cad.onshape.com/help in the sources).
+
 ### 2026-11-08 15:12 UTC: live's answers to 2323 applied
 - Compare: an Assembly tab is greyed and disabled ("Compare not supported for this tab.", ops `tab_compare` too):
   ver-compare-assembly matches.

@@ -319,7 +319,7 @@ impl AssemblyView {
                 .underline()
                 .cursor_pointer()
                 .child(t)
-                .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/Assembly/assembly_configurations.htm"))
+                .on_click(|_, _, cx| noshape_app_core::help::open("Configurations", cx))
         };
         v_flex()
             .items_center()

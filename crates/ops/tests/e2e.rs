@@ -732,6 +732,12 @@ fn help_and_the_featurescript_library_read_offline() {
     let mut ctx = Ctx::new();
     let h = call(&mut ctx, "app_user_guide", json!({}));
     assert!(h["guide"].as_str().is_some_and(|g| g.starts_with("# noshape help")), "{h}");
+    // A dialog's ? opens one section: its heading and text, up to the next.
+    let c = call(&mut ctx, "app_user_guide", json!({ "section": "Compare" }));
+    let text = c["guide"].as_str().unwrap();
+    assert!(text.starts_with("### Compare") && !text.contains("### Merging"), "{c}");
+    let e = try_call(&mut ctx, "app_user_guide", json!({ "section": "Nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("section"));
     let l = call(&mut ctx, "featurestudio_std", json!({}));
     assert!(l["modules"].as_array().is_some_and(|m| m.iter().any(|m| m == "geometry.fs")), "{l}");
     let m = call(&mut ctx, "featurestudio_std", json!({ "module": "common.fs" }));

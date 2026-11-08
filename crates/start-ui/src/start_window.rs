@@ -3478,7 +3478,7 @@ impl StartView {
                                 .font_weight(FontWeight::BOLD)
                                 .underline()
                                 .child("Learning Center.")
-                                .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
+                                .on_click(|_, _, cx| noshape_app_core::help::open("noshape help", cx)),
                         )
                         .into_any_element()
                 }

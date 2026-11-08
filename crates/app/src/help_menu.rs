@@ -6,6 +6,7 @@
 use crate::os_menu::{OsMenu, OsMenuItem};
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::v_flex;
 use gpui_kit::*;
 
 /// Every row, in live's order, then ours after a divider.
@@ -52,4 +53,84 @@ fn open_featurescript_library(window: &mut Window, cx: &mut App) {
         });
     })
     .detach();
+}
+
+/// The guide window (one; a later link shows its section in it).
+struct GuideWindow {
+    handle: AnyWindowHandle,
+    view: Entity<GuideView>,
+}
+
+impl Global for GuideWindow {}
+
+/// A section of the user guide in a window of its own (a dialog's ? or Learn more; live opens its help in a browser
+/// tab), "Whole guide" for the rest.
+struct GuideView {
+    section: Option<String>,
+}
+
+impl Render for GuideView {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let pal = p();
+        let text = self.section.as_deref().and_then(noshape_ops::about::guide_section).unwrap_or(noshape_ops::about::USER_GUIDE);
+        let whole = self.section.is_some().then(|| {
+            div()
+                .id("guide-whole")
+                .px(px(16.))
+                .pb(px(12.))
+                .text_size(px(14.))
+                .text_color(pal.link)
+                .underline()
+                .cursor_pointer()
+                .child("Whole guide")
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.section = None;
+                    cx.notify();
+                }))
+        });
+        v_flex()
+            .size_full()
+            .bg(pal.panel)
+            .text_color(pal.text)
+            .child(gpui_kit::component::TitleBar::new().bg(pal.panel_inactive).border_b_1().border_color(pal.border).child(div().pl(px(8.)).text_size(px(12.)).text_color(pal.text_muted).child("Help — noshape")))
+            .child(div().id("guide-text").flex_1().min_h_0().overflow_y_scroll().p(px(16.)).child(crate::doc_panels::markdown(text).w_full()))
+            .children(whole)
+    }
+}
+
+/// The user guide at `section` (noshape_ops::about::guide_section; the whole guide when there is none), in its window.
+pub fn open_section(section: &str, cx: &mut App) {
+    let section = noshape_ops::about::guide_section(section).is_some().then(|| section.to_string());
+    if let Some(g) = cx.try_global::<GuideWindow>() {
+        let (handle, view) = (g.handle, g.view.clone());
+        if handle.update(cx, |_, window, _| window.activate_window()).is_ok() {
+            view.update(cx, |v, cx| {
+                v.section = section;
+                cx.notify();
+            });
+            return;
+        }
+    }
+    let options = WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(720.), px(640.)), cx))),
+        window_min_size: Some(size(px(360.), px(240.))),
+        #[cfg(target_os = "linux")]
+        window_decorations: Some(WindowDecorations::Client),
+        app_id: Some("dev.noshape.noshape".into()),
+        ..gpui_kit::component::TitleBar::window_options()
+    };
+    let mut made = None;
+    match crate::os_menu::open_window(options, cx, |window, cx| {
+        window.set_window_title("Help — noshape");
+        let view = cx.new(|_| GuideView { section });
+        made = Some(view.clone());
+        view
+    }) {
+        Ok((handle, _)) => {
+            if let Some(view) = made {
+                cx.set_global(GuideWindow { handle, view });
+            }
+        }
+        Err(e) => log::error!("could not open the help window: {e:#}"),
+    }
 }

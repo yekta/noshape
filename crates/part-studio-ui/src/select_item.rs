@@ -1790,7 +1790,7 @@ impl Render for SelectItemPanel {
                         .px(px(4.))
                         .border_t_1()
                         .border_color(line)
-                        .child(div().id("sel-learn-fs").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/FsDoc/")))
+                        .child(div().id("sel-learn-fs").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| noshape_app_core::help::open("Custom features", cx)))
                         .child(crate::ui::glyph("help-dot", 12., crate::theme::help_dot(0xaaaaaa))),
                 )
             })

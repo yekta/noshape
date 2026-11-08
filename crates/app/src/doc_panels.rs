@@ -64,7 +64,7 @@ fn panel_footer(help: &'static str, cx: &App) -> Div {
                 .opacity(0.8)
                 .cursor_pointer()
                 .child(crate::assets::icon("help-filled", 14., cx))
-                .on_click(move |_, _, cx| cx.open_url(help)),
+                .on_click(move |_, _, cx| noshape_app_core::help::open(help, cx)),
         )
 }
 
@@ -175,7 +175,7 @@ impl Render for NotesPanel {
             .bg(panel_bg())
             .child(header)
             .child(v_flex().id("notes-body").flex_1().min_h_0().overflow_y_scroll().child(body))
-            .child(panel_footer("https://cad.onshape.com/help/Content/document_notes.htm", cx))
+            .child(panel_footer("Document notes", cx))
     }
 }
 
@@ -498,7 +498,7 @@ impl Render for PerformancePanel {
             .text_color(pal.text)
             .child(panel_header("Performance").child(header_icon("perf-close", "close", "Close").on_click(cx.listener(|_, _, _, cx| cx.emit(ClosePanel)))))
             .child(v_flex().id("perf-body").flex_1().min_h_0().overflow_y_scroll().pr(px(15.)).children(sections))
-            .child(panel_footer("https://cad.onshape.com/help/Content/performance_panel.htm", cx))
+            .child(panel_footer("Performance", cx))
     }
 }
 

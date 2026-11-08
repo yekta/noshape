@@ -567,7 +567,7 @@ impl VariableStudioView {
                 .underline()
                 .cursor_pointer()
                 .child(t)
-                .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/VariableStudio/variable_studio_configurations.htm"))
+                .on_click(|_, _, cx| noshape_app_core::help::open("Variable Studios", cx))
         };
         let empty_art = v_flex()
             .items_center()

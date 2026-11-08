@@ -1131,7 +1131,7 @@ impl Render for VisibilityDialog {
             .gap(px(4.))
             .border_t_1()
             .border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
-            .child(icon_btn("vis-help", "help", "Help", true, cx).mx(px(8.)).on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/PartStudio/visibility_conditions.htm")))
+            .child(icon_btn("vis-help", "help", "Help", true, cx).mx(px(8.)).on_click(|_, _, cx| crate::help::open("Configurations", cx)))
             .child(icon_btn("vis-undo", "undo", "Undo", can_undo, cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(prev) = this.undo.pop() {
                     this.redo.push(std::mem::replace(&mut this.cfg, prev));

@@ -859,7 +859,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(
                         h_flex().h(px(22.)).flex_none().border_t_1().border_color(rgb(0xeaeaea)).justify_end().pr(px(4.)).child(
                             // Live: opens help "Variable Studios" (same from every tab).
-                            div().id("ivs-help").cursor_pointer().child(crate::assets::icon("help-faint", 14., cx)).on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/VariableStudio/variable_studio.htm?cshid=variable_studios")),
+                            div().id("ivs-help").cursor_pointer().child(crate::assets::icon("help-faint", 14., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Variable Studios", cx)),
                         ),
                     ),
             )

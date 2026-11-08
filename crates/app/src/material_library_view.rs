@@ -153,7 +153,7 @@ impl Render for MaterialLibraryView {
             .child(
                 h_flex()
                     .pt(px(24.))
-                    .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child(link("ml-learn", "Learn more about custom materials").on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/PartStudio/customizing_part_materials.htm"))))
+                    .child(div().flex_1().font_weight(FontWeight::SEMIBOLD).child(link("ml-learn", "Learn more about custom materials").on_click(|_, _, cx| noshape_app_core::help::open("Custom materials", cx))))
                     .child(os::primary_button("ml-sample", "Download sample").on_click(|_, window, cx| {
                         let csv = MaterialLibrary::sample().to_csv();
                         crate::files::request_save_path("Download sample", "Material library sample.csv".into(), "csv", window, cx, move |path, _| {

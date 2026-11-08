@@ -32,3 +32,28 @@ pub fn notices_file() -> std::io::Result<std::path::PathBuf> {
 
 /// noshape's user guide, as Help › Help shows it (offline; app_user_guide).
 pub const USER_GUIDE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../app/assets/help/user-guide.md"));
+
+/// The guide's section titled `title` (a `##` or `###` heading, case aside): its heading and text, up to the next
+/// heading of the same or a higher level. The app's "?" help links open these.
+pub fn guide_section(title: &str) -> Option<&'static str> {
+    let level = |l: &str| l.chars().take_while(|c| *c == '#').count();
+    let mut at = 0;
+    let mut start: Option<(usize, usize)> = None;
+    for line in USER_GUIDE.split_inclusive('\n') {
+        let n = level(line);
+        if let Some((from, lv)) = start {
+            if n > 0 && n <= lv {
+                return Some(USER_GUIDE[from..at].trim_end());
+            }
+        } else if n >= 2 && line[n..].trim().eq_ignore_ascii_case(title.trim()) {
+            start = Some((at, n));
+        }
+        at += line.len();
+    }
+    start.map(|(from, _)| USER_GUIDE[from..].trim_end())
+}
+
+/// The guide's section titles, as `guide_section` takes them.
+pub fn guide_sections() -> Vec<&'static str> {
+    USER_GUIDE.lines().filter(|l| l.starts_with("##")).map(|l| l.trim_start_matches('#').trim()).collect()
+}

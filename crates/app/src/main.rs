@@ -444,6 +444,8 @@ fn main() {
     register_feature_studio_hooks();
     register_history_hooks();
     register_start_hooks();
+    // The "?" help links open the offline guide.
+    noshape_app_core::help::set_opener(help_menu::open_section);
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     // `--reopen <list>`: started by an update's helper with the documents that were open (updates.rs).
     let reopen = args.iter().position(|a| a == "--reopen").map(|i| {

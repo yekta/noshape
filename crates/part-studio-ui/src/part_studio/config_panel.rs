@@ -987,7 +987,7 @@ impl PartStudioView {
                                                 .underline()
                                                 .cursor_pointer()
                                                 .child("Learn more about variable tables.")
-                                                .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/variable_table.htm")),
+                                                .on_click(|_, _, cx| noshape_app_core::help::open("Variable tables", cx)),
                                         ),
                                     ),
                             ),
@@ -1127,7 +1127,7 @@ impl PartStudioView {
                         .underline()
                         .cursor_pointer()
                         .child(t)
-                        .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/Content/configurations.htm"))
+                        .on_click(|_, _, cx| noshape_app_core::help::open("Configurations", cx))
                 };
                 v_flex()
                     .mt(px(16.))
@@ -2564,7 +2564,7 @@ impl PartStudioView {
     /// link (live part-studio/77).
     /// `art`: the illustration, its size and the gap from it to the text
     /// (the illustrations' margins differ).
-    fn panel_empty_state(&self, art: (&'static str, f32, f32), lines: &[&'static str], link: (&'static str, &'static str), url: &'static str, cx: &mut Context<Self>) -> Div {
+    fn panel_empty_state(&self, art: (&'static str, f32, f32), lines: &[&'static str], link: (&'static str, &'static str), help: &'static str, cx: &mut Context<Self>) -> Div {
         let (illustration, size, gap) = art;
         let pal = p();
         // Live (part-studio/77): 20.8 px lines (21, 21, 21, 20, 21 at 1×).
@@ -2572,13 +2572,13 @@ impl PartStudioView {
         for (i, l) in lines.iter().enumerate() {
             if i + 1 == lines.len() {
                 text = text.child(
-                    h_flex().child(format!("{l}\u{a0}")).child(div().id("panel-help-1").font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x094174)).underline().cursor_pointer().child(link.0).on_click(move |_, _, cx| cx.open_url(url))),
+                    h_flex().child(format!("{l}\u{a0}")).child(div().id("panel-help-1").font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x094174)).underline().cursor_pointer().child(link.0).on_click(move |_, _, cx| noshape_app_core::help::open(help, cx))),
                 );
             } else {
                 text = text.child(*l);
             }
         }
-        text = text.child(div().id("panel-help-2").font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x094174)).underline().cursor_pointer().child(link.1).on_click(move |_, _, cx| cx.open_url(url)));
+        text = text.child(div().id("panel-help-2").font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb(0x094174)).underline().cursor_pointer().child(link.1).on_click(move |_, _, cx| noshape_app_core::help::open(help, cx)));
         v_flex().items_center().child(crate::assets::icon(illustration, size, cx)).child(text)
     }
 
@@ -2604,7 +2604,7 @@ impl PartStudioView {
                     "access to. Learn more about custom tables.",
                 ],
                 ("Learn more about", "custom tables."),
-                "https://cad.onshape.com/help/Content/customtables.htm",
+                "Custom tables",
                 cx,
             )))
             .into_any_element()
@@ -2699,7 +2699,7 @@ impl PartStudioView {
                     "to see data on any part in the Part Studio.",
                 ],
                 ("Learn more about", "Inspection data."),
-                "https://cad.onshape.com/help/Content/inspection.htm",
+                "Inspection data",
                 cx,
             )))
             .into_any_element()
