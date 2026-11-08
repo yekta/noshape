@@ -3958,10 +3958,16 @@ P1
   several faces, both sides on one sheet, sections other than a symmetric circular radius.
 - [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
   Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
-- [ ] P1 FACEBLEND-HOLD-RIM (blend) c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's
-  edges with a pocket (a side's boundary with another face), the blend takes the whole rim and runs down past the
-  pocket's floor (live 20 faces, 136943.82 mm³); ours errs "not supported yet" up front (the plain held cut split the
-  part in three).
+- [ ] P2 FACEBLEND-HOLD-RIM (blend, parked by the lead 11-08: reopen if another document needs the same cut)
+  c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's edges with a pocket (a side's boundary
+  with another face); the blend takes the whole rim and runs down past the pocket's floor (live 20 faces, 136,943.82
+  mm³); ours errs "not supported yet" up front. Our sections and tool match live (removes 5,897 vs 5,898.7 mm³); placing
+  it fails: a cut leaves slivers (the loft's side only approximates the curved end walls), blend_direct can't split the
+  wall (18 spurious sections) or refuses a lifted tool, OCCT's variable fillet (law placed on its contour) fails at the
+  exact radii and at 0.999 takes only ~2,600 mm³. Fix: in blend_direct, a tool face that approximates its part face
+  cut along the tool's touch line projected onto it (about a day). Branches: hold-rim-wip, hold-rim-wip3 (lifted
+  sections), held-direct-wip (blend_direct route), hold-rim-varlaw (op_fillet_variable_points); patches in
+  /root/blend-scratch/patches/hold-rim-*.patch; handoff/blend.md has the steps.
 - [ ] P2 FACEBLEND-HOLD-INVERSE (blend, live) Inverse tangent hold lines.
 - [x] P2 FACEBLEND-NOTRIM-DETACHED (blend) a detached No trim blend runs on past the chain's ends by the radius (live
   2306 C: 301.5929 mm², x −24…24 on the 40 mm block); ours stops at the ends. Done for straight rounds (cylinders).
