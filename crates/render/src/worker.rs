@@ -35,8 +35,7 @@ pub fn release_prewarm() {
 }
 
 /// `NOSHAPE_PREWARM=early` (a startup experiment for the perf runs): compile at once instead of after the first
-/// window draw, on low-priority threads ([`low_priority_compile`]) so the window's own work comes first, then one
-/// small frame off screen ([`Renderer::warm_up`]).
+/// window draw, on low-priority threads ([`low_priority_compile`]) so the window's own work comes first.
 pub fn prewarm_early() -> bool {
     static EARLY: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *EARLY.get_or_init(|| std::env::var("NOSHAPE_PREWARM").is_ok_and(|v| v == "early"))
@@ -121,9 +120,6 @@ impl RenderWorker {
             .spawn(move || {
                 wait_for_prewarm();
                 renderer.prewarm(Style::default().msaa);
-                if prewarm_early() {
-                    renderer.warm_up(Style::default().msaa);
-                }
                 let mut jobs: Vec<RenderJob> = Vec::new();
                 let mut picks: Vec<(u64, u64, PickRect)> = Vec::new();
                 let mut connected = true;
