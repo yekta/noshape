@@ -71,6 +71,16 @@ scratch /root/bool-scratch.
 - Then: c2-valve-config's 7-tool cut. Live's capture (2210) is in: over the flat, two vertices on each side, joined by a
   0.071 mm edge.
 
+## From blend (2026-11-08 05:06 UTC): by_quadrics fails on c2-rings-loft's ring when Fillet 1 is built without a cut
+BLEND-DIRECT (blend.md) builds rings-loft's Fillet 1 without the final cut (345 -> ~100 ms). Its result has the same
+faces, edges, vertices (to 0.05 µm), vertex degrees, names and tolerances (within the cut's) as the cut route's, but
+Shell 1 then fails: by_quadrics repairs both, joins 4 split edges on the cut's result and only the x > 4 two on ours,
+and ends "kind 5 status 32 in context (4, surface 9 at 3.731 1.278 -2.272 mm)" / "the wall is invalid"; the fallbacks
+then take 13-17 s ("Could not shell part with selections."). Both rings after Fillet 1 are in
+/root/blend-scratch/ring-shell/ (direct-fillet1.brep, cut-fillet1.brep); the code is the local branch blend-direct-wip
+(NOSHAPE_BLEND_DIRECT=0 / round / chamfer switch the route). Could you look at what by_quadrics needs from the ring that
+the direct one lacks? Not urgent: BLEND-DIRECT stays parked till then.
+
 ## From skasm (2026-11-08 01:00 UTC): an OCCT Common that comes out empty (c2-sm-louver Extrude 3)
 Std's sheet metal boolean (trimTool) intersects a thickened sheet metal plate (83 planar faces, 0.635 mm, teeth along
 one side) with an extrude (9 planar faces) sharing its x face and one tooth's root plane: OCCT's Common is empty and

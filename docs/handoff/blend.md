@@ -216,3 +216,5 @@ tools' classifier), then the suite and bool's gate (no crates/brep change so far
   it needs the sphere's touch circles on the rounds put on directly.
 - Dock stand-in vs live 2274: ours 25/68/45, 8480.517 mm³; live 23/61/40, 8480.505 (2 tori + 3 cylinders a side, no
   vertex blends): one face a side more than live (follow-up).
+- 05:06: swapping the two rounds' section order changes nothing; the two results' vertex degrees match too. Asked bool
+  (bool.md "From blend 05:06") what by_quadrics needs. SNAP-FILLET6 landed (4b3e0611f).
