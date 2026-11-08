@@ -3978,8 +3978,10 @@ P2
   Routing opChamfer through the Chamfer evaluator (03ea02463, reverted) broke cf-snap-hook's Snap Hook (FS 336,
   OFFSET_ANGLE, oppositeDirection true: its drafts fail, 18 -> 16); live matches the old op, which ignores
   oppositeDirection for OFFSET_ANGLE. Ask live which face an op-made edge measures from before routing.
-  Live 2325 D: opChamfer's distance and angle honours Opposite direction (off: the edge's second face, on: its
-  first); done. Tangent propagation / overrides / Tangent measurement in the op still to do.
+  Live 2325 D (FS 336 fCuboid, top front edge): Opposite off puts the 2 mm on the top, on on the front (ours: the
+  front both ways). But cf-spur-gear (FS 1576, opExtrude'd blank's rim edge, OFFSET_ANGLE) matches live with ours
+  for Opposite off and on (14/14); "off = the edge's second face" broke it (14 -> 8, reverted). The rule is
+  neither face order; ask live for the gear's rim with Opposite off / on before changing the op.
 - [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
   the same face as Two distances' Distance 1; on a round reference face the angle is to the line from the chamfer's
   side to the edge (OCCT: to the face's tangent), fixed with CHAMFER-METHOD.
