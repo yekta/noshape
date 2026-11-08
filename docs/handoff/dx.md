@@ -19,6 +19,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   dx-scratch/fsb1/gen.py. New targets (README "Feature Studio"): `code`, `gutter`, `fold`, `heat`, `profile_badge`,
   `notice`, `button:Monitor:<studio>`, `table_cell`, custom tables' and Add custom features' buttons, editor
   autocomplete `list_row` (a vendor patch: ROW_BOUNDS). All 35 run on ours; asked live for recordings.
+- Then: the ui-parity driver waits for a Feature Studio's save and compile, so `notices` follows the text as live's
+  does (fs-autocomplete-enter, fs-snippet-placeholders, fs-snippets-params match): fs-* 338/344 states, area
+  0.983 × 0.950 = 93.3 % (before 63.7 %). Left: fs-ps-show-code (live's tab menu has no Export… while its formats
+  call is throttled, 2305), fs-shortcuts-sheet (live's recorder typed "/" for Shift+/), studios' two.
 - Fixed on the way: hovering the profile's total badge crashed the app (`hidden().group_hover(block)`: GPUI's
   "must call prepaint before paint"); the editor had no fold arrows (Ace's C-style folds now, `fold_lines`).
 - Ours lacks, live will show: the notices panel's Monitor ▾ is no dropdown (ours sets the monitor at once); an added

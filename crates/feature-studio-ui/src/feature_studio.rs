@@ -598,6 +598,12 @@ impl FeatureStudioView {
         Some(Ok(point(x, at.center().y)))
     }
 
+    /// Typed text not yet saved, or its notices not yet compiled (the ui-parity driver waits for them, as live's
+    /// notices follow the text by the time its recorder reads them).
+    pub fn ui_busy(&self) -> bool {
+        self.save_task.is_some() || self.compile_task.is_some()
+    }
+
     /// Every toolbar control repainted (a cached slice): the ui-parity driver's marks.
     pub fn ui_redraw(&mut self, cx: &mut Context<Self>) {
         if let Some(t) = &self.toolbar {
@@ -947,6 +953,7 @@ impl FeatureStudioView {
                     cx.notify();
                 });
                 this.notices = notices;
+                this.compile_task = None;
                 cx.emit(FeatureStudioEvent::NoticesChanged);
                 cx.notify();
             });

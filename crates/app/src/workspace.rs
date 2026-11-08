@@ -551,9 +551,13 @@ impl Workspace {
         cx.notify();
     }
 
-    /// The active tab is a Part Studio, Assembly or Drawing whose view isn't made yet (the ui-parity driver waits).
+    /// The active tab is a Part Studio, Assembly or Drawing whose view isn't made yet, or a Feature Studio still saving or
+    /// compiling what was typed (the ui-parity driver waits).
     pub(crate) fn ui_view_pending(&self, cx: &App) -> bool {
         let Some(id) = self.active else { return false };
+        if let Some(TabView::FeatureStudio(v)) = self.views.get(&id) {
+            return v.read(cx).ui_busy();
+        }
         let studio = self.doc.read(cx).session.doc.tab(id).is_some_and(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_) | TabContent::Drawing(_)));
         studio && !self.views.contains_key(&id)
     }
