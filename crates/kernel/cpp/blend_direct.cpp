@@ -7,6 +7,8 @@
 #include <optional>
 
 #include <BOPAlgo_BuilderFace.hxx>
+#include <ElCLib.hxx>
+#include <gp_Circ.hxx>
 #include <BOPTools_AlgoTools3D.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
@@ -53,6 +55,44 @@ namespace
 using HHist = occ::handle<BRepTools_History>;
 
 bool debug() { return std::getenv("NOSHAPE_BLEND_DIRECT_DEBUG") != nullptr; }
+
+// Whether two blend faces meet only tangentially along a circle both end on (the rounds of a tangent chain, one after
+// another): their section is that circle, which their bounds already carry (IntSS takes ~5 ms over two tori there).
+bool tangent_along_shared_circle(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
+{
+  std::vector<gp_Circ> circles;
+  for (TopExp_Explorer x(a, TopAbs_EDGE); x.More(); x.Next())
+    if (BRepAdaptor_Curve c(TopoDS::Edge(x.Current())); c.GetType() == GeomAbs_Circle)
+      circles.push_back(c.Circle());
+  for (TopExp_Explorer x(b, TopAbs_EDGE); x.More(); x.Next())
+  {
+    BRepAdaptor_Curve c(TopoDS::Edge(x.Current()));
+    if (c.GetType() != GeomAbs_Circle)
+      continue;
+    const gp_Circ cb = c.Circle();
+    for (const gp_Circ& ca : circles)
+    {
+      if (ca.Location().Distance(cb.Location()) > tol || std::abs(ca.Radius() - cb.Radius()) > tol || !ca.Axis().Direction().IsParallel(cb.Axis().Direction(), 1e-7))
+        continue;
+      // Tangent there: the faces' normals at a point of the circle agree (up to sign).
+      const gp_Pnt p = ElCLib::Value(c.FirstParameter(), cb);
+      GeomAPI_ProjectPointOnSurf pa(p, BRep_Tool::Surface(a)), pb(p, BRep_Tool::Surface(b));
+      if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > tol || pb.LowerDistance() > tol)
+        continue;
+      double ua, va, ub, vb;
+      pa.LowerDistanceParameters(ua, va);
+      pb.LowerDistanceParameters(ub, vb);
+      gp_Pnt q;
+      gp_Vec a1, a2, b1, b2;
+      BRep_Tool::Surface(a)->D1(ua, va, q, a1, a2);
+      BRep_Tool::Surface(b)->D1(ub, vb, q, b1, b2);
+      const gp_Vec na = a1.Crossed(a2), nb = b1.Crossed(b2);
+      if (na.Magnitude() > 0 && nb.Magnitude() > 0 && na.IsParallel(nb, 1e-6))
+        return true;
+    }
+  }
+  return false;
+}
 
 // Whether two faces lie on one plane or one cylinder.
 bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, double tol)
@@ -973,6 +1013,12 @@ std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoD
       if (bb.IsOut(mb))
         continue;
       const KernelTimer t_bb("blend.direct.section.blends");
+      if (tangent_along_shared_circle(all_blends[k], all_blends[m], tol))
+      {
+        if (dbg)
+          std::fprintf(stderr, "  section of blends %zu and %zu: tangent along their shared circle\n", k, m);
+        continue;
+      }
       if (!section(all_blends[k], all_blends[m], on_blend[k], on_blend[m], &vertices))
         no("two blends' section");
     }
