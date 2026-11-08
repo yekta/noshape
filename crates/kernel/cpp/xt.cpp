@@ -748,17 +748,31 @@ occ::handle<Geom_BSplineSurface> periodic_bsurface(const occ::handle<Geom_Surfac
   occ::handle<Geom_BSplineSurface> ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
   up = round_u && (b->IsUPeriodic() || (b->IsUClosed() && tangent_seam(true)));
   vp = round_v && (b->IsVPeriodic() || (b->IsVClosed() && tangent_seam(false)));
+  // Periodic only when the seam knot comes down (a smooth seam): one left at full multiplicity is no smooth
+  // periodic surface and Parasolid drops the body (exchange suite, cf-hose-routing's swept hoses: degree-12
+  // single-span sections); such a face is split instead.
   try
   {
     if (up && !ps->IsUPeriodic())
     {
       ps->SetUPeriodic();
-      ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
+      up = ps->UMultiplicity(1) <= 1 || ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
+      if (!up)
+        ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
     }
     if (vp && !ps->IsVPeriodic())
     {
       ps->SetVPeriodic();
-      ps->RemoveVKnot(1, ps->VMultiplicity(1) - 1, kPrecision);
+      vp = ps->VMultiplicity(1) <= 1 || ps->RemoveVKnot(1, ps->VMultiplicity(1) - 1, kPrecision);
+      if (!vp)
+      {
+        ps = occ::down_cast<Geom_BSplineSurface>(b->Copy());
+        if (up)
+        {
+          ps->SetUPeriodic();
+          ps->RemoveUKnot(1, ps->UMultiplicity(1) - 1, kPrecision);
+        }
+      }
     }
   }
   catch (const Standard_Failure&)
@@ -795,7 +809,9 @@ occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve
   try
   {
     p->SetPeriodic();
-    p->RemoveKnot(1, p->Multiplicity(1) - 1, kPrecision);
+    // (A seam knot that won't come down is no smooth ring: the edge is split, as its face.)
+    if (p->Multiplicity(1) > 1 && !p->RemoveKnot(1, p->Multiplicity(1) - 1, kPrecision))
+      return nullptr;
   }
   catch (const Standard_Failure&)
   {
