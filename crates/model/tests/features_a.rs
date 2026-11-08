@@ -839,6 +839,59 @@ fn face_blend_propagation_detach_and_trim_as_live() {
     assert!((sheet.shape.area().unwrap() * 1e6 - 251.3274).abs() < 1e-3, "{}", sheet.shape.area().unwrap() * 1e6);
 }
 
+/// Live 2306 D / 2321: Face blend R 5 between two Extrude Surface walls 20 up (wall 1 (0,0)-(40,0), normal -y; wall 2
+/// (0,0)-(0,30) touching it or (5,5)-(5,30) apart, normal +x): one sheet, each wall trimmed at the round, or live's
+/// direction errors. Areas in mm².
+#[test]
+fn a_face_blend_between_two_surface_walls_as_live() {
+    let run = |wall2: [(f64, f64); 2], flips: [bool; 2]| {
+        let mut t = T::new();
+        let mut walls = Vec::new();
+        for [a, b] in [[(0.0, 0.0), (40.0, 0.0)], wall2] {
+            let mut sk = noshape_sketch::Sketch::new();
+            let ln = sk.add_line(DVec2::new(a.0, a.1) * 1e-3, DVec2::new(b.0, b.1) * 1e-3);
+            let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+            t.add("extrude", &[("bodyType", en("SURFACE")), ("surfaceEntities", q(vec![Reference::SketchEntity { sketch: s, entity: ln.0 }])), ("depth", e("20 mm"))]);
+            let res = t.ok();
+            let body = res.context.bodies.last().unwrap();
+            walls.push((Reference::Face((*body.faces[0]).clone()), body.shape.faces()[0].face_plane().unwrap().unwrap().normal));
+        }
+        assert!(walls[0].1.dot(-DVec3::Y) > 0.999 && walls[1].1.dot(DVec3::X) > 0.999, "the walls' normals as live's: {:?}", (walls[0].1, walls[1].1));
+        t.add("faceBlend", &[("side1", q(vec![walls[0].0.clone()])), ("side2", q(vec![walls[1].0.clone()])), ("radius", e("5 mm")), ("flipSide1", b(flips[0])), ("flipSide2", b(flips[1]))]);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap();
+        match st.status {
+            FeatureStatus::Ok => {
+                assert_eq!(res.context.bodies.len(), 1);
+                let sheet = &res.context.bodies[0].shape;
+                Ok((sheet.faces().len(), sheet.area().unwrap() * 1e6))
+            }
+            _ => Err(st.message.clone().unwrap_or_default()),
+        }
+    };
+    let touching = [(0.0, 0.0), (0.0, 30.0)];
+    let apart = [(5.0, 5.0), (5.0, 30.0)];
+    let bad = |m: &str| Err::<(usize, f64), String>(m.to_string());
+    for (what, wall2, flips, want) in [
+        ("touching", touching, [false, false], bad("Side 1 direction is invalid.")),
+        ("touching flip 2", touching, [false, true], bad("Both side 1 and side 2 directions are invalid.")),
+        ("touching both", touching, [true, true], bad("Side 2 direction is invalid.")),
+        ("touching flip 1", touching, [true, false], Ok((3, 1357.0796))),
+        ("apart", apart, [false, false], Ok((3, 1257.0796))),
+        ("apart flip 1", apart, [true, false], bad("Both side 1 and side 2 directions are invalid.")),
+        ("apart both", apart, [true, true], bad("Both side 1 and side 2 directions are invalid.")),
+        ("apart flip 2", apart, [false, true], Ok((2, 657.0796))),
+    ] {
+        let got = run(wall2, flips);
+        let same = match (&got, &want) {
+            (Ok((f, a)), Ok((wf, wa))) => f == wf && (a - wa).abs() < 1e-3,
+            (Err(m), Err(w)) => m == w,
+            _ => false,
+        };
+        assert!(same, "{what}: {got:?}, live {want:?}");
+    }
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).

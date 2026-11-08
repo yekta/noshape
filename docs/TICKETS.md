@@ -3886,13 +3886,16 @@ P1
   blends to solid parts." on a solid without Detached.
   Live 2306 C: attached Long / No trim refused as live (done); detached No trim runs on past the ends by the radius
   (not yet: P2 FACEBLEND-NOTRIM-DETACHED).
-- [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
+- [x] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
   Live 2306 D (two Extrude Surface walls, R 5): one sheet body after (walls trimmed at the touch lines, the cylinder
   sewn between). Touching walls (wall 1 (0,0)-(40,0), wall 2 (0,0)-(0,30)): default "Side 1 direction is invalid.",
   flip 2 "Both side 1 and side 2 directions are invalid.", both "Side 2 direction is invalid.", flip 1 OK (cylinder in
   x 0..5, y 0..5; a side is valid when its normal points toward the other wall). Apart (wall 2 (5,5)-(5,30)): default
   OK, cylinder x 5..10, y 0..5 bridging the gap, wall 1 trimmed to x 10..40: there wall 1's default normal (−y) points
   away from the blend, so the rule for walls apart differs: ask live (normals of both walls in D2) before building.
+  Done for two planar walls, each a one-face surface body (live 2321: std's wallsNormalAlignment; walls apart name
+  both sides when a direction misses); all 8 of live's cases. Left (P2 FACEBLEND-SURFACES-GENERAL): curved walls,
+  several faces, both sides on one sheet, sections other than a symmetric circular radius.
 - [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
   Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
 - [ ] P1 FACEBLEND-HOLD-RIM (blend) c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's

@@ -612,6 +612,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     // OCCT's rolling ball is exact for a symmetric circular radius; every
     // other section is swept and added or cut (blend_section).
     let rolling_ball = section == super::blend_section::Section::Circular && !width && !asym && spine_dir.is_none();
+    let (picked1, picked2) = (side1.clone(), side2.clone());
     let s1 = by_body(side1);
     let s2 = by_body(side2);
     let mut done = false;
@@ -744,6 +745,17 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         }
         return Ok(());
     }
+    if !done
+        && let ([w1], [w2]) = (picked1.as_slice(), picked2.as_slice())
+        && w1.0 != w2.0
+        && [w1.0, w2.0].iter().all(|&b| ev.ctx.bodies[b].kind == crate::display::BodyKind::Surface && ev.ctx.bodies[b].faces.len() == 1)
+        && section == super::blend_section::Section::Circular
+        && !width
+        && !asym
+        && !detach
+    {
+        return sheet_blend(ev, *w1, *w2, radius);
+    }
     if !done {
         // Live (psb 10-26 b FB6): sides on different parts can't attach.
         if s1.keys().all(|b| !s2.contains_key(b)) {
@@ -751,6 +763,85 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         }
         return err("Face blend between faces that don't share an edge is not supported yet");
     }
+    Ok(())
+}
+
+/// Live 2306 D / 2321: a face blend between two planar walls, each a surface body of one face, makes one sheet: the
+/// ball centred along each side's direction (std's wallsNormalAlignment: Flip toggles an automatic alignment; walls
+/// apart align toward each other, touching ones keep their normals), each wall trimmed at its touch line, the
+/// cylinder sewn between. A side's direction is invalid where it puts the touch on the other wall off that wall.
+fn sheet_blend(ev: &mut EvalCtx, (b1, f1): (usize, usize), (b2, f2): (usize, usize), r: f64) -> FResult<()> {
+    const FAILED: &str = "Failed to blend faces.";
+    let (body1, body2) = (ev.ctx.bodies[b1].clone(), ev.ctx.bodies[b2].clone());
+    let (w1, w2) = (body1.shape.sub_shape(ShapeType::Face, f1)?, body2.shape.sub_shape(ShapeType::Face, f2)?);
+    let (Some(pl1), Some(pl2)) = (w1.face_plane()?, w2.face_plane()?) else { return err(FAILED) };
+    let (n1, n2) = (pl1.normal.normalize(), pl2.normal.normalize());
+    let Some(a) = n1.cross(n2).try_normalize() else { return err(FAILED) };
+    let gap = k::distance(&w1, &w2)?;
+    let (aligned1, aligned2) = match gap.distance > r * 1e-9 {
+        true => {
+            let v = gap.point_b - gap.point_a;
+            (n1.dot(v) >= 0.0, n2.dot(v) <= 0.0)
+        }
+        false => (true, true),
+    };
+    let side = |n: DVec3, aligned: bool, flip: bool| if aligned == flip { -n } else { n };
+    let (d1, d2) = (side(n1, aligned1, ev.bool("flipSide1")), side(n2, aligned2, ev.bool("flipSide2")));
+    // Along the corner: where both walls are.
+    let span = |w: &Shape| -> (f64, f64) { w.vertices().iter().filter_map(|v| v.vertex_point().ok()).map(|p| p.dot(a)).fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), t| (lo.min(t), hi.max(t))) };
+    let ((lo1, hi1), (lo2, hi2)) = (span(&w1), span(&w2));
+    let (lo, hi) = (lo1.max(lo2), hi1.min(hi2));
+    if hi - lo <= r * 1e-9 {
+        return err(FAILED);
+    }
+    let mid = 0.5 * (lo + hi);
+    let solve = |rows: [(DVec3, f64); 3]| -> Option<DVec3> {
+        let m = glam::DMat3::from_cols(rows[0].0, rows[1].0, rows[2].0).transpose();
+        (m.determinant().abs() > 1e-12).then(|| m.inverse() * DVec3::new(rows[0].1, rows[1].1, rows[2].1))
+    };
+    let (Some(c), Some(corner)) = (
+        solve([(d1, d1.dot(pl1.origin) + r), (d2, d2.dot(pl2.origin) + r), (a, mid)]),
+        solve([(n1, n1.dot(pl1.origin)), (n2, n2.dot(pl2.origin)), (a, mid)]),
+    ) else {
+        return err(FAILED);
+    };
+    let (t1, t2) = (c - d1 * r, c - d2 * r);
+    let on = |w: &Shape, t: DVec3| -> FResult<bool> { Ok(k::distance(w, &k::make_vertex(t)?)?.distance <= r * 1e-7) };
+    // (Walls apart: live names both sides whichever touch misses, 2321's flip 1 and both flipped.)
+    let apart = gap.distance > r * 1e-9;
+    match (on(&w2, t2)?, on(&w1, t1)?) {
+        (true, true) => {}
+        (false, false) => return err("Both side 1 and side 2 directions are invalid."),
+        _ if apart => return err("Both side 1 and side 2 directions are invalid."),
+        (false, true) => return err("Side 1 direction is invalid."),
+        (true, false) => return err("Side 2 direction is invalid."),
+    }
+    // Each wall keeps what lies past its touch line, away from the corner.
+    let keep = |w: &Shape, t: DVec3| -> FResult<Vec<Shape>> {
+        let Some(u) = (t - corner).try_normalize() else { return Ok(vec![w.clone()]) };
+        let pieces = k::split_by_plane(w, &k::Plane::new(t, u, a))?.shape;
+        Ok(pieces.faces().into_iter().filter(|f| f.centroid().is_ok_and(|q| (q - t).dot(u) > r * 1e-9)).collect())
+    };
+    let (keep1, keep2) = (keep(&w1, t1)?, keep(&w2, t2)?);
+    let at = |p: DVec3| p + a * (lo - p.dot(a));
+    let bulge = c + ((t1 - c) + (t2 - c)).try_normalize().ok_or_else(|| fe(FAILED))? * r;
+    let arc = k::make_arc_3pts(at(t1), at(bulge), at(t2))?;
+    let round = k::extrude(&arc, a * (hi - lo))?.shape;
+    let mut all: Vec<Shape> = keep1.iter().chain(keep2.iter()).cloned().collect();
+    all.push(round);
+    let sheet = k::sew(&all, r * 1e-7, false)?.shape;
+    let blend = Arc::new(TopoName::face(ev.feature, Role::Blend(body1.faces[f1].clone())));
+    let names: Vec<Name> = sheet
+        .faces()
+        .iter()
+        .map(|f| match f.face_plane().ok().flatten() {
+            Some(p) if p.normal.normalize().cross(n1).length() < 1e-9 && (p.origin - pl1.origin).dot(n1).abs() < r * 1e-7 => body1.faces[f1].clone(),
+            Some(_) => body2.faces[f2].clone(),
+            None => blend.clone(),
+        })
+        .collect();
+    ev.replace_body(b1, sheet, names);
+    super::helpers_a::remove_bodies(ev, std::slice::from_ref(&body2.id));
     Ok(())
 }
 
