@@ -812,6 +812,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     matching both; 35 → 52 compared), fixed after this green by 2a99078ca / eb200af6f; the 11 scenarios that newly differed
     (asm-empty-menu, asm-face-menu-*, asm-section-view-turn-off, drw-canvas-zoom-to-sheet, drw-centerline-2-point,
     drw-dimension-*) all match alone on 0cb8ba5d at least once in three (load: UIP-ASM-FACE-MENU-FLAKY, UIP-DRW-START-FLAKY).
+  **qa 14:25, the 09:43 run (green 0cb8ba5d) against the 04:50 one:** models 72/87 → 74/87, features 740/951 → 754/951, scenarios
+  741/1029 → 886/1275 (252 new), parity index 64.7 → 74.4. The 04:50 run's flags are gone: cf-part-draft 19.8 → 4.1 s (13/13),
+  cf-snap-hook 18/18 (8.1 s), cf-sheet-metal-model-plus 3.1 → 1.9 s. New flags:
+  - core: c2-hunting-knife 0.5 → 3.5 s with 10 → 11/52 (more of it builds now: Chamfer 1 0.57 s, Fillet 3 0.28 s, Mirror 1
+    0.23 s; live 0.41 s for the whole document).
+  - dx: drw-sheet-properties differs alone too (2 / 2 on 4b09e98c): step 4 `.dialog.text[3]` live "Front" / ours "Part 1 In
+    progress" (a view still generating read into the dialog?). drw-callout-stacked-add differs (step 9 `.drawing.selection.length`
+    live 1 / ours 0) because live2 re-recorded it (2f97542bc): newly measured, not a regression.
+  - psui: plane-line-angle differs alone, at a different step each run (step 4 `.focus.selection[1]` live 5 / ours 0; step 5
+    `.focus.text` live "30" / ours "300 deg"): flaky typing into the angle field?
+  - The other 5 (asm-face-menu-find-in-instance-list, asm-triad-rotate-180, drw-centerline-circle-3-point,
+    drw-datum-target-show-dims, ver-cmp-leave-workspace-row) match alone (load). The re-runs were on 4b09e98c, which has studios'
+    3759eac77 (messages / focus recorded as live's); the 14:11 run is the first suite run with it.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
