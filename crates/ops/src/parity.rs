@@ -5378,26 +5378,45 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             .unwrap_or_default();
         let ours_parts: Vec<(String, f64)> = solids.iter().map(|(n, v, _)| (n.clone(), *v)).collect();
         let our_ids: Vec<String> = solids.iter().map(|(_, _, id)| id.clone()).collect();
-        // Parts of the same volume are taken one each (alike parts place alike), then shared.
+        // Parts of the same volume are taken one each (alike parts place alike), then shared. Those whose volume
+        // fits one of ours first; the others then by the feature that made them (ids in creation order), not taking
+        // a part another fits (asm-clamp-pattern's Pin, ours off in volume, took the Spacer's part by its creator).
+        let fits_of = |p: &Value| -> Vec<String> {
+            volume_band(p).map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n.clone()).collect()).unwrap_or_default()
+        };
+        let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string()).collect();
+        let fitting: Vec<String> = listed.iter().flat_map(|p| fits_of(p)).collect();
         let mut taken: Vec<String> = Vec::new();
-        for p in parts.as_array().into_iter().flatten() {
-            let (Some(pid), Some(pname)) = (p["partId"].as_str(), p["name"].as_str()) else { continue };
-            let band = volume_band(p);
-            let ours = if ours_parts.iter().any(|(n, _)| n == pname) || ours_parts.is_empty() {
-                pname.to_string()
-            } else if let [(only, _)] = ours_parts.as_slice() {
-                only.clone()
-            } else {
-                let fits: Vec<&String> = band.map(|(lo, hi)| ours_parts.iter().filter(|(_, v)| *v >= lo * (1.0 - 1e-6) && *v <= hi * (1.0 + 1e-6)).map(|(n, _)| n).collect()).unwrap_or_default();
-                // Else by the feature that made it (ids in creation order).
-                let by_creator = || t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
-                match fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
-                    Some(n) => (*n).clone(),
-                    None => by_creator().unwrap_or_else(|| pname.to_string()),
+        let mut chosen: HashMap<String, String> = HashMap::new();
+        for pass in [true, false] {
+            for p in &listed {
+                let (pid, pname) = (p["partId"].as_str().unwrap_or_default(), p["name"].as_str().unwrap_or_default());
+                if chosen.contains_key(pid) {
+                    continue;
                 }
-            };
-            taken.push(ours.clone());
-            part_names.insert((element.clone(), pid.to_string()), ours);
+                let fits = fits_of(p);
+                let ours = if ours_parts.iter().any(|(n, _)| n == pname) || ours_parts.is_empty() {
+                    pname.to_string()
+                } else if let [(only, _)] = ours_parts.as_slice() {
+                    only.clone()
+                } else if let Some(n) = fits.iter().find(|n| !taken.contains(n)).or(fits.first()) {
+                    n.clone()
+                } else if pass {
+                    continue;
+                } else {
+                    let by_creator = t.part_by_creator(t.len(), pid, &our_ids).and_then(|id| solids.iter().find(|s| s.2 == id).map(|s| s.0.clone()));
+                    match by_creator {
+                        Some(n) if fitting.contains(&n) => ours_parts.iter().map(|(n, _)| n).find(|n| !taken.contains(n) && !fitting.contains(n)).cloned().unwrap_or(n),
+                        Some(n) => n,
+                        None => pname.to_string(),
+                    }
+                };
+                taken.push(ours.clone());
+                chosen.insert(pid.to_string(), ours);
+            }
+        }
+        for (pid, ours) in chosen {
+            part_names.insert((element.clone(), pid), ours);
         }
     }
     let occurrences: Vec<&Value> = values(&root["occurrences"]);
