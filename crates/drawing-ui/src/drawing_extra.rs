@@ -367,19 +367,24 @@ impl DrawingEditor {
 
     /// A BOM / cut list table row of the Sheets panel, with Onshape's menu:
     /// Properties, Switch to BOM, Delete, Replace.
-    fn sheet_table_row(&self, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
-        let id = t.id;
-        // The assembly (Part Studio) the table lists: its view's root source.
+    /// A BOM / cut list table's Sheets panel row: its label and the assembly (Part Studio) it lists (its view's root
+    /// source). Live 2240: a BOM's row is named after its assembly.
+    fn sheet_table_label(&self, t: &Table, cx: &App) -> (String, Option<TabId>) {
         let source = t.view().and_then(|v| views::root_view(self.current_sheet(), v)).and_then(|r| match &self.current_sheet().view(r)?.kind {
             ViewKind::Base { source, .. } => Some(*source),
             _ => None,
         });
-        // Live 2240: a BOM's row is named after its assembly.
-        let source_name = source.and_then(|tab| self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone()));
-        let (label, icon) = match t.kind {
-            TableKind::CutList { .. } => ("Cut list".to_string(), "cut-list"),
-            _ => (source_name.unwrap_or_else(|| "Bill of materials".into()), "drawing-bom"),
+        let label = match t.kind {
+            TableKind::CutList { .. } => "Cut list".to_string(),
+            _ => source.and_then(|tab| self.doc.read(cx).session.doc.tab(tab).map(|t| t.name.clone())).unwrap_or_else(|| "Bill of materials".into()),
         };
+        (label, source)
+    }
+
+    fn sheet_table_row(&self, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
+        let id = t.id;
+        let (label, source) = self.sheet_table_label(t, cx);
+        let icon = if matches!(t.kind, TableKind::CutList { .. }) { "cut-list" } else { "drawing-bom" };
         // The runner's target: a start's assembly as "start asm" (each runner's start has its own name).
         let mark = if label.starts_with("start ") && label.contains(" asm") { "start asm".to_string() } else { label.clone() };
         let is_bom = matches!(t.kind, TableKind::Bom { .. });
@@ -800,6 +805,7 @@ impl DrawingEditor {
                     // BOM and cut list tables.
                     for t in s.tables.iter().filter(|t| matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. })) {
                         list = list.child(self.sheet_table_row(t, 54., cx));
+                        text.push(self.sheet_table_label(t, cx).0);
                     }
                 }
             }

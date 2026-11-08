@@ -152,12 +152,15 @@ impl DrawingEditor {
         let part = self.sources.iter().find(|(k, _)| k.tab == d.tab).and_then(|(_, m)| d.part.as_ref().and_then(|_| m.part(d.part.as_ref())).map(|p| p.name.clone())).unwrap_or_else(|| studio.clone());
         let row = |label: String, body: AnyElement| h_flex().h(px(30.)).px(px(10.)).gap(px(8.)).child(div().w(px(80.)).flex_none().text_size(px(12.)).child(label)).child(body).into_any_element();
         let mut rows: Vec<AnyElement> = Vec::new();
+        // The panel's texts in reading order, for the runner's record (README "### Drawings").
+        let mut texts = vec!["Change configuration".to_string(), document.clone(), branch.clone(), studio.clone()];
         for (i, input) in ps.configuration.inputs.iter().enumerate() {
             let iid = input.id.clone();
             match &input.kind {
                 ConfigInputKind::List { options, default } => {
                     let cur = d.values.0.get(&iid).cloned().unwrap_or(default.clone());
                     let label = options.iter().find(|o| o.id == cur).map(|o| o.name.clone()).unwrap_or_default();
+                    texts.extend([input.name.clone(), label.clone()]);
                     let opts: Vec<(String, String)> = options.iter().map(|o| (o.id.clone(), o.name.clone())).collect();
                     let ed = ed.clone();
                     let select = Button::new(("change-config-list", i))
@@ -187,6 +190,7 @@ impl DrawingEditor {
                 }
                 ConfigInputKind::Checkbox { default } => {
                     let on = d.values.0.get(&iid).map(|v| v == "true").unwrap_or(*default);
+                    texts.push(input.name.clone());
                     rows.push(
                         h_flex()
                             .h(px(26.))
@@ -202,11 +206,14 @@ impl DrawingEditor {
                 }
                 ConfigInputKind::Variable { .. } | ConfigInputKind::Text { .. } => {
                     if let Some((_, st)) = d.fields.iter().find(|(id, _)| *id == iid) {
+                        texts.extend([input.name.clone(), st.read(cx).value().to_string()]);
                         rows.push(row(input.name.clone(), Input::new(st).xsmall().w(px(120.)).into_any_element()));
                     }
                 }
             }
         }
+        texts.push(part.clone());
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Change configuration", "text": texts }));
         Some(
             v_flex()
                 .id("dr-change-config")
