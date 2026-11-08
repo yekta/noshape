@@ -864,6 +864,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     matched at 09:43); ours reads its own .x_t back unchanged, so the written Parasolid's edges changed.
   - core: c2-impeller-loft 14.9 → 19.8 s (×1.3; the loft start-step changes 9d81e3553 / 50eb4ecfe are in the range).
   - Load, not regressions: asm-empty-menu, asm-face-menu-select-other (both matched alone today; UIP-ASM-FACE-MENU-FLAKY).
+  **qa 23:35, the 18:54 run (green d6904caf) against the 14:11 one:** models 75/87 (same), features 756 → 760/951, scenarios
+  984 → 1082/1285 (103 better), parity index 78.7 → 79.6 (data exchange 74.0 → 77.1; speed 70.8 → 63.5, see below). Flags:
+  - core / blend: c2-impeller-loft "Fillet Bohrungssitz Ansaugflasch" now "Failed to fillet selections." (built before); the
+    range has core's loft start step 80cf79664 and many blend changes (66bf6d577, 938e6ffcb, 0668be6f0 …).
+  - asm: asm-face-menu-section-view and asm-face-menu-view-normal-to differ alone too (on 19036006): step 1 `.list.rows[22]`
+    live "View normal to" / ours "Delete Part 2 <1>" (a Delete row before View normal to in an instance face's menu).
+  - psui (studios: the focus rule?): asm-menu-edit-dynamic-suppression step 4 and plane-line-angle step 4 differ alone at
+    `.focus.selection`: live 5 / ours 0 (plane-line-angle still after 45c531fc0).
+  - Speed, probably vibe2's load (load 10 at the end; the median document 1.21× slower, several unchanged, the worst ×1.9):
+    c2-rings-loft 10.3 → 19.6 s, c2-sm-corner-break 5.2 → 9.2, cf-drive-train-generator 5.9 → 10.3, c2-sm-louver 8.2 → 13.0,
+    cf-fill-pattern 8.2 → 13.1, cf-surface-pattern 24.2 → 33.4, c2-valve-config 1.3 → 2.3 … Re-check on the next run before
+    acting; c2-fan-blade-sweep 0.2 → 1.4 s is its Derived 1 now building (287 ms), not a slowdown.
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):

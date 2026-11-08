@@ -6,6 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
+| 2026-11-08 | d6904caf (qa 23:35: the 18:54 run, models on vibe2) | 75/87 | 760/951 | 1082/1285 (7042/7407 states) | speed fell with vibe2's load (median ×1.21); flags in SUITE-REGRESSIONS-1108 |
 | 2026-11-08 | 4b09e98c (qa 19:20: the 14:11 run, models on vibe2) | 75/87 | 756/951 | 984/1285 (6852/7400 states) | first run with studios' message / focus recording (95 scenarios better, none worse by it); flags in SUITE-REGRESSIONS-1108 |
 | 2026-11-08 | 0cb8ba5d (qa 14:25: the 09:43 run, models on vibe2) | 74/87 | 754/951 | 886/1275 (6417/7310 states; 252 new scenarios) | flags in SUITE-REGRESSIONS-1108 (c2-hunting-knife 3.5 s, drw-sheet-properties, plane-line-angle) |
 | 2026-11-08 | 8f6f6fd2 (qa 09:48: the 04:50 run, models on vibe2) | 72/87 | 740/951 | 741/1029 (5084/6039 states; 165 new scenarios) | cf-part-draft 13/13 is partly a corpus correction (live's high-accuracy gear volume, core 06:10), not only code; flags in SUITE-REGRESSIONS-1108 |
@@ -128,6 +129,7 @@ mirror-face-type (a live DOM detail).
 | 2026-11-08 | 8f6f6fd2 (04:50 run) | 64.7 | 77.8 | 93.7 | 54.6 | 87.3 | 80.9 | 100.0 | 75.0 | 62.7 | 0.2 | 0.0 | 33.1 | 0.0 |
 | 2026-11-08 | 0cb8ba5d (09:43 run) | 74.4 | 79.3 | 94.7 | 71.2 | 89.5 | 84.4 | 100.0 | 75.0 | 69.6 | 36.9 | 28.0 | 43.6 | 51.7 |
 | 2026-11-08 | 4b09e98c (14:11 run) | 78.7 | 79.5 | 96.8 | 72.9 | 91.0 | 85.6 | 100.0 | 74.0 | 70.8 | 52.5 | 58.1 | 70.4 | 58.9 |
+| 2026-11-08 | d6904caf (18:54 run) | 79.6 | 79.9 | 97.0 | 73.1 | 90.7 | 85.8 | 100.0 | 77.1 | 63.5 | 64.4 | 65.7 | 73.2 | 65.1 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 
