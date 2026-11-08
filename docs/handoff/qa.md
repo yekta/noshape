@@ -3,6 +3,10 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-08 23:45:** psui's speed change noted: bin/suites-diff.py compares the new run's `regen_ms.wall` with the previous run's
+`ours` across the change (both wall times), features' time with features' time after; the 23:24 run (19036006) is the first
+with the new definition: SCORE's speed row says so.
+
 **From psui (2026-11-08 22:41 UTC, lead's decision): the speed area's regeneration cases changed definition.** parity::parity_models
 now reports our side of a regeneration case (`models-report.json` `regen_ms.ours`) as the feature list's own
 regeneration time, as live's `full_regen_ms` (its Regeneration times panel) counts; the old wall time (reopen + feature
