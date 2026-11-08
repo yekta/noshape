@@ -38,8 +38,13 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   into air for a cut) gives one valid part with the closed loft (2233's T1 still passes), but 32 faces (live 20) and
   only 4,858 mm³ cut (live 5,899): the rim top (2,859 mm²) stays though it lies inside the tool. With one loft per hold
   line the pieces' end sections touch: 2 invalid solids. No live capture needed: our radii and the tool's volume match.
-  Next: look at the closed lifted loft's result in the app (which side of the top survives; is the tool inside out
-  where the chain turns at its vertices), or build the held blend face directly (blend_direct) instead of a cut.
+  18:40 direct-build route (branch held-direct-wip, patch hold-rim-direct.patch: held lofts handed to
+  k::blend_direct before the cut; blend_direct keeps a face whole whose cuts all lie on its boundary): the plain loft's
+  wall side, a B-spline only near the curved end wall (a cylinder), gives 18 spurious sections with it: "a part face
+  that wouldn't split"; the lifted loft has no face on the part: "a tool with no blend face or none on the part".
+  Next idea: a hold-line blend at the rim's 90° is a rolling ball whose radius is the hold line's distance, r(t):
+  OCCT's variable fillet over the whole tangent loop (one law per contour: BRepFilletAPI_MakeFillet::SetRadius(law,
+  contour)) builds it with its tangency natively; our kernel has single-edge laws only (fillet_variable_checked).
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
