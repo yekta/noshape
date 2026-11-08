@@ -117,6 +117,73 @@ pub fn facing_problems(shape: &Shape, mesh: &MeshBuffers) -> Vec<String> {
     out
 }
 
+/// Where a mesh (positions, triangle indices) isn't a closed surface with consistently oriented triangles: corners
+/// welded by position, every edge must be used exactly once in each direction. An edge used twice the same way is a
+/// fold (triangles over one another, turned over); one used once is a hole. What a 3D printer's slicer refuses.
+pub fn edge_use_problems(positions: &[[f32; 3]], indices: &[u32]) -> Vec<String> {
+    let mut id = std::collections::HashMap::new();
+    let weld: Vec<u32> = positions
+        .iter()
+        .map(|p| {
+            let n = id.len() as u32;
+            *id.entry(p.map(f32::to_bits)).or_insert(n)
+        })
+        .collect();
+    let mut used: std::collections::HashMap<(u32, u32), u32> = std::collections::HashMap::new();
+    let mut degenerate = 0;
+    for t in indices.as_chunks::<3>().0 {
+        let [a, b, c] = t.map(|i| weld[i as usize]);
+        if a == b || b == c || c == a {
+            degenerate += 1;
+            continue;
+        }
+        for e in [(a, b), (b, c), (c, a)] {
+            *used.entry(e).or_default() += 1;
+        }
+    }
+    let at = |v: u32| positions[weld.iter().position(|w| *w == v).unwrap_or(0)].map(|x| x * 1000.0);
+    let (mut twice, mut open, mut first_twice, mut first_open) = (0, 0, None, None);
+    for (&(a, b), &n) in &used {
+        if n > 1 {
+            twice += 1;
+            first_twice.get_or_insert((a, b, n));
+        }
+        if used.get(&(b, a)).copied().unwrap_or(0) == 0 {
+            open += 1;
+            first_open.get_or_insert((a, b));
+        }
+    }
+    let mut out = Vec::new();
+    if let Some((a, b, n)) = first_twice {
+        out.push(format!("{twice} edges used more than once the same way (e.g. {:.3?} → {:.3?} mm, {n} times)", at(a), at(b)));
+    }
+    if let Some((a, b)) = first_open {
+        out.push(format!("{open} edges used one way only (open; e.g. {:.3?} → {:.3?} mm)", at(a), at(b)));
+    }
+    if degenerate > 0 {
+        out.push(format!("{degenerate} triangles with two corners at one point"));
+    }
+    out
+}
+
+/// The faces of a tessellation whose triangles use an edge twice the same way.
+fn folded_faces(t: &k::Tessellation) -> Vec<usize> {
+    let mut id = std::collections::HashMap::new();
+    let weld: Vec<u32> = t.positions.iter().map(|p| { let n = id.len() as u32; *id.entry(p.map(f32::to_bits)).or_insert(n) }).collect();
+    let face_of = |tri: usize| t.faces.iter().position(|r| (tri * 3) as u32 >= r.first_index && ((tri * 3) as u32) < r.first_index + r.index_count).unwrap_or(usize::MAX);
+    let mut used: std::collections::HashMap<(u32, u32), Vec<usize>> = std::collections::HashMap::new();
+    for (ti, tri) in t.indices.as_chunks::<3>().0.iter().enumerate() {
+        let [a, b, c] = tri.map(|i| weld[i as usize]);
+        for e in [(a, b), (b, c), (c, a)] {
+            used.entry(e).or_default().push(face_of(ti));
+        }
+    }
+    let mut out: Vec<usize> = used.values().filter(|f| f.len() > 1).flatten().copied().collect();
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
 fn frame(origin: DVec3) -> Plane {
     Plane::new(origin, DVec3::Z, DVec3::X)
 }
@@ -251,6 +318,64 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
     assert!(problems.is_empty(), "{} planar faces:\n{}", problems.len(), problems.join("\n"));
 }
 
+
+/// Every corpus body's export mesh (STL / OBJ: `k::tessellate` at the Export dialog's Coarse, Medium and Fine) is a
+/// closed surface, each edge used once in each direction (dx's exchange suite: cf-sheet-metal-model-plus folded a
+/// few triangles). NOSHAPE_PLANAR_ONLY=<document stem> runs one document.
+#[test]
+#[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
+fn corpus_export_meshes_are_closed_and_oriented() {
+    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    let only = std::env::var("NOSHAPE_PLANAR_ONLY").ok();
+    let mut docs: Vec<_> = std::fs::read_dir(&dir).expect("the corpus directory").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).filter(|p| only.as_ref().is_none_or(|o| p.file_stem().is_some_and(|s| s == o.as_str()))).collect();
+    docs.sort();
+    assert!(!docs.is_empty(), "no documents in {dir}");
+    // NOSHAPE_PLANAR_BREPMESH=1: every face meshed by BRepMesh (which mesher folded a face).
+    if std::env::var_os("NOSHAPE_PLANAR_BREPMESH").is_some() {
+        k::set_rust_mesh_everywhere(false);
+    }
+    let mut problems = Vec::new();
+    let mut bodies = 0;
+    for path in &docs {
+        // Regenerated as the Export does (its Feature Studios, std's sheet metal, derived parts).
+        let mut ctx = noshape_ops::Ctx::new();
+        let Ok(od) = ctx.open(path) else {
+            problems.push(format!("{}: doesn't open", path.display()));
+            continue;
+        };
+        let tabs: Vec<(noshape_model::TabId, String)> = od.doc().ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| (t.id, t.name.clone())).collect();
+        for (tab, tab_name) in tabs {
+            let Ok(r) = od.regenerate(tab, None) else { continue };
+            for b in r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid) {
+                bodies += 1;
+                for (name, &(chordal_mm, angle_deg, _)) in ["Coarse", "Medium", "Fine"].iter().zip(&noshape_ops::export::PRESETS) {
+                    let Ok(mut t) = k::tessellate(&b.shape, chordal_mm / 1000.0, angle_deg.to_radians(), true) else {
+                        problems.push(format!("{} / {} / {}: {name} doesn't mesh", path.file_stem().unwrap().to_string_lossy(), tab_name, b.name));
+                        continue;
+                    };
+                    // As the Export writes it (`export_mesh`): folded faces re-triangulated.
+                    k::repair_folded_faces(&b.shape, &mut t);
+                    let found = edge_use_problems(&t.positions, &t.indices);
+                    if !found.is_empty() {
+                        let about: Vec<String> = folded_faces(&t)
+                            .into_iter()
+                            .map(|fi| {
+                                let surface = b.shape.sub_shape(ShapeType::Face, fi).and_then(|f| f.face_surface()).map(|s| format!("{s:?}").split([' ', '(', '{']).next().unwrap_or("").to_string());
+                                format!("face {fi} {surface:?}, {} triangles", t.faces[fi].index_count / 3)
+                            })
+                            .collect();
+                        for p in found {
+                            problems.push(format!("{} / {} / {} ({name}): {p}; {}", path.file_stem().unwrap().to_string_lossy(), tab_name, b.name, about.join("; ")));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    eprintln!("{} documents, {bodies} solid bodies", docs.len());
+    assert!(bodies > 0, "no solid bodies in {dir}");
+    assert!(problems.is_empty(), "{} export meshes:\n{}", problems.len(), problems.join("\n"));
+}
 
 /// The checks see the two faults the user's dock showed on a Mac (v0.4.33): a flat face's triangle turned over (the
 /// solid's inside shown black, a hatched wedge in a section) and one stretched across the face over a hole or channel

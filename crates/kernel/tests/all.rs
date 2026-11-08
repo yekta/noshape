@@ -20,6 +20,7 @@ mod hlr;
 mod hole_orientation;
 mod instances;
 mod mesh_import;
+mod mesh_repair;
 mod perf;
 mod planar_mesh;
 mod projection;

@@ -453,7 +453,7 @@ pub fn write_export(s: &ExportSettings, path: &std::path::Path, parts: Vec<(Stri
     if s.format == PartFormat::Obj {
         let stem = path.file_stem().map(|x| x.to_string_lossy().to_string()).unwrap_or_else(|| "part".into());
         let (defl, ang) = mesh_params(s);
-        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
+        let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang)?, *c))).collect::<anyhow::Result<_>>()?;
         let (obj, mtl) = obj_and_mtl(&meshes, &stem);
         let (on, mn) = (format!("{stem}.obj"), format!("{stem}.mtl"));
         let out = path.with_extension("zip");
@@ -676,6 +676,13 @@ fn mesh_params(s: &ExportSettings) -> (f64, f64) {
     (lin.max(1e-7), ang.to_radians().clamp(1e-3, 1.5))
 }
 
+/// A part's export mesh (STL, OBJ, 3MF…): closed and consistently wound, the faces the mesher folded re-triangulated.
+fn export_mesh(sh: &k::Shape, defl: f64, ang: f64) -> anyhow::Result<k::Tessellation> {
+    let mut t = k::tessellate(sh, defl, ang, true)?;
+    k::repair_folded_faces(sh, &mut t);
+    Ok(t)
+}
+
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {
     match s.format {
         PartFormat::Step => {
@@ -703,7 +710,7 @@ fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::
         }
         f if f.mesh() => {
             let (defl, ang) = mesh_params(s);
-            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), k::tessellate(sh, defl, ang, true)?, *c))).collect::<anyhow::Result<_>>()?;
+            let meshes: Vec<(String, k::Tessellation, [f32; 4])> = parts.iter().map(|(n, sh, c)| Ok((n.clone(), export_mesh(sh, defl, ang)?, *c))).collect::<anyhow::Result<_>>()?;
             match f {
                 PartFormat::Stl | PartFormat::Obj => {
                     // STL: in the chosen unit; OBJ: meters.
