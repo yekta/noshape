@@ -89,6 +89,34 @@ pub fn coverage_problems(shape: &Shape, mesh: &MeshBuffers) -> Vec<String> {
     out
 }
 
+/// Faces of any surface whose triangles turn their back on the face's outward normal there (area-weighted, beyond
+/// the chords' tilt): a section view counts such a face's triangles with the wrong sign (red over a wall, material
+/// where there is none) and the viewport culls them (the solid's inside shows).
+pub fn facing_problems(shape: &Shape, mesh: &MeshBuffers) -> Vec<String> {
+    let mut out = Vec::new();
+    let p = |i: u32| DVec3::from(mesh.positions[i as usize].map(f64::from));
+    for (fi, &(first, count)) in mesh.face_ranges.iter().enumerate() {
+        let Ok(face) = shape.sub_shape(ShapeType::Face, fi) else { continue };
+        let tris = &mesh.indices[first as usize..(first + count) as usize];
+        let (mut total, mut backwards, mut n) = (0.0, 0.0, 0);
+        for t in tris.as_chunks::<3>().0 {
+            let (a, b, c) = (p(t[0]), p(t[1]), p(t[2]));
+            let cross = (b - a).cross(c - a);
+            let area = 0.5 * cross.length();
+            let Ok(normal) = face.normal_at_point((a + b + c) / 3.0) else { continue };
+            total += area;
+            if area > 0.0 && cross.normalize().dot(normal) < -0.5 {
+                backwards += area;
+                n += 1;
+            }
+        }
+        if n > 0 && backwards > 0.01 * total {
+            out.push(format!("face {fi} ({}): {n} of {} triangles ({:.4} of {:.4} mm²) face away from its outward normal", if matches!(face.face_surface(), Ok(k::Surface::Plane(_))) { "plane" } else { "curved" }, tris.len() / 3, backwards * 1e6, total * 1e6));
+        }
+    }
+    out
+}
+
 fn frame(origin: DVec3) -> Plane {
     Plane::new(origin, DVec3::Z, DVec3::X)
 }
@@ -212,7 +240,7 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
             for b in &r.display.bodies {
                 let Some(ctx) = r.context.bodies.iter().find(|c| c.id == b.id) else { continue };
                 for (level, mesh) in b.coarser.iter().chain(std::iter::once(&b.mesh)).enumerate() {
-                    for p in planar_face_problems(&ctx.shape, mesh).into_iter().chain(coverage_problems(&ctx.shape, mesh)) {
+                    for p in planar_face_problems(&ctx.shape, mesh).into_iter().chain(coverage_problems(&ctx.shape, mesh)).chain(facing_problems(&ctx.shape, mesh)) {
                         problems.push(format!("{} / {} / {} level {level}: {p}", path.file_stem().unwrap().to_string_lossy(), tab.name, b.name));
                     }
                 }

@@ -640,7 +640,12 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   /root/projects/noshape-wt/psui-fma has a NOSHAPE_NO_TIDY switch, not for landing): tidy turns 4 triangles either
   way. So the Mac fault (the lid's top face partly missing: black; the funnel's under-space counted as material)
   doesn't reproduce off a Mac; GCC's contraction isn't Apple clang's. Confirming needs the document on a Mac (the
-  user on v0.4.35, or a macOS runner: lead's call, it is user data). Asked live (REQUESTS 2255) for Onshape's section
+  user on v0.4.35, or a macOS runner: lead's call, it is user data). **The model is at fault too (00:20 11-08):**
+  Govde self-intersects (`Shape::self_intersects`; BRepCheck calls it valid) from feature 70 "Fis Gecidi R" (a fillet
+  of the USB-C plug passage) on, in every state since; every feature before it is clean (bisected with rollback on
+  c3x/s3.noshape). The red sliver on Linux is that fold; a Mac's OCCT rounds that fillet differently, so the user's
+  bigger red and the space counted as material most likely come from it. For core / blend. The corpus guard now
+  also checks every face's triangles face its outward normal (`facing_problems`, any surface; the dock passes). Asked live (REQUESTS 2255) for Onshape's section
   of two touching parts and a cavity (a stand-in, nothing of the user's).
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
