@@ -291,8 +291,8 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
     if radius <= 0.0 {
         return crate::regen::eval::err_at(&[if width { "width" } else if circular { "radius" } else { "nonCircularRadius" }], "Error regenerating: a parameter is out of range.");
     }
-    if ev.bool("isVariable") && !width {
-        return variable_fillet(ev, radius);
+    if ev.bool("isVariable") && !width && variable_fillet(ev, radius)? {
+        return Ok(());
     }
     // Sections OCCT can't build (conic, curvature, asymmetric, partial) go to booleans.
     let special = {
@@ -661,7 +661,9 @@ fn sharp_of_picked_faces(ev: &EvalCtx, refs: &[crate::reference::Reference]) -> 
     ev.resolve_edges(refs).into_iter().filter(|&(bi, ei)| picked.contains(&(bi, ei)) || !is_smooth(bi, ei)).collect()
 }
 
-fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
+/// A variable fillet; false where it comes to the constant fillet (every radius the default: live 2325 A's plain
+/// cylinder), left to the caller.
+fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<bool> {
     use crate::params::NumKind;
     let mut at_vertex: Vec<(glam::DVec3, f64)> = Vec::new();
     for item in ev.params.array("vertexSettings") {
@@ -669,6 +671,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
         let Some(p) = ev.resolve_vertex_point(r) else { return crate::regen::eval::err_at(&["vertexSettings"], "Select vertices on fillet chain.") };
         at_vertex.push((p, ev.eval_num_in(item, "vertexRadius", NumKind::Length)?));
     }
+    let settings = at_vertex.len();
     for r in ev.query("vertices") {
         if let Some(p) = ev.resolve_vertex_point(r) {
             at_vertex.push((p, radius));
@@ -689,6 +692,40 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
     // Live (qa5 DER13): edges that are all gone read like an empty field.
     if groups.is_empty() {
         return crate::regen::eval::err_at(&["entities"], "Select edges or faces to fillet.");
+    }
+    // Live 2325 A: vertex settings off the chain are dropped (a warning); a closed chain needs two of them, else the
+    // whole fillet is the constant one (a warning).
+    {
+        let mut ends: Vec<(k::Shape, k::EdgeInfo)> = Vec::new();
+        let mut closed = false;
+        for (bi, edges) in &groups {
+            let body = &ev.ctx.bodies[*bi];
+            let edges = if ev.bool("tangentPropagation") { propagate_tangent(&body.shape, edges) } else { edges.clone() };
+            let mut infos = Vec::new();
+            for &e in &edges {
+                let edge = body.shape.sub_shape(ShapeType::Edge, e)?;
+                let info = edge.edge_info()?;
+                infos.push(info.clone());
+                ends.push((edge, info));
+            }
+            let count = |p: glam::DVec3| infos.iter().map(|i| [i.start, i.end].iter().filter(|q| (**q - p).length() < 1e-9).count()).sum::<usize>();
+            closed |= !infos.is_empty() && infos.iter().all(|i| count(i.start) == 2 && count(i.end) == 2);
+        }
+        let on_chain = |p: glam::DVec3| ends.iter().any(|(e, i)| (p - i.start).length() < 1e-9 || (p - i.end).length() < 1e-9 || param_on_edge(e, i, p).is_some());
+        let before = at_vertex.len();
+        at_vertex.retain(|(p, _)| on_chain(*p));
+        if at_vertex.len() < before {
+            ev.warnings.push("Some selected vertices are not on an edge chain.".into());
+        }
+        if closed && settings == 1 {
+            ev.warnings.push("At least two vertices need to be selected for variable fillet on closed edge chains.".into());
+            at_vertex.clear();
+            on_edge.clear();
+        }
+        let default = |r: f64| (r - radius).abs() <= 1e-12 * radius;
+        if at_vertex.iter().all(|v| default(v.1)) && on_edge.iter().all(|p| default(p.2)) {
+            return Ok(false);
+        }
     }
     let radius_at = |p: glam::DVec3| at_vertex.iter().find(|(q, _)| (*q - p).length() < 1e-9).map(|v| v.1).unwrap_or(radius);
     for (bi, edges) in groups.into_iter().rev() {
@@ -753,7 +790,7 @@ fn variable_fillet(ev: &mut EvalCtx, radius: f64) -> FResult<()> {
             super::blend_section::variable_round(ev, bi, &laws).map_err(|_| e)?;
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {

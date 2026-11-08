@@ -871,10 +871,20 @@ fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
         for (bi, edges) in groups.into_iter().rev() {
             let body = ev.ctx.bodies[bi].clone();
             let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+            // Distance and angle: the distance on the edge's second face, its first with Opposite direction (live 2325
+            // D at FeatureScript 336: a cuboid's top front edge, off on the top, on on the front; cf-snap-hook).
+            let reference: Vec<Shape> = match spec {
+                k::ChamferSpec::DistanceAngle(..) => {
+                    let adjacency = body.shape.edge_faces().map_err(|e| fe(e.to_string()))?;
+                    let side = if def_bool(&def, "oppositeDirection", false) { 0 } else { 1 };
+                    edges.iter().map(|&e| adjacency.get(e).and_then(|f| f.get(side)).and_then(|&f| body.shape.sub_shape(ShapeType::Face, f as usize).ok())).collect::<Option<Vec<_>>>().unwrap_or_default()
+                }
+                _ => Vec::new(),
+            };
             let res = match (chamfer, spec) {
                 // The same blends as the Fillet and Chamfer features (with their fallbacks).
                 (false, k::ChamferSpec::Equal(r)) => k::fillet_checked(&body.shape, &shapes, &[r]),
-                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &[]),
+                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &reference),
             }
             .map_err(|e| fe(e.to_string()))?;
             let names = body.shape_names();

@@ -3930,6 +3930,38 @@ export const tiltedBlock = defineFeature(function(context is Context, id is Id, 
     }
 }
 
+/// Live 2325 D: opChamfer OFFSET_ANGLE at FeatureScript 336 (as cf-snap-hook's Snap Hook) on fCuboid (0,0,0)-(40,20,10)
+/// mm's edge through (20, 0, 10), 2 mm at 30°: Opposite direction off puts the 2 mm on the top (top 720 mm²), on on
+/// the front (the top loses 2 tan 30°: 753.812 mm²).
+#[test]
+fn op_chamfer_distance_and_angle_sides_as_live() {
+    for (opposite, top) in [(false, 720.0), (true, 753.812)] {
+        let src = format!(
+            r#"FeatureScript 336;
+import(path : "onshape/std/geometry.fs", version : "336.0");
+annotation {{ "Feature Type Name" : "Chamfer probe" }}
+export const chamferProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition {{}}
+    {{
+        fCuboid(context, id + "c", {{ "corner1" : vector(0, 0, 0) * millimeter, "corner2" : vector(40, 20, 10) * millimeter }});
+        opChamfer(context, id + "ch", {{ "entities" : qContainsPoint(qCreatedBy(id + "c", EntityType.EDGE), vector(20, 0, 10) * millimeter), "chamferType" : ChamferType.OFFSET_ANGLE, "width" : 2 * millimeter, "angle" : 30 * degree, "oppositeDirection" : {opposite}, "tangentPropagation" : false }});
+        const top = qContainsPoint(qCreatedBy(id + "c", EntityType.FACE), vector(20, 15, 10) * millimeter);
+        println(evArea(context, {{ "entities" : top }}) / millimeter ^ 2);
+    }});
+"#
+        );
+        let fx = Fixture::new(&src);
+        let mut ps = PartStudio::new();
+        let f = ps.new_feature(&fx.ty("chamferProbe"), &fx.units).unwrap();
+        let fid = f.id;
+        ps.features.push(f);
+        assert_ok(&fx.regen(&mut Regenerator::new(), &ps));
+        let out = custom::run::output_of(fid).unwrap().output;
+        let got: f64 = out.trim().parse().unwrap();
+        assert!((got - top).abs() < 1e-3, "oppositeDirection {opposite}: top {got} mm², live {top}");
+    }
+}
+
 /// evAxis of a cylinder face (live 1992): along its axis through the middle of the face's extent as it is now, not
 /// its surface's frame origin: the Ø20 × 20 mm cylinder's side 10 mm up, 9 after a 2 mm chamfer on its top edge
 /// (cf-o-ring-generator's O Ring 5 reads it after Chamfer 1).

@@ -3931,8 +3931,9 @@ P1
 - [ ] P2 FACEBLEND-HOLD-INVERSE (blend, live) Inverse tangent hold lines.
 - [x] P2 FACEBLEND-NOTRIM-DETACHED (blend) a detached No trim blend runs on past the chain's ends by the radius (live
   2306 C: 301.5929 mm², x −24…24 on the 40 mm block); ours stops at the ends. Done for straight rounds (cylinders).
-- [ ] P2 FACEBLEND-PROP-SIDE1 (blend, live) Adjacent / Custom propagation with the picks swapped (side 1 the wall):
+- [x] P2 FACEBLEND-PROP-SIDE1 (blend, live) Adjacent / Custom propagation with the picks swapped (side 1 the wall):
   which side walks (ours: side 2 only).
+  Live 2325 B: Adjacent follows side 1's loop (the front's four edges, 23,612.5068 mm³); ours the same (T1).
 - [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
   tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
   Drafted rib (a cylinder) and tapered rib (a cone, live 2306 E: 6,119.2357 mm³, one CONE 503.1114 mm²) done.
@@ -3945,6 +3946,8 @@ P2
 - [ ] P2 FILLET-VAR-PARTIAL (blend) Variable + Partial in one feature (Variable returns before Partial).
 - [ ] P2 FILLET-VAR-ERRORS (blend) std's variable errors (vertex off the chain, internal zero, closed chain needs 2
   vertices, one edge a point) and VRFILLET_NO_EFFECT.
+  Live 2325 A done: a setting off the chain and a closed chain with one setting warn and fillet constant; all at the
+  default: a plain cylinder. Left: an internal zero (ours fails like live, untested message path), one edge a point.
 - [ ] P2 FILLET-VAR-CORNERS (blend, live) variable chains with corners are filleted edge by edge: check against live.
 - [ ] P2 FILLET-KEEPEDGES (blend) Edges to keep (keepEdges) never read.
 - [ ] P2 FILLET-SMOOTHCORNERS (blend, live) Smooth fillet corners + exceptions never read; find a case where it changes
@@ -3961,8 +3964,9 @@ P2
   close). Next: analytic sections (IntAna_QuadQuadGeo for plane / cylinder / cone / sphere pairs; tori by marching
   from the touch curves' crossings). Fillet 5: op_boolean, the Rust Boolean's sections_ahead 50 ms then OCCT's 38 ms
   (bool's: a decline found late).
-- [ ] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
+- [x] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
   some parts." and keeps the others?
+  Live 2325 C: OK with no message, both parts filleted (part 2 overflows its 5 mm face); ours the same (T1).
 - [x] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
   Done: 90° and over go to OCCT as two distances (an acute edge's chamfer; one edge, or edges coming to the same).
 - [x] P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
@@ -3974,6 +3978,8 @@ P2
   Routing opChamfer through the Chamfer evaluator (03ea02463, reverted) broke cf-snap-hook's Snap Hook (FS 336,
   OFFSET_ANGLE, oppositeDirection true: its drafts fail, 18 -> 16); live matches the old op, which ignores
   oppositeDirection for OFFSET_ANGLE. Ask live which face an op-made edge measures from before routing.
+  Live 2325 D: opChamfer's distance and angle honours Opposite direction (off: the edge's second face, on: its
+  first); done. Tangent propagation / overrides / Tangent measurement in the op still to do.
 - [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
   the same face as Two distances' Distance 1; on a round reference face the angle is to the line from the chamfer's
   side to the edge (OCCT: to the face's tangent), fixed with CHAMFER-METHOD.

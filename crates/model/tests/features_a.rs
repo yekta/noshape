@@ -897,6 +897,83 @@ fn a_face_blend_between_two_surface_walls_as_live() {
     }
 }
 
+/// Live 2325 A-C. A 40 × 20 × 10 block, variable fillet (default 2 mm) on its top front edge: a vertex setting off the
+/// chain warns and fillets at the default; a point at radius 0 fails; the closed top loop with one vertex setting
+/// warns and fillets constant; end settings at the default are a plain cylinder. B: Face blend side 1 the front, side 2
+/// the top, Adjacent: the front's four edges. C: one Fillet R 6 over two parts, one too thin for it: both filleted.
+#[test]
+fn variable_fillet_messages_and_fillets_over_two_parts_as_live() {
+    let block = || {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.04, 0.02, "10 mm");
+        let res = t.ok();
+        (t, res.context.bodies[0].clone())
+    };
+    let vertex = |body: &Body, p: DVec3| {
+        let vi = body.shape.vertices().iter().position(|v| v.vertex_point().is_ok_and(|q| q.distance(p) < 1e-9)).expect("vertex");
+        Reference::Vertex((*body.vertices[vi]).clone())
+    };
+    let row = |v: Reference, r: &str| {
+        let mut p = ParamValues::default();
+        p.set("vertex", q(vec![v]));
+        p.set("vertexRadius", e(r));
+        p
+    };
+    let front_top = DVec3::new(0.02, 0.0, 0.01);
+    let run = |edges: Vec<Reference>, rows: Vec<ParamValues>, points: Vec<ParamValues>, mut t: T| {
+        t.add("fillet", &[("entities", q(edges)), ("radius", e("2 mm")), ("isVariable", b(true)), ("tangentPropagation", b(false)), ("vertexSettings", ParamValue::Array(rows)), ("pointOnEdgeSettings", ParamValue::Array(points))]);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap().clone();
+        let b0 = &res.context.bodies[0];
+        let cylinders = b0.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { .. }))).count();
+        (st.status, st.message, b0.shape.volume().unwrap() * 1e9, b0.faces.len(), cylinders)
+    };
+    let near_mm3 = |v: f64, w: f64| (v - w).abs() < 1e-3;
+    // (1) a setting on a bottom vertex.
+    let (t, b0) = block();
+    let (st, msg, v, faces, cyl) = run(vec![edge_near(&b0, front_top)], vec![row(vertex(&b0, DVec3::ZERO), "3 mm")], vec![], t);
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Warning, Some("Some selected vertices are not on an edge chain.")));
+    assert!(near_mm3(v, 7965.6637) && faces == 7 && cyl == 1, "(1) {v} {faces} {cyl}");
+    // (2) a point at 0.5 with radius 0.
+    let (t, b0) = block();
+    let mut point = ParamValues::default();
+    point.set("edge", q(vec![edge_near(&b0, front_top)]));
+    point.set("edgeParameter", e("0.5"));
+    point.set("pointOnEdgeRadius", e("0 mm"));
+    let (st, msg, ..) = run(vec![edge_near(&b0, front_top)], vec![], vec![point], t);
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Error, Some("Failed to fillet selections.")));
+    // (3) the closed top loop with one vertex setting.
+    let (t, b0) = block();
+    let top: Vec<Reference> = [DVec3::new(0.02, 0.0, 0.01), DVec3::new(0.04, 0.01, 0.01), DVec3::new(0.02, 0.02, 0.01), DVec3::new(0.0, 0.01, 0.01)].into_iter().map(|p| edge_near(&b0, p)).collect();
+    let (st, msg, v, faces, cyl) = run(top, vec![row(vertex(&b0, DVec3::new(0.0, 0.0, 0.01)), "3 mm")], vec![], t);
+    assert_eq!((st, msg.as_deref()), (FeatureStatus::Warning, Some("At least two vertices need to be selected for variable fillet on closed edge chains.")));
+    assert!(near_mm3(v, 7900.0589) && faces == 10 && cyl == 4, "(3) {v} {faces} {cyl}");
+    // (4) both ends at the default.
+    let (t, b0) = block();
+    let rows = vec![row(vertex(&b0, DVec3::new(0.0, 0.0, 0.01)), "2 mm"), row(vertex(&b0, DVec3::new(0.04, 0.0, 0.01)), "2 mm")];
+    let (st, _, v, faces, cyl) = run(vec![edge_near(&b0, front_top)], rows, vec![], t);
+    assert!(st == FeatureStatus::Ok && near_mm3(v, 7965.6637) && faces == 7 && cyl == 1, "(4) {st:?} {v} {faces} {cyl}");
+    // B: the front as side 1, the top as side 2, Adjacent.
+    let mut t = T::new();
+    t.block(-0.02, -0.015, 0.02, 0.015, "20 mm");
+    let res = t.ok();
+    let b0 = &res.context.bodies[0];
+    t.add("faceBlend", &[("side1", q(vec![face_with_normal(b0, -DVec3::Y)])), ("side2", q(vec![face_with_normal(b0, DVec3::Z)])), ("radius", e("4 mm")), ("propagation", b(true)), ("propagationType", en("ADJACENT"))]);
+    let res = t.ok();
+    let v = res.context.bodies[0].shape.volume().unwrap() * 1e9;
+    assert!(near_mm3(v, 23612.5068) && res.context.bodies[0].faces.len() == 10, "B {v} {}", res.context.bodies[0].faces.len());
+    // C: R 6 on the top front edge of a 10 mm and a 5 mm block.
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.02, 0.02, "10 mm");
+    t.block(0.04, 0.0, 0.06, 0.02, "5 mm");
+    let res = t.ok();
+    let edges = vec![edge_near(&res.context.bodies[0], DVec3::new(0.01, 0.0, 0.01)), edge_near(&res.context.bodies[1], DVec3::new(0.05, 0.0, 0.005))];
+    t.add("fillet", &[("entities", q(edges)), ("radius", e("6 mm"))]);
+    let res = t.ok();
+    let got: Vec<(f64, usize)> = res.context.bodies.iter().map(|b| (b.shape.volume().unwrap() * 1e9, b.faces.len())).collect();
+    assert!(got.len() == 2 && near_mm3(got[0].0, 3845.4867) && got[0].1 == 7 && near_mm3(got[1].0, 1846.0446) && got[1].1 == 6, "C {got:?}");
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).
@@ -2661,8 +2738,6 @@ fn variable_rounds_taller_than_their_walls_run_onto_the_floor() {
     let rows = vec![
         row(vertex(DVec3::new(0.0, 0.0, 0.025)), "15 mm"),
         row(vertex(DVec3::new(0.14, 0.0, 0.025)), "40 mm"),
-        row(vertex(DVec3::new(0.14, 0.08, 0.025)), "10 mm"),
-        row(vertex(DVec3::new(0.0, 0.08, 0.025)), "30 mm"),
     ];
     // Steep along the front edge, as the document's points (5 mm between 25s and 40s).
     let point = |f: &str, r: &str| {
