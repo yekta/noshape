@@ -2882,7 +2882,7 @@ fn drawing_of_a_part_studio_using_document_variables() {
         let ex = ps.features.iter_mut().find(|f| f.type_id == "extrude").unwrap();
         ex.params.set("depth", crate::params::ParamValue::Expr(ExprValue::new("#plate")));
     }
-    let def = |e: &str| VariableStudio { variables: vec![VariableDef { name: "plate".into(), expr: ExprValue::new(e), kind: None, description: String::new(), description_expr: false, import: None }], insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default() };
+    let def = |e: &str| VariableStudio { variables: vec![VariableDef { name: "plate".into(), expr: ExprValue::new(e), kind: None, description: String::new(), description_expr: false, import: None, other_values: Default::default() }], insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default() };
     let vs = doc.add_tab("Variable Studio 1", TabContent::VariableStudio(def("20 mm")));
     let ps = doc.tabs[0].id;
     let mut drawing = Drawing::default();

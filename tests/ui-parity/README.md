@@ -524,6 +524,9 @@ caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
 A native `<select>` of a page (Preferences' units) opens the OS's popup, which live's recorder can't read: while live's
 focus is such a select and its `list` null, ours' open dropdown isn't compared.
 
+A row live showed for a while and no longer has (the + menu's "Create table", live 2336) is dropped from its lists
+(`LIVE_TRANSIENT_ROWS`).
+
 A tooltip live draws as a native `title` (a history row's "Open version V1") is the OS's, which live's recorder can't
 read: ours' is compared as none while live's is (`NATIVE_TITLE_TOOLTIPS`).
 

@@ -27,6 +27,10 @@ pub struct VariableDef {
     /// "From import": the CSV selection (kind `FromImport`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub import: Option<CsvImport>,
+    /// The values of the types it had before (FeatureScript's Variable keeps one per type: lengthValue,
+    /// angleValue…), by `VarKind::key`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub other_values: BTreeMap<String, ExprValue>,
 }
 
 impl VariableDef {
@@ -41,6 +45,18 @@ impl VariableDef {
             self.description = format!("\"{}\"", self.description);
         }
         self.description_expr = !self.description_expr;
+    }
+
+    /// The Variable type select: the old type's value is kept for later, the new one's comes back, else it starts
+    /// at 0 in the workspace unit (live vs-type-back-length: Angle shows "0 deg", Length again "40 mm").
+    pub fn set_kind(&mut self, kind: VarKind, units: &noshape_units::UnitPrefs) {
+        if self.kind == Some(kind) {
+            return;
+        }
+        let old = self.kind.unwrap_or(VarKind::Any).key();
+        let back = self.other_values.remove(kind.key()).unwrap_or_else(|| ExprValue::new(crate::variable_table::default_value(kind.key(), units)));
+        self.other_values.insert(old.to_string(), std::mem::replace(&mut self.expr, back));
+        self.kind = Some(kind);
     }
 
     /// The Description cell's text, typed: an expression description keeps
@@ -62,6 +78,17 @@ pub enum VarKind {
 }
 
 impl VarKind {
+    /// FeatureScript's `VariableType` name ("LENGTH"…).
+    pub fn key(self) -> &'static str {
+        match self {
+            VarKind::Length => "LENGTH",
+            VarKind::Angle => "ANGLE",
+            VarKind::Number => "NUMBER",
+            VarKind::Any => "ANY",
+            VarKind::FromImport => "FROM_IMPORT",
+        }
+    }
+
     pub fn dim(self) -> Option<Dim> {
         match self {
             VarKind::Length => Some(Dim::LENGTH),
@@ -698,7 +725,7 @@ mod studio_scope_tests {
 
     #[test]
     fn description_converts_to_expression_and_back() {
-        let mut v = VariableDef { name: "w".into(), expr: ExprValue::new("10 mm"), kind: Some(VarKind::Length), description: "half of 10".into(), description_expr: false, import: None };
+        let mut v = VariableDef { name: "w".into(), expr: ExprValue::new("10 mm"), kind: Some(VarKind::Length), description: "half of 10".into(), description_expr: false, import: None, other_values: Default::default() };
         v.toggle_description_expr();
         assert_eq!((v.description.as_str(), v.description_expr), ("\"half of 10\"", true));
         v.set_description("plate width");
@@ -710,8 +737,22 @@ mod studio_scope_tests {
         assert_eq!((v.description.as_str(), v.description_expr), ("plate width", false));
     }
 
+    #[test]
+    fn each_variable_type_keeps_its_own_value() {
+        let units = noshape_units::UnitPrefs::default();
+        let mut v = VariableDef { name: "w".into(), expr: ExprValue::new("40 mm"), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None, other_values: Default::default() };
+        v.set_kind(VarKind::Angle, &units);
+        assert_eq!(v.expr.text, "0 deg");
+        v.set_kind(VarKind::Number, &units);
+        assert_eq!(v.expr.text, "0");
+        v.set_kind(VarKind::Length, &units);
+        assert_eq!((v.kind, v.expr.text.as_str()), (Some(VarKind::Length), "40 mm"));
+        v.set_kind(VarKind::Length, &units);
+        assert_eq!(v.expr.text, "40 mm");
+    }
+
     fn vs(vars: &[(&str, &str)], all: bool) -> VariableStudio {
-        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None }).collect(), insert_into_all: all, inserted: Vec::new(), configuration: VsConfiguration::default() }
+        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None, other_values: Default::default() }).collect(), insert_into_all: all, inserted: Vec::new(), configuration: VsConfiguration::default() }
     }
 
     fn doc_with(studios: Vec<VariableStudio>) -> (crate::Document, TabId, Vec<TabId>) {
@@ -814,7 +855,7 @@ mod studio_scope_tests {
         assert_eq!(mm(element_variables(&doc, ps).get("a")), 5.0);
         // Studio 2 inserts studio 1 and uses its variable; its own `a` still wins.
         if let TabContent::VariableStudio(v) = &mut doc.tab_mut(ids[1]).unwrap().content {
-            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new(), description_expr: false, import: None }];
+            v.variables = vec![VariableDef { name: "c".into(), expr: ExprValue::new("#a * 3"), kind: None, description: String::new(), description_expr: false, import: None, other_values: Default::default() }];
             v.inserted = vec![StudioRef::whole(ids[0])];
             v.insert_into_all = false;
         }

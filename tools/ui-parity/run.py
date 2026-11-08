@@ -175,6 +175,9 @@ NATIVE_TITLE_TOOLTIPS = re.compile(r"^Open (version|workspace) ")
 CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
               "Import from", "Create task…"}
+# Rows live showed for a while and no longer has (live 2336: the + menu's "Create table" only in its 05:00–06:20
+# recordings, in no document since).
+LIVE_TRANSIENT_ROWS = {"Create table"}
 
 
 def normalize_live(state):
@@ -293,7 +296,7 @@ def normalize_live(state):
         rows = lst.get("rows") or []
         hl = lst.get("highlighted")
         hl_row = rows[hl] if isinstance(hl, int) and 0 <= hl < len(rows) else None
-        lst["rows"] = [r for r in rows if r not in CLOUD_ONLY]
+        lst["rows"] = [r for r in rows if r not in CLOUD_ONLY | LIVE_TRANSIENT_ROWS]
         # A panel's ⋯ menu: live's recorder names it "menu" (ours "context-menu": the same rows to a user), and in the
         # assembly's panels reads each row twice (asm-bom-copy-table: "Copy table", "Copy table", …).
         if lst.get("kind") == "menu":

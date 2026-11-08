@@ -99,7 +99,7 @@ fn vs_set_fields(od: &mut OpenDoc, tab: TabId, i: usize, a: &Args) -> Result<(),
     let units = od.doc().settings.units;
     if let Some(k) = a.opt_str("kind")? {
         let k = kind_of(k)?;
-        vs_edit(od, tab, "Change variable type", |s| vs::set_kind(s, i, k))?;
+        vs_edit(od, tab, "Change variable type", |s| vs::set_kind(s, i, k, &units))?;
     }
     if let Some(v) = a.get("value") {
         let v = value_text(v)?;

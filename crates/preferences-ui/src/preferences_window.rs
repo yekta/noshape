@@ -441,6 +441,20 @@ impl PreferencesView {
         cx.notify();
     }
 
+    /// The popup's Reset to default: the default key in the field (an unassigned default resets at once).
+    fn reset_in_popup(&mut self, entry: &'static Entry, cx: &mut Context<Self>) {
+        let Some(key) = entry.default.and_then(shortcuts::canonical_str) else {
+            self.reset_entry(entry, cx);
+            self.close_edit(cx);
+            return;
+        };
+        if let Some(ed) = &mut self.edit {
+            ed.pressed = Some(key);
+            ed.disable = false;
+        }
+        cx.notify();
+    }
+
     fn reset_entry(&mut self, entry: &'static Entry, cx: &mut Context<Self>) {
         shortcuts::update(cx, |s| s.reset(entry));
         cx.notify();
@@ -896,15 +910,14 @@ impl PreferencesView {
                     .text_size(px(14.))
                     .text_color(pal.text_faint)
                     .when(!can_reset, |d| d.opacity(0.6))
-                    .when(can_reset, |d| d.cursor_pointer().hover(|d| d.text_color(pal.text_muted)))
                     .child("Reset to default")
-                    .child(crate::assets::icon("shortcut-reset", 18., cx))
-                    .when(can_reset, |d| {
-                        d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.reset_entry(entry, cx);
-                            this.close_edit(cx);
-                        }))
-                    }),
+                    // Live (studios 2336): only the ↺ reacts, filling the field with the default; Confirm applies it.
+                    .child(
+                        div()
+                            .id("kb-edit-reset-icon")
+                            .child(crate::assets::icon("shortcut-reset", 18., cx))
+                            .when(can_reset, |d| d.cursor_pointer().on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.reset_in_popup(entry, cx)))),
+                    ),
             ));
         Some(
             v_flex()

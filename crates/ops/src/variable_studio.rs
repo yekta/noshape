@@ -10,7 +10,7 @@ use noshape_units::{ExprValue, UnitPrefs};
 pub fn add_variable(s: &mut VariableStudio, name: &str, units: &UnitPrefs) {
     let name = name.trim().trim_start_matches('#').to_string();
     let unit = units.length.symbol();
-    s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None });
+    s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None, other_values: Default::default() });
 }
 
 /// Live's toast when an added variable's name was taken (vs-add-variable-duplicate).
@@ -121,9 +121,9 @@ pub fn set_description(s: &mut VariableStudio, i: usize, text: &str) {
 }
 
 /// The Type select ("Change variable type").
-pub fn set_kind(s: &mut VariableStudio, i: usize, kind: VarKind) {
+pub fn set_kind(s: &mut VariableStudio, i: usize, kind: VarKind, units: &noshape_units::UnitPrefs) {
     if let Some(v) = s.variables.get_mut(i) {
-        v.kind = Some(kind);
+        v.set_kind(kind, units);
     }
 }
 

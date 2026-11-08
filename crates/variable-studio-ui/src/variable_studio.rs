@@ -100,7 +100,9 @@ impl VariableStudioView {
         let rows = |collapsed: bool, drawn: &[serde_json::Value]| if collapsed { serde_json::json!([]) } else { serde_json::json!(drawn) };
         let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "collapsed": v.read(cx).collapsed, "rows": rows(v.read(cx).collapsed, &v.read(cx).ui_drawn) })).collect();
         tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
-        tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": rows(self.collapsed, &self.ui_drawn) }));
+        // Being renamed, the title reads as its field (live vs-table-rename).
+        let own = self.renaming.as_ref().map(|st| st.read(cx).value().to_string()).unwrap_or_else(|| title(self.tab));
+        tables.push(serde_json::json!({ "title": own, "collapsed": self.collapsed, "rows": rows(self.collapsed, &self.ui_drawn) }));
         let insert_into_all = self.studio(cx).is_some_and(|s| s.insert_into_all);
         serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": self.config_open.then(|| self.ui_configuration(cx)), "help": self.help_open })
     }
@@ -484,11 +486,15 @@ impl VariableStudioView {
     fn start_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
-        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, _, cx| {
+        let sub = cx.subscribe_in(&st, window, |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) && this.renaming.is_some() {
                 let name = st.read(cx).value().trim().to_string();
                 let tab = this.tab;
                 this.renaming = None;
+                // Enter leaves the keyboard with the studio (live vs-table-rename: focus none).
+                if matches!(ev, InputEvent::PressEnter { .. }) {
+                    window.focus(&this.focus, cx);
+                }
                 if !name.is_empty() {
                     this.doc.update(cx, |d, cx| {
                         d.edit_document_not_undoable(&format!("Rename tab : {name}"), cx, |doc| {
@@ -875,7 +881,8 @@ impl Render for VariableStudioView {
                                 let cell = type_cell(("vs-kind", i), KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
                                     let k = KINDS[k];
                                     kinds.update(cx, |this, cx| {
-                                        this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k));
+                                        let units = this.doc.read(cx).session.doc.settings.units;
+                                        this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k, &units));
                                         // From import: its settings are in the Variable dialog.
                                         if k == VarKind::FromImport {
                                             crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);

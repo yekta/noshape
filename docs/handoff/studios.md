@@ -28,6 +28,15 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 18:47 UTC: Variable Studio types keep their values; live's answers 2336
+- A Variable Studio row keeps one value per type (`VariableDef::other_values`, as FeatureScript's Variable): a new
+  type starts at 0 in the workspace unit, going back restores the old value (live vs-type-*). The table's title reads
+  as its rename field while renaming; Enter leaves the keyboard with the studio.
+- Edit shortcut › Reset to default: only its ↺ reacts and fills the field with the default; Confirm applies it (live
+  2336). run.py drops the + menu's "Create table" (live: gone since 06:20).
+- Open: the Value cell's `#` autocomplete (vs-value-autocomplete) needs `var_complete` moved from part-studio-ui to
+  app-core; the type picker leaves an empty input focused in live (vs-type-*: focus only).
+
 ### 2026-11-08 18:29 UTC: versions 52/91 (from 46), documents page and ☰ menu fixes
 - Versions: workspace / version Properties records its fields; a history entry's Create version is "from history"
   and offers Publish custom features and tables; the repair hint ends with "."; no row is selected while picking an
