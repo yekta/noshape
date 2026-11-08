@@ -138,6 +138,24 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// A configured reference's selection, input by input ("Size", "Small"), as its Sheets panel hover shows it (help
+    /// Drawing sheets: "a tooltip of the configuration selection"; live2 drw-sheet-ref-change-config).
+    pub fn config_selection(&self, tab: TabId, values: &ConfigValues, cx: &App) -> Vec<(String, String)> {
+        let Some(TabContent::PartStudio(ps)) = self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content) else { return Vec::new() };
+        ps.configuration
+            .inputs
+            .iter()
+            .map(|i| {
+                let v = match (values.0.get(&i.id), &i.kind) {
+                    (Some(v), ConfigInputKind::List { options, .. }) => options.iter().find(|o| &o.id == v).map_or_else(|| v.clone(), |o| o.name.clone()),
+                    (Some(v), _) => v.clone(),
+                    (None, _) => i.default_text(),
+                };
+                (i.name.clone(), v)
+            })
+            .collect()
+    }
+
     pub fn render_change_config(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.change_config.as_ref()?;
         let pal = p();

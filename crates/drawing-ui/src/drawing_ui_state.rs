@@ -322,6 +322,11 @@ impl DrawingEditor {
         if self.insert.chooser.is_some() {
             return json!({ "kind": "field", "label": null });
         }
+        // The custom table picker: once its list was opened, live's searchable select keeps the focus (live2
+        // drw-custom-table-*).
+        if matches!(self.custom_tables.dlg.as_ref().and_then(|d| d.picker.as_ref()), Some(crate::drawing_custom_table::Picker::Table { list_open, pending }) if *list_open || pending.is_some()) {
+            return json!({ "kind": "field", "label": null });
+        }
         json!({ "kind": "other" })
     }
 

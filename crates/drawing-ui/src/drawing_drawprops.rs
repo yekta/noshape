@@ -801,7 +801,22 @@ impl DrawingEditor {
         let ed = cx.entity();
         let props = self.drawing.props.clone();
         let units = props.units.unwrap_or(if self.drawing.units_mm { DimUnits::Millimeter } else { DimUnits::Inch });
+        // The tab's texts in reading order for the ui-parity runner (live2 drw-drawprops-*: a label, then its select's
+        // options): a select's options wait for the label of the row they are in.
+        let recording = crate::ui_script::active();
+        let rec: std::cell::RefCell<Vec<String>> = Default::default();
+        let pending: std::cell::RefCell<Vec<String>> = Default::default();
+        let rec_label = |label: &str| {
+            if recording {
+                let mut r = rec.borrow_mut();
+                r.push(label.to_string());
+                r.append(&mut pending.borrow_mut());
+            }
+        };
         let sel = |id: &'static str, current: String, items: Vec<(String, bool, Act)>, w: f32| {
+            if recording {
+                pending.borrow_mut().extend(items.iter().map(|i| i.0.clone()));
+            }
             let ed = ed.clone();
             select_field(id, current, w)
                 .os_dropdown_menu(SharedString::from(format!("{id}-dd")), true, move |mut menu, _, _| {
@@ -870,12 +885,18 @@ impl DrawingEditor {
         // centre (3 px of margin under it); group headers 30 px `#efefef`
         // with a `#ddd` rule, 500 #333, 8 px above their first row and 4 px
         // below the previous group's last one.
-        let row = |label: &'static str, body: AnyElement| h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(10.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element();
+        let row = |label: &'static str, body: AnyElement| {
+            rec_label(label);
+            h_flex().h(px(33.)).flex_none().pl(px(13.)).pr(px(10.)).child(div().flex_1().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().mb(px(3.)).child(body)).into_any_element()
+        };
         // A table row (live 1710's Dimensions tab): each group lays its
         // controls out from its own column `col` (px from the panel's
         // border), the row `h` high, the control `top` px down, the label
         // centred.
-        let trow = |label: &'static str, col: f32, h: f32, top: f32, body: AnyElement| div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().pt(px(top)).child(body)).into_any_element();
+        let trow = |label: &'static str, col: f32, h: f32, top: f32, body: AnyElement| {
+            rec_label(label);
+            div().h(px(h)).flex_none().flex().pl(px(13.)).child(div().w(px(col - 14.)).flex_none().h_full().flex().items_center().text_size(px(13.33)).text_color(gpui_kit::rgb(0x666666)).child(label)).child(div().pt(px(top)).child(body)).into_any_element()
+        };
         // The arrowhead control: the style's glyph and a caret, 28 px.
         // Live "ui2 (10-26) arrowhead picker": a 28 x 158 list right under
         // the control, six 26 px cells of glyphs only (None, Filled,
@@ -938,7 +959,10 @@ impl DrawingEditor {
                 .children(menu)
                 .into_any_element()
         };
-        let section = |title: &'static str| div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element();
+        let section = |title: &'static str| {
+            rec_label(title);
+            div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(gpui_kit::rgb(0xefefef)).border_t_1().border_color(gpui_kit::rgb(0xdddddd)).text_size(px(13.33)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).mt(px(4.)).mb(px(8.)).child(title).into_any_element()
+        };
         let precision_items = |cur: Option<u8>, max: usize, set: fn(&mut DrawingProps, Option<u8>)| -> Vec<(String, bool, Act)> {
             (0..=max).map(|k| (precision_label(k), cur == Some(k as u8), std::rc::Rc::new(move |p: &mut DrawingProps| set(p, Some(k as u8))) as Act)).collect()
         };
@@ -947,20 +971,6 @@ impl DrawingEditor {
         // scrollbar at the right, the groups ending before it.
         let overflow = self.drawing_props.overflow.get();
         let mut body = v_flex().id("dr-dprops-body").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.drawing_props.scroll).when(overflow, |d| d.pr(px(gpui_kit::component::menu::NATIVE_SCROLLBAR_WIDTH)));
-        crate::ui_script::note_dialog(|| {
-            let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
-            let mut text: Vec<String> = vec!["Drawing properties".into(), tab.into()];
-            if self.drawing_props.tab == 0 {
-                text.extend(["Primary", "Units"].map(String::from));
-                text.extend(DimUnits::ALL.iter().map(|u| u.name().to_string()));
-                text.extend(["Decimal separator", "Period", "Comma"].map(String::from));
-                for label in ["Precision", "Tolerance precision"] {
-                    text.push(label.into());
-                    text.extend((0..=6).map(precision_label));
-                }
-            }
-            serde_json::json!({ "kind": "drawing-panel", "title": "Drawing properties", "text": text })
-        });
         if self.drawing_props.tab == 0 {
             let unit_items: Vec<(String, bool, Act)> = DimUnits::ALL
                 .iter()
@@ -976,6 +986,7 @@ impl DrawingEditor {
             ];
             // Live (1710): the box 9 px in and 11 px down a 37 px row, a 13.33 px #666 label.
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1019,6 +1030,7 @@ impl DrawingEditor {
                 ("Horizontal".into(), horiz, std::rc::Rc::new(|p: &mut DrawingProps| p.dim_text_horizontal = true) as Act),
             ];
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1084,6 +1096,7 @@ impl DrawingEditor {
                 .map(|&t| (t.name().to_string(), t == props.ann_arrow_type, std::rc::Rc::new(move |p: &mut DrawingProps| p.ann_arrow_type = t) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1184,6 +1197,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 3 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1193,12 +1207,16 @@ impl DrawingEditor {
             let vt = props.view_tab.clone();
             let proj = self.drawing.projection;
             let ed2 = ed.clone();
+            if recording {
+                pending.borrow_mut().extend(["First angle", "Third angle"].map(String::from));
+            }
             // Live 1710: 223 px from the group's column (121 px).
             let proj_btn = select_field("dp-proj", if proj == Projection::ThirdAngle { "Third angle".into() } else { "First angle".into() }, 223.)
                 .os_dropdown_menu("dp-projection-dd", true, move |m, _, _| {
                     let (a, b) = (ed2.clone(), ed2.clone());
-                    m.item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::ThirdAngle))))
-                        .item(crate::os_menu::OsMenuItem::new("First angle").checked(proj == Projection::FirstAngle).on_click(move |_, _, cx| b.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::FirstAngle))))
+                    // Live (live2 drw-drawprops-*): First angle, Third angle.
+                    m.item(crate::os_menu::OsMenuItem::new("First angle").checked(proj == Projection::FirstAngle).on_click(move |_, _, cx| b.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::FirstAngle))))
+                        .item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::ThirdAngle))))
                 })
                 .into_any_element();
             let simp: [(&str, Simplification); 5] = [("None", Simplification::None), ("Auto", Simplification::Auto), ("Absolute", Simplification::Absolute(0.001)), ("Ratio to studio", Simplification::RatioToStudio(0.01)), ("Ratio to part", Simplification::RatioToPart(0.01))];
@@ -1408,6 +1426,7 @@ impl DrawingEditor {
                 .map(|&s| (point_size_label(s), (vt.sketch_point_size - s).abs() < 1e-9, std::rc::Rc::new(move |p: &mut DrawingProps| p.view_tab.sketch_point_size = s) as Act))
                 .collect();
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(44.)).flex_none().pl(px(8.)).pb(px(3.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1585,6 +1604,7 @@ impl DrawingEditor {
             }
         } else if self.drawing_props.tab == 7 {
             let check = |id: &'static str, label: &'static str, on: bool, f: fn(&mut DrawingProps, bool), cx: &mut Context<Self>| {
+                rec_label(label);
                 div().h(px(37.)).flex_none().pl(px(8.)).pb(px(2.)).flex().items_center().child(crate::drawing_chrome::DrCheckbox::new(id).native().label_style(13.33, 0x666666).label(label).checked(on).on_click(cx.listener(move |this, v: &bool, _, cx| {
                     let v = *v;
                     this.set_drawing_prop(&move |p| f(p, v), cx);
@@ -1638,6 +1658,15 @@ impl DrawingEditor {
             body = body
                 .child(div().h(px(30.)).flex_none().pl(px(14.)).flex().items_center().bg(crate::theme::light().panel).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(gpui_kit::rgb(0x333333)).child(TABS[self.drawing_props.tab].0))
                 .child(div().px(px(12.)).py_2().text_size(px(12.)).text_color(pal.text_muted).child("These properties are set per item for now (select a dimension, note or table)."));
+        }
+        if recording {
+            // The first tab under the panel's title and its own; the others under their own (live2 drw-drawprops-*).
+            let tab = TABS.get(self.drawing_props.tab).map(|t| t.0).unwrap_or_default();
+            let mut text: Vec<String> = if self.drawing_props.tab == 0 { vec!["Drawing properties".into(), tab.into()] } else { vec![tab.into()] };
+            text.append(&mut rec.borrow_mut());
+            text.append(&mut pending.borrow_mut());
+            let title = text[0].clone();
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": title, "text": text }));
         }
         // Live drawing/341: 38 px cells flush left, `#adadad` rules, `#f4f5f6`;
         // the active one white and open to the white section below.

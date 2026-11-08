@@ -26,6 +26,9 @@ pub struct CropDlg {
 }
 
 const SHAPES: [(&str, &str); 3] = [("Circle", "circle"), ("Spline", "spline"), ("Polygon", "polyline")];
+/// No shape pressed (the pressed one clicked again): the dialog picks an existing closed profile ("Select closed
+/// profile", live2 drw-crop-add-spline-point).
+pub const NO_SHAPE: u8 = 3;
 
 /// The pending profile's colour and its points' (help crop-view-spline-01:
 /// tan, light blue dots).
@@ -188,11 +191,12 @@ impl DrawingEditor {
                 .child(crate::assets::icon(icon, 20., cx))
                 .tooltip(crate::ui::tooltip(*tip))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    let next = if on { NO_SHAPE } else { i as u8 };
                     if let Some(d) = &mut this.crop_dlg {
-                        d.shape = i as u8;
+                        d.shape = next;
                         d.add_point = false;
                     }
-                    this.tool = shape_tool(i as u8, None);
+                    this.tool = shape_tool(next, None);
                     this.update_preview(cx);
                     cx.notify();
                 }));
@@ -213,9 +217,23 @@ impl DrawingEditor {
                         .cursor_pointer()
                         .child(crate::assets::icon("drawing-tool-caret", 12., cx))
                         .on_click(move |e: &ClickEvent, window, cx| {
+                            let frame = ed.clone();
                             let ed = ed.clone();
+                            // Live (live2 drw-crop-add-spline-point): Spline | Spline point.
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                                m.item(crate::os_menu::OsMenuItem::new("Add spline point").disabled(!can_add).on_click(move |_, _, cx| {
+                                let e2 = ed.clone();
+                                m.item(crate::os_menu::OsMenuItem::new("Spline").on_click(move |_, _, cx| {
+                                    e2.update(cx, |t, cx| {
+                                        if let Some(d) = &mut t.crop_dlg {
+                                            d.shape = 1;
+                                            d.add_point = false;
+                                        }
+                                        t.tool = shape_tool(1, None);
+                                        t.update_preview(cx);
+                                        cx.notify();
+                                    })
+                                }))
+                                .item(crate::os_menu::OsMenuItem::new("Spline point").disabled(!can_add).on_click(move |_, _, cx| {
                                     ed.update(cx, |t, cx| {
                                         if let Some(d) = &mut t.crop_dlg {
                                             d.add_point = true;
@@ -224,6 +242,9 @@ impl DrawingEditor {
                                     })
                                 }))
                             });
+                            // The drawing's own menu (live's is in its iframe).
+                            let weak = menu.downgrade();
+                            frame.update(cx, |t, _| t.frame_menu = Some(weak));
                             crate::os_menu::open(e.position(), menu, window, cx);
                         }),
                 );
@@ -245,10 +266,14 @@ impl DrawingEditor {
                     }))),
             )
         } else {
-            field.h(px(26.)).flex().items_center().child("Create closed profile")
+            field.h(px(26.)).flex().items_center().child(if shape == NO_SHAPE { "Select closed profile" } else { "Create closed profile" })
         };
         crate::ui_script::note_dialog(|| {
-            let text: &[&str] = if pending { &["Crop view", "Edit closed profile", "Profile", "×"] } else { &["Crop view", "Create closed profile"] };
+            let text: &[&str] = match (pending, shape == NO_SHAPE) {
+                (true, _) => &["Crop view", "Edit closed profile", "Profile", "×"],
+                (false, true) => &["Crop view", "Select closed profile"],
+                (false, false) => &["Crop view", "Create closed profile"],
+            };
             serde_json::json!({ "kind": "drawing-panel", "title": "Crop view", "text": text })
         });
         Some(

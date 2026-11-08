@@ -393,6 +393,8 @@ def compare(live, ours, whole_document=True):
             d = side.get("dialog")
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
                 d["text"] = [re.sub(r"^start \S+ asm( Copy \d+)?$", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
+                # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
+                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
                 # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own.
                 d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d["text"]][:30]
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
@@ -400,6 +402,8 @@ def compare(live, ours, whole_document=True):
             dr = side.get("drawing")
             if isinstance(dr, dict) and isinstance(dr.get("tab"), str):
                 dr["tab"] = re.sub(r"^start \S+ asm( Copy \d+)? ", "start asm ", dr["tab"])
+                # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view).
+                dr["tab"] = re.sub(r" \(\d+\)$", "", dr["tab"])
         # Live's recorder can't read a table's cells (its text is null there).
         anns = [((side.get("drawing") or {}).get("annotations") or []) for side in (a, b)]
         if any(x.get("kind") == "table" and x.get("text") is None for x in anns[0]):

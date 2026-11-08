@@ -491,6 +491,14 @@ impl DrawingEditor {
             };
             list = list.child(row);
         }
+        // Its texts for the ui-parity runner (live2 drw-callout-stacked-add).
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = vec!["Stacked callouts".into(), "Anchor:".into()];
+            text.extend(anchor.clone());
+            text.extend(["Add instances from BOM".to_string(), "Stacked instances".to_string()]);
+            text.extend(d.picks.iter().map(|(n, _)| n.clone()));
+            serde_json::json!({ "kind": "drawing-panel", "title": "Stacked callouts", "text": text })
+        });
         Some(
             v_flex()
                 .id("dr-stack-dlg")

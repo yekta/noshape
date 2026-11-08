@@ -715,7 +715,7 @@ impl DrawingEditor {
                     }),
                 )
         };
-        let ref_row = |this: &Self, key: String, name: &str, src: Option<(TabId, Option<noshape_model::BodyId>)>, indent: f32, cx: &mut Context<Self>| {
+        let ref_row = |this: &Self, key: String, name: &str, src: Option<(TabId, Option<noshape_model::BodyId>)>, config: &[(String, String)], indent: f32, cx: &mut Context<Self>| {
             let (name, version) = match name.split_once('\u{1}') {
                 Some((n, v)) => (n.to_string(), Some(v.to_string())),
                 None => (name.to_string(), None),
@@ -723,7 +723,10 @@ impl DrawingEditor {
             let menu = src.map(|(tab, part)| this.reference_menu(tab, part, version.is_some(), cx));
             let mark = name.clone();
             // Live (live2 drw-sheet-ref-switch): hovered, a popup of its name and version ("Part 1 In progress").
-            let tip = format!("{name}  {}", version.as_deref().unwrap_or("In progress"));
+            let mut tip = format!("{name}  {}", version.as_deref().unwrap_or("In progress"));
+            for (k, v) in config {
+                tip.push_str(&format!("\n{k}  {v}"));
+            }
             let hover_key = key.clone();
             crate::ui::tree_row(SharedString::from(key), false)
                 .map(|d| crate::ui_script::mark(d, || format!("sheet_ref:{mark}")))
@@ -792,7 +795,7 @@ impl DrawingEditor {
             }
             for (k, (r, vs)) in refs.iter().enumerate() {
                 let src = vs.first().and_then(|(si, v)| self.reference_source(&self.drawing.sheets[*si], v.id));
-                list = list.child(ref_row(self, format!("dr-ref-{k}"), r, src, 6., cx));
+                list = list.child(ref_row(self, format!("dr-ref-{k}"), r, src, &[], 6., cx));
                 // Its sheets, with their views underneath.
                 let mut last = None;
                 for (sheet_i, v) in vs {
@@ -827,10 +830,16 @@ impl DrawingEditor {
                     let key = format!("dr-sheet-ref-{i}-{k}");
                     let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
                     text.extend([version.to_string(), name.to_string()]);
+                    // A configured source's selection (its views' configuration).
+                    let config = match (src.as_ref(), vs.first().and_then(|v| noshape_model::drawing::views::view_source(s, v.id))) {
+                        (Some((tab, _)), Some((sk, _))) if self.reference_configurable(*tab, cx) => self.config_selection(*tab, &sk.config, cx),
+                        _ => Vec::new(),
+                    };
                     if self.sheets_ref_hover.as_deref() == Some(key.as_str()) {
                         text.push(format!("{name} {version}"));
+                        text.extend(config.iter().flat_map(|(k, v)| [k.clone(), v.clone()]));
                     }
-                    list = list.child(ref_row(self, key, r, src, 34., cx));
+                    list = list.child(ref_row(self, key, r, src, &config, 34., cx));
                     for v in vs {
                         list = list.child(self.sheet_view_row(s, v, 75., cx));
                         text.push(self.view_row_label(s, v).0);

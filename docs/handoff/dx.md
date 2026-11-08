@@ -50,6 +50,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   instances in xdev-subs, robot-relations, pinslot, corexy). Part Studio suite after all three: no document worse
   (70/86, 724/934).
 
+## 11-08 06:51 UTC: live2's 20 recordings (2f97542b): drawings 106/167, exports 24/24
+- **Drawing match 106/167 scenarios, 1142/1311 states** (vibe5, before this land's last two fixes: Views tab's
+  projection options and the crop ▾ / custom-table focus). **Exports 24/24** (compare.py with `--drawn-by NGYEKTA`
+  too: the title block's drawn-by is the vibe host's user).
+- Fixed: Drawing properties records each tab (title = the tab's name after the first; `row`/`select`/`section`
+  builders collect the texts); Inspection item Edit... is the full dialog (Manual | Automatic, Number, shape, width,
+  applied on ✓), Reorder shows live's instruction and an empty Number:; the configured reference's hover popup lists
+  its configuration; the Stacked callouts panel is recorded; Crop view's pressed shape button un-presses ("Select
+  closed profile": picking an existing closed profile, which ours doesn't do yet: clicks draw nothing) and its ▾ is
+  Spline | Spline point; the custom table picker keeps the focus. run.py: live2's start studio "start block Copy 1"
+  and a drawing tab's " (1)" normalised.
+
 ## 11-08 06:02 UTC: drawing match 95/158, new starts, coverage 98/102 (lead 11-08)
 - **Drawing match 95/158 scenarios, 1031/1208 states** (vibe5, before 98422063: its fixes add a few more). Fixed: the
   sheet's sketch geometry is recorded as live's export lists it (line, circle, arc, spline + its points, a lone

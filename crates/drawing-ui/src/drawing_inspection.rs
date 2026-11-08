@@ -50,20 +50,24 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    /// Context menu › Reorder inspection items: type a number, click items.
-    pub fn start_reorder_inspection(&mut self, from: u32, window: &mut Window, cx: &mut Context<Self>) {
-        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(from.to_string()));
+    /// Context menu › Reorder inspection items: type a number, click items (live2 drw-inspection-reorder: the field
+    /// starts empty).
+    pub fn start_reorder_inspection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
         self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: Some(st), edit: None, hover: None, number: None, shape: None, chars: None });
         self.status = Some("Reorder inspection items: click the items in their new order".into());
         cx.notify();
     }
 
     /// Edit an item (double-click it, or Edit in its context menu): the
-    /// dialog with its Number; the checkmark applies.
+    /// Inspection item dialog on it (live2 drw-inspection-edit: Manual | Automatic, Number, its shape and width); the
+    /// checkmark applies.
     pub fn edit_inspection(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(n) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id).and_then(|a| a.inspection) else { return };
+        let Some(a) = self.drawing.sheets[self.sheet].annotations.iter().find(|a| a.id == id) else { return };
+        let Some(n) = a.inspection else { return };
+        let (shape, chars) = (a.inspection_shape, a.inspection_chars);
         let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(n.to_string()));
-        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None, number: None, shape: None, chars: None });
+        self.inspection = Some(InspectionDlg { automatic: false, scope: 0, reorder: None, edit: Some((id, st)), hover: None, number: None, shape, chars });
         self.selection = vec![Sel::Annotation(id)];
         cx.notify();
     }
@@ -133,10 +137,15 @@ impl DrawingEditor {
 
     /// Checkmark: apply an edited number, close the dialog.
     fn close_inspection(&mut self, cx: &mut Context<Self>) {
-        if let Some(InspectionDlg { edit: Some((id, st)), .. }) = self.inspection.take()
+        if let Some(InspectionDlg { edit: Some((id, st)), shape, chars, .. }) = self.inspection.take()
             && let Ok(n) = st.read(cx).value().trim().parse::<u32>()
         {
-            self.edit_sheet("Edit inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, Some(n)));
+            self.edit_sheet("Edit inspection item", cx, |s| {
+                noshape_scene::drawing_tools::set_inspection(s, id, Some(n));
+                if let Some(a) = s.annotations.iter_mut().find(|a| a.id == id) {
+                    (a.inspection_shape, a.inspection_chars) = (shape, chars);
+                }
+            });
         }
         self.status = None;
         self.set_preview(None, cx);
@@ -215,11 +224,13 @@ impl DrawingEditor {
 
     /// The context menu of an inspection bubble (live 2226).
     pub fn inspection_entries(&self, a: &Annotation) -> Vec<MenuEntry> {
-        let Some(n) = a.inspection else { return vec![] };
+        if a.inspection.is_none() {
+            return vec![];
+        }
         let id = a.id;
         let mut out = vec![
             MenuEntry::item("Edit...", move |t, w, cx| t.edit_inspection(id, w, cx)),
-            MenuEntry::item("Reorder inspection items...", move |t, w, cx| t.start_reorder_inspection(n, w, cx)),
+            MenuEntry::item("Reorder inspection items...", move |t, w, cx| t.start_reorder_inspection(w, cx)),
             MenuEntry::item("Remove inspection item", move |t, _, cx| {
                 t.edit_sheet("Remove inspection item", cx, |s| noshape_scene::drawing_tools::set_inspection(s, id, None))
             }),
@@ -351,14 +362,20 @@ impl DrawingEditor {
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(30.)).px(px(6.)).child(div().w(px(90.)).text_size(px(12.)).child(label)).child(body).into_any_element();
         let mut body = v_flex().p(px(3.));
         let mut text: Vec<String> = vec![(if reorder.is_some() { "Reorder inspection items" } else { "Inspection item" }).into()];
-        if let Some(st) = reorder.as_ref().or(edit.as_ref()) {
-            body = body.child(row("Number", Input::new(st).small().into_any_element()));
-            text.extend(["Number".into(), st.read(cx).value().to_string()]);
+        if let Some(st) = reorder.as_ref() {
+            // Live (live2 drw-inspection-reorder): the instruction, then Number: (empty until typed).
+            const HINT: &str = "Enter new inspection item identifier and then select the item to renumber";
+            body = body.child(div().px(px(6.)).py(px(4.)).text_size(px(12.)).child(HINT)).child(row("Number:", Input::new(st).small().into_any_element()));
+            text.extend([HINT.into(), "Number:".into()]);
+            let v = st.read(cx).value().to_string();
+            if !v.is_empty() {
+                text.push(v);
+            }
         } else {
             body = body.child(h_flex().child(tab("insp-manual", "Manual", !automatic, false, cx)).child(tab("insp-auto", "Automatic", automatic, true, cx)));
             text.extend(["Manual".into(), "Automatic".into()]);
-            // Number in both modes (live behaviours D6: Automatic adds Scope and Preview).
-            if let Some(st) = number.as_ref() {
+            // Number in both modes (live behaviours D6: Automatic adds Scope and Preview), and when editing an item.
+            if let Some(st) = edit.as_ref().or(number.as_ref()) {
                 body = body.child(row("Number:", Input::new(st).small().into_any_element()));
                 text.extend(["Number:".into(), st.read(cx).value().to_string()]);
             }
