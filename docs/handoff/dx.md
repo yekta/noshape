@@ -89,6 +89,8 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 2026-11-08 13:30 UTC: (assembly side only) a studio's live parts are given ours in two passes: those whose volume
   fits one of ours first, then the others by the feature that made them, not taking a part another fits
   (asm-clamp-pattern's Pin, ours 1.145 cm³ against live's 4.76, took the Spacer's part: Revolute 17 unresolved).
+- 2026-11-08 20:10 UTC: (assembly side only) a live part takes ours by name only when its volume doesn't fit another of
+  ours instead (default "Part N" names shift when ours has a part fewer: asm-welding-config mates 12 -> 20/26).
 - 2026-11-08 11:40 UTC, to dx: your three multi-solid Parasolid files (a7bd858292…, 35719e9b95…, 2ee17582b9…: studios
   ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
   90 → 200/286.

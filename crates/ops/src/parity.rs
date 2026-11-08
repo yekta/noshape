@@ -5434,7 +5434,10 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     continue;
                 }
                 let fits = fits_of(p);
-                let ours = if ours_parts.iter().any(|(n, _)| n == pname) || ours_parts.is_empty() {
+                // By its name unless its volume fits other parts of ours and not that one (default names shift when
+                // ours has a part fewer: asm-welding-config's "Part 7" is our Part 6).
+                let by_name = ours_parts.iter().any(|(n, _)| n == pname) && (fits.is_empty() || fits.iter().any(|n| n == pname));
+                let ours = if by_name || ours_parts.is_empty() {
                     pname.to_string()
                 } else if let [(only, _)] = ours_parts.as_slice() {
                     only.clone()
