@@ -142,6 +142,11 @@ pub struct Translator<'a> {
     /// Live's final parts' volume bands (`partVolumes`, m³; an assembly corpus' studio): an id-only region query is
     /// the regions whose extrude makes one of them.
     part_volumes: Vec<[f64; 2]>,
+    /// The document's other Part Studios built before this one (an assembly corpus): element id → our tab id and
+    /// their features' ids (live's → ours), for a Frame's profile sketch in another studio.
+    pub other_studios: HashMap<String, (String, HashMap<String, String>)>,
+    /// Their configurations' defaults (element → input id → value).
+    pub other_defaults: HashMap<String, HashMap<String, Value>>,
     /// Import features' files (features.json `foreignFiles`: foreign id →
     /// `{ "path", "placed" }`, placed: live's export of the Part Studio).
     foreign: HashMap<String, Value>,
@@ -303,7 +308,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -1504,8 +1509,32 @@ impl<'a> Translator<'a> {
                 let ids: Vec<String> = p["featureIds"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|id| self.feature_ids.get(id).map(|o| format!("feature:{o}")).ok_or_else(|| format!("feature {id} was not built"))).collect::<Result<_, _>>()?;
                 Some(json!(ids))
             }
+            // A Frame's profile sketch in another Part Studio of the document: ours `<tab id>#<sketch>.4294967295`
+            // (psui's Select sketch › Current document), that studio built first.
+            "BTMParameterReferencePartStudio" if p["parameterId"] == "profileSketch" => Some(json!(self.studio_sketch(p)?)),
             _ => return Err(format!("parameter type {ty} not translated")),
         })
+    }
+
+    /// [`Self::param`]'s `profileSketch` of another Part Studio: its element from the namespace ("e<element>::m…"),
+    /// its sketch from the query's feature. That studio is built at its default configuration: another one is reported.
+    fn studio_sketch(&self, p: &Value) -> Result<String, String> {
+        let ns = p["namespace"].as_str().unwrap_or("");
+        let element = ns.split("::").find_map(|x| x.strip_prefix('e')).ok_or_else(|| format!("profile studio `{ns}`: no element"))?;
+        let (tab, ids) = self.other_studios.get(element).ok_or_else(|| format!("profile studio {element} not built"))?;
+        let q = &p["partQuery"]["queries"][0];
+        let fid = q["featureId"].as_str().ok_or("profile sketch: no feature in its query")?;
+        let sketch = ids.get(fid).ok_or_else(|| format!("profile sketch {fid} was not built"))?;
+        if p["configuration"].as_array().is_some_and(|c| !c.is_empty()) && !self.other_studio_default(element, &p["configuration"]) {
+            return Err("profile studio: a configuration other than its default".into());
+        }
+        Ok(format!("{tab}#{sketch}.{}", u32::MAX))
+    }
+
+    /// Whether `config` (live's parameter list) is the source studio's default (its studio JSON in `other_defaults`).
+    fn other_studio_default(&self, element: &str, config: &Value) -> bool {
+        let Some(defaults) = self.other_defaults.get(element) else { return false };
+        config.as_array().into_iter().flatten().all(|c| c["parameterId"].as_str().is_some_and(|id| defaults.get(id) == Some(&c["value"])))
     }
 
     /// Our reference ids for one Onshape query.
@@ -5137,7 +5166,23 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut tabs: HashMap<String, String> = HashMap::new();
     let mut part_names: HashMap<(String, String), String> = HashMap::new();
     let mut entities: HashMap<Key, String> = HashMap::new();
-    for (element, studio, parts) in studios {
+    // A studio whose sketch another's Frame takes as its profile first.
+    let sources: HashSet<String> = studios
+        .iter()
+        .flat_map(|(_, s, _)| s["features"].as_array().into_iter().flatten())
+        .flat_map(|f| f["parameters"].as_array().into_iter().flatten())
+        .filter(|p| p["parameterId"] == "profileSketch")
+        .filter_map(|p| p["namespace"].as_str()?.split("::").find_map(|x| x.strip_prefix('e')).map(str::to_string))
+        .collect();
+    let mut ordered: Vec<&(String, Value, Value)> = studios.iter().collect();
+    ordered.sort_by_key(|(e, _, _)| !sources.contains(e));
+    let mut built: HashMap<String, (String, HashMap<String, String>)> = HashMap::new();
+    let defaults: HashMap<String, HashMap<String, Value>> = studios
+        .iter()
+        .filter(|(e, _, _)| sources.contains(e))
+        .map(|(e, s, _)| (e.clone(), s["configuration"]["configurationParameters"].as_array().into_iter().flatten().filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].clone()))).collect()))
+        .collect();
+    for (element, studio, parts) in ordered {
         let name = format!("Studio {}", &element[..element.len().min(6)]);
         // The studio's part ids in creation order (see Translator::part_order).
         let mut studio = studio.clone();
@@ -5180,6 +5225,8 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                 continue;
             }
         };
+        t.other_studios = built.clone();
+        t.other_defaults = defaults.clone();
         for k in 0..t.len() {
             trace(&format!("{name}: feature {k}"));
             let step = t.step(k);
@@ -5210,6 +5257,11 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             }
         }
         // (An Import's Part Studio is a tab of its own.)
+        if sources.contains(element)
+            && let Some(tab) = &t.tab
+        {
+            built.insert(element.clone(), (tab.clone(), t.feature_ids.clone()));
+        }
         tabs.insert(element.clone(), t.tab.clone().unwrap_or(name));
         // Our parts (name, volume m³): live's part names come from its Part Studio's properties, which translation
         // doesn't carry ("Housing" here is our "Part 1"); such a part is ours by its only part or its volume band.

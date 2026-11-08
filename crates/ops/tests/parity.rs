@@ -1803,6 +1803,18 @@ fn parity_assemblies() {
             println!("{name}: unreadable assembly.json");
             continue;
         };
+        // Studios no instance uses whose sketch a Frame elsewhere takes as its profile: built too, with no parts.
+        let profile_sources: std::collections::HashSet<String> = std::fs::read_dir(dir.join("studios"))
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().ends_with(".json"))
+            .filter_map(|e| read(&e.path()))
+            .flat_map(|s| s["features"].as_array().cloned().unwrap_or_default())
+            .flat_map(|f| f["parameters"].as_array().cloned().unwrap_or_default())
+            .filter(|p| p["parameterId"] == "profileSketch")
+            .filter_map(|p| p["namespace"].as_str()?.split("::").find_map(|x| x.strip_prefix('e')).map(str::to_string))
+            .collect();
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
@@ -1834,7 +1846,7 @@ fn parity_assemblies() {
                 }
                 (!seen.is_empty()).then_some(Value::Array(list))
             };
-            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances)) else { continue };
+            let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| profile_sources.contains(element).then(|| json!([])))) else { continue };
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
             }
