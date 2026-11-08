@@ -567,6 +567,20 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 17:13 UTC, cold start split (perf 42489298913 on 80cf796).** noshape's own cold start (our caches cleared,
+the OS warm, medians of three): macOS 26 **697 ms**, macOS 15 **975 ms** (samples 772-1098), target 1000 met on both;
+the runner's first launch adds 1572 / 2114 ms (window creation 750-1000 ms of it, the fresh VM's). Ours, macOS 15:
+window created 410, workspace drawn 422, frame 1 taken 463 (pipelines 460), rendered 788 (its passes ~125 ms GPU,
+the rest the paravirtual GPU's first use: warm launches take ~200 ms over frame 1 too), presented 975 (the UI
+thread's GPUI frames queue behind it). Experiment landing: `NOSHAPE_PREWARM=early` now compiles at device ready and
+renders a 64x64 frame off screen while the window is created; bench.sh's `early-<n>` launches measure it beside ours
+(analyze "with NOSHAPE_PREWARM=early: N ms (±)"); default if it wins on both Macs. Not taken: skipping the empty
+first frame's AO (moves its first use into the model's frame, whose open target is already missed). The same run's
+macOS 26 gate flagged dialog-open UI CPU p95 6.6 → 9.6 (again 10.3 → 14.0): over all 20 samples the mean is +4 / +9 %
+and ours' p50 lower (4.0 vs 4.8); the tail is GPUI layout / prepaint / paint swinging on both binaries; macOS 15 passed.
+The sketch toolbar's per-render `doc_edited_in_dialog` now reads the undo top before walking the stack.
+
+
 **11-08 10:20 UTC (lead: focus differences, face-appearance menu, cap hover in assemblies, cold start ours < 1 s).**
 Suite 514/530 (SCORE). Cold start: bench.sh STARTUP (end of each job: our caches cleared, then warm; analyze.py
 "Cold start split"); startup fixes landed: font probes without listing every font (065c55f7), the command line's
