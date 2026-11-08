@@ -45,6 +45,14 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   Next idea: a hold-line blend at the rim's 90° is a rolling ball whose radius is the hold line's distance, r(t):
   OCCT's variable fillet over the whole tangent loop (one law per contour: BRepFilletAPI_MakeFillet::SetRadius(law,
   contour)) builds it with its tangency natively; our kernel has single-edge laws only (fillet_variable_checked).
+  19:30 tried it (branch hold-rim-varlaw, patch hold-rim-varlaw.patch: op_fillet_variable_points places (point,
+  radius) samples on OCCT's contour by RelativeAbscissa): OCCT fails at the exact radii (and at 1 - 1e-5); at 0.999
+  it builds one valid part, 23 faces, 140,239 mm³ (live 136,944): a ball rolling with a fast-changing radius touches
+  elsewhere than r from the edge, so it takes ~2,600 mm³ where live's circular sections take 5,899 (our loft tool:
+  5,897). So the section loft is right; what's missing is placing it.
+  What would fit: in blend_direct, a tool face that only approximates its part face (a loft's side on a curved wall)
+  treated as lying on it: the tool's touch edge (t1 / t2 curves) projected onto that part face as the cut there,
+  instead of sectioning the two surfaces (which gives the 18 spurious curves). A day's work, not an hour's.
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
