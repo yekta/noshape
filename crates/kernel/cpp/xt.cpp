@@ -809,9 +809,9 @@ occ::handle<Geom_BSplineCurve> ring_bspline(const occ::handle<Geom_Curve>& curve
   try
   {
     p->SetPeriodic();
-    // (A seam knot that won't come down is no smooth ring: the edge is split, as its face.)
-    if (p->Multiplicity(1) > 1 && !p->RemoveKnot(1, p->Multiplicity(1) - 1, kPrecision))
-      return nullptr;
+    // (A seam knot that won't come down stays: Parasolid takes such a ring, motor-mount-jack's fillet edges round an
+    // ellipse, live 2332; only a surface's must come down.)
+    p->RemoveKnot(1, p->Multiplicity(1) - 1, kPrecision);
   }
   catch (const Standard_Failure&)
   {

@@ -220,8 +220,11 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        // A face may come as its plane's `origin` and its `area` (live 2290).
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: None };
+        // A face may come as its plane's `origin` and its `area` (live 2290); a sketch's region as its `centroid`
+        // and area, a sketch's line as its `mid` and `length` (live 2313, `bodyType` SKETCH).
+        let point = f3(&v["point"]).or_else(|| f3(&v["origin"])).or_else(|| f3(&v["centroid"])).or_else(|| f3(&v["mid"]));
+        let bbox = v["box"].as_array().and_then(|b| Some([f3(b.first()?)?, f3(b.get(1)?)?]));
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point, normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()).or(v["length"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox, sketch: v["bodyType"] == "SKETCH", body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: None };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -2903,6 +2906,8 @@ impl<'a> Translator<'a> {
             }
             // A face given as its plane (live's evPlane): ours on that plane, the nearest in area.
             "FACE" if r.plane_origin && let Some(f) = self.face_on_plane(&r) => Ok(f),
+            // A sketch's region (refs.jsonl `bodyType` SKETCH): ours there, of its area.
+            "FACE" if r.sketch => self.region_at(p, r.measure),
             "FACE" | "PLANE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
