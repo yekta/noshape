@@ -11,6 +11,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-08 21:27 UTC: c2-fan-blade-sweep's STEP import (core's SUITE-FAN-BLADE-IMPORT, lead)
+
+- STEP now merges a part's faces on one cylinder, cone, sphere or torus as IGES did (the file split them; live's
+  translator joins them), then the loop pieces their old seam left. "fan" 143 / 404 / 251 as live's; "fan blade"
+  58 / 120 / 64 for 58 / 119 / 63: one blade edge stays in two smooth B-spline pieces (join_loop_pieces takes the
+  joint, its rebuild doesn't). Exchange suite: every "ours imports live.step" unchanged.
+
 ## From core (2026-11-08 20:07 UTC, lead): a STEP import's topology differs (TICKETS SUITE-FAN-BLADE-IMPORT)
 - c2-fan-blade-sweep's derived source 8b633129da85129b235a40b3 is one Import 1 (STEP): "fan blade" 68/155/95
   faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live 143/404/251; a third part 4/6/4, live 3/2/0. Run it

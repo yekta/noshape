@@ -4066,7 +4066,12 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
 - [ ] P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
   8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
-  143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…).
+  143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…). dx 2026-11-08 21:27 UTC: ours kept the file's split
+  periodic faces (STEP merged only planes; IGES already merged both): the halves of its cylinders, cone and torus and a
+  cylinder face cut in two are one face in live (their areas add up to live's). kernel io.rs: STEP merges them too,
+  then joins the loop pieces their old seam left (boolean.cpp `merge_same_surface_faces`). "fan" 143 / 404 / 251 =
+  live; "fan blade" 58 / 120 / 64 for live's 58 / 119 / 63 (one blade edge still in two smooth pieces: join_loop_pieces
+  finds the joint but makes nothing of it). Exchange suite: every "ours imports live.step" as before.
 - [ ] P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a
   folder's Set library ▸ "My sheet metal forms", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The sheet metal Form feature's form picker (custom host/sheetmetal.rs) should list, next to Onshape's own library, a "My sheet metal forms" entry holding
