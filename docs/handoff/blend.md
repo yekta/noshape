@@ -153,6 +153,8 @@ exact rounds (tori, the line's cylinder), the tools fused (concave) or cut (conv
 document 14 -> 18/18 (regen 4770 -> 3922 ms: Snap Hooks on the right input); Fillet 6 97 -> ~300 ms (live 8: OCCT's
 glued Boolean of the tori ~190 ms, the slivered OCCT attempt ~100 first). T1 features_c::a_tangent_loop_of_concave_
 rounds_has_no_slivers_as_live (data/snap-hook-lip.brep, Fillet 6's input).
+11-08 06:00: such a chain (tangent arcs changing support) goes to the exact rounds first, OCCT's slivered attempt
+skipped: Fillet 6 300 -> ~200 ms (the rest is OCCT's glued Boolean of the tori; live 8).
 : blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's
@@ -225,3 +227,10 @@ step's round running up to z 10.7 (0.9 line) and ending on the inner torus (1.17
 0.68 mm² B-spline corner patch where the outer arc's torus (15.15) meets the outer mouth's vertical cylinder (axis at
 (±6.3, 13.78), on the torus' centre circle): live's cylinder ends on the torus along their intersection curve, no patch.
 Next: equal-radius rounds whose spines meet (cylinder axis through the torus' centre circle) mitred, not patched.
+- 11-08 06:00, local branch dock-corner-wip: fillet_by_tools extended (lines along cylinders with exact spandrels
+  against the circle, arcs at concave corners cut back at the other wall's plane, free ends run on past where only air
+  is taken, convex and concave edges in one fillet, an OCCT USD pass after) builds the stand-in exactly as live:
+  23/61/40, 8480.50539 mm³ (live 8480.50526). Not landed: in the user's document it also takes two earlier fillets
+  and OCCT's Booleans on the 217-face part make them slow (USB Pencere R 55 -> 175 ms, Kapak Alt R 18 -> 254, Fis
+  Gecidi R 282 -> 492). Glue Shift is wrong there (tools run on through faces), pre-fusing the tools slower. Needs a
+  local Boolean (only the faces the tools touch) or the direct build (BLEND-DIRECT) to be fast enough.

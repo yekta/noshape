@@ -6123,8 +6123,11 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
 // Only fillets with such a mitre (OCCT can't roll a ball that stands still).
 // Null when it doesn't apply or doesn't come out valid.
 std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
-                                                              const std::vector<double>& rs, bool need_ball = true)
+                                                              const std::vector<double>& rs, int mode = 0)
 {
+  // mode 0: only with a mitre's ball; 1: OCCT's round had slivers (a tangent chain's); 2: before OCCT, a tangent chain
+  // whose arcs change support (OCCT's round of it has slivers there).
+  const bool need_ball = mode == 0;
   const double r = rs.front();
   for (double x : rs)
     if (std::abs(x - r) > 1e-9 * r)
@@ -6365,6 +6368,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     for (Tool& T : ts)
       if (!T.shape.IsNull())
         tools.Append(T.shape);
+    bool switched = false;
     // Concave corners: two lines meeting where their walls meet in a concave edge.
     for (int i = 1; i <= v2e.Extent(); ++i)
     {
@@ -6391,7 +6395,12 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         return d;
       };
       if (dir_at(A, at[0]).Crossed(dir_at(B, at[1])).Magnitude() <= 1e-9 * dir_at(A, at[0]).Magnitude() * dir_at(B, at[1]).Magnitude())
+      {
+        // (Two arcs changing support: OCCT leaves a sliver where they meet, cf-snap-hook's Fillet 6.)
+        const bool same = (A.w1.IsSame(B.w1) && A.w2.IsSame(B.w2)) || (A.w1.IsSame(B.w2) && A.w2.IsSame(B.w1));
+        switched        = switched || (A.kind == Arc && B.kind == Arc && !same);
         continue;
+      }
       // (Without a ball: tangent chains only.)
       if (!need_ball)
         return std::nullopt;
@@ -6429,7 +6438,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         return std::nullopt;
       tools.Append(both.Shape());
     }
-    if (tools.IsEmpty())
+    if (tools.IsEmpty() || (mode == 2 && !switched))
       return std::nullopt;
     // The lines' (planes and cylinders: noshape's Boolean takes them) first, then the rings and balls.
     ShapeList first, second;
@@ -7327,6 +7336,16 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
       tighten_new_tolerances(in, by->first, accurate(in));
       return make_result({in}, by->first, by->second.get());
     }
+    // A tangent chain whose arcs change support: OCCT's round of it has slivers (cf-snap-hook's Fillet 6): exact first.
+    {
+      const KernelTimer timer("blend.by_tools.first");
+      by = fillet_by_tools(in, es, rs, 2);
+    }
+    if (by)
+    {
+      tighten_new_tolerances(in, by->first, accurate(in));
+      return make_result({in}, by->first, by->second.get());
+    }
   }
   if (checked)
   {
@@ -7362,7 +7381,7 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
     if (checked && !legacy_blend_finish() && blend_slivers(in, out.shape->shape, rmax))
     {
       const KernelTimer timer("blend.slivers.by_tools");
-      if (std::optional<std::pair<TopoDS_Shape, HHist>> by = fillet_by_tools(in, es, rs, false))
+      if (std::optional<std::pair<TopoDS_Shape, HHist>> by = fillet_by_tools(in, es, rs, 1))
       {
         tighten_new_tolerances(in, by->first, accurate(in));
         return make_result({in}, by->first, by->second.get());
