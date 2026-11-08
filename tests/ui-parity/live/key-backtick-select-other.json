@@ -1,18 +1,18 @@
 {
  "scenario": "key-backtick-select-other",
- "recorded": "2026-11-07T03:04:13.862Z",
+ "recorded": "2026-11-08T00:38:53.944Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.5 53387b9e"
+  "recorder": "2026-11-08.1 50b19f57"
  },
  "live": {
-  "document": "095b4566eca1e1a3a5b6b340",
-  "workspace": "ea75236f4599cc410588c328",
-  "element": "ed373257efcae1450207b062",
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "8d69bc86d4e2b8ec361f64c5",
   "start": "block",
-  "startElement": "04f7e36901304a29cb05231d"
+  "startElement": "23614b0537e04a173a620e75"
  },
  "start": {
   "focus": {
@@ -137,7 +137,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 30943
+   "t": 53499
   },
   {
    "step": 2,
@@ -146,6 +146,14 @@
     "key": "`"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1167,
+     484
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -156,16 +164,21 @@
      {
       "id": "select-other-dialog",
       "title": "Select other",
-      "text": "Select other / Right plane / Front plane / Top plane",
+      "text": "Select other / Front plane / Face of Extrude 1 / Part 1 / Edge of Extrude 1 / Face of Extrude 1 / Top plane / Face of Extrude 1 / Right plane",
       "inputs": []
      }
     ],
     "list": {
      "kind": "select-other",
      "rows": [
-      "Right plane",
       "Front plane",
-      "Top plane"
+      "Face of Extrude 1",
+      "Part 1",
+      "Edge of Extrude 1",
+      "Face of Extrude 1",
+      "Top plane",
+      "Face of Extrude 1",
+      "Right plane"
      ],
      "highlighted": null
     },
@@ -215,7 +228,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 33049
+   "t": 56214
   },
   {
    "step": 3,
@@ -224,6 +237,16 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1167,
+     484
+    ],
+    "hover": [
+     "JHK"
+    ],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "none"
@@ -278,7 +301,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 36309
+   "t": 59525
   }
  ]
 }
