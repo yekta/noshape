@@ -318,6 +318,10 @@ pub fn table_source(sheet: &Sheet, t: &super::Table) -> Option<SourceKey> {
     if let super::TableKind::Bom { source: Some(s), .. } = &t.kind {
         return Some(SourceKey { version: s.version.clone(), ..SourceKey::studio(s.tab) });
     }
+    // A cut list of a composite part chosen by Insert (live2 2278).
+    if let super::TableKind::CutList { source: Some(s), config, .. } = &t.kind {
+        return Some(SourceKey { version: s.version.clone(), config: config.clone().unwrap_or_default(), ..SourceKey::studio(s.tab) });
+    }
     let (mut k, _) = view_source(sheet, t.view()?)?;
     if let super::TableKind::CutList { config: Some(c), .. } = &t.kind {
         k.config = c.clone();

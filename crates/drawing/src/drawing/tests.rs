@@ -3094,7 +3094,7 @@ fn cut_list_table_reads_its_own_configuration() {
     drawing.sheets[0].views.push(base_view(1, ps, ViewOrientation::Top, [150.0, 150.0]));
     let mut cfg = crate::configuration::ConfigValues::default();
     cfg.0.insert("Length".into(), "Long".into());
-    let t = Table::new(1, TableKind::CutList { view: ViewId(1), bottom_to_top: false, config: Some(cfg.clone()) }, [400.0, 280.0]);
+    let t = Table::new(1, TableKind::CutList { view: ViewId(1), bottom_to_top: false, config: Some(cfg.clone()), source: None }, [400.0, 280.0]);
     drawing.sheets[0].tables.push(t.clone());
     let key = views::table_source(&drawing.sheets[0], &t).unwrap();
     assert_eq!(key.config, cfg);

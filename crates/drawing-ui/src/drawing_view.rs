@@ -991,6 +991,13 @@ impl DrawingEditor {
                 wanted.push(k);
             }
         }
+        // The cut list's composite part chosen in its dialog: its preview reads its Part Studio.
+        if let Some(s) = self.table_dlg.as_ref().and_then(|d| d.cut_source.as_ref()) {
+            let k = SourceKey { version: s.version.clone(), ..SourceKey::studio(s.tab) };
+            if !wanted.contains(&k) {
+                wanted.push(k);
+            }
+        }
         // The Insert view chooser lists the parts of every Part Studio.
         for k in self.chooser_sources(cx) {
             if !wanted.contains(&k) {

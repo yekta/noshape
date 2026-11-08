@@ -1054,7 +1054,11 @@ pub fn cutlist(ev: &mut EvalCtx) -> FResult<()> {
             ev.warnings.push(format!("{non_frame} selected part(s) are not frame parts and are not listed"));
         }
     }
-    Ok(())
+    // Std createOpenComposite: an open composite part of the frames, its table's (a drawing's Cut list table inserts
+    // it: live2 2278).
+    let frames: Vec<usize> = ev.ctx.bodies.iter().enumerate().filter(|(_, b)| b.composite.is_none() && ev.ctx.frame_members.contains_key(&b.id) && ids.as_ref().is_none_or(|ids| ids.contains(&b.id))).map(|(i, _)| i).collect();
+    let name = ev.name.to_string();
+    super::refgeom::make_named_composite(ev, &frames, false, 0, name)
 }
 
 /// Tag: metadata only (profile tags are read by name from the sketch). Form

@@ -640,8 +640,12 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
                     j["bottom_to_top"] = json!(bottom_to_top);
                     j["template"] = json!(if *default_template { "onshape_default" } else { "follow_assembly" });
                 }
-                noshape_model::drawing::TableKind::CutList { bottom_to_top, config, .. } => {
+                noshape_model::drawing::TableKind::CutList { bottom_to_top, config, source: picked, .. } => {
                     j["bottom_to_top"] = json!(bottom_to_top);
+                    // Inserted from a composite part (Select a composite part): its name.
+                    if let Some(s) = picked {
+                        j["composite"] = json!(s.label);
+                    }
                     // Change configuration... (input id: value; the views keep theirs).
                     if let Some(c) = config {
                         j["configuration"] = json!(c.0);

@@ -767,7 +767,10 @@ fn frame_rectangle_mitered_cut_list() {
         assert!(row.description.contains("SHS 40x40x3"));
     }
     s.add("cutlist", |p| p.set("selectAllFrames", ParamValue::Bool(true)));
-    s.ok();
+    let r = s.ok();
+    // Std createOpenComposite: an open composite of the four frames, named as the feature.
+    let c = r.context.bodies.iter().find(|b| b.composite.is_some()).expect("the cut list's composite part");
+    assert_eq!((c.name.as_str(), c.composite.as_ref().map(|c| (c.members.len(), c.closed))), ("Cut list 1", Some((4, false))));
     // A Tag with no sketch (std doTagProfile).
     s.add("tag", |_| {});
     assert_eq!(s.last_status(), (FeatureStatus::Error, "Select a single sketch feature. The selected feature must create sketch regions.".to_string()));

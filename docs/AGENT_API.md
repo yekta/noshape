@@ -4767,7 +4767,7 @@ Examples:
 
 Place a BOM, cut list or hole table of a view (edits the document (one undoable history entry)).
 
-The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm); `more_views` adds further views of the same part, each `{view, origin}` (live request 1744: a hole seen again is listed once, the others join their size's rows; tags in the first view only). One edit with the tool's name.
+The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A cut list table may instead take `composite` (its dialog's Insert › Select a composite part): `{studio, part}`, a composite part of any Part Studio of the document (a Cut list feature's), whose members it lists; no `view` then. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm); `more_views` adds further views of the same part, each `{view, origin}` (live request 1744: a hole seen again is listed once, the others join their size's rows; tags in the first view only). One edit with the tool's name.
 
 Examples:
 
@@ -4782,7 +4782,8 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `kind` | one of `bom`, `cut_list`, `hole` | required | Table tool. |
-| `view` | integer | required | The view the table lists. |
+| `view` | integer |  | The view the table lists (not with `composite`). |
+| `composite` | object |  | Cut list table: the composite part listed, `{studio, part}` (Part Studio and part, each a name or id). |
 | `origin` | array of number |  | Hole table: the origin vertex (sheet mm). |
 | `more_views` | array of object |  | Hole table: further views of the same part, each {view, origin}. |
 | `position` | array of number | required | Where the table goes (sheet mm). |

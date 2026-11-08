@@ -38,6 +38,8 @@ pub struct TableDlg {
     /// BOM data: an uploaded file's rows (the first the header), placed as a
     /// static table (help bom_table: "BOM data (an uploaded file)").
     pub bom_data: Option<Vec<Vec<String>>>,
+    /// A cut list's composite part, from Insert › Select a composite part (live2 2278).
+    pub cut_source: Option<noshape_model::drawing::CompositeSource>,
 }
 
 impl DrawingEditor {
@@ -79,11 +81,14 @@ impl DrawingEditor {
                     _ => None,
                 };
                 let view = preferred.or_else(|| sources.first().map(|s| s.0));
-                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, top_level: false, bottom_to_top: false, corner: TableCorner::TopRight, default_template: false, bom_source: None, bom_data: None });
+                self.table_dlg = Some(TableDlg { kind: k, table: None, original: None, view, structured: false, top_level: false, bottom_to_top: false, corner: TableCorner::TopRight, default_template: false, bom_source: None, bom_data: None, cut_source: None });
             }
             Some(_) => {}
             // The properties dialog of a placed table stays.
-            None if self.table_dlg.as_ref().is_some_and(|d| d.table.is_none()) => self.table_dlg = None,
+            None if self.table_dlg.as_ref().is_some_and(|d| d.table.is_none()) => {
+                self.table_dlg = None;
+                self.close_composite_chooser();
+            }
             None => {}
         }
     }
@@ -96,13 +101,17 @@ impl DrawingEditor {
             TableKind::Bom { source, .. } => source.clone(),
             _ => None,
         };
+        let cut_source = match &t.kind {
+            TableKind::CutList { source, .. } => source.clone(),
+            _ => None,
+        };
         let (kind, view, structured, top_level, bottom_to_top) = match t.kind {
             TableKind::Bom { view, structured, top_level, bottom_to_top, .. } => (TableTool::Bom, view, structured, top_level, bottom_to_top),
             TableKind::CutList { view, bottom_to_top, .. } => (TableTool::CutList, view, false, false, bottom_to_top),
             _ => return,
         };
         self.tool = Tool::Select;
-        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, top_level, bottom_to_top, corner: t.corner, default_template, bom_source, bom_data: None });
+        self.table_dlg = Some(TableDlg { kind, table: Some(id), original: Some((t.kind.clone(), t.corner)), view: Some(view), structured, top_level, bottom_to_top, corner: t.corner, default_template, bom_source, bom_data: None, cut_source });
         cx.notify();
     }
 
@@ -249,6 +258,7 @@ impl DrawingEditor {
 
     pub fn close_table_dlg(&mut self, accept: bool, cx: &mut Context<Self>) {
         let Some(d) = self.table_dlg.take() else { return };
+        self.close_composite_chooser();
         match (d.table, d.original) {
             (Some(id), Some((kind, corner))) if !accept => self.edit_table(id, "Table properties", cx, |t| {
                 t.kind = kind;
@@ -412,10 +422,13 @@ impl DrawingEditor {
             t.corner = d.corner;
             return Some((t, "BOM table"));
         }
-        let view = if d.bom_source.is_some() { ViewId(0) } else { d.view? };
         let (kind, name) = match d.kind {
-            TableTool::Bom => (TableKind::Bom { view, structured: d.structured, top_level: d.top_level, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template, source: d.bom_source.clone() }, "BOM table"),
-            _ => (TableKind::CutList { view, bottom_to_top: d.bottom_to_top, config: None }, "Cut list table"),
+            TableTool::Bom => {
+                let view = if d.bom_source.is_some() { ViewId(0) } else { d.view? };
+                (TableKind::Bom { view, structured: d.structured, top_level: d.top_level, bottom_to_top: d.bottom_to_top, overrides: Vec::new(), default_template: d.default_template, source: d.bom_source.clone() }, "BOM table")
+            }
+            // Nothing to place until Insert picks a composite part (live2 2278: a click places nothing).
+            _ => (TableKind::CutList { view: ViewId(0), bottom_to_top: d.bottom_to_top, config: None, source: Some(d.cut_source.clone()?) }, "Cut list table"),
         };
         let mut t = noshape_model::drawing::Table::new(id, kind, at);
         t.corner = d.corner;
@@ -450,13 +463,14 @@ impl DrawingEditor {
         let ed = cx.entity();
         let bom = d.kind == TableTool::Bom;
         let editing = d.table.is_some();
-        let source_tab = d.view.and_then(|v| views::view_source(self.current_sheet(), v)).map(|(k, _)| k.tab);
+        let source_tab = d.cut_source.as_ref().map(|s| s.tab).or_else(|| d.view.and_then(|v| views::view_source(self.current_sheet(), v)).map(|(k, _)| k.tab));
         let sources = self.table_sources(d.kind);
         // The listed view of the table's source (one per source; the table's
         // own view may not be the one listed).
         let key_of = |v: ViewId| views::view_source(self.current_sheet(), v).map(|(k, _)| k);
         let source_label = match &d.bom_source {
             _ if d.bom_data.is_some() => "BOM data".to_string(),
+            _ if !bom => d.cut_source.as_ref().map(|s| s.label.clone()).unwrap_or_default(),
             Some(s) => s.label.clone(),
             None => sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default(),
         };
@@ -640,7 +654,31 @@ impl DrawingEditor {
                         ))
                 })
                 .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
-                .when(!editing, |v| {
+                // A cut list: Insert opens Select a composite part (live2 2278).
+                .when(!editing && !bom, |v| {
+                    v.child(
+                        div().px(px(4.)).pt(px(2.)).child(
+                            h_flex()
+                                .id("table-dlg-insert-composite")
+                                .map(|d| crate::ui_script::mark(d, || "button:Insert".into()))
+                                .h(px(26.))
+                                .justify_center()
+                                .gap(px(6.))
+                                .border_1()
+                                .border_color(gpui_kit::rgb(0xd7d7d7))
+                                .rounded(px(2.))
+                                .cursor_pointer()
+                                .text_size(px(13.))
+                                .hover(|d| d.bg(pal.row_hover))
+                                .when(self.chooser.composite && self.insert.chooser.is_some(), |d| d.bg(gpui_kit::rgb(0xeaeaea)))
+                                .child(crate::assets::icon("insert", 14., cx))
+                                .child("Insert")
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_composite_chooser(cx))),
+                        ),
+                    )
+                    .when_some(d.cut_source.as_ref().map(|s| s.label.clone()), |v, label| v.child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).child(crate::ui::user_text(label))))
+                })
+                .when(!editing && bom, |v| {
                     v.child(
                         h_flex()
                             .px(px(4.))

@@ -79,6 +79,8 @@ pub struct ChooserState {
     pub other_versions: HashMap<std::path::PathBuf, String>,
     pub other_query: Option<String>,
     pub other_doc: Option<OtherDoc>,
+    /// The Cut list table's "Select a composite part" (live2 2278): composite parts only, a pick is the table's.
+    pub composite: bool,
     /// Current document › Version graph: the list shown, and the version
     /// chosen (new views are pinned to it).
     pub graph: bool,
@@ -209,7 +211,8 @@ impl DrawingEditor {
     pub fn sync_chooser(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match (self.insert.chooser.is_some(), self.chooser.search.is_some()) {
             (true, false) => {
-                self.chooser.search = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search parts or sketches")));
+                let placeholder = if self.chooser.composite { "Search composite parts" } else { "Search parts or sketches" };
+                self.chooser.search = Some(cx.new(|cx| InputState::new(window, cx).placeholder(placeholder)));
                 self.chooser.url = Some(cx.new(|cx| InputState::new(window, cx).placeholder("Search or paste URL")));
                 // Live 2063: the search box takes the focus as the chooser opens.
                 if let Some(search) = self.chooser.search.clone() {
@@ -228,7 +231,48 @@ impl DrawingEditor {
     }
 
     fn chooser_filter(&self) -> u8 {
+        if self.chooser.composite {
+            return F_COMPOSITES;
+        }
         self.chooser.filter.unwrap_or(F_PARTS)
+    }
+
+    /// The Cut list table dialog's Insert: Select a composite part.
+    pub fn open_composite_chooser(&mut self, cx: &mut Context<Self>) {
+        if self.insert.chooser.is_some() && !self.chooser.composite {
+            // (The Insert view's chooser and search go first.)
+            self.insert.chooser = None;
+            self.chooser.search = None;
+        }
+        self.chooser.composite = true;
+        self.chooser.other = false;
+        self.insert.chooser = Some(0);
+        self.ensure_sources(false, cx);
+        cx.notify();
+    }
+
+    pub fn close_composite_chooser(&mut self) {
+        if std::mem::take(&mut self.chooser.composite) {
+            self.insert.chooser = None;
+        }
+    }
+
+    /// A composite part picked: the cut list table's, placed by the next click.
+    fn pick_composite(&mut self, id: TabId, part: Option<BodyId>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(part) = part else { return };
+        let other = self.chooser.other_doc.clone().filter(|_| self.chooser.other);
+        let version = other.as_ref().and_then(|d| d.key(id)).map(|k| k.0);
+        let key = SourceKey { version: version.clone(), ..SourceKey::studio(id) };
+        let label = self.sources.get(&key).and_then(|s| s.context.bodies.iter().find(|b| b.id == part).map(|b| b.name.clone())).unwrap_or_default();
+        if let Some(d) = &mut self.table_dlg {
+            d.cut_source = Some(noshape_model::drawing::CompositeSource { tab: id, version, part, label });
+        }
+        self.close_composite_chooser();
+        self.status = Some("Click to place the table".into());
+        window.focus(&self.focus, cx);
+        self.ensure_sources(false, cx);
+        self.update_preview(cx);
+        cx.notify();
     }
 
     /// Render the pictures of studios that changed since the last time.
@@ -806,7 +850,7 @@ impl DrawingEditor {
             // patterns above their parts, then its sketches (live
             // drawing/1394–1396).
             let mut children: Vec<ChildRow> = Vec::new();
-            if filter & F_STUDIOS != 0 {
+            if filter & F_STUDIOS != 0 && !self.chooser.composite {
                 children.push((name.clone(), ThumbOf::Part(None), None, false, None));
             }
             if let Some(src) = self.sources.get(&key_of(id)) {
@@ -857,7 +901,11 @@ impl DrawingEditor {
             for (i, (label, what, part, flat, sketch)) in shown.into_iter().enumerate() {
                 let pic = pic_of(id, what);
                 let name = label.to_string();
-                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                list = list.child(row_base(SharedString::from(format!("dr-ch-c-{id}-{i}")), 36.).min_h(px(38.)).map(|d| crate::ui_script::mark(d, || format!("list_row:{name}"))).child(thumb(pic)).child(div().truncate().child(label)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                    if this.chooser.composite {
+                        this.pick_composite(id, part.clone(), window, cx);
+                        return;
+                    }
                     this.pick_tree(id, part.clone(), cx);
                     if flat {
                         this.insert.flat = true;
@@ -926,7 +974,12 @@ impl DrawingEditor {
             .id("dr-chooser")
             // Replace...'s chooser: Esc closes it, even from its search box (live2 drw-sheet-ref-replace).
             .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
-                if this.insert.replace.is_some() {
+                if this.chooser.composite {
+                    this.close_composite_chooser();
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                } else if this.insert.replace.is_some() {
                     this.insert.chooser = None;
                     this.insert.replace = None;
                     this.insert.replace_part = None;
@@ -947,8 +1000,9 @@ impl DrawingEditor {
                     .pl(px(4.))
                     .border_b_1()
                     .border_color(gpui_kit::rgb(0xd3d7d9))
-                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Select a part or assembly"))
+                    .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if self.chooser.composite { "Select a composite part" } else { "Select a part or assembly" }))
                     .child(div().id("dr-chooser-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 12., pal.text_muted)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.chooser.composite = false;
                         this.insert.chooser = None;
                         cx.notify();
                     }))),
@@ -992,6 +1046,7 @@ impl DrawingEditor {
                 .child("Import...")
                 .on_click(|_, window, cx| crate::drawing_hooks::import(window, cx))
         };
+        let composite = self.chooser.composite;
         let panel = if self.chooser.other {
             match other_doc {
                 // An opened document: its header, Part Studios | Assemblies,
@@ -1013,18 +1068,18 @@ impl DrawingEditor {
                         });
                         let body = if released { self.render_released(&d, tab == 1, cx) } else { list.into_any_element() };
                         panel
-                            .child(sub_tabs)
+                            .when(!composite, |p| p.child(sub_tabs))
                             .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
                             .children(view_released)
-                            .when(tab == 0 && !released, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
+                            .when(tab == 0 && !released && !composite, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                             .children(changes)
                             .child(body)
-                            .child(import_row(cx))
+                            .when(!composite, |p| p.child(import_row(cx)))
                     }
                 }
                 None => {
                     let other = self.render_other_documents(cx);
-                    panel.child(other).child(import_row(cx))
+                    panel.child(other).when(!composite, |p| p.child(import_row(cx)))
                 }
             }
         } else {
@@ -1072,22 +1127,29 @@ impl DrawingEditor {
                 }
                 panel.child(col)
             } else {
+                // (Select a composite part: no kinds, filters or Import, live2 2278.)
                 panel
-                    .child(sub_tabs)
+                    .when(!composite, |p| p.child(sub_tabs))
                     .children(self.chooser.search.as_ref().map(|s| div().px(px(6.)).pt(px(6.)).child(Input::new(s).small())))
-                    .when(tab == 0, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
+                    .when(tab == 0 && !composite, |d| d.child(filters).child(div().h(px(1.)).bg(gpui_kit::rgb(0xeeeeee))))
                     .child(list)
-                    .child(import_row(cx))
+                    .when(!composite, |p| p.child(import_row(cx)))
             }
         };
         // Beside the Insert view panel (the empty one until a source is chosen).
-        let left = if matches!(self.tool, Tool::InsertView { .. }) { None } else { Some(self.render_empty_insert_panel(cx)) };
+        // (Select a composite part: beside the Cut list table panel.)
+        let left = if matches!(self.tool, Tool::InsertView { .. }) || composite { None } else { Some(self.render_empty_insert_panel(cx)) };
+        let offset = match (&left, composite) {
+            (Some(_), _) => 0.,
+            (None, true) => 214.,
+            (None, false) => 251.,
+        };
         Some(
             h_flex()
                 .id("dr-chooser-wrap")
                 .absolute()
                 .top(px(DIALOG_TOP))
-                .left(px(self.dialog_left() + if left.is_some() { 0. } else { 251. }))
+                .left(px(self.dialog_left() + offset))
                 .items_start()
                 .gap(px(4.))
                 .occlude()

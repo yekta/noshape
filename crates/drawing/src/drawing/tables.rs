@@ -443,6 +443,12 @@ pub fn cut_list_rows(view_geo: Option<&ViewGeometry>, source: Option<&SourceMode
     some.unwrap_or_else(|| crate::regen::features::frames::cut_list(&s.context, None))
 }
 
+/// The rows of composite part `part`'s cut list (its members).
+pub fn composite_cut_list(source: &SourceModel, part: &crate::reference::BodyId) -> Vec<crate::regen::features::frames::CutListRow> {
+    let members: Vec<crate::reference::BodyId> = source.context.bodies.iter().find(|b| b.id == *part).and_then(|b| b.composite.as_ref()).map(|c| c.members.clone()).unwrap_or_default();
+    crate::regen::features::frames::cut_list(&source.context, Some(&members))
+}
+
 /// The BOM table's header row.
 pub const BOM_HEADER: [&str; 4] = ["Item", "Quantity", "Part number", "Description"];
 
@@ -597,7 +603,7 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
         TableKind::Revision { .. } => revision_data(&table.kind, revisions),
         // Resolved by [`table_data_with`] from the evaluated tables.
         TableKind::Custom { .. } => TableData::default(),
-        TableKind::CutList { bottom_to_top, .. } => {
+        TableKind::CutList { bottom_to_top, source: picked, .. } => {
             // Onshape's cut list table (help cutlist-table-indrawing): Item,
             // Qty, Description, Length ("675.444 mm"), Angle 1 / 2 ("45 deg").
             let header = Some(["Item", "Qty", "Description", "Length", "Angle 1", "Angle 2"].map(String::from).to_vec());
@@ -605,7 +611,11 @@ pub fn table_data_holes(drawing: &Drawing, table: &Table, view_geo: Option<&View
             let u = length_units(drawing, &f);
             let len = |m: Option<f64>| m.map(|m| format!("{} {}", format_number(m / u.meters(), None, 3), u.symbol())).unwrap_or_default();
             let ang = |a: Option<f64>| a.map(|a| format!("{} deg", format_number(a.to_degrees(), None, 3))).unwrap_or_default();
-            let mut rows: Vec<Vec<String>> = cut_list_rows(view_geo, source)
+            let rows = match (picked, source) {
+                (Some(p), Some(s)) => composite_cut_list(s, &p.part),
+                _ => cut_list_rows(view_geo, source),
+            };
+            let mut rows: Vec<Vec<String>> = rows
                 .into_iter()
                 .map(|r| vec![r.item.to_string(), r.qty.to_string(), if r.standard.is_empty() { r.description } else { format!("{} {}", r.standard, r.description) }, len(r.length), ang(r.angle1), ang(r.angle2)])
                 .collect();

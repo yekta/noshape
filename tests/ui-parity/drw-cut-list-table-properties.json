@@ -1,6 +1,6 @@
 {
   "name": "drw-cut-list-table-properties",
-  "about": "A frame drawing's Cut list table (the Top view's, placed at sheet (200, 200)), its menu › Cut list table properties..., then Escape",
+  "about": "A frame drawing's Cut list table: Insert › the start's Part Studio › Cut list 1 (live2 2278: Insert opens Select a composite part), placed at sheet (200, 200), its menu › Cut list table properties..., then Escape",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-08: the last uncovered drawing items, a frame start)",
@@ -10,6 +10,29 @@
       "do": "click",
       "on": {
         "tool": "Cut list table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Insert"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Part Studio 1"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "Cut list 1"
       }
     },
     {

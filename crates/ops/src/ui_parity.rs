@@ -391,6 +391,14 @@ mod tests {
         let view = d["views"][0]["id"].clone();
         let r = call(&mut ctx, "drawing_view_table", json!({ "drawing": "Part Studio 1 Drawing 1", "kind": "cut_list", "view": view, "position": [150, 150] }));
         assert!(r.is_ok(), "{r:?}");
+        // Insert › Select a composite part (live2 2278): the Cut list feature's open composite, named as the feature.
+        let r = call(&mut ctx, "drawing_view_table", json!({ "drawing": "Part Studio 1 Drawing 1", "kind": "cut_list", "composite": { "studio": "Part Studio 1", "part": "Cut list 1" }, "position": [150, 250] }));
+        assert!(r.is_ok(), "{r:?}");
+        let d = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1", "edges": false })).unwrap();
+        let t = d["tables"].as_array().unwrap().iter().find(|t| t["composite"] == "Cut list 1").unwrap_or_else(|| panic!("{}", d["tables"]));
+        assert_eq!(t["rows"].as_array().map(|r| r.len()), d["tables"][0]["rows"].as_array().map(|r| r.len()), "the same frames as the view's: {t}");
+        let e = call(&mut ctx, "drawing_view_table", json!({ "drawing": "Part Studio 1 Drawing 1", "kind": "cut_list", "composite": { "studio": "Part Studio 1", "part": "Part 1" }, "position": [150, 250] })).unwrap_err();
+        assert!(e.contains("is not a composite part"), "{e}");
         let _ = std::fs::remove_dir_all(dir);
     }
 

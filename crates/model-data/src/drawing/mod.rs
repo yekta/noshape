@@ -1600,6 +1600,10 @@ pub enum TableKind {
         /// request 1638 (b)).
         #[serde(default, skip_serializing_if = "Option::is_none")]
         config: Option<ConfigValues>,
+        /// Its own composite part (Insert › Select a composite part: a cut list of any Part Studio, live2 2278);
+        /// None: the frames of `view`'s Part Studio.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<CompositeSource>,
     },
     /// The drawing's revisions from the release log (rows resolved when the
     /// sheet is built, from [`build::SheetInfo::revisions`]).
@@ -2181,6 +2185,16 @@ pub struct BomSource {
     pub tab: crate::document::TabId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
+    pub label: String,
+}
+
+/// A cut list table's composite part: its Part Studio (at another document's version), the part and its name.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CompositeSource {
+    pub tab: crate::document::TabId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub part: BodyId,
     pub label: String,
 }
 

@@ -9,7 +9,7 @@ use super::drawing::{commit, drawing_field, drawing_tab, point, point_value, rep
 use crate::drawing::{self as dr, SheetModel};
 use crate::error::OpError;
 use crate::registry::{Args, Op, OpOutput, opt, req};
-use crate::{Ctx, OpenDoc, refs};
+use crate::{Ctx, OpenDoc, doc, refs};
 use noshape_model::drawing::{AnnotationKind, SheetLayer, TableKind, BreakStyle, CalloutBorder, CalloutStyle, Crop, Drawing, GdtLeader, InspectionShape, TableCorner, ViewId, ViewKind};
 use noshape_scene::drawing_tools::{self as dt, AuxOpts, DetailOpts, Pick, PickedPoint, SectionOpts, TableTool, Tool, ToolValues, ViewOptions};
 use serde_json::{Value, json};
@@ -811,12 +811,13 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "view_table",
             summary: "Place a BOM, cut list or hole table of a view",
-            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm); `more_views` adds further views of the same part, each `{view, origin}` (live request 1744: a hole seen again is listed once, the others join their size's rows; tags in the first view only). One edit with the tool's name.",
+            description: "The BOM table, Cut list table and Hole table tools: the table of `view` with its anchor corner at `position` (sheet mm): the reply's `corner`, a BOM's top right as in Onshape (A3: [410, 287] is the frame's top right). A reply `warning` says when the table runs off the sheet. A cut list table may instead take `composite` (its dialog's Insert › Select a composite part): `{studio, part}`, a composite part of any Part Studio of the document (a Cut list feature's), whose members it lists; no `view` then. A hole table measures from `origin` (a vertex or circle center of the view, sheet mm); `more_views` adds further views of the same part, each `{view, origin}` (live request 1744: a hole seen again is listed once, the others join their size's rows; tags in the first view only). One edit with the tool's name.",
             fields: with(
                 common(),
                 vec![
                     req("kind", json!({ "type": "string", "enum": ["bom", "cut_list", "hole"] }), "Table tool."),
-                    view_id("view", "The view the table lists."),
+                    opt("view", json!({ "type": "integer" }), "The view the table lists (not with `composite`)."),
+                    opt("composite", json!({ "type": "object", "properties": { "studio": { "type": "string" }, "part": { "type": "string" } }, "required": ["studio", "part"] }), "Cut list table: the composite part listed, `{studio, part}` (Part Studio and part, each a name or id)."),
                     opt("origin", point(), "Hole table: the origin vertex (sheet mm)."),
                     opt("more_views", json!({ "type": "array", "items": { "type": "object" } }), "Hole table: further views of the same part, each {view, origin}."),
                     req("position", point(), "Where the table goes (sheet mm)."),
@@ -1307,8 +1308,24 @@ fn virtual_sharp(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
-    let mut t = target(od, a)?;
     let kind = enum_arg(a, "kind", &[("bom", TableTool::Bom), ("cut_list", TableTool::CutList), ("hole", TableTool::Hole)], TableTool::Bom)?;
+    let composite = match a.get("composite") {
+        None => None,
+        Some(_) if kind != TableTool::CutList => return Err(OpError::param("composite", "cut list tables only")),
+        Some(c) => Some(composite_arg(od, c)?),
+    };
+    let mut t = target(od, a)?;
+    if let Some(source) = composite {
+        // Insert › Select a composite part (live2 2278): no view.
+        let id = t.d.sheets[t.sheet].next_table_id();
+        let (mut table, name) = dt::view_table(id, kind, ViewId(0), None, pt_arg(a, "position")?);
+        if let TableKind::CutList { source: s, .. } = &mut table.kind {
+            *s = Some(source);
+        }
+        let sheet = t.sheet;
+        t.d.sheets[sheet].tables.push(table);
+        return done(od, t, name, "table", id);
+    }
     let view = view_arg(&t, a, "view")?;
     let origin = match (kind, a.get("origin")) {
         (TableTool::Hole, Some(o)) => {
@@ -1341,6 +1358,20 @@ fn view_table(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let sheet = t.sheet;
     t.d.sheets[sheet].tables.push(table);
     done(od, t, name, "table", id)
+}
+
+/// The `composite` argument: a composite part of one of the document's Part Studios, by names or ids.
+fn composite_arg(od: &mut OpenDoc, c: &Value) -> Result<noshape_model::drawing::CompositeSource, OpError> {
+    let field = |k: &str| c.get(k).and_then(|v| v.as_str()).ok_or_else(|| OpError::param("composite", &format!("`{k}`: the {} (a name or id)", if k == "studio" { "Part Studio" } else { "composite part" })));
+    let (studio, part) = (field("studio")?, field("part")?);
+    let tab = doc::tab_of_kind(od.doc(), Some(studio), "Part Studio", |c| matches!(c, noshape_model::document::TabContent::PartStudio(_))).map_err(|e| e.with_param("composite"))?;
+    let r = od.regenerate(tab, None)?;
+    let b = super::query::find_part(&r, part).map_err(|e| e.with_param("composite"))?;
+    if b.composite.is_none() {
+        return Err(OpError::param("composite", &format!("`{part}` is not a composite part")));
+    }
+    let label = r.display.bodies.iter().find(|d| d.id == b.id).map(|d| d.name.clone()).unwrap_or_else(|| b.name.clone());
+    Ok(noshape_model::drawing::CompositeSource { tab, version: None, part: b.id.clone(), label })
 }
 
 // ------------------------------------------------------------ callouts, ordinates, datums

@@ -168,7 +168,7 @@ impl DrawingEditor {
             vec![
                 // Insert view: Onshape opens its empty panel; [Insert] opens
                 // "Select a part or assembly" (live drawing/122, 170a).
-                tb("dr-insert", "base-view", "Insert view", matches!(t, Tool::InsertView { .. }) || self.insert.chooser.is_some() || self.insert.panel, |e, _, cx| e.open_insert_panel(cx)),
+                tb("dr-insert", "base-view", "Insert view", matches!(t, Tool::InsertView { .. }) || (self.insert.chooser.is_some() && !self.chooser.composite) || self.insert.panel, |e, _, cx| e.open_insert_panel(cx)),
                 tool("dr-proj", "projected-view", "Projected view (p)", matches!(t, Tool::Projected { .. }), || Tool::Projected { parent: None }),
                 tool("dr-aux", "auxiliary-view", "Auxiliary view", matches!(t, Tool::Auxiliary { .. }), || Tool::Auxiliary { parent: None }),
                 tool("dr-sect", "section-view", "Section view", matches!(t, Tool::Section { .. } | Tool::JoggedSection { .. }), || Tool::Section { parent: None, p0: None, line: None, partial: false, jogs: vec![] }),
