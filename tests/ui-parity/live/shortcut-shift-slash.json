@@ -1,16 +1,16 @@
 {
  "scenario": "shortcut-shift-slash",
- "recorded": "2026-11-04T01:08:00.654Z",
+ "recorded": "2026-11-08T19:41:51.004Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-05.0 backfilled"
+  "recorder": "2026-11-08.5 0a4d2573"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "c1d4e4181821a4693964dc96",
+  "element": "4e28e7f85f2890e83aea7883",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -20,6 +20,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -58,7 +59,8 @@
   },
   "message": null,
   "tooltip": null,
-  "sketch": null
+  "sketch": null,
+  "drawing": null
  },
  "steps": [
   {
@@ -80,6 +82,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -118,9 +121,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 23893
+   "t": 46932
   },
   {
    "step": 2,
@@ -129,13 +133,34 @@
     "key": "shift+/"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     1560,
+     960
+    ],
+    "hover": [],
+    "element": "canvas#canvas"
+   },
    "state": {
     "focus": {
      "kind": "other",
      "tag": "div"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "modal",
+     "title": "",
+     "fields": [
+      {
+       "label": "Search shortcuts",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [],
+     "text": "Keyboard shortcutsCustomize keyboard shortcuts General Part Studio Assembly 3D view Sketch Feature Studio Drawing shift enter Accept & repeat command enter Accept command escape Cancel space Clear selection ctrl/cmd c Copy shift c Curve/surface analysis delete / backspace Delete selection shift d Dihedral analysis ctrl/cmd shift f FeatureScript search ctrl u Feedback/Report a bug a Flip primary axis k Hide/show mate connectors shift / Keyboard shortcuts shift Lock mate inference ctrl m Mate conn"
+    },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -174,9 +199,10 @@
     },
     "message": null,
     "tooltip": null,
-    "sketch": null
+    "sketch": null,
+    "drawing": null
    },
-   "t": 25763
+   "t": 49054
   }
  ]
 }
