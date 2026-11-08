@@ -1584,3 +1584,39 @@ fn a_slab_fuse_merges_its_corner_edge_whole() {
     let split = u.sub_shapes(k::ShapeType::Vertex).iter().any(|v| v.vertex_point().is_ok_and(|p| (p - DVec3::new(-0.002, 0.0, 0.006)).length() < 1e-7));
     assert!(!split, "the corner along y 0, z 6 split at x -2 mm");
 }
+
+/// cf-surface-pattern's Surface Pattern 3 (recorded): 85 spheres cut from a 7-face curved part. OCCT's sections of the
+/// spheres with the part's B-spline faces are up to 0.24 mm off them (its result invalid: six pieces, one inside out);
+/// ours refined onto both faces, and the triangles of a few hundredths of a millimetre where three sections cross
+/// classified from their neighbours. Ours: valid, and at 2000 points (seeded) in the part's box inside exactly where
+/// the point is in the part and in no sphere.
+#[test]
+#[ignore = "T2: 85 sphere sections and 2000 classified points (~20 s release)"]
+fn spheres_cut_from_a_curved_part_as_its_points_say() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "990256f0cd39b8eb").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    assert!(r.is_valid());
+    let spheres: Vec<(DVec3, f64)> = c.tools.iter().flat_map(|t| t.faces()).filter_map(|f| match f.face_surface() {
+        Ok(k::Surface::Sphere { center, radius, .. }) => Some((center, radius)),
+        _ => None,
+    }).collect();
+    assert_eq!(spheres.len(), 85);
+    let t = &c.objects[0];
+    let b = t.bounding_box(true).unwrap();
+    let mut seed: u64 = 12345;
+    let mut rnd = || {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        (seed >> 11) as f64 / (1u64 << 53) as f64
+    };
+    for _ in 0..2000 {
+        let q = DVec3::new(b.min.x + (b.max.x - b.min.x) * rnd(), b.min.y + (b.max.y - b.min.y) * rnd(), b.min.z + (b.max.z - b.min.z) * rnd());
+        let want = matches!(t.classify_point(q, 1e-7), Ok(k::PointClass::Inside)) && spheres.iter().all(|&(c, r)| (q - c).length() >= r);
+        assert_eq!(matches!(r.classify_point(q, 1e-7), Ok(k::PointClass::Inside)), want, "at {:.3?} mm", q * 1e3);
+    }
+}

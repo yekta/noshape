@@ -5603,19 +5603,26 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     })?;
     let mut all_states: Vec<R<Vec<(usize, State)>>> = first.into_iter().zip(rest).map(|(a, b)| a.or(b).expect("a piece's states")).collect();
     // (A thin piece whose point lies on another solid's face (a sharp knurl tooth's sub-micrometre sliver beside the
-    // cylinder): as its neighbour across a section with that solid's face, in and out the other way; not across
-    // another's (the sliver's end at another groove's flank: its neighbour there inside the cylinder).)
-    for pi in 0..pieces.len() {
-        if !matches!(&all_states[pi], Err(Decline(w)) if *w == "a piece's point on another solid's face") {
-            continue;
-        }
-        let f = pieces[pi].face;
-        let mut got = None;
-        'find: for &(s, _) in pieces[pi].loops.iter().flatten() {
-            let lo = section_faces.partition_point(|x| x.0 < s);
-            for &(_, g) in section_faces[lo..].iter().take_while(|x| x.0 == s) {
-                let t = cx.faces[g].solid;
-                if g == f || t == cx.faces[f].solid || free::surface_distance(&cx.faces[g], pieces[pi].inside) > GREY * tol {
+    // cylinder; cf-surface-pattern's triangles of a few hundredths of a millimetre where its spheres' sections cross):
+    // as a neighbour of its face across a section edge they share, in and out the other way for the solids whose faces
+    // that section is with, the same for the rest; neighbours found so first, in rounds.)
+    let flip = |x: State| match x {
+        State::In => State::Out,
+        State::Out => State::In,
+        o => o,
+    };
+    loop {
+        let mut progress = false;
+        for pi in 0..pieces.len() {
+            if !matches!(&all_states[pi], Err(Decline(w)) if *w == "a piece's point on another solid's face") {
+                continue;
+            }
+            let f = pieces[pi].face;
+            let mut got = None;
+            'find: for &(s, _) in pieces[pi].loops.iter().flatten() {
+                let lo = section_faces.partition_point(|x| x.0 < s);
+                let across: Vec<usize> = section_faces[lo..].iter().take_while(|x| x.0 == s).map(|&(_, g)| cx.faces[g].solid).filter(|&t| t != cx.faces[f].solid).collect();
+                if across.is_empty() {
                     continue;
                 }
                 for &pn in &face_pieces[f] {
@@ -5623,21 +5630,20 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                         continue;
                     }
                     if let Ok(st) = &all_states[pn]
-                        && st.iter().any(|&(u, x)| u == t && matches!(x, State::In | State::Out))
+                        && across.iter().all(|&t| st.iter().any(|&(u, x)| u == t && matches!(x, State::In | State::Out)))
                     {
-                        let flip = |x: State| match x {
-                            State::In => State::Out,
-                            State::Out => State::In,
-                            o => o,
-                        };
-                        got = Some(st.iter().map(|&(u, x)| (u, if u == t { flip(x) } else { x })).collect::<Vec<_>>());
+                        got = Some(st.iter().map(|&(u, x)| (u, if across.contains(&u) { flip(x) } else { x })).collect::<Vec<_>>());
                         break 'find;
                     }
                 }
             }
+            if let Some(st) = got {
+                all_states[pi] = Ok(st);
+                progress = true;
+            }
         }
-        if let Some(st) = got {
-            all_states[pi] = Ok(st);
+        if !progress {
+            break;
         }
     }
     for (pi, states) in all_states.into_iter().enumerate() {

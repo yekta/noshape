@@ -114,7 +114,18 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
 - **Tried 11-08, not kept: the cut by all tools at once first** (one at a time only after it declines; blend's tpd
   note). bool_replay over every corpus + tpd + valve2: the same differences; tpd 123 -> 97 ms, but valve2's 7-tool cut
   331 -> 814 ms (at once is slower there than one at a time). The order stays; no cheap test tells them apart.
-- **Plan: sections refined onto both faces where OCCT's are coarse (cf-surface-pattern, 11-08 16:45 UTC; next).**
+- **cf-surface-pattern's sphere cut: ours and valid (11-08 19:39 UTC, landing).** Two changes:
+  - rust_boolean.cpp `refined_section`: a section past 1e-5 with a free-form face is resampled to 129 points, each
+    point projected onto both faces in turn, and refitted with its face curves; the refit is kept only under half of
+    OCCT's tolerance.
+  - boolean.rs: a piece declining "a piece's point on another solid's face" takes a resolved neighbour's state
+    across a shared section, flipped for that section's solids, in rounds.
+
+  Gate: corpora and parity56 at 0 differences, knurl and gear level. Model suite: cf-surface-pattern goes from 11
+  parts to 10 (live 6: the spheres upstream differ, core's area); everything else unchanged. T2
+  bool_patterns::spheres_cut_from_a_curved_part_as_its_points_say checks ours against 2000 classified points.
+  The three entries below are history.
+- **Plan: sections refined onto both faces where OCCT's are coarse (cf-surface-pattern, 11-08 16:45 UTC; done).**
   Its sphere cut (vibe4 ~/agents/bool-corpora/sp-cut) declines "a section touching a face's boundary" because the
   sections' tolerances (OCCT's IntTools_FaceFace, sphere against the part's B-spline faces) are 2e-5..2.6e-1 m
   reported; measured on 17 points against both surfaces most are 10-100x smaller (5.4e-4 -> 2.0e-5, 0.26 -> 6.4e-5)
@@ -181,9 +192,9 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   inside the part) from the valve's handles (their boxes overlap inside the part's box too, 150 x 150 x 3 mm); with the
   valve patch ours takes the valve's 7 tools at once, so the cut at once first (one by one only after it declines) is
   the experiment to run over the corpora (tpd case: vibe4 ~/agents/bool-corpora/tpd).
-- Queue after it (lead 11-08): cf-surface-pattern's Surface
-  Pattern 3 (85 spheres cut, OCCT invalid, see core's note below); blend's notes (tpd's final cut, michael's round
-  tools).
+- Queue (lead 11-08 evening): tangent contact (Rotieren 1, waits on live's 17:22 capture); cf-snap-hook's two
+  declines (091580a4, c22ea361: "an edge on another argument's free-form face") and Sweep 1's 577 ms cut; blend's
+  notes (tpd's final cut, michael's round tools).
 - **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure
   there is only vibe2 lacking /root/core-scratch: infra, not the Boolean). RUST-MIRROR-SPLIT-FACES has been fixed
   since d0838e9a2; T1 kernel_robustness::part_mirror_of_a_half_counterbored_hole_merges_across_the_plane (13eb48ac).

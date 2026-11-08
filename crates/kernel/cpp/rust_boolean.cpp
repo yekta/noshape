@@ -2592,6 +2592,84 @@ bool own_sections(const TopoDS_Face& fa, const TopoDS_Face& fb, std::vector<IntT
   return false;
 }
 
+// OCCT's section of two faces, one of them free-form, brought onto both surfaces where its approximation is coarse
+// (its tolerance past 1e-5 m: a sphere's section with a B-spline face, cf-surface-pattern's, 2.4e-4 m off them,
+// our grey band about a face's boundary then millimetres wide): 65 of its points (from its own parameters, its
+// curves on the faces as the first guesses) projected onto both surfaces in turn until within 1e-9 of each, the
+// curve and its curves on the faces fitted through them at those parameters, its tolerance what the fit is off
+// them between its points. Else (a point not brought onto both, the fit no tighter) the section as OCCT has it.
+static IntTools_Curve refined_section(const IntTools_Curve& ic, const TopoDS_Face& fa, const TopoDS_Face& fb)
+{
+  auto analytic = [](const TopoDS_Face& f) {
+    const GeomAbs_SurfaceType t = GeomAdaptor_Surface(BRep_Tool::Surface(f)).GetType();
+    return t == GeomAbs_Plane || t == GeomAbs_Cylinder || t == GeomAbs_Cone || t == GeomAbs_Sphere || t == GeomAbs_Torus;
+  };
+  const occ::handle<Geom_Curve>   c  = ic.Curve();
+  const occ::handle<Geom2d_Curve> c1 = ic.FirstCurve2d(), c2 = ic.SecondCurve2d();
+  if (ic.Tolerance() <= 1e-5 || c.IsNull() || c1.IsNull() || c2.IsNull() || (analytic(fa) && analytic(fb)))
+    return ic;
+  const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(fa), sb = BRep_Tool::Surface(fb);
+  const occ::handle<ShapeAnalysis_Surface> qa = new ShapeAnalysis_Surface(sa), qb = new ShapeAnalysis_Surface(sb);
+  const int    n = 128;
+  const double t0 = c->FirstParameter(), t1 = c->LastParameter();
+  occ::handle<NCollection_HArray1<gp_Pnt>>   pts = new NCollection_HArray1<gp_Pnt>(1, n + 1);
+  occ::handle<NCollection_HArray1<gp_Pnt2d>> ua  = new NCollection_HArray1<gp_Pnt2d>(1, n + 1), ub = new NCollection_HArray1<gp_Pnt2d>(1, n + 1);
+  occ::handle<NCollection_HArray1<double>>   prm = new NCollection_HArray1<double>(1, n + 1);
+  for (int k = 0; k <= n; ++k)
+  {
+    const double t = t0 + (t1 - t0) * k / n;
+    gp_Pnt       m = c->Value(t);
+    gp_Pnt2d     pa = qa->NextValueOfUV(c1->Value(t), m, 1e-10), pb = qb->NextValueOfUV(c2->Value(t), m, 1e-10);
+    double       gap = 1;
+    for (int it = 0; it < 50 && gap > 1e-9; ++it)
+    {
+      const gp_Pnt xa = sa->Value(pa.X(), pa.Y()), xb = sb->Value(pb.X(), pb.Y());
+      gap = xa.Distance(xb);
+      m   = gp_Pnt((xa.XYZ() + xb.XYZ()) / 2);
+      pa  = qa->NextValueOfUV(pa, m, 1e-10);
+      pb  = qb->NextValueOfUV(pb, m, 1e-10);
+    }
+    if (gap > 1e-8)
+      return ic;
+    pts->SetValue(k + 1, m);
+    ua->SetValue(k + 1, pa);
+    ub->SetValue(k + 1, pb);
+    prm->SetValue(k + 1, t);
+  }
+  // (Fitted by chord length: OCCT's parameters can bunch, the cubic through them waving between.)
+  occ::handle<NCollection_HArray1<double>> chord = new NCollection_HArray1<double>(1, n + 1);
+  chord->SetValue(1, 0.0);
+  for (int k = 2; k <= n + 1; ++k)
+    chord->SetValue(k, chord->Value(k - 1) + pts->Value(k).Distance(pts->Value(k - 1)));
+  if (!(chord->Value(n + 1) > 1e-9))
+    return ic;
+  for (int k = 2; k <= n + 1; ++k)
+    if (!(chord->Value(k) > chord->Value(k - 1)))
+      return ic;
+  prm = chord;
+  GeomAPI_Interpolate   f3(pts, prm, false, 1e-12);
+  Geom2dAPI_Interpolate fa2(ua, prm, false, 1e-12), fb2(ub, prm, false, 1e-12);
+  f3.Perform();
+  fa2.Perform();
+  fb2.Perform();
+  if (!f3.IsDone() || !fa2.IsDone() || !fb2.IsDone())
+    return ic;
+  const occ::handle<Geom_Curve> nc(f3.Curve());
+  const occ::handle<Geom2d_Curve> na(fa2.Curve()), nb(fb2.Curve());
+  double tol = 0;
+  for (int k = 0; k < n; ++k)
+  {
+    const double   t  = 0.5 * (prm->Value(k + 1) + prm->Value(k + 2));
+    const gp_Pnt   p  = nc->Value(t);
+    const gp_Pnt2d qa2 = na->Value(t), qb2 = nb->Value(t);
+    tol = std::max({tol, sa->Value(qa2.X(), qa2.Y()).Distance(p), sb->Value(qb2.X(), qb2.Y()).Distance(p)});
+  }
+  tol = std::max(tol, 1e-7);
+  if (!(tol < 0.5 * ic.Tolerance()))
+    return ic;
+  return IntTools_Curve(nc, na, nb, tol, ic.TangentialTolerance());
+}
+
 static void occt_ahead(rust::Slice<const uint32_t> pairs)
 {
   if (t_free == nullptr || t_free->srcs == nullptr)
@@ -2635,7 +2713,7 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       if (!ff.IsDone())
         return;
       for (const IntTools_Curve& ic : ff.Lines())
-        jobs[k].lines.push_back(ic);
+        jobs[k].lines.push_back(refined_section(ic, jobs[k].fa, jobs[k].fb));
       jobs[k].done = true;
     }
     catch (const Standard_Failure&)
@@ -2699,7 +2777,7 @@ static std::vector<IntTools_Curve> seeded_sections(const TopoDS_Face& fa, const 
       return pc.NbPoints() > 0 && pc.LowerDistance() <= 1e-7;
     });
     if (!seen)
-      out.push_back(ic);
+      out.push_back(refined_section(ic, fa, fb));
   }
   return out;
 }
@@ -2749,7 +2827,7 @@ static rust::String occt_sections(uint32_t a_arg, uint32_t a_face, uint32_t b_ar
     if (!ff.IsDone())
       return rust::String("OCCT's section failed");
     for (const IntTools_Curve& ic : ff.Lines())
-      lines.push_back(ic);
+      lines.push_back(refined_section(ic, fa, fb));
     t_free->ahead.emplace(swap ? std::array<uint32_t, 4>{b_arg, b_face, a_arg, a_face} : std::array<uint32_t, 4>{a_arg, a_face, b_arg, b_face}, lines);
   }
   for (const IntTools_Curve& ic : lines)
