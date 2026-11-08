@@ -203,6 +203,11 @@ def normalize_live(state):
             if sk.get(k) is None:
                 sk.pop(k, None)
         sk.pop("error", None)
+    # A drawing live's recorder couldn't read (only its `error`, e.g. after Switch to reference left the drawing tab:
+    # live2 drw-sheet-ref-switch) isn't compared.
+    dr = (state or {}).get("drawing")
+    if isinstance(dr, dict) and set(dr) == {"error"}:
+        state.pop("drawing")
     # Live's runner works in a copy of the start, its Part Studio "start <name> Copy 1" in a drawing panel.
     d = (state or {}).get("dialog")
     if isinstance(d, dict) and d.get("kind") == "drawing-panel":

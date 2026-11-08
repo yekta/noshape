@@ -328,9 +328,14 @@ impl DrawingEditor {
     /// reference on a pinned one.
     fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
         let replaced = part.clone();
+        let shown = part.clone();
         let assembly = matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
         let mut out = vec![
-            MenuEntry::item("Switch to reference", move |_, w, cx| crate::actions::request_activate_tab(tab, w, cx)),
+            // The source opens with the part selected (live2 drw-sheet-ref-switch).
+            MenuEntry::item("Switch to reference", move |_, w, cx| match shown.clone() {
+                Some(b) => crate::actions::request_activate_tab_selecting(tab, vec![noshape_model::reference::Reference::Body(b)], w, cx),
+                None => crate::actions::request_activate_tab(tab, w, cx),
+            }),
             MenuEntry::Separator,
             MenuEntry::item("Replace...", move |t, _, cx| {
                 t.insert.replace = Some(tab);

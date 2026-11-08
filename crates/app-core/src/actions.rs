@@ -373,6 +373,21 @@ pub fn take_requested_tab() -> Option<noshape_model::document::TabId> {
     REQUESTED_TAB.lock().take()
 }
 
+/// The selection the requested tab opens with.
+static REQUESTED_SELECTION: parking_lot::Mutex<Option<Vec<noshape_model::reference::Reference>>> = parking_lot::Mutex::new(None);
+
+/// [`request_activate_tab`] with `selection` selected there (a drawing's Switch to reference: its part, live2
+/// drw-sheet-ref-switch).
+pub fn request_activate_tab_selecting(tab: noshape_model::document::TabId, selection: Vec<noshape_model::reference::Reference>, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    *REQUESTED_SELECTION.lock() = Some(selection);
+    request_activate_tab(tab, window, cx);
+}
+
+/// The selection [`request_activate_tab_selecting`] asked for, once.
+pub fn take_requested_selection() -> Option<Vec<noshape_model::reference::Reference>> {
+    REQUESTED_SELECTION.lock().take()
+}
+
 #[cfg(test)]
 mod recent_tab_tests {
     use super::RECENT_TAB_CONTEXT;
