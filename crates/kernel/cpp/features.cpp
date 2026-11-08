@@ -747,6 +747,82 @@ static TopoDS_Shape join_target_seam_splits(const TopoDS_Shape& sheet, const Top
   return out;
 }
 
+// An edge between a plane and a surface of revolution about the plane's normal is a circle about that axis (live's
+// c2-valve-config Extrude 3: a text's flat side up to Revolve 1's face, two 0.039 / 0.899 mm CIRCLE edges, where
+// OCCT's section is a B-spline): its curve made that circle in place (the same edge: history and names stay),
+// where every point of it lies on the circle within its tolerance; its curves on the two faces made again. Not the
+// edges in `keep` (an input's own, shared with it); nothing where no face is a surface of revolution.
+void circles_on_revolutions(const TopoDS_Shape& s, const ShapeIMap& keep)
+{
+  bool any = false;
+  for (TopExp_Explorer x(s, TopAbs_FACE); x.More() && !any; x.Next())
+    any = BRepAdaptor_Surface(TopoDS::Face(x.Current()), false).GetType() == GeomAbs_SurfaceOfRevolution;
+  if (!any)
+    return;
+  ShapeAncMap ef;
+  TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
+  BRep_Builder b;
+  for (int i = 1; i <= ef.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(ef.FindKey(i));
+    if (ef(i).Extent() != 2 || BRep_Tool::Degenerated(e) || !e.Location().IsIdentity() || keep.Contains(e))
+      continue;
+    BRepAdaptor_Curve c(e);
+    if (c.GetType() != GeomAbs_BSplineCurve && c.GetType() != GeomAbs_BezierCurve && c.GetType() != GeomAbs_OtherCurve)
+      continue;
+    const TopoDS_Face f0 = TopoDS::Face(ef(i).First()), f1 = TopoDS::Face(ef(i).Last());
+    BRepAdaptor_Surface s0(f0), s1(f1);
+    const bool          rev0 = s0.GetType() == GeomAbs_SurfaceOfRevolution;
+    const BRepAdaptor_Surface& pl = rev0 ? s1 : s0;
+    const BRepAdaptor_Surface& rv = rev0 ? s0 : s1;
+    if (pl.GetType() != GeomAbs_Plane || rv.GetType() != GeomAbs_SurfaceOfRevolution)
+      continue;
+    const gp_Ax1 ax = rv.AxeOfRevolution();
+    const gp_Pln p  = pl.Plane();
+    if (!p.Axis().Direction().IsParallel(ax.Direction(), 1e-9))
+      continue;
+    // The circle: the axis where it crosses the plane, through the edge's middle.
+    const double a0 = c.FirstParameter(), a1 = c.LastParameter();
+    const gp_Pnt mid = c.Value(0.5 * (a0 + a1));
+    const gp_Pnt o   = ax.Location().Translated(gp_Vec(ax.Direction()) * gp_Vec(ax.Location(), p.Location()).Dot(gp_Vec(ax.Direction())));
+    const double r   = gp_Vec(o, mid).Crossed(gp_Vec(ax.Direction())).Magnitude();
+    const double tol = BRep_Tool::Tolerance(e);
+    if (r < 1e3 * tol)
+      continue;
+    gp_Ax2 frame(o, ax.Direction(), gp_Vec(o, mid).Normalized());
+    occ::handle<Geom_Circle> circle = new Geom_Circle(frame, r);
+    bool on = true;
+    for (int k = 0; k <= 8 && on; ++k)
+      on = GeomAPI_ProjectPointOnCurve(c.Value(a0 + (a1 - a0) * k / 8), circle).LowerDistance() <= tol;
+    if (!on)
+      continue;
+    // Its ends' angles, the arc through the middle (angle 0): the axis turned over where it runs the other way.
+    double t0 = ElCLib::Parameter(circle->Circ(), c.Value(a0)), t1 = ElCLib::Parameter(circle->Circ(), c.Value(a1));
+    t0 = t0 > M_PI ? t0 - 2 * M_PI : t0;
+    t1 = t1 > M_PI ? t1 - 2 * M_PI : t1;
+    if (t0 > t1)
+    {
+      frame  = gp_Ax2(o, ax.Direction().Reversed(), gp_Vec(o, mid).Normalized());
+      circle = new Geom_Circle(frame, r);
+      t0     = -t0;
+      t1     = -t1;
+    }
+    if (!(t0 < 0 && t1 > 0))
+      continue;
+    const occ::handle<Geom2d_Curve> c0 = GeomProjLib::Curve2d(circle, t0, t1, BRep_Tool::Surface(f0)), c1 = GeomProjLib::Curve2d(circle, t0, t1, BRep_Tool::Surface(f1));
+    if (c0.IsNull() || c1.IsNull())
+      continue;
+    b.UpdateEdge(e, circle, tol);
+    b.Range(e, t0, t1);
+    b.UpdateEdge(e, c0, f0, tol);
+    b.UpdateEdge(e, c1, f1, tol);
+    b.Range(e, f0, t0, t1);
+    b.Range(e, f1, t0, t1);
+    b.SameParameter(e, false);
+    BRepLib::SameParameter(e, tol);
+  }
+}
+
 OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, double start_offset)
 {
   check_sweepable(profile.shape);
@@ -878,6 +954,12 @@ OpOut op_prism_until(const OcShape& profile, P3 dirp, const OcShape& until, doub
     }
   }
 
+  {
+    ShapeIMap inputs;
+    TopExp::MapShapes(until.shape, TopAbs_EDGE, inputs);
+    TopExp::MapShapes(profile.shape, TopAbs_EDGE, inputs);
+    circles_on_revolutions(result, inputs);
+  }
   HistoryBuilder hb(args, result);
   hb.add_history(hist.get());
   auto moved = [&](const TopoDS_Shape& s) -> TopoDS_Shape {

@@ -704,3 +704,27 @@ fn offset_prism_sides_keep_a_short_face_between_tangent_rounds() {
         }
     }
 }
+
+/// A plane square to a surface of revolution's axis meets it in a circle (live c2-valve-config's Extrude 3: its two
+/// 0.039 mm CIRCLE edges where OCCT's section is a B-spline): the cut's edge on z = 1 is a circle of the profile's
+/// radius there, about the axis.
+#[test]
+fn a_plane_square_to_a_revolved_spline_cuts_it_in_a_circle() {
+    let w = make_wire_2d(&Plane::xz(), &[
+        Segment2d::Line { a: DVec2::new(1.0, 0.0), b: DVec2::new(2.0, 0.0) },
+        Segment2d::BSpline { poles: vec![DVec2::new(2.0, 0.0), DVec2::new(3.0, 1.0), DVec2::new(2.0, 2.0)], weights: None, knots: vec![0.0, 1.0], mults: vec![3, 3], degree: 2, periodic: false },
+        Segment2d::Line { a: DVec2::new(2.0, 2.0), b: DVec2::new(1.0, 2.0) },
+        Segment2d::Line { a: DVec2::new(1.0, 2.0), b: DVec2::new(1.0, 0.0) },
+    ])
+    .unwrap();
+    let ring = revolve(&make_face_from_wire(&w, true).unwrap(), DVec3::ZERO, DVec3::Z, 2.0 * PI).unwrap().shape;
+    let corner = make_box_corners(DVec3::new(0.0, 0.0, 1.0), DVec3::new(4.0, 4.0, 3.0)).unwrap();
+    let cut = boolean(BooleanOp::Cut, &[ring], &[corner], &BooleanOptions::default()).unwrap().shape;
+    assert!(cut.is_valid());
+    // (The profile's x at z 1: the quadratic's middle, 2.5.)
+    let rim = cut.edges().into_iter().filter_map(|e| e.edge_info().ok()).find(|i| (i.start.z - 1.0).abs() < 1e-9 && (i.end.z - 1.0).abs() < 1e-9 && i.start.length() > 2.0);
+    match rim.map(|i| i.curve) {
+        Some(Curve::Circle { center, radius, .. }) => assert!((center - DVec3::Z).length() < 1e-9 && close(radius, 2.5, 1e-7), "{center} {radius}"),
+        other => panic!("the cut's edge on z = 1: {other:?}"),
+    }
+}

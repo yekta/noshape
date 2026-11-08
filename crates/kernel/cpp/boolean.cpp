@@ -7331,8 +7331,24 @@ struct TrimAfter
   ~TrimAfter() { trim_if_grown(start); }
 };
 
+static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts);
+
 OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
                  const BoolOpts& opts)
+{
+  OpOut r = op_boolean_built(op, args, tools, opts);
+  if (r.shape)
+  {
+    ShapeIMap inputs;
+    for (const OcShapeList* l : {&args, &tools})
+      for (const TopoDS_Shape& x : l->items)
+        TopExp::MapShapes(x, TopAbs_EDGE, inputs);
+    circles_on_revolutions(r.shape->shape, inputs);
+  }
+  return r;
+}
+
+static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShapeList& tools, const BoolOpts& opts)
 {
   const TrimAfter trim_after;
   t_bool_path = "occt";

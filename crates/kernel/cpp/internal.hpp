@@ -267,6 +267,8 @@ private:
 // Images of `s` through a (possibly null) history: Modified images, or `s`
 // itself when unmodified; empty when removed.
 ShapeList images_of(const occ::handle<BRepTools_History>& h, const TopoDS_Shape& s);
+// features.cpp: section edges between a plane and a surface of revolution about its normal made circles.
+void circles_on_revolutions(const TopoDS_Shape& s, const ShapeIMap& keep);
 
 // `prism` (standing on the plane through `origin` square to `pull`) with its `sides` drafted by `angle` about its base,
 // built directly (shell.cpp; for profiles OCCT's draft fails on: involutes, splines). Null when it isn't such a prism.
