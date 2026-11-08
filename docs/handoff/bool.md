@@ -39,6 +39,13 @@ scratch /root/bool-scratch.
   gate's first recorded exception: vibe4 ~/agents/bool-corpora/valve2/live (brep_replay reads a corpus's `live` file:
   "<case> <capture>" lines, reported "as live, OCCT differs"); valve2 added to whyall's corpora. T1
   bool_patterns::a_valve_handle_cut_past_a_cones_apex_as_occt and a_valve_handles_pattern_keeps_both_short_edges_as_live.
+- **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
+  declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
+  the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
+  /root/bool-scratch/wip/sp-cut-touch-debug-1108.patch). Blend's tpd note: the box test can't tell tpd's rounds (meeting
+  inside the part) from the valve's handles (their boxes overlap inside the part's box too, 150 x 150 x 3 mm); with the
+  valve patch ours takes the valve's 7 tools at once, so the cut at once first (one by one only after it declines) is
+  the experiment to run over the corpora (tpd case: vibe4 ~/agents/bool-corpora/tpd).
 - Queue after it (lead 11-08): cf-surface-pattern's Surface
   Pattern 3 (85 spheres cut, OCCT invalid, see core's note below); blend's notes (tpd's final cut, michael's round
   tools).
