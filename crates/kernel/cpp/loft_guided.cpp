@@ -17,6 +17,8 @@
 #include <GeomFill_BSplineCurves.hxx>
 #include <GeomConvert.hxx>
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
+#include <Approx_CurvilinearParameter.hxx>
+#include <GeomAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
@@ -613,29 +615,41 @@ struct Open
 
 // The face through a grid, as a plane or cylinder (Parasolid's simplest
 // surface) when the grid lies on one.
-TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
+// The face on the plane, cylinder, ... its surface lies on within `tol`, bounded by its edges; else as it is.
+TopoDS_Face as_analytic(const TopoDS_Face& f, double tol)
 {
-  TopoDS_Face           f = grid_face(g);
   occ::handle<Geom_Surface> s(BRep_Tool::Surface(f));
   GeomConvert_SurfToAnaSurf conv(s);
   occ::handle<Geom_Surface> ana(conv.ConvertToAnalytical(tol));
   if (ana.IsNull() || conv.Gap() > tol)
     return f;
   BRepLib::BuildCurves3d(f);
-  BRepBuilderAPI_MakeFace mf(ana, BRepTools::OuterWire(f), true);
-  if (!mf.IsDone())
-    return f;
-  ShapeFix_Face fix(mf.Face());
-  fix.Perform();
-  TopoDS_Face out = fix.Face();
-  GProp_GProps a, b;
+  GProp_GProps a;
   BRepGProp::SurfaceProperties(f, a);
-  BRepGProp::SurfaceProperties(out, b);
-  return std::abs(a.Mass() - b.Mass()) <= 1e-6 * a.Mass() ? out : f;
+  // The wire both ways round: the one bounding the face (a surface facing the other way runs it reversed).
+  for (const TopoDS_Wire& w : {BRepTools::OuterWire(f), TopoDS::Wire(BRepTools::OuterWire(f).Reversed())})
+  {
+    BRepBuilderAPI_MakeFace mf(ana, w, true);
+    if (!mf.IsDone())
+      continue;
+    ShapeFix_Face fix(mf.Face());
+    fix.Perform();
+    const TopoDS_Face out = fix.Face();
+    GProp_GProps      b;
+    BRepGProp::SurfaceProperties(out, b);
+    if (std::abs(a.Mass() - b.Mass()) <= 1e-6 * std::abs(a.Mass()))
+      return out;
+  }
+  return f;
+}
+
+TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
+{
+  return as_analytic(grid_face(g), tol);
 }
 
 // A chain of edges as one B-spline, from `from` (an end of the chain): C0 at its joints.
-occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp_Pnt& from, double tol)
+occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp_Pnt& from, double tol, bool by_arc)
 {
   ShapeList edges;
   for (TopExp_Explorer x(chain, TopAbs_EDGE); x.More(); x.Next())
@@ -651,7 +665,16 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
     const occ::handle<Geom_Curve> c = BRep_Tool::Curve(x.Current(), f, l);
     if (c.IsNull())
       return nullptr;
-    occ::handle<Geom_BSplineCurve> piece = GeomConvert::CurveToBSplineCurve(occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c, f, l)));
+    const occ::handle<Geom_Curve> trimmed(new Geom_TrimmedCurve(c, f, l));
+    occ::handle<Geom_BSplineCurve> piece = GeomConvert::CurveToBSplineCurve(trimmed);
+    if (by_arc && !c->IsKind(STANDARD_TYPE(Geom_Line)))
+    {
+      const occ::handle<Adaptor3d_Curve> ad(new GeomAdaptor_Curve(trimmed));
+      Approx_CurvilinearParameter        arc(ad, tol, GeomAbs_C2, 14, 100);
+      if (!arc.IsDone() || !arc.HasResult())
+        return nullptr;
+      piece = arc.Curve3d();
+    }
     if (x.Current().Orientation() == TopAbs_REVERSED)
       piece->Reverse();
     if (!join.Add(piece, tol))
@@ -685,7 +708,7 @@ TopoDS_Face face_on_edges(const std::vector<TopoDS_Shape>& bounds, double tol)
   gp_Pnt at = BRep_Tool::Pnt(first);
   for (const TopoDS_Shape& b : bounds)
   {
-    occ::handle<Geom_BSplineCurve> c = chain_bspline(b, at, tol);
+    occ::handle<Geom_BSplineCurve> c = chain_bspline(b, at, tol, !std::getenv("NOSHAPE_LOFT_OWN"));
     if (c.IsNull())
       return TopoDS_Face();
     sides.push_back(c);
@@ -693,7 +716,7 @@ TopoDS_Face face_on_edges(const std::vector<TopoDS_Shape>& bounds, double tol)
   }
   // Stretch style: through the four curves exactly, area within live's band (Coons style is 0.05 % over); the inside
   // isn't live's yet (the blade's volume +2.9 %, asked live).
-  GeomFill_BSplineCurves fill(sides[0], sides[1], sides[2], sides[3], GeomFill_StretchStyle);
+  GeomFill_BSplineCurves fill(sides[0], sides[1], sides[2], sides[3], std::getenv("NOSHAPE_LOFT_COONS") ? GeomFill_CoonsStyle : GeomFill_StretchStyle);
   const occ::handle<Geom_BSplineSurface> surface = fill.Surface();
   if (surface.IsNull())
     return TopoDS_Face();
@@ -921,7 +944,7 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     {
       const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
       if (!exact.IsNull())
-        face = exact;
+        face = as_analytic(exact, 1e-6 * (1 + size));
     }
     sew.Add(face);
   }

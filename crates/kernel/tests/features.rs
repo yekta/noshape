@@ -768,3 +768,43 @@ fn a_plane_square_to_a_revolved_spline_cuts_it_in_a_circle() {
         other => panic!("the cut's edge on z = 1: {other:?}"),
     }
 }
+
+/// Live 2319: surface lofts of two wire profiles 50 apart along guides (Continuity None, trim guides on). Live pairs the
+/// curves by arc length (an arc profile between straight guides: 2130.807 mm², ours from the arc's own parameter was
+/// 2129.305), and a face lying on a plane or cylinder is one (two straight guides: a plane; two arc guides: an exact
+/// cylinder, R 36.25).
+#[test]
+fn a_guided_surface_loft_as_live() {
+    let v = |x: f64, y: f64, z: f64| DVec3::new(x, y, z);
+    let line = |a: DVec3, b: DVec3| make_wire(&[make_line(a, b).unwrap()]).unwrap();
+    let arc = |a: DVec3, m: DVec3, b: DVec3| make_wire(&[make_arc_3pts(a, m, b).unwrap()]).unwrap();
+    let (la, lb) = (line(v(0., 0., 0.), v(40., 0., 0.)), line(v(0., 0., 50.), v(40., 0., 50.)));
+    let (g0, g1) = (line(v(0., 0., 0.), v(0., 0., 50.)), line(v(40., 0., 0.), v(40., 0., 50.)));
+    let (c0, c1) = (arc(v(0., 0., 0.), v(0., -10., 25.), v(0., 0., 50.)), arc(v(40., 0., 0.), v(40., -10., 25.), v(40., 0., 50.)));
+    let aa = arc(v(0., 0., 0.), v(20., 10., 0.), v(40., 0., 0.));
+    let b7 = line(v(5., 0., 50.), v(35., 0., 50.));
+    let (t0, t1) = (arc(v(0., 0., 0.), v(0., -10., 25.), v(5., 0., 50.)), arc(v(40., 0., 0.), v(40., -10., 25.), v(35., 0., 50.)));
+    let cases = [
+        ("one straight guide", &la, &lb, vec![g0.clone()], 2000.0, "plane"),
+        ("two straight guides", &la, &lb, vec![g0.clone(), g1.clone()], 2000.0, "plane"),
+        ("an arc profile", &aa, &lb, vec![g0, g1], 2130.807, ""),
+        ("one arc guide", &la, &lb, vec![c0.clone()], 2118.1613, ""),
+        ("two arc guides", &la, &lb, vec![c0, c1], 2206.937, "cylinder"),
+        ("profiles of different length", &la, &b7, vec![t0, t1], 2113.639, ""),
+    ];
+    for (case, a, b, g, live, kind) in cases {
+        let r = loft_guided_open(a, b, &g, true, false).unwrap();
+        let faces = r.faces();
+        assert_eq!(faces.len(), 1, "{case}");
+        let area = faces[0].area().unwrap();
+        assert!(close(area, live, 2e-5), "{case}: {area} vs live {live}");
+        let surface = faces[0].face_surface().unwrap();
+        let kind_ok = match kind {
+            "plane" => matches!(surface, Surface::Plane(_)),
+            "cylinder" => matches!(surface, Surface::Cylinder { radius, .. } if (radius - 36.25).abs() < 1e-6),
+            _ => true,
+        };
+        assert!(kind_ok, "{case}: {surface:?}");
+        assert!(faces[0].is_valid(), "{case}");
+    }
+}
