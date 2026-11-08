@@ -737,7 +737,13 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             }
         }
         ev.ctx.bodies = before;
-        for (i, picked) in sheets.into_iter().enumerate() {
+        let no_trim = ev.is("trim", "NO_TRIM");
+        for (i, mut picked) in sheets.into_iter().enumerate() {
+            if no_trim {
+                for (f, _) in picked.iter_mut() {
+                    *f = run_on_round(f, radius)?;
+                }
+            }
             let shapes: Vec<Shape> = picked.iter().map(|(f, _)| f.clone()).collect();
             let sheet = if shapes.len() == 1 { shapes[0].clone() } else { k::sew(&shapes, 1e-7, false).map_err(kerr("Failed to blend faces."))?.shape };
             let names: Vec<Name> = sheet.faces().iter().map(|f| picked.iter().find(|(p, _)| p.is_same(f)).map_or_else(|| picked[0].1.clone(), |(_, n)| n.clone())).collect();
@@ -764,6 +770,23 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         return err("Face blend between faces that don't share an edge is not supported yet");
     }
     Ok(())
+}
+
+/// Live 2306 C: a detached No trim blend runs on past its ends by `by` (a straight round's cylinder; other faces as
+/// they are).
+fn run_on_round(face: &Shape, by: f64) -> FResult<Shape> {
+    let Ok(k::Surface::Cylinder { axis, .. }) = face.face_surface() else { return Ok(face.clone()) };
+    let a = axis.normalize();
+    let arcs: Vec<Shape> = face.edges().into_iter().filter(|e| matches!(e.edge_curve(), Ok(k::Curve::Circle { .. }))).collect();
+    let [first, second] = arcs.as_slice() else { return Ok(face.clone()) };
+    let at = |e: &Shape| e.edge_info().map(|i| i.start.dot(a));
+    let (lo, hi) = if at(first)? <= at(second)? { (first, second) } else { (second, first) };
+    let len = at(hi)? - at(lo)?;
+    let info = lo.edge_info()?;
+    let mid = lo.point_at(0.5 * (info.first_param + info.last_param))?;
+    let back = -a * by;
+    let arc = k::make_arc_3pts(info.start + back, mid + back, info.end + back)?;
+    Ok(k::extrude(&arc, a * (len + 2.0 * by))?.shape)
 }
 
 /// Live 2306 D / 2321: a face blend between two planar walls, each a surface body of one face, makes one sheet: the

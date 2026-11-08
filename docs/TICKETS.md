@@ -3903,8 +3903,8 @@ P1
   pocket's floor (live 20 faces, 136943.82 mm³); ours errs "not supported yet" up front (the plain held cut split the
   part in three).
 - [ ] P2 FACEBLEND-HOLD-INVERSE (blend, live) Inverse tangent hold lines.
-- [ ] P2 FACEBLEND-NOTRIM-DETACHED (blend) a detached No trim blend runs on past the chain's ends by the radius (live
-  2306 C: 301.5929 mm², x −24…24 on the 40 mm block); ours stops at the ends.
+- [x] P2 FACEBLEND-NOTRIM-DETACHED (blend) a detached No trim blend runs on past the chain's ends by the radius (live
+  2306 C: 301.5929 mm², x −24…24 on the 40 mm block); ours stops at the ends. Done for straight rounds (cylinders).
 - [ ] P2 FACEBLEND-PROP-SIDE1 (blend, live) Adjacent / Custom propagation with the picks swapped (side 1 the wall):
   which side walks (ours: side 2 only).
 - [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or

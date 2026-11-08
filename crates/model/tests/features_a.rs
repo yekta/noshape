@@ -837,6 +837,11 @@ fn face_blend_propagation_detach_and_trim_as_live() {
     assert_eq!(sheet.kind, noshape_model::display::BodyKind::Surface);
     assert_eq!(sheet.faces.len(), 1);
     assert!((sheet.shape.area().unwrap() * 1e6 - 251.3274).abs() < 1e-3, "{}", sheet.shape.area().unwrap() * 1e6);
+    // No trim runs on past both ends by the radius: x −24…24.
+    let res = run(vec![("detach", b(true)), ("trim", en("NO_TRIM"))]);
+    let sheet = &res.context.bodies[1].shape;
+    let bb = sheet.bounding_box(true).unwrap();
+    assert!((sheet.area().unwrap() * 1e6 - 301.5929).abs() < 1e-3 && (bb.min.x + 0.024).abs() < 1e-6 && (bb.max.x - 0.024).abs() < 1e-6, "{} {bb:?}", sheet.area().unwrap() * 1e6);
 }
 
 /// Live 2306 D / 2321: Face blend R 5 between two Extrude Surface walls 20 up (wall 1 (0,0)-(40,0), normal -y; wall 2
