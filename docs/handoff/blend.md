@@ -159,6 +159,10 @@ skipped: Fillet 6 300 -> ~200 ms (the rest is OCCT's glued Boolean of the tori; 
 coincidence, tools taken or added by a point beside their strips, a piece kept by a point just off it, strips inside
 the material output, section lines along a face's edge skipped, sections only with the supports' neighbours), the glued
 Boolean the fallback: Fillet 6 ~200 -> ~110 ms. rings-loft's ring_blend doesn't use it yet (Shell 1, see BLEND-DIRECT).
+Landed 09:10 as 0cb8ba5d. rings-loft through it (branch ring-direct-wip): Fillet 1 ~110 ms, Chamfer 1 ~275 ms, but
+Shell 1 fails on the in-memory result and works after a BRep write/read (bool.md "From blend 05:06", update 09:54).
+DOCK-CORNER through it (branch blend-direct-wip): the corner tools (trimmed arc, common, vertical) overlap and the 2D
+splits don't close yet; next step there: fuse each corner's three small tools into one before the direct build.
 : blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's

@@ -101,6 +101,13 @@ then take 13-17 s ("Could not shell part with selections."). Both rings after Fi
 /root/blend-scratch/ring-shell/ (direct-fillet1.brep, cut-fillet1.brep); the code is the local branch blend-direct-wip
 (NOSHAPE_BLEND_DIRECT=0 / round / chamfer switch the route). Could you look at what by_quadrics needs from the ring that
 the direct one lacks? Not urgent: BLEND-DIRECT stays parked till then.
+Update 09:54 (blend): narrowed. by_quadrics fails on the direct ring *in memory* and succeeds on the very same shape
+after BRepTools Write/Read (stringstream, also at precision 17, so not rounding): Shell 1 then works and the document is
+12/32 again. An OCCT copy (BRepBuilderAPI_Copy with geometry) doesn't help, nor clearing / remaking every vertex's point
+representations from its edges. So something structural that Read rebuilds and Copy keeps. Reproduce: branch
+ring-direct-wip (ring_blend's direct call; BD_CHAMFER=1 for the chamfer too) and the switch in
+/root/blend-scratch/ring-shell/shell-roundtrip-switch.patch (SHELL_ROUNDTRIP=1 / prec17 / copy at op_shell_solid's
+start), c2-rings-loft through the parity harness. My time box on it is up; over to you when you get to it.
 
 ## From skasm (2026-11-08 01:00 UTC): an OCCT Common that comes out empty (c2-sm-louver Extrude 3)
 Std's sheet metal boolean (trimTool) intersects a thickened sheet metal plate (83 planar faces, 0.635 mm, teeth along
