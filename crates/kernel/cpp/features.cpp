@@ -6365,9 +6365,14 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         if (T.shape.IsNull())
           return std::nullopt;
       }
-    for (Tool& T : ts)
-      if (!T.shape.IsNull())
-        tools.Append(T.shape);
+    std::vector<TopoDS_Shape> tool_list, tool_edges;
+    for (size_t k = 0; k < ts.size(); ++k)
+      if (!ts[k].shape.IsNull())
+      {
+        tools.Append(ts[k].shape);
+        tool_list.push_back(ts[k].shape);
+        tool_edges.push_back(es[k]);
+      }
     bool switched = false;
     // Concave corners: two lines meeting where their walls meet in a concave edge.
     for (int i = 1; i <= v2e.Extent(); ++i)
@@ -6454,8 +6459,27 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     }
     TopoDS_Shape cut = input;
     HHist        h;
-    // A chain's rounds without a mitre's ball (a G1 loop's: each tool meets the part only on its faces): one Boolean, glued.
+    // A chain's rounds without a mitre's ball (a G1 loop's: each tool meets the part only on its faces): built directly
+    // (the tools' faces on the part's put on them in 2D), else one Boolean, glued.
+    bool direct = false;
     if (!need_ball)
+      try
+      {
+        auto [d, hd] = blend_direct(input, tool_list, tool_edges);
+        if (valid_shape(d))
+        {
+          cut    = d;
+          h      = hd;
+          direct = true;
+          first.Clear();
+          second.Clear();
+        }
+      }
+      catch (const std::exception&)
+      {
+        // (OCCT's failures too: Standard_Failure is one.)
+      }
+    if (!need_ball && !direct)
     {
       const KernelTimer                             t_glued("blend.by_tools.glued");
       std::unique_ptr<BRepAlgoAPI_BooleanOperation> b;

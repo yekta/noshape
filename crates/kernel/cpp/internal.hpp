@@ -471,6 +471,11 @@ bool blend_in_slabs(const TopoDS_Shape& target, const std::vector<TopoDS_Edge>& 
 bool is_seam(const TopoDS_Edge& e, const NCollection_List<TopoDS_Shape>* faces);
 
 // Convenience: build OpOut from args + output + optional history.
+// Blends built with no cut (blend_direct.cpp): `P` less `tools` (each the region between an edge of P, `rim`, and its
+// blend; faces lying on P's faces), on P itself (a copy: its vertices get parameters on new edges). Throws when it can't.
+std::pair<TopoDS_Shape, occ::handle<BRepTools_History>> blend_direct(const TopoDS_Shape& P, const std::vector<TopoDS_Shape>& tools,
+                                                                     const std::vector<TopoDS_Shape>& rim);
+
 OpOut make_result(const std::vector<TopoDS_Shape>& args, const TopoDS_Shape& out,
                   const BRepTools_History* h, const std::vector<const OcShape*>* sources = nullptr,
                   std::array<ShapeIMap, 3>* out_maps = nullptr);

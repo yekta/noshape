@@ -588,6 +588,13 @@ pub fn fillet_checked(shape: &Shape, edges: &[Shape], radii: &[f64]) -> Result<O
     recorded(|| Blend::Fillet { radii: radii.to_vec() }, true, shape, edges, &[], || op(ffi::op_fillet(shape.raw(), &l, radii, true)))
 }
 
+/// Blends built with no cut (BLEND-DIRECT): `part` less each tool (the region between a rim edge of the part and its
+/// blend, whose other faces lie on the part's faces), its blend faces generated from `rims` (one edge a tool).
+pub fn blend_direct(part: &Shape, tools: &[Shape], rims: &[Shape]) -> Result<OpResult> {
+    let (t, r) = (vec_to_list(tools), vec_to_list(rims));
+    op(ffi::op_blend_direct(part.raw(), &t, &r))
+}
+
 /// Whether noshape's own blend makes this fillet (nothing is kept: a caller deciding how to split one).
 pub fn fillet_rust_accepts(shape: &Shape, edges: &[Shape], radii: &[f64]) -> bool {
     let l = vec_to_list(edges);

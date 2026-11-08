@@ -155,6 +155,10 @@ glued Boolean of the tori ~190 ms, the slivered OCCT attempt ~100 first). T1 fea
 rounds_has_no_slivers_as_live (data/snap-hook-lip.brep, Fillet 6's input).
 11-08 06:00: such a chain (tangent arcs changing support) goes to the exact rounds first, OCCT's slivered attempt
 skipped: Fillet 6 300 -> ~200 ms (the rest is OCCT's glued Boolean of the tori; live 8).
+11-08 08:30: the chain's rounds now go through the direct build (blend_direct.cpp, extended: cones / tori by sampled
+coincidence, tools taken or added by a point beside their strips, a piece kept by a point just off it, strips inside
+the material output, section lines along a face's edge skipped, sections only with the supports' neighbours), the glued
+Boolean the fallback: Fillet 6 ~200 -> ~110 ms. rings-loft's ring_blend doesn't use it yet (Shell 1, see BLEND-DIRECT).
 : blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's

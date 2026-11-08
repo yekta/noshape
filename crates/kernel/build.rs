@@ -62,6 +62,7 @@ const BRIDGE_SOURCES: &[&str] = &[
     "cpp/shell.cpp",
     "cpp/boolean.cpp",
     "cpp/rust_blend.cpp",
+    "cpp/blend_direct.cpp",
     "cpp/rust_boolean.cpp",
     "cpp/mesh.cpp",
     "cpp/mesh_rust.cpp",

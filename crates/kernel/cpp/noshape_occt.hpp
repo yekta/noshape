@@ -934,6 +934,7 @@ OpOut op_shell(const OcShape& solid, const OcShapeList& faces, double thickness,
 OpOut op_shell_solid(const OcShape& solid, const OcShapeList& faces, double thickness, bool outward,
                      uint8_t method);
 bool fillet_rust_accepts(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii);
+OpOut op_blend_direct(const OcShape& part, const OcShapeList& tools, const OcShapeList& rims);
 OpOut op_fillet(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked);
 OpOut op_fillet_variable(const OcShape& s, const OcShape& edge, rust::Slice<const double> params,

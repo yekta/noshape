@@ -655,6 +655,8 @@ pub(crate) mod ffi {
         -> Result<OpOut>;
         fn op_shell_solid(solid: &OcShape, faces: &OcShapeList, thickness: f64, outward: bool, method: u8) -> Result<OpOut>;
         fn op_fillet(s: &OcShape, edges: &OcShapeList, radii: &[f64], checked: bool) -> Result<OpOut>;
+        /// Blends built with no cut: the part, each blend's tool (the region between its edge and its blend) and the edge.
+        fn op_blend_direct(part: &OcShape, tools: &OcShapeList, rims: &OcShapeList) -> Result<OpOut>;
         fn fillet_rust_accepts(s: &OcShape, edges: &OcShapeList, radii: &[f64]) -> bool;
         fn op_fillet_variable(
             s: &OcShape,
