@@ -3827,6 +3827,75 @@ were checked in code by asm; "(verify)" ones need a live check first.
   a circular edge or cylinder and a cylinder / cone / torus; limit and offset ranges drawn in the graphics;
   interference of parts inside subassemblies; explode steps configured, red when their instance is missing.
 
+## Blends (blend)
+
+From blend's feature audit of 2026-11-08 11:xx (Fillet, Chamfer and Face blend: Onshape's help pages
+docs-raw/md/PartStudio__{fillet,chamfer,face_blend}.md, std's fillet.fs / chamfer.fs / faceBlend.fs / edgeBlendCommon.fs
+and behaviours.md, against crates/model-data, model-core regen/features/{detail,detail_a,blend_section}.rs, the kernel,
+part-studio-ui and ops). Onshape has no separate Edge blend feature (live 2302). The schemas match std's ids, labels,
+defaults, bounds and visibility; the gaps are in the evaluators. "(live)" = live's behaviour to capture first.
+
+P1
+- [ ] P1 FACEBLEND-EMPTY-OPTIONS (blend) a ticked Tangent hold lines / Conic hold lines / Cliff edges / Caps / Limits /
+  Help point box with nothing picked fails ("… not supported yet"); std blends as usual (detail_a.rs:564-567).
+- [ ] P1 FILLET-PARTIAL-PLANE (blend) Partial fillet's end type Entity can't take a datum plane (filter lacks PLANE,
+  part_studio/mod.rs:6240 kind_matches); the help says plane or mate connector.
+- [ ] P1 CHAMFER-METHOD (blend, live REQUESTS 11:10) Measurement Offset / Tangent (FACE_OFFSET / APEX_RANGE) is never
+  read: a chamfer beside a face curving across the edge measures the same either way.
+- [ ] P1 FACEBLEND-PROP-ADJACENT (blend) Propagation Adjacent does nothing (same as off).
+- [ ] P1 FACEBLEND-DETACH (blend) Detached ("the blend a new surface") fails "not supported yet".
+- [ ] P1 FACEBLEND-TRIM (blend) Trim Walls / Short / Long / No trim never read; with "Cannot attach long and no-trim
+  blends to solid parts." on a solid without Detached.
+- [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
+- [ ] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
+- [ ] P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
+  tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
+
+P2
+- [ ] P2 FILLET-PARTIAL-CAP (blend) Entity bounds cut at the face's surface (MC's XY plane) and trim the end by it, not a
+  flat cap at the centroid's projection (detail.rs:307-311).
+- [ ] P2 FILLET-VAR-SECTION (blend) variable fillet ignores crossSection / asymmetric (per-point rho, magnitude, second
+  radius, flip).
+- [ ] P2 FILLET-VAR-PARTIAL (blend) Variable + Partial in one feature (Variable returns before Partial).
+- [ ] P2 FILLET-VAR-ERRORS (blend) std's variable errors (vertex off the chain, internal zero, closed chain needs 2
+  vertices, one edge a point) and VRFILLET_NO_EFFECT.
+- [ ] P2 FILLET-VAR-CORNERS (blend, live) variable chains with corners are filleted edge by edge: check against live.
+- [ ] P2 FILLET-KEEPEDGES (blend) Edges to keep (keepEdges) never read.
+- [ ] P2 FILLET-SMOOTHCORNERS (blend, live) Smooth fillet corners + exceptions never read; find a case where it changes
+  the geometry.
+- [ ] P2 FILLET-MANIP-PARAM (blend) the drag arrow always drives `radius` (Conic / Curvature / Width edit a hidden value)
+  and shows with Variable on; std's offset r(1/cos(φ/2) - 1).
+- [ ] P2 FILLET-PARTIAL-DIR (blend, live) which end is position 0 off the axes (ours: lowest x, y, z); a second bound
+  flipped on a closed chain.
+- [ ] P2 FILLET-ASYM-SIDE (blend, live) which face is first for an asymmetric fillet on chains and loops.
+- [ ] P2 FILLET-FULLROUND-PROP (blend) Full round ignores Tangent propagation; "Cannot select separate center face sets."
+- [ ] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
+  some parts." and keeps the others?
+- [ ] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
+- [ ] P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
+  distance and angle still run on.
+- [ ] P2 CHAMFER-FS-OPCHAMFER (blend) the FS host's opChamfer (custom features, mixed sheet-metal selections) ignores
+  tangentPropagation, directionOverrides, oppositeDirection for OFFSET_ANGLE and chamferMethod.
+- [ ] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle.
+- [ ] P2 CHAMFER-SM-TESTS (blend) T1 for chamfer on active sheet metal and a mixed selection.
+- [ ] P2 FACEBLEND-PROP-CUSTOM (blend) Custom propagation with Maximum angle.
+- [ ] P2 FACEBLEND-PROP-WALLS (blend) Tangent propagation spreads the side faces, not only edge chains.
+- [ ] P2 FACEBLEND-CHECKS (blend) std's checks in std's order (sides on several bodies, spine + tangent propagation:
+  features_c:1290 assumes success, spine + zero angle, width + hold lines, hold line off the sides, edge limit side).
+- [ ] P2 FACEBLEND-FLIPS-SHARED (blend, live) flips on side faces sharing an edge are ignored.
+- [ ] P2 FACEBLEND-SPINE (blend) Swept profile with a curved spine or one not parallel to the edges.
+- [ ] P2 FACEBLEND-HOLD-CONIC (blend, live) Conic / Inverse conic hold lines.
+- [ ] P2 FACEBLEND-CLIFF (blend) Cliff edges.
+- [ ] P2 FACEBLEND-CAPS (blend) Caps with Flip cap and their arrows.
+- [ ] P2 FACEBLEND-LIMITS (blend) plane / face / edge limits with flips and arrows.
+- [ ] P2 FACEBLEND-FREEFORM (blend) conic / curvature / chamfer / width / asymmetric sections on freeform walls.
+
+P3: FILLET-TRIMMED-BOUND (trim to face boundaries; "Fillet has a bad end boundary."), FILLET-ERRVIS (draw the failed
+fillet), FILLET-VAR-MANIP (point-on-edge arrows), FILLET-TOL-WARN, FILLET-OPS-E2E, CHAMFER-OVERRIDE-NO-EFFECT,
+CHAMFER-ERRORS (smooth edges / adjoining edge / overlapping texts), CHAMFER-ENTITY-FILTER, CHAMFER-MIRROR-FLIP,
+CHAMFER-TOLERANCE, CHAMFER-T1-DIRECTION, FACEBLEND-HELPPOINT, FACEBLEND-ASYM-HOLD (live), FACEBLEND-OPFACEBLEND (custom
+features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST, FACEBLEND-OPS-E2E.
+
 ## Sketch + assembly (skasm)
 - [ ] P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
   (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance
