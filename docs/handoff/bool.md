@@ -97,6 +97,13 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   two other declines ("an edge on another argument's free-form face", 091580a4 and c22ea361) and c2-housing-draft's
   Rotieren 1 (526 ms cut: past "a face of revolution" now; a straight edge tangent to the revolved face at its end,
   then "a piece's point on another solid's face"; WIP /root/bool-scratch/wip/housing-rotieren-1108.patch) next.
+- **P1 SHFALL-A7AB-EXTRA-VERTEX fixed (11-08 16:50 UTC):** in a fuse of three tools or more (OCCT's fuse tree) the
+  coincident pieces go to the later argument's; other fuses, cuts and commons the first argument's (the later one for
+  every fuse broke brep_replay::a_notched_cylinder_fused_with_its_mirror_unifies_whole: 6 faces after the unify; for
+  cuts and commons 600+ history differences). Kernel tests 343/343, corpora + parity56 0 differences, shfall its known
+  2. T1 bool_patterns::a_slab_fuse_merges_its_corner_edge_whole. psui's invalid c2-impeller-loft Part 1 isn't the
+  Shell's (Shell Gehäuse fails on every path in the document: quadrics declines core's C0 loft, OCCT's offset fails,
+  the slabs' common is empty after 5.4 s): a later feature on the unshelled part.
 - **Tried 11-08, not kept: the cut by all tools at once first** (one at a time only after it declines; blend's tpd
   note). bool_replay over every corpus + tpd + valve2: the same differences; tpd 123 -> 97 ms, but valve2's 7-tool cut
   331 -> 814 ms (at once is slower there than one at a time). The order stays; no cheap test tells them apart.

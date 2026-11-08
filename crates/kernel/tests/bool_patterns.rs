@@ -1555,3 +1555,32 @@ fn a_valve_handles_pattern_keeps_both_short_edges_as_live() {
 fn a_fuse_with_revolved_arcs_as_occt() {
     valid_as_occt("4a77bf0cde101133", 1e-9);
 }
+
+/// A Shell's slab fuse of 23 tools (shfall a7ab967d, recorded): coincident planar faces of two tools on y = 0, the
+/// later one's kept as OCCT's fuse of several tools keeps it (brep_replay's reference). The earlier one's plane left an
+/// extra vertex on the straight edge along y 0, z 6 after the merge (P1 SHFALL-A7AB-EXTRA-VERTEX; OCCT through
+/// op_boolean's own path leaves it too). Ours: valid, OCCT's counts and volume, and after unify_same_domain no vertex left
+/// at (-2, 0, 6) mm, 51 edges.
+#[test]
+fn a_slab_fuse_merges_its_corner_edge_whole() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "a7ab967d0e6d4517").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's").shape;
+    k::set_rust_boolean(None);
+    assert!(r.is_valid());
+    let counts = |s: &k::Shape| [k::ShapeType::Face, k::ShapeType::Edge, k::ShapeType::Vertex].map(|t| s.count(t));
+    assert_eq!(counts(&r), counts(&o));
+    let (v, w) = (r.volume().unwrap(), o.volume().unwrap());
+    assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
+    let u = k::unify_same_domain(&r).unwrap().shape;
+    assert_eq!(counts(&u), [22, 51, 33], "after the merge");
+    let split = u.sub_shapes(k::ShapeType::Vertex).iter().any(|v| v.vertex_point().is_ok_and(|p| (p - DVec3::new(-0.002, 0.0, 0.006)).length() < 1e-7));
+    assert!(!split, "the corner along y 0, z 6 split at x -2 mm");
+}

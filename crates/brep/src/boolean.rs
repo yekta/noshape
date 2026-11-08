@@ -5729,8 +5729,15 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     for &(pi, _) in &on_pairs {
         let e = by_key.entry(piece_key(&pieces[pi])).or_insert((pi, 0));
         e.1 += 1;
-        // (A fuse's: a piece of a face that was split before a whole face, as OCCT's same-domain faces' first.)
-        let rank = |p: usize| (op == Op::Fuse && !face_split[pieces[p].face], cx.faces[pieces[p].face].arg);
+        // (A fuse's: a piece of a face that was split before a whole face, as OCCT's same-domain faces' first; then in a
+        // fuse of three tools or more the later argument's, as OCCT's fuse tree keeps (shfall a7ab967d: the earlier
+        // one's plane left an extra vertex on a straight edge after the merge, P1 SHFALL-A7AB-EXTRA-VERTEX); else, and
+        // in cuts and commons, the first argument's (a part fused with its mirror unifies whole on its own faces).)
+        let tree = op == Op::Fuse && args.len() >= 4;
+        let rank = |p: usize| {
+            let arg = cx.faces[pieces[p].face].arg;
+            (op == Op::Fuse && !face_split[pieces[p].face], if tree { u32::MAX - arg } else { arg })
+        };
         if rank(pi) < rank(e.0) {
             e.0 = pi;
         }
