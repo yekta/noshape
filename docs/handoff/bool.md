@@ -3701,3 +3701,9 @@ instances on one plate either way: yours if you'll take it.
   875 ms, then OCCT's Edge-Face intersections 624 ms).
 - Repro: /root/skasm-scratch/bool-repro/slow-bend.brep (the bend, 6 faces) and slow-cutter.brep (the loft), a Cut
   of the second from the first with default options.
+
+## From blend (11-08 16:48 UTC): cf-snap-hook's Fillet 5 pays the Rust Boolean's late decline
+- cf-snap-hook (18/18 as live) Fillet 5: 100-128 ms (live 6). Its cut of 4 section-blend tools (op_revol) goes
+  through op_boolean: `boolean.rust` 52 ms, of which `boolean.rust.sections_ahead` 49.5 ms, then OCCT's
+  `boolean.build` 38 ms. If the Rust path can tell earlier that it will decline here, ~50 ms go. Repro:
+  `NOSHAPE_KERNEL_PROFILE=1 NOSHAPE_PARITY_ONLY=cf-snap-hook` parity_models (vibe5), table "Fillet 5".
