@@ -3049,8 +3049,8 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   studio's regenerated sketch through the derived provider (configured: `context_configured`), its cache keys follow
   the source (`importing::source_studio`); the panel's Current document lists the other studios, a click unfolds a
   studio's sketches, a sketch picks; e2e a_frame_with_another_part_studios_sketch. For the translator (dx / asm):
-  write BTMParameterReferencePartStudio as that value. Waiting on live (REQUESTS 07:57): the field's text after the
-  pick (ours: the sketch's name), a configured source's configuration area, the profile's placement.
+  write BTMParameterReferencePartStudio as that value. Live 2294 (08:11): a sketch click applies and closes the
+  panel, the field reads the studio's name (both as ours now), placement as a library bar (ours).
 
 - [ ] P2 UIP-SELECT-OTHER-LIST (psui) **ui-parity face-menu-select-other: after the face menu's Select other…, ours reports
   no list**, live (re-recorded 11-07 03:09, 43f4389bc) a select-other list ("Front plane / Face of Extrude 1 / Part 1 / Edge of

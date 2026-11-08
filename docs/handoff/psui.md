@@ -564,8 +564,9 @@ ours has it in the document's only). The Appearance editor's ✓ / ✕ clear its
 (its field's menu over the input) and key-mod-shift-f (the search pane's Find text noted as "other", Esc closes it)
 match; part-menu-release is live's Release paywall; mirror-face-type: live moves the keyboard to the query after
 Face mirror and Chamfer's Two distances only (9 other recorded type switches keep it on the select: a DOM detail,
-left). Left, ours: appearance-face-row-remove's
-row menu (live: Rename… · Edit appearance… · Suppress · Delete: needs model fields + ops; asked live, REQUESTS 07:01),
+left). Left, ours: (08:59) a face appearance's row
+is live 2292's: Rename… (the panel's "Rename" popup, `FaceAppearance::name`), Edit appearance…, Suppress (row struck
+through, swatch crossed, faces back to the part colour; then Unsuppress · Delete), Delete; op part_appearance_row;
 sketch-row-copy-paste-onto-front (asked live 11-07), variable-table-row-filter (ours marks the row related at the
 right-click, live only after Filter feature list).
 Perf 42427964353 (main 5660398, all green), macOS 26: cold start 3446 ms (target 1000): 417 ms to the GPUI app,

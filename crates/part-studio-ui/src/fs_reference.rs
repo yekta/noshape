@@ -59,14 +59,9 @@ fn value_name(sources: &[RefSource], value: &str) -> Option<String> {
     if let Some((_, profile, _, _)) = noshape_model::regen::features::frame_library::parse_value(value) {
         return Some(profile);
     }
-    // A sketch of another Part Studio (Frame › Select sketch › Current document): the sketch's name (provisional:
-    // asked live what the field reads).
-    if let Some((tab, sketch, _)) = noshape_model::features::frames::studio_sketch(value) {
-        let body = noshape_model::assembly::eval::sketch_body_id(sketch);
-        return sources.iter().find(|s| s.tab == tab).and_then(|s| match &s.what {
-            RefSourceKind::PartStudio(parts) => parts.iter().find(|(b, _)| *b == body).map(|(_, n)| n.clone()),
-            _ => None,
-        });
+    // A sketch of another Part Studio (Frame › Select sketch › Current document) reads as its studio (live 2294: "A").
+    if let Some((tab, _, _)) = noshape_model::features::frames::studio_sketch(value) {
+        return sources.iter().find(|s| s.tab == tab).map(|s| s.name.clone());
     }
     // A profile named by its kind and dimensions (documents from before the library: "SHS 40x40x3").
     if !value.contains('\t') && noshape_model::regen::features::frames_profiles::parse(value).is_ok() {
@@ -259,7 +254,8 @@ impl FeatureDialog {
             // Picking a file closes the panel (live 483, 610); a Part
             // Studio's stays open to pick its parts (486).
             SelectItemEvent::Picked(v) => {
-                if !matches!(kind, ReferenceKind::PartStudio | ReferenceKind::VariableStudio) {
+                // Frame's sketch pick applies and closes the panel (live 2294).
+                if !matches!(kind, ReferenceKind::PartStudio | ReferenceKind::VariableStudio) || (frame && noshape_model::features::frames::studio_sketch(v).is_some()) {
                     this.ref_picker = None;
                 }
                 if derived {

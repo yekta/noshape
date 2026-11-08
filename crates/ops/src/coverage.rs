@@ -571,6 +571,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Turn thickness analysis off", Op("view_display")),
     ("partStudio:Unpack folder", Op("feature_unpack_folder")),
     ("partStudio:Unsuppress", Op("feature_suppress")),
+    ("partStudio:Suppress", Op("part_appearance_row")),
     ("partStudio:Use", Op("sketch_use")),
     ("partStudio:View normal to sketch plane", Op("view_camera")),
     ("partStudio:View normal to", Op("view_camera")),

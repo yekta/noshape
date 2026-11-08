@@ -4361,7 +4361,7 @@ fn shown_sketch_takes_its_appearance() {
     });
     let ps = ps.expect("demo has a Part Studio");
     let fid = ps.features[0].id;
-    ps.appearances.push(crate::partstudio::FaceAppearance { target: crate::partstudio::AppearanceTarget::Feature(fid), color: [1.0, 0.0, 0.0, 1.0] });
+    ps.appearances.push(crate::partstudio::FaceAppearance::new(crate::partstudio::AppearanceTarget::Feature(fid), [1.0, 0.0, 0.0, 1.0]));
     drawing.sheets[0].view_mut(ViewId(1)).unwrap().shown_sketches = vec![fid];
     let sources = regenerate_sources(&doc, &drawing);
     let cache = ViewCache::new();

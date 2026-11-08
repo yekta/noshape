@@ -99,6 +99,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "part",
+            verb: "appearance_row",
+            summary: "Rename, suppress or unsuppress a face appearance (Appearance panel › its row's menu)",
+            description: "Face / feature appearance `index` (from part_appearances): `name` renames it (the panel's Rename… dialog), `suppressed` suppresses it (its faces show their part's colour, the row greyed) or brings it back. Edit appearance… is part_set_appearance with the faces, Delete is part_remove_appearance.",
+            fields: vec![doc_field(), tab_field(), req("index", json!({ "type": "integer", "minimum": 0 }), "Face / feature appearance index."), opt("name", json!({ "type": "string" }), "New name."), opt("suppressed", json!({ "type": "boolean" }), "Suppress (true) or unsuppress (false).")],
+            mutates: true,
+            destructive: false,
+            run: appearance_row,
+        },
+        Op {
+            group: "part",
             verb: "appearances",
             summary: "The Part Studio's custom appearances and materials (the Appearance panel)",
             description: "Each part's material, density and own appearance, and the face / feature appearances with their index.",
@@ -258,6 +268,32 @@ fn set_appearance(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(json!({ "color": hex(rgb), "transparency": transparency }).into())
 }
 
+fn appearance_row(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let (od, tab) = studio_target(ctx, a)?;
+    let n = doc::studio(od.doc(), tab)?.appearances.len();
+    let index = a.opt_u64("index")?.ok_or_else(|| OpError::param("index", "required: the appearance's index (part_appearances)"))? as usize;
+    if index >= n {
+        return Err(OpError::param("index", &format!("an index below {n} (part_appearances)")));
+    }
+    if let Some(name) = a.opt_str("name")? {
+        let name = name.trim().to_string();
+        if name.is_empty() {
+            return Err(OpError::param("name", "Name cannot be empty."));
+        }
+        edit_studio(od, tab, ap::RENAME_APPEARANCE, |ps| {
+            ps.appearances[index].name = Some(name.clone());
+            Ok(())
+        })?;
+    }
+    if let Some(on) = a.get("suppressed").map(|v| v.as_bool().ok_or_else(|| OpError::param("suppressed", "true or false"))).transpose()? {
+        edit_studio(od, tab, if on { ap::SUPPRESS_APPEARANCE } else { ap::UNSUPPRESS_APPEARANCE }, |ps| {
+            ps.appearances[index].suppressed = on;
+            Ok(())
+        })?;
+    }
+    appearances(ctx, a)
+}
+
 fn remove_appearance(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = studio_target(ctx, a)?;
     if a.get("parts").is_some() {
@@ -309,6 +345,10 @@ fn appearances(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         .map(|(i, x)| {
             let mut j = color_json(x.color);
             j["index"] = json!(i);
+            j["name"] = json!(ap::face_appearance_name(&ps.appearances, i));
+            if x.suppressed {
+                j["suppressed"] = json!(true);
+            }
             match &x.target {
                 noshape_model::partstudio::AppearanceTarget::Faces(f) => j["faces"] = json!(f.iter().map(refs::to_id).collect::<Vec<_>>()),
                 noshape_model::partstudio::AppearanceTarget::Feature(f) => j["feature"] = json!(f.to_string()),

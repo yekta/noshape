@@ -1650,6 +1650,14 @@ fn materials_and_appearances() {
     assert_eq!(a["appearances"][0]["color"], "#ff0000", "{a}");
     let hist = call(&mut ctx, "history_list", json!({ "limit": 1 }));
     assert_eq!(hist["history"][0]["description"], "Part Studio 1 :: Edit appearance");
+    // The row's menu (live 2292): "Face appearance 1" renamed, suppressed (kept with its colour), unsuppressed.
+    assert_eq!(a["appearances"][0]["name"], "Face appearance 1", "{a}");
+    let r = call(&mut ctx, "part_appearance_row", json!({ "index": 0, "name": "Red top", "suppressed": true }));
+    assert_eq!((&r["appearances"][0]["name"], &r["appearances"][0]["suppressed"]), (&json!("Red top"), &json!(true)), "{r}");
+    let e = try_call(&mut ctx, "part_appearance_row", json!({ "index": 3, "suppressed": false })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("index"), "{e:?}");
+    let a = call(&mut ctx, "part_appearance_row", json!({ "index": 0, "suppressed": false }));
+    assert!(a["appearances"][0]["name"] == "Red top" && a["appearances"][0].get("suppressed").is_none() && a["appearances"][0]["color"] == "#ff0000", "{a}");
     let after = call(&mut ctx, "part_remove_appearance", json!({ "parts": [part], "appearances": [0] }));
     assert!(after["appearances"].as_array().unwrap().is_empty() && after["parts"][0].get("appearance").is_none(), "{after}");
 }

@@ -324,6 +324,18 @@ pub struct FaceAppearance {
     pub target: AppearanceTarget,
     /// Linear RGBA.
     pub color: [f32; 4],
+    /// Its name in the Appearance panel once renamed (else "Face appearance N", live 2292).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Suppressed in the Appearance panel: the faces show their part's colour again (live 2292).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub suppressed: bool,
+}
+
+impl FaceAppearance {
+    pub fn new(target: AppearanceTarget, color: [f32; 4]) -> Self {
+        Self { target, color, name: None, suppressed: false }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]

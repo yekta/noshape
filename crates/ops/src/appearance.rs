@@ -58,22 +58,40 @@ pub fn apply_appearance(ps: &mut PartStudio, target: &AppearanceEditTarget, rgb:
                 p.tessellation = (tess != TessQuality::Auto).then_some(tess);
             }
         }
-        AppearanceEditTarget::Faces(faces, index) => {
-            let a = FaceAppearance { target: AppearanceTarget::Faces(faces.clone()), color };
-            match index.and_then(|i| ps.appearances.get_mut(i)) {
-                Some(slot) => *slot = a,
-                None => ps.appearances.push(a),
-            }
-        }
+        AppearanceEditTarget::Faces(faces, index) => set_face_appearance(ps, *index, AppearanceTarget::Faces(faces.clone()), color),
         AppearanceEditTarget::Feature(f, index) => {
-            let a = FaceAppearance { target: AppearanceTarget::Feature(*f), color };
-            match index.or_else(|| ps.appearances.iter().position(|x| x.target == a.target)).and_then(|i| ps.appearances.get_mut(i)) {
-                Some(slot) => *slot = a,
-                None => ps.appearances.push(a),
-            }
+            let target = AppearanceTarget::Feature(*f);
+            let index = index.or_else(|| ps.appearances.iter().position(|x| x.target == target));
+            set_face_appearance(ps, index, target, color);
         }
     }
 }
+
+/// A face / feature appearance's colour, at `index` (keeping its name and suppression) or a new one.
+pub fn set_face_appearance(ps: &mut PartStudio, index: Option<usize>, target: AppearanceTarget, color: [f32; 4]) {
+    match index.and_then(|i| ps.appearances.get_mut(i)) {
+        Some(slot) => {
+            slot.target = target;
+            slot.color = color;
+        }
+        None => ps.appearances.push(FaceAppearance::new(target, color)),
+    }
+}
+
+/// The Appearance panel's name of face / feature appearance `index` among `all`: its own, else "Face appearance N"
+/// counting face appearances in order (live 2292).
+pub fn face_appearance_name(all: &[FaceAppearance], index: usize) -> Option<String> {
+    let a = all.get(index)?;
+    if let Some(n) = &a.name {
+        return Some(n.clone());
+    }
+    let n = all[..=index].iter().filter(|x| matches!(x.target, AppearanceTarget::Faces(_))).count();
+    matches!(a.target, AppearanceTarget::Faces(_)).then(|| format!("Face appearance {n}"))
+}
+
+pub const RENAME_APPEARANCE: &str = "Rename appearance";
+pub const SUPPRESS_APPEARANCE: &str = "Suppress appearance";
+pub const UNSUPPRESS_APPEARANCE: &str = "Unsuppress appearance";
 
 pub const EDIT_APPEARANCE: &str = "Edit appearance";
 pub const REMOVE_APPEARANCE: &str = "Remove appearance";

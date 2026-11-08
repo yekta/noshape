@@ -147,6 +147,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("part_set_material", &[r##"{"parts": ["Part 1"], "material": "Aluminum - 6061"}"##]),
     ("part_set_appearance", &[r##"{"parts": ["Part 1"], "color": "#3b61b4"}"##, r##"{"faces": ["face:…"], "color": [200, 40, 40], "transparency": 0.3}"##]),
     ("part_remove_appearance", &[r##"{"parts": ["Part 1"]}"##]),
+    ("part_appearance_row", &[r##"{"index": 0, "name": "Red top"}"##, r##"{"index": 0, "suppressed": true}"##]),
     ("part_appearances", &[r##"{}"##]),
     ("release_create", &[r##"{"tab": "Part Studio 1", "name": "Release 1", "part_numbers": {"Part 1": "PRT-0001"}}"##, r##"{"tab": "Assembly 1", "name": "R2", "notes": "first build", "include_drawings": true}"##]),
     ("release_revision_history", &[r##"{"part_number": "PRT-0001"}"##, r##"{}"##]),

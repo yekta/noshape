@@ -125,7 +125,8 @@ pub fn face_colors(body: &noshape_model::display::BodyDisplay, appearances: &[Fa
             }
         }
     }
-    for a in appearances {
+    // A suppressed appearance leaves the faces their part's colour (live 2292).
+    for a in appearances.iter().filter(|a| !a.suppressed) {
         let c = [lin_to_srgb(a.color[0]), lin_to_srgb(a.color[1]), lin_to_srgb(a.color[2]), 255];
         for (fi, r) in body.face_refs.iter().enumerate() {
             let hit = match &a.target {
@@ -419,33 +420,34 @@ impl PartStudioView {
                         p.tessellation = (tess != TessQuality::Auto).then_some(tess);
                     }
                 }
-                EditTarget::Faces(faces, index) => {
-                    let a = FaceAppearance { target: AppearanceTarget::Faces(faces.clone()), color };
-                    match index.and_then(|i| ps.appearances.get_mut(i)) {
-                        Some(slot) => *slot = a,
-                        None => ps.appearances.push(a),
-                    }
-                }
+                EditTarget::Faces(faces, index) => noshape_ops::appearance::set_face_appearance(ps, *index, AppearanceTarget::Faces(faces.clone()), color),
                 EditTarget::ConfiguredCell(..) => {}
                 EditTarget::Feature(f, index) => {
-                    let a = FaceAppearance { target: AppearanceTarget::Feature(*f), color };
-                    match index.or_else(|| ps.appearances.iter().position(|x| x.target == a.target)).and_then(|i| ps.appearances.get_mut(i)) {
-                        Some(slot) => *slot = a,
-                        None => ps.appearances.push(a),
-                    }
+                    let target = AppearanceTarget::Feature(*f);
+                    let index = index.or_else(|| ps.appearances.iter().position(|x| x.target == target));
+                    noshape_ops::appearance::set_face_appearance(ps, index, target, color);
                 }
                 EditTarget::Features(fs) => {
                     for f in fs {
-                        let a = FaceAppearance { target: AppearanceTarget::Feature(*f), color };
-                        match ps.appearances.iter_mut().find(|x| x.target == a.target) {
-                            Some(slot) => *slot = a,
-                            None => ps.appearances.push(a),
-                        }
+                        let target = AppearanceTarget::Feature(*f);
+                        let index = ps.appearances.iter().position(|x| x.target == target);
+                        noshape_ops::appearance::set_face_appearance(ps, index, target, color);
                     }
                 }
             });
         });
         cx.notify();
+    }
+
+    /// The row's Suppress / Unsuppress: its faces show their part's colour meanwhile (live 2292).
+    fn suppress_appearance(&mut self, index: usize, on: bool, cx: &mut Context<Self>) {
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_studio(self.tab, if on { noshape_ops::appearance::SUPPRESS_APPEARANCE } else { noshape_ops::appearance::UNSUPPRESS_APPEARANCE }, cx, |ps| {
+                if let Some(a) = ps.appearances.get_mut(index) {
+                    a.suppressed = on;
+                }
+            });
+        });
     }
 
     fn remove_appearance(&mut self, index: usize, cx: &mut Context<Self>) {
@@ -827,7 +829,8 @@ impl PartStudioView {
         let grid = rgb_u32(0xaaaaaa);
         // Live (part-studio/173): a selected part's row has a 2 px `#1651b0`
         // outline and `#def1fb` cells; the cells keep their height inside it.
-        let swatch = |color: [f32; 4], selected: bool| {
+        // `off`: a suppressed appearance's swatch, crossed out (live 2292).
+        let swatch = |color: [f32; 4], selected: bool, off: bool| {
             let c = gpui_kit::Rgba { r: lin_to_srgb(color[0]) as f32 / 255.0, g: lin_to_srgb(color[1]) as f32 / 255.0, b: lin_to_srgb(color[2]) as f32 / 255.0, a: color[3].clamp(0.0, 1.0) };
             div()
                 .flex_1()
@@ -856,10 +859,27 @@ impl PartStudioView {
                             .absolute()
                             .size_full(),
                         )
+                    })
+                    .when(off, |d| {
+                        d.relative().child(
+                            canvas(
+                                |_, _, _| {},
+                                |b, _, window, _| {
+                                    let mut path = gpui_kit::PathBuilder::stroke(px(1.5));
+                                    path.move_to(b.origin);
+                                    path.line_to(b.bottom_right());
+                                    if let Ok(p) = path.build() {
+                                        window.paint_path(p, rgb_u32(0x333333));
+                                    }
+                                },
+                            )
+                            .absolute()
+                            .size_full(),
+                        )
                     }),
                 )
         };
-        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool, selected: bool| {
+        let row = |id: SharedString, color: [f32; 4], label: String, indent: bool, selected: bool, off: bool| {
             let target = format!("panel_row:{label}");
             h_flex()
                 .id(id)
@@ -880,10 +900,11 @@ impl PartStudioView {
                         .text_size(px(14.))
                         .when(!indent, |d| d.font_weight(FontWeight::BOLD))
                         .text_color(pal.text)
+                        .when(off, |d| d.line_through().text_color(pal.text_faint))
                         .truncate()
                         .child(label),
                 )
-                .child(swatch(color, selected))
+                .child(swatch(color, selected, off))
         };
         let mut rows: Vec<AnyElement> = Vec::new();
         // Configured properties exist once the studio has an input.
@@ -903,7 +924,7 @@ impl PartStudioView {
                 let view = cx.entity();
                 let rename_popup = if rename_part.as_ref() == Some(&body.id) { rename_popup.take() } else { None };
                 rows.push(
-                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false, self.selection.contains(&Reference::Body(body.id.clone())))
+                    row(SharedString::from(format!("ap-part-{}", body.id)), color, body.name.clone(), false, self.selection.contains(&Reference::Body(body.id.clone())), false)
                         // Live: a click selects the part (row and part
                         // highlighted), a double click edits its appearance.
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
@@ -944,16 +965,19 @@ impl PartStudioView {
                 continue;
             }
             let (label, target) = match &a.target {
-                AppearanceTarget::Faces(f) => (format!("Face appearance {face_n}"), EditTarget::Faces(f.clone(), Some(i))),
-                AppearanceTarget::Feature(f) => (names(&Reference::Feature(*f)), EditTarget::Feature(*f, Some(i))),
+                AppearanceTarget::Faces(f) => (a.name.clone().unwrap_or_else(|| format!("Face appearance {face_n}")), EditTarget::Faces(f.clone(), Some(i))),
+                AppearanceTarget::Feature(f) => (a.name.clone().unwrap_or_else(|| names(&Reference::Feature(*f))), EditTarget::Feature(*f, Some(i))),
             };
+            let suppressed = a.suppressed;
             let faces = match &a.target {
                 AppearanceTarget::Faces(f) => f.clone(),
                 AppearanceTarget::Feature(_) => Vec::new(),
             };
             let view = cx.entity();
+            let edit_target = target.clone();
+            let rename_popup_here = if matches!(&self.folder_prompt, Some((_, super::FolderTarget::Appearance(k), _)) if *k == i) { self.name_prompt(cx) } else { None };
             rows.push(
-                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch, false)
+                row(SharedString::from(format!("ap-face-{i}")), a.color, label, !is_sketch, false, suppressed)
                     .on_hover(cx.listener(move |this, h: &bool, _, cx| {
                         // Hovering a face appearance highlights its faces.
                         this.ui.appearance_hover = if *h { faces.clone() } else { Vec::new() };
@@ -964,10 +988,23 @@ impl PartStudioView {
                             this.edit_appearance(target.clone(), w, cx);
                         }
                     }))
+                    // Live 2292: Rename… · Edit appearance… · Suppress · Delete; suppressed: Unsuppress · Delete.
                     .os_context_menu(move |m, _, _| {
-                        let v = view.clone();
-                        m.item(crate::os_menu::OsMenuItem::new("Remove appearance").on_click(move |_, _, cx| v.update(cx, |this, cx| this.remove_appearance(i, cx))))
+                        let item = |label: &str, f: super::ViewAction| {
+                            let v = view.clone();
+                            crate::os_menu::OsMenuItem::new(label).on_click(move |_, w, cx| v.update(cx, |this, cx| f(this, w, cx)))
+                        };
+                        let edit = edit_target.clone();
+                        let m = if suppressed {
+                            m.item(item("Unsuppress", Box::new(move |this, _, cx| this.suppress_appearance(i, false, cx))))
+                        } else {
+                            m.item(item("Rename…", Box::new(move |this, w, cx| this.open_folder_prompt_for(super::FolderTarget::Appearance(i), w, cx))))
+                                .item(item("Edit appearance…", Box::new(move |this, w, cx| this.edit_appearance(edit.clone(), w, cx))))
+                                .item(item("Suppress", Box::new(move |this, _, cx| this.suppress_appearance(i, true, cx))))
+                        };
+                        m.item(item("Delete", Box::new(move |this, _, cx| this.remove_appearance(i, cx))))
                     })
+                    .when_some(rename_popup_here, |d, popup| d.relative().child(div().absolute().top_0().left_0().size_0().child(deferred(anchored().anchor(Anchor::TopRight).snap_to_window().child(popup)).with_priority(5))))
                     .into_any_element(),
             );
         }
@@ -978,7 +1015,7 @@ impl PartStudioView {
                 let f = sk.feature;
                 let color = sk.color.unwrap_or_else(|| crate::theme::lin(crate::theme::viewport::INACTIVE));
                 rows.push(
-                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false)
+                    row(SharedString::from(format!("ap-sk-{f}")), color, sk.name.clone(), false, false, false)
                         .on_click(cx.listener(move |this, ev: &ClickEvent, w, cx| {
                             if ev.click_count() >= 2 {
                                 this.edit_appearance(EditTarget::Feature(f, None), w, cx);

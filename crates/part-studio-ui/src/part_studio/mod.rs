@@ -356,6 +356,8 @@ enum FolderTarget {
     Features(Vec<FeatureId>),
     Folder(u32),
     Part(noshape_model::BodyId),
+    /// A face / feature appearance's row in the Appearance panel (live 2292: the same "Rename" popup).
+    Appearance(usize),
 }
 
 pub struct PartStudioView {
@@ -3466,12 +3468,12 @@ impl PartStudioView {
         // the rollback bar (live 586, 589).
         let prompt_anchor = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
             FolderTarget::Features(ids) => Some(ids.first().copied()),
-            FolderTarget::Folder(_) | FolderTarget::Part(_) => None,
+            FolderTarget::Folder(_) | FolderTarget::Part(_) | FolderTarget::Appearance(_) => None,
         });
         // Wrapping a folder: the popup sits under the folder's row.
         let prompt_folder = self.folder_prompt.as_ref().and_then(|(_, t, _)| match t {
             FolderTarget::Folder(f) => Some(*f),
-            FolderTarget::Features(_) | FolderTarget::Part(_) => None,
+            FolderTarget::Features(_) | FolderTarget::Part(_) | FolderTarget::Appearance(_) => None,
         });
         let mut items: Vec<ListItem> = Vec::new();
         let mut open_folder: Vec<u32> = Vec::new();
@@ -4660,6 +4662,7 @@ impl PartStudioView {
     fn open_folder_prompt_for(&mut self, target: FolderTarget, window: &mut Window, cx: &mut Context<Self>) {
         let name = match &target {
             FolderTarget::Part(b) => self.display.body(b).map(|b| b.name.clone()).unwrap_or_default(),
+            FolderTarget::Appearance(i) => self.studio(cx).and_then(|s| noshape_ops::appearance::face_appearance_name(&s.appearances, *i)).unwrap_or_default(),
             _ => noshape_ops::studio::NEW_FOLDER_NAME.to_string(),
         };
         let st = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).default_value(name));
@@ -4680,6 +4683,23 @@ impl PartStudioView {
     fn commit_folder_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some((st, target, _)) = self.folder_prompt.take() else { return };
         let name = st.read(cx).value().to_string();
+        if let FolderTarget::Appearance(i) = &target {
+            let (i, text) = (*i, name.trim().to_string());
+            let old = self.studio(cx).and_then(|s| noshape_ops::appearance::face_appearance_name(&s.appearances, i));
+            if !text.is_empty() && old.as_deref() != Some(text.as_str()) {
+                self.doc.update(cx, |doc, cx| {
+                    doc.edit_studio(self.tab, noshape_ops::appearance::RENAME_APPEARANCE, cx, |ps| {
+                        if let Some(a) = ps.appearances.get_mut(i) {
+                            a.name = Some(text.clone());
+                        }
+                    });
+                });
+            }
+            let fh = self.focus.clone();
+            window.focus(&fh, cx);
+            cx.notify();
+            return;
+        }
         if let FolderTarget::Part(b) = &target {
             let text = name.trim();
             if !text.is_empty() && self.display.body(b).is_some_and(|x| x.name != text) {
@@ -4699,7 +4719,7 @@ impl PartStudioView {
                     let name = name.trim();
                     ps.wrap_folder(*f, if name.is_empty() { noshape_ops::studio::NEW_FOLDER_NAME } else { name }.to_string())
                 }
-                FolderTarget::Part(_) => None,
+                FolderTarget::Part(_) | FolderTarget::Appearance(_) => None,
             })
         });
         // Live (ui 10-25 b (1)): no row shows selected, the new folder's row related-highlighted until the next
@@ -4723,7 +4743,7 @@ impl PartStudioView {
     fn name_prompt(&mut self, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let pal = p();
         let (st, target, _) = self.folder_prompt.as_ref()?;
-        let title = if matches!(target, FolderTarget::Part(_)) { "Rename" } else { "Folder name" };
+        let title = if matches!(target, FolderTarget::Part(_) | FolderTarget::Appearance(_)) { "Rename" } else { "Folder name" };
         let popup = v_flex()
             .id("folder-prompt")
             .occlude()
