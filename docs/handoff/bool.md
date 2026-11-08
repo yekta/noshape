@@ -3,37 +3,31 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Where things stand (2026-11-08 01:07 UTC; running again)
-- **c2-rings-loft's 51-tool cut is ours (11-08 02:20 UTC, landing):** 0 differences from OCCT (equivalent, 1.3e-7 of
-  the volume); case 745 ms on loaded vibe4 (OCCT 7.6 s, live 767 ms); Circular pattern 1 13.3 -> 1.17 s in the model
-  suite, the document 20.0 -> 6.6 s (live 1.56 s). A piece beside a coincident face's boundary takes the side its
-  points clear of it agree on; `free::apart` halves a free-form face's patches along their longer control net (a ring
-  loft's closes along v: its chord was zero, so it halved along u forever) against a plane or cylinder face's own box
-  in its parameter plane and its surface (`off_surface`): 834 -> 374 B-spline/plane sections (362 meet). Gate clean
-  (corpora + parity56 0 differences, shfall its 2, gpf its 2, knurl/gear level); model suite 70/86, 730/934 before
-  and after. Left on that document: Shell 1 2.3 s, Circular pattern 2 1.1 s, Fillet 1 / Chamfer 1 (blend's tools).
-- **Now: the impeller Shell on live's loft (stage 2), 11-08 02:41 UTC.** The parked patch (stage2-impeller-live-loft-
-  1107d) is applied in agent/bool (uncommitted). With NOSHAPE_SHELL_TANGENT_EXTENSION=1 the wall is now valid: the
-  "invalid wall" was the rim edge's curve on the inlet's offset, ShapeConstruct_ProjectCurveOnSurface's 23 um off at
-  both ends (exact between); its edge kept its 0.16 um tolerance and SameParameter flag, and BRepLib::SameParameter
-  returns at once for a flagged edge (OCCT BRepLib.cxx 1256), so the shell's "same parameter" pass checks nothing.
-  Fix in add_pcurve: a projected B-spline's end poles moved onto the edge's ends. Result on core's q2228 STEP
-  (vibe4 ~/agents/bool-imp/impeller-after-loft.step, test shell::a_lofts_angled_sides_shell with IMP_STEP): 6 faces,
-  20 edges / 16 vertices (live 16 / 12: live makes one inner edge per run of offset edges between the same two faces,
-  JKN = the 3 arcs', JKB = the D's 3), 45,280.47 mm3 (live 45,272.92), 1.3 s. Inner edges match live's (JKV 41.894,
-  JKN 143.46, JKF's midpoint 23.7242 to 0.1 um) but for the two corners on z = 0: ours (14.4818, 26.6681), live
-  (14.4477, 26.6655); every extension rule (GeomLib cont 1 / 2, any length, polynomial) puts it at 14.481-14.485, so
-  it isn't the extension. Areas: inlet inner 1001.45 (live 998.76), z rim 1359.38 (1356.94), G inner 13508.09
-  (13509.22). The polynomial extension (default) fails on live's loft (march off at x 16-20): by_quadrics retries with the
-  tangent one when it fails that way; a run's offset edges joined (16 edges); live asked for points along JKF / JKB /
-  JKJ (REQUESTS 11-08 02:45) to find the 2.5 mm2. Kept main's extension length rule (the slowest speed broke
-  rings-loft's Shell 1 in the document) and the projected end fix off closed surfaces (it broke the ring's repair).
-- Queue after it (lead 11-08): the valve's 7-tool cut (live 2210);
-  skasm's c2-sm-louver Extrude 3 (OCCT's Common of two valid solids empty, its Cut removes nothing, ours "a
-  non-manifold result"; case in /root/skasm-scratch/bool-louver-ex3/); skasm's c2-valve-config text cut
-  (op_prism_until gives a B-spline where live has a circle); core's cf-part-draft Part Draft 3 union of the two
-  drafted halves (1.87 s of its 2.6 s, live 865 ms; lead 11-08); cf-surface-pattern's Surface Pattern 3 (85 spheres
-  cut, OCCT invalid, see core's note below); blend's notes (tpd's final cut, michael's round tools).
+## Where things stand (2026-11-08 04:45 UTC)
+- **Landed 11-08:** c2-rings-loft's 51-tool cut ours (42ae0d85: Circular pattern 1 13.3 -> 1.17 s, live 767 ms);
+  P0 CRASH-6297 (3f3fe564: free::apart's halving 64 deep at most) and P0 SECTIONS-AHEAD-HANG (f210258f: a pool job's
+  time counts against its launcher's CPU deadline; qa to verify on vibe3, where it hung); the impeller Shell on live's
+  loft (8f6f6fd2: T1 shell::an_impeller_lofts_shell_as_live, live's 6/16/12, 45,280.48 mm3 against 45,272.92, 1.65 s
+  against live's 31 ms). Each with its gate, the model suite before / after unchanged.
+- **Impeller, what's left:** the corners on z = 0 sit 34 um from live's (ours (14.4818, 26.6681), live (14.4477,
+  26.6655)) and no extension rule moves them (GeomLib cont 1 / 2, any length, polynomial: 14.481-14.485); areas
+  inlet inner 1001.45 (live 998.76), z rim 1359.38 (1356.94). Live asked for points along JKF / JKB / JKJ (REQUESTS
+  11-08 02:45). The real document's loft is still core's (251,071 against live's 257,078 mm3). Speed: the first
+  (polynomial) attempt fails, then the tangent one builds; 1.65 s, mostly OCCT on B-spline offsets.
+- **Now: cf-part-draft's union (lead 11-08), in bool-b (777b522a, not landed).** In the document ours declined "an
+  edge on another argument's free-form face" after 1.16 s, then OCCT 1.9 s (replay takes it, 1.0 s: the recorded
+  input differs). New `fuse_glued` (boolean.cpp, op_boolean before on_face): two solids meeting on one planar face
+  each, the same outline edge for edge, each on its own side: their shells sewn along it (BRepBuilderAPI_Sewing
+  without analysis or cutting), both solids Deleted as OCCT records: 138 ms, OCCT's result and history exactly.
+  T1 bool_patterns::cylinders_meeting_on_a_whole_face_fuse_glued. Corpus: vibe4 ~/agents/bool-corpora/pd3 (its
+  87332476 differs in history on main too). Checking: bool_replay over every corpus, main against it
+  (/root/bool-scratch/boolrep.sh, br-main.txt / br-glued.txt), then the model suite.
+- Queue after it (lead 11-08): the valve's 7-tool cut (live 2210; parked valve-handle-cut / valve-rim-regroup
+  patches conflict with main now); skasm's c2-sm-louver Extrude 3 (OCCT's Common of two valid solids empty, its Cut
+  removes nothing, ours "a non-manifold result"; case in /root/skasm-scratch/bool-louver-ex3/); skasm's
+  c2-valve-config text cut (op_prism_until gives a B-spline where live has a circle); cf-surface-pattern's Surface
+  Pattern 3 (85 spheres cut, OCCT invalid, see core's note below); blend's notes (tpd's final cut, michael's round
+  tools).
 - **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure
   there is only vibe2 lacking /root/core-scratch: infra, not the Boolean). RUST-MIRROR-SPLIT-FACES has been fixed
   since d0838e9a2; T1 kernel_robustness::part_mirror_of_a_half_counterbored_hole_merges_across_the_plane (13eb48ac).
