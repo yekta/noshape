@@ -1,16 +1,16 @@
 {
  "scenario": "feature-menu-remove-expression",
- "recorded": "2026-11-07T10:02:05.403Z",
+ "recorded": "2026-11-08T06:52:25.066Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0"
+  "recorder": "2026-11-08.3 6f77db4f"
  },
  "live": {
   "document": "372245a4cbbdaa48cb0bdfdb",
   "workspace": "4c74b00690b3ab194f1c78a9",
-  "element": "c59211860104bdce5d7fddf4",
+  "element": "def5ba458f9712809cab2808",
   "start": "block",
   "startElement": "23614b0537e04a173a620e75"
  },
@@ -142,7 +142,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 95666
+   "t": 35068
   },
   {
    "step": 2,
@@ -242,7 +242,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 98127
+   "t": 37445
   },
   {
    "step": 3,
@@ -331,7 +331,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 103295
+   "t": 39972
   },
   {
    "step": 4,
@@ -423,7 +423,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 105484
+   "t": 42253
   },
   {
    "step": 5,
@@ -486,7 +486,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 113982
+   "t": 45977
   },
   {
    "step": 6,
@@ -562,12 +562,12 @@
      "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Dynamic suppression added. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 118029
+   "t": 48636
   },
   {
    "step": 7,
@@ -593,22 +593,42 @@
     "list": {
      "kind": "context-menu",
      "rows": [
-      "Rename",
-      "Edit…",
-      "Edit Sketch 1…",
-      "Show dimensions",
-      "Add selection to folder…",
-      "Suppress",
-      "Edit dynamic suppression",
-      "Add comment",
-      "Zoom to selection",
-      "Show dependencies…",
-      "Add appearance to feature…",
-      "Delete"
+      "Edit expression…",
+      "Remove expression"
      ],
      "highlighted": null,
      "disabled": []
     },
+    "lists": [
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Rename",
+       "Edit…",
+       "Edit Sketch 1…",
+       "Show dimensions",
+       "Add selection to folder…",
+       "Suppress",
+       "Edit dynamic suppression",
+       "Add comment",
+       "Zoom to selection",
+       "Show dependencies…",
+       "Add appearance to feature…",
+       "Delete"
+      ],
+      "highlighted": 6,
+      "disabled": []
+     },
+     {
+      "kind": "context-menu",
+      "rows": [
+       "Edit expression…",
+       "Remove expression"
+      ],
+      "highlighted": null,
+      "disabled": []
+     }
+    ],
     "selection": {
      "count": 0,
      "items": []
@@ -649,7 +669,7 @@
     "sketch": null,
     "drawing": null
    },
-   "t": 120202
+   "t": 50931
   },
   {
    "step": 8,
@@ -659,8 +679,11 @@
      "menu": "Remove expression"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Remove expression\"}",
+   "ok": true,
+   "at": [
+    339,
+    495
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -668,25 +691,7 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Rename",
-      "Edit…",
-      "Edit Sketch 1…",
-      "Show dimensions",
-      "Add selection to folder…",
-      "Suppress",
-      "Edit dynamic suppression",
-      "Add comment",
-      "Zoom to selection",
-      "Show dependencies…",
-      "Add appearance to feature…",
-      "Delete"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -709,7 +714,7 @@
        "editing": false,
        "related": false,
        "hidden": false,
-       "cls": "fake-hover context-menu-active"
+       "cls": ""
       }
      ],
      "rollbackAfter": "Extrude 1"
@@ -722,12 +727,12 @@
      "undo": true,
      "redo": false
     },
-    "message": null,
+    "message": "Dynamic suppression removed. × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null
    },
-   "t": 121965
+   "t": 54532
   }
  ]
 }
