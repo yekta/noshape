@@ -277,7 +277,17 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
         return Ok(point(b.center().x, b.bottom() + px(3.)));
     }
     // A pointer is at whole pixels (a mouse's, and Chrome's under live's runner).
-    let whole = |p: Point<Pixels>| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor()));
+    // The exact target is noted for what Chrome hit-tests at it (`pointer_between_pixels`), as live's runner gives it:
+    // a point on the model at its projection; the triad, drawn where the last face pick landed, at that pick's exact
+    // point (live2's runner: the triad at the pick's world point); an empty spot at a whole pixel ([1560, 960]).
+    let floor = |p: Point<Pixels>| point(px(f32::from(p.x).floor()), px(f32::from(p.y).floor()));
+    let empty = t.get("empty").is_some();
+    let whole = |p: Point<Pixels>| {
+        let at = floor(p);
+        let same_pick = noshape_app_core::ui_script::exact_pointer().filter(|e| floor(*e) == at && p == at);
+        noshape_app_core::ui_script::set_exact_pointer(if empty { None } else { same_pick.or(Some(p)) });
+        at
+    };
     if let Some(ps) = studio.as_ref() {
         return ps.read(cx).ui_target_point(t, cx).map(whole);
     }

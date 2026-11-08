@@ -326,6 +326,27 @@ impl OsMenu {
     }
 
     /// Icon-less list style (13 px text, 17 px inset), as on the documents page.
+    /// A right-click menu's height (22 px rows, 1 px separators, its 1 px border), for placing it before it is drawn.
+    pub fn context_height(&self) -> Pixels {
+        let row = self.row_height.unwrap_or(ROW_H);
+        px(2. + self.items.iter().map(|i| if matches!(i, OsMenuItem::Separator) { 1. } else { row }).sum::<f32>())
+    }
+
+    /// The row `y` below the menu's top edge (in its 1 px border) shows hovered, as a pointer resting there when it
+    /// opens (live: a menu opened above the pointer has it on its last row).
+    pub fn hover_at(&mut self, y: Pixels) {
+        let row = self.row_height.unwrap_or(ROW_H);
+        let mut top = 1.;
+        for (ix, i) in self.items.iter().enumerate() {
+            let h = if matches!(i, OsMenuItem::Separator) { 1. } else { row };
+            if !matches!(i, OsMenuItem::Separator) && f32::from(y) >= top && f32::from(y) < top + h {
+                self.hovered = Some(ix);
+                return;
+            }
+            top += h;
+        }
+    }
+
     pub fn list_no_icons(mut self) -> Self {
         self.plain = true;
         self

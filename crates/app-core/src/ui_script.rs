@@ -13,6 +13,30 @@ pub fn active() -> bool {
     *ON.get_or_init(|| std::env::var_os("NOSHAPE_UI_SCRIPT").is_some())
 }
 
+/// The exact (sub-pixel) point a scenario's model target projects to: the driver clicks its whole pixel, as Chrome
+/// reports whole pixels to live's page, but Chrome hit-tests rows at the exact point (live's recorder: a menu opened
+/// over the pointer has the row under it hovered only then). See [`pointer_between_pixels`].
+static EXACT: Mutex<Option<Point<Pixels>>> = Mutex::new(None);
+
+/// The driver's click target before it is put at whole pixels.
+pub fn set_exact_pointer(p: Option<Point<Pixels>>) {
+    if let Ok(mut e) = EXACT.lock() {
+        *e = p;
+    }
+}
+
+/// The exact target noted last ([`set_exact_pointer`]).
+pub fn exact_pointer() -> Option<Point<Pixels>> {
+    EXACT.lock().ok().and_then(|e| *e)
+}
+
+/// Whether the pointer at `at` lies between pixel edges (right of its whole pixel): a real pointer's own fraction, or
+/// under a scenario the exact target the driver clicked at `at`.
+pub fn pointer_between_pixels(at: Point<Pixels>) -> bool {
+    let exact = active().then(|| EXACT.lock().ok().and_then(|e| *e)).flatten().filter(|e| e.x.floor() == at.x.floor() && e.y.floor() == at.y.floor());
+    f32::from(exact.unwrap_or(at).x).fract() > 1e-3
+}
+
 /// Each named control's window and bounds when last painted.
 type Marks = Mutex<HashMap<String, (WindowId, Bounds<Pixels>)>>;
 

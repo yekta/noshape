@@ -2843,7 +2843,18 @@ impl AssemblyView {
             this.ui.ctx_menu = None;
             cx.notify();
         });
-        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
+        menu.update(cx, |m, cx| {
+            window.focus(&m.focus_handle(cx), cx);
+            // Opened above the pointer: the pointer rests on its last row when it is right of the menu's left edge
+            // (live, probed 11-08: the edge at the pointer's whole pixel, so a pointer between pixels is on the row,
+            // one on a whole pixel on the border).
+            let h = m.context_height();
+            let (anchor, at) = graphics_menu_place(position, h, window.viewport_size());
+            let between = crate::ui_script::pointer_between_pixels(position);
+            if between && anchor == Anchor::BottomLeft {
+                m.hover_at(position.y - (at.y - h).max(px(2.)));
+            }
+        });
         self.ui.ctx_menu = Some((position, menu, sub));
         cx.notify();
     }
@@ -2858,15 +2869,30 @@ impl AssemblyView {
             this.ui.ctx_menu = None;
             cx.notify();
         });
-        menu.update(cx, |m, cx| window.focus(&m.focus_handle(cx), cx));
+        menu.update(cx, |m, cx| {
+            window.focus(&m.focus_handle(cx), cx);
+            // Opened above the pointer: the pointer rests on its last row when it is right of the menu's left edge
+            // (live, probed 11-08: the edge at the pointer's whole pixel, so a pointer between pixels is on the row,
+            // one on a whole pixel on the border).
+            let h = m.context_height();
+            let (anchor, at) = graphics_menu_place(position, h, window.viewport_size());
+            let between = crate::ui_script::pointer_between_pixels(position);
+            if between && anchor == Anchor::BottomLeft {
+                m.hover_at(position.y - (at.y - h).max(px(2.)));
+            }
+        });
         self.ui.ctx_menu = Some((position, menu, sub));
         self.refresh_scene(false, cx);
         cx.notify();
     }
 
-    pub(super) fn render_graphics_menu(&self) -> Option<AnyElement> {
+    /// Live (probed 11-08): the menu's top-left 2 px under the pointer's pixel; when it doesn't fit below, its bottom 4 px
+    /// under it (the pointer on its last row), its top kept 2 px inside the window; its left edge at the pointer's
+    /// pixel, or its right edge a pixel left of it near the window's right side.
+    pub(super) fn render_graphics_menu(&self, window: &Window, cx: &App) -> Option<AnyElement> {
         let (pos, menu, _) = self.ui.ctx_menu.as_ref()?;
-        Some(deferred(anchored().position(*pos).switch_anchor_or_snap().child(menu.clone())).with_priority(3).into_any_element())
+        let (anchor, at) = graphics_menu_place(*pos, menu.read(cx).context_height(), window.viewport_size());
+        Some(deferred(anchored().anchor(anchor).position(at).snap_to_window_with_margin(px(2.)).child(menu.clone())).with_priority(3).into_any_element())
     }
 
     pub(super) fn expand_all(&mut self, expand: bool, cx: &mut Context<Self>) {
@@ -5811,4 +5837,18 @@ fn filter_help() -> AnyElement {
         }))
         .child(div().pt(px(4.)).child("To perform an exact search, use quotation marks, such as :part \"Part 1 <1>\". Filters may be combined. For example, :part :hidden will search for only parts which are hidden."))
         .into_any_element()
+}
+
+/// Where a graphics right-click menu of height `h` opens for a click at `pos` (see
+/// [`AssemblyView::render_graphics_menu`]): its anchor corner and that corner's position.
+fn graphics_menu_place(pos: Point<Pixels>, h: Pixels, view: Size<Pixels>) -> (Anchor, Point<Pixels>) {
+    let pos = point(pos.x.floor(), pos.y.floor());
+    let below = pos.y + px(2.) + h <= view.height;
+    let right = pos.x + px(250.) <= view.width;
+    match (below, right) {
+        (true, true) => (Anchor::TopLeft, point(pos.x, pos.y + px(2.))),
+        (true, false) => (Anchor::TopRight, point(pos.x - px(1.), pos.y + px(2.))),
+        (false, true) => (Anchor::BottomLeft, point(pos.x, pos.y + px(4.))),
+        (false, false) => (Anchor::BottomRight, point(pos.x - px(1.), pos.y + px(4.))),
+    }
 }

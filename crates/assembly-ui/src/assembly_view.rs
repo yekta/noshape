@@ -5746,7 +5746,7 @@ impl AssemblyView {
         out
     }
 
-    fn render_overlay(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn render_overlay(&mut self, window: &Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let mut out = Vec::new();
         if self.panel == Some(SidePanel::Variables) {
@@ -5889,7 +5889,7 @@ impl AssemblyView {
         if let Some(el) = self.render_measure(cx) {
             out.push(el);
         }
-        if let Some(m) = self.render_graphics_menu() {
+        if let Some(m) = self.render_graphics_menu(window, cx) {
             out.push(m);
         }
         out
@@ -6212,7 +6212,7 @@ impl AssemblyView {
             },
             cx,
         );
-        let overlay = Slice::new(&me, |this, _, cx| this.render_overlay_slice(cx), cx);
+        let overlay = Slice::new(&me, |this, window, cx| this.render_overlay_slice(window, cx), cx);
         let under = Slice::new(&me, |this, _, cx| this.render_under_slice(cx), cx);
         let insert_body = Slice::new(&me, |this, _, cx| this.render_insert_body(cx), cx);
         let insert_top = Slice::new(&me, |this, _, cx| this.render_insert_part(InsertPart::Top, cx), cx);
@@ -6299,8 +6299,8 @@ impl AssemblyView {
             .into_any_element()
     }
 
-    fn render_overlay_slice(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let overlay = self.render_overlay(cx);
+    fn render_overlay_slice(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let overlay = self.render_overlay(window, cx);
         let rail = self.render_panel_rail(cx);
         // The strip first: the tool search, menus and notices reaching the
         // right edge are drawn over it (live: Alt+C's ten results pass it).
