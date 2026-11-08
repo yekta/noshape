@@ -872,6 +872,57 @@ fn section_leaves_uncut_faces_unhatched() {
     assert!(cap_dark * 4 < cap_mid * 3, "no hatched cap on the cut (darkest {cap_dark}, median {cap_mid})");
 }
 
+/// A section cap picks as its plane (Onshape: the caps stand for the section plane), where the plane cuts
+/// material only: the face behind the cut beside the box picks as itself, empty space as nothing. A hovered
+/// plane's caps mix 33 % toward SECTION_PLANE_PRE_HIGHLIGHT_COLOR #FFC685 (live 2255: #91bede → #b5c1c0).
+#[test]
+fn section_caps_pick_as_their_plane_and_hover_orange() {
+    let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
+    let mut r = match Renderer::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("skipping: {e}");
+            return;
+        }
+    };
+    let mut scene = Scene::default();
+    scene.instances.push(Instance::new(Drawable::Mesh(r.upload_mesh(&primitives::box_mesh([-0.05, -0.05, -0.05], [0.05, 0.05, 0.05], 1)))).with_color([0.45, 0.6, 0.75, 1.0]));
+    scene.clip = Some(ClipPlane::new(glam::Vec3::Z, 0.0));
+    let mut cam = Camera { rotation: Camera::look_rotation(glam::DVec3::new(0.3, 1.0, -0.8).normalize(), glam::DVec3::Z), ..Default::default() };
+    let (w, h) = (400u32, 300u32);
+    cam.fit_box(glam::DVec3::splat(-0.05), glam::DVec3::splat(0.05), w as f64 / h as f64);
+    let at = |p: glam::DVec3| cam.project(p, glam::DVec2::new(w as f64, h as f64), 0.2).expect("on screen");
+    let cap = at(glam::DVec3::ZERO);
+    let side = at(glam::DVec3::new(0.0, -0.05, -0.025));
+    let render = |r: &mut Renderer, scene: &Scene| r.render(RenderParams { scene, camera: &cam, width: w, height: h, device_pixel_ratio: 1.0, style: &Style::default(), pick: true }).unwrap();
+    let f = render(&mut r, &scene);
+    let pick = f.pick.as_ref().unwrap();
+    let id = |p: glam::DVec2| pick.ids[(p.y as u32 * w + p.x as u32) as usize];
+    assert_eq!(section_cap_of_pick(id(cap)), Some(0), "the cap picks as plane 0's cap: {:#x}", id(cap));
+    assert!(section_cap_of_pick(id(side)).is_none() && id(side) != 0, "the uncut side picks as the box: {:#x}", id(side));
+    assert_eq!(id(glam::DVec2::new(3.0, 3.0)), 0, "empty space picks nothing");
+    // The cap's light colour between hatch lines, before and after hovering.
+    let light = |f: &noshape_render::Frame| {
+        let mut best = [0u8; 3];
+        for dy in -10..=10 {
+            for dx in -10..=10 {
+                let p = &f.bgra[(((cap.y as i32 + dy) as u32 * w + (cap.x as i32 + dx) as u32) * 4) as usize..][..3];
+                if p.iter().map(|&c| c as u32).sum::<u32>() > best.iter().map(|&c| c as u32).sum::<u32>() {
+                    best = [p[2], p[1], p[0]];
+                }
+            }
+        }
+        best
+    };
+    let plain = light(&f);
+    scene.clip_hovered[0] = true;
+    let hovered = light(&render(&mut r, &scene));
+    for k in 0..3 {
+        let want = plain[k] as f32 + 0.33 * ([255.0, 198.0, 133.0][k] - plain[k] as f32);
+        assert!((hovered[k] as f32 - want).abs() <= 3.0, "hovered cap {hovered:?}, want {plain:?} 33 % toward #FFC685");
+    }
+}
+
 /// Zebra stripes: a shaded box face turns into black and white stripes
 /// whose count follows the instance setting; turning them off restores
 /// the normal shading.

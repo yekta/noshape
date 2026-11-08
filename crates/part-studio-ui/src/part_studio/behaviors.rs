@@ -306,6 +306,9 @@ pub struct UiState {
     /// Another section plane's handle under the cursor (its index).
     pub section_hover_other: Option<(usize, super::section_manip::SectionHandle)>,
     pub section_parts: Option<(bool, Vec<BodyId>)>,
+    /// The section plane whose caps are under the pointer (live 2255: all its caps pre-highlighted, kept when the
+    /// pointer leaves the graphics, cleared by hovering anything else there).
+    pub cap_hover: Option<usize>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
     /// `NOSHAPE_PERF`: the opened studio's first preview (1) and full (2) displays had their frames armed.
@@ -704,6 +707,7 @@ impl UiState {
             section_hover: None,
             section_hover_other: None,
             section_parts: None,
+            cap_hover: None,
             appearance_edit: None,
             open_frames: 0,
             first_full_shown: false,

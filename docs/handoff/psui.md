@@ -653,9 +653,14 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   pixels, CSS-sized except on a Retina Mac; ours counted device pixels, so the CLI's 2× supersampled renders (and a
   HiDPI Windows / Linux screen) hatched at half spacing (A 7 px, B 10 px; live 16 / 20; ours now 14-16 / 21; the
   angle is the part id's hash, live's changed between two section creations too). The GPU test's period check
-  passed at half the period (the autocorrelation's second peak); it now fails on the old code. Left: live's cap
-  hover (any cap highlights every cap, #FFC685 at 0.33, kept when the pointer leaves the canvas); ours has no cap
-  picking (a pointer on a cap hovers what is behind it).
+  passed at half the period (the autocorrelation's second peak); it now fails on the old code. Cap hover (next
+  commit): the caps draw into the pick pass where the last frame's mask holds material (`fs_section_cap_pick`, id
+  `SECTION_CAP_PICK + plane`, `section_cap_of_pick`); a hovered plane's caps mix 33 % toward #FFC685
+  (`Scene::clip_hovered`, `ui.cap_hover`; kept when the pointer leaves the graphics, as live). GPU test
+  section_caps_pick_as_their_plane_and_hover_orange. A click / right-click on a cap is now empty space's (before: the
+  face behind it); live's cap menu is the plane's + Turn off section view + View normal to section plane (10-2x
+  notes); asked live what a click, a double click, a face-based plane's menu and ` do on a cap (REQUESTS 00:42).
+  Assemblies pick caps as nothing for now (asm: their hover is the same shader flag).
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

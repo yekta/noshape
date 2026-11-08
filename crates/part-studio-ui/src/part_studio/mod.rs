@@ -1426,6 +1426,9 @@ impl PartStudioView {
         let shown = self.with_plane_drag(self.display.clone());
         let extra_len = extra.len();
         let mut scene = scene_builder::with_highlights(built, &shown, &selection, single_hover.as_ref(), &accent, extra, failing && error_mesh.is_none(), self.gpu.uploader());
+        if let Some(slot) = self.ui.cap_hover.and_then(|k| scene.clip_hovered.get_mut(k)) {
+            *slot = true;
+        }
         self.tint_selected_owners(&mut scene, &selection, cx);
         // with_highlights' overlays, then the extra ones (see the preview's POST tags).
         let (highlights_end, extra_end) = (scene.instances.len() - extra_len, scene.instances.len());
@@ -2142,8 +2145,14 @@ impl PartStudioView {
                 // highlighted; on a plane's resize ring nothing is.
                 let id = id.filter(|_| self.ui.plane_ring_hover.is_none());
                 self.ui.hover_raw = id.and_then(|id| self.built.as_ref()?.picks.get(id).cloned());
+                let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| !self.ui.section.is_empty());
+                let left = id.is_none() && !vp.read(cx).pointer_inside();
+                let cap_changed = !left && cap != self.ui.cap_hover;
+                if cap_changed {
+                    self.ui.cap_hover = cap;
+                }
                 let shift = window.modifiers().shift;
-                if self.rehover(cx) | self.update_inference(shift, cx) {
+                if self.rehover(cx) | self.update_inference(shift, cx) | cap_changed {
                     self.refresh_scene(false, cx);
                 }
                 self.schedule_midpoint_dwell(cx);

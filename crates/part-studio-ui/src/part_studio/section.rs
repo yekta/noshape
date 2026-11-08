@@ -153,6 +153,7 @@ impl PartStudioView {
         self.end_section_dialog(false, window, cx);
         self.ui.section.clear();
         self.ui.section_parts = None;
+        self.ui.cap_hover = None;
         self.apply_section(window, cx);
     }
 

@@ -555,7 +555,7 @@ struct CapPlane {
     u: vec4<f32>,         // xyz tangent, w = hatch pattern scale (world)
     v: vec4<f32>,         // xyz normal x tangent
     selector: vec4<f32>,  // this plane's selector color
-    index: vec4<u32>,     // x = plane index, y = 1 when the plane is selected, z = 1 overlaps red
+    index: vec4<u32>,     // x = plane index, y = 1 when the plane is selected, z = 1 overlaps red, w = 1 hovered
 };
 
 @group(2) @binding(0) var<uniform> cap: CapPlane;
@@ -654,6 +654,8 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
     let overlap = parts > 1.0 && cap.index.z != 0u;
     if (overlap) { col = vec3(220.0 / 255.0, 0.0, 0.0); }
     col = mix(col, cap.selector.rgb, 0.1);
+    // A hovered plane's caps: SECTION_PLANE_PRE_HIGHLIGHT_COLOR rgba(255, 198, 133, 0.33).
+    if (cap.index.w != 0u) { col = mix(col, vec3(255.0, 198.0, 133.0) / 255.0, 0.33); }
     // Onshape's endcap shader: a selected plane (the Section view dialog's)
     // mixes toward SECTION_PLANE_PRE_HIGHLIGHT_COLOR rgb(255, 198, 133) by
     // ENTITY_HIGHLIGHT_COLOR1's alpha 0.8 (#8fc4e4 parts give live's #e9c698).
@@ -662,6 +664,18 @@ fn fs_section_cap(i: CapOut) -> @location(0) vec4<f32> {
     var a = alpha;
     if (overlap) { a = clamp(alpha + 0.1, 0.0, 1.0); }
     return vec4(col, a);
+}
+
+// The pick pass: a plane's caps pick as SECTION_CAP_PICK + its index where the mask holds material.
+@fragment
+fn fs_section_cap_pick(i: CapOut) -> @location(0) u32 {
+    var planes = array<vec4<f32>, 3>(g.clip, g.clip2, g.clip3);
+    for (var k = 0u; k < g.flags.x; k = k + 1u) {
+        let pl = planes[k];
+        if (k != cap.index.x && dot(i.world, pl.xyz) - pl.w > CLIP_EPS) { discard; }
+    }
+    if (cap_sample(vec2<i32>(floor(i.pos.xy))).a < 0.001) { discard; }
+    return 0xFFFFFF00u + cap.index.x;
 }
 
 @fragment

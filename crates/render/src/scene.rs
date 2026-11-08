@@ -910,6 +910,9 @@ pub struct Scene {
     /// one being edited in the Section view dialog. Onshape mixes its cap 80%
     /// toward the section pre-highlight color (webgl endcap shader).
     pub clip_selected: [bool; 3],
+    /// Section planes whose caps are hovered: Onshape pre-highlights every cap of the plane under the pointer
+    /// (SECTION_PLANE_PRE_HIGHLIGHT_COLOR, live 2255).
+    pub clip_hovered: [bool; 3],
     /// Compare mode: instances tagged [`Instance::compare`] are the two
     /// versions (see [`compare`]).
     pub compare: Option<Compare>,
@@ -924,6 +927,14 @@ pub struct Scene {
     /// Studios alike (live behaviours "psui (2026-10-27, P2) PS-SECTION
     /// overlap"); off, each part's cap is hatched as usual.
     pub section_interference: bool,
+}
+
+/// The pick id of section plane k's caps is `SECTION_CAP_PICK + k` (above every scene's own ids).
+pub const SECTION_CAP_PICK: u32 = 0xFFFF_FF00;
+
+/// The section plane whose cap a pick id is.
+pub fn section_cap_of_pick(id: u32) -> Option<usize> {
+    (SECTION_CAP_PICK..SECTION_CAP_PICK + 3).contains(&id).then(|| (id - SECTION_CAP_PICK) as usize)
 }
 
 impl Scene {
@@ -953,6 +964,8 @@ impl Scene {
     pub fn same_as(&self, other: &Scene) -> bool {
         self.clip == other.clip
             && self.clip_extra == other.clip_extra
+            && self.clip_selected == other.clip_selected
+            && self.clip_hovered == other.clip_hovered
             && self.compare == other.compare
             && self.preview_mix == other.preview_mix
             && self.section_interference == other.section_interference
@@ -1075,7 +1088,7 @@ impl Scene {
             (i.pick_base, i.hatch_id, i.reflection.is_some(), i.compare, i.body, i.mesh_lod, i.line_lod, i.lod_box).hash(&mut h);
         }
         self.states.hash(&mut h);
-        (self.hover_outline, self.no_occlusion, self.clip_selected, self.section_interference).hash(&mut h);
+        (self.hover_outline, self.no_occlusion, self.clip_selected, self.clip_hovered, self.section_interference).hash(&mut h);
         format!("{:?}{:?}{:?}{:?}", self.clip, self.clip_extra, self.compare, self.preview_mix).hash(&mut h);
         h.finish()
     }

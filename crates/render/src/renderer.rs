@@ -1285,6 +1285,13 @@ fn draw_lists(pass: &mut wgpu::RenderPass, lists: &DrawLists, instances: &[Insta
         draw(pass, &behind, &pipelines.line_pick_behind);
         draw(pass, &lit, &pipelines.mesh_pick_transparent);
         draw(pass, &lists.opaque, &pipelines.mesh_pick);
+        if let Some((group, planes)) = caps {
+            pass.set_pipeline(&pipelines.section_cap_pick);
+            for &k in planes {
+                pass.set_bind_group(2, group, &[(k as u64 * crate::section_caps::PLANE_STRIDE) as u32]);
+                pass.draw(0..6, 0..1);
+            }
+        }
         // Pick-only meshes (e.g. sketch regions drawn on a part face) after
         // the faces: opaque faces are pushed back by their depth bias, so a
         // region lying exactly on a face wins even though the two
@@ -1578,7 +1585,7 @@ fn section_cap_planes(scene: &Scene, camera: &Camera, view_proj: &Mat4, height: 
             u: [p.tangent.x, p.tangent.y, p.tangent.z, scale],
             v: n.cross(p.tangent).extend(0.0).to_array(),
             selector: crate::section_caps::SELECTOR_COLORS[k],
-            index: [k as u32, u32::from(scene.clip_selected.get(k).copied().unwrap_or(false)), u32::from(scene.section_interference), 0],
+            index: [k as u32, u32::from(scene.clip_selected.get(k).copied().unwrap_or(false)), u32::from(scene.section_interference), u32::from(scene.clip_hovered.get(k).copied().unwrap_or(false))],
         });
         if forward.dot(n) <= 0.0 {
             visible.push(k as u32);
@@ -1975,6 +1982,7 @@ struct Pipelines {
     /// section_caps.rs).
     section_mask: Lazy,
     section_cap: Lazy,
+    section_cap_pick: Lazy,
     /// A hovered whole part's mask (hover_outline.rs).
     mesh_hover_mask: Lazy,
     mesh_transparent: wgpu::RenderPipeline,
@@ -2038,6 +2046,7 @@ impl Pipelines {
             &self.mesh_outline_depth,
             &self.section_mask,
             &self.section_cap,
+            &self.section_cap_pick,
             &self.mesh_hover_mask,
             &self.mesh_reflect,
             &self.mesh_transparent_back,
@@ -2665,6 +2674,7 @@ impl Renderer {
         // lies in (transparent, strictly in front only) is hidden over it, as
         // live part-studio/73-74 (the cap keeps its exact color).
         let section_cap = lazy(LayoutKind::Cap, P { label: "section-cap", vs: "vs_section_cap", fs: "fs_section_cap", buffers: &[], format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: none, samples: msaa }, PLAIN);
+        let section_cap_pick = lazy(LayoutKind::Cap, P { label: "section-cap-pick", vs: "vs_section_cap", fs: "fs_section_cap_pick", buffers: &[], format: PICK_FORMAT, blend: None, depth: Some((true, ge)), bias: none, samples: 1 }, PLAIN);
         let mesh_reflect = lazy(LayoutKind::Image, P { label: "mesh-reflect", vs: "vs_mesh", fs: "fs_mesh_reflect", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((true, ge)), bias: face, samples: msaa }, PLAIN);
         let mesh_transparent_back = lazy(LayoutKind::Main, P { label: "mesh-t-back", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Front) });
         let mesh_transparent_front = lazy(LayoutKind::Main, P { label: "mesh-t-front", vs: "vs_mesh", fs: "fs_mesh", buffers: MESH_BUFFERS, format: COLOR_FORMAT, blend: alpha, depth: Some((false, wgpu::CompareFunction::Greater)), bias: none, samples: msaa }, Extra { writes: wgpu::ColorWrites::ALL, cull: Some(wgpu::Face::Back) });
@@ -2698,6 +2708,7 @@ impl Renderer {
             mesh_outline_depth,
             section_mask,
             section_cap,
+            section_cap_pick,
             mesh_hover_mask,
             mesh_reflect,
             mesh_transparent,
@@ -3444,6 +3455,9 @@ impl Renderer {
             lists.build(&last.scene, &Mat4::from_cols_array_2d(&globals.view_proj), (width, height, last.device_pixel_ratio), true, &mut self.mesh_lod_memory);
             let bind_inst = self.prepare_slots(SLOTS_PICK, &lists.slots);
             let tex = self.targets[&target].tex.as_ref().expect("textures");
+            // The caps pick where the last frame's mask holds material (its planes' uniforms are that frame's).
+            let cap_planes = last.scene.clip.is_some().then(|| section_cap_planes(&last.scene, &last.camera, &Mat4::from_cols_array_2d(&globals.view_proj), canvas_height(height, last.device_pixel_ratio)).1);
+            let caps = self.targets[&target].caps.as_ref().zip(cap_planes.as_ref()).map(|(c, visible)| (&c.cap, visible.as_slice()));
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("pick"),
@@ -3464,7 +3478,7 @@ impl Renderer {
                 });
                 pass.set_bind_group(0, self.bind_pick.as_ref().expect("bind groups"), &[]);
                 pass.set_bind_group(3, &self.compare_none, &[]);
-                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), &bind_inst, DrawMode { pick: true, ..Default::default() });
+                draw_lists(&mut pass, &lists, &last.scene.instances, self.pipelines.as_ref().expect("pipelines"), &bind_inst, DrawMode { pick: true, caps, ..Default::default() });
             }
             self.lists = lists;
             self.targets.get_mut(&target).expect("target").pick_valid = true;

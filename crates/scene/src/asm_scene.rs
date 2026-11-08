@@ -74,7 +74,7 @@ impl AsmPickMap {
     }
     pub fn priority_fn(&self) -> Arc<dyn Fn(u32) -> i32 + Send + Sync> {
         let prio: Vec<i32> = self.targets.iter().map(|t| t.kind.priority()).collect();
-        Arc::new(move |id| if id == 0 { -1 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
+        Arc::new(move |id| if id == 0 { -1 } else if noshape_render::section_cap_of_pick(id).is_some() { 0 } else { prio.get(id as usize - 1).copied().unwrap_or(100) })
     }
 }
 
@@ -674,7 +674,7 @@ fn push_triad(lines: &mut LineData, f: &Frame, size: f64, width: f32, pick: u32,
 }
 
 pub fn with_highlights(built: &AsmBuilt, result: &AssemblyResult, h: &Highlights, up: &Uploader) -> Scene {
-    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
+    let mut scene = Scene { instances: built.scene.instances[..built.static_instances].to_vec(), states: vec![0; built.picks.len() + 1], clip: built.scene.clip, clip_extra: built.scene.clip_extra.clone(), clip_selected: built.scene.clip_selected, clip_hovered: [false; 3], compare: built.scene.compare, preview_mix: built.scene.preview_mix, section_interference: built.scene.section_interference, hover_outline: false, no_occlusion: built.scene.no_occlusion };
     for top in &h.accent_tops {
         for &id in built.picks.faces_of(*top) {
             scene.add_flag(id, state::ACCENT);
