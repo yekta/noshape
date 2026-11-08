@@ -2401,6 +2401,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         }
     }
     for (n, part_id, (faces, edges, vertices), flat, data, wires) in built {
+        i.check_deadline()?;
         let Some((body_ref, dfaces, dedges, dverts, _)) = def_refs.get(n) else { continue };
         // New parts were renamed to the feature after the operation.
         let part_id = super::wrap_body_id(&part_id, marker, st.op_bits(marker), feature);
@@ -2793,6 +2794,9 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     let mut pieces = Vec::new();
     let mut heads = Vec::new();
     for (fi, face) in wall_flats {
+        if k::thread_cancelled() {
+            return None;
+        }
         let m = unfolded.walls.get(fi)?;
         let mut face = face.clone();
         // The wall's cutting tools (a counterbore Hole): the flat loses what
@@ -2826,6 +2830,9 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     // Forms: their footprint fills the flat, outlined with a center mark (as the native route).
     let mut flat_forms = Vec::new();
     for (fi, tools, sketched, n_removes) in forms {
+        if k::thread_cancelled() {
+            return None;
+        }
         let (Some(m), Some((_, wall))) = (unfolded.walls.get(fi), wall_flats.iter().find(|w| w.0 == *fi)) else { continue };
         let Ok(Some(plane)) = wall.face_plane() else { continue };
         let (o, n, x) = (plane.origin, plane.normal.normalize(), plane.x_dir);
@@ -2903,6 +2910,9 @@ fn flat_of(def: &Definition, topo: &Topo, wall_flats: &[(usize, Shape)], strips:
     }
     let mut lines = Vec::new();
     for (n, s) in strips.iter().enumerate() {
+        if k::thread_cancelled() {
+            return None;
+        }
         let Some(ma) = unfolded.walls.get(&s.wall_a) else { continue };
         let a = s.a.map(|p| ma.transform_point3(p));
         let b = match unfolded.walls.get(&s.wall_b) {
@@ -2971,6 +2981,7 @@ fn unfold(def: &Definition, k_factor: f64, topo: &Topo) -> FResult<Unfolded> {
     // Each part's first wall (walls only joined by rips are separate parts):
     // its definition normal to -z, its plane to z = 0.
     for root in 0..topo.faces.len() {
+        stop_if_cancelled()?;
         if walls.contains_key(&root) || def.rolled.contains_key(&root) || !matches!(topo.faces[root].face_plane(), Ok(Some(_))) {
             continue;
         }

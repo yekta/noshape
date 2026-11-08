@@ -1944,7 +1944,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   extrude) lofted corner to corner (an L of 10 + 10 mm, 20 mm, 1 mm: 380 / 420 mm³, 8 faces; was 343 / 330); Flip wall
   off grows to the right of the drawing direction as live 1677 (420 / 2500 at 1 / 5 mm, 380 / 1500 flipped, its boxes);
   straight single lines keep k::thicken (exact, live's side).
-- [ ] P1 CANCEL-LATENCY (user 11-01 00:24, core; psui the UI side) cancelling a long regeneration (the printable
+- [x] P1 CANCEL-LATENCY (user 11-01 00:24, core; psui the UI side; closed core 11-08 17:49 on the lead's rule: worst < 150 ms) cancelling a long regeneration (the printable
   knurl at 45° / 45°, which runs long and fails) took seconds to take effect (the spinner went on): cancel must free
   the worker within ~100 ms. core 10-31 23:30: the custom feature's FeatureScript thread ran outside the
   regeneration's cancel scope (the kernel's flag is per thread), so neither its interpreter nor its Booleans saw the
@@ -1976,7 +1976,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   on 16 cores, cancel at 0.5-20 s: **27-128 ms at every point** (12 points), from 10-19 s before round 1.
   core 11-08 17:23 (lead's go): over the whole corpus (T2 ops parity::cancel_latency_probe, every Part Studio over
   0.3 s cancelled at 10-90 %, vibe5 at load 5-9) the worst was 529-586 ms (sheet metal rebuild, the Boolean's tool
-  grouping), 124-211 ms (Part Draft 3); fixed (a0a3e5b8): every cancel under ~100 ms, most under 50. Lead: close?
+  grouping), 124-211 ms (Part Draft 3); fixed (a0a3e5b8): every cancel under ~100 ms, most under 50. 17:47, with the sheet metal flat / unfold / associations
+  checked too: 170 cancels over the corpus (load 3-5), worst 94 ms (c2-sm-corner-break's Corner break 1), then 83
+  (c2-sm-louver Sketch 10), 71 (cf-part-draft's Spur Gear); cf-fill-pattern's 206 ms (at load 9) gone. Closed.
 - [x] 801e98e9 (core 11-02 23:50: OCCT's two patches per corner, meeting in a degenerated edge whose vertex lay 0.9 mm off the
   top face, become live's one face: the R2 ball rolling on the top and the R3 cylinder, its spine the ellipse where
   their offsets meet, ends where each drafted side is tangent to the R3 cylinder (kernel vertex_blend.cpp `Rolling`):
