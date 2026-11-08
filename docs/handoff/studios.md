@@ -106,7 +106,8 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Open decisions (lead): Help menu (live: Help, FeatureScript documentation, System check are web pages; ours has
   Install command line tool / Connect to coding agents instead); ☰ › Update workspace… (live: the feature library
   version, a toast "Workspace is already at the latest feature library version."; ours: updates references to
-  other documents' versions); the std version in a new Feature Studio (live 3112, ours 3095: dx's).
+  other documents' versions); the std version in a new Feature Studio (live 3112, ours 3095: dx's; **done** 11-08 11:34 UTC, 2f066886: new
+  Feature Studios say `FeatureScript 3112;`, existing pins keep their release; rerun the fs-* scenarios).
 
 ### 2026-11-08 05:30 UTC: driver below-the-fold fix, batch 3 (55 scenarios), coverage up in all four areas
 - Driver: a control in an inner scrolling list (Keyboard shortcuts, material libraries) is wheeled into view inside its

@@ -50,6 +50,24 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   instances in xdev-subs, robot-relations, pinslot, corexy). Part Studio suite after all three: no document worse
   (70/86, 724/934).
 
+## 11-08 11:45 UTC: drawings 120/175; Cut list table by composite part; std 3112 landed
+- std 3112 landed (2f066886); studios told (handoff/studios.md).
+- Cut list table as live (live2 2278): its Insert opens the Insert view chooser in a composite mode ("Select a
+  composite part": composites only, no kinds/filters/Import); the table's `CutList.source` (CompositeSource: studio,
+  version, part) lists that composite's members, any Part Studio, no view needed (`view` = ViewId(0), as a BOM's own
+  source). The Cut list feature now makes std's open composite of its frames, named as the feature ("Cut list 1").
+  Ops drawing_view_table takes `composite {studio, part}`. drw-cut-list-table-properties has new steps (REQUESTS 2299).
+- Crop / Detail with an existing profile take its curves off the sheet (app and ops). Drawing file pickers are page
+  panels (no dialog) and keep the tool; Crop's Spline ▾ rows are the panel's text while open; Switch to reference
+  selects the part in its Part Studio; Edit detail... shows "Edit closed profile · Profile ×"; Region... clears the
+  selection. Runner: a drawing live's recorder couldn't read (error only) isn't compared.
+- Left as live quirks or unclear (asked live2, REQUESTS 2301): First angle's renamed views (live: Left + Top, ours
+  Left + Bottom), Alt+drag on a note (live: no copy; Onshape's shortcut sheet: Copy annotation). Not ours: DWG 2018
+  (live's remembered option, fresh default 2000), the Sheets panel's hover popup after a menu click, live's two
+  centermark recordings disagree (after Esc / at once), the sketch point listed only after Esc (1 state), EDGE vs VIEW
+  on right-clicks at a view's centre (the hover pattern).
+- Waiting on live2: other-document views (REQUESTS 2300, P1), the cut list recording (2299).
+
 ## 11-08 10:04 UTC: std 3112, XT-B3, louver, drawings 114/173
 - std 3112 (live's export, /root/onshape-research/live/std-3112) is the embedded std and new Feature Studios' pin
   (custom.rs TEMPLATE, ops FS_TEMPLATE). 3095 joined the packs; all 99 packs were repacked against the new base
