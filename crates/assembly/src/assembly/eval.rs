@@ -2082,7 +2082,7 @@ impl AssemblyEvaluator {
         // Derived parts and custom features need their sources (qa5 DER8:
         // a Part Studio of derived parts listed nothing in Insert); the
         // sources' versions are part of the cache key.
-        let needs_sources = ps.features.iter().any(|f| crate::features::importing::is_derived(&f.type_id) || crate::custom::is_custom(&f.type_id));
+        let needs_sources = ps.features.iter().any(|f| crate::features::importing::source_studio(f).is_some() || crate::custom::is_custom(&f.type_id));
         let mut opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
             Some(make) => make(doc),
             None => RegenOptions::default(),
@@ -2091,8 +2091,9 @@ impl AssemblyEvaluator {
         opts.document_variables = crate::variables::element_variables(doc, tab);
         hash = hash.rotate_left(5) ^ hash_of(&serde_json::to_string(&opts.document_variables).unwrap_or_default());
         if let Some(p) = &opts.derived {
-            for f in ps.features.iter().filter(|f| crate::features::importing::is_derived(&f.type_id)) {
-                hash = hash.rotate_left(5) ^ p.version(f.params.text("partStudio").trim());
+            // (A Derived's source, a Frame's profile studio.)
+            for tab in ps.features.iter().filter_map(crate::features::importing::source_studio) {
+                hash = hash.rotate_left(5) ^ p.version(&tab);
             }
         }
         if opts.custom_features.is_some() {

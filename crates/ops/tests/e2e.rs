@@ -1984,6 +1984,26 @@ fn a_frame_with_another_part_studios_sketch() {
     assert_eq!(e["feature_status"]["status"], "Error", "{e}");
 }
 
+/// An assembly instance of a Frame part whose profile is another Part Studio's sketch has its geometry (the assembly
+/// regenerates the studio with its profile's source, as the Part Studio does; asm-pattern-std's frame parts).
+#[test]
+fn an_assembly_shows_a_frame_part_with_another_studios_profile() {
+    let mut ctx = Ctx::new();
+    let profile = new_sketch(&mut ctx, "asm-frame-other-studio.noshape", "plane:top");
+    call(&mut ctx, "sketch_draw", json!({ "sketch": profile, "tool": "center_rectangle", "points": [[0, 0], [10, 5]] }));
+    let info = call(&mut ctx, "document_info", json!({}));
+    let source = info["tabs"].as_array().unwrap().iter().find(|t| t["name"] == "Part Studio 1").unwrap()["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "tab_create", json!({ "kind": "Part Studio", "name": "Path" }));
+    let path = call(&mut ctx, "sketch_create", json!({ "tab": "Path", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "tab": "Path", "sketch": path, "tool": "line", "points": [[0, 0], [200, 0]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap()["id"].clone();
+    let f = call(&mut ctx, "feature_add", json!({ "tab": "Path", "type": "frame", "params": { "profileSketch": format!("{source}#{profile}.{}", u32::MAX), "selections": [line] } }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    let inst = call(&mut ctx, "assembly_insert", json!({ "source": "Path" }))["instance"].as_str().unwrap().to_string();
+    let faces = call(&mut ctx, "assembly_entities", json!({ "instance": inst, "kind": "faces" }));
+    assert!(faces["faces"].as_array().is_some_and(|a| !a.is_empty()), "the frame part has no faces in the assembly: {faces}");
+}
+
 /// A new Frame's profile is 8020 › 10 Series › 1001 (live 2216: a fresh account's default), a profile with no Size;
 /// feature_frame_profiles lists 8020's series as Types.
 #[test]
