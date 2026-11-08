@@ -121,7 +121,8 @@ def real_rclick(item):
     from ctypes import wintypes
     u = ctypes.windll.user32
     name = "real-" + item.split()[0].lower()
-    env = dict(os.environ, NOSHAPE_UI_SCRIPT=str(scenario(name, [{"do": "wait", "ms": 14000}, {"do": "click", "on": {"menu": item}}], 6000 if item == label else 3000)), NOSHAPE_UI_STATE_OUT=str(out / f"{name}-state.json"),
+    steps = [{"do": "click", "on": {"doc_row": "uip Bracket"}}, {"do": "wait", "ms": 14000}, {"do": "click", "on": {"menu": item}}]
+    env = dict(os.environ, NOSHAPE_UI_SCRIPT=str(scenario(name, steps, 6000 if item == label else 3000)), NOSHAPE_UI_STATE_OUT=str(out / f"{name}-state.json"),
                NOSHAPE_UI_STARTS=str(starts), NOSHAPE_CONFIG_DIR=str(out / f"cfg-{name}"), NOSHAPE_DOCUMENTS_DIR=str(docs))
     with open(out / f"{name}-app.log", "w") as log:
         p = subprocess.Popen([args.bin], env=env, stdout=log, stderr=log)
@@ -140,10 +141,18 @@ def real_rclick(item):
         else:
             h = found[0]
             u.SetForegroundWindow(h)
-            pt = wintypes.POINT(0, 0)
-            u.ClientToScreen(h, ctypes.byref(pt))
-            x, y = pt.x + 359, pt.y + 322  # uip Bracket's name on a 1024 x 768 runner screen (qa-os details.png)
-            say(f"{name}: right-click at {x}, {y} (client origin {pt.x}, {pt.y})")
+            from PIL import ImageGrab
+            img = ImageGrab.grab().convert("RGB")
+            # uip Bracket is the list's last row: the lowest dark text in the name column, above the taskbar (the UI script's
+            # clicks don't select rows on Windows, UIS-RCLICK-WINDOWS).
+            ys = [y for y in range(img.height - 60) for x in range(324, 400, 2) if sum(img.getpixel((x, y))) < 300]
+            if not ys:
+                img.save(out / f"{name}-norow.png")
+                problems.append(f"{name}: no list row found on screen")
+                ys = [322]
+            low = [y for y in ys if y > max(ys) - 20]
+            x, y = 359, (min(low) + max(low)) // 2
+            say(f"{name}: right-click at {x}, {y} (row text {min(low)}-{max(low)})")
             u.SetCursorPos(x, y)
             time.sleep(0.3)
             u.mouse_event(0x0008, 0, 0, 0, 0)  # RIGHTDOWN
