@@ -33,6 +33,19 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 20:31 UTC: the suite's failing features (lead 20:0x); the loft version gate waits for live.**
+- Suite 75/87 documents to the end, 760/951 features. Routed: c2-fan-blade-sweep (53 lost: its derived source's
+  Chamfer 1) and c2-rings-loft's blend faces to blend.md; the fan blade's STEP import to dx.md; text indent / louver
+  Sketch 9 (skasm, paused) and the extension spring's edges (core, parked) in TICKETS.
+- Impeller (lead: yes): REQUESTS 2378 asks live to bisect the FeatureScript version where opLoft's start rule
+  changes. Patch ready, not landed (no cut-off yet): /root/core-scratch/loft-version.patch (the loft's hidden
+  `asVersion` text param, the translator keeps it for lofts, solid_a.rs `feature_version` < LOFT_START_RULE_VERSION
+  -> LoftOptions::squared_start_rule -> features.cpp's per-column step (0.9 (c·n)² + 0.1 |c|²) / |c|). Set the
+  constant from live's answer, run kernel / model tests + suite, land. With it Loft Gehäuse is 257,272.8 vs live
+  257,078 (+0.076 %; was +2.4 %) and area -0.02 %: still the first difference (live pairs section points otherwise).
+- Knife: live 2324's four guided lofts (curved guide + curved profile) all match ours to 4e-6 (areas, the bulges past
+  the boundaries): the knife's difference is its guides of several curves. Next.
+
 **State 11-08 19:27 UTC: speed in core's area (lead 17:5x): slower-than-live features outside Booleans / blends.**
 - Per-document profile: /root/core-scratch/bin/featprof.sh (vibe5, every suite document alone with
   NOSHAPE_KERNEL_PROFILE) + featprof.py (ours, live, Boolean, blend, rest). Kernel profiles of the build pass include
