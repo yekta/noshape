@@ -6041,7 +6041,7 @@ bool fillet_overflows(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>&
 // Only fillets with such a mitre (OCCT can't roll a ball that stands still).
 // Null when it doesn't apply or doesn't come out valid.
 std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape& input, const std::vector<TopoDS_Edge>& es,
-                                                              const std::vector<double>& rs)
+                                                              const std::vector<double>& rs, bool need_ball = true)
 {
   const double r = rs.front();
   for (double x : rs)
@@ -6095,12 +6095,15 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         }
       return true;
     };
-    // The spandrel at E between faces of outward normals n1, n2 (convex): E, the tangent points, the ball's arc.
-    auto spandrel = [r](const gp_Pnt& E, const gp_Vec& n1, const gp_Vec& n2, gp_Pnt& C) -> TopoDS_Face {
+    // The spandrel at E between faces of outward normals n1, n2: E, the tangent points, the ball's arc (the ball in
+    // the material for a convex edge, in the air for a concave one: `side` -1 / +1).
+    double side     = -1;
+    bool   sided    = false;
+    auto   spandrel = [r, &side](const gp_Pnt& E, const gp_Vec& n1, const gp_Vec& n2, gp_Pnt& C) -> TopoDS_Face {
       const double half = std::acos(std::max(-1.0, std::min(1.0, n1.Dot(n2)))) / 2;
       const gp_Vec bis  = (n1 + n2).Normalized();
-      C                 = E.Translated(-bis * (r / std::cos(half)));
-      const gp_Pnt t1 = C.Translated(n1 * r), t2 = C.Translated(n2 * r);
+      C                 = E.Translated(bis * (side * r / std::cos(half)));
+      const gp_Pnt t1 = C.Translated(n1 * (-side * r)), t2 = C.Translated(n2 * (-side * r));
       const gp_Pnt mid = C.Translated(gp_Vec(C, E).Normalized() * r);
       GC_MakeArcOfCircle arc(t1, mid, t2);
       if (!arc.IsDone())
@@ -6137,9 +6140,14 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       // Smooth: nothing to take.
       if (nm1.Dot(nm2) > 1 - 1e-9)
         continue;
-      // Convex only.
-      if (nm1.Crossed(nm2).Dot(tm) <= 1e-9)
+      // All convex; or all concave (their rounds added), without a mitre's ball.
+      const double turn = nm1.Crossed(nm2).Dot(tm);
+      if (std::abs(turn) <= 1e-9 || (turn < 0 && need_ball))
         return std::nullopt;
+      if (sided && (turn > 0) != (side < 0))
+        return std::nullopt;
+      side  = turn > 0 ? -1 : 1;
+      sided = true;
       BRepAdaptor_Surface s1(T.w1, false), s2(T.w2, false);
       if (c.GetType() == GeomAbs_Line && s1.GetType() == GeomAbs_Plane && s2.GetType() == GeomAbs_Plane)
       {
@@ -6163,12 +6171,24 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       }
       if (c.GetType() == GeomAbs_Circle)
       {
-        // A plane square to the circle's axis and the cylinder it bounds.
-        const gp_Circ circ = c.Circle();
-        const BRepAdaptor_Surface* pl = s1.GetType() == GeomAbs_Plane ? &s1 : s2.GetType() == GeomAbs_Plane ? &s2 : nullptr;
-        const BRepAdaptor_Surface* cy = s1.GetType() == GeomAbs_Cylinder ? &s1 : s2.GetType() == GeomAbs_Cylinder ? &s2 : nullptr;
-        if (pl == nullptr || cy == nullptr || !pl->Plane().Axis().IsParallel(circ.Axis(), 1e-9) || !cy->Cylinder().Axis().IsParallel(circ.Axis(), 1e-9)
-            || gp_Lin(cy->Cylinder().Axis()).Distance(circ.Location()) > 1e-9 * circ.Radius() || std::abs(cy->Cylinder().Radius() - circ.Radius()) > 1e-9 * circ.Radius())
+        // Faces of revolution about the circle's axis (a plane square to it, a cylinder or cone about it): the
+        // spandrel is the same all round.
+        const gp_Circ circ    = c.Circle();
+        auto          coaxial = [&](const BRepAdaptor_Surface& sf) {
+          const double tol = 1e-9 * circ.Radius();
+          switch (sf.GetType())
+          {
+            case GeomAbs_Plane:
+              return sf.Plane().Axis().IsParallel(circ.Axis(), 1e-9);
+            case GeomAbs_Cylinder:
+              return sf.Cylinder().Axis().IsParallel(circ.Axis(), 1e-9) && gp_Lin(sf.Cylinder().Axis()).Distance(circ.Location()) < tol;
+            case GeomAbs_Cone:
+              return sf.Cone().Axis().IsParallel(circ.Axis(), 1e-9) && gp_Lin(sf.Cone().Axis()).Distance(circ.Location()) < tol;
+            default:
+              return false;
+          }
+        };
+        if (!coaxial(s1) || !coaxial(s2) || (s1.GetType() == GeomAbs_Plane && s2.GetType() == GeomAbs_Plane))
           return std::nullopt;
         T.kind  = Arc;
         T.a     = c.Value(p0);
@@ -6180,7 +6200,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
         continue;
       }
       // The mitre of two earlier rounds of this radius whose axes cross square: the ball there.
-      if (s1.GetType() == GeomAbs_Cylinder && s2.GetType() == GeomAbs_Cylinder)
+      if (s1.GetType() == GeomAbs_Cylinder && s2.GetType() == GeomAbs_Cylinder && side < 0)
       {
         const gp_Cylinder c1 = s1.Cylinder(), c2 = s2.Cylinder();
         const gp_Dir      a1 = c1.Axis().Direction(), a2 = c2.Axis().Direction();
@@ -6221,7 +6241,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     }
     // Only with a ball OCCT can't roll (elsewhere a round past an edge it doesn't take fails in live: "End boundary
     // intersects unfilleted edge.", and OCCT's blends and the other fallbacks are live's).
-    if (std::none_of(ts.begin(), ts.end(), [](const Tool& T) { return T.kind == Ball; }))
+    if (need_ball && std::none_of(ts.begin(), ts.end(), [](const Tool& T) { return T.kind == Ball; }))
       return std::nullopt;
     // A line's or arc's tool, extended at its start / end by `e0` / `e1` (lengths; an arc's by the angle at its
     // ball's path).
@@ -6290,6 +6310,9 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       };
       if (dir_at(A, at[0]).Crossed(dir_at(B, at[1])).Magnitude() <= 1e-9 * dir_at(A, at[0]).Magnitude() * dir_at(B, at[1]).Magnitude())
         continue;
+      // (Without a ball: tangent chains only.)
+      if (!need_ball)
+        return std::nullopt;
       if (A.kind != Line || B.kind != Line)
         return std::nullopt;
       // The face they share, and the edge at V between their other faces.
@@ -6340,6 +6363,51 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
     }
     TopoDS_Shape cut = input;
     HHist        h;
+    // A chain's rounds without a mitre's ball (a G1 loop's: each tool meets the part only on its faces): one Boolean, glued.
+    if (!need_ball)
+    {
+      const KernelTimer                             t_glued("blend.by_tools.glued");
+      std::unique_ptr<BRepAlgoAPI_BooleanOperation> b;
+      if (side < 0)
+        b = std::make_unique<BRepAlgoAPI_Cut>();
+      else
+        b = std::make_unique<BRepAlgoAPI_Fuse>();
+      // (The tools one ring first: the part's Boolean then meets one tool, not each tool and each other.)
+      ShapeList ring = tools;
+      if (tools.Extent() > 1)
+      {
+        const KernelTimer t_ring("blend.by_tools.ring");
+        BRepAlgoAPI_Fuse  rf;
+        ShapeList         a1, t1;
+        a1.Append(tools.First());
+        for (ShapeList::Iterator it(tools); it.More(); it.Next())
+          if (!it.Value().IsSame(tools.First()))
+            t1.Append(it.Value());
+        rf.SetArguments(a1);
+        rf.SetTools(t1);
+        rf.SetGlue(BOPAlgo_GlueShift);
+        rf.SetRunParallel(bop_parallel());
+        rf.Build();
+        if (rf.HasErrors() || !rf.IsDone())
+          return std::nullopt;
+        ring.Clear();
+        ring.Append(rf.Shape());
+      }
+      ShapeList args;
+      args.Append(input);
+      b->SetArguments(args);
+      b->SetTools(ring);
+      b->SetGlue(BOPAlgo_GlueShift);
+      b->SetNonDestructive(true);
+      b->SetRunParallel(bop_parallel());
+      b->Build();
+      if (b->HasErrors() || !b->IsDone() || !valid_shape(b->Shape()))
+        return std::nullopt;
+      h   = b->History();
+      cut = b->Shape();
+      first.Clear();
+      second.Clear();
+    }
     for (const ShapeList* part : {&first, &second})
     {
       if (part->IsEmpty())
@@ -6348,7 +6416,7 @@ std::optional<std::pair<TopoDS_Shape, HHist>> fillet_by_tools(const TopoDS_Shape
       args.Append(cut);
       TopoDS_Shape step;
       HHist        hs;
-      if (!quick_boolean(1, args, *part, bop_parallel(), step, hs) || !valid_shape(step))
+      if (!quick_boolean(side < 0 ? 1 : 0, args, *part, bop_parallel(), step, hs) || !valid_shape(step))
         return std::nullopt;
       h   = h.IsNull() ? hs : compose(input, h, hs);
       cut = step;
@@ -7062,6 +7130,25 @@ static bool fillet_square_corner(const TopoDS_Shape& s, const TopoDS_Edge& e, do
   return true;
 }
 
+// Whether a blend's result has a sliver: a new face narrower than a twentieth of the radius across its size.
+static bool blend_slivers(const TopoDS_Shape& input, const TopoDS_Shape& r, double radius)
+{
+  ShapeIMap old;
+  TopExp::MapShapes(input, TopAbs_FACE, old);
+  for (TopExp_Explorer x(r, TopAbs_FACE); x.More(); x.Next())
+  {
+    if (old.Contains(x.Current()))
+      continue;
+    Bnd_Box b;
+    BRepBndLib::Add(x.Current(), b);
+    GProp_GProps g;
+    BRepGProp::SurfaceProperties(x.Current(), g);
+    if (g.Mass() < 0.05 * radius * std::sqrt(b.SquareExtent()))
+      return true;
+  }
+  return false;
+}
+
 static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, rust::Slice<const double> radii,
                 bool checked)
 {
@@ -7187,8 +7274,19 @@ static OpOut op_fillet_unbudgeted(const OcShape& s, const OcShapeList& edges, ru
   }
   try
   {
-    return scaled_blend(in, checked, rmax, "fillet",
-                        [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
+    OpOut out = scaled_blend(in, checked, rmax, "fillet", [&](const Scaled& sc) { return fillet_build(sc, es, rs); });
+    // OCCT's round of a tangent chain crossing from one support to the next with a sliver face at the joint (cf-snap-hook's
+    // Fillet 6: six 0.1 mm slivers where its lip's arcs meet; live 84 faces): the chain's rounds built exact instead.
+    if (checked && !legacy_blend_finish() && blend_slivers(in, out.shape->shape, rmax))
+    {
+      const KernelTimer timer("blend.slivers.by_tools");
+      if (std::optional<std::pair<TopoDS_Shape, HHist>> by = fillet_by_tools(in, es, rs, false))
+      {
+        tighten_new_tolerances(in, by->first, accurate(in));
+        return make_result({in}, by->first, by->second.get());
+      }
+    }
+    return out;
   }
   catch (const std::runtime_error&)
   {

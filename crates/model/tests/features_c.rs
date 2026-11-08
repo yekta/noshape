@@ -3685,3 +3685,35 @@ fn rounds_over_a_tenth_mm_step_leave_a_valid_body() {
     assert!(shape.is_valid());
     assert!(!shape.self_intersects());
 }
+
+/// cf-snap-hook's Fillet 6 (live 84/160/80 faces/edges/vertices): R10 on the case's lip, a closed tangent loop of eight
+/// concave edges (arcs between coaxial drafted walls, one line between planes). OCCT's round of the loop left a 0.1 mm
+/// sliver face where each two arcs meet (90 faces): the loop's rounds are built exact instead, a torus an arc, a
+/// cylinder the line.
+#[test]
+fn a_tangent_loop_of_concave_rounds_has_no_slivers_as_live() {
+    let brep = include_str!("data/snap-hook-lip.brep").to_string();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let counts = |sh: &noshape_kernel::Shape| {
+        let t = sh.shown_topology().unwrap();
+        (sh.faces().len(), t.edge_count(), t.vertices.iter().filter(|v| **v).count())
+    };
+    assert_eq!(counts(&b.shape), (76, 144, 72));
+    let picks: Vec<Reference> = [93, 96, 98, 100, 102, 104, 106, 107].iter().map(|&e| Reference::Edge((*b.edges[e]).clone())).collect();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("radius", expr("10 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid());
+    assert_eq!(counts(shape), (84, 160, 80));
+    let r10 = |x: f64| near(x, mm(10.0), 1e-9);
+    let kinds: Vec<_> = shape.faces().iter().map(|f| f.face_surface().unwrap()).collect();
+    let tori = kinds.iter().filter(|k| matches!(k, noshape_kernel::Surface::Torus { minor_radius, .. } if r10(*minor_radius))).count();
+    let cylinders = kinds.iter().filter(|k| matches!(k, noshape_kernel::Surface::Cylinder { radius, .. } if r10(*radius))).count();
+    assert_eq!((tori, cylinders), (7, 1));
+}

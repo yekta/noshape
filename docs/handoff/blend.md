@@ -144,7 +144,16 @@ at x = ±5.5, y ≈ 13.3, z ≈ 9.8 (one shape of each a vertex-sized 0.2 mm box
   Live asked (REQUESTS blend 01:21, same stand-in). Left: the subset "outer arc + 0.1 step + outer side" (inner arc
   left out) still SI after the scaled build (a 0.1 mm vertex 0.1 from another); probe /root/blend-scratch/dock/.
 
-## BLEND-DIRECT: blends built with no cut (lead 11-07 23:20: design (b))
+## SNAP-FILLET6 (lead 11-08, before BLEND-DIRECT): cf-snap-hook's Fillet 6
+R10 on the case's lip, a closed G1 loop of eight concave edges (arcs between coaxial drafted cones, one line between
+planes). OCCT's round: a 0.1 mm sliver face where each two arcs meet (90/178/92, live 84/160/80). Fix: when OCCT's
+fillet has a sliver (a new face narrower than r / 20 across its size), `fillet_by_tools` without a mitre's ball (a
+tangent chain of lines between planes and arcs between coaxial planes / cylinders / cones, all convex or all concave):
+exact rounds (tori, the line's cylinder), the tools fused (concave) or cut (convex) in one Glue Shift Boolean. The
+document 14 -> 18/18 (regen 4770 -> 3922 ms: Snap Hooks on the right input); Fillet 6 97 -> ~300 ms (live 8: OCCT's
+glued Boolean of the tori ~190 ms, the slivered OCCT attempt ~100 first). T1 features_c::a_tangent_loop_of_concave_
+rounds_has_no_slivers_as_live (data/snap-hook-lip.brep, Fillet 6's input).
+: blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's
 Fillet 1 + Chamfer 1 828 ms, live 53; michael's Fillet 2 629 ms, live 46). The rounds themselves are cheap (OCCT's
@@ -179,3 +188,31 @@ section curves on B: BRepFeat_SplitShape, no surface work); (3) the pieces kept 
 outside the removed region (wedge minus its blend), a B piece inside the part; (4) the kept faces sewn into the
 solid, history Modified for split faces, Generated from the rim edge for B. Checks: one valid solid whose volume is the part's less
 the tools'; else ring_blend's cut as today. Target rings-loft Fillet 1 + Chamfer 1 under ~60 ms.
+
+Stage 1 progress (11-08 02:33, local WIP commit, not landed): kernel `op_blend_direct` (cpp/blend_direct.cpp, Rust
+`k::blend_direct`, tried first in `ring_blend`, its cut the fallback). Rings-loft's Fillet 1 builds directly: 9 faces,
+719.382 mm³ (live 719.453), T1 ring test passes; Fillet 1 345 -> 114 ms (direct 79: sections 38, tool classifications
+16, splits 7, sewing 2). Lessons: BRepAlgoAPI_Section is as slow as the cut (44 ms a pair): GeomInt_IntSS on the faces'
+UV boxes instead, each curve trimmed in both faces' 2D domains (a run-out touches the part face's boundary tangentially,
+the blend's it crosses square); FClass2d wraps periodic points by default (Perform(uv, false)); a seam is split once and
+used both ways; cut edges need SameParameter cleared before BRepLib::SameParameter; two rounds tangent to each other
+where they meet the bore: their section stops ~7 µm short, so it's extended to the touch curves' crossing
+(GeomLib::ExtendCurveToPoint). Next: Chamfer 1 (free edges after sewing, notch region), then speed (sections, the
+tools' classifier), then the suite and bool's gate (no crates/brep change so far).
+
+**11-08 04:06 UTC: BLEND-DIRECT parked (lead: cf-snap-hook Fillet 6 first).** Local WIP commit only (branch state in
+/root/projects/noshape-wt/blend, "blend: WIP blends built directly"); stage-2 attempt in
+/root/blend-scratch/stage2-by-tools.patch.
+- Rings-loft (vibe5): Fillet 1 345 -> ~100 ms and Chamfer 1 276 -> ~195 ms, both built directly, T1 ring test passes
+  with live's counts (Fillet 1 719.385 mm³, live 719.453; Chamfer 1 705.021, live 705.853).
+- Blocker: the suite's rings-loft drops 12 -> 9: Shell 1 fails ("Could not shell part with selections.", 13-17 s) on
+  the direct Fillet 1 result (the chamfer's direct result is fine: with NOSHAPE_BLEND_DIRECT=chamfer the document stays
+  12/32). Same faces, edges, lengths and vertices (to 0.05 µm) as the cut's result, same names; bool's quadrics Shell
+  repairs both but on ours joins only 2 of 4 split edges and ends "kind 5 status 32" (a wire badly oriented in the
+  offset of the x < 4 round). Done so far: touch edges keep OCCT's blend tolerance (Shell reads it as tangency slack),
+  EncodeRegularity, section edges as loose as the blend's, unify after: no change. Next idea: dump both results and
+  shell them with Shell 1's own parameters in a T1 to diff the offset walls.
+- Stage 2 (michael's Fillet 2): the ball tool (box less sphere) has no face on the part, so the direct build declines;
+  it needs the sphere's touch circles on the rounds put on directly.
+- Dock stand-in vs live 2274: ours 25/68/45, 8480.517 mm³; live 23/61/40, 8480.505 (2 tori + 3 cylinders a side, no
+  vertex blends): one face a side more than live (follow-up).
