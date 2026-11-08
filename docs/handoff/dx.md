@@ -65,6 +65,35 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
   90 → 200/286.
 
+## 11-08 13:04 UTC: paused by the lead (quota) until live delivers. What each answer unblocks
+Resume on REQUESTS 2300 or the exchange re-import (lead). Rebuild the app (rb.sh --get noshape) and rerun the drawing
+suite with /root/dx-scratch/drw-shards.sh (copied into tools/ui-parity/.drw-shards.sh for the run; last: out-w on
+vibe5, 120/175, 1243/1397 states); diff runs per scenario as in the earlier score-*.log comparisons.
+- **2300 (live2), P1: a drawing view of another document's version.** Unblocks the other-document views work: the
+  Sheets panel reference row and its menu (Pin / Unpin view reference, Update, Open in linked document), the update
+  notice, the hover popup. Ours already inserts from Other documents (drawing_insert.rs choose_external, pinned
+  PinnedVersion); build the row menu and update flow to live's screenshots, add ops + e2e, then the scenario.
+- **2299 (live2): drw-cut-list-table-properties re-record** with its new steps (Insert › Part Studio 1 › Cut list
+  1). Then compare; the answers to (a)-(d) say whether the picked composite shows in the panel, whether the tool stays
+  on after placing, and whether studios without a composite are listed (ours lists only those with one).
+- **2301 (live2), two hand checks:** (1) First angle: if live moves the views, ours should keep orientations and
+  move them (ours renames Top to Bottom); (2) Alt+drag on a note / dimension: if no copy, Alt/Shift/Ctrl+drag on an
+  annotation becomes a box selection (drawing_tools.rs Button::Left arm, alt_duplicate's Annotation case removed).
+- **11:57 (live): corpus fetch** of c2-gamma-imported / c2-wire-clip-imported (imports/<blob>.json + file) and
+  c2-fan-blade-sweep / c2-hex-bookcase-derived (derived/<element>/). Unblocks 4 documents, 82 features at 0: rerun
+  parity_models on them (NOSHAPE_PARITY_ONLY=...), fix what the translator lacks (parity.rs import_foreign,
+  derived_source).
+- **12:10 (live): live.stl's export resolution.** If Medium, our faceting is coarser in volume than Parasolid's at
+  the same setting (look at mesh_params / tessellate); if Fine, export ours at Fine in exchange_round_trip
+  (tests/parity.rs) so "live imports ours.stl" compares like with like.
+- **12:54 (live): exchange re-import** of the 12:21 ours.* (old ones kept in /root/dx-scratch/exch-old). Unblocks:
+  cf-hose-routing ours.x_t (4 of 8 parts kept: the swept hoses dropped; read live's import messages), cf-o-ring
+  ours.igs (no vertices in live's import), then the new "live imports ours" score.
+- Handed off, not mine now: the STL mesh fold (psui, P1, lead 13:04), cf-surface-pattern's Boolean (bool.md 13:03),
+  c2-hunting-knife Loft 3 (core), c2-sm-louver Sketch 9 / corner-break (skasm).
+- Not ours (no action): live's hover EDGE selections, DWG 2018 (remembered), Sheets panel hover popup after menu
+  clicks, the two disagreeing centermark recordings, a sketch point listed after Esc (1 state), Revision table (plan).
+
 ## 11-08 11:45 UTC: drawings 120/175; Cut list table by composite part; std 3112 landed
 - std 3112 landed (2f066886); studios told (handoff/studios.md).
 - Cut list table as live (live2 2278): its Insert opens the Insert view chooser in a composite mode ("Select a
