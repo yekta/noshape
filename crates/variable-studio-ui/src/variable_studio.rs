@@ -44,13 +44,12 @@ pub struct VariableStudioView {
     /// Enter added a variable from the Name row: focus the next (empty)
     /// Name row once it's rebuilt, as Onshape does.
     focus_add_row: bool,
-    /// Value cells (live input/variable-value-*, behaviours "Input
-    /// behaviour" F): a click focuses the cell (no text field, blue 2 px
-    /// border); a typed key or a double-click opens the editor; Enter /
-    /// a click away commit, Esc reverts.
-    value_focus: HashMap<usize, FocusHandle>,
-    value_selected: Option<usize>,
-    value_editing: Option<usize>,
+    /// Name, value and description cells by their input's key ("n3", "e3", "d3"; live input/variable-value-*,
+    /// behaviours "Input behaviour" F, vs-rename-variable): a click focuses the cell (no text field, blue 2 px
+    /// border); a typed key or a double-click opens the editor; Enter / a click away commit, Esc reverts.
+    cell_focus: HashMap<String, FocusHandle>,
+    cell_selected: Option<String>,
+    cell_editing: Option<String>,
     /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
     ui_drawn: Vec<serde_json::Value>,
     /// The right edge's Configuration panel (variable_config.rs).
@@ -146,9 +145,9 @@ impl VariableStudioView {
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
             focus_add_row: false,
-            value_focus: HashMap::new(),
-            value_selected: None,
-            value_editing: None,
+            cell_focus: HashMap::new(),
+            cell_selected: None,
+            cell_editing: None,
             ui_drawn: Vec::new(),
             config_open: false,
             cfg_cell: None,
@@ -202,12 +201,31 @@ impl VariableStudioView {
         });
     }
 
-    /// Open a value cell's editor: with the typed key (type-to-edit), or the
+    /// The Name cell's rename (op variable_set's): `#old` follows in every tab that sees the studio, a taken name
+    /// becomes `<name>_0`; live's toast says which.
+    fn rename_variable(&mut self, i: usize, name: String, cx: &mut Context<Self>) {
+        if !noshape_model::variable_table::is_identifier(name.trim().trim_start_matches('#')) {
+            cx.notify();
+            return;
+        }
+        let tab = self.tab;
+        let old = self.studio(cx).and_then(|s| s.variables.get(i)).map(|v| v.name.clone()).unwrap_or_default();
+        let mut done = None;
+        self.doc.update(cx, |d, cx| {
+            let what = format!("{} :: Rename variable", d.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default());
+            d.edit_document(&what, cx, |doc| done = noshape_ops::variable_studio::rename_everywhere(doc, tab, i, &name));
+        });
+        let Some((new, taken, tabs)) = done else { return };
+        let message = if taken { noshape_ops::variable_studio::RENAMED_TAKEN_MESSAGE.to_string() } else { noshape_ops::variable_studio::renamed_message(&old, &new, tabs.len()) };
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(message)));
+    }
+
+    /// Open a cell's editor: with the typed key (type-to-edit), or the
     /// whole text selected (double-click).
-    fn start_value_edit(&mut self, i: usize, typed: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((st, _)) = self.inputs.get(&format!("e{i}")).cloned() else { return };
-        self.value_editing = Some(i);
-        self.value_selected = Some(i);
+    fn start_cell_edit(&mut self, key: &str, typed: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((st, _)) = self.inputs.get(key).cloned() else { return };
+        self.cell_editing = Some(key.to_string());
+        self.cell_selected = Some(key.to_string());
         // (Value fields don't select on focus: the caret stays after the typed key.)
         st.update(cx, |s, cx| {
             s.focus(window, cx);
@@ -223,23 +241,77 @@ impl VariableStudioView {
         cx.notify();
     }
 
-    /// Esc in a value cell's editor: back to the committed text, the cell
+    /// Esc in a cell's editor: back to the committed text, the cell
     /// focused.
-    fn revert_value_edit(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some((st, last)) = self.inputs.get(&format!("e{i}")).cloned() {
+    fn revert_cell_edit(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((st, last)) = self.inputs.get(key).cloned() {
             st.update(cx, |s, cx| s.set_value(last, window, cx));
         }
-        self.value_editing = None;
-        self.value_selected = Some(i);
-        let fh = self.value_focus_handle(i, cx);
+        self.cell_editing = None;
+        self.cell_selected = Some(key.to_string());
+        let fh = self.cell_focus_handle(key, cx);
         window.focus(&fh, cx);
         cx.notify();
     }
 
-    /// The focus handle of row `i`'s value cell (one per cell, always
-    /// tracked, so a click can focus it right away).
-    fn value_focus_handle(&mut self, i: usize, cx: &mut Context<Self>) -> FocusHandle {
-        self.value_focus.entry(i).or_insert_with(|| cx.focus_handle()).clone()
+    /// The focus handle of a cell (one per cell, always tracked, so a click
+    /// can focus it right away).
+    fn cell_focus_handle(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
+        self.cell_focus.entry(key.to_string()).or_insert_with(|| cx.focus_handle()).clone()
+    }
+
+    /// A name or description cell: its text, selected on a click, edited on a
+    /// key or a double-click (as a value cell).
+    fn text_cell(&mut self, key: String, col: usize, input: &Entity<InputState>, shown: String, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let id = SharedString::from(format!("vs-cell-{key}"));
+        if self.cell_editing.as_deref() == Some(key.as_str()) {
+            let k = key.clone();
+            return gpui_kit::base::input::input_frame(
+                cell_div(col)
+                    .id(id)
+                    .border_2()
+                    .border_color(rgb(0x1651b0))
+                    .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                        if e.keystroke.key == "escape" {
+                            cx.stop_propagation();
+                            this.revert_cell_edit(&k, window, cx);
+                        }
+                    }))
+                    .child(cell_input(input)),
+            )
+            .into_any_element();
+        }
+        let fh = self.cell_focus_handle(&key, cx);
+        let selected = self.cell_selected.as_deref() == Some(key.as_str()) && fh.is_focused(window);
+        let (k1, k2, k3) = (key.clone(), key.clone(), key);
+        cell_div(col)
+            .id(id)
+            .px(px(7.))
+            .track_focus(&fh)
+            .when(selected, |d| d.border_2().border_color(rgb(0x1651b0)).px(px(6.)))
+            .child(div().min_w_0().truncate().child(crate::ui::user_text(shown)))
+            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
+                this.cell_selected = Some(k1.clone());
+                let fh = this.cell_focus_handle(&k1, cx);
+                window.focus(&fh, cx);
+                cx.notify();
+            }))
+            .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                if e.click_count() >= 2 {
+                    this.start_cell_edit(&k2, None, window, cx);
+                }
+            }))
+            .on_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                let m = &e.keystroke.modifiers;
+                if m.control || m.alt || m.platform {
+                    return;
+                }
+                if let Some(ch) = e.keystroke.key_char.clone().filter(|c| !c.chars().any(char::is_control)) {
+                    cx.stop_propagation();
+                    this.start_cell_edit(&k3, Some(ch), window, cx);
+                }
+            }))
+            .into_any_element()
     }
 
     fn cell(&mut self, key: String, value: String, window: &mut Window, cx: &mut Context<Self>, commit: impl Fn(&mut Self, String, &mut Context<Self>) + 'static) -> Entity<InputState> {
@@ -252,32 +324,26 @@ impl VariableStudioView {
         }
         // The add row's cell shows Onshape's "Name" placeholder.
         let placeholder = if key == "new" { "Name" } else { "" };
-        // A value cell's editor opens from the cell (type-to-edit keeps the
-        // caret after the key; double-click selects all itself).
-        let value_cell = key.starts_with('e');
-        // (Esc in a value editor is `revert_value_edit`'s: the cell stays selected.)
-        let st = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder).default_value(value.clone()).select_on_focus(!value_cell).revert_on_escape(!value_cell));
+        // A cell's editor opens from the cell (type-to-edit keeps the caret
+        // after the key; double-click selects all itself).
+        let table_cell = key != "new" && key.get(1..).is_some_and(|n| n.parse::<usize>().is_ok());
+        // (Esc in a cell's editor is `revert_cell_edit`'s: the cell stays selected.)
+        let st = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder).default_value(value.clone()).select_on_focus(!table_cell).revert_on_escape(!table_cell));
         let add_row = key == "new";
-        let value_row = key.strip_prefix('e').and_then(|n| n.parse::<usize>().ok());
         let k = key.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
-                // A value cell's editor closes: Enter keeps the cell focused,
-                // a click away leaves it.
-                if let Some(i) = value_row.filter(|i| this.value_editing == Some(*i)) {
-                    this.value_editing = None;
-                    this.value_selected = matches!(ev, InputEvent::PressEnter { .. }).then_some(i);
-                    if this.value_selected.is_some() {
-                        let fh = this.value_focus_handle(i, cx);
+                // A cell's editor closes: Enter keeps the cell focused, a
+                // click away leaves it.
+                if this.cell_editing.as_deref() == Some(k.as_str()) {
+                    this.cell_editing = None;
+                    this.cell_selected = matches!(ev, InputEvent::PressEnter { .. }).then(|| k.clone());
+                    if this.cell_selected.is_some() {
+                        let fh = this.cell_focus_handle(&k, cx);
                         window.focus(&fh, cx);
                     }
                     cx.notify();
-                }
-                // Enter in a name or description leaves the field (live vs-rename-variable: the cell keeps the
-                // selection, not the keyboard).
-                if !add_row && value_row.is_none() && matches!(ev, InputEvent::PressEnter { .. }) {
-                    window.focus(&this.focus, cx);
                 }
                 // Unchanged text commits nothing (no empty undo step; Esc's
                 // revert then blur stays a no-op).
@@ -656,9 +722,7 @@ impl Render for VariableStudioView {
             if only.as_ref().is_some_and(|o| !o.contains(&v.name)) {
                 continue;
             }
-            let name = self.cell(format!("n{i}"), v.name.clone(), window, cx, move |this, val, cx| {
-                this.edit("Rename variable", cx, |s| noshape_ops::variable_studio::rename_variable(s, i, &val))
-            });
+            let name = self.cell(format!("n{i}"), v.name.clone(), window, cx, move |this, val, cx| this.rename_variable(i, val, cx));
             // Live (qa4 10-20): a bare number gets the workspace unit of a Length
             // / Angle variable ("5" → "5 mm"), as in the Part Studio table.
             let cell_units = units;
@@ -675,7 +739,7 @@ impl Render for VariableStudioView {
             let desc_shown = if desc_error { String::new() } else { literal.map(str::to_string).unwrap_or_else(|| v.description.clone()) };
             let desc_tip = if desc_error { Some("Error regenerating.".to_string()) } else { v.description_expr.then(|| v.description.clone()).filter(|d| !d.is_empty()) };
             let (desc_text, desc_is_expr) = (v.description.clone(), v.description_expr);
-            let desc = self.cell(format!("d{i}"), desc_shown, window, cx, move |this, val, cx| {
+            let desc = self.cell(format!("d{i}"), desc_shown.clone(), window, cx, move |this, val, cx| {
                 this.edit("Edit variable description", cx, |s| noshape_ops::variable_studio::set_description(s, i, &val))
             });
             // Onshape (behaviours.md, Variable Studio): a plain value shows as
@@ -716,7 +780,7 @@ impl Render for VariableStudioView {
                         .into_any_element()
                 }
                 // Editing: the field inside the focused cell's blue border.
-                _ if self.value_editing == Some(i) => gpui_kit::base::input::input_frame(
+                _ if self.cell_editing.as_deref() == Some(format!("e{i}").as_str()) => gpui_kit::base::input::input_frame(
                     cell_div(2)
                         .id(("vs-val", i))
                         .border_2()
@@ -724,7 +788,7 @@ impl Render for VariableStudioView {
                         .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
                             if e.keystroke.key == "escape" {
                                 cx.stop_propagation();
-                                this.revert_value_edit(i, window, cx);
+                                this.revert_cell_edit(&format!("e{i}"), window, cx);
                             }
                         }))
                         .child(cell_input(&expr)),
@@ -733,9 +797,9 @@ impl Render for VariableStudioView {
                 // The cell: its value (an expression's result), the stored text
                 // as the tooltip, red with the error when it fails.
                 shown => {
-                    let fh = self.value_focus_handle(i, cx);
+                    let fh = self.cell_focus_handle(&format!("e{i}"), cx);
                     // The blue border while the cell has the focus (clicking elsewhere drops it).
-                    let selected = self.value_selected == Some(i) && fh.is_focused(window);
+                    let selected = self.cell_selected.as_deref() == Some(format!("e{i}").as_str()) && fh.is_focused(window);
                     let text = shown.unwrap_or_else(|| noshape_units::localize(&v.expr.text));
                     let tip = error.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text));
                     cell_div(2)
@@ -747,14 +811,14 @@ impl Render for VariableStudioView {
                         .tooltip(crate::ui::tooltip(tip))
                         .child(div().min_w_0().truncate().child(text))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-                            this.value_selected = Some(i);
-                            let fh = this.value_focus_handle(i, cx);
+                            this.cell_selected = Some(format!("e{i}"));
+                            let fh = this.cell_focus_handle(&format!("e{i}"), cx);
                             window.focus(&fh, cx);
                             cx.notify();
                         }))
                         .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
                             if e.click_count() >= 2 {
-                                this.start_value_edit(i, None, window, cx);
+                                this.start_cell_edit(&format!("e{i}"), None, window, cx);
                             }
                         }))
                         // Type-to-edit: the first printable key opens the editor with it.
@@ -765,13 +829,15 @@ impl Render for VariableStudioView {
                             }
                             if let Some(ch) = e.keystroke.key_char.clone().filter(|c| !c.chars().any(char::is_control)) {
                                 cx.stop_propagation();
-                                this.start_value_edit(i, Some(ch), window, cx);
+                                this.start_cell_edit(&format!("e{i}"), Some(ch), window, cx);
                             }
                         }))
                         .into_any_element()
                 }
             };
             let kind = v.kind.unwrap_or(VarKind::Any);
+            let name_cell = self.text_cell(format!("n{i}"), 0, &name, v.name.clone(), window, cx);
+            let desc_cell = self.text_cell(format!("d{i}"), 3, &desc, desc_shown, window, cx);
             let kinds = view.clone();
             let menu_view = view.clone();
             rows.push(
@@ -793,10 +859,10 @@ impl Render for VariableStudioView {
                                 move |m, _, _| row_menu(m, view.clone(), i, n)
                             })
                             .child(gpui_kit::base::input::input_frame(
-                                cell_div(0)
+                                div()
                                     .relative()
                                     .map(|d| crate::ui_script::mark(d, || format!("var_cell:{}:Name", v.name)))
-                                    .child(cell_input(&name))
+                                    .child(name_cell)
                                     .when(overwritten.contains(&v.name), |d| d.child(div().id(("vs-over", i)).absolute().right(px(8.)).top(px(12.)).tooltip(crate::ui::tooltip("Overwritten in another variable table.")).child(crate::ui::glyph("info", 10., rgb(0x666666))))),
                             ))
                             .child({
@@ -841,7 +907,7 @@ impl Render for VariableStudioView {
                             .id(("vs-desc", i))
                             .relative()
                             .map(|d| crate::ui_script::mark(d, || format!("var_cell:{var}:Description")))
-                            .child(gpui_kit::base::input::input_frame(cell_div(3).child(cell_input(&desc))))
+                            .child(desc_cell)
                             .when(cfg_desc, |d| d.child(variable_config::configured_outline()))
                             .when_some(desc_tip, |d, t| d.tooltip(crate::ui::tooltip(t)))
                             .os_context_menu_over_inputs(move |m, _, _| {

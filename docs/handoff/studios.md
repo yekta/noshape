@@ -53,9 +53,18 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Documents page: the trash toast fades as the restore one (3 s); the page's Empty trash… isn't one of the modal's
   buttons (`os::page_secondary_button`). Runner: "Paste tab", "Paste inputs" are clipboard rows; dropped scenarios'
   live recordings (Copy link) are skipped and deleted.
+- Then (same day): measured again with these: 208/390 scenarios, 1528/1796 states (85.1 %): documents 84.7 %,
+  versions 84.8 %, Variable Studio 86.6 %, Feature Studio 84.6 %. After it: the Variable Studio's name and
+  description cells select on a click and edit on a key or a double-click, as its value cells (`text_cell`,
+  `cell_selected` / `cell_editing` by input key); a rename follows in every tab that sees the studio with live's
+  toast ("Renamed variable 'w' to 'width' in 3 tabs in this workspace."), a taken name becomes `<name>_0` ("Changed
+  some variable names to avoid name conflicts."), in the op too (`variable_studio::rename_everywhere`).
 - Next (not started): the FS editor's undo as live's (the toolbar's Undo / Redo act on Ace's history, by word groups,
-  the caret at the change; Ctrl+Z makes Redo available); the Variable Studio's name / description cells select on a
-  click and edit on a key, as its value cells; documents-page ops (trash, folders, labels, moves: none exist).
+  the caret at the change; Ctrl+Z makes Redo available); documents-page ops (trash, folders, labels, moves: none exist); the
+  Tabs panel's menus as live's (a row: Create…, then the tab bar's menu without Properties… and with Add selection to
+  folder; a folder: Create…, Rename, Add selected to folder, Unpack, Move to document…), which needs the workspace's
+  tab menu shared with the panel. For psui: the S shortcut toolbar opens on a key with the pointer off the graphics
+  (doc-tab-rename-escape: typing over the tab bar opens it; live doesn't).
 
 ### 2026-11-08 13:00 UTC: compare, Insert Variable Studio and inserted tables to live's recordings
 - The 24 ver-compare / vs-insert / vs-inserted scenarios: 6 → 16 matched, 125/135 states. Compare: change marks as

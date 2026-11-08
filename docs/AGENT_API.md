@@ -1879,7 +1879,7 @@ Examples:
 | `variable` | string |  | The variable to change: its name (with or without #) or feature id. When omitted, `name` names it. |
 | `value` | string or number |  | New expression. |
 | `kind` | one of `LENGTH`, `ANGLE`, `NUMBER`, `ANY` |  | New kind. |
-| `new_name` | string |  | New name (renames it). |
+| `new_name` | string |  | New name (renames it). In a Variable Studio every tab that sees the studio follows and a taken name becomes `<name>_0`, with Onshape's `message`. |
 | `name` | string |  | With `variable`: the new name (as `new_name`). Without it: the variable to change, as variable_create names it. |
 | `description` | string |  | New description. |
 

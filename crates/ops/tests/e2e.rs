@@ -849,6 +849,16 @@ fn variable_studio_tables_in_part_studios() {
     call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "#w" } }));
     let vol = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({}))["parts"][0]["volume"]);
     assert!((vol(&mut ctx) - 3000.0).abs() < 1e-6);
+    // A rename follows in every tab that sees the studio (live vs-rename-variable); a taken name becomes `<name>_0`.
+    let r = call(&mut ctx, "variable_set", json!({ "tab": "Variable Studio 1", "variable": "w", "new_name": "width" }));
+    assert_eq!(r["message"], "Renamed variable 'w' to 'width' in 3 tabs in this workspace.", "{r}");
+    assert!((vol(&mut ctx) - 3000.0).abs() < 1e-6, "the extrude's #w is #width now");
+    call(&mut ctx, "variable_create", json!({ "tab": "Variable Studio 1", "name": "w", "value": "1 mm" }));
+    let r = call(&mut ctx, "variable_set", json!({ "tab": "Variable Studio 1", "variable": "width", "new_name": "w" }));
+    assert_eq!((r["message"].as_str(), r["variables"][0]["name"].as_str()), (Some("Changed some variable names to avoid name conflicts."), Some("#w_0")), "{r}");
+    call(&mut ctx, "variable_delete", json!({ "tab": "Variable Studio 1", "variable": "w" }));
+    call(&mut ctx, "variable_set", json!({ "tab": "Variable Studio 1", "variable": "w_0", "new_name": "w" }));
+    assert!((vol(&mut ctx) - 3000.0).abs() < 1e-6);
     // A second studio is inserted explicitly; the later table wins.
     call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "Sizes" }));
     call(&mut ctx, "variable_create", json!({ "tab": "Sizes", "name": "w", "value": "50 mm" }));

@@ -72,18 +72,6 @@ fn vs_find(s: &VariableStudio, key: &str) -> Result<usize, OpError> {
     s.variables.iter().position(|v| v.name == k).ok_or_else(|| OpError::not_found(format!("no variable `{key}`; variables: {}", s.variables.iter().map(|v| format!("#{}", v.name)).collect::<Vec<_>>().join(", "))).with_param("variable"))
 }
 
-/// A new name for the table: an identifier no other row uses.
-fn vs_name(s: &VariableStudio, name: &str, except: Option<usize>) -> Result<String, OpError> {
-    let n = name.trim().trim_start_matches('#');
-    if !vt::is_identifier(n) {
-        return Err(name_error(NameError::Invalid, n));
-    }
-    if s.variables.iter().enumerate().any(|(i, v)| v.name == n && Some(i) != except) {
-        return Err(name_error(NameError::Duplicate, n));
-    }
-    Ok(n.to_string())
-}
-
 fn vs_list(od: &OpenDoc, tab: TabId) -> Result<Value, OpError> {
     let units = od.doc().settings.units;
     let s = vs_studio(od, tab)?;
@@ -165,7 +153,7 @@ pub fn ops() -> Vec<Op> {
                 opt("variable", s(), "The variable to change: its name (with or without #) or feature id. When omitted, `name` names it."),
                 opt("value", json!({ "type": ["string", "number"] }), "New expression."),
                 opt("kind", kind, "New kind."),
-                opt("new_name", s(), "New name (renames it)."),
+                opt("new_name", s(), "New name (renames it). In a Variable Studio every tab that sees the studio follows and a taken name becomes `<name>_0`, with Onshape's `message`."),
                 opt("name", s(), "With `variable`: the new name (as `new_name`). Without it: the variable to change, as variable_create names it."),
                 opt("description", s(), "New description."),
             ],
@@ -620,18 +608,30 @@ fn set(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = match table(ctx, a)? {
         (od, Table::Vs(tab)) => {
             let i = vs_find(vs_studio(od, tab)?, var)?;
-            let new_name = match rename {
-                Some(n) => Some(vs_name(vs_studio(od, tab)?, n, Some(i))?),
-                None => None,
-            };
+            if let Some(n) = rename.map(|n| n.trim().trim_start_matches('#'))
+                && !vt::is_identifier(n)
+            {
+                return Err(name_error(NameError::Invalid, n));
+            }
             if let Some(k) = a.opt_str("kind")? {
                 kind_of(k)?;
             }
             vs_set_fields(od, tab, i, a)?;
-            if let Some(n) = new_name {
-                vs_edit(od, tab, "Rename variable", |s| vs::rename_variable(s, i, &n))?;
+            let mut message = None;
+            if let Some(n) = rename {
+                // As the table's Name cell: every tab that sees the studio follows; a taken name becomes `<name>_0`.
+                let old = vs_studio(od, tab)?.variables[i].name.clone();
+                let what = format!("{} :: Rename variable", od.doc().tab(tab).map(|t| t.name.clone()).unwrap_or_default());
+                let done = od.session.edit_document(&what, |d| vs::rename_everywhere(d, tab, i, n))?;
+                if let Some((new, taken, tabs)) = done {
+                    message = Some(if taken { vs::RENAMED_TAKEN_MESSAGE.to_string() } else { vs::renamed_message(&old, &new, tabs.len()) });
+                }
             }
-            return Ok(vs_list(od, tab)?.into());
+            let mut out = vs_list(od, tab)?;
+            if let Some(m) = message {
+                out["message"] = json!(m);
+            }
+            return Ok(out.into());
         }
         (od, Table::Studio(tab)) => (od, tab),
     };

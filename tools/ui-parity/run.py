@@ -176,6 +176,9 @@ def normalize_live(state):
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
         focus["text"], focus["selection"] = None, None
+        # A clicked checkbox (an <input> with no selection): no text field (README "Focus").
+        if focus.get("tag") == "input":
+            focus["tag"] = "checkbox"
     # The Feature Studio's code editor: Ace's hidden textarea holds a piece of the text around the caret, not a field's
     # text; the editor's own `featurestudio.caret` is compared instead.
     if isinstance(focus, dict) and focus.get("tag") == "textarea" and (state or {}).get("featurestudio"):
@@ -586,7 +589,7 @@ def main():
     for name in names:
         out = out_dir / f"{name}.json"
         if not (scen_dir / f"{name}.json").exists():
-            print(f"{name}: no scenario (a live recording of a dropped one)")
+            print(f"{name}: no scenario file")
             continue
         if not args.compare_only:
             problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)

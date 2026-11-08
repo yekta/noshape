@@ -26,6 +26,62 @@ pub fn free_name(s: &VariableStudio, name: &str) -> String {
     (0..).map(|i| format!("{name}_{i}")).find(|n| !taken(n)).expect("a free name")
 }
 
+/// Live's toast when a renamed variable's new name was taken (vs-rename-duplicate).
+pub const RENAMED_TAKEN_MESSAGE: &str = "Changed some variable names to avoid name conflicts.";
+
+/// Live's toast after a rename (vs-rename-variable): every tab that sees the studio follows.
+pub fn renamed_message(old: &str, new: &str, tabs: usize) -> String {
+    format!("Renamed variable '{old}' to '{new}' in {tabs} {} in this workspace.", if tabs == 1 { "tab" } else { "tabs" })
+}
+
+/// The tabs that see Variable Studio `studio`: itself, then the Part Studios, Assemblies and Variable Studios that
+/// insert it (by Insert into all or their own reference), in tab order.
+pub fn tabs_seeing(doc: &noshape_model::Document, studio: noshape_model::document::TabId) -> Vec<noshape_model::document::TabId> {
+    use noshape_model::TabContent;
+    let mut out = vec![studio];
+    for t in doc.ordered_tabs() {
+        let sees = match &t.content {
+            TabContent::PartStudio(_) | TabContent::Assembly(_) => noshape_model::variables::element_studios(doc, t.id).iter().any(|r| r.studio == studio && r.external.is_none()),
+            TabContent::VariableStudio(v) => t.id != studio && v.inserted.iter().any(|r| r.studio == studio && r.external.is_none()),
+            _ => false,
+        };
+        if sees {
+            out.push(t.id);
+        }
+    }
+    out
+}
+
+/// The Name cell ("Rename variable") as live does it: a taken name becomes `<name>_0` (`taken` true), and `#old`
+/// follows in every tab that sees the studio ([`tabs_seeing`]: Part Studios' features and configured values,
+/// inserting Variable Studios' values). Returns (the new name, whether it was taken, the tabs), None for no such row.
+pub fn rename_everywhere(doc: &mut noshape_model::Document, studio: noshape_model::document::TabId, i: usize, name: &str) -> Option<(String, bool, Vec<noshape_model::document::TabId>)> {
+    use noshape_model::TabContent;
+    let tabs = tabs_seeing(doc, studio);
+    let TabContent::VariableStudio(s) = &doc.tab(studio)?.content else { return None };
+    let old = s.variables.get(i)?.name.clone();
+    let given = name.trim().trim_start_matches('#');
+    let others = |n: &str| s.variables.iter().enumerate().any(|(j, v)| j != i && v.name == n);
+    let new = if others(given) { (0..).map(|k| format!("{given}_{k}")).find(|n| !others(n)).expect("a free name") } else { given.to_string() };
+    let taken = new != given;
+    for t in &tabs {
+        let Some(tab) = doc.tab_mut(*t) else { continue };
+        match &mut tab.content {
+            TabContent::VariableStudio(v) if *t == studio => rename_variable(v, i, &new),
+            TabContent::VariableStudio(v) => {
+                for var in &mut v.variables {
+                    if var.expr.text.contains(&format!("#{old}")) {
+                        var.expr = ExprValue::new(noshape_model::variable_table::rename_in_expr(&var.expr.text, &old, &new));
+                    }
+                }
+            }
+            TabContent::PartStudio(ps) => noshape_model::variable_table::rename_refs(ps, &old, &new),
+            _ => {}
+        }
+    }
+    Some((new, taken, tabs))
+}
+
 /// The Name cell ("Rename variable"): configured cells follow the name.
 pub fn rename_variable(s: &mut VariableStudio, i: usize, name: &str) {
     if let Some(v) = s.variables.get_mut(i) {

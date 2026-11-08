@@ -200,6 +200,31 @@ pub fn rename_in_expr(text: &str, old: &str, new: &str) -> String {
     out
 }
 
+/// `#old` → `#new` in every expression of a Part Studio: feature parameters, suppression expressions, configured
+/// values.
+pub fn rename_refs(ps: &mut PartStudio, old: &str, new: &str) {
+    let fix = |v: &mut ParamValue| {
+        if let ParamValue::Expr(e) = v
+            && e.text.contains(&format!("#{old}"))
+        {
+            *e = ExprValue::new(rename_in_expr(&e.text, old, new));
+        }
+    };
+    for f in &mut ps.features {
+        for v in f.params.0.values_mut() {
+            fix(v);
+        }
+        if let Some(e) = &mut f.suppression_expr {
+            *e = rename_in_expr(e, old, new);
+        }
+    }
+    for c in &mut ps.configuration.configured {
+        for v in c.values.values_mut() {
+            fix(v);
+        }
+    }
+}
+
 /// Rename a variable; every feature (and configured value) that refers to
 /// it follows (Help: "all Features that refer to the variable will be
 /// updated").
@@ -213,26 +238,7 @@ pub fn rename(ps: &mut PartStudio, feature: FeatureId, new: &str) -> Result<(), 
     }
     let Some(f) = ps.feature(feature) else { return Ok(()) };
     let old = f.params.text("name").trim().trim_start_matches('#').to_string();
-    let fix = |v: &mut ParamValue| {
-        if let ParamValue::Expr(e) = v
-            && e.text.contains(&format!("#{old}"))
-        {
-            *e = ExprValue::new(rename_in_expr(&e.text, &old, new));
-        }
-    };
-    for f in &mut ps.features {
-        for v in f.params.0.values_mut() {
-            fix(v);
-        }
-        if let Some(e) = &mut f.suppression_expr {
-            *e = rename_in_expr(e, &old, new);
-        }
-    }
-    for c in &mut ps.configuration.configured {
-        for v in c.values.values_mut() {
-            fix(v);
-        }
-    }
+    rename_refs(ps, &old, new);
     if let Some(f) = ps.features.iter_mut().find(|f| f.id == feature) {
         f.params.set("name", ParamValue::Text(new.to_string()));
     }
