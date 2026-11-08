@@ -127,6 +127,23 @@ features): those are next, the slowest first (michael's Fillet 2).
   result"), OCCT ~600 ms: what the Boolean would need is in bool.md ("From blend 23:10").
 - Kernel timers added for the record (not landed): blend.checked.build / .valid / .shrunk, blend.scaled.finish.
 
+## DOCK-FILLET (P1, lead 11-08): AppleWatchDock's "Fis Gecidi R" folds Govde
+User data /root/lead-scratch/user-docs/AppleWatchDock.noshape (never in the repo; copy in /root/blend-scratch/watchdock).
+Tab "A - Yumusak Kutu", feature index 69 "Fis Gecidi R" (fillet on the USB-C plug passage, after 68 "USB-C Fis Gecidi"
+extrude). Probe (not to land): crates/ops/tests/zz_dock_probe.rs (`DOCK=<copy> FROM= TO= NEAR=1 DUMP=<dir>`), and
+`NOSHAPE_SI_DUMP=1` in kernel common.cpp `self_intersects` prints the faulty pairs. 01:00: six faulty pairs, mirrored
+at x = ±5.5, y ≈ 13.3, z ≈ 9.8 (one shape of each a vertex-sized 0.2 mm box).
+- 01:35 UTC: cause and fix. The pairs are vertices with 0.53 / 0.52 / 0.1 mm tolerance overlapping: OCCT's as-is
+  fillet puts the corners where the wall underside's round (r 13.95 arc at z 9.9) meets the 0.1 mm step edge's round
+  0.5 mm off; tighten_new_tolerances can't tighten them (keeps OCCT's), BRepCheck passes, BOP's check fails. Each
+  round alone is fine; together OCCT's corner is wrong. Fix (kernel features.cpp `scaled_blend`): when the as-is
+  corners are far off (tighten returns inf) and a loose vertex's ball reaches another vertex
+  (`loose_vertices_overlap`), the working-scale build instead (valid, no SI). Dock: Part 1 valid, not SI, volume
+  25097.046 mm³ (broken one 25097.085); Fis Gecidi R 102 -> 182 ms (two builds). T1 model
+  features_c::rounds_over_a_tenth_mm_step_leave_a_valid_body (stand-in built with the kernel, no user data).
+  Live asked (REQUESTS blend 01:21, same stand-in). Left: the subset "outer arc + 0.1 step + outer side" (inner arc
+  left out) still SI after the scaled build (a 0.1 mm vertex 0.1 from another); probe /root/blend-scratch/dock/.
+
 ## BLEND-DIRECT: blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's
@@ -151,3 +168,14 @@ Design (stages, each through bool's gate and the before / after suite):
    mitres where two rounds' axes cross.
 Each stage falls back to today's route where its checks fail (a budget only as a hang guard). T1s: rings-loft's ring
 (data/rings-loft-ring.brep) against live's numbers, and michael's part.
+
+Stage 1, how (11-08 01:50): the cost is OCCT rediscovering the touch curves on the plane and the bore (the tool's faces
+lie on the part's): no Boolean finds them faster, so they're imprinted, not found. Per rim, OCCT's lone-rim blend on
+its wedge as now (~9 ms) gives the blend face B with exact edges on the plane and the cylinder. Then, in the kernel
+(C++, one call): (1) the intersections that are real: B against each other face of the part it crosses (the outside
+the rounds run out onto) and B against the other rims' blends, each a two-face section with pcurves; (2) every
+face that gets a curve split in 2D by it (the touch curves on the plane / bore, the run-out curves on the outside, the
+section curves on B: BRepFeat_SplitShape, no surface work); (3) the pieces kept by one point each: a part face's piece
+outside the removed region (wedge minus its blend), a B piece inside the part; (4) the kept faces sewn into the
+solid, history Modified for split faces, Generated from the rim edge for B. Checks: one valid solid whose volume is the part's less
+the tools'; else ring_blend's cut as today. Target rings-loft Fillet 1 + Chamfer 1 under ~60 ms.

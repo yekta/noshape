@@ -5222,6 +5222,31 @@ static void true_ball_over_rims(const TopoDS_Shape& input, TopoDS_Shape& r, HHis
   merge_split_tori(input, end_tori, r, h);
 }
 
+// Whether a new vertex's tolerance ball reaches another vertex of `r` (what makes a body with OCCT's far-off blend
+// corners self-intersect).
+static bool loose_vertices_overlap(const TopoDS_Shape& input, const TopoDS_Shape& r)
+{
+  ShapeIMap old, all;
+  TopExp::MapShapes(input, TopAbs_VERTEX, old);
+  TopExp::MapShapes(r, TopAbs_VERTEX, all);
+  const double loose = 10 * Precision::Confusion();
+  for (int i = 1; i <= all.Extent(); ++i)
+  {
+    const TopoDS_Vertex& v = TopoDS::Vertex(all(i));
+    const double         t = BRep_Tool::Tolerance(v);
+    if (old.Contains(v) || t <= loose)
+      continue;
+    const gp_Pnt p = BRep_Tool::Pnt(v);
+    for (int j = 1; j <= all.Extent(); ++j)
+    {
+      const TopoDS_Vertex& w = TopoDS::Vertex(all(j));
+      if (j != i && p.Distance(BRep_Tool::Pnt(w)) < t + BRep_Tool::Tolerance(w))
+        return true;
+    }
+  }
+  return false;
+}
+
 // A blend's new faces finished: approximated ones made analytic, then a full round's two faces on one cylinder one
 // face (B-spline blends of a full round too: the analytic step first), a corner's two sphere patches one. A studio
 // saved before (legacy_blend_finish) keeps the old order: the merges first.
@@ -5270,8 +5295,10 @@ OpOut scaled_blend(const TopoDS_Shape& input, bool checked, double size, const c
       const KernelTimer timer("blend.finish");
       finish_blend_faces(input, r, h);
       join_split_lines(input, r, h);
-      tighten_new_tolerances(input, r, accurate(input));
-      return as_is.finish(r, h);
+      // OCCT's corners far off whose loose vertices take in others (a user's dock: R 0.8 over a 0.1 mm step, corners
+      // 0.5 mm off, a self-intersecting body): the working scale's blend instead.
+      if (std::isfinite(tighten_new_tolerances(input, r, accurate(input))) || !loose_vertices_overlap(input, r))
+        return as_is.finish(r, h);
     }
   }
   const KernelTimer timer("blend.scaled");

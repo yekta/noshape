@@ -3590,3 +3590,63 @@ fn rounds_where_boss_tori_meet_the_floor_are_tori_as_live() {
     let rounds = shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Torus { minor_radius, .. }) if near(minor_radius, mm(1.0), 1e-9))).count();
     assert_eq!(rounds, 4);
 }
+
+/// A stand-in for a user's dock (AppleWatchDock, "Fis Gecidi R"): a puck pocket (floor 9.8 mm) in a ring wall
+/// (r 13.95 / 15.95), a trench (|x| < 5.5, z 2 to 9.9) under the wall, a cable slot (|x| < 3) through it: the wall's
+/// underside over the trench is 0.1 above the floor. R 0.8 on the trench's mouth edges.
+fn dock_passage() -> (Studio, Vec<Reference>) {
+    use noshape_kernel as k;
+    let frame = k::Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X);
+    let disc = k::make_cylinder(&frame, mm(15.95), mm(18.0), 2.0 * PI).unwrap();
+    let pocket = k::make_cylinder(&k::Plane::new(DVec3::new(0.0, 0.0, mm(9.8)), DVec3::Z, DVec3::X), mm(13.95), mm(10.0), 2.0 * PI).unwrap();
+    let trench = k::make_box_corners(DVec3::new(mm(-5.5), mm(6.45), mm(2.0)), DVec3::new(mm(5.5), mm(20.0), mm(9.9))).unwrap();
+    let slot = k::make_box_corners(DVec3::new(mm(-3.0), mm(6.45), mm(9.0)), DVec3::new(mm(3.0), mm(20.0), mm(19.0))).unwrap();
+    let mut body = disc;
+    for tool in [pocket, trench, slot] {
+        body = k::cut(&body, &tool).unwrap().shape;
+    }
+    let path = std::env::temp_dir().join(format!("dock-passage-{}-{:?}.brep", std::process::id(), std::thread::current().id()));
+    k::write_brep(&body, &path).unwrap();
+    let brep = std::fs::read_to_string(&path).unwrap();
+    std::fs::remove_file(&path).ok();
+    let mut s = Studio::new();
+    s.add("importForeign", move |p| p.set("blobData", ParamValue::Text(brep)));
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    let rc = |r: f64, x: f64| DVec3::new(mm(x), (mm(r).powi(2) - mm(x).powi(2)).sqrt(), 0.0);
+    // Edges by a point on them: the wall's underside arcs (inner, outer), the inner 0.1 steps, the outer mouth's sides,
+    // the trench's far end.
+    let mut at = Vec::new();
+    for sx in [-1.0, 1.0] {
+        at.push(rc(13.95, sx * 4.25) + DVec3::Z * mm(9.9));
+        at.push(rc(15.95, sx * 4.25) + DVec3::Z * mm(9.9));
+        at.push(rc(13.95, sx * 5.5) + DVec3::Z * mm(9.85));
+        at.push(rc(15.95, sx * 5.5) + DVec3::Z * mm(6.0));
+        at.push(DVec3::new(mm(sx * 5.5), mm(6.45), mm(6.0)));
+    }
+    let edges = b.shape.edges();
+    let picks: Vec<Reference> = at
+        .iter()
+        .map(|&p| {
+            let v = k::make_vertex(p).unwrap();
+            let e = edges.iter().position(|e| k::distance(e, &v).is_ok_and(|d| d.distance < 1e-7)).unwrap_or_else(|| panic!("no edge at {p:?}"));
+            Reference::Edge((*b.edges[e]).clone())
+        })
+        .collect();
+    (s, picks)
+}
+
+/// The user's fillet: OCCT's corners where the step's rounds meet were 0.5 mm off (vertices with 0.53 mm tolerance
+/// overlapping each other: a self-intersecting body on every later feature).
+#[test]
+fn rounds_over_a_tenth_mm_step_leave_a_valid_body() {
+    let (mut s, picks) = dock_passage();
+    s.add("fillet", move |p| {
+        p.set("entities", ParamValue::Query(picks));
+        p.set("radius", expr("0.8 mm"));
+    });
+    let r = s.ok();
+    let shape = &r.context.bodies[0].shape;
+    assert!(shape.is_valid());
+    assert!(!shape.self_intersects());
+}
