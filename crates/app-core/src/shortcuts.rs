@@ -229,20 +229,22 @@ impl Shortcuts {
         }
     }
 
-    /// The other action of the tab that `key` runs now (the conflict
-    /// "Confirming the changes will disable the shortcut X").
+    /// The other action that `key` runs now (the conflict "Confirming the changes will disable the shortcut X").
     pub fn conflict_for(&self, e: &Entry, key: &str) -> Option<&'static Entry> {
-        entries(e.tab).find(|o| o.id != e.id && self.active_key(o).as_deref() == Some(key))
+        self.conflicts_for(e, key).into_iter().next()
     }
 
-    /// Every other action of `e`'s tab on `key` (the Edit shortcut popup's alert lists them all).
+    /// Every other action on `key` that an edit of `e` would take it from (the Edit shortcut popup's alert lists them
+    /// all): its tab's, and for a Part Studio action the Sketch's too (live prefs-shortcut-edit-conflict: Extrude on
+    /// shift+f is "in use by multiple shortcuts … Fillet Sketch fillet").
     pub fn conflicts_for(&self, e: &Entry, key: &str) -> Vec<&'static Entry> {
-        entries(e.tab).filter(|o| o.id != e.id && self.active_key(o).as_deref() == Some(key)).collect()
+        let sketch = (e.tab == Tab::PartStudio).then(|| entries(Tab::Sketch)).into_iter().flatten();
+        entries(e.tab).chain(sketch).filter(|o| o.id != e.id && self.active_key(o).as_deref() == Some(key)).collect()
     }
 
     /// Two actions of the tab run on this action's key (Onshape's ❗).
     pub fn has_conflict(&self, e: &Entry) -> bool {
-        self.active_key(e).is_some_and(|k| self.conflict_for(e, &k).is_some())
+        self.active_key(e).is_some_and(|k| entries(e.tab).any(|o| o.id != e.id && self.active_key(o).as_deref() == Some(k.as_str())))
     }
 
     /// Confirms the edit popup: `key` (canonical; `None` keeps the current
@@ -657,8 +659,9 @@ mod tests {
         assert_eq!(s.key(ellipse), None);
         assert_eq!(s.conflict_for(ellipse, "shift-q"), Some(symmetric));
         assert_eq!(s.conflict_for(ellipse, "l"), Some(line));
-        // Other tabs are separate: shift-s is Sketch (Part Studio) and Point (Sketch).
-        assert_eq!(s.conflict_for(e("partStudio:Sketch"), "shift-s"), None);
+        // A Part Studio action also meets the Sketch's (live prefs-shortcut-edit-conflict), not the other way round.
+        assert_eq!(s.conflicts_for(e("partStudio:Extrude"), "shift-f"), vec![e("partStudio:Fillet"), e("sketch:Sketch fillet")]);
+        assert_eq!(s.conflict_for(e("sketch:Point"), "shift-e"), None);
         let off = s.assign(ellipse, Some("l".into()), false);
         assert_eq!(off, vec![line]);
         assert_eq!(s.style(ellipse), KeyStyle::Customized);

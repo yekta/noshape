@@ -28,6 +28,14 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 17:58 UTC: Preferences 49/56 scenarios (from 43)
+- Add / Edit export rule records the body's text as live reads it; Toolbars › Reset to defaults greys after a click;
+  Edit shortcut: Disable shortcut hides the hint and Reset to default; a Part Studio action's conflicts include the
+  Sketch's (Extrude on shift+f: "multiple shortcuts … Fillet Sketch fillet"); a disabled row has no reset icon and
+  reads as no key. run.py: a page's native select's popup isn't compared (live can't read it).
+- Asked live (REQUESTS 17:52): documents-page recordings read before the opened document loaded, Cancel steps that
+  found no button, the + menu's "Create table", the shortcut popup's Reset to default.
+
 ### 2026-11-08 17:36 UTC: full suite 266/394 scenarios, 1625/1814 states (89.6%, from 85.1%), no regressions
 - Edit internal IDs records its fields (name / id pairs, as live's inputs); the Variable input dialog's Default,
   Minimum and Maximum are "number" fields for the numeric kinds; clicking a kind tab takes the keyboard from Name (live

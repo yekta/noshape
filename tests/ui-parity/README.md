@@ -521,6 +521,9 @@ clicked button holding the keyboard (Enter or Space re-activating it) is the exc
 The Feature Studio's code editor holding the keyboard is live's Ace textarea, whose text is a piece around the
 caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
 
+A native `<select>` of a page (Preferences' units) opens the OS's popup, which live's recorder can't read: while live's
+focus is such a select and its `list` null, ours' open dropdown isn't compared.
+
 The Tabs panel's Sort menu hangs inside the panel's header, so live's recorder reads its rows into
 `document.panel` ("Tabs Tab order Name: A → Z …"): read as "Tabs" while that menu is the open list.
 

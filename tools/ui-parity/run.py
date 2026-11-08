@@ -473,6 +473,9 @@ def compare(live, ours, whole_document=True):
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         b = same_fieldless_focus(a, b)
+        # A page's native <select> holding the keyboard: its open list is the OS's popup, which live's recorder can't read.
+        if isinstance(a.get("focus"), dict) and a["focus"].get("tag") == "select" and a.get("list") is None:
+            b["list"] = None
         # A feature-style panel whose header live's recorder doesn't read (Insert Variable Studio: `title` null, so
         # its `titleState` and `ok` are defaults).
         if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and a["dialog"].get("kind") == "feature" and a["dialog"].get("title") is None:

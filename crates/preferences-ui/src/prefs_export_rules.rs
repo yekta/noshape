@@ -243,7 +243,13 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
             ]);
             let title = if editing.is_some() { "Edit export rule" } else { "Add export rule" };
             let ok = if editing.is_some() { "Save changes" } else { "Add" };
-            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"], "ok": if error.is_some() { "disabled" } else { "enabled" }, "text": error.into_iter().collect::<Vec<_>>() })
+            // Live reads the body's text: the labels, each select's options, the convention and the count under it.
+            let scopes: Vec<&str> = ExportElement::ALL.iter().map(|e| e.label()).collect();
+            let mut body = vec!["Scope".to_string(), scopes.join(" "), "Format".into(), scope.formats().join(" "), "Convention".into()];
+            body.extend((!text.is_empty()).then(|| text.clone()));
+            body.push(format!("{remaining} characters remaining"));
+            body.extend(error.map(str::to_string));
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"], "ok": if error.is_some() { "disabled" } else { "enabled" }, "text": body.join(" ") })
         });
         os::modal_doc_page(dialog, tr(if editing.is_some() { "Edit export rule" } else { "Add export rule" }), 600.)
             .child(

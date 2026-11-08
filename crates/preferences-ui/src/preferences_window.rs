@@ -251,6 +251,8 @@ pub struct PreferencesView {
     /// Saved toolbar preferences, and the Shortcut toolbars draft that
     /// "Save shortcut toolbar settings" writes (live: ticks apply on Save).
     toolbar: ToolbarPrefs,
+    /// Toolbars › Reset to defaults was clicked: greyed for the rest of the visit (live prefs-toolbars-reset).
+    toolbars_reset: bool,
     toolbar_draft: ToolbarPrefs,
     /// A tick was clicked since the last save (live: unticking it again
     /// leaves Save enabled, dk-pref-save-disabled).
@@ -354,6 +356,7 @@ impl PreferencesView {
             scroll_to_end: false,
             toolbar_context: 0,
             toolbar: ToolbarPrefs::load(),
+            toolbars_reset: false,
             toolbar_draft: ToolbarPrefs::load(),
             toolbar_dirty: false,
             asm_toolbar: crate::assembly_view::AsmToolbarPrefs::load(),
@@ -724,9 +727,12 @@ impl PreferencesView {
             None => vec![key_chip("Unassigned", style).into_any_element()],
         };
         let customized = s.is_customized(e);
+        // Live (prefs-shortcut-disable): a disabled row keeps its greyed chips, has no reset icon (Edit's Disable
+        // shortcut box brings it back) and reads as no key.
+        let disabled = style == KeyStyle::Disabled;
         // A changed row as it shows (the rest are Onshape's defaults).
         if customized {
-            crate::ui_script::note_control(e.name, "shortcut", serde_json::json!(key.as_deref().map(shortcuts::key_text)));
+            crate::ui_script::note_control(e.name, "shortcut", serde_json::json!(key.as_deref().filter(|_| !disabled).map(shortcuts::key_text)));
         }
         let group = SharedString::from(format!("kb-row-{}", e.id));
         h_flex()
@@ -749,7 +755,7 @@ impl PreferencesView {
                     .tooltip(crate::ui::tooltip("Edit"))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.open_edit(e, window, cx))),
             )
-            .when(customized, |d| {
+            .when(customized && !disabled, |d| {
                 d.child(
                     div()
                         .id(SharedString::from(format!("kb-reset-{}", e.id)))
@@ -786,8 +792,11 @@ impl PreferencesView {
             many => crate::ui_script::note_message(format!("{} {}", conflict_text(""), many.iter().map(|o| o.name).collect::<Vec<_>>().join(" "))),
         }
         crate::ui_script::note_dialog(|| {
-            let disabled: Vec<&str> = [(!changed).then_some("Confirm"), (!can_reset).then_some("Reset to default")].into_iter().flatten().collect();
-            serde_json::json!({ "kind": "modal", "title": format!("Edit shortcut: {}", entry.name), "fields": [{ "label": "Shortcut", "kind": "input", "value": text }, { "label": "Disable shortcut", "kind": "checkbox", "value": ed.disable }], "buttons": ["Confirm", "Cancel", "Reset to default"], "disabled": disabled, "ok": if changed { "enabled" } else { "disabled" }, "text": "Press desired key combination and confirm" })
+            // Live prefs-shortcut-disable: with Disable shortcut ticked the hint and Reset to default go.
+            let disabled: Vec<&str> = [(!changed).then_some("Confirm"), (!can_reset && !ed.disable).then_some("Reset to default")].into_iter().flatten().collect();
+            let buttons: &[&str] = if ed.disable { &["Confirm", "Cancel"] } else { &["Confirm", "Cancel", "Reset to default"] };
+            let hint = (!ed.disable).then_some("Press desired key combination and confirm");
+            serde_json::json!({ "kind": "modal", "title": format!("Edit shortcut: {}", entry.name), "fields": [{ "label": "Shortcut", "kind": "input", "value": text }, { "label": "Disable shortcut", "kind": "checkbox", "value": ed.disable }], "buttons": buttons, "disabled": disabled, "ok": if changed { "enabled" } else { "disabled" }, "text": hint })
         });
         // ✓: green `#009400` (faded until something changed), ✕: `#bd3039`.
         let ok = div()
@@ -879,7 +888,7 @@ impl PreferencesView {
                 cx.notify();
             })))
             .child(div().flex_1())
-            .child(
+            .when(!disable, |d| d.child(
                 h_flex()
                     .id("kb-edit-reset")
                     .map(|d| crate::ui_script::mark(d, || "button:Keyboard shortcuts › Reset to default".into()))
@@ -896,7 +905,7 @@ impl PreferencesView {
                             this.close_edit(cx);
                         }))
                     }),
-            );
+            ));
         Some(
             v_flex()
                 .id("kb-edit-popup")
@@ -914,7 +923,7 @@ impl PreferencesView {
                 .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| this.close_edit(cx)))
                 .child(h_flex().absolute().top(px(10.)).right(px(14.)).gap(px(8.)).child(ok).child(close))
                 .child(div().h(px(30.)).flex().justify_center().items_center().text_size(px(20.)).text_color(pal.text).child(format!("Edit shortcut: {}", entry.name)))
-                .child(div().mt(px(3.)).h(px(20.)).flex().justify_center().items_center().text_size(px(14.7)).text_color(pal.text).child("Press desired key combination and confirm"))
+                .child(div().mt(px(3.)).h(px(20.)).flex().justify_center().items_center().text_size(px(14.7)).text_color(pal.text).when(!disable, |d| d.child("Press desired key combination and confirm")))
                 .child(h_flex().mt(px(22.)).justify_center().child(div().w(px(24.))).child(field).child(info))
                 .children(echo)
                 .children(alert)
@@ -1040,7 +1049,11 @@ impl PreferencesView {
             // and Assembly toolbars back (tool sets, removed tools, Search tools).
             .child(
                 Self::heading("Toolbars", None).mt(px(38.)).child(
-                    h_flex().mt(px(16.)).pl(px(15.)).child(Self::save_button("tb-reset", "Reset to defaults", true).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                    h_flex().mt(px(16.)).pl(px(15.)).child(Self::save_button("tb-reset", "Reset to defaults", !self.toolbars_reset).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                        if this.toolbars_reset {
+                            return;
+                        }
+                        this.toolbars_reset = true;
                         let mut ps = ToolbarPrefs::load();
                         ps.removed.clear();
                         ps.group_order.clear();
