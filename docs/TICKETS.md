@@ -3124,6 +3124,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   library, setting another replaces it). The Frame feature's profile picker (select_item.rs; today only "Onshape frame profiles", model-core frame_library.rs) should list, next to Onshape's own library, a "My frame profiles library" entry holding
   that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
   sketches usable as frame profiles, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
+- [ ] P2 METAL-PIPELINES-PRECOMPILED (psui; lead 2026-11-08 19:21 UTC: not now) **the first launch after an install or update
+  compiles every Metal pipeline for the GPU.** The Metal shader cache then keeps them, so later launches don't pay it.
+  Perf 42489298913 / 42504449807, our caches cleared (config, display cache, Metal shader caches) against warm, medians
+  of three: macOS 26 662-697 ms against 339-526 ms warm; macOS 15 975-1180 ms against 412-658 ms. Where: window
+  creation ~270-400 ms with the caches cleared against ~30-70 ms warm (GPUI's 8 pipelines, already compiled in
+  parallel and loaded from a precompiled metallib), and frame 1 ~280-550 ms from the workspace drawn (our first-frame
+  pipelines ~45-70 ms, then the GPU's first use). The fix: pipelines shipped compiled for the GPU (Metal binary
+  archives harvested per Apple GPU family, or `metal-tt` in the macOS release job), GPUI's and ours. Not a fix: the
+  off-screen warm-up frame at device ready (perf 42504449807: +54 ms macOS 26, +622 ms macOS 15, reverted 1b1850a2).
 - [x] P2 FRAME-PROFILE-OTHER-STUDIO (psui; asm 2026-11-08 01:11 UTC, the assembly corpus' pattern-std, 41 occurrences): **a Frame's
   Sketch profile can't be a sketch of another Part Studio of the document**. Live's picker has a Current document tab
   (behaviours "psui (2026-11-01 … D134) Frame Sketch profile picker": every other Part Studio, expandable to its
