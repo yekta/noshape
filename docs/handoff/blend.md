@@ -75,6 +75,13 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   Faces: our chamfer faces 10.044 mm² (live 9.8228), y to 1.81 (live 1.89); the side strips 8.854 (live 9.17, ours
   cut to y ±2.49, live ±2.53): the run-on past the arc's ends goes further than live's. Asked live (REQUESTS 21:06)
   for the chamfer face's surface and edges.
+  Live answered (2384: blend/q2384/chamfer-run-on.json): JRC is one ruled B-spline (degree 1 x 3, 9.8524 mm²) running
+  smoothly past the arc's end, trimmed by the strip plane JRy along KRpB to the strip's ellipse edge at y ±2.5349 (ours
+  ±2.49). So live's run-on is its chamfer surface continued, ours the rim's chamfer continued along the rim. Not built
+  yet (quota): next, compare KRpB's 17 points with our run-on's edge, then build the run-on as the chamfer surface
+  extended along its own ruling (blend_section ring_blend RimBlend::Chamfer).
+- opChamfer distance-and-angle side: live 2336's rule (off = cap) breaks cf-spur-gear's gear 8; reverted, see
+  TICKETS CHAMFER-FS-OPCHAMFER (patch opchamfer-cap-rule.patch).
 
 ## Speed survey (lead 11-08 19:40: audit11's blend features slower than live, by ms over live)
 Ours over live, from each document's slowest features and live.jsonl's per_feature_ms (only documents matching up to

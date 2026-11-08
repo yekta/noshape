@@ -4022,6 +4022,12 @@ P2
   front both ways). But cf-spur-gear (FS 1576, opExtrude'd blank's rim edge, OFFSET_ANGLE) matches live with ours
   for Opposite off and on (14/14); "off = the edge's second face" broke it (14 -> 8, reverted). The rule is
   neither face order; ask live for the gear's rim with Opposite off / on before changing the op.
+  Live 2336 (11-08): Opposite off = the cap (planar end face), on = the side, at FS 336 and 1576, for a block and a
+  cylinder's either cap. That rule (patch /root/blend-scratch/patches/opchamfer-cap-rule.patch, with live's four cases
+  as a T1) passes cf-snap-hook and cf-spur-gear's gear 4 (flipGear: Opposite on) but breaks its gear 8 (Opposite off,
+  edge the blank's rim circle between the cylinder and its planar cap): live there takes OCCT's default face, the
+  cylinder. Next: ask live for cf-spur-gear's feature 8 blank: which face carries the 0.5 mm, and the blank's extrude
+  (direction, which cap the rim is on).
 - [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
   the same face as Two distances' Distance 1; on a round reference face the angle is to the line from the chamfer's
   side to the edge (OCCT: to the face's tangent), fixed with CHAMFER-METHOD.
