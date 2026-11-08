@@ -589,6 +589,20 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 22:09 UTC, speed area (lead: parity index speed 70.8 %, psui and bool first).** The cases: 85 parity
+regenerations + 13 opens (all opens at or under live: 0 lost). Profiled on vibe5 (`NOSHAPE_PARITY_SPLIT=1`
+parity::parity_models: open / feature_list / query_parts, then each Part Studio's features against its display):
+regenerations 85.9 % as measured on today's tree (the qa 14:11 run was 70.8 % for the area on a slower, niced run).
+Every top lost point is feature evaluation (bool's / core's; bool's handoff has the list); psui's share is the
+display build: elliptical edges meshed here (ea06cbfe: cf-part-draft display 156 → 35 ms), a circle's surface of
+revolution meshed as a torus and a face closed both ways splitting its seams as rows (a0c4bae0: cf-o-ring-generator
+Medium 1.2 → 0.18 s, display 1.07x BRepMesh's triangles); corpus display meshing 2.93 → 1.89 s (ours / BRepMesh's
+time in the same runs 0.28 → 0.16). Measurement, asked of the lead: ours is open + feature_list + query_parts wall
+time (query_parts' mass properties 0.1-1.6 s on some; our display build) where live's `full_regen_ms` is its
+Regeneration times panel (features only): 85.9 % as measured, 90.5 % features only. Next: c2-rings-loft's 395 ms of
+display (2 faces we don't take, Offset-like, settle all 26 others to BRepMesh), cf-fill-pattern 107 ms.
+
+
 **11-08 19:20 UTC, early warm-up measured (perf 42504449807 on f57f96b): out.** Ours (caches cleared) vs early:
 macOS 26 662 → 715 ms (+54), macOS 15 1180 → 1802 ms (+622: window created 648 → 1652, the warm-up's GPU work on
 the one paravirtual GPU held AppKit's window); reverted, bench back to ours / warm. This run's macOS 15 was slow
