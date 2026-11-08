@@ -83,7 +83,7 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    fn close_hole_table_props(&mut self, accept: bool, cx: &mut Context<Self>) {
+    pub(crate) fn close_hole_table_props(&mut self, accept: bool, cx: &mut Context<Self>) {
         let Some(d) = self.hole_dlg.take() else { return };
         // The table's columns may change: no stale cell outline (qa
         // HOLE-TABLE-MENU (2)).
@@ -367,11 +367,15 @@ impl DrawingEditor {
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options, a picked
             // view's and origin's chips with their ×.
-            let mut text: Vec<String> = vec![if editing.is_some() { "Hole table properties" } else { "Hole table" }.into(), "Show location data".into(), "Location precision".into()];
+            let mut text: Vec<String> = vec!["Hole table".into(), "Show location data".into(), "Location precision".into()];
             text.extend(PRECISIONS.iter().map(|(l, _)| l.to_string()));
             text.push("Views".into());
             if let Some(name) = &view_name {
-                text.extend([name.clone(), "×".into(), "Origin".into()]);
+                text.extend([name.clone(), "×".into()]);
+            }
+            // Editing (live drw-hole-table-properties): no origin, directions or holes to exclude.
+            if view_name.is_some() && editing.is_none() {
+                text.push("Origin".into());
                 if first_origin {
                     text.extend(["Point".into(), "×".into()]);
                 }
@@ -400,7 +404,7 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(28.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if editing.is_some() { "Hole table properties" } else { "Hole table" }))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child("Hole table"))
                         // Live: ✓ stays disabled until an origin is picked (a click places the table).
                         .child(
                             div()
@@ -454,11 +458,11 @@ impl DrawingEditor {
                             }))
                         }),
                 )
-                .when(view.is_some(), |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
+                .when(view.is_some() && editing.is_none(), |v| v.child(field(if first_origin { "Origin: Point".into() } else { "Origin: a vertex or circle center".into() }, !first_origin)))
                 // Live 1985 / 1682: X direction and Y direction, each a
                 // straight edge of the view; setting one hides the other (the
                 // other axis is square to it); a click on a set one clears it.
-                .when(view.is_some(), |v| {
+                .when(view.is_some() && editing.is_none(), |v| {
                     let axis = |id: &'static str, label: &'static str, y: bool, cx: &mut Context<Self>| {
                         let on = if y { d.y_picking } else { d.x_picking };
                         let set = d.x_dir.is_some() && d.y_set == y;
@@ -496,7 +500,7 @@ impl DrawingEditor {
                     if d.x_dir.is_some() && !d.y_set { v } else { v.child(axis("hole-table-y-dir", "Y direction", true, cx)) }
                 })
                 // Live 1609: the X / Y flip icons and Holes to exclude.
-                .when(view.is_some(), |v| {
+                .when(view.is_some() && editing.is_none(), |v| {
                     let flip = |id: &'static str, label: &'static str, on: bool, f: fn(&mut HoleTableDlg), cx: &mut Context<Self>| {
                         div()
                             .id(id)
@@ -518,7 +522,7 @@ impl DrawingEditor {
                     };
                     v.child(h_flex().px(px(8.)).h(px(28.)).gap(px(6.)).child(flip("hole-table-flip-x", "Flip X", d.flip_x, |d| d.flip_x = !d.flip_x, cx)).child(flip("hole-table-flip-y", "Flip Y", d.flip_y, |d| d.flip_y = !d.flip_y, cx)))
                 })
-                .when(view.is_some(), |v| {
+                .when(view.is_some() && editing.is_none(), |v| {
                     let n = d.exclude.len();
                     let on = d.picking;
                     v.child(

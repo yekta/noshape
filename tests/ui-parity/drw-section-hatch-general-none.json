@@ -1,0 +1,88 @@
+{
+  "name": "drw-section-hatch-general-none",
+  "about": "Edit hatch section... on a section view, pick its hatch, the General tab, Pattern ▾ None (live behaviours (4): General starts with None; Scale, Angle and Color go), then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Section view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Horizontal"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            0,
+            15,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          81,
+          125
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view": "Section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Edit hatch section..."
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view": "Section"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "General"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "dropdown": "Solid",
+        "pick": "None"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

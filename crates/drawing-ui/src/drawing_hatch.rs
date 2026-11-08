@@ -450,6 +450,7 @@ impl DrawingEditor {
             let tip = format!("{name} patterns");
             div()
                 .id(("hd-tab", g))
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{name}")))
                 .flex_1()
                 .h(px(26.))
                 .flex()

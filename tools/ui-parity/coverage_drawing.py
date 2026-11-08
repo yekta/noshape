@@ -68,6 +68,7 @@ def norm(s):
 
 def norm_key(k):
     k = k.strip().lower().replace("ctrl/cmd", "mod").replace("cmd", "mod").replace("ctrl", "mod")
+    k = re.sub(r"/[^\x00-\x7f]", "", k)  # "alt/⌥": the Mac symbol beside the key's name
     return "+".join(p for p in re.split(r"[ +]|(?<=[a-z])-(?=.)", k) if p)
 
 
@@ -129,11 +130,27 @@ def main():
                     items[("menu", "Export…")].add(name)
                 else:
                     unmatched[f"menu {on['menu']}"] += 1
+            elif "button" in on:
+                # A tool that is a button of the drawing's own (Drawing properties at the right edge).
+                hit = tool_of.get(norm(on["button"])) or tool_of.get(norm(on["button"]) + " panel")
+                if hit:
+                    items[hit].add(name)
             if step.get("do") == "key":
                 for item in key_of.get(norm_key(step.get("key", "")), []):
                     items[item].add(name)
+            if step.get("do") == "drag" and step.get("mods"):
+                for item in key_of.get(norm_key(f"{step['mods']} lmb drag"), []):
+                    items[item].add(name)
             if ("export", on.get("pick")) in items:
                 items[("export", on["pick"])].add(name)
+            elif "dropdown" in on and (hit := menu_of.get(norm(str(on.get("pick"))))):
+                # A dialog's list item (Edit hatch's Pattern ▾ None).
+                items[hit].add(name)
+        # A scenario's "export" key: each runner exports the drawing in those formats through the Export dialog.
+        for f in sc.get("export", []):
+            f = f.get("format") if isinstance(f, dict) else f
+            if ("export", f) in items:
+                items[("export", f)].add(name)
 
     by_area = defaultdict(lambda: [0, 0])
     for (kind, n), s in items.items():

@@ -91,8 +91,6 @@ pub enum Panel {
     /// takes clicks on parts.
     /// `add_point`: Spline point (the next click on the profile adds a point).
     BrokenOut { view: ViewId, edit: Option<usize>, profile: Vec<[f64; 2]>, spline: bool, up_to: bool, depth: Entity<InputState>, depth_ref: Option<PointRef>, offset: Option<Entity<InputState>>, exclude: Vec<noshape_model::BodyId>, picking: bool, add_point: bool },
-    /// Angle of a straight cutting line.
-    CutAngle { view: ViewId, input: Entity<InputState> },
     /// Table cell formatting; `scope`: 0 cell, 1 row, 2 column, 3 table.
     CellFormat { table: u64, row: usize, col: usize, scope: usize, align: CellAlign, bold: bool, height: Entity<InputState> },
     /// BOM cell: the value and "Override" (`enabled`: the row has a part number).

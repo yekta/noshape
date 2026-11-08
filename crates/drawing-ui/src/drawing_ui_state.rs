@@ -174,12 +174,18 @@ impl DrawingEditor {
                     v if v.contains("Centerline") => "centerline",
                     "Callout" | "HoleCallout" | "Balloon" => "callout",
                     "Datum" => "datum",
+                    "DatumTarget" => "datumtarget",
                     "Gdt" => "gdt",
                     "SurfaceFinish" => "surfacefinishsymbol",
                     "VirtualSharp" => "virtualsharp",
                     _ => "other",
                 };
-                let t = text(a.id);
+                let t = match &a.kind {
+                    // A note open in its editor isn't drawn; live reads its saved text until the edit ends (live2
+                    // drw-note-edit).
+                    AnnotationKind::Note { text: saved, .. } if text(a.id).is_empty() => saved.split_whitespace().collect::<Vec<_>>().join(" "),
+                    _ => text(a.id),
+                };
                 let t = match k {
                     "dimension" => dimension_value(&t),
                     // Each member's value: "0.000 1.575" (live).
@@ -211,7 +217,8 @@ impl DrawingEditor {
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-        let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().map(|(_, k, t)| (k, t)).collect();
+        // Live's recorder lists no datum target (live2 drw-datum-target).
+        let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().filter(|(_, k, _)| *k != "datumtarget").map(|(_, k, t)| (k, t)).collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
             // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
@@ -324,7 +331,8 @@ impl DrawingEditor {
             "selection": { "count": self.selection.len(), "items": [] },
             "features": { "rows": [], "rollbackAfter": null },
             "parts": [],
-            "message": null,
+            // The message bubble shown (live2 drw-canvas-paste-as-table: "Clipboard is empty.").
+            "message": self.toast.as_ref().map(|t| t.to_string()),
             "tooltip": null,
             "undo": { "undo": undo, "redo": redo },
             "sketch": null,
@@ -400,7 +408,8 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
         Tool::EdgeCenterline { .. } => "Edge to edge centerline",
         Tool::VirtualSharp { .. } => "Virtual sharp",
         Tool::HoleCallout { .. } => "Hole/thread callout",
-        Tool::Datum { .. } => "Datum",
+        // The Datum dialog's Datum target tab is still the Datum tool (live2 drw-datum-target).
+        Tool::Datum { .. } | Tool::DatumTarget { .. } => "Datum",
         Tool::Gdt => "Geometric tolerance",
         Tool::SurfaceFinish => "Surface finish symbol",
         Tool::Weld => "Weld symbol",

@@ -124,6 +124,11 @@ impl DrawingEditor {
             self.redraw(cx);
             return;
         }
+        // A hole table's properties: Esc closes them unchanged (live drw-hole-table-properties).
+        if self.hole_dlg.as_ref().is_some_and(|d| d.table.is_some()) {
+            self.close_hole_table_props(false, cx);
+            return;
+        }
         // The Table dialog: closed without placing.
         if self.table_dlg.is_some() {
             self.close_table_dlg(false, cx);

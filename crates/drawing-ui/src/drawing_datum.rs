@@ -396,8 +396,7 @@ impl DrawingEditor {
 
     pub fn render_datum_dlg(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let d = self.datum_dlg.as_ref()?;
-        // (The panel's texts for the ui-parity runner, as live's recorder reads them, the label's value not: live 2146.)
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "text": ["Datum", "Datum", "Datum target", "Label"] }));
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Datum", "text": datum_dlg_texts(d) }));
         let pal = p();
         let ink = gpui_kit::rgb(0x333333);
         let ed = cx.entity();
@@ -876,4 +875,58 @@ fn style_glyph(s: TargetStyle) -> &'static str {
         (true, false) => "⊲",
         (true, true) => "⊲↗",
     }
+}
+
+/// The Datum panel's texts in reading order, as live's recorder reads them (live 2146: a label's value not; live2
+/// drw-datum-target: a target row's name, its ×, an open row's captions, a select's options and a field's value).
+fn datum_dlg_texts(d: &DatumDlg) -> Vec<String> {
+    let mut out: Vec<String> = ["Datum", "Datum", "Datum target"].map(String::from).to_vec();
+    if d.tab == 0 {
+        out.push("Label".into());
+        return out;
+    }
+    out.extend(["Target area:", "Style:", "Area size:", "Targets"].map(String::from));
+    for (k, r) in d.rows.iter().enumerate() {
+        let AnnotationKind::DatumTarget { label, area, .. } = &r.ann.kind else { continue };
+        let opts = r.ann.target.as_deref().cloned().unwrap_or_default();
+        let n = if opts.angular { opts.instances.max(1) as usize } else { 1 };
+        out.push(if n > 1 { format!("{label}-{}", DatumTargetOpts::instance_label(label, n - 1)) } else { label.clone() });
+        out.push("×".into());
+        if d.open != Some(k) {
+            continue;
+        }
+        out.push("Label".into());
+        if matches!(area, DatumTargetArea::Custom) {
+            continue;
+        }
+        out.extend(["Length", "Angle", "Origin"].map(String::from));
+        if opts.origin.is_some() {
+            out.push("Point".into());
+        }
+        out.extend(["Target location", "Point"].map(String::from));
+        if opts.angular {
+            out.extend(["Diameter distance:", "Radial lines", "Reference line"].map(String::from));
+            if opts.ref_dir.is_some() {
+                out.push("Edge".into());
+            }
+            out.extend(["Angle:", "Instance count:", "Flip", "Rotate"].map(String::from));
+            continue;
+        }
+        out.push("X position".into());
+        if opts.x_dir.is_none() || !r.dir_y {
+            out.push("X direction".into());
+            if opts.x_dir.is_some() {
+                out.push("Edge".into());
+            }
+        }
+        out.extend(["Distance:", "Y position"].map(String::from));
+        if opts.x_dir.is_none() || r.dir_y {
+            out.push("Y direction".into());
+            if opts.x_dir.is_some() {
+                out.push("Edge".into());
+            }
+        }
+        out.extend(["Distance:", "X", "Y"].map(String::from));
+    }
+    out
 }

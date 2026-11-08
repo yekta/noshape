@@ -1,0 +1,112 @@
+{
+  "name": "drw-datum-target-hide-dim",
+  "about": "A datum target on the Front view's top right vertex, its Origin the bottom right vertex (only a vertical distance), Show dimensions ▸ This target, then the boxed dimension's menu › Hide dimension (live behaviours A35)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the remaining drawing menu items)",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Datum"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "tab": "Datum target"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            10
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            60,
+            0,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            40,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            60,
+            0,
+            30
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "menu": "Show dimensions"
+      },
+      "ms": 600
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "This target"
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            46,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Hide dimension"
+      }
+    }
+  ]
+}

@@ -369,8 +369,8 @@ impl DrawingEditor {
     /// Properties, Switch to BOM, Delete, Replace.
     /// A BOM / cut list table's Sheets panel row: its label and the assembly (Part Studio) it lists (its view's root
     /// source). Live 2240: a BOM's row is named after its assembly.
-    fn sheet_table_label(&self, t: &Table, cx: &App) -> (String, Option<TabId>) {
-        let source = t.view().and_then(|v| views::root_view(self.current_sheet(), v)).and_then(|r| match &self.current_sheet().view(r)?.kind {
+    fn sheet_table_label(&self, sheet: &Sheet, t: &Table, cx: &App) -> (String, Option<TabId>) {
+        let source = t.view().and_then(|v| views::root_view(sheet, v)).and_then(|r| match &sheet.view(r)?.kind {
             ViewKind::Base { source, .. } => Some(*source),
             _ => None,
         });
@@ -381,14 +381,16 @@ impl DrawingEditor {
         (label, source)
     }
 
-    fn sheet_table_row(&self, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
+    fn sheet_table_row(&self, sheet: &Sheet, t: &Table, indent: f32, cx: &mut Context<Self>) -> AnyElement {
         let id = t.id;
-        let (label, source) = self.sheet_table_label(t, cx);
+        let (label, source) = self.sheet_table_label(sheet, t, cx);
+        let current = std::ptr::eq(sheet, self.current_sheet());
+        let sheet_i = self.drawing.sheets.iter().position(|s| std::ptr::eq(s, sheet)).unwrap_or(self.sheet);
         let icon = if matches!(t.kind, TableKind::CutList { .. }) { "cut-list" } else { "drawing-bom" };
         // The runner's target: a start's assembly as "start asm" (each runner's start has its own name).
         let mark = if label.starts_with("start ") && label.contains(" asm") { "start asm".to_string() } else { label.clone() };
         let is_bom = matches!(t.kind, TableKind::Bom { .. });
-        crate::ui::tree_row(SharedString::from(format!("dr-table-{id}")), self.selection.contains(&Sel::Table(id)))
+        crate::ui::tree_row(SharedString::from(format!("dr-table-{sheet_i}-{id}")), current && self.selection.contains(&Sel::Table(id)))
             .map(|d| crate::ui_script::mark(d, move || format!("sheet_table:{mark}")))
             .on_drag(ItemDrag { view: None, table: Some(id) }, |d, _, _, cx| cx.new(|_| d.clone()))
             .pl(px(indent))
@@ -396,13 +398,19 @@ impl DrawingEditor {
             .child(sheets_icon(icon, cx))
             .child(div().flex_1().truncate().child(crate::ui::user_text(label)))
             .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                if this.sheet != sheet_i {
+                    this.switch_sheet(sheet_i, cx);
+                }
                 this.selection = vec![Sel::Table(id)];
                 this.redraw(cx);
             }))
             .on_mouse_down(
                 MouseButton::Right,
-                cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
+                    if this.sheet != sheet_i {
+                        this.switch_sheet(sheet_i, cx);
+                    }
                     // Live 2240: Properties..., Replace..., Switch to BOM, Delete.
                     let mut entries = vec![MenuEntry::item("Properties...", move |t, _, cx| t.open_table_props(id, cx))];
                     if let Some(tab) = source {
@@ -421,6 +429,8 @@ impl DrawingEditor {
                     }));
                     let ed = cx.entity();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    // The drawing's own menu (live's is in its iframe, as the canvas's).
+                    this.frame_menu = Some(menu.downgrade());
                     crate::os_menu::open(e.position, menu, window, cx);
                 }),
             )
@@ -462,9 +472,10 @@ impl DrawingEditor {
         // Live (K20): a click selects the view (Ctrl+click adds); the current
         // sheet's only, the selection being the current sheet's.
         let current = std::ptr::eq(sheet, self.current_sheet());
+        let sheet_i = self.drawing.sheets.iter().position(|s| std::ptr::eq(s, sheet)).unwrap_or(self.sheet);
         let selected = current && self.selection.contains(&Sel::View(id));
-        let popup = (self.row_rename.as_ref().map(|r| r.0) == Some(RowRename::View(id))).then(|| self.row_rename_popup(cx));
-        crate::ui::tree_row(SharedString::from(format!("dr-view-{}", v.id.0)), selected)
+        let popup = (current && self.row_rename.as_ref().map(|r| r.0) == Some(RowRename::View(id))).then(|| self.row_rename_popup(cx));
+        crate::ui::tree_row(SharedString::from(format!("dr-view-{sheet_i}-{}", v.id.0)), selected)
             .relative()
             .pl(px(indent + 20. * depth as f32))
             .text_color(rgb(0x666666))
@@ -493,6 +504,10 @@ impl DrawingEditor {
                 MouseButton::Right,
                 cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
+                    // A row of another sheet: its menu acts on that sheet.
+                    if this.sheet != sheet_i {
+                        this.switch_sheet(sheet_i, cx);
+                    }
                     let src = this.reference_source(this.current_sheet(), id);
                     let assembly = src.as_ref().is_some_and(|(tab, _)| matches!(this.doc.read(cx).session.doc.tab(*tab).map(|t| &t.content), Some(TabContent::Assembly(_))));
                     let entries = vec![
@@ -513,6 +528,8 @@ impl DrawingEditor {
                     ];
                     let ed = cx.entity();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                    // The drawing's own menu (live's is in its iframe, as the canvas's).
+                    this.frame_menu = Some(menu.downgrade());
                     crate::os_menu::open(e.position, menu, window, cx);
                 }),
             )
@@ -713,11 +730,12 @@ impl DrawingEditor {
                 .when_some(menu, |row, entries| {
                     row.on_mouse_down(
                         MouseButton::Right,
-                        cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                        cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                             cx.stop_propagation();
                             let entries = entries.clone();
                             let ed = cx.entity();
                             let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                            this.frame_menu = Some(menu.downgrade());
                             crate::os_menu::open(e.position, menu, window, cx);
                         }),
                     )
@@ -791,25 +809,24 @@ impl DrawingEditor {
                     Some(m) if m.model => s.name.clone(),
                     _ => format!("{} ({})", s.name, i + 1 - model_before(i)),
                 });
-                if active {
-                    for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
-                        let src = vs.first().and_then(|v| self.reference_source(s, v.id));
-                        list = list.child(ref_row(self, format!("dr-sheet-ref-{k}"), r, src, 34., cx));
-                        let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
-                        text.extend([version.to_string(), name.to_string()]);
-                        for v in vs {
-                            list = list.child(self.sheet_view_row(s, v, 75., cx));
-                            text.push(self.view_row_label(s, v).0);
-                        }
-                    }
-                    // BOM and cut list tables.
-                    for t in s.tables.iter().filter(|t| matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. })) {
-                        list = list.child(self.sheet_table_row(t, 54., cx));
-                        text.push(self.sheet_table_label(t, cx).0);
+                // Every sheet lists its references and views (live2 drw-sheet-insert / -duplicate).
+                for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
+                    let src = vs.first().and_then(|v| self.reference_source(s, v.id));
+                    list = list.child(ref_row(self, format!("dr-sheet-ref-{i}-{k}"), r, src, 34., cx));
+                    let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
+                    text.extend([version.to_string(), name.to_string()]);
+                    for v in vs {
+                        list = list.child(self.sheet_view_row(s, v, 75., cx));
+                        text.push(self.view_row_label(s, v).0);
                     }
                 }
+                // BOM and cut list tables.
+                for t in s.tables.iter().filter(|t| matches!(t.kind, TableKind::Bom { .. } | TableKind::CutList { .. })) {
+                    list = list.child(self.sheet_table_row(s, t, 54., cx));
+                    text.push(self.sheet_table_label(s, t, cx).0);
+                }
             }
-            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": text.first(), "text": text }));
+            crate::ui_script::note_dialog_pinned(|| serde_json::json!({ "kind": "drawing-panel", "title": text.first(), "text": text }));
         }
         let tab = |id: &'static str, label: &'static str, selected: bool, cx: &mut Context<Self>| {
             div()
@@ -2398,7 +2415,7 @@ impl DrawingEditor {
                 });
             }
             Panel::Datum { edit: None, .. } => {}
-            p @ (Panel::BrokenOut { .. } | Panel::CutAngle { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
+            p @ (Panel::BrokenOut { .. } | Panel::CellFormat { .. } | Panel::CellResize { .. } | Panel::DatumTarget { .. }) => self.apply_more_panel(p, cx),
             Panel::BomCell { table, item, col, input, over, .. } => {
                 let value = input.read(cx).value().to_string();
                 self.apply_bom_cell(table, item, col, value, over, cx);

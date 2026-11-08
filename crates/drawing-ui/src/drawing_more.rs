@@ -551,15 +551,6 @@ impl DrawingEditor {
         cx.notify();
     }
 
-    pub fn open_cut_angle_panel(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(p) = self.current_sheet().section_points(view).filter(|p| p.len() == 2) else { return };
-        let ang = (p[1][1] - p[0][1]).atan2(p[1][0] - p[0][0]).to_degrees();
-        let input = self.input(&format::format_number(ang, None, 3), window, cx);
-        Self::focus_input(&input, window, cx);
-        self.panel = Some(Panel::CutAngle { view, input });
-        cx.notify();
-    }
-
     pub fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = self.current_sheet().table(table) else { return };
         let f = t.shown_cell_format(row, col);
@@ -808,7 +799,6 @@ impl DrawingEditor {
                 }
                 ("Broken-out section", rows)
             }
-            Panel::CutAngle { input, .. } => ("Cutting line angle", vec![Self::label_row("Angle (°)", Input::new(input).small().w(px(120.)).into_any_element())]),
             Panel::CellFormat { scope, align, bold, height, .. } => {
                 let (scope, align, bold) = (*scope, *align, *bold);
                 let scope_entries: Vec<MenuEntry> = SCOPES
@@ -912,17 +902,6 @@ impl DrawingEditor {
                 // (Live 2131: nothing selected after ✓.)
                 self.selection.clear();
             }
-            Panel::CutAngle { view, input } => match num(val(&input, cx).trim_end_matches('°').to_string()) {
-                Some(deg) => {
-                    if self.current_sheet().section_points(view).filter(|p| p.len() == 2).is_none() {
-                        return;
-                    }
-                    self.edit_sheet("Cutting line angle", cx, |sh| {
-                        noshape_scene::drawing_tools::annotation_edit::set_cutting_line_angle(sh, view, deg);
-                    });
-                }
-                None => self.status = Some("Invalid angle".into()),
-            },
             Panel::CellFormat { table, row, col, scope, align, bold, height } => {
                 let h = num(val(&height, cx)).filter(|h| *h > 0.5);
                 let layout = self.built.as_ref().and_then(|b| b.table_layout(table)).cloned();

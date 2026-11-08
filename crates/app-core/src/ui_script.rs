@@ -121,11 +121,25 @@ fn dialog_slot() -> &'static Mutex<Option<serde_json::Value>> {
 /// A modal drawn now (`state.dialog`: its title and fields, as a feature dialog's); the driver clears it and
 /// redraws before reading, so a closed one is gone.
 pub fn note_dialog(dialog: impl FnOnce() -> serde_json::Value) {
+    if !active() || DIALOG_PINNED.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    if let Ok(mut d) = dialog_slot().lock() {
+        *d = Some(dialog());
+    }
+}
+
+static DIALOG_PINNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// A panel that stays `state.dialog` whatever else the frame notes (a drawing's Sheets panel: live's recorder reads
+/// the first panel of the page, live2 drw-sheet-properties).
+pub fn note_dialog_pinned(dialog: impl FnOnce() -> serde_json::Value) {
     if !active() {
         return;
     }
     if let Ok(mut d) = dialog_slot().lock() {
         *d = Some(dialog());
+        DIALOG_PINNED.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -235,6 +249,7 @@ pub fn clear_dialog() {
     if let Ok(mut d) = dialog_slot().lock() {
         *d = None;
     }
+    DIALOG_PINNED.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut f) = fields_slot().lock() {
         f.clear();
     }
