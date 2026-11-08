@@ -44,6 +44,11 @@ pub fn toast(text: impl Into<String>, cx: &mut App) {
     .detach();
 }
 
+/// The bubble's text while it shows (the ui-parity state's `message`).
+pub fn shown_toast(cx: &App) -> Option<String> {
+    cx.try_global::<PrefsToast>()?.0.clone()
+}
+
 /// The bubble, top centre (live: 8 px down), if one is showing.
 pub fn toast_overlay(cx: &App) -> Option<AnyElement> {
     let text = cx.try_global::<PrefsToast>()?.0.clone()?;

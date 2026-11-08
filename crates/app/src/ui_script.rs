@@ -847,7 +847,8 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
 fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Workspace>) -> Value {
     let focus = match ws.ui_rename_focus(window, cx) {
         Some(f) => f,
-        None if window.focused(cx).is_some() && !ws.ui_variables_hold_focus(window, cx) => json!({ "kind": "other" }),
+        // A text field (a table cell, the code editor) has the keyboard; a view itself holding it is live's body.
+        None if window.focused(cx).is_some() && window.context_stack().iter().any(|c| c.contains("Input")) => json!({ "kind": "other" }),
         None => json!({ "kind": "none" }),
     };
     let list = noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list);

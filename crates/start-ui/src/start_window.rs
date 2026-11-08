@@ -2369,6 +2369,7 @@ impl StartView {
                                         .child(
                                             div()
                                                 .id("adv-caret")
+                                                .map(|d| crate::ui_script::mark(d, || "caret:Search".into()))
                                                 .w(px(20.))
                                                 .h_full()
                                                 .flex()
@@ -2540,7 +2541,7 @@ impl StartView {
             "focus": focus,
             "dialog": crate::ui_script::open_dialog(),
             "list": crate::os_menu::ui_state(cx).or_else(crate::ui_script::open_list),
-            "selection": { "count": 0, "items": [] },
+            "selection": null,
             "features": null,
             "parts": [],
             "message": null,
@@ -2550,13 +2551,25 @@ impl StartView {
             "drawing": null,
             "document": null,
             "documents": {
-                "place": self.source_title(),
+                "place": self.ui_place(),
                 "selected": selected,
                 "search": self.query,
                 "panel": panel,
                 "advanced": self.adv_open,
                 "columns": self.cols_open,
             },
+        })
+    }
+
+    /// The ui-parity state's `place`: the highlighted left-nav entry (live: Owned by me inside its folders, none
+    /// over search results).
+    fn ui_place(&self) -> Option<String> {
+        if !self.query.trim().is_empty() || self.adv_query.is_some() {
+            return None;
+        }
+        Some(match &self.source {
+            Source::Folder(_) => "Owned by me".into(),
+            _ => self.source_title(),
         })
     }
 
@@ -3130,6 +3143,7 @@ impl StartView {
         let probe = self.cols_anchor.clone();
         let button = h_flex()
             .id("add-columns")
+            .map(|d| crate::ui_script::mark(d, || "button:Add".into()))
             .relative()
             .h(px(28.))
             .px(px(7.))
@@ -3171,7 +3185,7 @@ impl StartView {
                 .h(px(40.))
                 .px(px(8.))
                 .gap(px(8.))
-                .child(div().id("cols-all").cursor_pointer().child(box_(all, on > 0)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                .child(div().id("cols-all").map(|d| crate::ui_script::mark(d, || "checkbox:All columns".into())).cursor_pointer().child(box_(all, on > 0)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     for c in this.columns.iter_mut() {
                         c.1 = !all;
                     }
@@ -3192,7 +3206,7 @@ impl StartView {
                     .gap(px(8.))
                     .text_size(px(14.))
                     .text_color(pal.text)
-                    .child(div().id(("col-check", i)).cursor_pointer().child(box_(shown, false)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .child(div().id(("col-check", i)).map(|d| crate::ui_script::mark(d, || format!("checkbox:{}", c.label()))).cursor_pointer().child(box_(shown, false)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.columns[i].1 = !this.columns[i].1;
                         this.save_prefs();
                         cx.notify();

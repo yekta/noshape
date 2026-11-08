@@ -47,6 +47,7 @@ impl Render for MaterialLibrariesView {
         // text, 15 px from the right), the Onshape library's too.
         let remove = |id: SharedString, library: &str, cx: &mut Context<Self>, f: Box<dyn Fn()>| {
             let name = crate::ui_script::in_section(&format!("Remove {library}"));
+            let removed = library.to_string();
             div()
                 .id(id)
                 .map(|d| crate::ui_script::mark(d, || format!("button:{name}")))
@@ -66,6 +67,7 @@ impl Render for MaterialLibrariesView {
                 .child("Remove")
                 .on_click(cx.listener(move |_, _: &ClickEvent, _, cx| {
                     f();
+                    crate::prefs_general::toast(crate::i18n::tr("Material library __libraryName__ is removed.").replace("__libraryName__", &removed), cx);
                     cx.notify();
                 }))
         };

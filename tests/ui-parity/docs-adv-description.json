@@ -1,0 +1,31 @@
+{
+ "name": "docs-adv-description",
+ "about": "Advanced search › Description \"plate\", Search",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-description (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Description"
+   }
+  },
+  {
+   "do": "type",
+   "text": "plate"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

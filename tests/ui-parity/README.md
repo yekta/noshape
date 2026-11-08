@@ -282,7 +282,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   compare panel's rows on a Part Studio, `change` modified | removed | added | moved | null; `null` elsewhere); targets
   `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`;
   `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
-  from the latest version (live's REST can only branch there; else Main's head), its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
+  from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the
   panel header's buttons by tooltip (`"Create version…"`, `"Compare history entries"`, `"Close"`), the left rail's
   (`"Versions and history"`, `"Create version…"`).
@@ -307,7 +307,13 @@ states above.
 
 - Targets on the documents page: `{"nav": "Owned by me"}` (the left column's places: "Recently opened", "Created by
   me", "Labels", "Trash"), `{"button": "Create"}`, `{"doc_row": "uip Bracket"}` a document's row or a folder's tile
-  by its name, `{"field": "Search"}` the search box; menus and modals as everywhere.
+  by its name, `{"field": "Search"}` the search box; menus and modals as everywhere. The table's `{"button":
+  "Add"}` (+ Add) and its column chooser's `{"checkbox": "Type"}` (a column by its name; `"All columns"` the
+  select-all box); `{"caret": "Search"}` the search box's ▾ (Advanced search), its fields by label `{"field":
+  "Name"}` ("Type", "Description", "Part number", "State", "Revision", "Add criteria", "Results from", and "Results
+  at" for the unlabelled Latest select under it), its buttons `"Reset"` / `"Search"`. The start leaves its documents
+  in Recently opened (live's account opened them) and the page on Owned by me with Folders open. `documents.place` is
+  the highlighted left-column entry (Owned by me inside its folders; null over search results).
 - Targets on Preferences: a control by its section and label, `{"field": "Units › Length default unit", "pick":
   "Inch"}` (a select), `{"field": "Units › Length default unit › Display decimals"}` (the select after it),
   `{"checkbox": "Decimal format › Use comma as decimal separator"}`, a section's button `{"button": "Units › Save

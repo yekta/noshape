@@ -456,7 +456,11 @@ impl Render for AdvancedSearch {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let view = cx.entity();
-        let row = |label: &'static str, field: AnyElement| h_flex().h(px(40.)).px(px(4.)).child(div().w(px(100.)).flex_none().text_size(px(12.)).text_color(pal.text).child(label)).child(field);
+        // The ui-parity driver's `{"field": label}` (the unlabelled "Latest" select under Results from: "Results at").
+        let row = |label: &'static str, field: AnyElement| {
+            let name = if label.is_empty() { "Results at" } else { label };
+            h_flex().h(px(40.)).px(px(4.)).child(div().w(px(100.)).flex_none().text_size(px(12.)).text_color(pal.text).child(label)).child(crate::ui_script::mark(div().flex_1().min_w_0().child(field), || format!("field:{name}")))
+        };
         let input = |st: &Entity<InputState>| gpui_kit::base::input::input_frame(field_box(SharedString::from(format!("adv-{}", st.entity_id()))).child(Input::new(st).appearance(false).text_size(px(12.))).into_any_element()).into_any_element();
         // Select lists hang under their field: each field records its bounds.
         let anchors: Vec<Rc<Cell<Bounds<Pixels>>>> = (0..5).map(|_| Rc::default()).collect();

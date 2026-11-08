@@ -244,6 +244,7 @@ impl Render for UnitsPrefsView {
                                         u.time_24h = this.edited.time_24h;
                                         save(u);
                                         this.saved = this.edited;
+                                        crate::prefs_general::toast(crate::i18n::tr("Default units updated."), cx);
                                         // Document times shown elsewhere follow the new format.
                                         window.refresh();
                                         cx.notify();
@@ -344,6 +345,7 @@ impl Render for DecimalPrefsView {
                                         save(u);
                                         noshape_units::set_comma_decimal(this.edited);
                                         this.saved = this.edited;
+                                        crate::prefs_general::toast(crate::i18n::tr("Decimal format updated."), cx);
                                         // Values on screen follow the new separator.
                                         window.refresh();
                                         cx.notify();

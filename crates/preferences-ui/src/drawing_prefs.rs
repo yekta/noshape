@@ -40,6 +40,7 @@ impl DrawingPrefsView {
         prefs.drawing_light_model_space = self.edited;
         prefs.save();
         self.saved = self.edited;
+        crate::prefs_general::toast(crate::i18n::tr("Drawing settings updated."), cx);
         cx.notify();
     }
 

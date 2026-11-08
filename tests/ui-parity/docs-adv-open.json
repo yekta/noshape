@@ -1,0 +1,21 @@
+{
+ "name": "docs-adv-open",
+ "about": "The search box's ▾: Advanced search, then ▾ again",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  }
+ ]
+}

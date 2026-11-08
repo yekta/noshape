@@ -1,0 +1,31 @@
+{
+ "name": "docs-adv-revision",
+ "about": "Advanced search › Revision \"A\", Search",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-revision (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Revision"
+   }
+  },
+  {
+   "do": "type",
+   "text": "A"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

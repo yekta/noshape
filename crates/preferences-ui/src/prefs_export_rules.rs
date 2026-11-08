@@ -12,7 +12,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::export_rules::{self as er, ExportElement, ExportRule, ExportRules};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 fn tr(s: &str) -> SharedString {
@@ -130,11 +130,8 @@ fn open_dialog(view: Entity<ExportRulesPrefsView>, editing: Option<usize>, windo
             })
             .detach();
     }
-    let focused = Rc::new(Cell::new(false));
-    window.open_dialog(cx, move |dialog, window, cx| {
-        if !focused.replace(true) {
-            conv.update(cx, |s, cx| s.focus(window, cx));
-        }
+    // Live (prefs-export-rule-add): nothing has the keyboard when it opens (typing goes nowhere).
+    window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let (scope, format_ix, complete) = {
             let e = state.borrow();

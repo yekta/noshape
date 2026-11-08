@@ -1,0 +1,31 @@
+{
+ "name": "docs-adv-part-number",
+ "about": "Advanced search › Part number \"PN\", Search",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-part-number (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

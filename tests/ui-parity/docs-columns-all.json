@@ -1,0 +1,27 @@
+{
+ "name": "docs-columns-all",
+ "about": "+ Add › the select-all box, twice",
+ "area": "studios",
+ "source": "universe documents documents-page-column-chooser-select-all-tri-state (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "All columns"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "All columns"
+   }
+  }
+ ]
+}

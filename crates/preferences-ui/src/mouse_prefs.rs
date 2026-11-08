@@ -56,6 +56,7 @@ impl MousePrefsView {
     fn save(&mut self, cx: &mut Context<Self>) {
         self.edited.save();
         self.saved = self.edited;
+        crate::prefs_general::toast(crate::i18n::tr("Mouse controls updated."), cx);
         cx.notify();
     }
 

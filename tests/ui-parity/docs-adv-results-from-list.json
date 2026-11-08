@@ -1,0 +1,25 @@
+{
+ "name": "docs-adv-results-from-list",
+ "about": "Advanced search › Results from: its list, Esc",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-results-from-workspaces-versions-all (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Results from"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

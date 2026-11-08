@@ -299,10 +299,10 @@ impl PreferencesView {
             "focus": focus,
             "dialog": crate::ui_script::open_dialog(),
             "list": crate::os_menu::ui_state(cx).or_else(crate::ui_script::open_list),
-            "selection": { "count": 0, "items": [] },
+            "selection": null,
             "features": null,
             "parts": [],
-            "message": null,
+            "message": crate::prefs_general::shown_toast(cx).or_else(crate::ui_script::noted_message),
             "tooltip": null,
             "undo": null,
             "sketch": null,
@@ -577,6 +577,7 @@ impl PreferencesView {
                 b.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     set_parts_list_properties(this.edited.parts_list_properties);
                     this.saved.parts_list_properties = this.edited.parts_list_properties;
+                    crate::prefs_general::toast(crate::i18n::tr("Part Studio settings updated."), cx);
                     cx.notify();
                 }))
             })))
@@ -591,6 +592,7 @@ impl PreferencesView {
                 b.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     set_instance_list_properties(this.edited.instance_list_properties);
                     this.saved.instance_list_properties = this.edited.instance_list_properties;
+                    crate::prefs_general::toast(crate::i18n::tr("Assembly settings updated."), cx);
                     cx.notify();
                 }))
             })))
@@ -604,7 +606,6 @@ impl PreferencesView {
         let s = shortcuts::current();
         crate::ui_script::set_section("Keyboard shortcuts");
         crate::ui_script::note_control("Tab", "select", serde_json::json!(self.tab.label()));
-        crate::ui_script::note_control("Reset all", "button", serde_json::json!(true));
         let tabs: Vec<AnyElement> = Tab::CUSTOMIZE.iter().map(|&t| {
             let on = t == self.tab;
             div()
@@ -629,6 +630,8 @@ impl PreferencesView {
                 .into_any_element()
         }).collect();
         let rows: Vec<AnyElement> = shortcuts::entries(self.tab).map(|e| self.render_row(e, &s, cx)).collect();
+        // After the rows (live: the customized rows, then Reset all).
+        crate::ui_script::note_control("Reset all", "button", serde_json::json!(true));
         let list = div()
             .id("kb-list")
             .mt(px(11.))
@@ -741,14 +744,20 @@ impl PreferencesView {
         let s = shortcuts::current();
         let entry = ed.entry;
         let changed = ed.changed();
-        let conflict = ed.pressed.as_ref().and_then(|k| s.conflict_for(entry, k));
+        let conflicts = ed.pressed.as_ref().map(|k| s.conflicts_for(entry, k)).unwrap_or_default();
         let can_reset = s.is_customized(entry);
         let width = f32::from(window.viewport_size().width);
         let left = ((width - POPUP_W) / 2.0 - NAV_W - CONTENT_PAD).max(0.0);
         let text = ed.pressed.as_deref().map(shortcuts::key_text).unwrap_or_default();
+        // The alert as the page's message, its names after the sentence (live prefs-shortcut-edit-conflict).
+        match conflicts.as_slice() {
+            [] => {}
+            [o] => crate::ui_script::note_message(conflict_text(o.name)),
+            many => crate::ui_script::note_message(format!("{} {}", conflict_text(""), many.iter().map(|o| o.name).collect::<Vec<_>>().join(" "))),
+        }
         crate::ui_script::note_dialog(|| {
-            let alert = conflict.map(|o| format!("This combination is already in use by {0}. Confirming the changes will disable the shortcut {0}.", o.name));
-            serde_json::json!({ "kind": "modal", "title": format!("Edit shortcut: {}", entry.name), "fields": [{ "label": "Shortcut", "kind": "input", "value": text }, { "label": "Disable shortcut", "kind": "checkbox", "value": ed.disable }], "buttons": ["Confirm", "Cancel", "Reset to default"], "ok": if changed { "enabled" } else { "disabled" }, "text": alert.into_iter().collect::<Vec<_>>() })
+            let disabled: Vec<&str> = [(!changed).then_some("Confirm"), (!can_reset).then_some("Reset to default")].into_iter().flatten().collect();
+            serde_json::json!({ "kind": "modal", "title": format!("Edit shortcut: {}", entry.name), "fields": [{ "label": "Shortcut", "kind": "input", "value": text }, { "label": "Disable shortcut", "kind": "checkbox", "value": ed.disable }], "buttons": ["Confirm", "Cancel", "Reset to default"], "disabled": disabled, "ok": if changed { "enabled" } else { "disabled" }, "text": "Press desired key combination and confirm" })
         });
         // ✓: green `#009400` (faded until something changed), ✕: `#bd3039`.
         let ok = div()
@@ -799,7 +808,12 @@ impl PreferencesView {
             }))
             .when(ed.info, |d| d.child(invalid_keys_popover(cx)));
         let echo = ed.pressed.as_ref().map(|k| h_flex().mt(px(12.)).h(px(26.)).justify_center().gap(px(4.)).children(shortcuts::key_chips(k).into_iter().map(|c| key_chip(c, KeyStyle::Customized))));
-        let alert = conflict.map(|o| {
+        let alert = (!conflicts.is_empty()).then(|| {
+            let names: Vec<&'static str> = conflicts.iter().map(|o| o.name).collect();
+            let sentence = match names.as_slice() {
+                [one] => StyledText::new(conflict_text(one)).with_highlights(bold_names(one)).into_any_element(),
+                _ => v_flex().child(conflict_text("")).children(names.iter().map(|n| div().font_weight(FontWeight::BOLD).child(*n))).into_any_element(),
+            };
             h_flex()
                 .mt(px(12.))
                 .mx(px(10.))
@@ -820,7 +834,7 @@ impl PreferencesView {
                         .text_size(px(14.))
                         .line_height(px(21.))
                         .text_color(pal.text)
-                        .child(StyledText::new(format!("This combination is already in use by {0}. Confirming the changes will disable the shortcut {0}.", o.name)).with_highlights(bold_names(o.name))),
+                        .child(sentence),
                 )
         });
         let disable = ed.disable;
@@ -988,6 +1002,7 @@ impl PreferencesView {
                     asm.save();
                     this.asm_toolbar = asm;
                     this.toolbar_dirty = false;
+                    crate::prefs_general::toast(crate::i18n::tr("Shortcut toolbar settings updated."), cx);
                     cx.notify();
                 }))
             })))
@@ -1058,9 +1073,19 @@ const CROSS: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20
 /// The context menu key (≣) of the invalid keys list.
 const MENU_KEY: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M1.25 1.25h17.5V20H1.25zm1.25 1.25v16.25h15V2.5z"/><path d="M5 6.25h10V7.5H5zM5 10h10v1.25H5zm0 3.75h10V15H5z"/></svg>"#;
 
+/// The Edit shortcut popup's alert: one other action on the key by name; several ("" here) by "multiple shortcuts",
+/// their names listed under it.
+fn conflict_text(name: &str) -> String {
+    if name.is_empty() {
+        "This combination is already in use by multiple shortcuts. Confirming the changes will disable the shortcuts.".into()
+    } else {
+        format!("This combination is already in use by {name}. Confirming the changes will disable the shortcut {name}.")
+    }
+}
+
 /// Bold ranges for the conflict alert's action names.
 fn bold_names(name: &str) -> Vec<(std::ops::Range<usize>, HighlightStyle)> {
-    let text = format!("This combination is already in use by {name}. Confirming the changes will disable the shortcut {name}.");
+    let text = conflict_text(name);
     let bold = HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() };
     text.match_indices(name).map(|(i, m)| (i..i + m.len(), bold)).collect()
 }

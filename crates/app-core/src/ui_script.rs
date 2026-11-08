@@ -232,6 +232,26 @@ pub fn note_dialog_fields(title: &str) {
     note_dialog(|| serde_json::json!({ "title": title, "kind": "other", "tabs": [], "fields": fields, "error": null, "ok": "enabled" }));
 }
 
+fn message_slot() -> &'static Mutex<Option<String>> {
+    static M: OnceLock<Mutex<Option<String>>> = OnceLock::new();
+    M.get_or_init(Default::default)
+}
+
+/// An alert drawn now that live's recorder reads as the page's `message` (the Edit shortcut popup's conflict).
+pub fn note_message(text: String) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut m) = message_slot().lock() {
+        *m = Some(text);
+    }
+}
+
+/// The alert noted since the last [`clear_dialog`].
+pub fn noted_message() -> Option<String> {
+    message_slot().lock().ok()?.clone()
+}
+
 /// Whether the noted dialog is a [`note_modal`] one, which takes the buttons drawn after it ([`note_button`]).
 static TITLE_ONLY_MODAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -272,6 +292,9 @@ pub fn clear_dialog() {
         *d = None;
     }
     TITLE_ONLY_MODAL.store(false, std::sync::atomic::Ordering::Relaxed);
+    if let Ok(mut m) = message_slot().lock() {
+        *m = None;
+    }
     DIALOG_PINNED.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut f) = fields_slot().lock() {
         f.clear();

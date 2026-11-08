@@ -1,0 +1,21 @@
+{
+ "name": "docs-columns-panel",
+ "about": "+ Add: the column chooser, then + Add again closes it",
+ "area": "studios",
+ "source": "universe documents documents-page-add-column-chooser (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  }
+ ]
+}

@@ -2179,7 +2179,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                     }),
             );
         }
-        os::modal(dialog, "", 640.)
+        os::modal(dialog, "Revision history", 640.)
             .title(v_flex().child(div().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).child("Revision history")).child(div().text_size(px(12.)).text_color(pal.text_muted).child(part_number.clone())))
             .child(rows)
             .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("rh-close", "Close", cx))))

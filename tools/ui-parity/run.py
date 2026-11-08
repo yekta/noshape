@@ -165,7 +165,8 @@ def all_differences(a, b, path=""):
 
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
 CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
-              "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug"}
+              "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
+              "Import from"}
 
 
 def normalize_live(state):
@@ -311,8 +312,9 @@ def cloud_menu(a, b):
 STARTS = {}
 
 
-# Rows only a local app has (a document's file in the OS's file manager; user 11-07): not compared.
-LOCAL_ROWS = {"Show in folder", "Show in Explorer", "Show in Finder"}
+# Rows only a local app has (a document's file in the OS's file manager, the command line and coding agents; user 11-07):
+# not compared.
+LOCAL_ROWS = {"Show in folder", "Show in Explorer", "Show in Finder", "Install command line tool…", "Connect to coding agents…"}
 
 
 # Rows that depend on what the clipboard held before the scenario (live's runner keeps one browser session, so a copy
@@ -333,6 +335,20 @@ def copies(live):
 # Rows only Onshape's paid plans show (live's account is free: its Show analysis tools menu has no Thickness
 # analysis); ours has them, as parity is behaviour, not a plan's limits. Not compared.
 PLAN_ROWS = {"Thickness analysis…", "Edit thickness analysis", "Turn thickness analysis off"}
+
+
+def fold_start_edits(state):
+    """A start's sketch is one history row in live's REST-built starts (and after a sketch's ✓ in the UI); ours' start
+    builder adds its shapes in a second edit: its "<tab> :: Edit : <sketch>" right after "<tab> :: Insert feature :
+    <sketch>" is folded into that row (on both sides)."""
+    doc = (state or {}).get("document")
+    rows = doc.get("history") if isinstance(doc, dict) else None
+    if not isinstance(rows, list):
+        return state
+    # (Newest first: the edit is the row before its insert.)
+    names = [r.get("name") if isinstance(r, dict) else None for r in rows]
+    doc["history"] = [r for i, r in enumerate(rows) if not (isinstance(names[i], str) and " :: Edit : " in names[i] and i + 1 < len(rows) and names[i + 1] == names[i].replace(" :: Edit : ", " :: Insert feature : "))]
+    return state
 
 
 def drop_rows(state, drop):
@@ -375,7 +391,7 @@ def compare(live, ours, whole_document=True):
         if str(live.get("recorded", "")) < PANEL_DIALOGS_SINCE and a.get("dialog") is None and is_panel_dialog(b.get("dialog")):
             b["dialog"] = None
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
-        a, b = drop_rows(a, drop), drop_rows(b, drop)
+        a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
         # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
         for side in (a, b):

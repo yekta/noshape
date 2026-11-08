@@ -235,6 +235,11 @@ impl Shortcuts {
         entries(e.tab).find(|o| o.id != e.id && self.active_key(o).as_deref() == Some(key))
     }
 
+    /// Every other action of `e`'s tab on `key` (the Edit shortcut popup's alert lists them all).
+    pub fn conflicts_for(&self, e: &Entry, key: &str) -> Vec<&'static Entry> {
+        entries(e.tab).filter(|o| o.id != e.id && self.active_key(o).as_deref() == Some(key)).collect()
+    }
+
     /// Two actions of the tab run on this action's key (Onshape's ❗).
     pub fn has_conflict(&self, e: &Entry) -> bool {
         self.active_key(e).is_some_and(|k| self.conflict_for(e, &k).is_some())

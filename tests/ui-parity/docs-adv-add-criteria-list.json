@@ -1,0 +1,25 @@
+{
+ "name": "docs-adv-add-criteria-list",
+ "about": "Advanced search › Add criteria: its list, Esc",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-add-criteria-creator-published-featurescript-vend (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Add criteria"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

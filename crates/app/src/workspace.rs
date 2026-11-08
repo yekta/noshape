@@ -84,7 +84,7 @@ pub struct Workspace {
     /// Tab being renamed (tab › Rename, double-click).
     renaming_tab: Option<(TabId, Entity<gpui_kit::component::input::InputState>, Subscription)>,
     /// The navbar's document name being renamed inline (a click on it, ☰ › Rename document).
-    renaming_doc: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    renaming_doc: Option<(Entity<gpui_kit::component::input::InputState>, Subscription, std::time::Instant)>,
     /// A tab being dragged along the bar (live qa5 TABS1).
     tab_gap: Option<TabGap>,
     /// ☰ › Workspace units… panel.
@@ -486,14 +486,6 @@ impl Workspace {
         }
     }
 
-    /// Whether the active Variable Studio holds the focus itself, no field of it (ui-parity: live's page body).
-    pub(crate) fn ui_variables_hold_focus(&self, window: &Window, cx: &App) -> bool {
-        match self.active.and_then(|t| self.views.get(&t)) {
-            Some(TabView::Variables(v)) => v.read(cx).focus_handle(cx).is_focused(window),
-            _ => false,
-        }
-    }
-
     /// The active Feature Studio's editor state (ui-parity driver), if it is one.
     pub(crate) fn ui_feature_studio_state(&self, cx: &App) -> Option<serde_json::Value> {
         match self.active.and_then(|t| self.views.get(&t)) {
@@ -542,7 +534,7 @@ impl Workspace {
     /// when no studio reads it.
     pub(crate) fn ui_rename_focus(&self, window: &Window, cx: &App) -> Option<serde_json::Value> {
         // The navbar's name field (live: a "field" with the name, all selected).
-        if let Some((st, _)) = self.renaming_doc.as_ref() {
+        if let Some((st, ..)) = self.renaming_doc.as_ref() {
             let st = st.read(cx);
             if st.focus_handle(cx).is_focused(window) {
                 let mut f = noshape_app_core::ui_script::field_focus("", st);
@@ -728,7 +720,11 @@ impl Workspace {
     /// it renames the document, Esc keeps the name.
     fn start_doc_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         use gpui_kit::component::input::{InputEvent, InputState};
-        if self.renaming_doc.is_some() {
+        if let Some((st, ..)) = &self.renaming_doc {
+            st.update(cx, |s, cx| {
+                s.focus(window, cx);
+                s.select_all(window, cx);
+            });
             return;
         }
         let name = self.doc.read(cx).name();
@@ -752,7 +748,7 @@ impl Workspace {
             s.focus(window, cx);
             s.select_all(window, cx);
         });
-        self.renaming_doc = Some((st, sub));
+        self.renaming_doc = Some((st, sub, std::time::Instant::now()));
         cx.notify();
     }
 
@@ -855,9 +851,18 @@ impl Workspace {
                     )
                     .child(self.render_doc_menu(cx))
                     .child(match self.renaming_doc.as_ref() {
-                        Some((st, _)) => div()
+                        Some((st, _, started)) => div()
                             .flex_none()
                             .w(px(300.))
+                            // A double-click's second press (on the field the first one opened) keeps it all selected.
+                            .capture_any_mouse_down({
+                                let started = *started;
+                                move |_, _, cx| {
+                                    if started.elapsed() < std::time::Duration::from_millis(500) {
+                                        cx.stop_propagation();
+                                    }
+                                }
+                            })
                             .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                                 // Esc keeps the name: the field goes before its blur would rename.
                                 if ev.keystroke.key == "escape" {
@@ -881,7 +886,16 @@ impl Workspace {
                             .truncate()
                             .cursor_text()
                             .child(crate::ui::user_text(name))
-                            .when(!read_only && viewing_version.is_none(), |d| d.on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.start_doc_rename(window, cx))))
+                            .when(!read_only && viewing_version.is_none(), |d| {
+                                // A double-click's second press can reach the name before the field is drawn: it
+                                // stays here (the navbar would take the keyboard) and selects the field's text again.
+                                d.on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                                    if this.renaming_doc.is_some() {
+                                        cx.stop_propagation();
+                                    }
+                                }))
+                                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.start_doc_rename(window, cx)))
+                            })
                             .map(|d| noshape_app_core::ui_script::mark(d, || "navbar:name".into()))
                             .into_any_element(),
                     })
@@ -1489,7 +1503,12 @@ impl Workspace {
                     return;
                 }
                 let Some(g) = &mut this.tab_gap else { return };
-                let before = if kind.is_none() { None } else if e.event.position.x < e.bounds.center().x { Some(Some(id)) } else { Some(next) };
+                // Over a folder the gap stays put: closing it would slide the folder out from under the pointer, and
+                // the drop goes into the folder.
+                if kind.is_none() {
+                    return;
+                }
+                let before = if e.event.position.x < e.bounds.center().x { Some(Some(id)) } else { Some(next) };
                 if g.before != before {
                     g.before = before;
                     cx.notify();

@@ -1,0 +1,21 @@
+{
+ "name": "docs-columns-modified",
+ "about": "+ Add › Modified toggled (the table's columns)",
+ "area": "studios",
+ "source": "universe documents documents-page-column-chooser-modified (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Modified"
+   }
+  }
+ ]
+}

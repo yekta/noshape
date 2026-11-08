@@ -93,6 +93,8 @@ pub struct HistoryPanel {
     /// The search ▾ filter panel (live documents/117): open, the fields
     /// being edited, and the filter its Search button applied.
     filter_open: bool,
+    /// When a press outside closed the filter panel: the caret's click of that same press keeps it closed.
+    filter_closed_at: Option<std::time::Instant>,
     filter_edit: HistoryFilter,
     filter: HistoryFilter,
     date_from: Entity<InputState>,
@@ -137,6 +139,7 @@ impl HistoryPanel {
             hide_merges: true,
             hide_auto_versions: true,
             filter_open: false,
+            filter_closed_at: None,
             filter_edit: HistoryFilter::default(),
             filter: HistoryFilter::default(),
             date_from,
@@ -275,6 +278,7 @@ impl HistoryPanel {
             .on_mouse_down_out(cx.listener(|t, _: &MouseDownEvent, _, cx| {
                 if !crate::os_menu::is_open(cx) {
                     t.filter_open = false;
+                    t.filter_closed_at = Some(std::time::Instant::now());
                     cx.notify();
                 }
             }))
@@ -594,8 +598,9 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
     window.open_dialog(cx, move |dialog, _, cx| {
         let create = create.clone();
         let title = if in_document { version_dialog_title_in(&doc_name, &branch) } else { version_dialog_title("Create version from", &branch) };
+        let text = if in_document { format!("Create version in {doc_name} {branch}") } else { format!("Create version from {branch}") };
         let (create2, edit_after) = (create.clone(), edit_after.clone());
-        os::modal(dialog, "", 950.)
+        os::modal(dialog, text, 950.)
             .title(title)
             .child(version_dialog_body(&name, &desc, None))
             .when(has_fs, |d| d.child(publish_row(publish.clone(), cx)))
@@ -679,7 +684,7 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
         let create = create.clone();
         let open = open.clone();
         let (create2, edit_after) = (create.clone(), edit_after.clone());
-        os::modal(dialog, "", 950.)
+        os::modal(dialog, format!("Create workspace from {from_name}"), 950.)
             .title(version_dialog_title("Create workspace from", &from_name))
             .child(version_dialog_body(&name, &desc, Some(open)))
             .footer(
@@ -792,7 +797,7 @@ fn open_publish_dialog(doc: Entity<DocModel>, id: noshape_store::VersionId, wind
             };
             h_flex().h(px(22.)).gap(px(4.)).child(mark).child(div().child(*text))
         });
-        os::modal(dialog, "", 598.)
+        os::modal(dialog, format!("Publish custom features and tables at {}", info.name), 598.)
             .title(version_dialog_title_w("Publish custom features and tables at", &info.name, 598.))
             .child(
                 v_flex()
@@ -1306,10 +1311,10 @@ impl Render for HistoryPanel {
                 // to create workspace…, Compare, Restore to <ws>…, Properties…,
                 // Releases ▸, Publish FeatureScript… (Copy link is web-only).
                 let (dr0, row_packages) = (d.clone(), row_packages.clone());
-                // A version row always lists Releases (live ver-version-menu), greyed with none.
+                // A version row always lists Releases (live ver-version-menu); with none, its submenu says so.
                 let releases = move |m: crate::os_menu::OsMenu, version_row: bool, window: &mut Window, cx: &mut Context<crate::os_menu::OsMenu>| {
                     if row_packages.is_empty() {
-                        return if version_row { m.item(crate::os_menu::OsMenuItem::new("Releases").disabled(true)) } else { m };
+                        return if version_row { m.submenu("Releases", window, cx, |sm, _, _| sm.item(crate::os_menu::OsMenuItem::new("No releases").disabled(true))) } else { m };
                     }
                     let (pk, dr) = (row_packages.clone(), dr0.clone());
                     m.submenu("Releases", window, cx, move |mut sm, _, _| {
@@ -1494,6 +1499,10 @@ impl Render for HistoryPanel {
                                     .cursor_pointer()
                                     .child(os::glyph(os::GLYPH_CARET, 10., pal.text))
                                     .on_click(cx.listener(|t, _: &ClickEvent, _, cx| {
+                                        // The press that just closed it (outside the panel) doesn't reopen it.
+                                        if t.filter_closed_at.take().is_some_and(|at| at.elapsed() < std::time::Duration::from_millis(700)) {
+                                            return;
+                                        }
                                         t.filter_open = !t.filter_open;
                                         cx.notify();
                                     })),

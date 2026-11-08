@@ -45,6 +45,17 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   read "none"; studios' whole-document starts open on Part Studio 1. run.py: cloud rows (Copy link, Share…,
   Applications, CAM / PCB / Render Studio, tutorials, Explore Onshape, What's new, Forums, Report a bug) dropped;
   live's "Add feature" history rows and "live2 uip <start> <time>" names normalized.
+- Then (second land): Preferences confirm every save with live's toast (recorded as `message`), the Edit shortcut
+  popup's conflict lists every action on the key ("multiple shortcuts"), Reset all after the customized rows, the
+  export rule's Convention not focused on open; `selection` null on pages; modal titles with custom headers named
+  (Create version from / Create workspace from / Merging changes into … from … / Workspace protection for … /
+  Publish custom features and tables at … / Revision history); version rows' Releases a submenu ("No releases");
+  the history filter's ▾ closes the panel it opened; a Variable Studio tab reads focus "none" unless a field has
+  the keyboard; hovering a folder tab keeps the drag's gap (the folder no longer slides from under the pointer, so
+  the drop files the tab); the navbar's double-click rename keeps the field all selected. run.py folds a start
+  sketch's "Edit" row into its "Insert feature" row (ours' start builder adds shapes in a second edit).
+  doc-branches' B1 stays from Main's head (live's B1 has Sketch 2 / Extrude 2: live2's note was wrong there).
+- Coverage batch 4: 18 docs-* (+ Add column chooser, Advanced search fields, Reset / Search): documents 72.2 %.
 - Asked live (REQUESTS, batch 2+3 request): Export… missing on tab menus (export quota throttled?), tab double-click
   rename, the drag drop point, the Tabs panel left open at some starts.
 - Open decisions (lead): Help menu (live: Help, FeatureScript documentation, System check are web pages; ours has

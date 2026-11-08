@@ -1,0 +1,31 @@
+{
+ "name": "docs-adv-name",
+ "about": "Advanced search › Name \"uip\", Search",
+ "area": "studios",
+ "source": "universe documents documents-page-advanced-search-name (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "uip"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Search"
+   }
+  }
+ ]
+}

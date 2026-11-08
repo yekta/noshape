@@ -569,7 +569,16 @@
    "where": "documents page › right above the table",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-select-all-tri-state",
@@ -578,7 +587,21 @@
    "where": "documents page › + Add panel header",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "All columns"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-search",
@@ -596,7 +619,21 @@
    "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Modified"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-modified-by",
@@ -605,7 +642,21 @@
    "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Modified by"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-owned-by",
@@ -614,7 +665,21 @@
    "where": "documents page › + Add panel (checkbox, on by default; global, persists)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Owned by"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-type",
@@ -623,7 +688,21 @@
    "where": "documents page › + Add panel (checkbox, off by default; global, persists)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Type"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-description",
@@ -632,7 +711,21 @@
    "where": "documents page › + Add panel (checkbox, off by default; global, persists)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Description"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-drag-a-column-s-grip-to-reorder",
@@ -671,7 +764,16 @@
    "where": "documents page › caret in the search box",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:45"
+   "source": "behaviours.md:45",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-type-multi-select-chips-document-part-part-studio",
@@ -680,7 +782,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Type"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-name",
@@ -689,7 +805,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Name"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-description",
@@ -698,7 +828,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Description"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-part-number",
@@ -707,7 +851,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Part number"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-state",
@@ -716,7 +874,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "State"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-revision",
@@ -725,7 +897,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Revision"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-add-criteria-creator-published-featurescript-vend",
@@ -734,7 +920,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Add criteria"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-results-from-workspaces-versions-all",
@@ -743,7 +943,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Results from"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-latest",
@@ -752,7 +966,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Results at"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-reset",
@@ -761,7 +989,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "button": "Reset"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-search",
@@ -770,7 +1012,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "button": "Search"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-advanced-search-help",

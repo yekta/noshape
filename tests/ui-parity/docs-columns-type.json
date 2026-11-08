@@ -1,0 +1,21 @@
+{
+ "name": "docs-columns-type",
+ "about": "+ Add › Type toggled (the table's columns)",
+ "area": "studios",
+ "source": "universe documents documents-page-column-chooser-type (studios 11-08, coverage batch 4)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Type"
+   }
+  }
+ ]
+}
