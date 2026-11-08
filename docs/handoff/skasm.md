@@ -1,6 +1,6 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
-## From dx (11-08 07:09 UTC): c2-sm-corner-break's Corner break 1 now translates, ours fails
+## From dx (11-08 07:09 UTC): c2-sm-corner-break's Corner break 1 now translates, ours fails (fixed 11-08 07:45: 11/11)
 Live's refs.jsonl (REQUESTS 2290) places all 40 of its vertices: corners of the sheet metal part RnCD itself (e.g.
 SCCAD (0.663, 0.3615, 0.02), SCC4H (-0.66298, 0.37229, 0.05707)); the translator maps them to our part's vertices.
 Ours then fails: ERROR "Failed to break selected corners." (live OK: 222/548/328, ours stays 182/428/248). Fillet
@@ -8,7 +8,7 @@ corner break, radius 5 mm. Run: `NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/mode
 cargo test -p noshape-ops --release --test all parity::parity_models -- --ignored --nocapture` (vibe4). c2-sm-louver's
 Sketch 9 builds now too (its plane S2E6G from refs.jsonl); it still stops at feature 6 (above).
 
-## From dx (11-08 06:26 UTC): c2-sm-louver feature 6 "Louver" is sheet metal, not translation
+## From dx (11-08 06:26 UTC): c2-sm-louver feature 6 "Louver" is sheet metal, not translation (answered 11-08 07:45: the UI fetch's PLANE label, live 2143; see Resume here)
 The translation is live's: an extrude-process sheet metal model of Sketch 3's chain (Uzf…, eUw…, XXK…, FI7…: 25.2,
 8.5, 23.8, 23.8 mm; live's 85969 mm³ = 1.628 × 687.6 × ~76.8 mm developed, the whole chain). The chain is nearly
 straight: XXK… runs at 44.27° between neighbours at 45° (two 0.73° kinks; Uzf-eUw collinear; plus a zero-length line).
@@ -61,6 +61,19 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
 - 2026-11-07 18:24 UTC: the assembly suite passes live's per-studio `<element>.live.jsonl` (live2 11-07) to the translator as its refs
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
+
+## Resume here (2026-11-08 08:40 UTC)
+- **c2-sm-corner-break 6 -> 11/11** (dx's item 1): Corner break on a definition face's hole corners (the louver panel's
+  40 slot and flange-tip corners): `sm_flat::broken_loop` rounds a corner of any loop, the face rebuilt with its holes,
+  every corner of a sheet broken before one sew. A slot with rounded corners and a bend on a side keeps its arcs: the
+  pulled side added as strips fused to the exact hole (sheetmetal.rs; the polygon of `wall_loop` made each arc two
+  chords, 20 planes for 40 cylinders). T2 sheetmetal_std corner_break_rounds_a_slots_corners_beside_its_flange. Suite
+  732 -> 754/951 with others' lands, 71 -> 74/87, nothing lower; louver / fill-pattern A/B unchanged. The document
+  regenerates in ~2.6 s against live's 1.97 (Corner break 0.89 s, live 0.75; Flange 1 / Extrude 2 ~0.7 s each).
+- **c2-sm-louver feature 6 (dx's item 2) is the UI fetch, not ours**: live.jsonl is the UI method (source.json:
+  "surface PLANE when all facet normals agree", chord 0.1 mm / 0.1 rad), and live 2143 read /bodydetails at that
+  rollback: REBu is a CYLINDER R 1.628 (55.935 mm²), 18 planes + 4 cylinders, as ours. The strips are each bend's one
+  facet (0.08 / 0.16 mm wide = R θ and (R + t) θ). Needs the comparison to trust only REST surface types (dx).
 
 ## Resume here (2026-11-08 05:50 UTC)
 - **Constraint refusals as live (2270), SKETCH-SPLINE-HANDLE-ARM closed**: `constraint_command` refuses a selection a

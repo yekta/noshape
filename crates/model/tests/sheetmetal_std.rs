@@ -532,6 +532,51 @@ fn corner_break_fillets_a_free_corner() {
     assert!((flat.area() * 1e6 - expected / 2.0).abs() < 1e-4, "flat area {}", flat.area() * 1e6);
 }
 
+/// Corner break of a slot's corners (live c2-sm-corner-break: a louver panel's slots, a flange on one side of each):
+/// each corner rounded in the flat, the slot pulled back from its flange's bend as before.
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn corner_break_rounds_a_slots_corners_beside_its_flange() {
+    let mut s = plate("2 mm");
+    s.ok();
+    let mut sk = noshape_sketch::Sketch::new();
+    sk.corner_rectangle(glam::DVec2::new(mm(20.0), mm(10.0)), glam::DVec2::new(mm(40.0), mm(30.0)));
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let sk = r.display.sketches.iter().find(|x| x.feature == sketch).expect("sketch");
+    let key = sk.regions.iter().min_by(|a, b| a.area.total_cmp(&b.area)).expect("region").key.clone();
+    s.add("extrude", |p| {
+        p.set("entities", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        p.set("operationType", en("REMOVE"));
+        p.set("defaultScope", ParamValue::Bool(true));
+        p.set("endBound", en("THROUGH_ALL"));
+    });
+    let r = s.ok();
+    let edge = edge_at(&r, DVec3::new(30.0, 30.0, 2.0));
+    s.add("sheetMetalFlange", |p| {
+        p.set("edges", ParamValue::Query(vec![edge]));
+        p.set("distance", expr("10 mm"));
+    });
+    let r = s.ok();
+    let before = volume_mm3(&r);
+    let corners = vec![vertex_at(&r, DVec3::new(20.0, 10.0, 2.0)), vertex_at(&r, DVec3::new(40.0, 10.0, 2.0))];
+    s.add("sheetMetalCornerBreak", move |p| {
+        p.set("entities", ParamValue::Query(corners.clone()));
+        p.set("blendType", en("FILLET"));
+        p.set("radius", expr("5 mm"));
+    });
+    let r = s.ok();
+    assert_eq!(r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid).count(), 1, "one part: {:#?}", face_report(&r));
+    let rounds = r.context.bodies[part(&r)].shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 5e-3).abs() < 1e-9)).count();
+    assert_eq!(rounds, 2, "{:#?}", face_report(&r));
+    // Each rounded corner fills (r² − πr²/4) × t of the slot.
+    let filled = 2.0 * (25.0 - std::f64::consts::PI * 25.0 / 4.0) * 2.0;
+    assert!((volume_mm3(&r) - before - filled).abs() < 1e-3, "{} mm³ after, {before} before", volume_mm3(&r));
+}
+
 /// Live (qa5 workflow 27): Bend of a 60 × 40 × 2 plate, radius 2, along a
 /// line (30,0)→(30,40) on its top: 4812.566370614357 mm³, 14 faces; x < 30
 /// stays, the wall rises at x 29.7223453..31.7223453.

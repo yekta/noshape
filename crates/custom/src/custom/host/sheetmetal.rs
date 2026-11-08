@@ -1765,6 +1765,29 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
                     }
                 }
             }
+            // A slot with rounded corners (a Corner break's arcs, live c2-sm-corner-break): kept exact, the pulled
+            // sides added as strips beyond it.
+            if hl.curved.iter().any(|c| *c) {
+                let mut with = vec![hole.clone()];
+                for (j, &off) in pull.iter().enumerate() {
+                    if off >= -TOL || hl.curved[j] {
+                        continue;
+                    }
+                    let (a, b) = (hl.pts[j], hl.pts[(j + 1) % m]);
+                    let u = inward(&hl, hn, j);
+                    let quad = [a - u * off, b - u * off, b + u * off, a + u * off];
+                    if let Ok(f) = k::make_polyline(&quad, true).and_then(|w| k::make_face(&k::Plane::new(a, hn, (b - a).normalize()), &w, &[])) {
+                        with.push(f);
+                    }
+                }
+                let fused = k::boolean(k::BooleanOp::Fuse, &with[..1], &with[1..], &k::BooleanOptions { unify: true, ..Default::default() });
+                if let Ok(r) = fused
+                    && let [f] = r.shape.faces().as_slice()
+                {
+                    *hole = f.clone();
+                    continue;
+                }
+            }
             let pts = outline_points(&pulled_sides(&hl, hn, &pull));
             if let Ok(f) = k::make_polyline(&pts, true).and_then(|w| k::make_face_from_wire(&w, true)) {
                 *hole = f;

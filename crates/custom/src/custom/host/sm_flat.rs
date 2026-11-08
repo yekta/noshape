@@ -4,8 +4,8 @@
 //! picked part vertex or edge (they share its association attribute). The
 //! corner's two straight sides are cut back and joined by a tangent arc
 //! (fillet, `radius`) or a line (equal-offsets chamfer, `width`).
-//! Corners of one planar definition face are supported (a wall's free
-//! corner); corners next to bends are not yet.
+//! Corners of a planar definition face's loops are supported (a wall's free
+//! corner, a hole's corner); corners next to bends are not yet.
 
 use super::query::{Ent, QueryCx, evaluate_refs};
 use super::sheetmetal::{associations, sm_attribute};
@@ -74,23 +74,28 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
         return Err(i.error("sheetMetalApplyInFlat: no sheet metal corner selected"));
     }
     run_op(i, &cx, &id, "SHEET_METAL_CORNER_BREAK_FAILED", |ev| {
-        for (body_id, v) in &corners {
+        // Every corner of a sheet broken first, then sewn once (a louver panel's 40 slot corners).
+        let mut ids: Vec<&BodyId> = Vec::new();
+        for (b, _) in &corners {
+            if !ids.contains(&b) {
+                ids.push(b);
+            }
+        }
+        for body_id in ids {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| &b.id == body_id) else { continue };
             let body = ev.ctx.bodies[bi].clone();
-            let faces = body.shape.faces();
-            let mut changed = false;
-            let mut built = Vec::new();
-            for f in &faces {
-                match break_corner(f, *v, how)? {
-                    Some(nf) => {
-                        built.push(nf);
+            let mut built = body.shape.faces();
+            for (_, v) in corners.iter().filter(|(b, _)| b == body_id) {
+                let mut changed = false;
+                for f in built.iter_mut() {
+                    if let Some(nf) = break_corner(f, *v, how)? {
+                        *f = nf;
                         changed = true;
                     }
-                    None => built.push(f.clone()),
                 }
-            }
-            if !changed {
-                return err("Corner break is only supported at a wall's free corner yet");
+                if !changed {
+                    return err("Corner break is only supported at a wall's free corner yet");
+                }
             }
             let (shape, names) = resewn(&built, &body.faces)?;
             ev.replace_body(bi, shape, names);
@@ -100,33 +105,61 @@ fn sheet_metal_apply_in_flat(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     Ok(Value::Undefined)
 }
 
-/// Face `f` with its corner at `v` broken, if `v` is a corner of `f`
-/// between two straight sides.
+/// Face `f` with its corner at `v` broken, if `v` is a corner of one of its loops (the outer one, or a hole's: live's
+/// c2-sm-corner-break rounds its louver slots' corners) between two straight sides.
 fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
-    let Some(_) = f.face_plane().map_err(fe)? else { return Ok(None) };
+    let Some(pl) = f.face_plane().map_err(fe)? else { return Ok(None) };
+    let size = |w: &Shape| w.bounding_box(false).map_or(0.0, |b| b.diagonal());
     let wires = f.wires();
-    let [wire] = wires.as_slice() else { return Ok(None) };
-    // The outer loop's corners, chained; only straight sides.
-    let mut segs: Vec<(DVec3, DVec3)> = Vec::new();
-    for e in wire.edges() {
-        let info = e.edge_info().map_err(fe)?;
-        if !matches!(info.curve, k::Curve::Line { .. }) {
-            return Ok(None);
+    let Some(outer) = wires.iter().max_by(|a, b| size(a).total_cmp(&size(b))).cloned() else { return Ok(None) };
+    let mut loops: Vec<Shape> = Vec::with_capacity(wires.len());
+    let mut broken = false;
+    for w in &wires {
+        match (broken, broken_loop(w, v, how)?) {
+            (false, Some(nw)) => {
+                broken = true;
+                loops.push(nw);
+            }
+            _ => loops.push(w.clone()),
         }
-        segs.push((info.start, info.end));
     }
-    let (first, mut at) = segs.swap_remove(0);
-    let mut pts = vec![first];
-    while !segs.is_empty() {
-        let Some(k) = segs.iter().position(|(a, b)| a.distance(at) < TOL || b.distance(at) < TOL) else { return Ok(None) };
-        let (a, b) = segs.swap_remove(k);
-        pts.push(at);
-        at = if a.distance(at) < TOL { b } else { a };
+    if !broken {
+        return Ok(None);
     }
-    let m = pts.len();
-    let Some(k) = pts.iter().position(|p| p.distance(v) < TOL) else { return Ok(None) };
-    let (prev, next) = (pts[(k + m - 1) % m], pts[(k + 1) % m]);
-    let (d1, d2) = ((prev - v).normalize(), (next - v).normalize());
+    let k = wires.iter().position(|w| w.is_same(&outer)).unwrap_or(0);
+    let outer = loops.remove(k);
+    let normal = |s: &Shape| -> FResult<DVec3> {
+        let [u0, u1, v0, v1] = s.uv_bounds().map_err(fe)?;
+        s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)
+    };
+    let n = normal(f)?;
+    let mut face = k::make_face(&k::Plane::new(pl.origin, n, pl.unit_x()), &outer, &loops).map_err(fe)?;
+    if normal(&face)?.dot(n) < 0.0 {
+        face = face.reversed().map_err(fe)?;
+    }
+    Ok(Some(face))
+}
+
+/// Loop `wire` with its corner at `v` broken, if `v` is one of its corners between two straight sides (its other
+/// edges kept as they are: a corner broken before stays).
+fn broken_loop(wire: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
+    let edges = wire.edges();
+    let mut lines: Vec<(DVec3, DVec3, bool)> = Vec::with_capacity(edges.len());
+    for e in &edges {
+        let info = e.edge_info().map_err(fe)?;
+        lines.push((info.start, info.end, matches!(info.curve, k::Curve::Line { .. })));
+    }
+    // The two sides at v: (edge, its far end).
+    let at_v: Vec<(usize, DVec3)> = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(j, (a, b, _))| if a.distance(v) < TOL { Some((j, *b)) } else if b.distance(v) < TOL { Some((j, *a)) } else { None })
+        .collect();
+    let [(e1, prev), (e2, next)] = at_v.as_slice() else { return Ok(None) };
+    if !lines[*e1].2 || !lines[*e2].2 {
+        return Ok(None);
+    }
+    let (d1, d2) = ((*prev - v).normalize(), (*next - v).normalize());
     let theta = d1.dot(d2).clamp(-1.0, 1.0).acos();
     if theta < 1e-6 || theta > std::f64::consts::PI - 1e-6 {
         return Ok(None);
@@ -139,34 +172,26 @@ fn break_corner(f: &Shape, v: DVec3, how: Break) -> FResult<Option<Shape>> {
         return err("The corner break is larger than the corner's sides");
     }
     let (p1, p2) = (v + d1 * reach, v + d2 * reach);
-    // The new loop: corner k replaced by p1 – (arc or line) – p2.
-    let mut edges = Vec::new();
-    for j in 0..m {
-        let (a, b) = (pts[j], pts[(j + 1) % m]);
-        let a = if j == k { p2 } else { a };
-        let b = if (j + 1) % m == k { p1 } else { b };
-        edges.push(k::make_line(a, b).map_err(fe)?);
-        if (j + 1) % m == k {
-            edges.push(match how {
-                Break::Fillet(r) => {
-                    let bis = (d1 + d2).normalize();
-                    let centre = v + bis * (r / (theta * 0.5).sin());
-                    k::make_arc_3pts(p1, centre - bis * r, p2).map_err(fe)?
-                }
-                Break::Chamfer(_) => k::make_line(p1, p2).map_err(fe)?,
-            });
+    let corner = match how {
+        Break::Fillet(r) => {
+            let bis = (d1 + d2).normalize();
+            let centre = v + bis * (r / (theta * 0.5).sin());
+            k::make_arc_3pts(p1, centre - bis * r, p2).map_err(fe)?
+        }
+        Break::Chamfer(_) => k::make_line(p1, p2).map_err(fe)?,
+    };
+    let mut out: Vec<Shape> = Vec::with_capacity(edges.len() + 1);
+    for (j, e) in edges.iter().enumerate() {
+        if j == *e1 {
+            out.push(k::make_line(*prev, p1).map_err(fe)?);
+        } else if j == *e2 {
+            out.push(k::make_line(p2, *next).map_err(fe)?);
+        } else {
+            out.push(e.clone());
         }
     }
-    let wire = k::make_wire(&edges).map_err(fe)?;
-    let mut face = k::make_face_from_wire(&wire, true).map_err(fe)?;
-    let normal = |s: &Shape| -> FResult<DVec3> {
-        let [u0, u1, v0, v1] = s.uv_bounds().map_err(fe)?;
-        s.normal_at_uv((u0 + u1) * 0.5, (v0 + v1) * 0.5).map_err(fe)
-    };
-    if normal(&face)?.dot(normal(f)?) < 0.0 {
-        face = face.reversed().map_err(fe)?;
-    }
-    Ok(Some(face))
+    out.push(corner);
+    Ok(Some(k::make_wire(&out).map_err(fe)?))
 }
 
 /// The faces sewn back into one sheet; each keeps its old face's name.
