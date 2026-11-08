@@ -40,7 +40,10 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - STEP now merges a part's faces on one cylinder, cone, sphere or torus as IGES did (the file split them; live's
   translator joins them), then the loop pieces their old seam left. "fan" 143 / 404 / 251 as live's; "fan blade"
   58 / 120 / 64 for 58 / 119 / 63: one blade edge stays in two smooth B-spline pieces (join_loop_pieces takes the
-  joint, its rebuild doesn't). Exchange suite: every "ours imports live.step" unchanged.
+  joint, its rebuild doesn't: join_loop_pieces wants each piece's pcurve range to be its curve's, which a STEP edge's
+  needn't be; it runs in every Boolean, so changing it needs bool's gate). Exchange suite: every "ours imports
+  live.step" unchanged. A part whose merged periodic face only closes through its seam (NIST's cap screw thread: the
+  Parasolid writer can't bound it) merges across planes only (`closes_without_seams`).
 
 ## From core (2026-11-08 20:07 UTC, lead): a STEP import's topology differs (TICKETS SUITE-FAN-BLADE-IMPORT)
 - c2-fan-blade-sweep's derived source 8b633129da85129b235a40b3 is one Import 1 (STEP): "fan blade" 68/155/95
