@@ -974,6 +974,41 @@ fn variable_fillet_messages_and_fillets_over_two_parts_as_live() {
     assert!(got.len() == 2 && near_mm3(got[0].0, 3845.4867) && got[0].1 == 7 && near_mm3(got[1].0, 1846.0446) && got[1].1 == 6, "C {got:?}");
 }
 
+/// Live 2333: Face blend's checks (std's checkParameters) in std's order, each an error with the part unchanged. Block
+/// A 40 × 30 × 20 at the origin, block B 20 × 20 × 20 at x 60; R 4, side 1 A's top, side 2 A's front unless told.
+#[test]
+fn face_blend_checks_as_live() {
+    let top = |body: &Body| face_with_normal(body, DVec3::Z);
+    let front = |body: &Body| face_with_normal(body, -DVec3::Y);
+    type Case = fn(&Body, &Body) -> Vec<(&'static str, ParamValue)>;
+    let cases: Vec<(Case, &str)> = vec![
+        (|a, b| vec![("side1", q(vec![face_with_normal(a, DVec3::Z), face_with_normal(b, DVec3::Z)]))], "Side 1 faces are from different bodies."),
+        (|a, b| vec![("side2", q(vec![face_with_normal(a, -DVec3::Y), face_with_normal(b, -DVec3::Y)]))], "Side 2 faces are from different bodies."),
+        (|_, _| vec![("crossSection", en("SWEPT_PROFILE"))], "Select spine of blend."),
+        (|a, _| vec![("crossSection", en("SWEPT_PROFILE")), ("spine", q(vec![edge_near(a, DVec3::new(0.02, 0.0, 0.02))])), ("propagation", b(true)), ("propagationType", en("TANGENT"))], "Spine face blends are incompatible with tangent propagation."),
+        (|a, _| vec![("crossSection", en("SWEPT_PROFILE")), ("spine", q(vec![edge_near(a, DVec3::new(0.02, 0.0, 0.02))])), ("propagation", b(true)), ("propagationType", en("CUSTOM")), ("propagationAngle", e("0 deg"))], "Spine face blends with propagation require a non-zero propagation angle."),
+        (|a, _| vec![("blendControlType", en("WIDTH")), ("width", e("6 mm")), ("tangentHoldLines", b(true)), ("tangentEdges", q(vec![edge_near(a, DVec3::new(0.02, 0.0, 0.02))]))], "Face blend with width control type cannot have hold lines or cliff edges."),
+        (|a, _| vec![("tangentHoldLines", b(true)), ("tangentEdges", q(vec![edge_near(a, DVec3::new(0.02, 0.03, 0.0))]))], "Hold lines and cliff edges must belong to a wall."),
+    ];
+    for (extra, want) in cases {
+        let mut t = T::new();
+        t.block(0.0, 0.0, 0.04, 0.03, "20 mm");
+        t.block(0.06, 0.0, 0.08, 0.02, "20 mm");
+        let res = t.ok();
+        let (block_a, block_b) = (&res.context.bodies[0], &res.context.bodies[1]);
+        let mut params: Vec<(&str, ParamValue)> = vec![("side1", q(vec![top(block_a)])), ("side2", q(vec![front(block_a)])), ("radius", e("4 mm"))];
+        for (k, v) in extra(block_a, block_b) {
+            params.retain(|(p, _)| *p != k);
+            params.push((k, v));
+        }
+        t.add("faceBlend", &params);
+        let res = t.regen();
+        let st = res.display.features.last().unwrap();
+        assert_eq!((st.status, st.message.as_deref()), (FeatureStatus::Error, Some(want)));
+        assert!(near(res.context.bodies[0].shape.volume().unwrap(), 0.04 * 0.03 * 0.02, 1e-9));
+    }
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).

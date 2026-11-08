@@ -554,12 +554,67 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
 // ------------------------------------------------------------------ face blend
 
 pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
+    use crate::regen::eval::err_at;
+    // std's checkParameters, in its order (live 2333's texts and fields).
+    let side1 = ev.resolve_faces(ev.query("side1"));
+    let side2 = ev.resolve_faces(ev.query("side2"));
+    let bodies_of = |faces: &[(usize, usize)]| faces.iter().map(|f| f.0).collect::<BTreeSet<usize>>();
+    if side1.is_empty() {
+        return err_at(&["side1"], "Select faces to blend.");
+    }
+    if bodies_of(&side1).len() > 1 {
+        return err_at(&["side1"], "Side 1 faces are from different bodies.");
+    }
+    if side2.is_empty() {
+        return err_at(&["side2"], "Select faces to blend.");
+    }
+    if bodies_of(&side2).len() > 1 {
+        return err_at(&["side2"], "Side 2 faces are from different bodies.");
+    }
+    let detach = ev.bool("detach");
+    let solids = bodies_of(&side1).union(&bodies_of(&side2)).any(|&b| ev.ctx.bodies[b].shape.count(ShapeType::Solid) > 0);
+    if matches!(ev.enum_("trim"), "LONG" | "NO_TRIM") && !detach && solids {
+        return err("Cannot attach long and no-trim blends to solid parts.");
+    }
     let swept = ev.is("crossSection", "SWEPT_PROFILE");
-    let spine_dir = if swept {
-        let Some(r) = ev.query("spine").first() else { return crate::regen::eval::err_at(&["spine"], "Select spine of blend.") };
-        Some(ev.resolve_axis(r).ok_or_else(|| fe("The spine must be a straight edge"))?.1)
-    } else {
-        None
+    if swept {
+        if ev.query("spine").is_empty() {
+            return err_at(&["spine"], "Select spine of blend.");
+        }
+        if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
+            return err_at(&["propagationAngle"], "Spine face blends are incompatible with tangent propagation.");
+        }
+        if ev.bool("propagation") && ev.is("propagationType", "CUSTOM") && ev.angle("propagationAngle")? < 1e-9 {
+            return err_at(&["propagationAngle"], "Spine face blends with propagation require a non-zero propagation angle.");
+        }
+    }
+    let mut hold_ids: Vec<&str> = Vec::new();
+    if ev.bool("tangentHoldLines") {
+        hold_ids.extend(["tangentEdges", "inverseTangentEdges"]);
+    }
+    if ev.bool("conicHoldLines") {
+        hold_ids.extend(["conicEdges", "inverseConicEdges"]);
+    }
+    if ev.bool("hasCliffEdges") {
+        hold_ids.push("cliffEdges");
+    }
+    let hold_lines: Vec<(usize, usize)> = hold_ids.iter().flat_map(|id| ev.resolve_edges(ev.query(id))).collect();
+    if ev.is("blendControlType", "WIDTH") && !hold_lines.is_empty() {
+        return err_at(&["tangentEdges"], "Face blend with width control type cannot have hold lines or cliff edges.");
+    }
+    for &(b, e) in &hold_lines {
+        let ef = ev.ctx.bodies[b].shape.edge_faces()?;
+        let on_wall = ef.get(e).is_some_and(|fs| fs.iter().any(|&f| side1.contains(&(b, f as usize)) || side2.contains(&(b, f as usize))));
+        if !on_wall {
+            return err_at(&["tangentEdges"], "Hold lines and cliff edges must belong to a wall.");
+        }
+    }
+    let spine_dir = match swept {
+        true => {
+            let r = ev.query("spine")[0].clone();
+            Some(ev.resolve_axis(&r).ok_or_else(|| fe("The spine must be a straight edge"))?.1)
+        }
+        false => None,
     };
     let shape_kind = ev.enum_("crossSectionShape").to_string();
     // A ticked option with nothing picked blends as without it (as std).
@@ -576,16 +631,6 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     if let Some((what, _)) = used.iter().find(|(_, on)| *on) {
         return err(format!("{what} are not supported yet"));
     }
-    let side1 = ev.resolve_faces(ev.query("side1"));
-    let side2 = ev.resolve_faces(ev.query("side2"));
-    // Live face-blend-tool: the empty side is the faulty field, Side 1 first.
-    if side1.is_empty() {
-        return crate::regen::eval::err_at(&["side1"], "Select faces to blend.");
-    }
-    if side2.is_empty() {
-        return crate::regen::eval::err_at(&["side2"], "Select faces to blend.");
-    }
-    let detach = ev.bool("detach");
     let width = ev.is("blendControlType", "WIDTH");
     let asym = ev.bool("asymmetric");
     let radius = if width { ev.length("width")? } else { ev.length("radius")? };
@@ -623,9 +668,6 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         let (Some(a0), Some(b0)) = (s1.get(&bi), s2.get(&bi)) else { continue };
         let (mut a, mut b) = (a0.clone(), b0.clone());
         let mut body = ev.ctx.bodies[bi].clone();
-        if !detach && matches!(ev.enum_("trim"), "LONG" | "NO_TRIM") && body.shape.count(ShapeType::Solid) > 0 {
-            return err("Cannot attach long and no-trim blends to solid parts.");
-        }
         if ev.bool("propagation") && !ev.is("propagationType", "TANGENT") {
             let max = if ev.is("propagationType", "CUSTOM") { ev.angle("propagationAngle")? } else { std::f64::consts::PI };
             grow_side(&body.shape, &mut b, &a, max)?;

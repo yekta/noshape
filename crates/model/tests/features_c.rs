@@ -1377,6 +1377,8 @@ fn full_round_fillet_parting_draft_swept_blend() {
         p.set("side2", q(top));
         p.set("crossSection", en("SWEPT_PROFILE"));
         p.set("spine", q(spine));
+        // (A spine blend refuses tangent propagation, the default: live 2333.)
+        p.set("propagation", ParamValue::Bool(false));
         p.set("radius", expr("5 mm"));
     });
     let r = s.ok();

@@ -3999,8 +3999,9 @@ P2
 - [ ] P2 CHAMFER-SM-TESTS (blend) T1 for chamfer on active sheet metal and a mixed selection.
 - [ ] P2 FACEBLEND-PROP-CUSTOM (blend) Custom propagation with Maximum angle.
 - [ ] P2 FACEBLEND-PROP-WALLS (blend) Tangent propagation spreads the side faces, not only edge chains.
-- [ ] P2 FACEBLEND-CHECKS (blend) std's checks in std's order (sides on several bodies, spine + tangent propagation:
+- [x] P2 FACEBLEND-CHECKS (blend) std's checks in std's order (sides on several bodies, spine + tangent propagation:
   features_c:1290 assumes success, spine + zero angle, width + hold lines, hold line off the sides, edge limit side).
+  Done: live 2333's seven texts and fields in std's order, before our own "not supported yet" options.
 - [ ] P2 FACEBLEND-FLIPS-SHARED (blend, live) flips on side faces sharing an edge are ignored.
 - [ ] P2 FACEBLEND-SPINE (blend) Swept profile with a curved spine or one not parallel to the edges.
 - [ ] P2 FACEBLEND-HOLD-CONIC (blend, live) Conic / Inverse conic hold lines.
