@@ -1,0 +1,103 @@
+{
+  "name": "drw-dimension-foreshorten",
+  "about": "A radius of the hole with its text inside the arc › Foreshorten (the jogged leader follows the pointer; a click outside the plate sets its end), then its menu › Remove foreshorten (live behaviours, 10-30: Foreshorten only with the text inside the arc)",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the remaining drawing menu items)",
+  "start": "hole-plate-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Dimension",
+        "menu": "Radial dimension (shift+r)"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_edge": {
+          "view": "Top",
+          "at": [
+            -3.5355,
+            3.5355,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            -1,
+            1,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "0.197"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Foreshorten"
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            10,
+            -6,
+            20
+          ]
+        }
+      },
+      "ms": 500
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Top",
+          "at": [
+            10,
+            -6,
+            20
+          ]
+        }
+      }
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "annotation": "0.197"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Remove foreshorten"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 500
+    }
+  ]
+}

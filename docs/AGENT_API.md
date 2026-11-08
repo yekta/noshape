@@ -5002,7 +5002,7 @@ The annotation context menus, one edit each with the menu's edit text:
 - Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).
 - `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).
 - Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).
-- Radial dimensions: `foreshorten`; `remove_foreshorten`.
+- Radius dimensions with their text inside the arc: `foreshorten` (the leader jogs to end at `point`); `remove_foreshorten` (the straight leader back, the text on it where the jog ended).
 - Surface finish symbols on an edge: `flip` (to the edge's other side).
 - Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.
 - Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.
@@ -5028,7 +5028,7 @@ Examples:
 | `annotation` | integer | required | Annotation id (drawing_get). |
 | `action` | one of `add_jog`, `remove_jog`, `add_leader`, `remove_leaders`, `add_node`, `remove_node`, `delete_leader`, `move_leader`, `foreshorten`, `remove_foreshorten`, `hide_dimension`, `show_dimensions`, `flip`, `group`, `remove_from_group`, `group_annotation`, `remove_annotation_from_group`, `align_centermark`, `centerline_end`, `move_centerline`, `stacked_callouts`, `break`, `reset_ordinate`, `orientation`, `flip_arrows`, `arc_condition` | required | The menu action. |
 | `line` | one of 0, 1 |  | add_jog / remove_jog: the extension line. |
-| `point` | array of number |  | add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm). |
+| `point` | array of number |  | foreshorten: where the jogged leader ends; add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm). |
 | `leader` | integer |  | add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor). |
 | `node` | integer |  | remove_node: the node (0 = nearest the note). |
 | `from_node` | array of integer |  | add_leader on a note or callout: branch from [leader, node]. |

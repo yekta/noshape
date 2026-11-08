@@ -149,6 +149,9 @@ pub enum Tool {
     DatumTarget { anchor: Option<PickedPoint> },
     /// Add a leader to geometric tolerance `id`.
     GdtLeader { id: u64 },
+    /// Foreshorten radial dimension `id`: its jogged leader ends at the pointer until a click (live behaviours
+    /// "Foreshorten works from the right-click menu").
+    Foreshorten { id: u64 },
     /// Drawing sketch tools (see `drawing_sketch`): the clicked points and
     /// the sketch point the next segment starts from.
     Sketch { tool: super::SkTool, pts: Vec<[f64; 2]>, from: Option<u32> },
@@ -199,6 +202,7 @@ impl Tool {
             Tool::CropPoly { .. } => "Crop view (spline)",
             Tool::DatumTarget { .. } => "Datum target",
             Tool::GdtLeader { .. } => "Add leader",
+            Tool::Foreshorten { .. } => "Foreshorten",
             Tool::Sketch { tool, .. } => tool.name(),
             Tool::Constrain { kind, .. } => kind.name(),
             Tool::PlaceImage { .. } => "Insert image",

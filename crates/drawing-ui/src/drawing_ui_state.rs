@@ -168,6 +168,7 @@ impl DrawingEditor {
                 // Onshape::Dimension::Ordinate "ordinate", Onshape::SurfaceFinishSymbol "surfacefinishsymbol".)
                 let k = match variant {
                     "OrdinateDimension" | "OrdinateGroup" => "ordinate",
+                    "ForeshortenedRadial" | "ForeshortenedDiameter" => "dimension",
                     v if v.ends_with("Dimension") => "dimension",
                     "Note" => "note",
                     "Centermark" => "centermark",
@@ -385,7 +386,8 @@ impl DrawingEditor {
 
 fn ui_tool_name(t: &Tool) -> Option<&'static str> {
     Some(match t {
-        Tool::Select => return None,
+        // Foreshorten (a radius's menu) is no toolbar tool.
+        Tool::Select | Tool::Foreshorten { .. } => return None,
         Tool::InsertView { .. } => "Insert view",
         Tool::Projected { .. } => "Projected view",
         Tool::Auxiliary { .. } => "Auxiliary view",

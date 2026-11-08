@@ -1,6 +1,6 @@
 //! The drawing annotation menus' edits (jogs, leaders and leader nodes,
-//! foreshortening, datum target dimensions, groups, Detach, Align
-//! centermark), shared by the drawing editor and the agent API. Note and
+//! foreshortening, datum target dimensions, groups, Align centermark),
+//! shared by the drawing editor and the agent API. Note and
 //! callout leaders (live drw2 10-21 g; (6): a callout's leaders work the
 //! same): their paths, what a point hits on them, Add node / Remove node /
 //! Add leader from a node / Delete / Move by grip.
@@ -8,7 +8,7 @@
 use super::SheetPick;
 use super::jog::seg_dist;
 use noshape_model::drawing::sheet::{LeaderPath, LinearFrame, note_leader_paths};
-use noshape_model::drawing::build::BuiltSheet;
+use noshape_model::drawing::build::{BuiltSheet, ViewPlacement};
 use noshape_model::drawing::{Annotation, AnnotationKind, ExtJog, Leader, LeaderStart, PointRef, Sheet, ViewId, remove_leader, remove_leader_node};
 
 fn find(s: &mut Sheet, id: u64) -> Option<&mut Annotation> {
@@ -195,19 +195,30 @@ pub fn nearest_segment(path: &LeaderPath, p: [f64; 2]) -> Option<(usize, f64)> {
     path.points.windows(2).enumerate().map(|(i, w)| (i, seg_dist(p, w[0], w[1]))).min_by(|a, b| a.1.total_cmp(&b.1))
 }
 
-/// Foreshorten (radial dimensions): the jog at 55 % of the radius, 20 % to
-/// the side. None for other kinds.
-pub fn foreshortened(k: &AnnotationKind) -> Option<AnnotationKind> {
+/// Foreshorten (radial dimensions): the leader's far end at `jog` (view coordinates). None for other kinds.
+pub fn foreshortened(k: &AnnotationKind, jog: [f64; 2]) -> Option<AnnotationKind> {
     let &AnnotationKind::RadialDimension { view, center, radius, angle, .. } = k else { return None };
-    let (d, w) = ([angle.cos(), angle.sin()], [-angle.sin(), angle.cos()]);
-    let jog = [center[0] + d[0] * radius * 0.55 + w[0] * radius * 0.2, center[1] + d[1] * radius * 0.55 + w[1] * radius * 0.2];
     Some(AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog })
 }
 
-/// Remove foreshorten: back to a radius dimension.
-pub fn unforeshortened(k: &AnnotationKind) -> Option<AnnotationKind> {
-    let &AnnotationKind::ForeshortenedRadial { view, center, radius, angle, .. } = k else { return None };
-    Some(AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false, knee: None })
+/// A radius dimension whose text is inside its arc (on the centre side): live offers Foreshorten only then (behaviours
+/// "Foreshorten works from the right-click menu, but only for a radial dimension whose text is placed inside the arc").
+pub fn text_inside_arc(a: &Annotation, pl: &ViewPlacement) -> bool {
+    let AnnotationKind::RadialDimension { center, radius, diameter: false, .. } = a.kind else { return false };
+    let c = pl.to_sheet(center);
+    (a.position[0] - c[0]).hypot(a.position[1] - c[1]) < pl.len_to_sheet(radius)
+}
+
+/// Remove foreshorten: a radius dimension again, its straight leader back, its text on it where the jogged leader
+/// ended (live: "it ends up further along the leader … near where the jog's endpoint was").
+pub fn remove_foreshorten(a: &mut Annotation, pl: &ViewPlacement) -> bool {
+    let AnnotationKind::ForeshortenedRadial { view, center, radius, angle, jog } = a.kind else { return false };
+    // (The angle is the sheet's, as the dimension draws it.)
+    let (c, f, d) = (pl.to_sheet(center), pl.to_sheet(jog), [angle.cos(), angle.sin()]);
+    let t = (f[0] - c[0]) * d[0] + (f[1] - c[1]) * d[1];
+    a.position = [c[0] + d[0] * t, c[1] + d[1] * t];
+    a.kind = AnnotationKind::RadialDimension { view, center, radius, diameter: false, angle, dim_line: false, knee: None };
+    true
 }
 
 /// Datum targets: Hide dimension (`hide`) / Show dimensions ▸ This target

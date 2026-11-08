@@ -728,7 +728,7 @@ impl DrawingEditor {
             preview = base;
         }
         // Edit detail / Edit section: the edited view as the dialog has it.
-        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()) {
+        if let Some(d) = self.detail_edit_drawing(cx).or_else(|| self.section_edited()).or_else(|| self.foreshorten_preview()) {
             preview = Some(d);
         }
         overlay.infer.extend(self.infer_lines.iter().cloned());

@@ -262,6 +262,12 @@ impl DrawingEditor {
                     }
                 }
             }
+            Tool::Foreshorten { .. } => {
+                if let Some(d) = self.foreshorten_preview() {
+                    self.commit("Foreshorten", d, cx);
+                }
+                self.tool = Tool::Select;
+            }
             Tool::GdtLeader { id } => {
                 let leader = noshape_scene::drawing_tools::annotation_edit::leader_to(&self.pk(), c);
                 let start = self.leader_from.take().unwrap_or_default();
@@ -413,13 +419,25 @@ impl DrawingEditor {
                     out.push(MenuEntry::item("Remove leaders", move |t, _, cx| t.edit_sheet("Remove leaders", cx, |s| noshape_scene::drawing_tools::annotation_edit::remove_leaders(s, id))));
                 }
             }
-            // Live's radial menu has no Foreshorten (qa DWG-FORESHORTEN-JUMP,
-            // behaviours D14: only the toolbar tool); one made before keeps
-            // Remove foreshorten.
-            AnnotationKind::ForeshortenedRadial { .. } => {
-                if let Some(k) = noshape_scene::drawing_tools::annotation_edit::unforeshortened(&a.kind) {
-                    out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| set_kind(t, "Remove foreshorten", k.clone(), cx)));
+            // Live (behaviours, 10-30): Foreshorten only on a radius whose text is inside the arc; the jogged leader then
+            // ends at the pointer until a click.
+            AnnotationKind::RadialDimension { view, .. } => {
+                if self.placement(*view).is_some_and(|pl| noshape_scene::drawing_tools::annotation_edit::text_inside_arc(a, &pl)) {
+                    out.push(MenuEntry::item("Foreshorten", move |t, _, cx| {
+                        t.set_tool(Tool::Foreshorten { id }, cx);
+                        t.update_preview(cx);
+                    }));
                 }
+            }
+            &AnnotationKind::ForeshortenedRadial { view, .. } => {
+                out.push(MenuEntry::item("Remove foreshorten", move |t, _, cx| {
+                    let Some(pl) = t.placement(view) else { return };
+                    t.edit_sheet("Remove foreshorten", cx, |s| {
+                        if let Some(x) = s.annotations.iter_mut().find(|x| x.id == id) {
+                            noshape_scene::drawing_tools::annotation_edit::remove_foreshorten(x, &pl);
+                        }
+                    })
+                }));
             }
             &AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                 let label = if direct { "Display as foreshorten diameter" } else { "Display as regular diameter" };
@@ -549,6 +567,17 @@ impl DrawingEditor {
         let offset = (b.offset != 0.0).then(|| self.input(&format::format_number(b.offset / u.meters(), None, 4), window, cx));
         self.panel = Some(Panel::BrokenOut { view, edit: Some(index), profile: b.profile, spline: b.spline, up_to: b.depth_ref.is_some(), depth, depth_ref: b.depth_ref, offset, exclude: b.exclude, picking: false, add_point: false });
         cx.notify();
+    }
+
+    /// Foreshorten: the drawing with radius dimension `id` foreshortened, its jogged leader ending at the pointer.
+    pub fn foreshorten_preview(&self) -> Option<noshape_model::drawing::Drawing> {
+        let Tool::Foreshorten { id } = self.tool else { return None };
+        let a = self.drawing.sheets.get(self.sheet)?.annotations.iter().find(|a| a.id == id)?;
+        let pl = self.placement(a.kind.view()?)?;
+        let k = noshape_scene::drawing_tools::annotation_edit::foreshortened(&a.kind, pl.to_view(self.cursor))?;
+        let mut d = self.drawing.clone();
+        d.sheets[self.sheet].annotations.iter_mut().find(|x| x.id == id)?.kind = k;
+        Some(d)
     }
 
     pub fn open_cell_format_panel(&mut self, table: u64, row: usize, col: usize, window: &mut Window, cx: &mut Context<Self>) {

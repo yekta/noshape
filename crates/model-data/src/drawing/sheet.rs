@@ -2289,7 +2289,12 @@ impl SheetGeometry {
                     let dir = [angle.cos(), angle.sin()];
                     let tip = [c[0] + dir[0] * r, c[1] + dir[1] * r];
                     let f = env.to_sheet(*view, *jog);
-                    let leg = (r * 0.4).clamp(3.0, 12.0);
+                    let t = env.text(a, *radius, false, "R");
+                    // Live (behaviours, 10-30): the leader runs from the arrow through the text, which stays where it
+                    // was, to a knee just past it; then the jog, and a leg parallel to the radius ending at `jog`.
+                    let tw = self.dim_label_width(&t, dh);
+                    let s_text = (tip[0] - a.position[0]) * dir[0] + (tip[1] - a.position[1]) * dir[1];
+                    let leg = (s_text + tw / 2.0 + 1.5).max((r * 0.4).clamp(3.0, 12.0));
                     let q = [tip[0] - dir[0] * leg, tip[1] - dir[1] * leg];
                     let t0 = ((q[0] - f[0]) * dir[0] + (q[1] - f[1]) * dir[1]) * 0.55;
                     let b = [f[0] + dir[0] * t0.max(0.0), f[1] + dir[1] * t0.max(0.0)];
@@ -2301,14 +2306,13 @@ impl SheetGeometry {
                     if let Some(l) = self.lines.last_mut() {
                         l.pick = pick;
                     }
-                    let t = env.text(a, *radius, false, "R");
                     let mut ang = dir[1].atan2(dir[0]);
                     if ang > std::f64::consts::FRAC_PI_2 + 1e-9 || ang < -std::f64::consts::FRAC_PI_2 - 1e-9 {
                         ang += std::f64::consts::PI;
                     }
-                    let mid = [(f[0] + b[0]) / 2.0, (f[1] + b[1]) / 2.0];
+                    let on = [tip[0] - dir[0] * s_text.max(tw / 2.0), tip[1] - dir[1] * s_text.max(tw / 2.0)];
                     let up = [-ang.sin(), ang.cos()];
-                    self.dim_label([mid[0] + up[0] * 1.2, mid[1] + up[1] * 1.2], ang, 0.5, false, &t, dh, pick);
+                    self.dim_label([on[0] + up[0] * 1.2, on[1] + up[1] * 1.2], ang, 0.5, false, &t, dh, pick);
                 }
                 AnnotationKind::ForeshortenedDiameter { view, axis, edge, direct } => {
                     let (a0, a1) = (env.to_sheet(*view, axis[0]), env.to_sheet(*view, axis[1]));

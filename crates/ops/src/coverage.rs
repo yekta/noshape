@@ -392,6 +392,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("drawing:Export to CSV", Op("drawing_export")),
     ("drawing:First angle", Op("drawing_properties")),
     ("drawing:Fit to content", Op("drawing_table_edit")),
+    ("drawing:Foreshorten", Op("drawing_annotation_edit")),
     ("drawing:Hole table properties...", Op("drawing_table_edit")),
     ("drawing:Image properties...", Op("drawing_get")),
     ("drawing:Flip X direction", Op("drawing_table_edit")),

@@ -50,7 +50,7 @@ pub fn ops() -> Vec<Op> {
         group: "drawing",
         verb: "annotation_edit",
         summary: "Edit an annotation from its menus: jogs, leaders, nodes, foreshorten, groups, align centermark, stacked callouts",
-        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radial dimensions: `foreshorten`; `remove_foreshorten`.\n- Surface finish symbols on an edge: `flip` (to the edge's other side).\n- Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).\n- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: \"Dimension orientation\"); dimensions: `flip_arrows` (the flip node: \"Flip arrows\"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: \"Arc condition\").",
+        description: "The annotation context menus, one edit each with the menu's edit text:\n- Linear dimensions: `add_jog` / `remove_jog` on extension line `line` (0 / 1; a 45° jog, 11.2 mm; a short line first moves the dimension line out); linear and ordinate dimensions: `break` (`on`: Break / Unbreak dimension).\n- `add_leader` to `point` (sheet mm; a vertex or edge point of a view, else the sheet) on GD&T frames, callouts, surface finish and weld symbols and notes (a note's starts at its landing's bend; a note's or callout's at `from_node` [leader, node]); `remove_leaders` (a callout's added ones).\n- Note and callout leaders (a callout's leader 0 is the one to its anchor, then the added ones; drawing_get `leaders`): `add_node` on leader `leader` at `point` (on the leader line), `remove_node` (`leader`, `node`; its branches then start at the bend), `delete_leader` (`leader`; a callout's leader 0 leaves it in space), `move_leader` (Move by grip: leader `leader`'s end to `point`; onto a vertex, circle center or edge it attaches there, elsewhere it stays on the sheet; a callout's leader 0 only onto a model point).\n- Radius dimensions with their text inside the arc: `foreshorten` (the leader jogs to end at `point`); `remove_foreshorten` (the straight leader back, the text on it where the jog ended).\n- Surface finish symbols on an edge: `flip` (to the edge's other side).\n- Datum targets: a new one draws no position dimensions (as live); `show_dimensions` (`all`: All targets, else This target; basic, boxed dimensions from its origin), `hide_dimension`.\n- Notes and callouts: `group` with view `view` (they move with it; `with`: more annotation ids), `remove_from_group`; `group_annotation` with `with`, `remove_annotation_from_group`.\n- Centermarks: `align_centermark` to the straight edge at `point`.\n- Centerlines (drag their grips): `centerline_end` slides end `end` along the line to `point` (shorter or longer than the references; not an end on a model point); `move_centerline` puts an edge to edge one's middle at `point`.\n- Callouts (with a BOM table in the drawing): `stacked_callouts` — the `parts` (names) stacked under it (Add stacked callouts…; [] clears).\n- Ordinate dimensions: `reset_ordinate` (Reset ordinate; as in the editor nothing moves: the values always sit on the group's text line, so no edit).\n- Linear dimensions: `orientation` (`value` horizontal / vertical / aligned: \"Dimension orientation\"); dimensions: `flip_arrows` (the flip node: \"Flip arrows\"); maximum / minimum dimensions: `arc_condition` (`end` 0 / 1, `value` center / minimum / maximum: \"Arc condition\").",
         fields: vec![
             doc_field(),
             drawing_field(),
@@ -58,7 +58,7 @@ pub fn ops() -> Vec<Op> {
             req("annotation", int(), "Annotation id (drawing_get)."),
             req("action", json!({ "type": "string", "enum": ACTIONS }), "The menu action."),
             opt("line", json!({ "type": "integer", "enum": [0, 1] }), "add_jog / remove_jog: the extension line."),
-            opt("point", point(), "add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm)."),
+            opt("point", point(), "foreshorten: where the jogged leader ends; add_leader: where it points; add_node: on the leader line; move_leader: where the leader's end goes; align_centermark: on a straight edge; centerline_end: where the end goes (projected onto the line); move_centerline: the new middle (sheet mm)."),
             opt("leader", int(), "add_node / remove_node / delete_leader / move_leader: the leader (a note's 0 = first; a callout's 0 = the one to its anchor)."),
             opt("node", int(), "remove_node: the node (0 = nearest the note)."),
             opt("from_node", json!({ "type": "array", "items": int(), "minItems": 2, "maxItems": 2 }), "add_leader on a note or callout: branch from [leader, node]."),
@@ -268,13 +268,22 @@ fn annotation_edit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         }
         "foreshorten" => {
-            let k = ae::foreshortened(&ann.kind).ok_or_else(|| OpError::param("action", "foreshorten: radius dimensions only"))?;
+            let AnnotationKind::RadialDimension { view, diameter: false, .. } = ann.kind else { return refuse("radius dimensions only") };
+            let p = pt_arg(a, "point")?;
+            let pl = t.m.pick(&Tool::Select, &[], p).placement(view).ok_or_else(|| OpError::param("annotation", "the dimension's view is gone"))?;
+            if !ae::text_inside_arc(&ann, &pl) {
+                return refuse("the dimension's text must be inside the arc");
+            }
+            let k = ae::foreshortened(&ann.kind, pl.to_view(p)).ok_or_else(|| OpError::param("action", "foreshorten: radius dimensions only"))?;
             t.d.sheets[s].annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.kind = k.clone());
             "Foreshorten"
         }
         "remove_foreshorten" => {
-            let k = ae::unforeshortened(&ann.kind).ok_or_else(|| OpError::param("action", "remove_foreshorten: foreshortened radius dimensions only"))?;
-            t.d.sheets[s].annotations.iter_mut().filter(|x| x.id == id).for_each(|x| x.kind = k.clone());
+            let AnnotationKind::ForeshortenedRadial { view, .. } = ann.kind else { return refuse("foreshortened radius dimensions only") };
+            let pl = t.m.pick(&Tool::Select, &[], ann.position).placement(view).ok_or_else(|| OpError::param("annotation", "the dimension's view is gone"))?;
+            if let Some(x) = t.d.sheets[s].annotations.iter_mut().find(|x| x.id == id) {
+                ae::remove_foreshorten(x, &pl);
+            }
             "Remove foreshorten"
         }
         "flip" => {

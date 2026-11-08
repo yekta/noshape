@@ -4801,13 +4801,24 @@ fn drawing_annotation_menu_edits() {
     let e = edit(&mut ctx, &gdt, json!({ "action": "add_jog", "line": 0 })).unwrap_err();
     assert!(e.message.contains("linear dimensions"), "{e:?}");
 
-    // Radius: foreshorten and back.
-    let rad = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "radius", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }))["annotation"].clone();
-    edit(&mut ctx, &rad, json!({ "action": "foreshorten" })).unwrap();
+    // Radius: foreshorten (live: only with its text inside the arc) and back.
+    let outside = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "radius", "picks": [[cx + r, cy]], "place": [cx + r + 15.0, cy + 15.0] }))["annotation"].clone();
+    let e = edit(&mut ctx, &outside, json!({ "action": "foreshorten", "point": [cx + r + 30.0, cy] })).unwrap_err();
+    assert!(e.message.contains("inside the arc"), "{e:?}");
+    let rad = call(&mut ctx, "drawing_dimension", json!({ "drawing": tab, "kind": "radius", "picks": [[cx + r, cy]], "place": [cx + r * 0.4, cy] }))["annotation"].clone();
+    let e = edit(&mut ctx, &rad, json!({ "action": "foreshorten" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("point"), "{e:?}");
+    let jog = [cx - r * 3.0, cy + 4.0];
+    edit(&mut ctx, &rad, json!({ "action": "foreshorten", "point": jog })).unwrap();
     assert_eq!(last(&mut ctx), "Foreshorten");
     assert_eq!(ann(&mut ctx, &rad)["kind"], "ForeshortenedRadial");
     edit(&mut ctx, &rad, json!({ "action": "remove_foreshorten" })).unwrap();
-    assert_eq!(ann(&mut ctx, &rad)["kind"], "RadialDimension");
+    assert_eq!(last(&mut ctx), "Remove foreshorten");
+    let a = ann(&mut ctx, &rad);
+    assert_eq!(a["kind"], "RadialDimension");
+    // The text on the straight leader, level with where the jog ended.
+    let at = [num(&a["position"][0]), num(&a["position"][1])];
+    assert!((at[0] - jog[0]).abs() < 0.5, "{at:?} {jog:?}");
 
     // Stacked callouts need a BOM table.
     let co = call(&mut ctx, "drawing_callout", json!({ "drawing": tab, "anchor": quarter(h0), "position": [40, 250] }))["annotation"].clone();
