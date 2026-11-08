@@ -1,11 +1,11 @@
 {
  "scenario": "docs-row-open-dblclick",
- "recorded": "2026-11-08T02:08:52.618Z",
+ "recorded": "2026-11-08T18:22:11.885Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -49,7 +49,7 @@
    "ok": true,
    "at": [
     407,
-    925
+    919
    ],
    "state": {
     "focus": {
@@ -59,10 +59,41 @@
     "dialogs": [],
     "panels": null,
     "list": null,
-    "selection": null,
-    "features": null,
-    "parts": [],
-    "undo": null,
+    "selection": {
+     "count": null,
+     "items": [],
+     "error": "TypeError: window.__wr is not a function"
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 1"
+    },
+    "parts": [
+     "Part 1"
+    ],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
     "message": null,
     "tooltip": null,
     "sketch": null,
@@ -90,8 +121,8 @@
     },
     "url": "/documents/8314e3a39f233abde0cccb64/w/f577795489a3a78e368c0705/e/7c6278ecab0f5fc55b52c2f8"
    },
-   "t": 19971
+   "t": 40183
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 15
 }

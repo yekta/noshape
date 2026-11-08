@@ -1,18 +1,18 @@
 {
  "scenario": "doc-menu-move-to",
- "recorded": "2026-11-08T02:54:29.004Z",
+ "recorded": "2026-11-08T18:24:28.007Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "994b3fd6dfa4d8aba4430e53",
-  "workspace": "9bb4be3c9ca815ccfcbb7277",
-  "element": "d2da8597afc7cc3a3689f5bb",
+  "document": "2513d0565df98e972f293872",
+  "workspace": "d2c78fe335dd6d275c5ae523",
+  "element": "191c86dc971dd547d15a8c3a",
   "start": "doc-tabs",
-  "startElement": "d2da8597afc7cc3a3689f5bb",
+  "startElement": "191c86dc971dd547d15a8c3a",
   "runner": "live2 "
  },
  "start": {
@@ -266,7 +266,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 161011
+   "t": 99924
   },
   {
    "step": 2,
@@ -382,7 +382,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 176723
+   "t": 102382
   },
   {
    "step": 3,
@@ -395,23 +395,13 @@
    "ok": true,
    "at": [
     1212,
-    366
+    416
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Move documents and folders to",
-     "fields": [],
-     "buttons": [
-      "Move here",
-      "Cancel"
-     ],
-     "text": "Owned by me uip Folder noshape test A nested-asm-B.step"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -498,7 +488,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 182784
+   "t": 107163
   }
  ]
 }

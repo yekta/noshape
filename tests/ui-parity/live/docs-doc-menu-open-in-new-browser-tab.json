@@ -1,11 +1,11 @@
 {
  "scenario": "docs-doc-menu-open-in-new-browser-tab",
- "recorded": "2026-11-08T01:55:50.886Z",
+ "recorded": "2026-11-08T18:26:23.012Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -49,7 +49,7 @@
    "ok": true,
    "at": [
     407,
-    932
+    703
    ],
    "state": {
     "focus": {
@@ -96,7 +96,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 4351
+   "t": 13792
   },
   {
    "step": 2,
@@ -109,7 +109,7 @@
    "ok": true,
    "at": [
     494,
-    718
+    739
    ],
    "state": {
     "focus": {
@@ -139,8 +139,8 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 6561
+   "t": 20445
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 14
 }

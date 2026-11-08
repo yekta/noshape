@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-export-rule-add",
- "recorded": "2026-11-08T02:14:20.613Z",
+ "recorded": "2026-11-08T18:30:24.997Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "preferences"
@@ -702,7 +702,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 2237
+   "t": 2268
   },
   {
    "step": 2,
@@ -1063,7 +1063,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 5786
+   "t": 4317
   },
   {
    "step": 3,
@@ -1091,7 +1091,7 @@
     "features": null,
     "parts": [],
     "undo": null,
-    "message": null,
+    "message": "Successfully added export rule with convention: ${name} × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1411,7 +1411,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 23102
+   "t": 6537
   },
   {
    "step": 4,
@@ -1752,8 +1752,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 26211
+   "t": 8730
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 14
 }

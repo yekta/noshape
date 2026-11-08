@@ -1,18 +1,18 @@
 {
  "scenario": "doc-menu-restore-workspaces",
- "recorded": "2026-11-08T03:05:33.385Z",
+ "recorded": "2026-11-08T18:26:28.360Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "b44c1b4446ee71e0340afefd",
-  "workspace": "964809f6df20a2051a954c4d",
-  "element": "8988f927d8b887f2cf589c57",
+  "document": "0c6a2fcc99d14f4c53925a16",
+  "workspace": "2b81a06a4dd1c9eeb61f2b87",
+  "element": "146075d99513768c5bab45be",
   "start": "doc-tabs",
-  "startElement": "8988f927d8b887f2cf589c57",
+  "startElement": "146075d99513768c5bab45be",
   "runner": "live2 "
  },
  "start": {
@@ -266,7 +266,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 146514
+   "t": 72920
   },
   {
    "step": 2,
@@ -382,7 +382,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 163679
+   "t": 75361
   },
   {
    "step": 3,
@@ -395,23 +395,13 @@
    "ok": true,
    "at": [
     1212,
-    140
+    190
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "ngb-modal-window"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Restore deleted workspaces",
-     "fields": [],
-     "buttons": [
-      "Restore selected",
-      "Cancel"
-     ],
-     "text": "No deleted workspaces found in this document."
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -450,7 +440,7 @@
      "undo": false,
      "redo": false
     },
-    "message": "No deleted workspaces found in this document.",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -498,7 +488,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 173615
+   "t": 80088
   }
  ]
 }

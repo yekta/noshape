@@ -1,11 +1,11 @@
 {
  "scenario": "docs-create-document",
- "recorded": "2026-11-08T01:44:44.103Z",
+ "recorded": "2026-11-08T18:25:13.412Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -90,7 +90,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 2179
+   "t": 3928
   },
   {
    "step": 2,
@@ -159,7 +159,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 4347
+   "t": 6181
   },
   {
    "step": 3,
@@ -222,7 +222,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 7108
+   "t": 9191
   },
   {
    "step": 4,
@@ -245,10 +245,20 @@
     "dialogs": [],
     "panels": null,
     "list": null,
-    "selection": null,
-    "features": null,
+    "selection": {
+     "count": null,
+     "items": [],
+     "error": "TypeError: window.__wr is not a function"
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": "Default geometry"
+    },
     "parts": [],
-    "undo": null,
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
     "message": null,
     "tooltip": null,
     "sketch": null,
@@ -274,10 +284,10 @@
      "panel": null,
      "switcher": null
     },
-    "url": "/documents/c12dc1622fa8bf6e7a9678d7/w/da84fcb130d24df7d18c6fd1/e/c7e7275fdfa775608e248ae8"
+    "url": "/documents/bd66c6e2acc11cbf7f905bfd/w/1c0c1e060b08a12f04d1d23f/e/04c16b32fcb9572ed2b99140"
    },
-   "t": 21594
+   "t": 30674
   }
  ],
- "tabsOpened": 11
+ "tabsOpened": 14
 }

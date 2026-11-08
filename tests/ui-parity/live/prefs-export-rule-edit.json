@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-export-rule-edit",
- "recorded": "2026-11-08T02:16:59.056Z",
+ "recorded": "2026-11-08T18:31:21.841Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "preferences"
@@ -702,7 +702,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 2836
+   "t": 2332
   },
   {
    "step": 2,
@@ -1063,7 +1063,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 4946
+   "t": 4372
   },
   {
    "step": 3,
@@ -1091,7 +1091,7 @@
     "features": null,
     "parts": [],
     "undo": null,
-    "message": null,
+    "message": "Successfully added export rule with convention: ${name} × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1411,7 +1411,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 22154
+   "t": 6603
   },
   {
    "step": 4,
@@ -1464,7 +1464,7 @@
     "features": null,
     "parts": [],
     "undo": null,
-    "message": null,
+    "message": "Successfully added export rule with convention: ${name} × Close",
     "tooltip": null,
     "sketch": null,
     "drawing": null,
@@ -1784,7 +1784,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 24500
+   "t": 8880
   },
   {
    "step": 5,
@@ -2132,7 +2132,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 26667
+   "t": 11101
   },
   {
    "step": 6,
@@ -2473,8 +2473,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 28826
+   "t": 13331
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 14
 }
