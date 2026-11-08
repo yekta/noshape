@@ -146,6 +146,35 @@ impl DrawingEditor {
     }
 
     /// The pending profile on the sheet (tan, its points marked).
+    /// No shape pressed (live2 drw-crop-add-spline-point): the closed sketch curve clicked becomes the pending
+    /// profile; a click elsewhere does nothing (live 1404, as the Detail view's).
+    pub fn crop_pick_profile(&mut self, cx: &mut Context<Self>) {
+        let Some(outline) = self.closed_loop_at() else { return };
+        let Some((view, pl)) = self.view_of_loop(&outline).and_then(|v| Some((v, self.placement(v)?))) else { return };
+        let pts: Vec<[f64; 2]> = outline.iter().map(|q| pl.to_view(*q)).collect();
+        if let Some(d) = &mut self.crop_dlg {
+            d.pending = Some((view, Crop::Polygon(pts)));
+        }
+        self.update_preview(cx);
+        cx.notify();
+    }
+
+    /// Picking an existing closed profile (Crop view with no shape pressed, Detail view after Esc): the closed curve
+    /// under the pointer drawn tan (live 1404).
+    pub fn closed_loop_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
+        let crop = self.crop_dlg.as_ref().is_some_and(|d| d.shape == NO_SHAPE && d.pending.is_none());
+        let detail = self.detail_dlg.as_ref().is_some_and(|d| d.pick_region);
+        if !(crop || detail) {
+            return;
+        }
+        if let Some(mut outline) = self.closed_loop_at() {
+            if let Some(&first) = outline.first() {
+                outline.push(first);
+            }
+            overlay.tinted.push((outline, PROFILE, 2.0));
+        }
+    }
+
     pub fn crop_overlay(&self, overlay: &mut crate::drawing_scene::Overlay) {
         let Some((view, crop)) = self.crop_dlg.as_ref().and_then(|d| d.pending.as_ref()) else { return };
         let Some(pl) = self.placement(*view) else { return };

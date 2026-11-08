@@ -1,6 +1,6 @@
 {
   "name": "drw-crop-add-spline-point",
-  "about": "Crop view with a Spline profile, then Spline ▾ › Add spline point on its bottom edge, ✓",
+  "about": "Crop view with its default Spline profile, then Spline ▾ › Spline point on its bottom edge, ✓",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "coverage (lead 11-07: the remaining drawing menu items)",
@@ -16,12 +16,6 @@
       "do": "wait",
       "until": "ms",
       "ms": 1000
-    },
-    {
-      "do": "click",
-      "on": {
-        "button": "Spline"
-      }
     },
     {
       "do": "click",
@@ -97,7 +91,7 @@
     {
       "do": "click",
       "on": {
-        "menu": "Add spline point"
+        "menu": "Spline point"
       }
     },
     {

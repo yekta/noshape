@@ -1290,6 +1290,20 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
     let _ = s.sketch.sketch.solve();
 }
 
+/// The closed loop of sheet sketch `sk` whose curve passes within `tol` of `p` (sheet mm): its outline, the smallest
+/// such loop (Crop / Detail view picking an existing closed profile: live 1404, the curve is picked, not its inside).
+pub fn closed_loop_through(sk: &noshape_sketch::Sketch, p: [f64; 2], tol: f64) -> Option<Vec<[f64; 2]>> {
+    let near = |pts: &[noshape_sketch::DVec2]| pts.windows(2).any(|w| super::jog::seg_dist(p, [w[0].x, w[0].y], [w[1].x, w[1].y]) <= tol);
+    let regions = sk.regions();
+    regions
+        .iter()
+        .flat_map(|r| std::iter::once(&r.outer).chain(r.holes.iter()))
+        .map(|l| (l.signed_area().abs(), l.tessellate(0.05)))
+        .filter(|(_, pts)| near(pts))
+        .min_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, pts)| pts.into_iter().map(|q| [q.x, q.y]).collect())
+}
+
 #[cfg(test)]
 mod title_field_tests {
     use noshape_model::drawing::build::{PickTarget, render_sheet};

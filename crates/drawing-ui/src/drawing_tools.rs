@@ -687,6 +687,7 @@ impl DrawingEditor {
             _ => self.extra_overlay(&mut overlay),
         }
         self.crop_overlay(&mut overlay);
+        self.closed_loop_overlay(&mut overlay);
         // The Datum dialog's targets show until ✓ (under the pending one).
         let base = self.datum_rows_drawing();
         if let Some(v) = self.pending_view() {

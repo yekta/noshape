@@ -1,0 +1,113 @@
+{
+  "name": "drw-crop-existing-profile",
+  "about": "A sketch circle on the Front view; Crop view, its pressed Spline clicked off (Select closed profile), a click inside the circle (nothing), then on the circle (Profile), ✓",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "lead 11-08: Crop / Detail view picking an existing closed profile",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Center point circle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            15,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "tool": "Crop view"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "Spline"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            15,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      },
+      "ms": 500
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "button": "ok"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

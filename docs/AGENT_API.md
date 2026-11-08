@@ -3886,7 +3886,8 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `parent` | integer | required | View to detail. |
-| `profile` | one of `circle`, `rectangle`, `spline`, `polygon` |  | The dialog's profile tool. |
+| `profile` | one of `circle`, `rectangle`, `spline`, `polygon`, `existing` |  | The dialog's profile tool; `existing`: Esc, then an existing closed sketch curve of the sheet picked at `at`. |
+| `at` | array of number |  | Existing: a point on the closed sketch curve (sheet mm). |
 | `center` | array of number |  | Circle: the center (sheet mm; a vertex or circle center there is snapped). |
 | `radius` | number |  | Circle: the radius (sheet mm). |
 | `points` | array of array of number |  | Rectangle: two corners; spline / polygon: at least 3 points (sheet mm), closed. |
@@ -3992,7 +3993,8 @@ Examples:
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
 | `view` | integer | required | View to crop. |
-| `shape` | one of `rectangle`, `circle`, `polygon`, `spline` |  | Crop shape. |
+| `shape` | one of `rectangle`, `circle`, `polygon`, `spline`, `existing` |  | Crop shape; `existing`: the dialog with no shape pressed, an existing closed sketch curve of the sheet picked at `at`. |
+| `at` | array of number |  | Existing: a point on the closed sketch curve (sheet mm). |
 | `from` | array of number |  | Rectangle corner / circle center (sheet mm). |
 | `to` | array of number |  | Opposite corner / a point on the circle (sheet mm). |
 | `points` | array of array of number |  | Polygon / spline points (sheet mm). |

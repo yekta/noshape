@@ -1,0 +1,114 @@
+{
+  "name": "drw-detail-existing-profile",
+  "about": "A sketch circle on the Front view; Detail view, Esc (Select closed profile), a click inside the circle (nothing), then on the circle (Profile selected), the detail placed",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "lead 11-08: Crop / Detail view picking an existing closed profile",
+  "start": "block-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Center point circle"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            15,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "tool": "Detail view"
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            15,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "hover",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      },
+      "ms": 500
+    },
+    {
+      "do": "click",
+      "on": {
+        "view_point": {
+          "view": "Front",
+          "at": [
+            19,
+            0,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          220,
+          60
+        ]
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

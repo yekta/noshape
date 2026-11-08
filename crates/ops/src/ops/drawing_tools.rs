@@ -123,7 +123,8 @@ pub fn ops() -> Vec<Op> {
                 common(),
                 vec![
                     view_id("parent", "View to detail."),
-                    opt("profile", json!({ "type": "string", "enum": ["circle", "rectangle", "spline", "polygon"], "default": "circle" }), "The dialog's profile tool."),
+                    opt("profile", json!({ "type": "string", "enum": ["circle", "rectangle", "spline", "polygon", "existing"], "default": "circle" }), "The dialog's profile tool; `existing`: Esc, then an existing closed sketch curve of the sheet picked at `at`."),
+                    opt("at", point(), "Existing: a point on the closed sketch curve (sheet mm)."),
                     opt("center", point(), "Circle: the center (sheet mm; a vertex or circle center there is snapped)."),
                     opt("radius", json!({ "type": "number", "exclusiveMinimum": 0 }), "Circle: the radius (sheet mm)."),
                     opt("points", json!({ "type": "array", "items": point() }), "Rectangle: two corners; spline / polygon: at least 3 points (sheet mm), closed."),
@@ -212,7 +213,8 @@ pub fn ops() -> Vec<Op> {
                 common(),
                 vec![
                     view_id("view", "View to crop."),
-                    opt("shape", json!({ "type": "string", "enum": ["rectangle", "circle", "polygon", "spline"], "default": "rectangle" }), "Crop shape."),
+                    opt("shape", json!({ "type": "string", "enum": ["rectangle", "circle", "polygon", "spline", "existing"], "default": "rectangle" }), "Crop shape; `existing`: the dialog with no shape pressed, an existing closed sketch curve of the sheet picked at `at`."),
+                    opt("at", point(), "Existing: a point on the closed sketch curve (sheet mm)."),
                     opt("from", point(), "Rectangle corner / circle center (sheet mm)."),
                     opt("to", point(), "Opposite corner / a point on the circle (sheet mm)."),
                     opt("points", points(3, 1000), "Polygon / spline points (sheet mm)."),
@@ -991,9 +993,17 @@ fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t = target(od, a)?;
     let parent = view_arg(&t, a, "parent")?;
-    let shape = enum_arg(a, "profile", &[("circle", 0u8), ("rectangle", 1), ("spline", 2), ("polygon", 3)], 0)?;
+    let shape = enum_arg(a, "profile", &[("circle", 0u8), ("rectangle", 1), ("spline", 2), ("polygon", 3), ("existing", 4)], 0)?;
     let tool0 = Tool::Detail { parent: None, center: None, radius: None };
-    let (center, r, profile) = if shape == 0 {
+    let (center, r, profile) = if shape == 4 {
+        // Esc, then an existing closed sketch curve picked at `at` ("Profile selected").
+        let at = pt_arg(a, "at")?;
+        let outline = existing_profile(&t, at)?;
+        let pl = t.m.pick(&tool0, &[], at).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
+        let local: Vec<[f64; 2]> = outline.iter().map(|p| pl.to_view(*p)).collect();
+        let (poly, center, r) = dt::detail_profile(3, &local).ok_or_else(|| OpError::param("at", "the closed curve is too small"))?;
+        (center, r, Some(poly))
+    } else if shape == 0 {
         let c = pt_arg(a, "center")?;
         let pl = t.m.pick(&tool0, &[], c).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
         let center = snap_in(&t, &tool0, parent, c).map(|s| s.p).unwrap_or(pl.to_view(c));
@@ -1080,8 +1090,14 @@ fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let mut t = target(od, a)?;
     let view = view_arg(&t, a, "view")?;
     refused(&t, "crop", view, "view")?;
-    let shape = enum_arg(a, "shape", &[("rectangle", 0), ("circle", 1), ("polygon", 2), ("spline", 3)], 0)?;
-    let crop = if shape >= 2 {
+    let shape = enum_arg(a, "shape", &[("rectangle", 0), ("circle", 1), ("polygon", 2), ("spline", 3), ("existing", 4)], 0)?;
+    let crop = if shape == 4 {
+        // No shape pressed: an existing closed sketch curve, picked at `at`.
+        let at = pt_arg(a, "at")?;
+        let outline = existing_profile(&t, at)?;
+        let pl = t.m.pick(&Tool::Select, &[], at).placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
+        Crop::Polygon(outline.iter().map(|q| pl.to_view(*q)).collect())
+    } else if shape >= 2 {
         let (_, pts) = profile(&t, a, Some(view))?;
         if shape == 3 { Crop::Spline(pts) } else { Crop::Polygon(pts) }
     } else {
@@ -1095,6 +1111,12 @@ fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     };
     edit_view(&mut t, view, |v| v.crop = Some(crop));
     done(od, t, "Crop view", "view", view.0)
+}
+
+/// The closed sheet sketch curve through `at` (sheet mm, within 1 mm): its outline (live 1404: the Detail / Crop view
+/// dialogs pick an existing closed profile by its curve).
+fn existing_profile(t: &Target, at: [f64; 2]) -> Result<Vec<[f64; 2]>, OpError> {
+    dt::closed_loop_through(&t.d.sheets[t.sheet].sketch.sketch, at, 1.0).ok_or_else(|| OpError::param("at", "not on a closed sketch curve of the sheet"))
 }
 
 /// Profile clicks `points` (sheet mm) as the profile tools take them: the

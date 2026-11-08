@@ -214,8 +214,8 @@ impl DrawingEditor {
                     }
                 }
             }
-            // No shape pressed: picking an existing closed profile (not ours yet), the clicks draw nothing.
-            Tool::CropPoly { .. } if self.crop_dlg.as_ref().is_some_and(|d| d.shape == crate::drawing_crop::NO_SHAPE) => {}
+            // No shape pressed: the click picks an existing closed sketch curve.
+            Tool::CropPoly { .. } if self.crop_dlg.as_ref().is_some_and(|d| d.shape == crate::drawing_crop::NO_SHAPE) => self.crop_pick_profile(cx),
             Tool::CropPoly { parent, mut points, spline } => {
                 if self.crop_add_point_click(c, cx) {
                     return true;
