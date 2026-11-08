@@ -4040,6 +4040,14 @@ CHAMFER-TOLERANCE, CHAMFER-T1-DIRECTION, FACEBLEND-HELPPOINT, FACEBLEND-ASYM-HOL
 features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST, FACEBLEND-OPS-E2E.
 
 ## Sketch + assembly (skasm)
+- [ ] P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
+  "text indent" (extrude of a text sketch's regions) makes "shrunk" 43/111/70 faces/edges/vertices, live 31/87/58: the
+  text's glyph regions aren't live's. 13 of 17 features lost behind it.
+- [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
+  606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
+- [ ] P2 SUITE-FAN-BLADE-IMPORT (import owner; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
+  8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
+  143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…).
 - [ ] P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a
   folder's Set library ▸ "My sheet metal forms", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The sheet metal Form feature's form picker (custom host/sheetmetal.rs) should list, next to Onshape's own library, a "My sheet metal forms" entry holding

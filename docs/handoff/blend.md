@@ -12,6 +12,12 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-08 20:05 UTC, lead's suite ranking): c2-fan-blade-sweep's 53 lost features start at a chamfer
+- c2-fan-blade-sweep (0/53) fails at Derived 1 because its source studio fb207f797bca6b31509dba54 fails at feature 8
+  "Chamfer 1": ERROR "Failed to chamfer selections.", live OK (Fan-Connector 32/78/52 faces/edges/vertices, live
+  48/110/68). Run it alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived
+  NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54. The biggest cascade in the suite: yours.
+
 ## Feature audit (lead 11-08 ~11:00): Fillet / Chamfer / Face blend options, tickets in TICKETS.md "Blends (blend)"
 - Landed 11-08: 823698ce (face blend empty options, partial plane end, drafted-rib full round, CHAMFER-METHOD + DA on
   a round face (`blend_section::chamfer_offsets`), FACEBLEND-HOLD-TANGENT (`Sides.hold`, `hold_ranges`), stopped
