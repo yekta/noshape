@@ -66,6 +66,22 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
   90 → 200/286.
 
+## 11-08 17:26 UTC: STL presets as Onshape's (lead), hose Parasolid confirmed, c2-fan-blade-sweep
+- **STL presets (lead: Onshape's own Coarse / Medium / Fine).** Live's dialog sends 0.24 / 0.12 / 0.06 mm (ours the
+  same), but its facetter takes the chord as about a thousandth: clamp-hms' arcs sag 0.24 / 0.12 / 0.06 µm
+  (samples/stl-res, dx-scratch/bin/stlarc.py). Ours (ops export.rs `mesh_params`): BRepMesh deflection = 0.002 × the
+  mm value, angle doubled (OCCT's segments turn half its angle), through `k::tessellate_export` (BRepMesh alone,
+  `mesh_prepare(exact)`, on a 1000× copy, psui's closed-mesh repairs). clamp-hms: 24,596 / 34,712 / 49,044 triangles
+  for live's 24,608 / 34,732 / 49,056. Waiting: live's files for knob-jason and pulley02-maxwell (REQUESTS 16:24)
+  to check the lead's ±10 % there. e2e `stl_presets_facet_as_onshapes`. The exchange suite's STL is REST's default
+  (5° arcs: custom 100 mm / 5°; clamp 4,568 for live's 4,576), held to the model within 2× live's own STL error.
+- **cf-hose-routing Parasolid:** live 2334 confirms all 8 parts import. Only the surface half was needed (a closed
+  B-spline surface periodic only when its seam knot comes down, else split: our hoses read back 22 faces for the
+  model's 12, still a count difference); the edge half split motor-mount-jack's rings (16/48/48) and is reverted;
+  both files sent back to live (REQUESTS 17:24).
+- **c2-fan-blade-sweep:** refs.jsonl sketch regions / lines are read (centroid / mid, area / length, box); Derived 1
+  builds its four parts; Fan-Connector waits on 7 more ids, Derived 2 on its source's part ids (REQUESTS 17:18).
+
 ## 11-08 15:45 UTC: resumed (lead): P1 other-document views, the four documents, exchange, 2313 / 2299
 - **P1 drawing views of another document's version (live 2303), queued f7073f5b.** Insert view › Other documents
   already pinned views to `ext:` keys; now the Sheets panel row reads In progress · ⧫ V1 (the ⧫ a blue update icon
