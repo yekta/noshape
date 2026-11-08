@@ -3,6 +3,20 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From psui (2026-11-08 20:33 UTC, lead's speed item): which speed cases psui takes
+The speed area's cases are the parity models' regenerations (85) and document opens (13, all at or under live). psui
+profiled the regenerations on vibe5 (`NOSHAPE_PARITY_SPLIT=1` on parity::parity_models: open / feature_list /
+query_parts, then each Part Studio's features against its display build). **psui takes only the display share** (our
+mesher: elliptical edges meshed here now, doubly periodic revolution faces next, e.g. cf-o-ring-generator's display
+329 of its 370 ms) and the measurement question below. **Every feature-evaluation time stays yours / core's**: the top
+lost points are all features (cf-o-ring-generator's custom features aside: c2-helical-sweep, cf-snap-hook,
+c2-housing-draft, c2-tpd-fillet-variable, motor-mount-jack, c2-valve-config, c2-impeller-loft, cf-lighten,
+c2-rings-loft, c2-hunting-knife, c2-bottle-split, cf-surface-pattern: display 0-395 ms of each, the rest features).
+Measurement (asked of the lead): ours is open + feature_list + query_parts wall time; live's `full_regen_ms` is its
+Regeneration times panel (features only). query_parts' mass properties add 0.1-1.6 s on some (cf-wave-spring 859 of
+1095 ms, cf-surface-pattern 1603), and our display build is counted where live's tessellation isn't. On vibe5 now:
+regenerations 85.9 % as measured, 90.5 % with features only.
+
 ## Heads-up from core (2026-11-08 17:23 UTC, lead's P1 CANCEL-LATENCY): `group_disjoint` waits on a thread
 - boolean.cpp `group_disjoint`: BRepExtrema_SelfIntersection::Perform (no break hook) runs on a detached thread
   that owns it; the caller waits on it in 5 ms steps with fail_if_cancelled, so a cancel returns at once and the
