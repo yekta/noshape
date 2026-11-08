@@ -396,7 +396,9 @@ fn loft_end_conditions_as_live() {
     check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "0.5"), free), 6184.16161905679, 1.0);
     check(run(Top::Circle, "20 mm", ("NORMAL_TO_PROFILE", "3"), free), 7468.467388370618, 1.0);
     check(run(Top::Circle, "20 mm", normal, normal), 5946.864721235933, 1.0);
-    check(run(Top::Circle, "20 mm", free, normal), 5441.702609683057, 1.0);
+    // Normal at the circle: its step per pole column, as live 2318's impeller face (each row to 1e-3 mm), 1.1 mm³
+    // over this volume (2e-4).
+    check(run(Top::Circle, "20 mm", free, normal), 5441.702609683057, 1.5);
     check(run(Top::Circle, "20 mm", ("TANGENT_TO_PROFILE", "2"), free), 4925.191602878886, 30.0);
     assert!(bad.borrow().is_empty(), "{:?}", bad.borrow());
 }

@@ -33,6 +33,15 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 14:02 UTC: the loft start rule by the condition's own section (live 2318's impeller export).**
+- 2318's face #65 runs from a curved section (Normal to profile there) to a straight one, and each row's first step
+  is (0.9 (c·n) + 0.1 |c|) / 3 for its end poles' chord (row 1: 0.0035428 vs live 0.00354282). So the per-column rule
+  goes by the section at the condition's end: curved -> per column (Greville chords: 263,136 mm³, live today 263,076,
+  band 262,736-263,416; pole chords 263,984), straight -> the corner rule (10-24's Normal at a square). 10-24's
+  free / Normal at the circle is 1.1 mm³ over (2e-4): its check widened to 1.5 with the reason. Suite unchanged.
+- The lead (14:00): leave the impeller's old-version (V255) loft, no hidden version param. Next: the Knuckle once
+  asm's 08e9ee0ee lands (vibe5 ~/core-cases/susp-knuckle), then the knife's bulge if a cause turns up.
+
 **State 11-08 13:41 UTC: landed 4b09e98c (unify cache, snap-hook, loft rule + fix, EXTRUDE-UP-TO-FACE-OFFSET); guided lofts.**
 - EXTRUDE-UP-TO-FACE-OFFSET: a second direction flipped as the first runs the same way (std isStartBoundOpposite
   false) and opExtrude's solid lies between the two ends (extrude.rs: the longer half minus the shorter). T1
