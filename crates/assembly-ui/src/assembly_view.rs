@@ -1296,7 +1296,10 @@ impl AssemblyView {
         }
         let geometry_changed = geometry_changed || sig != self.overlay_sig;
         self.overlay_sig = sig;
-        let scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
+        let mut scene = assembly_scene::with_highlights(built, &self.result, &h, self.gpu.uploader());
+        if let Some(slot) = self.ui.cap_hover.filter(|_| self.ui.section.is_some()).and_then(|k| scene.clip_hovered.get_mut(k)) {
+            *slot = true;
+        }
         // Onshape's cursors (docs/parity/cursors.md): the selection count,
         // and the snap-mate cursor while a drag is snapped to a target
         // connector (Onshape: alignSnapData with target data shows it,
@@ -2548,7 +2551,14 @@ impl AssemblyView {
                 self.manip_hover = manip;
                 self.hover_overlay = ov;
                 let t = if overlay.is_some() { None } else { self.pick(*id) };
-                let changed = changed_overlay || t.as_ref().map(|t| (&t.path, &t.reference)) != self.hover.as_ref().map(|h| (&h.path, &h.reference));
+                // A section cap under the pointer lights every cap of its plane; leaving the graphics keeps it.
+                let cap = id.and_then(noshape_render::section_cap_of_pick).filter(|_| self.ui.section.as_ref().is_some_and(|s| !s.planes.is_empty()));
+                let left = id.is_none() && !self.viewport.read(cx).pointer_inside();
+                let cap_changed = !left && cap != self.ui.cap_hover;
+                if cap_changed {
+                    self.ui.cap_hover = cap;
+                }
+                let changed = cap_changed || changed_overlay || t.as_ref().map(|t| (&t.path, &t.reference)) != self.hover.as_ref().map(|h| (&h.path, &h.reference));
                 self.hover = t;
                 // The pointer on the background (it moved since the undo: a rebuilt scene's empty pick isn't one)
                 // ends the undone part's pause (live 2023): by a pick there, not a highlight a fast move cleared

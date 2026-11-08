@@ -635,7 +635,7 @@ pub fn overlay_id(built: &AsmBuilt, o: OverlayPick) -> u32 {
 /// Overlay item for a pick id, if it is one.
 pub fn overlay_pick(built: &AsmBuilt, id: u32) -> Option<OverlayPick> {
     let b = overlay_base(built);
-    if id < b {
+    if id < b || noshape_render::section_cap_of_pick(id).is_some() {
         return None;
     }
     Some(match id - b {

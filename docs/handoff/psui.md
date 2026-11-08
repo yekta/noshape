@@ -699,7 +699,8 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   section_caps_pick_as_their_plane_and_hover_orange. A click / right-click on a cap is now empty space's (before: the
   face behind it); live's cap menu is the plane's + Turn off section view + View normal to section plane (10-2x
   notes); asked live what a click, a double click, a face-based plane's menu and ` do on a cap (REQUESTS 00:42).
-  Assemblies pick caps as nothing for now (asm: their hover is the same shader flag).
+  Assemblies too since 11-08 (`AsmUi::cap_hover`; `overlay_pick` leaves cap ids out: they had fallen in the mates'
+  overlay range).
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

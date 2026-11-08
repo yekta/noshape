@@ -406,6 +406,9 @@ pub struct AsmUi {
     pub measure_settings: crate::measure_panel::MeasureSettings,
     /// Section view (Shift+X): plane origin, normal, offset, flipped, offset field.
     pub section: Option<AsmSection>,
+    /// The section plane whose caps are under the pointer: every cap of it pre-highlighted, kept when the pointer
+    /// leaves the graphics (the Part Studio's, live 2255).
+    pub cap_hover: Option<usize>,
     /// A drag of the section arrow in progress.
     pub section_drag: Option<SectionDrag>,
     /// The section manipulator's value box (after a drag).
