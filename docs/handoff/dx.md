@@ -42,6 +42,28 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## 11-08 01:20 UTC: drawing match 87 -> 92/158, Foreshorten, coverage (lead's items 1-2)
+- **Drawing match (vibe5, 8 shards, /root/dx-scratch/drw-shards.sh): 92/158 scenarios, 1010/1208 states** (was 87/158,
+  988). Fixed: the Sheets panel lists every sheet's references and views (was the active sheet's only) and stays the
+  recorded panel while open (`ui_script::note_dialog_pinned`: live's recorder reads the page's first panel); its row
+  menus are the drawing's (`frame_menu`: list null, focus other); Hole table properties as live (title "Hole table", no
+  Origin / direction / exclude rows, Esc closes); the Datum dialog's target texts and tool "Datum"; datum targets not in
+  the annotations; a note being edited keeps its text; message bubbles recorded.
+- Left (by kind): selection (live's recorder reports the hovered edge, ~25 states), the inserted / duplicated sheet's
+  border lines and title notes live exports (35 / 94: asked live2 whether to drop them in the runner), inspection
+  bubbles' number (old recordings, re-record 2257), revision table (no account has it), DWG version default.
+- **Foreshorten** on a radius whose text is inside the arc (live 10-30; ours had removed it on the 10-28 capture):
+  `Tool::Foreshorten`, the jog follows the pointer to a click; the text stays on the first leg; Remove foreshorten puts
+  it where the jog ended. Op `foreshorten` takes `point`, refuses a text outside the arc.
+- "Edit section" (cut angle panel) removed: unreachable, no live evidence. Add stacked callouts kept (live has it on a
+  BOM balloon, behaviours 27473; 2240 right-clicked a zone label).
+- **Coverage: menu 94/102, tools 56/58, shortcuts 14/14, exports 10/10.** coverage_drawing.py counts drawing buttons,
+  Alt+drag, `export` keys and dropdown picks. New scenarios (REQUESTS 01:17): drw-dimension-foreshorten,
+  drw-datum-target-hide-dim, drw-section-hatch-general-none. Uncovered: Insert image / Image properties / Insert DXF
+  or DWG (need a start with a file), Cut list table properties (a frame start), Merge with cell below (revision
+  table), Open Feature Studio in linked document and Unpin view reference (a linked document; ours offers Pin view
+  reference ▸ versions on same-document references, live's help says versioned references only: to check).
+
 ## 11-07 23:57 UTC: exports, view order, Detach, coverage (lead's items 2-3)
 - BOM table as live 2232 (`tables::text_widths`, `row_need`): columns = widest text in its weight + h/3 + padding
   (inch drawings at least 1.0 in), rows 5/3 h (bold header 26/15 h) + padding. Live's widths are N/367 multiples (an
