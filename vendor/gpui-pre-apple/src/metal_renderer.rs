@@ -296,71 +296,46 @@ impl MetalRenderer {
             },
         );
 
-        let paths_rasterization_pipeline_state = build_path_rasterization_pipeline_state(
-            &device,
-            &library,
-            "paths_rasterization",
-            "path_rasterization_vertex",
-            "path_rasterization_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-            PATH_SAMPLE_COUNT,
-        );
-        let path_sprites_pipeline_state = build_path_sprite_pipeline_state(
-            &device,
-            &library,
-            "path_sprites",
-            "path_sprite_vertex",
-            "path_sprite_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let shadows_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "shadows",
-            "shadow_vertex",
-            "shadow_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let quads_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "quads",
-            "quad_vertex",
-            "quad_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let underlines_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "underlines",
-            "underline_vertex",
-            "underline_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let monochrome_sprites_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "monochrome_sprites",
-            "monochrome_sprite_vertex",
-            "monochrome_sprite_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let polychrome_sprites_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "polychrome_sprites",
-            "polychrome_sprite_vertex",
-            "polychrome_sprite_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
-        let surfaces_pipeline_state = build_pipeline_state(
-            &device,
-            &library,
-            "surfaces",
-            "surface_vertex",
-            "surface_fragment",
-            MTLPixelFormat::BGRA8Unorm,
-        );
+        // NOSHAPE PATCH (agent psui): the eight pipelines compile in parallel. Built one after another they took
+        // ~480 ms of the window's creation on a cold Metal shader cache (macOS 26 runner: a first launch after
+        // install); Metal compiles pipelines on any thread.
+        let (
+            paths_rasterization_pipeline_state,
+            path_sprites_pipeline_state,
+            shadows_pipeline_state,
+            quads_pipeline_state,
+            underlines_pipeline_state,
+            monochrome_sprites_pipeline_state,
+            polychrome_sprites_pipeline_state,
+            surfaces_pipeline_state,
+        ) = std::thread::scope(|s| {
+            let (device, library) = (&device, &library);
+            let plain = |label: &'static str, vertex: &'static str, fragment: &'static str| {
+                s.spawn(move || build_pipeline_state(device, library, label, vertex, fragment, MTLPixelFormat::BGRA8Unorm))
+            };
+            let paths = s.spawn(move || {
+                build_path_rasterization_pipeline_state(
+                    device,
+                    library,
+                    "paths_rasterization",
+                    "path_rasterization_vertex",
+                    "path_rasterization_fragment",
+                    MTLPixelFormat::BGRA8Unorm,
+                    PATH_SAMPLE_COUNT,
+                )
+            });
+            let path_sprites = s.spawn(move || {
+                build_path_sprite_pipeline_state(device, library, "path_sprites", "path_sprite_vertex", "path_sprite_fragment", MTLPixelFormat::BGRA8Unorm)
+            });
+            let shadows = plain("shadows", "shadow_vertex", "shadow_fragment");
+            let quads = plain("quads", "quad_vertex", "quad_fragment");
+            let underlines = plain("underlines", "underline_vertex", "underline_fragment");
+            let mono = plain("monochrome_sprites", "monochrome_sprite_vertex", "monochrome_sprite_fragment");
+            let poly = plain("polychrome_sprites", "polychrome_sprite_vertex", "polychrome_sprite_fragment");
+            let surfaces = plain("surfaces", "surface_vertex", "surface_fragment");
+            let join = |h: std::thread::ScopedJoinHandle<'_, metal::RenderPipelineState>| h.join().unwrap_or_else(|e| std::panic::resume_unwind(e));
+            (join(paths), join(path_sprites), join(shadows), join(quads), join(underlines), join(mono), join(poly), join(surfaces))
+        });
 
         let command_queue = device.new_command_queue();
         let supports_shared_storage = cfg!(target_os = "ios") || is_apple_gpu;
