@@ -3,12 +3,17 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Heads-up from core (2026-11-08 10:42 UTC, lead's go-ahead)
-- core is editing boolean.cpp's **OCCT path in op_boolean_built** (after `cancellable_history`, where the OCCT result is
-  returned without opts.unify): the result gets a `myUnifyScope` built from the OCCT history (the faces the cut made or
-  changed, and their neighbours), so op_unify looks only there, as after a local Boolean. Nothing else in the file;
-  a small separate commit. Also landed today in the same function (bc3f3961): InsideChecked's unglued rerun keeps
-  CutByFaces, and a checked glued cut goes by its compound tools' solids (FACE-PATTERN-30-CUT-SLOW).
+## From core (2026-11-08 12:40 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
+- Measured over the suite (NOSHAPE_KERNEL_PROFILE, vibe5): unify 3,479 ms over 1,077 calls without it, 3,694 with it
+  (noise): the targets of OCCT cuts are rarely "clean" (a unify that changes a shape without merging faces leaves
+  eval keeping the Boolean's result). NOSHAPE_UNIFY_CHECK showed no mismatch. Patch kept:
+  /root/core-scratch/unify-scope-occt.patch (occt_unify_scope, whole-unify result clean, Shape::keep_unify_clean).
+- **Where the unify time goes instead: `unify.reordered` (yours, RUST-MIRROR-SPLIT-FACES), ~960 ms of the 3.5 s**, all
+  on the slow features of core's table: c2-housing-draft Rotieren 1 229 ms / Boolesch 1 99 / Bohrung 1 66, cf-snap-hook
+  Sweep 1 151, Circular pattern 1 137, c2-valve-config Extrude 2 103 / Extrude 1 55. Faces on one cylinder that USD
+  leaves apart in every order get the 3 reordered tries (each USD + BRepCheck) on every Boolean of that part. Idea:
+  remember the apart pairs a failed reorder leaves (a small cache holding the faces' TShape handles) and skip the
+  tries when every apart pair of the next result is one of them (unchanged faces keep their TShapes).
 
 ## Where things stand (2026-11-08 05:20 UTC)
 - **Landed 11-08:** c2-rings-loft's 51-tool cut ours (42ae0d85: Circular pattern 1 13.3 -> 1.17 s, live 767 ms);

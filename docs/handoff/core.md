@@ -33,6 +33,19 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 12:15 UTC: the unify scope from OCCT's history (lead: take it; heads-up in bool.md).**
+- Worktree (not landed): boolean.cpp `occt_unify_scope` (an OCCT result of a clean target gets a UnifyScope: the
+  faces not the target's own, those across their edges and at their vertices); op_unify marks a whole unify's
+  result clean (its fixed point); kernel `Shape::keep_unify_clean` + eval split_solids pass the flag to the one solid
+  of a result compound. NOSHAPE_UNIFY_CHECK=1 over the suite: no mismatch; score unchanged.
+- But c2-housing-draft's Rotieren 1 isn't helped: its target is never clean (Boolesch 1's unify changed the shape
+  without merging faces, so eval keeps the Boolean's result, not the unify's). Its 178 ms unify is `unify.reordered`
+  (135 ms: faces on one cylinder left apart, 3 retries in other orders, each with BRepCheck) on every Boolean of
+  that part: bool's RUST-MIRROR-SPLIT-FACES retry; the lever there is remembering that reorders can't merge them.
+- Measured (NOSHAPE_KERNEL_PROFILE, /root/core-scratch/bin/unify-total.py): suite unify 3,479 ms without, 3,694 with:
+  no gain, not landed (patch /root/core-scratch/unify-scope-occt.patch). The lever is unify.reordered, ~960 ms of
+  the suite's unify, all on the slow features: written to bool.md (12:40) with a cache idea.
+
 **State 11-08 10:45 UTC: P0 FACE-PATTERN-30-CUT-SLOW (lead): 520 s -> the document in 264 ms.**
 - Case: asm-suspension's Part Studio 805e29 as a one-document model corpus on vibe5 (~/core-cases/asm-susp-805e29:
   features.json = studios/<eid>.json, live.jsonl = <eid>.live.jsonl). sudo gdb works on vibe5 (ptrace_scope 1).
