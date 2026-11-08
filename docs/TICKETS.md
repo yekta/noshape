@@ -284,6 +284,21 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-08 05:00 release, v0.4.36 (qa list 04:20, checked on green a25df4cd; the latest release is v0.4.35)
+- **qa 04:20: no blocker.** Greens since v0.4.35 swept on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket documents):
+  b9f855f0 → a25df4cd unchanged except at 4fee814c (below). **Fixed and verified on a25df4cd (P0s): CRASH-6297** (a saved
+  document dead on open with a stack overflow, in v0.4.33–v0.4.35) **and SECTIONS-AHEAD-HANG** (a Shell that never ended on
+  vibe3, since v0.4.33). DOCS-SELECT-LEAVES-WAL verified (1cd8f6685). Fuzz since v0.4.35: v0.4.35 120 seeds (one death:
+  seed 6297 = CRASH-6297), greens b9f855f0 / 56603985 / a07f6a3b 180 seeds, 0 deaths.
+- **New in this cut, not a blocker by the SAVED-CHAMFER-CHANGE precedent (lead's call): P1 SAVED-SKETCH-PLANE-LOST**
+  (blend 4fee814c): a fillet that OCCT built with corners far off is rebuilt at the working scale; in qa's ticket document
+  cli-fillet2-segv that changes Fillet 1 by 0.13 mm³ and then two sketches on later faces lose their planes ("Select a
+  sketch plane."). Narrow (only fillets OCCT built wrong), and the same commit fixes a user's self-intersecting dock fillet;
+  cutting from before 4fee814c would drop that fix and CRASH-6297's (3f3fe564d is after it).
+- Open P0s, not new: FACE-PATTERN-30-CUT-SLOW (core), BLEND-RUST, SHELL-SLOW, REGEN-SPEED (long-running). At publish: the
+  smoke, sweeps on the release CLI, the agent session (Haiku, MCP), the footer path (Linux here; qa-os.yml on Windows /
+  macOS), the updater and title bar menus.
+
 ## Release blockers for the 2026-11-07 17:00 release (qa list 16:14, checked on green 5baedbe4; the latest release is v0.4.34)
 - **qa 17:35: v0.4.35 is cut from 04b3eaa93 (run 42396148281), older than the greens above:** green b3f393b8 (swept: unchanged)
   + the Windows installer without Restart Manager (1c5e1be5) + asm's parity translator; it has SAVED-CHAMFER-CHANGE, not
@@ -702,7 +717,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   documents" table on all three platforms and verifies from it. Until then v0.4.32 hangs on this document on macOS / Windows.
 
 ## Rust Boolean (bool)
-- [x] P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
+- [x] (bool 3f3fe564d; qa verified 11-08 04:17 on green a25df4cd, vibe3: the document opens, 57 features, Shell 8 an error as on v0.4.32) P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
   v0.4.33** (CLI fuzz seed 6297 on v0.4.35, step 97: a Shell, 2 faces, 1 mm). The fuzz document was saved with the Shell in
   it, so every open regenerates it and dies: `thread '<unknown>' has overflowed its stack` on v0.4.33, v0.4.34, v0.4.35 and
   greens 24829a72 / 4fee814c / 42ae0d85; **v0.4.32 opens it** (57 features, Shell 8 Error). gdb on 24829a72
@@ -717,7 +732,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   itself, so it halved the way that never shrank it; it now stops 64 deep (not apart, the safe answer). The document
   opens in 6.6 s with Shell 8 an error, as on v0.4.32. T1 brep `boolean::free::tests::a_ring_patch_against_a_touching_one_stays_shallow`
   (overflows a 256 KB stack without the bound).
-- [ ] P0 SECTIONS-AHEAD-HANG (bool + core) **a Shell's regeneration never ends, in v0.4.33 too: the CPU budget can't stop
+- [x] (bool f210258f4; qa verified 11-08 04:17 on green a25df4cd, vibe3 under ulimit -v 40 GB, where it never ended before: step 30 ends in 30.8 / 31.8 s with "Could not shell part with selections.", 2 / 2; repro tickets/hang5786/rep.py) P0 SECTIONS-AHEAD-HANG (bool + core) **a Shell's regeneration never ends, in v0.4.33 too: the CPU budget can't stop
   OCCT's face/face sections made ahead on the thread pool.** CLI fuzz seed 5786, step 30 (a Shell, 0.5 mm, with or without
   NOSHAPE_BOOL_FALLBACK=0): on vibe3 it never finishes on v0.4.33's release CLI and on greens 91035029 / a70b2698 (4 / 4, the
   loop's run hit its 4000 s timeout; with or without `ulimit -v`). Here (16 cores) it ends after 31.8 s with "Could not shell
