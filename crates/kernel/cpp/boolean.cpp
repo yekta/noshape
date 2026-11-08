@@ -7363,11 +7363,20 @@ bool no_interaction(uint8_t op, const std::vector<TopoDS_Shape>& a, const std::v
 // face of a tool (at its middle) inside an argument.
 bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS_Shape>& t)
 {
+  // (Each solid's classifier is built once, and only for points in an argument's box: cf-snap-hook's cuts that miss
+  // took 0.4 s each in classifiers rebuilt per face.)
+  std::vector<Bnd_Box>                                     boxes(a.size());
+  std::vector<std::unique_ptr<BRepClass3d_SolidClassifier>> in_a(a.size());
+  for (size_t i = 0; i < a.size(); ++i)
+    BRepBndLib::Add(a[i], boxes[i]);
   for (const TopoDS_Shape& x : t)
   {
     Bnd_Box bx;
     BRepBndLib::Add(x, bx);
     const double eps = 1e-6 * std::sqrt(bx.SquareExtent());
+    if (std::all_of(boxes.begin(), boxes.end(), [&](const Bnd_Box& b) { return b.IsOut(bx); }))
+      continue;
+    std::unique_ptr<BRepClass3d_SolidClassifier> in_x;
     for (TopExp_Explorer fx(x, TopAbs_FACE); fx.More(); fx.Next())
     {
       // (Each face classifies against whole solids: seconds on a knurl's 10k faces, so a cancel looks here.)
@@ -7383,11 +7392,25 @@ bool tools_reach_in(const std::vector<TopoDS_Shape>& a, const std::vector<TopoDS
         continue;
       // Into the tool (BRepGProp_Face's normal is the face's outward one).
       const gp_Pnt q = p.Translated(-n.Normalized() * eps);
-      if (BRepClass3d_SolidClassifier(x, q, eps * 1e-3).State() != TopAbs_IN)
+      std::vector<size_t> inside;
+      for (size_t i = 0; i < a.size(); ++i)
+        if (!boxes[i].IsOut(q))
+          inside.push_back(i);
+      if (inside.empty())
         continue;
-      for (const TopoDS_Shape& y : a)
-        if (BRepClass3d_SolidClassifier(y, q, eps * 1e-3).State() == TopAbs_IN)
+      if (!in_x)
+        in_x = std::make_unique<BRepClass3d_SolidClassifier>(x);
+      in_x->Perform(q, eps * 1e-3);
+      if (in_x->State() != TopAbs_IN)
+        continue;
+      for (const size_t i : inside)
+      {
+        if (!in_a[i])
+          in_a[i] = std::make_unique<BRepClass3d_SolidClassifier>(a[i]);
+        in_a[i]->Perform(q, eps * 1e-3);
+        if (in_a[i]->State() == TopAbs_IN)
           return true;
+      }
     }
   }
   return false;

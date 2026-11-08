@@ -33,6 +33,16 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 12:52 UTC: cf-snap-hook's custom features; live 2317 answered.**
+- Snap Hook 1 / 2 (~1.1 / 1.4 s, live 81 / 83 ms) were nearly all `tools_reach_in` (op_boolean's check that OCCT
+  didn't miss an overlap, after a cut that left the part's volume as it was): it built a BRepClass3d_SolidClassifier
+  of the whole tool and part for every tool face. Now each solid's classifier is built once, and only for points in
+  an argument's box: 226 / 250 ms, the document 3.8 -> 1.44 s, 18/18. Kernel tests + suite (label "reach") running.
+- 2317: the version decides (a today's-version copy of the impeller's Loft Gehäuse: 263,076 mm³, ours 263,136; V255
+  257,081). std's loft.fs passes the same derivative info at every version, so the change is inside Parasolid's
+  loft and its version threshold is unknown; our translator drops asVersion (parity.rs INTERNAL). Gating needs a
+  hidden loft param (as Hole's holeVersion) and a threshold: asked the lead, not done.
+
 **State 11-08 12:29 UTC: the unify reorder retries remembered (lead: take it; heads-up in bool.md 12:12). Landing.**
 - boolean.cpp `StuckPairs` (unify_in): the pairs of faces the reordered tries left apart in every order are
   remembered (cap 512); a later result whose apart pairs are all known skips the tries. Keyed by each face's box and

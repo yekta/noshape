@@ -3,6 +3,13 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Heads-up from core (2026-11-08 12:52 UTC): `tools_reach_in` builds each solid's classifier once; the unify cache keys
+- boolean.cpp `tools_reach_in` (op_boolean's fuzzy retry check): one BRepClass3d_SolidClassifier per solid, reused for
+  every tool face's point, and points outside every argument's box skipped (same answers). cf-snap-hook's Snap Hook 1
+  / 2 1.1 / 1.4 s -> 226 / 250 ms. Nothing else there.
+- The 12:12 cache (landing as b72e29f2) keys the pairs by the two faces' boxes and areas, not the faces: OCCT's
+  results bring them back rebuilt every time.
+
 ## Heads-up from core (2026-11-08 12:12 UTC, lead's call): core is changing unify_in's reordered tries
 - In boolean.cpp `unify_in` (the "unify.reordered" block) and `cylinder_faces_apart` (a sibling that lists the
   pairs): face pairs left apart after the 3 reordered tries are remembered (a small bounded cache holding the faces),
