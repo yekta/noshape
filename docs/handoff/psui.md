@@ -114,6 +114,19 @@ document's display mesh is under 0.5 s.
 
 ## Landed on main
 
+- 11-08 15:30 MESH-GRID-LOCAL (lead: brep::mesh's grid step): a B-spline face's interior nodes are the corners of cells cut
+  as fine as the surface bends there (`mesh_grid_why`): a raster over the parameter box (4 cells a knot span, ≤512 a
+  way, ≤262k) holds the steps each way from the bending across the surface (S''·N, not |S''|: a draft's flat wall took
+  3,792 triangles for BRepMesh's 32), the twist and the normal's measured turn between raster corners (a checkerboard
+  tube), a cell taking its neighbours' too, graded (+0.5 per unit distance); cells split by it breadth-first
+  (≤400k; over, every step scaled up evenly). Triangulated on the plane stretched so a typical cell is square (a long
+  bend: slivers along its flat length as BRepMesh's; tall cells fanned a boundary node across several), cells within
+  10x of that shape; corners snapped (two cuts' corner a hair apart failed the CDT). A normal where Su×Sv all but
+  vanishes (a blade's tip) is unknown (its noise asked 19k cells). Corpus (fresh copies; BRepMesh reuses a finer
+  triangulation already on a shape, which skewed the first counts): ours/BRepMesh 1.17x → 0.68x display, 1.41x →
+  0.68x Medium; faces over 2x 239 → 7, worst 1,353x (cf-spur-gear face 207) → 4.3x (c2-hunting-knife's blade at
+  display, where BRepMesh's 1,291 miss the angle). Guard: T2 `planar_face_mesh::corpus_triangle_counts_against_brepmesh`
+  (no face ≥5x); export meshes all closed.
 - 11-08 15:20 EXPORT-MESH-FOLD (lead P1, dx's exchange suite): every export mesh (STL, OBJ, 3MF…) goes through
   `k::tessellate_closed`: the raw mesh without the display's `tidy_triangles` (it turned slivers by their corners'
   normals against their neighbours and dropped area-less ones, opening edges: c2-hunting-knife, cf-setback-fillet,
@@ -125,6 +138,7 @@ document's display mesh is under 0.5 s.
   edges (cf-surface-pattern Parts 1-6, c2-impeller-loft Part 1: no closed mesh possible; for core). Open: our grid
   mesher makes ~500k triangles on one B-spline face at export Medium (c2-hunting-knife faces 17 / 37, cf-setback-fillet
   face 5; BRepMesh 1270): one tight spot (the blade edge) sets the whole tensor grid's step, then the 400k cap thins it.
+  → fixed 11-08 15:30 UTC (MESH-GRID-LOCAL above).
 
 - 11-05 22:25 queued ABOUT-DISABLED: Help › About / macOS "About noshape" open the About modal (app/src/about.rs; text in
   ops/src/about.rs, op app_about). The notices file crates/ops/assets/THIRD-PARTY-NOTICES.txt is generated:
