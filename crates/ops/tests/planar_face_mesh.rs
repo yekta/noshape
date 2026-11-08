@@ -319,7 +319,7 @@ fn corpus_planar_faces_mesh_flat_along_their_normal() {
 }
 
 
-/// Every corpus body's export mesh (STL / OBJ: `k::tessellate` at the Export dialog's Coarse, Medium and Fine) is a
+/// Every corpus body's export mesh (STL / OBJ: `k::tessellate_closed` at the Export dialog's Coarse, Medium and Fine) is a
 /// closed surface, each edge used once in each direction (dx's exchange suite: cf-sheet-metal-model-plus folded a
 /// few triangles). NOSHAPE_PLANAR_ONLY=<document stem> runs one document.
 #[test]
@@ -334,7 +334,7 @@ fn corpus_export_meshes_are_closed_and_oriented() {
     if std::env::var_os("NOSHAPE_PLANAR_BREPMESH").is_some() {
         k::set_rust_mesh_everywhere(false);
     }
-    let mut problems = Vec::new();
+    let (mut problems, mut invalid) = (Vec::new(), Vec::new());
     let mut bodies = 0;
     for path in &docs {
         // Regenerated as the Export does (its Feature Studios, std's sheet metal, derived parts).
@@ -347,14 +347,17 @@ fn corpus_export_meshes_are_closed_and_oriented() {
         for (tab, tab_name) in tabs {
             let Ok(r) = od.regenerate(tab, None) else { continue };
             for b in r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid) {
+                // A B-rep with gaps (regeneration's, not the mesher's) has no closed mesh: listed, not checked.
+                if !b.shape.is_valid() {
+                    invalid.push(format!("{} / {} / {}", path.file_stem().unwrap().to_string_lossy(), tab_name, b.name));
+                    continue;
+                }
                 bodies += 1;
                 for (name, &(chordal_mm, angle_deg, _)) in ["Coarse", "Medium", "Fine"].iter().zip(&noshape_ops::export::PRESETS) {
-                    let Ok(mut t) = k::tessellate(&b.shape, chordal_mm / 1000.0, angle_deg.to_radians(), true) else {
+                    let Ok(t) = k::tessellate_closed(&b.shape, chordal_mm / 1000.0, angle_deg.to_radians()) else {
                         problems.push(format!("{} / {} / {}: {name} doesn't mesh", path.file_stem().unwrap().to_string_lossy(), tab_name, b.name));
                         continue;
                     };
-                    // As the Export writes it (`export_mesh`): folded faces re-triangulated.
-                    k::repair_folded_faces(&b.shape, &mut t);
                     let found = edge_use_problems(&t.positions, &t.indices);
                     if !found.is_empty() {
                         let about: Vec<String> = folded_faces(&t)
@@ -372,7 +375,7 @@ fn corpus_export_meshes_are_closed_and_oriented() {
             }
         }
     }
-    eprintln!("{} documents, {bodies} solid bodies", docs.len());
+    eprintln!("{} documents, {bodies} solid bodies; {} invalid B-reps not checked: {invalid:?}", docs.len(), invalid.len());
     assert!(bodies > 0, "no solid bodies in {dir}");
     assert!(problems.is_empty(), "{} export meshes:\n{}", problems.len(), problems.join("\n"));
 }

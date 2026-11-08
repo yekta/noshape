@@ -10,17 +10,83 @@ use glam::{DVec2, DVec3};
 use noshape_brep::mesh::cdt::{self, Pt};
 use std::collections::HashMap;
 
-/// Folded faces of `t` (the tessellation of `shape`, its faces in order) re-triangulated; returns how many.
-pub fn repair_folded_faces(shape: &Shape, t: &mut Tessellation) -> usize {
+/// Each triangle wound against its neighbours (an edge it uses the way another triangle does) turned when that makes
+/// fewer such edges: a mesher's triangle wound the other way, without turning one the corners' normals mislead
+/// about. Returns how many.
+pub fn orient_by_neighbours(t: &mut Tessellation) -> usize {
+    let weld = weld(t);
+    let mut used: HashMap<(u32, u32), u32> = HashMap::new();
+    for tri in t.indices.as_chunks::<3>().0 {
+        let w = tri.map(|i| weld[i as usize]);
+        for k in 0..3 {
+            *used.entry((w[k], w[(k + 1) % 3])).or_default() += 1;
+        }
+    }
+    let mut turned = 0;
+    // A few passes: a turned triangle may settle its neighbour's count.
+    for _ in 0..4 {
+        let before = turned;
+        for tri in t.indices.as_chunks_mut::<3>().0 {
+            let w = tri.map(|i| weld[i as usize]);
+            let sides = [(w[0], w[1]), (w[1], w[2]), (w[2], w[0])];
+            let against = sides.iter().filter(|e| used.get(e).copied().unwrap_or(0) > 1).count();
+            if against == 0 {
+                continue;
+            }
+            let turned_against = sides.iter().filter(|(a, b)| used.get(&(*b, *a)).copied().unwrap_or(0) > 0).count();
+            if turned_against >= against {
+                continue;
+            }
+            for (a, b) in sides {
+                *used.get_mut(&(a, b)).expect("counted") -= 1;
+                *used.entry((b, a)).or_default() += 1;
+            }
+            tri.swap(1, 2);
+            turned += 1;
+        }
+        if turned == before {
+            break;
+        }
+    }
+    turned
+}
+
+/// The triangles with two corners at one point dropped (a pole's: its other two sides are one edge both ways, so the
+/// triangles beyond them meet). Returns how many.
+pub fn drop_pinched_triangles(t: &mut Tessellation) -> usize {
+    let weld = weld(t);
+    let mut out = Vec::with_capacity(t.indices.len());
+    for r in &mut t.faces {
+        let first = out.len() as u32;
+        for tri in t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].as_chunks::<3>().0 {
+            let [a, b, c] = tri.map(|i| weld[i as usize]);
+            if a != b && b != c && c != a {
+                out.extend_from_slice(tri);
+            }
+        }
+        r.first_index = first;
+        r.index_count = out.len() as u32 - first;
+    }
+    let dropped = (t.indices.len() - out.len()) / 3;
+    t.indices = out;
+    dropped
+}
+
+/// Each vertex's first vertex at the same position (the faces' meshes share their edges' points, not indices).
+fn weld(t: &Tessellation) -> Vec<u32> {
     let mut id = HashMap::new();
-    let weld: Vec<u32> = t
-        .positions
+    t.positions
         .iter()
         .map(|p| {
             let n = id.len() as u32;
             *id.entry(p.map(f32::to_bits)).or_insert(n)
         })
-        .collect();
+        .collect()
+}
+
+/// Folded faces of `t` (the tessellation of `shape`, its faces in order) re-triangulated; returns how many.
+pub fn repair_folded_faces(shape: &Shape, t: &mut Tessellation) -> usize {
+    let weld = weld(t);
     // Each directed welded edge: the faces using it.
     let mut faces_of: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
     for (fi, r) in t.faces.iter().enumerate() {

@@ -676,11 +676,9 @@ fn mesh_params(s: &ExportSettings) -> (f64, f64) {
     (lin.max(1e-7), ang.to_radians().clamp(1e-3, 1.5))
 }
 
-/// A part's export mesh (STL, OBJ, 3MF…): closed and consistently wound, the faces the mesher folded re-triangulated.
+/// A part's export mesh (STL, OBJ, 3MF…): a closed surface, consistently wound.
 fn export_mesh(sh: &k::Shape, defl: f64, ang: f64) -> anyhow::Result<k::Tessellation> {
-    let mut t = k::tessellate(sh, defl, ang, true)?;
-    k::repair_folded_faces(sh, &mut t);
-    Ok(t)
+    Ok(k::tessellate_closed(sh, defl, ang)?)
 }
 
 fn write_parts(s: &ExportSettings, path: &std::path::Path, parts: &[(String, k::Shape, [f32; 4])]) -> anyhow::Result<()> {

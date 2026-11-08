@@ -68,3 +68,15 @@ fn a_face_that_cannot_be_laid_flat_is_left_as_it_was() {
         assert_eq!(folds_and_holes(&t), (0, 0));
     }
 }
+
+#[test]
+fn a_triangle_wound_against_its_neighbours_is_turned_back() {
+    let part = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.01, 0.02, TAU).unwrap();
+    let mut t = tessellate_closed(&part, 1e-4, 0.35).unwrap();
+    assert_eq!(folds_and_holes(&t), (0, 0));
+    let side = (0..t.faces.len()).max_by_key(|&f| t.faces[f].index_count).unwrap();
+    turn_one_over(&mut t, side);
+    assert_ne!(folds_and_holes(&t), (0, 0));
+    assert_eq!(orient_by_neighbours(&mut t), 1);
+    assert_eq!(folds_and_holes(&t), (0, 0));
+}

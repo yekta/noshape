@@ -145,6 +145,24 @@ pub fn tessellate(shape: &Shape, linear_deflection: f64, angular_deflection: f64
 
 /// [`tessellate`] with full options.
 pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
+    let mut t = tessellate_raw(shape, o)?;
+    tidy_triangles(&mut t);
+    Ok(t)
+}
+
+/// An export mesh (STL, OBJ, 3MF…): a closed surface, each edge used once in each direction. Not the display's
+/// [`tidy_triangles`] (it turns a sliver by its corners' normals, against its neighbours at a crease, and drops one
+/// without area, opening its edges: lead 11-08 P1, c2-hunting-knife, learning-center-michael); the faces a mesher
+/// folded re-triangulated (a pole's pinched triangles dropped first), then a triangle wound against its neighbours turned.
+pub fn tessellate_closed(shape: &Shape, linear_deflection: f64, angular_deflection: f64) -> Result<Tessellation> {
+    let mut t = tessellate_raw(shape, &MeshOptions { linear_deflection, angular_deflection, relative: false, parallel: true })?;
+    crate::mesh_repair::drop_pinched_triangles(&mut t);
+    crate::mesh_repair::repair_folded_faces(shape, &mut t);
+    crate::mesh_repair::orient_by_neighbours(&mut t);
+    Ok(t)
+}
+
+fn tessellate_raw(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
     if shape.is_null() {
         return Err(KernelError::invalid("cannot tessellate a null shape"));
     }
@@ -186,7 +204,6 @@ pub fn tessellate_with(shape: &Shape, o: &MeshOptions) -> Result<Tessellation> {
         .iter()
         .map(|r| EdgeRange { first_point: r[0], point_count: r[1] })
         .collect();
-    tidy_triangles(&mut t);
     Ok(t)
 }
 

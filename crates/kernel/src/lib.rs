@@ -70,8 +70,8 @@ pub use io::{
     ExportShape, ImportedShape, LengthUnit, StepOptions, StepSchema, StlFormat, read_brep, read_iges, read_mesh, read_step, write_brep,
     rhino_brep_count, write_acis, write_iges, write_iges_assembly, write_iges_parts, write_jt, write_obj, write_obj_mesh, write_parasolid, write_parasolid_assembly, write_parasolid_bare, write_parasolid_parts, write_parasolid_version, PARASOLID_VERSIONS, write_pvz, read_parasolid, read_parasolid_parts, read_native_parts, read_native_parts_configuration, read_native_assembly, read_native_assembly_in, extract_zip, NativeComponent, read_acis_parts, read_jt_parts, read_rhino_parts, read_pvz, read_pvz_parts, read_pvz_instances, read_step_assembly, read_step_assembly_nested, read_iges_assembly, read_iges_parts, read_step_pmi, PartPmi, PmiDatum, PmiKind, PmiDimension, PmiPresentation, StepNesting, NestChild, read_parasolid_assembly, write_step_assembly, StepAssembly, StepInstance, PvzInstance, read_mesh_bodies, write_rhino, write_step, write_step_shapes, write_step_with, write_stl, write_stl_mesh,
 };
-pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_with};
-pub use mesh_repair::repair_folded_faces;
+pub use mesh::{EdgeRange, FaceRange, MeshOptions, Tessellation, tessellate, tessellate_closed, tessellate_with};
+pub use mesh_repair::{orient_by_neighbours, repair_folded_faces};
 pub use ops::*;
 pub use props::{Distance, MassProperties, PropsKind, angle_between, distance, linear_properties, mass_properties, mass_property_bounds, surface_properties, volume_properties};
 pub use shape::{AncestorMap, Orientation, Shape, ShapeType, ShownTopology};

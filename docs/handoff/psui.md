@@ -114,15 +114,18 @@ document's display mesh is under 0.5 s.
 
 ## Landed on main
 
-- 11-08 13:35 EXPORT-MESH-FOLD (lead P1, dx's exchange suite): cf-sheet-metal-model-plus Part 3's flange face 48 (a
-  14×1 B-spline strip) is BRepMesh's (ours declines it through settle from its Extrusion / Offset neighbours 33, 45, 47)
-  and BRepMesh turns two of its triangles over (4 edges used twice the same way, 4 open, Medium and Fine).
-  `k::repair_folded_faces` (kernel/src/mesh_repair.rs) re-triangulates such a face from its own nodes in its
-  derivative-scaled parameter plane, its shared sides as constraints, kept only if every triangle faces out and each
-  side is used once; the Export's mesh formats go through `export_mesh`. Guard: T2
-  `planar_face_mesh::corpus_export_meshes_are_closed_and_oriented` (every corpus solid at Coarse / Medium / Fine:
-  each edge once each way); T1 `mesh_repair::`. Display meshes aren't repaired (a fold there is two triangles' shading);
-  taking Extrusion / Offset faces into our mesher would remove the BRepMesh face itself.
+- 11-08 15:20 EXPORT-MESH-FOLD (lead P1, dx's exchange suite): every export mesh (STL, OBJ, 3MF…) goes through
+  `k::tessellate_closed`: the raw mesh without the display's `tidy_triangles` (it turned slivers by their corners'
+  normals against their neighbours and dropped area-less ones, opening edges: c2-hunting-knife, cf-setback-fillet,
+  learning-center-michael, pipeflange-steven), a pole's pinched triangles dropped, folded faces re-triangulated
+  (`repair_folded_faces`: cf-sheet-metal-model-plus Part 3 face 48, BRepMesh's two triangles turned over on a 14×1
+  B-spline strip) and triangles wound against their neighbours turned (`orient_by_neighbours`). Guard: T2
+  `planar_face_mesh::corpus_export_meshes_are_closed_and_oriented` (340 corpus solids × Coarse / Medium / Fine, each
+  edge once each way: green 11-08); T1 `mesh_repair::`. Not ours: 7 bodies regenerate as invalid B-reps with free
+  edges (cf-surface-pattern Parts 1-6, c2-impeller-loft Part 1: no closed mesh possible; for core). Open: our grid
+  mesher makes ~500k triangles on one B-spline face at export Medium (c2-hunting-knife faces 17 / 37, cf-setback-fillet
+  face 5; BRepMesh 1270): one tight spot (the blade edge) sets the whole tensor grid's step, then the 400k cap thins it.
+
 - 11-05 22:25 queued ABOUT-DISABLED: Help › About / macOS "About noshape" open the About modal (app/src/about.rs; text in
   ops/src/about.rs, op app_about). The notices file crates/ops/assets/THIRD-PARTY-NOTICES.txt is generated:
   `UPDATE_NOTICES=1 cargo test -p noshape-ops --test all notices::` after any Cargo.lock change (its test fails until then; a
