@@ -91,7 +91,11 @@ impl PartStudioView {
             .or_else(|| self.context_menu.as_ref().and_then(|(_, m, _)| crate::os_menu::menu_state(m, cx)))
             .or_else(|| dialog.and_then(|d| d.ui_list()))
             .or_else(|| self.dim_completion_state(cx))
-            .or_else(|| self.ui.cell_completion.as_ref().map(|c| c.ui_state(None)))
+            .or_else(|| {
+                let c = self.ui.cell_completion.as_ref()?;
+                let units = self.doc.read(cx).session.doc.settings.units;
+                Some(c.ui_state((c.key == super::behaviors::DYN_SUPPRESSION_KEY).then_some((&self.display.variables, &units))))
+            })
             .or_else(|| self.ui_select_other_state(cx))
             .or_else(|| self.ui_mini_toolbar_state())
             .or_else(crate::ui_script::open_list);

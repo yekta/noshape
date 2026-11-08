@@ -541,6 +541,29 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 06:34 UTC.** Part Studio ui-parity: 493/530 on 11-07 19:54's binary (all 530, vibe5, /root/psui-scratch/uip-psui.sh),
+498 on main 05:31 (key-backtick-select-other, face-menu-select-other, frame-tool, plane-line-angle,
+sketch-circumscribed-polygon now match); this commit +6 (camera-menu ×9 counted once fixed: Previous view never
+greyed, live 2212; a view cube submenu reads "camera-submenu" with its checks; in-context ×2: a context made by Create
+Part Studio in context was "out of date" at once (the assembly compared it by primary instance; now ops'
+`out_of_date_in`), a page dropdown reads its top level and highlights its chosen row, its actions hand the keyboard to
+the graphics). Dynamic suppression's box completes like a number field ("true"), ✓ deselects and says "Dynamic
+suppression added." (first expression). Left, not ours: analysis-thickness ×3 (live's free account), external-thread /
+sm-form (account memory), fillet-chip ×2 ("Unknown" start), feature-menu-suppress-unsuppress (live hides the sketch
+row only after the server's regeneration), dialog-number-rclick-menu (live runner). Asked live: "Edit dynamic
+suppression" with an expression (REQUESTS 05:58: no submenu in live's recordings). Left, ours: focus kinds in
+config-* / part-menu-release / key-mod-shift-f / mirror-face-type / dialog-checkbox-convert-back,
+appearance-face-row-remove (the dialog field active), sketch-row-copy-paste-onto-front (asked live 11-07),
+variable-table-row-filter (related rows).
+Perf 42427964353 (main 5660398, all green), macOS 26: cold start 3446 ms (target 1000): 417 ms to the GPUI app,
+gpui-kit 470 ms (system fonts), **window creation 1044 ms** (later launches 20-100 ms; GPUI's metallib is precompiled
+in release, so it is the fresh VM's first window), first GPU frame 300 ms. Warm start 825 ms (met). Open 555 ms
+(target 500): the first frame's GPU 143 ms is the runners' first-frame stall. First frames (camera starts after an
+idle) GPU 19-244 ms, steady 6 ms: the paravirtual GPU's idle stall (N000000000). Fixed here: NIST's first model
+frame compiled `silhouette-pulled` in the frame (62 ms), now in the deferred set. Next: NIST's 372 ms between "full
+display in" and "frame 3 scene set", and frame 3's 180 ms beyond its pipeline and color pass.
+
+
 **11-07 08:58 UTC, lead's order (the 121's final count, then Add custom features, the std tool dialogs, the sketch tool
 diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 2937/3069.
 - Add custom features (live 2213): ⊞ opens `SelectItemPanel` in its new `PanelMode::CustomFeatures` (300 × 581,

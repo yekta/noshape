@@ -830,18 +830,26 @@ pub fn ui_state(cx: &App) -> Option<serde_json::Value> {
 
 /// [`ui_state`] of a menu held elsewhere (the graphics area's context menu).
 pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> {
+    state_of(menu, false, cx)
+}
+
+/// `in_camera`: a submenu of the view cube's menu (live's recorder: "camera-submenu", with each row's check).
+fn state_of(menu: &Entity<OsMenu>, in_camera: bool, cx: &App) -> Option<serde_json::Value> {
     let m = menu.read(cx);
-    // An open submenu is the list (live's recorder reads the deepest one: ui-parity folder-menu-collapse-all).
-    if let Some(sub) = m.open_submenu() {
-        return menu_state(sub, cx);
+    // An open submenu is the list (live's recorder reads the deepest one: ui-parity folder-menu-collapse-all), but
+    // not a page dropdown's (in-context-follow-position: Follow position ▸ open, the list its menu).
+    if let Some(sub) = m.open_submenu().filter(|_| !m.page) {
+        return state_of(sub, in_camera || m.camera, cx);
     }
     let mut rows = Vec::new();
-    let (mut highlighted, mut disabled, mut flags) = (None, Vec::new(), Vec::new());
+    let (mut highlighted, mut disabled, mut flags, mut checks) = (None, Vec::new(), Vec::new(), Vec::new());
     for (ix, item) in m.items.iter().enumerate() {
-        let (label, off) = match item {
-            OsMenuItem::Item { label, disabled, .. } | OsMenuItem::Submenu { label, disabled, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled),
+        let (label, off, on) = match item {
+            OsMenuItem::Item { label, disabled, checked, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled, *checked),
+            OsMenuItem::Submenu { label, disabled, .. } => (label.split('\t').next().unwrap_or_default().to_string(), *disabled, false),
             OsMenuItem::Separator => continue,
         };
+        checks.push(on);
         if m.hovered == Some(ix) {
             highlighted = Some(rows.len());
         }
@@ -852,8 +860,16 @@ pub fn menu_state(menu: &Entity<OsMenu>, cx: &App) -> Option<serde_json::Value> 
         rows.push(label);
     }
     // Live's recorder names the view cube's menu apart, its disabled rows one flag per row (ui-parity camera-menu-*).
+    if in_camera {
+        return Some(serde_json::json!({ "kind": "camera-submenu", "rows": rows, "checked": checks, "highlighted": highlighted, "disabled": flags }));
+    }
     if m.camera {
         return Some(serde_json::json!({ "kind": "camera-menu", "rows": rows, "highlighted": highlighted, "disabled": flags }));
+    }
+    // A page dropdown's highlighted row is its chosen one, not the hovered one (live in-context-context-none:
+    // "Context 1"; in-context-follow-position: none with Follow position hovered).
+    if m.page {
+        highlighted = checks.iter().position(|c| *c);
     }
     Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))
 }

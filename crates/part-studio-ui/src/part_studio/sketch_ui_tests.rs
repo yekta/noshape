@@ -581,6 +581,37 @@ fn the_parity_state_reads_dialog_list_and_features(cx: &mut TestAppContext) {
     assert_eq!(state["features"]["rollbackAfter"], "Extrude 1");
 }
 
+/// Live (ui-parity feature-menu-edit-expression): Dynamic suppression's "Unsuppressed if" box lists what a number
+/// field does: "tr" gives the row "true"; Enter inserts it, the next Enter applies it; Esc with the list open
+/// closes only the list.
+#[gpui::test]
+fn dynamic_suppression_box_completes_true(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] },
+        { "type": "extrude", "name": "Extrude 1", "params": { "entities": ["Sketch 1 region 0"], "depth": "10 mm" } }
+    ] });
+    let (window, view) = part_studio_from(cx, "dyn-complete", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let id = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.name == "Extrude 1").unwrap().id);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_dynamic_suppression(id, w, cx))).unwrap();
+    draw(cx, window);
+    let rows = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.cell_completion.as_ref().map(|c| c.entries.iter().map(|e| e.insertion().0).collect::<Vec<_>>()));
+    keys(cx, window, &["t", "r"]);
+    assert_eq!(rows(cx), Some(vec!["true".to_string()]), "the constant listed");
+    keys(cx, window, &["escape"]);
+    assert_eq!(rows(cx), None, "Esc closes the list");
+    assert!(cx.update(|cx| view.read(cx).ui.dyn_suppression.is_some()), "…and leaves the box open");
+    keys(cx, window, &["u"]);
+    keys(cx, window, &["enter"]);
+    let text = cx.update(|cx| view.read(cx).ui.dyn_suppression.as_ref().map(|d| d.1.read(cx).value().to_string()));
+    assert_eq!(text.as_deref(), Some("true"), "Enter inserted the row");
+    keys(cx, window, &["enter"]);
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    let expr = cx.update(|cx| view.read(cx).studio(cx).unwrap().features.iter().find(|f| f.id == id).unwrap().suppression_expr.clone());
+    assert_eq!(expr.as_deref(), Some("true"), "the next Enter applies it");
+}
+
 /// Live (ui-parity extrude-enter-commits): `20` Enter applies "20 mm" and keeps the dialog; the next Enter accepts it.
 #[gpui::test]
 fn enter_applies_then_the_next_enter_accepts(cx: &mut TestAppContext) {

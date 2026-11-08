@@ -20,8 +20,6 @@ use noshape_render::StandardView;
 #[derive(Clone, Copy)]
 pub struct State {
     pub perspective: bool,
-    /// "Previous view" is enabled.
-    pub has_history: bool,
     /// "Zoom to selection" is listed.
     pub has_selection: bool,
     pub mode: DisplayMode,
@@ -89,7 +87,8 @@ pub fn build<V: 'static>(mut m: crate::os_menu::OsMenu, s: State, view: &Entity<
         m = m.item(item(label, Action::View(sv)));
     }
     m = m.separator().item(item("Graphics preferences…", Action::GraphicsPrefs).icon_name("settings"));
-    m = m.separator().item(item("Named views…", Action::NamedViews)).item(item("Previous view", Action::PreviousView).disabled(!s.has_history));
+    // Live 2212: Previous view is never greyed, not even before any view change.
+    m = m.separator().item(item("Named views…", Action::NamedViews)).item(item("Previous view", Action::PreviousView));
     m = m.separator().item(item("Zoom to fit", Action::ZoomFit));
     if s.has_selection {
         m = m.item(item("Zoom to selection", Action::ZoomSelection));

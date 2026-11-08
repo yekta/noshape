@@ -104,13 +104,12 @@ impl PartStudioView {
         let section = !self.ui.section.is_empty();
         // Live (psb 10-21 f): no Section view item while a feature dialog is open.
         let dialog_open = self.edit.is_some();
-        let has_history = !self.ui.cam_history.is_empty();
         let orient = self.ui.orient_on_edit;
         let hidden_edges = self.opts.hidden_edges_visible;
         let tangent = self.opts.tangent_edges;
         let high_quality = self.ui.high_quality;
         let boundary = self.opts.highlight_boundary;
-        let state = crate::camera_menu::State { perspective, has_history, has_selection, mode, hidden_edges, tangent, high_quality, section_on: section, section_dialog: self.ui.section_dialog.is_some(), show_section: !dialog_open, orient: Some(orient), boundary: Some(boundary) };
+        let state = crate::camera_menu::State { perspective, has_selection, mode, hidden_edges, tangent, high_quality, section_on: section, section_dialog: self.ui.section_dialog.is_some(), show_section: !dialog_open, orient: Some(orient), boundary: Some(boundary) };
         // Onshape: the view-mode cube icon with a ▾ under the cube.
         let pal = p();
         // Live (part-studio/21, 53): no fill at rest, #eaeaea on hover,

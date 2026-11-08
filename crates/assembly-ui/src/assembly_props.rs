@@ -349,14 +349,13 @@ impl AssemblyView {
         // A context exists for the user only once a feature references it
         // (live assembly/548: Edit in context alone adds no context arrow).
         let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+        let stale = cx.try_global::<StaleContexts>();
         ps.contexts
             .iter()
             .filter(|c| c.assembly == self.tab && referenced.contains(&c.id))
             .map(|c| {
                 let primary = c.primary == vec![top.0];
-                let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
-                let current = noshape_model::in_context::state_hash(&self.result, &path);
-                let out_of_date = c.state != 0 && current.is_some_and(|h| h != c.state);
+                let out_of_date = stale.is_some_and(|s| s.0.contains(&(studio, c.id)));
                 (studio, c.id, c.name.clone(), primary, out_of_date)
             })
             .collect()
@@ -369,10 +368,10 @@ impl AssemblyView {
         for t in &self.doc.read(cx).session.doc.tabs {
             let TabContent::PartStudio(ps) = &t.content else { continue };
             let referenced = noshape_model::in_context::referenced_contexts(&ps.features);
+            // A context made by Create Part Studio in context has no primary instance: its state is the assembly seen
+            // through its origin (ui-parity in-context-context-none: it read as out of date at once).
             for c in ps.contexts.iter().filter(|c| c.assembly == self.tab && referenced.contains(&c.id)) {
-                let path: Vec<InstanceId> = c.primary.iter().map(|i| InstanceId(*i)).collect();
-                let current = noshape_model::in_context::state_hash(&self.result, &path);
-                flags.push(((t.id, c.id), c.state != 0 && current.is_some_and(|h| h != c.state)));
+                flags.push(((t.id, c.id), noshape_ops::in_context::out_of_date_in(c, &self.result, Some(t.id))));
             }
         }
         let stale = &mut cx.default_global::<StaleContexts>().0;

@@ -2067,7 +2067,11 @@ impl Pipelines {
             &self.image_blend,
             &self.compare_dn,
             &self.compare_mix,
-        ] {
+        ]
+        .into_iter()
+        // A big model's first frame drew its pulled silhouettes after compiling them (62 ms on macOS 26, NIST).
+        .chain(self.silhouette_pulled.as_ref())
+        {
             p.start();
         }
     }

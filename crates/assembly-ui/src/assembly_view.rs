@@ -5935,7 +5935,6 @@ impl AssemblyView {
         // without Orient normal to sketch on edit and Highlight boundary edges.
         let state = crate::camera_menu::State {
             perspective,
-            has_history: !self.ui.cam_history.is_empty(),
             has_selection: !self.selected.is_empty(),
             mode: self.ui.display_mode,
             hidden_edges: self.ui.hidden_edges_visible,

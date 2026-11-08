@@ -105,6 +105,9 @@ mod part_to_copy_tests {
     }
 }
 
+/// The Dynamic suppression box's autofill key (`UiState::cell_completion`).
+pub(super) const DYN_SUPPRESSION_KEY: &str = "dyn-suppression";
+
 /// What the Dynamic suppression dialog sets: a feature's "Unsuppressed if"
 /// expression, or that of every feature in a folder.
 #[derive(Clone, Copy)]
@@ -1648,10 +1651,30 @@ impl PartStudioView {
             })
             .unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(current));
-        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, _, ev: &InputEvent, window, cx| {
-            if let InputEvent::PressEnter { .. } = ev {
-                this.accept_dynamic_suppression(window, cx);
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+            // Live (ui-parity feature-menu-edit-expression): the box lists variables, functions and constants as a
+            // dialog's number field does ("true" typed: the row "true").
+            InputEvent::Change => {
+                this.ui.cell_completion = crate::var_complete::VarCompletion::compute(DYN_SUPPRESSION_KEY, st.read(cx), &this.display.variables, None).map(|mut c| {
+                    c.new_variable = None;
+                    c
+                });
+                cx.notify();
             }
+            InputEvent::Blur => {
+                this.close_dyn_completion(cx);
+            }
+            InputEvent::PressEnter { .. } => {
+                let text = st.read(cx).value().to_string();
+                match this.ui.cell_completion.take().filter(|c| c.key == DYN_SUPPRESSION_KEY && c.enter_inserts(&text)) {
+                    Some(c) => {
+                        c.accept(None, st, window, cx);
+                        cx.notify();
+                    }
+                    None => this.accept_dynamic_suppression(window, cx),
+                }
+            }
+            _ => {}
         });
         st.update(cx, |s, cx| s.focus(window, cx));
         // Live (ui-parity feature-menu-edit-expression): the feature is selected while its box is open.
@@ -1663,8 +1686,16 @@ impl PartStudioView {
         cx.notify();
     }
 
+    fn close_dyn_completion(&mut self, cx: &mut Context<Self>) {
+        if self.ui.cell_completion.as_ref().is_some_and(|c| c.key == DYN_SUPPRESSION_KEY) {
+            self.ui.cell_completion = None;
+            cx.notify();
+        }
+    }
+
     /// The Dynamic suppression box closed without applying (Esc, ✕): its feature no longer selected.
     fn cancel_dynamic_suppression(&mut self, cx: &mut Context<Self>) {
+        self.close_dyn_completion(cx);
         if let Some((DynTarget::Feature(id), _, _)) = self.ui.dyn_suppression.take() {
             self.selected_features.retain(|f| *f != id);
             self.refresh_scene(false, cx);
@@ -1673,11 +1704,24 @@ impl PartStudioView {
     }
 
     fn accept_dynamic_suppression(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_dyn_completion(cx);
         let Some((target, st, _)) = self.ui.dyn_suppression.take() else { return };
+        // Live (ui-parity feature-menu-edit-expression): ✓ leaves nothing selected, as Esc.
+        if let DynTarget::Feature(id) = target {
+            self.selected_features.retain(|f| *f != id);
+            self.refresh_scene(false, cx);
+        }
         let text = st.read(cx).value().to_string();
         // An empty field leaves the feature as it was (live: nothing
         // changes until an expression is committed).
         if !text.trim().is_empty() {
+            let had = match target {
+                DynTarget::Feature(id) => self.studio(cx).and_then(|s| s.feature(id)).is_some_and(|f| f.suppression_expr.is_some()),
+                DynTarget::Folder(_) => false,
+            };
+            if !had {
+                self.flash_info("Dynamic suppression added.".into(), cx);
+            }
             self.doc.update(cx, |doc, cx| {
                 doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(Some(&text)), cx, |ps| match target {
                     DynTarget::Feature(id) => noshape_ops::studio::set_suppression_expr(ps, id, Some(text.clone())),
@@ -1694,6 +1738,18 @@ impl PartStudioView {
     pub(super) fn render_dynamic_suppression(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (_, st, _) = self.ui.dyn_suppression.as_ref()?;
         let pal = p();
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let completion = self.ui.cell_completion.as_ref().filter(|c| c.key == DYN_SUPPRESSION_KEY).map(|c| {
+            let (view, st) = (cx.entity(), st.clone());
+            c.render(&self.display.variables, &units, move |i, window, cx| {
+                view.update(cx, |this, cx| {
+                    if let Some(c) = this.ui.cell_completion.take() {
+                        c.accept(Some(i), &st, window, cx);
+                    }
+                    cx.notify();
+                })
+            })
+        });
         let field = gpui_kit::component::input::Input::new(st).appearance(false).text_size(px(13.33)).h(px(25.));
         let help = div().size(px(14.)).rounded_full().flex().items_center().justify_center().text_size(px(11.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 15.6, crate::theme::help_dot(0x888888)));
         Some(
@@ -1707,6 +1763,13 @@ impl PartStudioView {
                 .bg(pal.dialog_bg)
                 .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
                 .text_color(pal.text)
+                // The list open: Esc closes only the list (before the input's own Escape).
+                .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, _, cx| {
+                    if this.ui.cell_completion.as_ref().is_some_and(|c| c.key == DYN_SUPPRESSION_KEY) {
+                        cx.stop_propagation();
+                        this.close_dyn_completion(cx);
+                    }
+                }))
                 .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                     if ev.keystroke.key == "escape" {
                         this.cancel_dynamic_suppression(cx);
@@ -1749,7 +1812,7 @@ impl PartStudioView {
                     h_flex()
                         .h(px(26.))
                         .child(div().w(px(96.)).pl(px(5.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("Unsuppressed if"))
-                        .child(div().w(px(98.)).border_b_1().border_color(gpui_kit::rgb(0x1651b0)).child(field)),
+                        .child(div().relative().w(px(98.)).border_b_1().border_color(gpui_kit::rgb(0x1651b0)).child(field).children(completion)),
                 )
                 .child(h_flex().h(px(22.)).justify_end().pr(px(4.)).child(help))
                 .into_any_element(),

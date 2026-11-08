@@ -998,8 +998,10 @@ impl PartStudioView {
                     return;
                 }
                 let (v, list, stale) = (v.clone(), list.clone(), stale.clone());
+                // A choice hands the keyboard back to the graphics (live in-context-context-none: focus none after None).
+                let after = v.read(cx).focus.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                    m = m.select_list(153.);
+                    m = m.select_list(153.).focus_after_action(after.clone());
                     let v0 = v.clone();
                     m = m.item(crate::os_menu::OsMenuItem::new("None").checked(active.is_none()).on_click(move |_, _, cx| v0.update(cx, |this, cx| this.activate_context(None, cx))));
                     for (id, name, asm) in &list {
@@ -1029,12 +1031,16 @@ impl PartStudioView {
                     let held = v.read(cx).context_select_focus.clone();
                     window.focus(&held, cx);
                     let v = v.clone();
+                    // …and an action hands it back to the graphics (live: focus none after Current assembly position).
+                    let after = v.read(cx).focus.clone();
                     let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| {
+                        let sub_after = after.clone();
                         let it = |label: &'static str, f: StudioAct| {
                             let v = v.clone();
                             crate::os_menu::OsMenuItem::new(label).on_click(move |_, window, cx| v.update(cx, |this, cx| f(this, window, cx)))
                         };
                         m.list_no_icons()
+                            .focus_after_action(after.clone())
                             .item(it("Rename…", Rc::new(move |this, window, cx| this.start_context_rename(id, window, cx))))
                             .item(it("Update context", Rc::new(move |this, _, cx| this.update_context_here(id, cx))))
                             .item(it("Hide/show context instances…", Rc::new(|this, _, cx| {
@@ -1051,7 +1057,10 @@ impl PartStudioView {
                                 cx.notify();
                             })))
                             // Follow position: the only position is the assembly's current one (live 510).
-                            .submenu("Follow position", window, cx, |sm, _, _| sm.item(crate::os_menu::OsMenuItem::new("Current assembly position").checked(true)))
+                            .submenu("Follow position", window, cx, move |sm, _, _| {
+                                let f = sub_after.clone();
+                                sm.item(crate::os_menu::OsMenuItem::new("Current assembly position").checked(true).on_click(move |_, window, cx| window.focus(&f, cx)))
+                            })
                             .separator()
                             .item(it("Delete", Rc::new(move |this, _, cx| this.delete_context(id, cx))))
                     });
