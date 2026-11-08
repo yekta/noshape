@@ -1484,3 +1484,26 @@ fn rods_crossing_inside_a_plate_cut_at_once_as_occt() {
     let (v, w) = (ours.shape.volume().unwrap(), occt.shape.volume().unwrap());
     assert!((v - w).abs() <= 1e-9 * w, "volume {v} against OCCT's {w}");
 }
+
+/// Two solids meeting on one planar face each, the same outline (a part split on a plane and fused again: cf-part-
+/// draft's drafted gear halves on z 0): the two shells sewn along it, without a Boolean; OCCT's counts (no unify) and
+/// the sum of the volumes. Shifted half off the other's face, they aren't glued. (Planes and cylinders go to
+/// noshape's Boolean first: switched off here, the glued fuse comes before OCCT's.)
+#[test]
+fn cylinders_meeting_on_a_whole_face_fuse_glued() {
+    k::set_rust_boolean(Some(false));
+    let (r, h) = (0.01, 0.02);
+    let up = k::make_cylinder(&z_frame(DVec3::ZERO), r, h, TAU).unwrap();
+    let down = k::make_cylinder(&z_frame(DVec3::new(0.0, 0.0, -h)), r, h, TAU).unwrap();
+    let f = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&up), &[down], &k::BooleanOptions::default()).unwrap();
+    assert_eq!(k::last_boolean_path(), "glued");
+    assert!(f.shape.is_valid());
+    assert_eq!((f.shape.count(k::ShapeType::Solid), f.shape.count(k::ShapeType::Face)), (1, 4));
+    let v = f.shape.volume().unwrap();
+    assert!((v / (2.0 * std::f64::consts::PI * r * r * h) - 1.0).abs() < 1e-9, "{v}");
+    let aside = k::make_cylinder(&z_frame(DVec3::new(r, 0.0, -h)), r, h, TAU).unwrap();
+    let g = k::boolean(k::BooleanOp::Fuse, &[up], &[aside], &k::BooleanOptions::default()).unwrap();
+    assert_ne!(k::last_boolean_path(), "glued");
+    assert!(g.shape.is_valid());
+    k::set_rust_boolean(None);
+}

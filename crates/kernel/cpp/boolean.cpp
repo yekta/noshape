@@ -37,6 +37,7 @@
 #include <Message_ProgressIndicator.hxx>
 #include <Message_ProgressScope.hxx>
 #include <BRepBndLib.hxx>
+#include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <Geom2d_BSplineCurve.hxx>
 #include <Geom2d_TrimmedCurve.hxx>
@@ -6131,6 +6132,194 @@ static bool cut_through_holes(const TopoDS_Shape& target, const std::vector<Topo
 }
 
 
+// Two solids meeting on one planar face each, the two faces' outlines the same edge for edge and each solid on its own
+// side of their plane (a part split on a plane, its halves drafted about it and fused again: cf-part-draft's Part
+// Draft 3, two 153-face halves on z 0, 1.9 s of OCCT's). The fuse is the two shells sewn along that outline, without
+// the two faces. False when it doesn't apply; the caller fuses as usual.
+static bool fuse_glued(const TopoDS_Shape& target, const TopoDS_Shape& tool, TopoDS_Shape& out, HHist& hist)
+{
+  auto only = [](const TopoDS_Shape& s, TopAbs_ShapeEnum k, TopoDS_Shape& one) {
+    int n = 0;
+    for (TopExp_Explorer e(s, k); e.More(); e.Next(), ++n)
+      one = e.Current();
+    return n == 1;
+  };
+  TopoDS_Shape sa, sb, sha, shb;
+  if (!only(target, TopAbs_SOLID, sa) || !only(tool, TopAbs_SOLID, sb) || !only(sa, TopAbs_SHELL, sha) || !only(sb, TopAbs_SHELL, shb))
+    return false;
+  // (Not two that share a vertex already: OCCT keeps or rebuilds those as its own rules say.)
+  {
+    ShapeIMap va;
+    TopExp::MapShapes(sa, TopAbs_VERTEX, va);
+    for (TopExp_Explorer x(sb, TopAbs_VERTEX); x.More(); x.Next())
+      if (va.Contains(x.Current()))
+        return false;
+  }
+  // Each planar face's plane, its normal outward.
+  struct Flat
+  {
+    TopoDS_Face face;
+    gp_Pln      pln;
+    gp_Dir      n;
+  };
+  auto flats = [](const TopoDS_Shape& s) {
+    std::vector<Flat> v;
+    for (TopExp_Explorer x(s, TopAbs_FACE); x.More(); x.Next())
+    {
+      const TopoDS_Face&  f = TopoDS::Face(x.Current());
+      BRepAdaptor_Surface su(f, false);
+      if (su.GetType() != GeomAbs_Plane)
+        continue;
+      const gp_Pln pl = su.Plane();
+      gp_Dir       n  = pl.Axis().Direction();
+      if (f.Orientation() == TopAbs_REVERSED)
+        n.Reverse();
+      v.push_back({f, pl, n});
+    }
+    return v;
+  };
+  const std::vector<Flat> fa = flats(sa), fb = flats(sb);
+  double tol = 1e-7;
+  for (const TopoDS_Shape* sh : {&sa, &sb})
+    for (TopExp_Explorer x(*sh, TopAbs_EDGE); x.More(); x.Next())
+      tol = std::max(tol, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
+  // The one pair facing each other on one plane; no other planar face of either on it.
+  const Flat* pa = nullptr;
+  const Flat* pb = nullptr;
+  for (const Flat& x : fa)
+    for (const Flat& y : fb)
+      if (x.n.Dot(y.n) < -1 + 1e-12 && x.pln.Distance(y.pln.Location()) <= tol)
+      {
+        if (pa != nullptr)
+          return false;
+        pa = &x;
+        pb = &y;
+      }
+  if (pa == nullptr)
+    return false;
+  const gp_Pln& pl  = pa->pln;
+  auto          on = [&](const std::vector<Flat>& v, const Flat* keep) {
+    return std::any_of(v.begin(), v.end(), [&](const Flat& x) { return &x != keep && x.pln.Axis().Direction().IsParallel(pl.Axis().Direction(), 1e-12) && pl.Distance(x.pln.Location()) <= tol; });
+  };
+  if (on(fa, pa) || on(fb, pb))
+    return false;
+  // The same outline: each of b's edges one of a's, by its ends and its middle.
+  ShapeIMap ea, eb;
+  TopExp::MapShapes(pa->face, TopAbs_EDGE, ea);
+  TopExp::MapShapes(pb->face, TopAbs_EDGE, eb);
+  if (ea.Extent() != eb.Extent() || ea.Extent() == 0)
+    return false;
+  auto mid = [](const TopoDS_Edge& e) {
+    BRepAdaptor_Curve c(e);
+    return c.Value(0.5 * (c.FirstParameter() + c.LastParameter()));
+  };
+  std::vector<char> used((size_t)ea.Extent() + 1);
+  for (int j = 1; j <= eb.Extent(); ++j)
+  {
+    const TopoDS_Edge& e  = TopoDS::Edge(eb(j));
+    const gp_Pnt       b0 = BRep_Tool::Pnt(TopExp::FirstVertex(e)), b1 = BRep_Tool::Pnt(TopExp::LastVertex(e)), bm = mid(e);
+    bool               found = false;
+    for (int i = 1; i <= ea.Extent() && !found; ++i)
+    {
+      if (used[(size_t)i])
+        continue;
+      const TopoDS_Edge& d  = TopoDS::Edge(ea(i));
+      const double       t  = 2 * tol;
+      const gp_Pnt       a0 = BRep_Tool::Pnt(TopExp::FirstVertex(d)), a1 = BRep_Tool::Pnt(TopExp::LastVertex(d));
+      if (((a0.Distance(b0) <= t && a1.Distance(b1) <= t) || (a0.Distance(b1) <= t && a1.Distance(b0) <= t)) && mid(d).Distance(bm) <= t)
+        found = used[(size_t)i] = 1;
+    }
+    if (!found)
+      return false;
+  }
+  // Each on its own side: its box in the plane's frame, and its vertices on the plane the face's.
+  gp_Trsf to_plane;
+  to_plane.SetTransformation(gp_Ax3(pl.Location(), pa->n));
+  auto side = [&](const TopoDS_Shape& s, const TopoDS_Face& f, bool below) {
+    Bnd_Box box;
+    BRepBndLib::Add(s.Moved(TopLoc_Location(to_plane)), box, false);
+    double x0, y0, z0, x1, y1, z1;
+    box.Get(x0, y0, z0, x1, y1, z1);
+    if (below ? z1 > 10 * tol + box.GetGap() : z0 < -10 * tol - box.GetGap())
+      return false;
+    ShapeIMap fv;
+    TopExp::MapShapes(f, TopAbs_VERTEX, fv);
+    for (TopExp_Explorer x(s, TopAbs_VERTEX); x.More(); x.Next())
+      if (!fv.Contains(x.Current()) && pl.Distance(BRep_Tool::Pnt(TopoDS::Vertex(x.Current()))) <= 2 * tol)
+        return false;
+    return true;
+  };
+  if (!side(sa, pa->face, true) || !side(sb, pb->face, false))
+    return false;
+  // Sewn: each shell without its face, joined along the outline.
+  BRep_Builder b;
+  TopoDS_Shell s1, s2;
+  b.MakeShell(s1);
+  b.MakeShell(s2);
+  for (TopoDS_Iterator x(sha); x.More(); x.Next())
+    if (!x.Value().IsSame(pa->face))
+      b.Add(s1, x.Value());
+  for (TopoDS_Iterator x(shb); x.More(); x.Next())
+    if (!x.Value().IsSame(pb->face))
+      b.Add(s2, x.Value());
+  BRepBuilderAPI_Sewing sew(2 * tol, true, false, false, false);
+  sew.Add(s1);
+  sew.Add(s2);
+  sew.Perform();
+  if (sew.NbFreeEdges() != 0 || sew.NbMultipleEdges() != 0)
+    return false;
+  TopoDS_Shape shell;
+  if (!only(sew.SewedShape(), TopAbs_SHELL, shell))
+    return false;
+  TopoDS_Solid sol;
+  b.MakeSolid(sol);
+  TopoDS_Shell closed = TopoDS::Shell(shell);
+  closed.Closed(true);
+  b.Add(sol, closed);
+  BRepLib::OrientClosedSolid(sol);
+  if (!BRepCheck_Analyzer(sol).IsValid())
+    return false;
+  // (As OCCT's fuse records it: both solids deleted, and what touches the outline (its vertices, the edges at them,
+  // the faces of those edges) modified even where the sewing kept it.)
+  hist = new BRepTools_History();
+  hist->Remove(sa);
+  hist->Remove(sb);
+  ShapeIMap touch;
+  for (const TopoDS_Face* f : {&pa->face, &pb->face})
+    TopExp::MapShapes(*f, TopAbs_VERTEX, touch);
+  for (const TopoDS_Shape* sh : {&sa, &sb})
+  {
+    ShapeAncMap ve, ef;
+    TopExp::MapShapesAndUniqueAncestors(*sh, TopAbs_VERTEX, TopAbs_EDGE, ve);
+    TopExp::MapShapesAndUniqueAncestors(*sh, TopAbs_EDGE, TopAbs_FACE, ef);
+    for (int i = 1, n = touch.Extent(); i <= n; ++i)
+      if (const ShapeList* es = touch(i).ShapeType() == TopAbs_VERTEX ? ve.Seek(touch(i)) : nullptr)
+        for (ShapeList::Iterator e(*es); e.More(); e.Next())
+        {
+          touch.Add(e.Value());
+          for (ShapeList::Iterator f(ef.FindFromKey(e.Value())); f.More(); f.Next())
+            touch.Add(f.Value());
+        }
+  }
+  for (const TopoDS_Shape* sh : {&sa, &sb})
+    for (const TopAbs_ShapeEnum k : {TopAbs_FACE, TopAbs_EDGE, TopAbs_VERTEX})
+    {
+      ShapeIMap m;
+      TopExp::MapShapes(*sh, k, m);
+      for (int i = 1; i <= m.Extent(); ++i)
+      {
+        const TopoDS_Shape& x = m(i);
+        const TopoDS_Shape  y = sew.IsModifiedSubShape(x) ? sew.ModifiedSubShape(x) : x;
+        if (x.IsSame(pa->face) || x.IsSame(pb->face))
+          hist->Remove(x);
+        else if (!y.IsSame(x) || touch.Contains(x))
+          hist->AddModified(x, y);
+      }
+    }
+  out = sol;
+  return true;
+}
+
 // A tool standing on a planar face of the target (a boss extruded from a
 // sketch on the face): one of its planar faces lies in the face's plane,
 // facing it, inside it and clear of its edges, and the rest of the tool is
@@ -7195,6 +7384,41 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
   }
   // A tool standing on a face of the target (a boss): built directly.
+  // Two solids meeting on a whole planar face each (fuse_glued): first where either has free-form faces (noshape's
+  // Boolean's slow part: cf-part-draft's halves 1.2 s), else once it has declined (it is quicker on the rest).
+  const bool glue_case = op == 0 && a.size() == 1 && t.size() == 1 && facets.source.empty() && opts.fuzzy <= 0 && !opts.unify;
+  auto       free_form = [](const TopoDS_Shape& x) {
+    for (TopExp_Explorer f(x, TopAbs_FACE); f.More(); f.Next())
+      switch (BRepAdaptor_Surface(TopoDS::Face(f.Current()), false).GetType())
+      {
+        case GeomAbs_Plane:
+        case GeomAbs_Cylinder:
+        case GeomAbs_Cone:
+        case GeomAbs_Sphere:
+        case GeomAbs_Torus:
+          break;
+        default:
+          return true;
+      }
+    return false;
+  };
+  const bool glue_first = glue_case && (free_form(a[0]) || free_form(t[0]));
+  auto       glued      = [&]() -> std::optional<OpOut> {
+    TopoDS_Shape out;
+    HHist        h;
+    bool         done = false;
+    {
+      const KernelTimer timer("boolean.glued");
+      done = fuse_glued(a[0], t[0], out, h);
+    }
+    if (!done)
+      return std::nullopt;
+    t_bool_path = "glued";
+    return make_result(concat(args.items, tools.items), out, h.get(), &srcs);
+  };
+  if (glue_first)
+    if (std::optional<OpOut> r = glued())
+      return std::move(*r);
   if (op == 0 && a.size() == 1 && t.size() == 1 && facets.source.empty())
   {
     TopoDS_Shape out;
@@ -7322,6 +7546,9 @@ OpOut op_boolean(uint8_t op, const OcShapeList& args, const OcShapeList& tools,
       return r;
     }
   }
+  if (glue_case && !glue_first)
+    if (std::optional<OpOut> r = glued())
+      return std::move(*r);
   // Many tools apart from each other cut out of one solid (holes): in slabs.
   if (op == 1 && opts.unify && a.size() == 1 && facets.source.empty())
   {
