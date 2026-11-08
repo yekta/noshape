@@ -1,0 +1,40 @@
+{
+ "name": "vs-value-decimals",
+ "about": "Value 1.23456 mm, Enter, then the cell hovered: rounded to the workspace precision, its tooltip the full value",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "1.23456 mm"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "hover",
+   "on": {
+    "var_cell": "width:Value"
+   },
+   "ms": 1500
+  }
+ ]
+}

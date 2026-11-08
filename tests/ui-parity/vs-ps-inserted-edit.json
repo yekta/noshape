@@ -1,0 +1,45 @@
+{
+ "name": "vs-ps-inserted-edit",
+ "about": "Part Studio 1's Variable table: width's Value in the inserted Variable Studio 1 set to 45 mm, then Variable Studio 1's tab",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "45 mm"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  }
+ ]
+}

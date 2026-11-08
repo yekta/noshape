@@ -1,0 +1,69 @@
+{
+ "name": "vs-insert-reset-default",
+ "about": "As vs-insert-config-expand, then the row's ▾ › Reset to default; ✕",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configure Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Configuration inputs:Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Reset to default"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "cancel"
+   }
+  }
+ ]
+}

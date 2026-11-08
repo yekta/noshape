@@ -1,0 +1,61 @@
+{
+ "name": "vs-cfg-set-to-cv",
+ "about": "Insert into all off, a Configuration variable len (Length), then width's Value right-click › Set to #len",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Configure Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configuration variable"
+   }
+  },
+  {
+   "do": "type",
+   "text": "len"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Set to #len"
+   }
+  }
+ ]
+}

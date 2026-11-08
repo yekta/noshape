@@ -1,0 +1,25 @@
+{
+ "name": "vs-column-resize",
+ "about": "Drag the Value header's right edge to the Description header: the column widens",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "var_header": "Value",
+    "edge": "right"
+   },
+   "to": {
+    "var_header": "Description"
+   }
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "vs-help-learn-more",
+ "about": "Insert into all's ? popover, then Learn more about Variable Studios (help in a browser tab)",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert into all help"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Learn more about Variable Studios"
+   }
+  }
+ ]
+}

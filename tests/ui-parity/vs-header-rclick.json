@@ -1,0 +1,27 @@
+{
+ "name": "vs-header-rclick",
+ "about": "Right-click the table's Value and Name headers: no menu",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_header": "Value"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_header": "Name"
+   }
+  }
+ ]
+}

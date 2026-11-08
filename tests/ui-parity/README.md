@@ -272,6 +272,17 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 - `{"var_cell": "width:Value"}`: a variable's cell by its name and column (`Name`, `Variable type`, `Value`,
   `Description`); `{"var_cell": "Name"}` the italic Name cell of the add row; `{"var_cell": "count:Variable type",
   "pick": "Any"}` picks a type.
+- Variable tables (psui, 11-08; a Variable Studio's and a Part Studio's or Assembly's Variable table panel):
+  `{"var_header": "Value"}` a column's header cell (`Name`, `Variable type`, `Value`, `Description`; with `"edge":
+  "right"` its resize handle, for a `drag`); `{"table_title": "Variable Studio 1"}` a table's title text (an inserted
+  studio's too: a `drag` from it reorders, `"edge": "top"` on the drop target); `{"button": "Automatically referenced
+  Variable Studio"}` that icon on an inserted table's title (by its tooltip); help links by their text: `{"button":
+  "Learn more about variable tables"}` (the empty panel's), `{"button": "Learn more about Variable Studios"}` (Insert
+  into all's ? popover). The Insert Variable Studio dialog: `{"button": "Insert Variable Studio help"}` (its ?),
+  `{"button": "Create version…"}` and `{"button": "Version graph"}` (the document header's squares, by tooltip), a
+  configured studio row's ▦ `{"button": "Configuration inputs:<studio>"}` and its ▾ `{"caret": "Configuration
+  inputs:<studio>"}`. A Variable Studio's Configuration panel: `{"field": "Filter inputs"}`, a List input's italic add
+  row `{"config_row": "Name"}`.
 - On a Variable Studio tab the state has `"variables": {"tables": [{"title": "Variable Studio 1", "rows": [{"name",
   "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
   (an expression's result while the cell isn't being edited).

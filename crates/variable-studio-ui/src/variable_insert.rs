@@ -137,6 +137,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         let open = !state.borrow().collapsed.contains(&key);
         let cfg_key = key.clone();
         let (doc1, st, ext1) = (doc.clone(), state.clone(), external.clone());
+        let (open_mark, more_mark) = (format!("button:Configuration inputs:{name}"), format!("caret:Configuration inputs:{name}"));
         rows.push(
             h_flex()
                 .id(SharedString::from(format!("ivs-{}-{id}", path.as_ref().map(|p| p.display().to_string()).unwrap_or_default())))
@@ -202,7 +203,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                             .border_1()
                             .border_color(rgb(0xaaaaaa))
                             .bg(crate::theme::p().panel)
-                            .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).px(px(5.)).h_full().flex().items_center().child(crate::assets::icon("configuration", 18., cx)).on_click({
+                            .child(div().id(SharedString::from(format!("ivs-cfg-open-{id}"))).map(|d| crate::ui_script::mark(d, || open_mark)).px(px(5.)).h_full().flex().items_center().child(crate::assets::icon("configuration", 18., cx)).on_click({
                                 let (st, key) = (st.clone(), key.clone());
                                 move |_, window, cx| {
                                     cx.stop_propagation();
@@ -214,7 +215,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                                 }
                             }))
                             // Live vs-926: Set to last viewed / Reset to default.
-                            .child(div().id(SharedString::from(format!("ivs-cfg-more-{id}"))).w(px(20.)).h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text)).on_click({
+                            .child(div().id(SharedString::from(format!("ivs-cfg-more-{id}"))).map(|d| crate::ui_script::mark(d, || more_mark)).w(px(20.)).h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(crate::ui::glyph("drawing-tool-caret", 12., pal.text)).on_click({
                                 let (st, key, last) = (st.clone(), key.clone(), cfg.active.clone());
                                 move |e: &ClickEvent, window, cx| {
                                     cx.stop_propagation();
@@ -739,8 +740,8 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(div().truncate().text_size(px(14.67)).font_weight(FontWeight::MEDIUM).line_height(px(19.)).text_color(pal.text).child(doc_name))
                     .child(h_flex().gap_1().opacity(0.5).text_size(px(12.)).line_height(px(15.6)).text_color(pal.text).child(crate::ui::glyph("branch", 10., pal.text)).child(own_label)),
             )
-            .child(square("ivs-create-version", "version", "Create version…", false).on_click(move |_, window, cx| crate::variable_hooks::create_version(doc_v.clone(), window, cx)))
-            .child(square("ivs-version-graph", "version-graph", "Version graph", graph).on_click(move |_, window, _| {
+            .child(square("ivs-create-version", "version", "Create version…", false).map(|d| crate::ui_script::mark(d, || "button:Create version…".into())).on_click(move |_, window, cx| crate::variable_hooks::create_version(doc_v.clone(), window, cx)))
+            .child(square("ivs-version-graph", "version-graph", "Version graph", graph).map(|d| crate::ui_script::mark(d, || "button:Version graph".into())).on_click(move |_, window, _| {
                 let mut s = st_g.borrow_mut();
                 s.graph = !s.graph;
                 window.refresh();
@@ -859,7 +860,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(
                         h_flex().h(px(22.)).flex_none().border_t_1().border_color(rgb(0xeaeaea)).justify_end().pr(px(4.)).child(
                             // Live: opens help "Variable Studios" (same from every tab).
-                            div().id("ivs-help").cursor_pointer().child(crate::assets::icon("help-faint", 14., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Variable Studios", cx)),
+                            div().id("ivs-help").map(|d| crate::ui_script::mark(d, || "button:Insert Variable Studio help".into())).cursor_pointer().child(crate::assets::icon("help-faint", 14., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Variable Studios", cx)),
                         ),
                     ),
             )

@@ -1,0 +1,59 @@
+{
+ "name": "vs-ps-shadow-by-feature",
+ "about": "Part Studio 1: a Variable feature width = 50 mm after the features, then the Variable table panel",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Variable"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Name"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "width"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Value"
+   }
+  },
+  {
+   "do": "type",
+   "text": "50 mm"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  }
+ ]
+}

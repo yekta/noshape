@@ -1,0 +1,31 @@
+{
+ "name": "vs-ps-own-table-menu",
+ "about": "Part Studio 1's Variable table: the own table's ⋯ (Copy table, Collapse all tables); Esc",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_more": "Variable table"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

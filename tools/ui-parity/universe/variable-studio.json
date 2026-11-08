@@ -532,7 +532,24 @@
    "where": "Value cell while focused",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2105"
+   "source": "behaviours.md:2105",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*[-+*/].*"
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-decimals-tooltip",
@@ -541,7 +558,17 @@
    "where": "Value cell hover",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:4282"
+   "source": "behaviours.md:4282",
+   "via": [
+    [
+     {
+      "do": "hover",
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-expression-refocus",
@@ -550,7 +577,29 @@
    "where": "Value cell focus",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4285"
+   "source": "behaviours.md:4285",
+   "via": [
+    [
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*[-+*/].*"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     },
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-autocomplete",
@@ -674,7 +723,19 @@
    "where": "table header title (editable)",
    "freq": 3,
    "cloud": false,
-   "source": "dom/variable-studio.txt"
+   "source": "dom/variable-studio.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "table_title": "*"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-column-resize",
@@ -683,7 +744,17 @@
    "where": "table header",
    "freq": 3,
    "cloud": false,
-   "source": "dom/variable-studio.txt"
+   "source": "dom/variable-studio.txt",
+   "via": [
+    [
+     {
+      "do": "drag",
+      "on": {
+       "var_header": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-header-no-menu",
@@ -692,7 +763,17 @@
    "where": "table header",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1772"
+   "source": "behaviours.md:1772",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "var_header": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-row-delete",
@@ -1013,7 +1094,16 @@
    "where": "footer ? popover",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1568"
+   "source": "behaviours.md:1568",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Learn more about Variable Studios"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-table-editable",
@@ -1022,7 +1112,28 @@
    "where": "inserted table in a Variable Studio / Variable table",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1571"
+   "source": "behaviours.md:1571",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     },
+     {
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-switch-to",
@@ -1100,7 +1211,21 @@
    "where": "inserted table ⋯ (not first)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2782"
+   "source": "behaviours.md:2782",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Move up"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-move-down",
@@ -1109,7 +1234,21 @@
    "where": "inserted table ⋯ (not last)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2782"
+   "source": "behaviours.md:2782",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Move down"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-rename",
@@ -1173,7 +1312,17 @@
    "where": "Variable table / Variable Studio",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2777"
+   "source": "behaviours.md:2777",
+   "via": [
+    [
+     {
+      "do": "drag",
+      "on": {
+       "table_title": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-shadowed-warning",
@@ -1182,7 +1331,27 @@
    "where": "Name cell of a shadowed variable",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:2759"
+   "source": "behaviours.md:2759",
+   "via": [
+    [
+     {
+      "on": {
+       "panel_row": "Variable Studio 2"
+      }
+     },
+     {
+      "on": {
+       "button": "ok"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "var_cell": "re:.+:Name"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-auto-ref-icon",
@@ -1191,7 +1360,17 @@
    "where": "Variable table header",
    "freq": 3,
    "cloud": false,
-   "source": "dom/assembly-panel-variable-table.txt"
+   "source": "dom/assembly-panel-variable-table.txt",
+   "via": [
+    [
+     {
+      "do": "hover",
+      "on": {
+       "button": "Automatically referenced Variable Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-dialog",
@@ -1285,7 +1464,21 @@
    "where": "Insert Variable Studio dialog document header",
    "freq": 3,
    "cloud": false,
-   "source": "dom/dialog-insert-variable-studio.txt"
+   "source": "dom/dialog-insert-variable-studio.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "button": "Create version…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-version-graph",
@@ -1294,7 +1487,21 @@
    "where": "Insert Variable Studio dialog document header",
    "freq": 3,
    "cloud": false,
-   "source": "dom/dialog-insert-variable-studio.txt"
+   "source": "dom/dialog-insert-variable-studio.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "button": "Version graph"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-pick-preview",
@@ -1326,7 +1533,31 @@
    "where": "Variable table",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2760"
+   "source": "behaviours.md:2760",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     },
+     {
+      "on": {
+       "button": "Insert Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "panel_row": "Variable Studio 2"
+      }
+     },
+     {
+      "on": {
+       "button": "ok"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-config-expand",
@@ -1335,7 +1566,16 @@
    "where": "Insert Variable Studio dialog row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5490"
+   "source": "behaviours.md:5490",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Configuration inputs:.+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-set-to-last-viewed",
@@ -1344,7 +1584,21 @@
    "where": "Insert Variable Studio dialog row ▾ next to ▦",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5493"
+   "source": "behaviours.md:5493",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "re:Configuration inputs:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Set to last viewed"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-reset-to-default",
@@ -1353,7 +1607,21 @@
    "where": "Insert Variable Studio dialog row ▾ next to ▦",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5493"
+   "source": "behaviours.md:5493",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "re:Configuration inputs:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Reset to default"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-help",
@@ -1362,7 +1630,16 @@
    "where": "Insert Variable Studio dialog footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:7528"
+   "source": "behaviours.md:7528",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Insert Variable Studio help"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-variable-table-panel",
@@ -1412,7 +1689,21 @@
    "where": "Variable table with nothing inserted",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1569"
+   "source": "behaviours.md:1569",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     },
+     {
+      "on": {
+       "button": "Learn more about variable tables"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-own-table-menu",
@@ -1421,7 +1712,21 @@
    "where": "Variable table own table ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:28438"
+   "source": "behaviours.md:28438",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     },
+     {
+      "on": {
+       "panel_more": "Variable table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-asm-variable-table",
@@ -1453,7 +1758,29 @@
    "where": "feature field typing #name",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1569"
+   "source": "behaviours.md:1569",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 1"
+      }
+     },
+     {
+      "on": {
+       "field": "*"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:#.*"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-shadow-by-feature",
@@ -1462,7 +1789,21 @@
    "where": "Part Studio",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:7027"
+   "source": "behaviours.md:7027",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Variable"
+      }
+     },
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-fs-monitor-profile",
@@ -1635,7 +1976,23 @@
    "where": "configuration input table",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5465"
+   "source": "behaviours.md:5465",
+   "via": [
+    [
+     {
+      "on": {
+       "config_row": "Name"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-configure",
@@ -1692,7 +2049,22 @@
    "where": "Value cell right-click (matching config variable)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5471"
+   "source": "behaviours.md:5471",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Set to #.+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-configured-cell-look",
@@ -1701,7 +2073,22 @@
    "where": "Value cell",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5473"
+   "source": "behaviours.md:5473",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Configure( with .+)?"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-input-menu",
@@ -1811,7 +2198,19 @@
    "where": "Configuration panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17673"
+   "source": "behaviours.md:17673",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Filter inputs"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-delete-all-restores",

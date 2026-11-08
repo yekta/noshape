@@ -1,0 +1,33 @@
+{
+ "name": "vs-table-title-rename",
+ "about": "Click the table's title, type Sizes, Enter",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "table_title": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "Sizes"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

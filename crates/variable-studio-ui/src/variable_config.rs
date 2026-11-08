@@ -565,7 +565,7 @@ impl VariableStudioView {
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_cfg_text(key.clone(), String::new(), add.clone(), window, cx)))
                     .into_any_element(),
             };
-            table = table.child(h_flex().child(cell(NAME_W).child(add_cell)));
+            table = table.child(h_flex().child(cell(NAME_W).map(|d| crate::ui_script::mark(d, || "config_row:Name".into())).child(add_cell)));
         }
         section = section.child(div().id(SharedString::from(format!("vcfg-table-{iid}"))).overflow_x_scroll().child(table));
         if columns.is_empty() {
@@ -701,7 +701,7 @@ impl VariableStudioView {
                 .px(px(6.))
                 .gap(px(4.))
                 .child(crate::ui::glyph("filter", 16., pal.text))
-                .child(div().flex_1().child(crate::os_ui::input_h(Input::new(&filter).text_size(px(13.)), 26.)))
+                .child(div().flex_1().map(|d| crate::ui_script::mark(d, || "field:Filter inputs".into())).child(crate::os_ui::input_h(Input::new(&filter).text_size(px(13.)), 26.)))
                 .child(toggle("vcfg-k-list", "cfg-filter-list", 0, self, cx))
                 .child(toggle("vcfg-k-check", "cfg-filter-checkbox", 1, self, cx))
                 .child(toggle("vcfg-k-var", "cfg-filter-variable", 2, self, cx))

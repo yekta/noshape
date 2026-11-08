@@ -462,6 +462,7 @@ impl PartStudioView {
             .map(|(c, h)| {
                 let dragging = self.ui.var_col_drag.is_some_and(|d| d.0 == c);
                 cell(h.into(), true, ws[c])
+                    .map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}")))
                     .text_size(px(14.))
                     .bg(pal.table_header)
                     .relative()
@@ -982,6 +983,7 @@ impl PartStudioView {
                                         h_flex().child("Studio.\u{a0}").child(
                                             div()
                                                 .id("vt-help")
+                                                .map(|d| crate::ui_script::mark(d, || "button:Learn more about variable tables".into()))
                                                 .font_weight(FontWeight::BOLD)
                                                 .text_color(gpui_kit::rgb(0x094174))
                                                 .underline()

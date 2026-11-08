@@ -225,7 +225,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "editor", "cp_header", "notice", "profile_badge", "table_cell"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "editor", "cp_header", "notice", "profile_badge", "table_cell"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))

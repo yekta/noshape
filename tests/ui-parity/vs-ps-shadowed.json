@@ -1,0 +1,46 @@
+{
+ "name": "vs-ps-shadowed",
+ "about": "Part Studio 1's Variable table: insert Variable Studio 2 (its width shadows Variable Studio 1's), then hover width's Name cell",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "var_cell": "width:Name"
+   },
+   "ms": 1500
+  }
+ ]
+}

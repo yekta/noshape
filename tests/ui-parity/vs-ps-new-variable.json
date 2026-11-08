@@ -1,0 +1,39 @@
+{
+ "name": "vs-ps-new-variable",
+ "about": "Part Studio 1: Extrude 1's Depth typed #depth2 (no such variable), Enter: New variable…",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "#depth2"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

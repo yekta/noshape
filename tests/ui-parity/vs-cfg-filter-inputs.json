@@ -1,0 +1,43 @@
+{
+ "name": "vs-cfg-filter-inputs",
+ "about": "Insert into all off, Configure Variable Studio, then Filter inputs :name Conf",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configure Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Filter inputs"
+   }
+  },
+  {
+   "do": "type",
+   "text": ":name Conf"
+  }
+ ]
+}

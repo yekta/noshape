@@ -715,6 +715,7 @@ impl VariableStudioView {
                             .child(
                                 div()
                                     .id("vs-help-learn")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Learn more about Variable Studios".into()))
                                     .cursor_pointer()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .underline()
@@ -1088,7 +1089,7 @@ impl Render for VariableStudioView {
                             // part-studio/160); one there only through "Insert into all…" with
                             // the automatic-reference icon (live dom assembly-panel-variable-table).
                             .when(in_panel && !auto_ref, |r| r.child(crate::assets::icon("variable-studio", 20., cx)))
-                            .when(auto_ref, |r| r.child(div().id("vs-auto-ref").pl(px(4.)).tooltip(crate::ui::tooltip("Automatically referenced Variable Studio")).child(crate::assets::icon("auto-variable-reference", 20., cx))))
+                            .when(auto_ref, |r| r.child(div().id("vs-auto-ref").map(|d| crate::ui_script::mark(d, || "button:Automatically referenced Variable Studio".into())).pl(px(4.)).tooltip(crate::ui::tooltip("Automatically referenced Variable Studio")).child(crate::assets::icon("auto-variable-reference", 20., cx))))
                             .child(match &self.renaming {
                                 Some(st) => div()
                                     .w(px(260.))
@@ -1105,7 +1106,7 @@ impl Render for VariableStudioView {
                                         }
                                     }))
                                     .child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
-                                None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title)).into_any_element(),
+                                None => div().map(|d| crate::ui_script::mark(d, || format!("table_title:{title}"))).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title)).into_any_element(),
                             })
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                                 this.collapsed = !this.collapsed;
@@ -1168,7 +1169,7 @@ impl Render for VariableStudioView {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(pal.text)
-                        .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| cell_div(c).justify_center().child(h))),
+                        .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| cell_div(c).map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}"))).justify_center().child(h))),
                 )
                 .children(rows)
                 .when(only.is_none(), |t| {

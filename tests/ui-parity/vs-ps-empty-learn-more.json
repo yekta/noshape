@@ -1,0 +1,21 @@
+{
+ "name": "vs-ps-empty-learn-more",
+ "about": "Part Studio 1's empty Variable table: its text, then Learn more about variable tables (help in a browser tab)",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Learn more about variable tables"
+   }
+  }
+ ]
+}

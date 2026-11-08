@@ -1,0 +1,49 @@
+{
+ "name": "vs-ps-inserted-drag",
+ "about": "Part Studio 1's Variable table: insert Variable Studio 2, then drag its title above Variable Studio 1's",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "table_title": "Variable Studio 2"
+   },
+   "to": {
+    "table_title": "Variable Studio 1",
+    "edge": "top"
+   }
+  }
+ ]
+}

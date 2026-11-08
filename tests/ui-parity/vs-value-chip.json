@@ -1,0 +1,33 @@
+{
+ "name": "vs-value-chip",
+ "about": "Value cell typed an expression (no Enter): its evaluated-value chip; Esc",
+ "area": "psui",
+ "source": "universe variable-studio (psui 11-08, studios' coverage list)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "width:Value"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "40 mm + 5 mm"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
