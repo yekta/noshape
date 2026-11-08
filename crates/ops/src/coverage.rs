@@ -225,6 +225,10 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
 /// collects them). Labels built at run time ("Delete Part 1") aren't listed.
 pub const MENUS: &[(&str, Cover)] = &[
     ("app:About", Op("app_about")),
+    ("app:FeatureScript documentation", Op("featurestudio_std")),
+    ("app:Help", Op("app_help")),
+    ("app:Keyboard shortcuts", Op("ui_shortcuts")),
+    ("app:System check", Op("app_system_check")),
     ("app:Connect to coding agents…", Op("agents_connect")),
     ("app:Install command line tool…", Op("cli_install")),
     ("assembly:Add exploded view…", Op("assembly_exploded_view")),

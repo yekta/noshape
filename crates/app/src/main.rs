@@ -26,6 +26,8 @@ use noshape_history_ui::{compare_mode, history_panel};
 // The documents page (docs/CRATES.md), under its old path; what it needs of the app: `register_start_hooks`.
 use noshape_start_ui::start_window;
 mod about;
+mod help_menu;
+mod system_check;
 mod agent_setup;
 mod updates;
 #[cfg(test)]
@@ -395,7 +397,7 @@ fn register_history_hooks() {
 
 /// What the documents page (noshape-start-ui) needs of the app: a document's window, the build label.
 pub(crate) fn register_start_hooks() {
-    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page, help_items: agent_setup::help_items });
+    noshape_start_ui::start_hooks::register(noshape_start_ui::start_hooks::Hooks { open_document_window: files::open_document_window, open_document_at: files::open_document_at, build_label, import_dialog: import_dialog::open_for_page, help_items: help_menu::items });
     noshape_app_core::os_menu::set_floating(updates::card);
 }
 

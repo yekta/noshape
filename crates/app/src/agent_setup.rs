@@ -31,12 +31,10 @@ enum Scope {
     Everything,
 }
 
-/// The Help menu's items: the two setup dialogs, then About (live: last, after a divider).
+/// The Help menu's two setup rows (after live's rows: help_menu.rs).
 pub fn help_items(menu: OsMenu) -> OsMenu {
-    let menu = menu
-        .item(OsMenuItem::new("Install command line tool…").on_click(|_, window, cx| open(Scope::Cli, window, cx)))
-        .item(OsMenuItem::new("Connect to coding agents…").on_click(|_, window, cx| open(Scope::Agents, window, cx)));
-    crate::about::help_item(menu)
+    menu.item(OsMenuItem::new("Install command line tool…").on_click(|_, window, cx| open(Scope::Cli, window, cx)))
+        .item(OsMenuItem::new("Connect to coding agents…").on_click(|_, window, cx| open(Scope::Agents, window, cx)))
 }
 
 /// The two items as actions (the macOS app menu), in the active window.

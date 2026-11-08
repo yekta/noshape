@@ -21,6 +21,16 @@ pub fn ops() -> Vec<Op> {
     vec![
         Op {
             group: "featurestudio",
+            verb: "std",
+            summary: "The FeatureScript standard library noshape ships (Help › FeatureScript documentation): its modules, or one module's source",
+            description: "Without `module`: `version` and the `modules` by name (\"geometry.fs\", \"evaluate.fs\", …). With one: its `source`, as the read-only std document the app opens shows it.",
+            fields: vec![opt("module", s(), "A module's file name (\"common.fs\").")],
+            mutates: false,
+            destructive: false,
+            run: std_library,
+        },
+        Op {
+            group: "featurestudio",
             verb: "get",
             summary: "A Feature Studio's FeatureScript source, its compile notices and the features it defines",
             description: "The text the editor shows (the saved draft, else the committed source), whether it has uncommitted changes, the notices (errors, warnings, info with line and column) and the custom features it defines. Part Studios use the committed source.",
@@ -143,4 +153,13 @@ fn commit(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let types: Vec<Value> = noshape_model::custom::DocumentScripts::from_document(od.doc()).feature_types().iter().map(|t| json!({ "type": t.id, "name": t.name })).collect();
     Ok(json!({ "committed": tabs.len(), "feature_types": types }).into())
+}
+
+fn std_library(_: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_model::custom::{STD_SOURCES, STD_VERSION};
+    let Some(name) = a.opt_str("module")? else {
+        return Ok(json!({ "version": format!("{STD_VERSION}.0"), "modules": STD_SOURCES.iter().map(|(m, _)| *m).collect::<Vec<_>>() }).into());
+    };
+    let (module, source) = STD_SOURCES.iter().find(|(m, _)| *m == name || m.trim_end_matches(".fs") == name).ok_or_else(|| OpError::param("module", &format!("no module `{name}` in the standard library (featurestudio_std lists them)")))?;
+    Ok(json!({ "version": format!("{STD_VERSION}.0"), "module": module, "source": source }).into())
 }

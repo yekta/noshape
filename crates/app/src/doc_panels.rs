@@ -181,7 +181,7 @@ impl Render for NotesPanel {
 
 /// The Markdown subset the notes show: headings, bullet and numbered
 /// lists, paragraphs, **bold** and *italic*.
-fn markdown(src: &str) -> Div {
+pub(crate) fn markdown(src: &str) -> Div {
     let pal = p();
     let mut out = v_flex().px(px(15.)).py(px(15.)).gap(px(8.)).text_color(pal.text);
     let mut para: Vec<String> = Vec::new();
@@ -205,10 +205,10 @@ fn markdown(src: &str) -> Div {
             out = out.child(div().text_size(px(size)).font_weight(FontWeight::BOLD).child(inline(&t[m.len()..])));
         } else if let Some(rest) = bullet {
             out = flush(out, &mut para);
-            out = out.child(h_flex().items_start().gap(px(8.)).pl(px(10.)).text_size(px(14.)).line_height(px(21.)).child("•").child(div().flex_1().child(inline(rest))));
+            out = out.child(h_flex().items_start().gap(px(8.)).pl(px(10.)).text_size(px(14.)).line_height(px(21.)).child("•").child(div().flex_1().min_w_0().child(inline(rest))));
         } else if let Some((n, rest)) = numbered {
             out = flush(out, &mut para);
-            out = out.child(h_flex().items_start().gap(px(8.)).pl(px(10.)).text_size(px(14.)).line_height(px(21.)).child(format!("{n}.")).child(div().flex_1().child(inline(rest))));
+            out = out.child(h_flex().items_start().gap(px(8.)).pl(px(10.)).text_size(px(14.)).line_height(px(21.)).child(format!("{n}.")).child(div().flex_1().min_w_0().child(inline(rest))));
         } else {
             para.push(t.trim().to_string());
         }
@@ -260,11 +260,9 @@ pub struct PerfSnapshot {
 }
 
 impl PerfSnapshot {
-    /// Onshape flags software GL renderers (SwiftShader) as a performance
-    /// error; ours are llvmpipe, lavapipe, WARP and the like.
+    /// A software renderer (Onshape's performance error; `system_info::is_software_adapter`).
     pub fn software_renderer(&self) -> bool {
-        let a = self.adapter.as_deref().unwrap_or_default().to_lowercase();
-        ["llvmpipe", "lavapipe", "softpipe", "swiftshader", "software", "basic render"].iter().any(|k| a.contains(k))
+        noshape_scene::system_info::is_software_adapter(self.adapter.as_deref().unwrap_or_default())
     }
 }
 

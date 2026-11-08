@@ -18,7 +18,8 @@ pub struct Hooks {
     /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and whether to
     /// split them into a document each.
     pub import_dialog: fn(Vec<PathBuf>, ImportCallback, &mut Window, &mut App),
-    /// The app's rows of the Help menu (Install command line tool…, Connect to coding agents…).
+    /// The Help menu's rows (the app's help_menu: Help, FeatureScript documentation, Keyboard shortcuts, System check,
+    /// About, then its setup rows).
     pub help_items: fn(crate::os_menu::OsMenu) -> crate::os_menu::OsMenu,
 }
 

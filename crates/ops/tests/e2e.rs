@@ -724,6 +724,32 @@ fn workspace_units_are_not_an_undo_step() {
     assert_eq!(call(&mut ctx, "document_info", json!({}))["units"]["length"], "in", "the units stay");
 }
 
+/// Help › Help and Help › FeatureScript documentation: the user guide, the standard library's modules and sources.
+#[test]
+fn help_and_the_featurescript_library_read_offline() {
+    let mut ctx = Ctx::new();
+    let h = call(&mut ctx, "app_help", json!({}));
+    assert!(h["guide"].as_str().is_some_and(|g| g.starts_with("# noshape help")), "{h}");
+    let l = call(&mut ctx, "featurestudio_std", json!({}));
+    assert!(l["modules"].as_array().is_some_and(|m| m.iter().any(|m| m == "geometry.fs")), "{l}");
+    let m = call(&mut ctx, "featurestudio_std", json!({ "module": "common.fs" }));
+    assert!(m["source"].as_str().is_some_and(|s| s.starts_with("FeatureScript")), "{m}");
+    let e = try_call(&mut ctx, "featurestudio_std", json!({ "module": "nothing.fs" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("module"));
+}
+
+/// Help › System check: the system, its memory, the documents folder's disk and the graphics adapter.
+#[test]
+fn system_check_reports_the_machine() {
+    let mut ctx = Ctx::new();
+    let r = call(&mut ctx, "app_system_check", json!({}));
+    assert_eq!(r["os"], std::env::consts::OS, "{r}");
+    assert!(r["cpus"].as_u64().is_some_and(|n| n >= 1), "{r}");
+    assert!(r["memory"]["total"].as_u64().is_some_and(|t| t > 0), "{r}");
+    assert!(r["disk"]["total"].as_u64().is_some_and(|t| t > 0), "{r}");
+    assert!(r["graphics"]["software"].is_boolean() && r["problems"].is_array(), "{r}");
+}
+
 /// A version row's Branch to create workspace…: the workspace starts at that version, not at the current state.
 #[test]
 fn a_workspace_branches_from_a_version() {
@@ -1014,10 +1040,10 @@ fn hole_standard_sets_the_table_sizes() {
     call(&mut ctx, "feature_edit", json!({ "feature": "Hole 1", "params": g["params"].clone() }));
 }
 
-/// ☰ › Update workspace: a Variable Studio inserted from another document's
-/// V1 is listed once that document has a V2, and moved to it.
+/// The Reference manager's Update to latest: a Variable Studio inserted from another document's V1 is listed once that
+/// document has a V2, and moved to it. ☰ › Update workspace… is the feature library's (always the latest here).
 #[test]
-fn update_workspace_moves_references_to_newer_versions() {
+fn update_references_moves_references_to_newer_versions() {
     let mut ctx = Ctx::new();
     let lib = scratch("update-ws-lib.noshape");
     call(&mut ctx, "document_create", json!({ "path": lib.to_str().unwrap() }));
@@ -1027,14 +1053,16 @@ fn update_workspace_moves_references_to_newer_versions() {
     let user = scratch("update-ws-user.noshape");
     call(&mut ctx, "document_create", json!({ "path": user.to_str().unwrap() }));
     call(&mut ctx, "variable_insert_studio", json!({ "studio": "Sizes", "document": lib.to_str().unwrap(), "version": "V1" }));
-    let none = call(&mut ctx, "document_update_workspace", json!({}));
+    let ws = call(&mut ctx, "document_update_workspace", json!({}));
+    assert_eq!(ws["message"], "Workspace is already at the latest feature library version.", "{ws}");
+    let none = call(&mut ctx, "document_update_references", json!({}));
     assert_eq!(none["outdated"], json!([]), "{none}");
     // The library moves on.
     call(&mut ctx, "variable_set", json!({ "doc": lib.to_str().unwrap(), "tab": "Sizes", "variable": "w", "value": "20 mm" }));
     call(&mut ctx, "history_create_version", json!({ "doc": lib.to_str().unwrap(), "name": "V2" }));
-    let l = call(&mut ctx, "document_update_workspace", json!({ "doc": user.to_str().unwrap() }));
+    let l = call(&mut ctx, "document_update_references", json!({ "doc": user.to_str().unwrap() }));
     assert_eq!((l["outdated"][0]["from"].as_str(), l["outdated"][0]["to"].as_str()), (Some("V1"), Some("V2")), "{l}");
-    call(&mut ctx, "document_update_workspace", json!({ "doc": user.to_str().unwrap(), "apply": true }));
+    call(&mut ctx, "document_update_references", json!({ "doc": user.to_str().unwrap(), "apply": true }));
     let v = call(&mut ctx, "variable_list", json!({ "doc": user.to_str().unwrap() }));
     assert_eq!(v["studio_tables"][0]["version"], "V2", "{v}");
     assert!(v["visible_at_end"]["#w"].as_str().is_some_and(|w| w.starts_with("20")), "{v}");

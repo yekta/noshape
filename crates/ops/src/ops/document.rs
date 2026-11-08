@@ -30,12 +30,22 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "document",
             verb: "update_workspace",
-            summary: "References to other documents' versions with a newer version (☰ › Update workspace…), and updating them",
-            description: "Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit (\"Update workspace\"), as the dialog's Update.",
+            summary: "Move the workspace to the latest feature library (FeatureScript standard library) version (☰ › Update workspace…)",
+            description: "noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.",
+            fields: vec![doc_field()],
+            mutates: false,
+            destructive: false,
+            run: update_workspace,
+        },
+        Op {
+            group: "document",
+            verb: "update_references",
+            summary: "References to other documents' versions with a newer version (the Reference manager's Update to latest), and updating them",
+            description: "Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit, as the Reference manager's Update all.",
             fields: vec![doc_field(), opt("apply", json!({ "type": "boolean", "default": false }), "Update them all.")],
             mutates: true,
             destructive: false,
-            run: update_workspace,
+            run: update_references,
         },
         Op {
             group: "document",
@@ -461,6 +471,11 @@ fn tab_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 }
 
 fn update_workspace(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    ctx.doc(a.opt_str("doc")?)?;
+    Ok(json!({ "updated": false, "std_version": noshape_featurescript::STD_VERSION, "message": crate::workspace_update::LATEST_MESSAGE }).into())
+}
+
+fn update_references(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     use crate::workspace_update as wu;
     let od = ctx.doc(a.opt_str("doc")?)?;
     let list = wu::outdated(od.doc());

@@ -1,0 +1,21 @@
+{
+ "name": "doc-help-menu-featurescript-documentation",
+ "about": "Help menu › FeatureScript documentation (navbar › ? ▾)",
+ "area": "studios",
+ "source": "universe documents help-menu-featurescript-documentation (studios 11-08, coverage batch 5)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Help"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "FeatureScript documentation"
+   },
+   "do": "click"
+  }
+ ]
+}

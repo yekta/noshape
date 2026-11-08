@@ -318,7 +318,7 @@ the app.
 The operations by group. Field types are JSON types; lengths and angles take expressions with units.
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
-- **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
+- **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
@@ -340,10 +340,10 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
-- **featurestudio**: [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
+- **featurestudio**: [`featurestudio_std`](#featurestudio_std), [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
 - **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
 - **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
-- **app**: [`app_about`](#app_about)
+- **app**: [`app_help`](#app_help), [`app_system_check`](#app_system_check), [`app_about`](#app_about)
 
 ### ops
 
@@ -421,9 +421,25 @@ Examples:
 
 #### document_update_workspace
 
-References to other documents' versions with a newer version (☰ › Update workspace…), and updating them (edits the document (one undoable history entry)).
+Move the workspace to the latest feature library (FeatureScript standard library) version (☰ › Update workspace…).
 
-Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit ("Update workspace"), as the dialog's Update.
+noshape ships one standard library, so a workspace is always at the latest: the reply says so in Onshape's words (`message`) with the version (`std_version`). References to other documents' versions are updated with document_update_references.
+
+Examples:
+
+```json
+{}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+
+#### document_update_references
+
+References to other documents' versions with a newer version (the Reference manager's Update to latest), and updating them (edits the document (one undoable history entry)).
+
+Lists the Derived features and inserted Variable Studios that use an older version of another document than its newest one (`outdated`: what, its version, the newest). With `apply`, points them all at their newest version in one edit, as the Reference manager's Update all.
 
 Examples:
 
@@ -6647,6 +6663,23 @@ Examples:
 
 ### featurestudio
 
+#### featurestudio_std
+
+The FeatureScript standard library noshape ships (Help › FeatureScript documentation): its modules, or one module's source.
+
+Without `module`: `version` and the `modules` by name ("geometry.fs", "evaluate.fs", …). With one: its `source`, as the read-only std document the app opens shows it.
+
+Examples:
+
+```json
+{}
+{"module": "common.fs"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `module` | string |  | A module's file name ("common.fs"). |
+
 #### featurestudio_get
 
 A Feature Studio's FeatureScript source, its compile notices and the features it defines.
@@ -6807,6 +6840,30 @@ Examples:
 | `command` | string |  | The noshape binary agents start (`<command> mcp`). Default: this one (the app, or noshape-cli). |
 
 ### app
+
+#### app_help
+
+noshape's user guide, as Help › Help shows it (Markdown).
+
+`guide`: the guide's Markdown. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.
+
+Examples:
+
+```json
+{}
+```
+
+#### app_system_check
+
+What Help › System check shows: the system, its memory and the documents folder's disk, and the graphics adapter noshape draws with.
+
+`os`, `arch`, `cpus`; `memory` (`total`, `available` bytes; available is null where the system doesn't say); `disk` (the documents folder's: `path`, `free`, `total` bytes); `graphics` (`adapter`, "name (Backend)", and `software`: true for a software renderer such as llvmpipe or WARP, which draws slowly). `problems` lists what the dialog marks: a software renderer, under 4 GB of memory, under 1 GB free on the disk.
+
+Examples:
+
+```json
+{}
+```
 
 #### app_about
 

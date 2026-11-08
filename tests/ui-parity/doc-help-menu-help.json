@@ -1,0 +1,21 @@
+{
+ "name": "doc-help-menu-help",
+ "about": "Help menu › Help (navbar › ? ▾)",
+ "area": "studios",
+ "source": "universe documents help-menu-help (studios 11-08, coverage batch 5)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "on": {
+    "button": "Help"
+   },
+   "do": "click"
+  },
+  {
+   "on": {
+    "menu": "Help"
+   },
+   "do": "click"
+  }
+ ]
+}

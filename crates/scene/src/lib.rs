@@ -12,6 +12,7 @@ pub mod graphics_prefs;
 pub mod palette;
 pub mod png;
 pub mod sketch_mode;
+pub mod system_info;
 
 pub use graphics_prefs::GraphicsPrefs;
 

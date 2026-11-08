@@ -116,7 +116,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("sheetmetal_convert_to_rip", &[r##"{"bend": "Bend A"}"##]),
     ("sheetmetal_edit_joint", &[r##"{"joint": "Joint C", "style": "Butt joint - Direction 1"}"##, r##"{"joint": "Joint C", "type": "Bend"}"##]),
     ("sheetmetal_export_flat", &[r##"{"part": "Part 1", "file": "/tmp/flat.dxf"}"##]),
-    ("document_update_workspace", &[r##"{}"##, r##"{"apply": true}"##]),
+    ("document_update_workspace", &[r##"{}"##]),
+    ("document_update_references", &[r##"{}"##, r##"{"apply": true}"##]),
     ("variable_list", &[r##"{}"##]),
     ("variable_create", &[r##"{"name": "wall", "value": "2.5 mm"}"##, r##"{"name": "holes", "kind": "NUMBER", "value": 4}"##]),
     ("variable_set", &[r##"{"variable": "wall", "value": "3 mm"}"##, r##"{"name": "wall", "value": "3 mm"}"##, r##"{"variable": "wall", "new_name": "thickness"}"##]),
@@ -177,6 +178,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("import_files", &[r##"{"files": ["/tmp/bracket.step"]}"##, r##"{"files": ["/tmp/a.x_t", "/tmp/b.x_t"], "combine": true}"##]),
     // Feature Studio, history
     ("featurestudio_get", &[r##"{"tab": "Feature Studio 1"}"##]),
+    ("featurestudio_std", &[r##"{}"##, r##"{"module": "common.fs"}"##]),
     ("featurestudio_edit", &[r##"{"tab": "Feature Studio 1", "source": "FeatureScript 2581;\n…"}"##]),
     ("featurestudio_commit", &[r##"{"tab": "Feature Studio 1"}"##]),
     ("featurestudio_monitor", &[r##"{"part_studio": "Part Studio 1"}"##]),
@@ -335,6 +337,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("cli_status", &[r##"{}"##]),
     ("cli_install", &[r##"{}"##, r##"{"dir": "~/.local/bin"}"##]),
     ("app_about", &[r##"{}"##, r##"{"notices": true}"##]),
+    ("app_system_check", &[r##"{}"##]),
+    ("app_help", &[r##"{}"##]),
 ];
 
 /// The groups whose every operation must have examples (the coverage test).

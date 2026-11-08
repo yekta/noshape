@@ -31,9 +31,9 @@ pub fn init(cx: &mut App) {
     });
 }
 
-/// The Help menu's About row (live: "About", the last row after a divider).
+/// The Help menu's About row (live: "About", after System check).
 pub fn help_item(menu: OsMenu) -> OsMenu {
-    menu.separator().item(OsMenuItem::new("About").on_click(|_, window, cx| open(window, cx)))
+    menu.item(OsMenuItem::new("About").on_click(|_, window, cx| open(window, cx)))
 }
 
 /// The About modal in `window`.
@@ -177,7 +177,7 @@ mod tests {
         assert!(text.contains("Open CASCADE exception"), "Open CASCADE's LGPL in the notices");
     }
 
-    /// Help › About (the start window's ? menu; a document's has the same items): the last row, after a divider,
+    /// Help › About (the start window's ? menu; a document's has the same items): live's last row, after System check,
     /// opens the About modal.
     #[gpui::test]
     fn help_about_opens_the_about_modal(cx: &mut TestAppContext) {
@@ -188,7 +188,7 @@ mod tests {
         vcx.simulate_click(b.center(), Modifiers::default());
         draw(cx, w);
         let rows = cx.update(|cx| noshape_app_core::os_ui::open_dropdown_labels(menu, cx)).expect("the Help menu is open");
-        assert_eq!(rows.last().map(String::as_str), Some("About"), "{rows:?}");
+        assert!(rows.iter().position(|r| r == "About") == rows.iter().position(|r| r == "System check").map(|i| i + 1), "{rows:?}");
         // (The dropdown's rows are laid out in the frame after it opens.)
         draw(cx, w);
         let mut vcx = VisualTestContext::from_window(w, cx);

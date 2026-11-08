@@ -29,7 +29,7 @@ pub fn std_definition(name: &str) -> Option<(&'static str, usize, usize)> {
 }
 
 /// The local "std" document (created on first use).
-fn std_document() -> anyhow::Result<PathBuf> {
+pub fn std_document() -> anyhow::Result<PathBuf> {
     let version = noshape_model::custom::STD_VERSION;
     let dir = crate::paths::config_dir().join(format!("std-{version}"));
     std::fs::create_dir_all(&dir)?;

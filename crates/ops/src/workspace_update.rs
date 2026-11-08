@@ -1,8 +1,7 @@
-//! ☰ › Update workspace…: references of this workspace to other documents'
-//! versions that have a newer version (Derived features, inserted Variable
-//! Studios), updated together. Shared by the app's dialog
-//! (crates/app/src/doc_dialogs.rs, which moves onto this module after the app
-//! split) and the agent API (document_update_workspace).
+//! The Reference manager's Update to latest: references of this workspace to other documents' versions that have a
+//! newer version (Derived features, inserted Variable Studios), updated together. Shared by the app's dialog
+//! (crates/app/src/doc_dialogs.rs, opened from a tab's "Newer versions of linked documents available" icon) and the
+//! agent API (document_update_references).
 
 use crate::derived::{self, ExternalRef, VersionChoice};
 use noshape_model::document::{Document, TabContent, TabId};
@@ -26,7 +25,10 @@ pub enum OutdatedKind {
 }
 
 /// The history text of [`apply`].
-pub const DESCRIPTION: &str = "Update workspace";
+pub const DESCRIPTION: &str = "Update references";
+
+/// ☰ › Update workspace…'s toast: the workspace's feature library is the one noshape ships (live's words).
+pub const LATEST_MESSAGE: &str = "Workspace is already at the latest feature library version.";
 
 /// References of this workspace to other documents' versions with a newer
 /// version available.

@@ -83,7 +83,7 @@ fn menu_labels() -> BTreeSet<String> {
             "partStudio"
         } else if name == "camera_menu.rs" {
             "view"
-        } else if name == "agent_setup.rs" || name == "about.rs" {
+        } else if name == "agent_setup.rs" || name == "about.rs" || name == "help_menu.rs" {
             "app"
         } else {
             continue;

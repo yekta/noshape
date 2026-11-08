@@ -319,15 +319,23 @@ fn apply_update(o: &Outdated, doc: &mut noshape_model::Document) {
     }
 }
 
-/// ☰ › Update workspace…: references to other documents with newer
-/// versions, updated together.
-pub fn update_workspace(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
+/// ☰ › Update workspace…: the workspace's feature library goes to the latest; noshape ships one, so live's toast says
+/// it already is.
+pub fn update_workspace(doc: Entity<DocModel>, cx: &mut App) {
+    doc.update(cx, |_, cx| cx.emit(DocEvent::Info(noshape_ops::workspace_update::LATEST_MESSAGE.into())));
+}
+
+/// The Reference manager (a tab's "Newer versions of linked documents available" icon): references to other
+/// documents with newer versions, updated together (Update to latest).
+pub fn reference_manager(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let outdated = outdated_references(&doc.read(cx).session.doc);
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let rows: Vec<AnyElement> = if outdated.is_empty() {
             vec![os::info_box("All references to other documents are up to date.").into_any_element()]
         } else {
+            let n = outdated.len();
+            std::iter::once(os::info_box(format!("Newer versions available for {n} {}", if n == 1 { "reference" } else { "references" })).into_any_element()).chain(
             outdated
                 .iter()
                 .map(|o| {
@@ -338,21 +346,21 @@ pub fn update_workspace(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
                         .child(div().flex_1().truncate().text_color(pal.text).child(o.label.clone()))
                         .child(div().text_color(pal.text_muted).child(if o.from.is_empty() { format!("→ {}", o.to.label) } else { format!("{} → {}", o.from, o.to.label) }))
                         .into_any_element()
-                })
+                }))
                 .collect()
         };
         let (doc, list) = (doc.clone(), outdated.clone());
         let can = !list.is_empty();
-        os::modal(dialog, "Update workspace", 560.)
+        os::modal(dialog, "Reference manager", 560.)
             .child(os::modal_body().children(rows))
             .footer(
                 os::modal_footer()
-                    .when(can, |f| f.child(os::modal_ok(os::primary_button("ok", "Update"))))
+                    .when(can, |f| f.child(os::modal_ok(os::primary_button("ok", "Update all"))))
                     .child(os::modal_cancel(os::cancel_button("cancel", if can { "Cancel" } else { "Close" }, cx))),
             )
             .on_ok(move |_, _, cx| {
                 let list = list.clone();
-                doc.update(cx, |d, cx| d.edit_document("Update workspace", cx, |document| list.iter().for_each(|o| apply_update(o, document))));
+                doc.update(cx, |d, cx| d.edit_document(noshape_ops::workspace_update::DESCRIPTION, cx, |document| list.iter().for_each(|o| apply_update(o, document))));
                 true
             })
     });

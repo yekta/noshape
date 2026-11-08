@@ -370,6 +370,26 @@ def fold_start_edits(state):
     return state
 
 
+TEXT_TAGS = {"input", "textarea", "select"}
+
+
+def no_field_focus(focus):
+    """Whether no text field has the keyboard: "none", or "other" on a button, a row, a menu (live: Chrome focuses a
+    clicked button; ours' buttons take no focus). Two such are compared as equal (README "Focus")."""
+    if not isinstance(focus, dict):
+        return focus is None
+    if focus.get("kind") == "none":
+        return True
+    return focus.get("kind") == "other" and focus.get("tag") not in TEXT_TAGS and not focus.get("text") and focus.get("selection") in (None, [None, None])
+
+
+def same_fieldless_focus(a, b):
+    """Live's and ours' focus when neither has a text field: ours takes live's (the rule above)."""
+    if isinstance(a, dict) and isinstance(b, dict) and no_field_focus(a.get("focus")) and no_field_focus(b.get("focus")):
+        b["focus"] = a.get("focus")
+    return b
+
+
 def drop_rows(state, drop):
     lst = (state or {}).get("list")
     if not isinstance(lst, dict) or lst.get("kind") != "context-menu":
@@ -411,6 +431,7 @@ def compare(live, ours, whole_document=True):
             b["dialog"] = None
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
+        b = same_fieldless_focus(a, b)
         # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
         # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
         for side in (a, b):

@@ -29,3 +29,6 @@ pub fn notices_file() -> std::io::Result<std::path::PathBuf> {
     })?;
     Ok(path)
 }
+
+/// noshape's user guide, as Help › Help shows it (offline; app_help).
+pub const USER_GUIDE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../app/assets/help/user-guide.md"));

@@ -124,8 +124,23 @@ impl Workspace {
             }
             // Tabs without their own message display show Onshape's bubble here.
             DocEvent::Error(msg) | DocEvent::Info(msg) => {
-                let kind = if matches!(ev, DocEvent::Error(_)) { crate::ui::AlertKind::Error } else { crate::ui::AlertKind::Info };
+                let info = matches!(ev, DocEvent::Info(_));
+                let kind = if info { crate::ui::AlertKind::Info } else { crate::ui::AlertKind::Error };
                 this.toast = Some((kind, msg.clone()));
+                // An info bubble hides by itself after ≈4.4 s (live TOAST-AUTOHIDE); an error stays until ×.
+                if info {
+                    let msg = msg.clone();
+                    cx.spawn(async move |this, cx| {
+                        cx.background_executor().timer(std::time::Duration::from_millis(4400)).await;
+                        let _ = this.update(cx, |this, cx| {
+                            if this.toast.as_ref().is_some_and(|(_, m)| *m == msg) {
+                                this.toast = None;
+                                cx.notify();
+                            }
+                        });
+                    })
+                    .detach();
+                }
                 cx.notify();
             }
             // An agent's Switch to reference / Open Feature Studio in linked
@@ -967,10 +982,7 @@ impl Workspace {
             .h(px(crate::ui::NAVBAR_H))
             .px(px(6.))
             .rounded(px(0.))
-            .os_dropdown_menu("help-menu-dd", false, |menu, _, _| {
-                let menu = menu.item(crate::os_menu::OsMenuItem::new("Keyboard shortcuts").on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleShortcutHelp), cx))).separator();
-                crate::agent_setup::help_items(menu)
-            })
+            .os_dropdown_menu("help-menu-dd", false, |menu, _, _| crate::help_menu::items(menu))
             .into_any_element()
     }
 
@@ -1037,7 +1049,7 @@ impl Workspace {
                         .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
                         .separator()
                         .item(I::new("Copy workspace…").on_click(move |_, wi, cx| dd::copy_workspace(d5.clone(), wi, cx)))
-                        .item(I::new("Update workspace…").on_click(move |_, wi, cx| dd::update_workspace(d6.clone(), wi, cx)))
+                        .item(I::new("Update workspace…").on_click(move |_, _, cx| dd::update_workspace(d6.clone(), cx)))
                         .item(I::new("Workspace units…").on_click(move |_, wi, cx| w.update(cx, |t, cx| t.open_units_panel(wi, cx))))
                         .item(I::new("Workspace properties…").on_click(move |_, wi, cx| dd::workspace_properties(d7.clone(), wi, cx)))
                         .item(I::new(if view_only { "Switch to edit mode" } else { "Switch to view only mode" }).on_click(move |_, _, cx| {
@@ -1562,7 +1574,24 @@ impl Workspace {
                     // (a linked document's newer version, or a drawing pinned to an
                     // older version of this one).
                     .when(self.behind.contains(&id) || newer, |d| {
-                        d.child(div().id(SharedString::from(format!("tab-behind-{id}"))).flex_none().tooltip(crate::ui::tooltip("Newer versions of linked documents available")).child(crate::assets::icon("inserted-version-update", 16., cx)))
+                        // A linked document's newer version: a click opens the Reference manager (Update to latest),
+                        // as live's out-of-date icons do (a drawing's own is its Change to version…).
+                        let (doc, linked) = (self.doc.clone(), self.behind.contains(&id));
+                        d.child(
+                            div()
+                                .id(SharedString::from(format!("tab-behind-{id}")))
+                                .flex_none()
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip("Newer versions of linked documents available"))
+                                .map(|d| noshape_app_core::ui_script::mark(d, || "button:Newer versions of linked documents available".into()))
+                                .when(linked, |d| {
+                                    d.on_click(move |_, window, cx| {
+                                        cx.stop_propagation();
+                                        crate::doc_dialogs::reference_manager(doc.clone(), window, cx);
+                                    })
+                                })
+                                .child(crate::assets::icon("inserted-version-update", 16., cx)),
+                        )
                     })
                     .child(div().flex_none().when(compare_off, |d| d.opacity(0.5)).child(crate::assets::icon(tab_icon(kind), 20., cx)))
                     .child(match self.renaming_tab.as_ref().filter(|r| r.0 == id) {
