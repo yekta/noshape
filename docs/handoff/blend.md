@@ -17,7 +17,10 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   partial plane end, drafted-rib full round, CHAMFER-METHOD + DA direction (`blend_section::chamfer_offsets`),
   FACEBLEND-HOLD-TANGENT (`Sides.hold`, `hold_ranges`), stopped chamfer setbacks + two distances, face blend
   Adjacent / Custom propagation (`grow_side`), Detached, Long / No trim error (live 2306 A-C).
-- Committed, not landed (needs a suite): tapered-rib full round as a cone (`tapered_round_tool`, live 2306 E).
+- Landed 823698ce (the 5 above). Suite audit6 (base 0c20bd035) covers: tapered-rib full round as a cone
+  (`tapered_round_tool`, live 2306 E), CHAMFER-ANGLE-OVER-90 (90° and over as two distances), opChamfer through the
+  Chamfer evaluator (builtin.rs). After it (need audit7): FACEBLEND-SURFACES (`sheet_blend`, live 2321's
+  alignment rule, 8 cases), detached No trim run-on (`run_on_round`).
 - Parked: FACEBLEND-HOLD-RIM (c2-variable-fillet-faceblend's Face blend 1, the only blend first-difference in the
   suite), branch `hold-rim-wip` (patch /root/blend-scratch/patches/hold-rim-wip.patch, ZZ_HOLD_RIM / ZZ_ONE_BY_ONE
   debug env). Radii match live (13.858 at (50, 25): live's JPC down to z 1.14) and the tool removes 5897 mm³ (live
