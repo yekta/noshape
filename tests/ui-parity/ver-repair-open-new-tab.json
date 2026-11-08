@@ -1,0 +1,33 @@
+{
+ "name": "ver-repair-open-new-tab",
+ "about": "View in repair on V1, then the panel's ↗ (the entry in a window of its own)",
+ "area": "studios",
+ "source": "universe versions repair-open-new-tab (studios 11-08, coverage batch 5)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View in repair"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Open in new browser tab"
+   }
+  }
+ ]
+}

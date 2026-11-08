@@ -15,7 +15,7 @@
 //!
 //! The state is per document window (a global keyed by the DocModel).
 
-use crate::doc_model::DocModel;
+use crate::doc_model::{DocEvent, DocModel};
 use crate::theme::p;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -29,7 +29,6 @@ use std::sync::Arc;
 pub const PANEL_W: f32 = 567.;
 
 pub struct RepairSession {
-    #[allow(dead_code)] // Wired in next step: perf's second view keys its cached scene on it.
     pub mv: MicroversionId,
     /// "V2", or "Main :: Insert new tab : ui iso" for a change.
     pub label: String,
@@ -142,7 +141,24 @@ pub fn render_panel(doc: &Entity<DocModel>, graphics: Option<AnyElement>, cx: &A
                             .text_size(px(14.))
                             .text_color(pal.text)
                             .child(format!("Viewing {}", s.label))
-                            .child(div().id("repair-new-tab").size(px(18.)).cursor_pointer().tooltip(crate::ui::tooltip("Open in new browser tab")).child(crate::assets::icon("open-external", 18., cx)))
+                            .child({
+                                // The entry in a window of its own, read-only (as a version row's Open in new
+                                // browser tab).
+                                let (open_doc, mv) = (doc.clone(), s.mv);
+                                div()
+                                    .id("repair-new-tab")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Open in new browser tab".into()))
+                                    .size(px(18.))
+                                    .cursor_pointer()
+                                    .tooltip(crate::ui::tooltip("Open in new browser tab"))
+                                    .child(crate::assets::icon("open-external", 18., cx))
+                                    .on_click(move |_, _, cx| {
+                                        open_doc.update(cx, |d, cx| {
+                                            let path = d.session.path.clone();
+                                            cx.emit(DocEvent::Ui(noshape_ops::UiRequest::OpenDocument { path, version: Some(mv), external_key: None }));
+                                        })
+                                    })
+                            })
                             .child(div().size(px(20.)).child(crate::assets::icon("help-filled", 20., cx))),
                     ),
                 ),
@@ -151,6 +167,7 @@ pub fn render_panel(doc: &Entity<DocModel>, graphics: Option<AnyElement>, cx: &A
             .child(
                 div()
                     .id("repair-sync")
+                    .map(|d| crate::ui_script::mark(d, || "button:Synchronize view".into()))
                     .absolute()
                     .left(px(10.))
                     .bottom(px(8.))

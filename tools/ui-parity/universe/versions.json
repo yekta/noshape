@@ -554,7 +554,22 @@
    "where": "Documents page › select a document › right strip versions icon",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:53"
+   "source": "behaviours.md:53",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "docs-page-adv-search-versions",
@@ -563,7 +578,21 @@
    "where": "Documents page › search ▾ advanced search (also State / Revision fields)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:47"
+   "source": "behaviours.md:47",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "field": "Results from"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vrow-open",
@@ -1623,7 +1652,27 @@
    "where": "rename/duplicate/delete tabs gone, feature dialogs read-only, feature menu View… only",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5579"
+   "source": "behaviours.md:5579",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     },
+     {
+      "do": "rclick",
+      "on": {
+       "doc_tab": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "wp-disable",
@@ -2468,7 +2517,26 @@
    "where": "yellow warning \"Workspace protection has been enabled. …\", Merge disabled",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5586"
+   "source": "behaviours.md:5586",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     },
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "ref-change-to-version",
@@ -2926,7 +2994,16 @@
    "where": "View in repair / Repair mode: docked panel \"Viewing <entry>\" with its own view-only graphics",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3318"
+   "source": "behaviours.md:3318",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "View in repair"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "repair-sync-view",
@@ -2935,7 +3012,21 @@
    "where": "Repair panel toggle (on by default)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3322"
+   "source": "behaviours.md:3322",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "View in repair"
+      }
+     },
+     {
+      "on": {
+       "button": "Synchronize view"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "repair-open-new-tab",
@@ -2944,7 +3035,21 @@
    "where": "Repair panel pill icon",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3320"
+   "source": "behaviours.md:3320",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "View in repair"
+      }
+     },
+     {
+      "on": {
+       "button": "Open in new browser tab"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "repair-close",

@@ -239,6 +239,9 @@ fn strategy_icon(s: Strategy, row: &Row) -> &'static str {
     }
 }
 
+/// The merge dialog's warning when the target workspace is protected and has changes of its own.
+const PROTECTED_NOTICE: &str = "Workspace protection has been enabled. Merges are allowed only when the source workspace has all the changes from the protected workspace. Merge the protected workspace into the source workspace first and then retry.";
+
 fn strategy_label(s: Strategy, plan: &Plan) -> String {
     match s {
         Strategy::Keep => format!("Keep {}", plan.target),
@@ -548,7 +551,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
         // Notices (help merge-dialog-no-changes-02, protections-4.1-no-merge-01).
         let notice = if plan.protected_with_changes {
             // Live wp-937.
-            Some(div().mx(px(10.)).mt(px(10.)).px(px(14.)).py(px(15.)).rounded(px(3.)).bg(rgb(0xfff8e6)).border_1().border_color(rgb(0xf5df9e)).text_size(px(14.)).text_color(pal.text).child("Workspace protection has been enabled. Merges are allowed only when the source workspace has all the changes from the protected workspace. Merge the protected workspace into the source workspace first and then retry."))
+            Some(div().mx(px(10.)).mt(px(10.)).px(px(14.)).py(px(15.)).rounded(px(3.)).bg(rgb(0xfff8e6)).border_1().border_color(rgb(0xf5df9e)).text_size(px(14.)).text_color(pal.text).child(PROTECTED_NOTICE).map(|d| crate::ui_script::mark_message(d, || PROTECTED_NOTICE.into())))
         } else if plan.up_to_date {
             Some(os::info_box(format!("{} is already up to date with {}.", plan.target, plan.source)).mx(px(10.)).mt(px(10.)))
         } else {
@@ -564,13 +567,13 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             .child(same_header)
             .children(same_rows)
             .children(notice);
-        let merge_button = os::primary_button("merge-ok", "Merge").when(!can_merge, |b| b.disabled(true).opacity(0.4));
         let help = div().size(px(18.)).rounded_full().flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
         let (doc, plan2, state2) = (doc.clone(), plan.clone(), state.clone());
         os::modal(dialog, format!("Merging changes into {} from {}", plan.target, plan.source), W)
             .title(title)
             .child(body)
-            .footer(os::modal_footer().child(help).child(div().flex_1()).child(os::modal_ok(merge_button)).child(os::modal_cancel(os::cancel_button("merge-cancel", "Cancel", cx))))
+            // (The buttons are built after the modal: its ui-parity reading lists them.)
+            .footer(os::modal_footer().child(help).child(div().flex_1()).child(os::modal_ok(os::primary_button("merge-ok", "Merge").when(!can_merge, |b| b.disabled(true).opacity(0.4)))).child(os::modal_cancel(os::cancel_button("merge-cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {
                 if !can_merge {
                     return false;

@@ -1,0 +1,57 @@
+{
+ "name": "ver-protected-merge",
+ "about": "Main protected, then B1 › Merge into current workspace… (the warning, Merge disabled), Cancel",
+ "area": "studios",
+ "source": "universe versions mg-into-protected (studios 11-08, coverage batch 5)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace protection…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Enable workspace protection"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Apply"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

@@ -56,6 +56,9 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Focused text fields recorded as live's (`with_input_focus_in`: gpui-component's `window.focused_input` when the
   state named no field: a modal's name field, Document details' textarea); a Variable Studio cell being typed in
   reports what's typed; Document details focuses its description on open.
+- The Repair panel's ↗ opens the entry in a window of its own (it did nothing); its ↗ and Synchronize view are
+  driver buttons. The merge dialog lists its Merge button (built after the modal) and records its protection warning.
+  Coverage batch 5: 4 ver-* (protected workspace's tab menu and merge, Repair ↗ and sync): versions 62.7 %.
 - Open: Assembly Properties lacks Mass / Override / Subassembly
   BOM behavior; ours' modal fields aren't recorded (an Input hook in vendored gpui-component); dx has std 3112.
 

@@ -1,0 +1,33 @@
+{
+ "name": "ver-repair-sync",
+ "about": "View in repair on V1, then Synchronize view off",
+ "area": "studios",
+ "source": "universe versions repair-sync-view (studios 11-08, coverage batch 5)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View in repair"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Synchronize view"
+   }
+  }
+ ]
+}

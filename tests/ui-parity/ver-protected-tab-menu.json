@@ -1,0 +1,49 @@
+{
+ "name": "ver-protected-tab-menu",
+ "about": "Main protected, then a tab's right-click menu (no Rename / Duplicate / Delete)",
+ "area": "studios",
+ "source": "universe versions wp-blocked-actions (studios 11-08, coverage batch 5)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace protection…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Enable workspace protection"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Apply"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}
