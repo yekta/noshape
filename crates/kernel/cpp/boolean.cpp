@@ -7706,6 +7706,8 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     std::vector<std::unique_ptr<OcShape>> own;
     bool                                  done       = false;
     bool                                  one_by_one = false;
+    // (Asked to cut scaled copies, OCCT's path below would: its history has the object's entities all Modified.)
+    const bool scaled_inputs = opts.scaled && working_scale() != 1.0 && std::getenv("NOSHAPE_BOOL_NO_SCALE") == nullptr;
     {
       const KernelTimer timer("boolean.rust");
       // (A pattern's checked glue: OCCT's result is the plain Boolean's only where the instances just touch; where
@@ -7737,7 +7739,7 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
             rs = srcs;
         }
         if (!done)
-          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false);
+          done = rust_boolean(op, concat(a, t), rs, own, out, h, opts.fuzzy, false, scaled_inputs);
       }
     }
     if (done)

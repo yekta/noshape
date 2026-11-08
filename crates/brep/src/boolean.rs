@@ -1112,7 +1112,14 @@ impl Ctx<'_> {
                 // (A degenerate edge (the surface closing at a point), or a closed one whole: its whole curve on the
                 // face.)
                 Geo::Apex { .. } => (*pt0, *pt1),
-                _ if s.v[0] == s.v[1] => (*pt0, *pt1),
+                // (The way the piece goes round: another argument's circle merged with it may go the other way (a
+                // round's on a boss's revolved face).)
+                _ if s.v[0] == s.v[1] => {
+                    // (Both from the vertex where they close: their ways out of it.)
+                    let own = self.edge_seg(e);
+                    let out = |g: &Seg| self.seg_at(g, 1e-3) - self.seg_at(g, 0.0);
+                    if own.v[0] == s.v[0] && out(s).dot(out(&own)) < 0.0 { (*pt1, *pt0) } else { (*pt0, *pt1) }
+                }
                 _ => {
                     // A piece of a straight or round edge: its ends' parameters on the edge's curve on the face.
                     let whole = C2::Nurbs { c: c.clone(), t0: *pt0, t1: *pt1 };
@@ -2171,7 +2178,7 @@ impl Ctx<'_> {
     }
 
     /// Whether faces `fs` and `ft` lie on one surface where they overlap: every point of each (its samples within
-    /// the other's box) on the other's surface, and some.
+    /// the other's box) on the other's surface, and some; or every point of one on the other's ([`Self::lies_on`]).
     fn same_surface(&self, fs: usize, ft: usize) -> bool {
         let tol = self.tol;
         let mut n = 0;
@@ -2184,12 +2191,25 @@ impl Ctx<'_> {
                     continue;
                 }
                 if free::surface_distance(&self.faces[g], p) > tol {
-                    return false;
+                    return self.lies_on(fs, ft) || self.lies_on(ft, fs);
                 }
                 n += 1;
             }
         }
         n >= 8
+    }
+
+    /// Whether every sample of face `f` lies on face `g`'s surface: `f` a part of it where `g` reaches past it (a
+    /// round's ring face on a boss's revolved face, whose box, sampled and grown, holds the boss's far side too).
+    fn lies_on(&self, f: usize, g: usize) -> bool {
+        // (Within it, so within its box (each grown by its own size's share); its inner samples first: a face meeting
+        // `g` along an edge leaves its surface there.)
+        let (a, b, t) = (&self.faces[f], &self.faces[g], DVec3::splat(self.tol));
+        if !(a.lo.cmpge(b.lo - t).all() && a.hi.cmple(b.hi + t).all()) {
+            return false;
+        }
+        let samples = self.face_samples(f);
+        samples.len() >= 8 && samples.iter().rev().all(|&p| free::surface_distance(&self.faces[g], p) <= self.tol)
     }
 
     fn nurbs_pair(&mut self, fs: usize, ft: usize) -> R<()> {
@@ -3753,10 +3773,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         }
         sheet_cut = true;
     }
-    // (Its edges and vertices untouched: Modified where OCCT's path of 64 tools or more cuts scaled copies of the
-    // inputs (op_boolean's ScaledInputs: every input entity Modified, a fill pattern's region less its 1735 disks),
-    // else Kept.)
-    let rebuilt = sheet_cut && args.len() > 64;
+    // (Its edges and vertices untouched: Modified where OCCT's path cuts scaled copies of the inputs (op_boolean's
+    // ScaledInputs: every input entity Modified; 64 tools or more, a fill pattern's region less its 1735 disks, or
+    // asked for, cf-snap-hook's rounds' glued fuse), else Kept.)
+    let rebuilt = (sheet_cut && args.len() > 64) || crate::scaled_inputs();
     if op == Op::Common && args.len() == 2 && args.iter().all(|b| b.solids.is_empty() && !b.faces.is_empty()) && !sheet_common {
         let mut out = Output::default();
         for (a, b) in args.iter().enumerate() {

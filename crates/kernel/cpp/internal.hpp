@@ -218,7 +218,7 @@ std::string rust_last_decline();
 occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy = 0, bool touching_only = false);
+                  double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false);
 // `s` as a flat body (its maps' indices the body's), from its cache; why not, or null.
 const char* brep_body_cached(const OcShape& s, BrepBody& b, double& max_tol);
 // noshape's own fillet / chamfer (rust_blend.cpp, NOSHAPE_BLEND_RUST=1): `es` with per edge (kind 0 fillet / 1

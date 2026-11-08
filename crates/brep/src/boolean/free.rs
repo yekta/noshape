@@ -10,6 +10,17 @@ use glam::DVec4;
 /// a hundredth.
 /// (None where its curves lie outside the surface's own range (OCCT's curves on a periodic surface a period on): the
 /// box would be inside out.)
+/// How far [`uv_box`] reaches past a face's curves, of their span each way.
+const UV_PAD: f64 = 0.01;
+
+/// A face's parameter range along u (`i` 0) or v (1) as its curves span it: [`uv_box`]'s without its margin (where no
+/// natural range cut it).
+fn uv_span(g: &GFace, i: usize) -> (f64, f64) {
+    let (lo, hi) = (g.uvbox[2 * i], g.uvbox[2 * i + 1]);
+    let pad = (hi - lo - 2e-9) / (1.0 + 2.0 * UV_PAD) * UV_PAD + 1e-9;
+    (lo + pad, hi - pad)
+}
+
 pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> Option<[f64; 4]> {
     let Some(ns) = ns else { return Some([0.0; 4]) };
     let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
@@ -20,7 +31,7 @@ pub(super) fn uv_box(ns: Option<&FreeSurface>, pcurves: &PCurves) -> Option<[f64
             hi = hi.max(q);
         }
     }
-    let grow = (hi - lo) * 0.01 + DVec2::splat(1e-9);
+    let grow = (hi - lo) * UV_PAD + DVec2::splat(1e-9);
     let (mut lo, mut hi) = (lo - grow, hi + grow);
     for (k, r) in ns.range().into_iter().enumerate() {
         if let Some((a, b)) = r {
@@ -471,7 +482,24 @@ pub(super) fn projected(g: &GFace, at: &dyn Fn(f64) -> (DVec3, DVec3), t0: f64, 
         if det.abs() < 1e-300 {
             return None;
         }
-        qs.push((uv, DVec2::new((c * e - b * f) / det, (a * f - b * e) / det)));
+        let duv = DVec2::new((c * e - b * f) / det, (a * f - b * e) / det);
+        // (Starting on the seam of a face going a whole turn round and heading out of it there: from the seam's other
+        // side, a boss's round edge on a revolved face.)
+        let mut uv = uv;
+        if k == 0 {
+            for (i, round) in ns.periodic().into_iter().enumerate() {
+                let (lo, hi) = uv_span(g, i);
+                if !round || (hi - lo - TAU).abs() > 1e-6 {
+                    continue;
+                }
+                if duv[i] < 0.0 && (uv[i] - lo).abs() < 1e-6 {
+                    uv[i] = hi;
+                } else if duv[i] > 0.0 && (uv[i] - hi).abs() < 1e-6 {
+                    uv[i] = lo;
+                }
+            }
+        }
+        qs.push((uv, duv));
     }
     // Bézier pieces between the points (a B-spline with triple knots).
     let h = (t1 - t0) / N as f64;

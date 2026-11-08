@@ -34,6 +34,7 @@
 #include <ElCLib.hxx>
 #include <ElSLib.hxx>
 #include <Geom2d_Line.hxx>
+#include <gp_Lin.hxx>
 #include <gp_Ax22d.hxx>
 #include <Geom2dAPI_Interpolate.hxx>
 #include <gp_Ax2d.hxx>
@@ -911,6 +912,52 @@ occ::handle<Geom2d_Curve> coincident_pcurve(const TopoDS_Edge& e, const TopoDS_F
   return occ::handle<Geom2d_Curve>();
 }
 
+// A circle about a surface of revolution's own axis lying on it (a round's edge on a boss's revolved face): its curve
+// on face `f`, the line along u at the circle's v (OCCT's projection of it took 30 ms each); null otherwise.
+static occ::handle<Geom2d_Curve> parallel_pcurve(const TopoDS_Edge& e, const TopoDS_Face& f, double tol)
+{
+  double                  a = 0, z = 0;
+  TopLoc_Location         el, fl;
+  occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, el, a, z);
+  while (const occ::handle<Geom_TrimmedCurve> tc = occ::down_cast<Geom_TrimmedCurve>(c))
+    c = tc->BasisCurve();
+  const occ::handle<Geom_Circle>  ci = occ::down_cast<Geom_Circle>(c);
+  const occ::handle<Geom_Surface> s  = BRep_Tool::Surface(f, fl);
+  occ::handle<Geom_Surface>       base = s;
+  while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
+    base = tr->BasisSurface();
+  const occ::handle<Geom_SurfaceOfRevolution> rev = occ::down_cast<Geom_SurfaceOfRevolution>(base);
+  if (ci.IsNull() || rev.IsNull())
+    return occ::handle<Geom2d_Curve>();
+  // (The circle in the surface's own frame; its angle and u turn the same way round or opposite ways.)
+  const gp_Circ k  = ci->Circ().Transformed((fl.Inverted() * el).Transformation());
+  const gp_Ax1  ax = rev->Axis();
+  if (!k.Axis().IsParallel(ax, 1e-9) || gp_Lin(ax).Distance(k.Location()) > tol)
+    return occ::handle<Geom2d_Curve>();
+  const double   sgn = k.Axis().Direction().Dot(ax.Direction()) > 0 ? 1.0 : -1.0;
+  const gp_Pnt2d uv  = ShapeAnalysis_Surface(s).ValueOfUV(ElCLib::Value(a, k), tol);
+  double         umin = 0, umax = 0, vmin = 0, vmax = 0;
+  BRepTools::UVBounds(f, umin, umax, vmin, vmax);
+  // (Its angles within the face's: a whole turn's from one side of the seam to the other.)
+  const double eps = 1e-9 * (1 + std::abs(umin) + std::abs(umax));
+  for (const double turn : {0.0, 2 * M_PI, -2 * M_PI})
+  {
+    const double u0 = uv.X() + turn, u1 = u0 + sgn * (z - a);
+    if (std::min(u0, u1) < umin - eps || std::max(u0, u1) > umax + eps)
+      continue;
+    bool on = true;
+    for (int j = 0; j <= 8 && on; ++j)
+    {
+      const double t = a + (z - a) * j / 8;
+      on = s->Value(u0 + sgn * (t - a), uv.Y()).Distance(ElCLib::Value(t, k)) <= tol;
+    }
+    if (!on)
+      return occ::handle<Geom2d_Curve>();
+    return new Geom2d_Line(gp_Pnt2d(u0 - sgn * a, uv.Y()), gp_Dir2d(sgn, 0));
+  }
+  return occ::handle<Geom2d_Curve>();
+}
+
 thread_local FreeSections* t_free = nullptr;
 
 // A section's tolerance as the pave filler gives it: its own, at least the faces' (ToleranceFF), at least 5e-6
@@ -1535,6 +1582,8 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
         // (Another argument's edge coincident with one of this face's: that one's curve on it.)
         if (pf.IsNull() && !BRep_Tool::IsClosed(se, sf))
           pf = coincident_pcurve(es[k], sf, 1e-7 + BRep_Tool::Tolerance(es[k]));
+        if (pf.IsNull() && !BRep_Tool::IsClosed(se, sf))
+          pf = parallel_pcurve(es[k], sf, 1e-7 + BRep_Tool::Tolerance(es[k]));
         // (An edge without its curve on it (another argument's edge inside or along it, an INTERNAL one): projected,
         // as OCCT's builder makes it.)
         if (pf.IsNull())
@@ -3003,7 +3052,7 @@ static bool solid_inside_out(const TopoDS_Shape& solid)
 
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
-                  double fuzzy, bool touching_only)
+                  double fuzzy, bool touching_only, bool scaled_inputs)
 {
   // A stale regeneration's Boolean stops (as OCCT's does through its progress indicator).
   const std::atomic<bool>* cancel = thread_cancel_flag();
@@ -3191,7 +3240,7 @@ bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector
   {
     const KernelTimer     timer("boolean.rust.brep");
     const RustMemoryWatch watch;
-    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, fuzzy, touching_only, r))
+    if (!brep_boolean(op, rust::Slice<const BrepBody>(bodies.data(), bodies.size()), tol, fuzzy, touching_only, scaled_inputs, r))
     {
       // (Declined "cancelled": stopped, not handed to OCCT; so past the memory budget, with OCCT's error.)
       stop();

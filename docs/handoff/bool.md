@@ -140,7 +140,28 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
 - **Tried 11-08, not kept: the cut by all tools at once first** (one at a time only after it declines; blend's tpd
   note). bool_replay over every corpus + tpd + valve2: the same differences; tpd 123 -> 97 ms, but valve2's 7-tool cut
   331 -> 814 ms (at once is slower there than one at a time). The order stays; no cheap test tells them apart.
-- **cf-surface-pattern's sphere cut: ours and valid (11-08 19:39 UTC, landing).** Two changes:
+- **cf-snap-hook's last two declines taken (11-08 20:33 UTC, gate running; branch bool-snap2, b4ce3520):** the
+  rounds at the pegs' bases, as OCCT's (vibe4 ~/agents/bool-corpora/snapA = 091580a4, snapB = c22ea361).
+  - free.rs `projected`: a full circle starting on the seam of a face going a whole turn, heading out of it, starts
+    on the seam's other side (it walked out of the face's box: "an edge on another argument's free-form face").
+  - `same_surface`: also true when every sample of one face lies on the other's surface (`lies_on`). `face_box` is
+    the sampled box grown by 10 % of its diagonal (1.7 mm on a 0.33 mm ring), so the boss's whole revolved face was
+    measured against the ring's. First tried: skipping samples whose foot lay past the other face's parameter box.
+    Two knurl grooves meeting at an angle then passed as one surface (only their shared edge counted): k25-25 went
+    from 3 to 15 s.
+  - `c2_of`: a closed edge used whole goes the merged piece's way round (the tool's circle, axis +z, merged into
+    the plate's, axis -z: the revolved face's loop ran the wrong way, "a non-manifold result").
+  - `rebuilt` (history all Modified) also where op_boolean was asked for scaled inputs (`opts.scaled`):
+    `with_scaled_inputs`, passed down from op_boolean through `brep_boolean`. OCCT's history of the scaled copies
+    has every object entity Modified; it was the only difference left.
+  - rust_boolean.cpp `parallel_pcurve`: a circle about a surface of revolution's own axis gets its curve on the face
+    directly (a line along u). OCCT's projection took 30 ms each, 118 of the fuse's ms.
+
+  Times: snapB 44 ms (OCCT 46; before: ~52 ms declining + OCCT). snapA 118-150 ms (OCCT 57-86; before: ~80-130
+  declining + OCCT). What is left in snapA is OCCT's sections ahead of the peg's revolved face against the round's
+  torus, tangent along a circle: 54-78 ms each, 24-27 lines. OCCT's own Boolean is fast here only on the scaled
+  copies: unscaled it takes 316 ms. Next speed step: the sections ahead at the working scale when op_boolean scales.
+- **cf-surface-pattern's sphere cut: ours and valid (11-08 19:39 UTC, landed 2b6fef75).** Two changes:
   - rust_boolean.cpp `refined_section`: a section past 1e-5 with a free-form face is resampled to 129 points, each
     point projected onto both faces in turn, and refitted with its face curves; the refit is kept only under half of
     OCCT's tolerance.

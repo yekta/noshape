@@ -1556,6 +1556,37 @@ fn a_fuse_with_revolved_arcs_as_occt() {
     valid_as_occt("4a77bf0cde101133", 1e-9);
 }
 
+/// cf-snap-hook's rounds at its four pegs' bases (recorded): each round's ring fused to the plate (glued, op_boolean's
+/// scaled inputs), its inner face on the peg's revolved face and its edge there a full circle from the peg's seam. As
+/// OCCT's (it declined "an edge on another argument's free-form face"), its history too: on scaled copies OCCT has the
+/// plate's untouched faces, edges and vertices Modified.
+#[test]
+fn rounds_fused_onto_revolved_pegs_as_occt() {
+    valid_as_occt("091580a4fbed1e01", 1e-9);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "091580a4fbed1e01").expect("the recorded case");
+    let history = |rust: bool| {
+        k::set_rust_boolean(Some(rust));
+        let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("the fuse");
+        k::set_rust_boolean(None);
+        let mut v: Vec<String> = r.history.records.iter().map(|h| format!("{} {:?}{} {:?}", h.arg, h.input_kind, h.input_index, h.relation)).collect();
+        v.sort();
+        v
+    };
+    k::set_rust_boolean_only(true);
+    let ours = history(true);
+    k::set_rust_boolean_only(false);
+    assert_eq!(ours, history(false));
+}
+
+/// The same pegs turned by a cut (recorded, Fillet 5): each tool's ring between the peg's cylinder and its revolved
+/// profile, the tool's circle at the top merged with the plate's going the other way round. As OCCT's (it declined
+/// "a non-manifold result": the revolved face's loop ran the plate's way).
+#[test]
+fn pegs_cut_to_revolved_profiles_as_occt() {
+    valid_as_occt("c22ea361e07d301a", 1e-9);
+}
+
 /// A Shell's slab fuse of 23 tools (shfall a7ab967d, recorded): coincident planar faces of two tools on y = 0, the
 /// later one's kept as OCCT's fuse of several tools keeps it (brep_replay's reference). The earlier one's plane left an
 /// extra vertex on the straight edge along y 0, z 6 after the merge (P1 SHFALL-A7AB-EXTRA-VERTEX; OCCT through

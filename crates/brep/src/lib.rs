@@ -46,6 +46,21 @@ pub(crate) fn fuzzy() -> f64 {
     FUZZY.with(|f| f.get())
 }
 
+std::thread_local!(static SCALED_INPUTS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) });
+
+/// Runs `run` as a Boolean whose OCCT path would cut scaled copies of the inputs (op_boolean's ScaledInputs, asked
+/// for): the object's untouched entities come out Modified, as OCCT's history of those copies has them.
+pub fn with_scaled_inputs<T>(scaled: bool, run: impl FnOnce() -> T) -> T {
+    let before = SCALED_INPUTS.with(|f| f.replace(scaled));
+    let r = run();
+    SCALED_INPUTS.with(|f| f.set(before));
+    r
+}
+
+pub(crate) fn scaled_inputs() -> bool {
+    SCALED_INPUTS.with(|f| f.get())
+}
+
 /// This thread's cancel flag (the address of an `AtomicBool`, 0 none; the kernel's `with_cancel` sets it): once
 /// set, a running Boolean stops at its next check and declines "cancelled" (a stale regeneration's worker is free
 /// within ~100 ms). The Boolean's worker threads take their caller's.
