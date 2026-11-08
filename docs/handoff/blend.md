@@ -218,3 +218,10 @@ tools' classifier), then the suite and bool's gate (no crates/brep change so far
   vertex blends): one face a side more than live (follow-up).
 - 05:06: swapping the two rounds' section order changes nothing; the two results' vertex degrees match too. Asked bool
   (bool.md "From blend 05:06") what by_quadrics needs. SNAP-FILLET6 landed (4b3e0611f).
+
+**DOCK-CORNER (follow-up of DOCK-FILLET, 05:15 UTC):** the stand-in (features_c `dock_passage`) after R0.8: ours 25/68/45,
+live 23/61/40 (live 2274). Per side ours matches live's 2 tori (14.75 / 15.15) and 3 r0.8 cylinders, including the
+step's round running up to z 10.7 (0.9 line) and ending on the inner torus (1.171 curve); the extra face is OCCT's
+0.68 mm² B-spline corner patch where the outer arc's torus (15.15) meets the outer mouth's vertical cylinder (axis at
+(±6.3, 13.78), on the torus' centre circle): live's cylinder ends on the torus along their intersection curve, no patch.
+Next: equal-radius rounds whose spines meet (cylinder axis through the torus' centre circle) mitred, not patched.
