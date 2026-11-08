@@ -254,6 +254,9 @@ struct EditSession {
     /// Dialog-local undo (Onshape: Ctrl+Z inside an open dialog or sketch
     /// undoes the last change to the draft, not the document's last edit).
     history: DraftHistory,
+    /// The document's newest undo step when the dialog opened: a document edit made since (a field's Configure)
+    /// is in the dialog's Undo too (live ui-parity config-depth-configure).
+    doc_undo_at_open: Option<noshape_store::MicroversionId>,
 }
 
 /// Snapshots of the draft feature while its dialog is open.
@@ -1995,8 +1998,27 @@ impl PartStudioView {
         self.edit.as_ref().map_or((false, false), |e| e.history.can())
     }
 
+    /// The document was edited while the dialog is open (its Configure): Undo there undoes that.
+    pub(super) fn doc_edited_in_dialog(&self, cx: &App) -> bool {
+        let Some(e) = &self.edit else { return false };
+        let d = self.doc.read(cx);
+        d.can_undo() && d.session.undo_tops().0 != e.doc_undo_at_open
+    }
+
     /// Ctrl+Z / Ctrl+Y while a feature dialog (or sketch) is open.
     fn draft_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // Nothing of the draft's own to undo, but a Configure since the dialog opened: that comes off.
+        if !redo && !self.draft_history_state().0 && self.doc_edited_in_dialog(cx) {
+            self.doc.update(cx, |d, cx| d.undo(cx));
+            if let Some(dialog) = self.edit.as_ref().map(|e| e.dialog.clone()) {
+                let (configured, _) = self.configured_of(dialog.read(cx).feature.id, cx);
+                dialog.update(cx, |d, cx| {
+                    d.configured = configured;
+                    cx.notify();
+                });
+            }
+            return;
+        }
         let Some(e) = &mut self.edit else { return };
         e.history.dragging = false;
         let dialog = e.dialog.clone();
@@ -2616,7 +2638,8 @@ impl PartStudioView {
         // empty old definition; an edited one starts from its values.
         self.ui.std_edit_old = (!is_new).then(|| dialog.read(cx).feature.params.clone());
         self.ui.std_logic_first = (is_new && noshape_model::custom::std_feature::has_editing_logic(&dialog.read(cx).feature.type_id)).then_some(false);
-        self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history });
+        let doc_undo_at_open = self.doc.read(cx).session.undo_tops().0;
+        self.edit = Some(EditSession { dialog, index, is_new, _sub: sub, history, doc_undo_at_open });
         // Live ("Panels vs feature dialogs"): opening a feature dialog closes
         // the tool panels (Mass and section properties, Named views) for good;
         // Isolate stays, under the dialog.

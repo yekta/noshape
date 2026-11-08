@@ -332,7 +332,8 @@ pub struct UiState {
     pub cfg_note_shown: bool,
     /// The contexts features referenced at the last regeneration (None until the first).
     pub known_contexts: Option<std::collections::HashSet<u32>>,
-    /// 'New assembly context … created.' shown for the open dialog's pick (cleared when it closes).
+    /// A message the open dialog made ('New assembly context … created.' for its pick, a field's Configure), cleared
+    /// when the dialog closes.
     pub context_note: Option<String>,
     /// The regeneration's coarse (preview) display and its sequence number, cached with its full one.
     pub preview_for_cache: Option<(u64, std::sync::Arc<noshape_model::display::StudioDisplay>)>,

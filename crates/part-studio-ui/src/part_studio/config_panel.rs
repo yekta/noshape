@@ -2981,7 +2981,10 @@ impl PartStudioView {
         };
         if on {
             self.add_configured(feature.id, param, &input, cx);
-            self.flash_for(noshape_model::display::FeatureStatus::Info, format!("{} {label} added to {input_name}", feature.name), std::time::Duration::from_millis(6700), cx);
+            let text = format!("{} {label} added to {input_name}", feature.name);
+            // Gone once the dialog closes (live ui-parity config-depth-configure: none after ✓).
+            self.ui.context_note = Some(text.clone());
+            self.flash_for(noshape_model::display::FeatureStatus::Info, text, std::time::Duration::from_millis(6700), cx);
         } else {
             let (fid, p) = (feature.id, param.to_string());
             self.edit_config("Unconfigure parameter", cx, |ps| ps.configuration.configured.retain(|c| !(c.feature == fid && c.param == p)));

@@ -4121,6 +4121,7 @@ impl PartStudioView {
         // Undo / Redo follow the sketch's own history, greyed out with
         // nothing to undo / redo (live: both off on entering a sketch).
         let (can_undo, can_redo) = self.draft_history_state();
+        let can_undo = can_undo || self.doc_edited_in_dialog(cx);
         let history_btn = |id: &'static str, icon: &'static str, tip: &'static str, action: Box<dyn Action>, enabled: bool, cx: &mut Context<Self>| {
             let button = crate::ui::tool_button(id, icon, false, cx).opacity(if enabled { 1.0 } else { 0.4 }).when(!enabled, |b| b.cursor(CursorStyle::OperationNotAllowed));
             crate::ui::with_tool_tooltip(SharedString::from(format!("{id}-tt")), tip, button.on_click(move |_, window, cx| {

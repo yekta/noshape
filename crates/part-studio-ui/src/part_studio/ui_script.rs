@@ -275,7 +275,8 @@ impl PartStudioView {
     /// or dialog, its own history).
     fn ui_undo_state(&self, cx: &App) -> Value {
         let (undo, redo) = if self.edit.is_some() {
-            self.draft_history_state()
+            let (undo, redo) = self.draft_history_state();
+            (undo || self.doc_edited_in_dialog(cx), redo)
         } else {
             let d = self.doc.read(cx);
             (d.can_undo(), d.can_redo())
