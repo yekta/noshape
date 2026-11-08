@@ -219,6 +219,22 @@ def normalize_live(state):
         for f in d.get("fields") or []:
             if isinstance(f, dict) and str(f.get("label", "")).startswith("File name") and isinstance(f.get("value"), str):
                 f["value"] = re.sub(r"^start \S+( Copy \d+)? - ", "Part Studio 1 - ", f["value"])
+    # The Properties modal as live's recorder reads it since 2026-11-08 (Description, the category row labelled by its
+    # value, Undo / Redo named), in its earlier form, ours' (part-menu-properties): no Description, "Category", the
+    # icon buttons unnamed.
+    d = (state or {}).get("dialog")
+    if isinstance(d, dict) and d.get("title") == "Properties" and isinstance(d.get("fields"), list):
+        f = [x for x in d["fields"] if not (isinstance(x, dict) and x.get("label") == "Description")]
+        for x in f:
+            if isinstance(x, dict) and str(x.get("label", "")).startswith("Onshape "):
+                x["label"], x["value"] = "Category", ""
+        d["fields"] = f
+        if isinstance(d.get("buttons"), list):
+            d["buttons"] = ["" if b in ("Undo", "Redo") else b for b in d["buttons"]]
+    # Live's Free plan makes public documents: "Create public document" (New document, Copy workspace / version) is a
+    # paid plan's and ours' "Create document".
+    if isinstance(d, dict) and isinstance(d.get("buttons"), list):
+        d["buttons"] = ["Create document" if b == "Create public document" else b for b in d["buttons"]]
     # A REST-built start's history reads "Add feature" where the UI's (ours) reads "Insert feature" (live2 2258).
     doc = (state or {}).get("document")
     if isinstance(doc, dict):

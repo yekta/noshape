@@ -1319,9 +1319,9 @@ impl StartView {
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, f) = (location.clone(), view.clone(), f.clone());
-            os::modal_doc_page(dialog, "Move to", 460.)
+            os::modal_doc_page(dialog, "Move documents and folders to", 460.)
                 .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
                     let Some(file_name) = f.file_name() else { return false };
@@ -2232,9 +2232,9 @@ impl StartView {
         let view = cx.entity();
         window.open_dialog(cx, move |dialog, _, cx| {
             let (loc, view, d) = (location.clone(), view.clone(), d.clone());
-            os::modal_doc_page(dialog, "Move to", 460.)
+            os::modal_doc_page(dialog, "Move documents and folders to", 460.)
                 .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
-                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+                .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
                     match lib::move_document(&d.path, &dir) {

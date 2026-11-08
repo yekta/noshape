@@ -659,6 +659,7 @@ impl Workspace {
             // (its tab icon and name), blue Delete then gray Cancel.
             let n = users.len();
             let warning = format!("Deleting this tab will result in failed or missing features in {n} {}", if n == 1 { "tab" } else { "tabs" });
+            noshape_app_core::ui_script::note_message(warning.clone());
             let rows = users.iter().map(|(name, kind)| {
                 h_flex().h(px(26.)).pl(px(23.)).gap(px(3.)).text_size(px(13.33)).text_color(p().text).child(crate::assets::icon(tab_icon(kind), 14., cx)).child(name.clone())
             });
@@ -1591,12 +1592,9 @@ impl Workspace {
                         if compare_off {
                             return;
                         }
-                        // The first click activated the tab; a double-click renames it
-                        // (activating again would take the field's focus).
-                        // A protected workspace's tabs aren't renamed (live wp-933).
-                        if e.click_count() >= 2 && !this.doc.read(cx).session.is_protected() {
-                            this.start_tab_rename(id, window, cx);
-                        } else {
+                        // The first click activated the tab; a double-click does nothing more (live 2279 (b): no
+                        // rename, Rename is in the tab's menu).
+                        if e.click_count() < 2 {
                             this.activate(id, window, cx);
                         }
                     }))

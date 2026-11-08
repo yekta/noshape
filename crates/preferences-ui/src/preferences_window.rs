@@ -517,8 +517,18 @@ impl PreferencesView {
 
     /// A browser checkbox (13 px, `#767676` outline) with its 13.33 px label.
     fn checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
-        let pal = p();
         let name = crate::ui_script::note_control(label, "checkbox", serde_json::json!(on));
+        Self::checkbox_named(id, label, on, name)
+    }
+
+    /// [`Self::checkbox`] of a popup (the Edit shortcut one): clickable by name but no field of the page (its modal
+    /// lists it).
+    fn popup_checkbox(id: &'static str, label: &'static str, on: bool) -> Stateful<Div> {
+        Self::checkbox_named(id, label, on, crate::ui_script::in_section(label))
+    }
+
+    fn checkbox_named(id: &'static str, label: &'static str, on: bool, name: String) -> Stateful<Div> {
+        let pal = p();
         h_flex()
             .id(id)
             .map(|d| crate::ui_script::mark(d, || format!("checkbox:{name}")))
@@ -842,7 +852,7 @@ impl PreferencesView {
             .mt(px(if ed.pressed.is_some() { 22. } else { 18. }))
             .h(px(22.))
             .px(px(10.))
-            .child(Self::checkbox("kb-edit-disable", "Disable shortcut", disable).text_size(px(14.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(Self::popup_checkbox("kb-edit-disable", "Disable shortcut", disable).text_size(px(14.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 if let Some(ed) = &mut this.edit {
                     ed.disable = !ed.disable;
                 }

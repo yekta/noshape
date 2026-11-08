@@ -132,6 +132,11 @@ impl Document {
     /// Tab ids are random 64-bit numbers, so finding one in a tab's data
     /// (decimal, or the hex form derived features store) is reliable.
     pub fn tab_users(&self, tab: TabId) -> Vec<TabId> {
+        // A Variable Studio inserted into all Part Studios and Assemblies is used by every one of them (live
+        // vs-tab-menu-delete: "… failed or missing features in 2 tabs").
+        if matches!(self.tab(tab).map(|t| &t.content), Some(TabContent::VariableStudio(v)) if v.insert_into_all) {
+            return self.tabs.iter().filter(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_))).map(|t| t.id).collect();
+        }
         let (dec, hex) = (tab.0.to_string(), tab.to_string());
         self.tabs
             .iter()
@@ -384,6 +389,23 @@ impl Document {
 #[cfg(test)]
 mod tab_user_tests {
     use super::*;
+
+    /// A Variable Studio inserted into all Part Studios and Assemblies is used by each (Delete warns, live
+    /// vs-tab-menu-delete); one that isn't, by none.
+    #[test]
+    fn an_auto_inserted_variable_studio_is_used_everywhere() {
+        let mut doc = Document::default();
+        let ps = doc.add_tab("Part Studio 1", TabContent::PartStudio(PartStudio::new()));
+        let asm = doc.add_tab("Assembly 1", TabContent::Assembly(Box::default()));
+        let vs = doc.add_tab("Variable Studio 1", TabContent::VariableStudio(crate::variables::VariableStudio { insert_into_all: true, ..Default::default() }));
+        let users = doc.tab_users(vs);
+        assert!(users.contains(&ps) && users.contains(&asm) && !users.contains(&vs), "{users:?}");
+        assert!(users.iter().all(|u| matches!(doc.tab(*u).map(|t| &t.content), Some(TabContent::PartStudio(_) | TabContent::Assembly(_)))));
+        if let Some(TabContent::VariableStudio(v)) = doc.tab_mut(vs).map(|t| &mut t.content) {
+            v.insert_into_all = false;
+        }
+        assert!(doc.tab_users(vs).is_empty());
+    }
 
     #[test]
     fn tabs_using_a_part_studio() {

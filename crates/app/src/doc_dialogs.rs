@@ -77,34 +77,53 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
 }
 
 /// ☰ › Restore deleted workspaces…: deleted branches with a Restore button.
+/// ☰ › Restore deleted workspaces… (live doc-menu-restore-workspaces): the deleted workspaces to tick, [Restore
+/// selected] (pale until one is ticked) [Cancel]; none: "No deleted workspaces found in this document."
 pub fn restore_deleted_workspaces(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
+    let picked: Rc<std::cell::RefCell<Vec<noshape_store::BranchId>>> = Rc::default();
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let deleted: Vec<noshape_store::BranchInfo> = doc.read(cx).session.store.graph().map(|g| g.branches.into_iter().filter(|b| b.deleted).collect()).unwrap_or_default();
         let rows: Vec<AnyElement> = if deleted.is_empty() {
-            vec![os::info_box("No deleted workspaces found in this document.").into_any_element()]
+            const NONE: &str = "No deleted workspaces found in this document.";
+            noshape_app_core::ui_script::note_message(NONE.into());
+            vec![os::info_box(NONE).into_any_element()]
         } else {
             deleted
                 .into_iter()
                 .map(|b| {
-                    let (doc, id) = (doc.clone(), b.id);
+                    let (picked, id) = (picked.clone(), b.id);
+                    let on = picked.borrow().contains(&id);
                     h_flex()
                         .h(px(36.))
                         .gap(px(8.))
-                        .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child(crate::ui::user_text(b.name.clone())))
-                        .child(div().text_size(px(13.)).text_color(pal.text_muted).child(crate::start_library::format_onshape_time(b.created)))
-                        .child(os::secondary_button(SharedString::from(format!("restore-{}", id.0)), "Restore", cx).on_click(move |_, window, cx| {
-                            let r = doc.update(cx, |d, _| d.session.store.restore_branch(id).map_err(Into::into));
-                            report(&doc, r, cx);
+                        .child(os::user_checkbox(SharedString::from(format!("restore-{}", id.0)), b.name.clone(), on).flex_1().on_click(move |_, window, _| {
+                            let mut p = picked.borrow_mut();
+                            if let Some(i) = p.iter().position(|x| *x == id) {
+                                p.remove(i);
+                            } else {
+                                p.push(id);
+                            }
                             window.refresh();
                         }))
+                        .child(div().text_size(px(13.)).text_color(pal.text_muted).child(crate::start_library::format_onshape_time(b.created)))
                         .into_any_element()
                 })
                 .collect()
         };
+        let any = !picked.borrow().is_empty();
+        let (doc, picked) = (doc.clone(), picked.clone());
         os::modal(dialog, "Restore deleted workspaces", 460.)
             .child(os::modal_body().children(rows))
-            .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
+            .footer(os::modal_footer().child(os::modal_ok(div().when(!any, |d| d.opacity(0.4)).child(os::primary_button("ok", "Restore selected")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                let ids = picked.borrow().clone();
+                if ids.is_empty() {
+                    return false;
+                }
+                let r = doc.update(cx, |d, _| ids.iter().try_for_each(|id| d.session.store.restore_branch(*id)).map_err(Into::into));
+                report(&doc, r, cx)
+            })
     });
 }
 
@@ -192,9 +211,9 @@ pub fn move_to(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     let location = Rc::new(crate::start_window::Location::new(start));
     window.open_dialog(cx, move |dialog, _, cx| {
         let (loc, path) = (location.clone(), path.clone());
-        os::modal(dialog, "Move to", 460.)
+        os::modal(dialog, "Move documents and folders to", 460.)
             .child(os::modal_body().child(os::field_label("Location")).child(location.render()))
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, window, cx| {
                 let dir = loc.chosen.borrow().clone();
                 if path.parent() == Some(dir.as_path()) {

@@ -55,9 +55,17 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   the drop files the tab); the navbar's double-click rename keeps the field all selected. run.py folds a start
   sketch's "Edit" row into its "Insert feature" row (ours' start builder adds shapes in a second edit).
   doc-branches' B1 stays from Main's head (live's B1 has Sketch 2 / Extrude 2: live2's note was wrong there).
+- Third land: a tab double-click no longer renames (live 2279 (b)); Restore deleted workspaces as live's (tick rows,
+  Restore selected / Cancel, the empty line as `message`); ☰ and the documents page's Move to… titled "Move documents
+  and folders to" with "Move here"; deleting a Variable Studio inserted into all Part Studios and Assemblies warns
+  ("Delete tabs", every Part Studio and Assembly; `tab_users`); the Edit shortcut popup's checkbox is no page field.
+  run.py: live's newer Properties reading (Description, the category row by its value, Undo / Redo named) and the
+  Free plan's "Create public document" compared in ours' form.
 - Coverage batch 4: 18 docs-* (+ Add column chooser, Advanced search fields, Reset / Search): documents 72.2 %.
-- Asked live (REQUESTS, batch 2+3 request): Export… missing on tab menus (export quota throttled?), tab double-click
-  rename, the drag drop point, the Tabs panel left open at some starts.
+- Asked live (REQUESTS 2279): (a) Export… missing on tab menus: live's export quota is throttled again, they
+  re-record doc-tab-menu-export / -assembly when it lifts; (b) live doesn't rename a tab on double-click (ours no
+  longer does: Rename is in the menu); (c), (d) re-recorded by live. live recorded the docs-trash scenarios;
+  live2 is recording the 114 ver/vs/fs "11-08" ones (07:17).
 - Open decisions (lead): Help menu (live: Help, FeatureScript documentation, System check are web pages; ours has
   Install command line tool / Connect to coding agents instead); ☰ › Update workspace… (live: the feature library
   version, a toast "Workspace is already at the latest feature library version."; ours: updates references to
