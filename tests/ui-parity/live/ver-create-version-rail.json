@@ -1,19 +1,19 @@
 {
  "scenario": "ver-create-version-rail",
- "recorded": "2026-11-08T01:15:28.199Z",
+ "recorded": "2026-11-08T14:11:23.369Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "cc9e266319600b117ecca19b",
-  "workspace": "3661c4a6278b034aa7f289fc",
-  "element": "e24fd6a019585a55080eb08f",
+  "document": "5f69df5d188aeaefb65e38e8",
+  "workspace": "4b58b236716890d563b23e22",
+  "element": "4618269dba312cb26cc6b546",
   "start": "doc-versions",
-  "startElement": "e24fd6a019585a55080eb08f",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "4618269dba312cb26cc6b546",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 39774
+   "t": 28868
   },
   {
    "step": 2,
@@ -256,28 +256,7 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Create version from Main",
-     "fields": [
-      {
-       "label": null,
-       "kind": "input",
-       "value": "V2"
-      },
-      {
-       "label": "Description cannot contain HTML.",
-       "kind": "input",
-       "value": ""
-      }
-     ],
-     "buttons": [
-      "Create",
-      "Create version and edit properties",
-      "Cancel"
-     ],
-     "text": "Name: Description: (Maximum of 10000 characters) Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -363,7 +342,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 42327
+   "t": 38084
   }
  ]
 }

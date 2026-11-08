@@ -1,19 +1,19 @@
 {
  "scenario": "ver-create-version-named",
- "recorded": "2026-11-08T01:16:26.699Z",
+ "recorded": "2026-11-08T14:13:14.132Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "21e1d70ca477955ffe2cbb6c",
-  "workspace": "717dce501edeb69467ae25df",
-  "element": "24af2d7c0ac5fd40546e001c",
+  "document": "68ec74c0239fb7bf37257e8b",
+  "workspace": "e30a0bee904c538d6d12e112",
+  "element": "ae4e59031b708c517ff7c3ee",
   "start": "doc-versions",
-  "startElement": "24af2d7c0ac5fd40546e001c",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "ae4e59031b708c517ff7c3ee",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -237,7 +237,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 39056
+   "t": 52902
   },
   {
    "step": 2,
@@ -372,7 +372,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 41267
+   "t": 54839
   },
   {
    "step": 3,
@@ -499,7 +499,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 44295
+   "t": 57784
   },
   {
    "step": 4,
@@ -518,28 +518,7 @@
     "focus": {
      "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Create version from Main",
-     "fields": [
-      {
-       "label": null,
-       "kind": "input",
-       "value": "Prototype"
-      },
-      {
-       "label": "Description cannot contain HTML.",
-       "kind": "input",
-       "value": ""
-      }
-     ],
-     "buttons": [
-      "Create",
-      "Create version and edit properties",
-      "Cancel"
-     ],
-     "text": "Name: Description: (Maximum of 10000 characters) Note: Merging feature changes is only supported for Part Studio and Assembly tabs"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -625,7 +604,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 46547
+   "t": 66741
   },
   {
    "step": 5,
@@ -708,7 +687,28 @@
     "drawing": null,
     "document": {
      "workspace": "Main",
-     "history": [],
+     "history": [
+      {
+       "name": "Main",
+       "kind": "workspace",
+       "selected": true
+      },
+      {
+       "name": "Prototype",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "V1",
+       "kind": "version",
+       "selected": false
+      },
+      {
+       "name": "Start",
+       "kind": "start",
+       "selected": false
+      }
+     ],
      "compare": null,
      "tabs": [
       {
@@ -730,7 +730,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50098
+   "t": 70554
   }
  ]
 }
