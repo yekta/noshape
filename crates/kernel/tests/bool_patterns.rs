@@ -1545,4 +1545,12 @@ fn a_valve_handles_pattern_keeps_both_short_edges_as_live() {
         let short = r.edges().into_iter().any(|e| (e.length().unwrap() - 0.07117e-3).abs() < 0.5e-6 && e.edge_info().is_ok_and(|i| ((i.start + i.end) * 0.5 - at).length() < 5e-6));
         assert!(short, "no 0.0712 mm edge at x {}", x * 2.934);
     }
+
+/// cf-snap-hook's Snap Hook 2 (recorded): a hook fused to a body whose rounds are arcs turned about an axis (tori
+/// OCCT keeps as surfaces of revolution): the arcs as B-splines at their own parameters, as an extrusion's, so the
+/// revolutions are noshape's free-form faces and the fuse ours, as OCCT's (it declined "a face of revolution"; OCCT
+/// 0.96 s, ours ~11 ms).
+#[test]
+fn a_fuse_with_revolved_arcs_as_occt() {
+    valid_as_occt("4a77bf0cde101133", 1e-9);
 }

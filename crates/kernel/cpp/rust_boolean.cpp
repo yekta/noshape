@@ -481,13 +481,15 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     const occ::handle<Geom_SurfaceOfRevolution>      rvl = occ::down_cast<Geom_SurfaceOfRevolution>(surf);
     // (A sweep of a B-spline only; an extrusion's ellipse or circle as one.)
     occ::handle<Geom_BSplineCurve> swept = occ::down_cast<Geom_BSplineCurve>(basis_of(!ext.IsNull() ? ext->BasisCurve() : !rvl.IsNull() ? rvl->BasisCurve() : occ::handle<Geom_Curve>()));
-    // (The turn the face's parameters are on: a face from pi to 3 pi starts its turn at pi.)
-    if (swept.IsNull() && !ext.IsNull())
+    // (The turn the face's parameters are on: a face from pi to 3 pi starts its turn at pi. A revolution's profile
+    // is along v: cf-snap-hook's revolved arcs, tori kept as revolutions.)
+    if (swept.IsNull() && (!ext.IsNull() || !rvl.IsNull()))
     {
       double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
       BRepTools::UVBounds(f, u0, u1, v0, v1);
-      const bool first = u0 > -1e-9 && u1 < 2 * M_PI + 1e-9;
-      swept = conic_as_bspline(basis_of(ext->BasisCurve()), first || u1 - u0 > 2 * M_PI + 1e-9 ? 0.0 : u0);
+      const double a0 = ext.IsNull() ? v0 : u0, a1 = ext.IsNull() ? v1 : u1;
+      const bool   first = a0 > -1e-9 && a1 < 2 * M_PI + 1e-9;
+      swept = conic_as_bspline(basis_of(!ext.IsNull() ? ext->BasisCurve() : rvl->BasisCurve()), first || a1 - a0 > 2 * M_PI + 1e-9 ? 0.0 : a0);
     }
     // (A hyperbola's or parabola's over the face's range of it, a little more either side.)
     if (swept.IsNull() && !ext.IsNull())
