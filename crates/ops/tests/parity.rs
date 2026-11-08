@@ -912,6 +912,18 @@ fn an_ellipse_is_rebuilt() {
     assert_eq!((r.matching, r.compared), (1, 1), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// A query live's fetch gives no ids for (c2-sm-louver's Flange 6 edges): live's evaluation of it for that feature's
+/// parameter (refs.jsonl `parameter`) gives its entities.
+#[test]
+fn a_query_without_ids_takes_lives_evaluation_for_its_parameter() {
+    let (mut features, live, refs) = block_model();
+    features["features"][2]["parameters"][0]["queries"] = json!([{ "btType": "BTMIndividualQuery-138", "deterministicIds": [], "queryString": "query=qCompressed(1.0,\"&430$opaque\",id);" }]);
+    let refs = refs.replace(r#""id":"JHt""#, r#""id":"JHt","parameter":"entities""#);
+    assert!(refs.contains(r#""parameter":"entities""#), "{refs}");
+    let r = run_model("block-evaluated", &features, &live, &refs);
+    assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
+}
+
 /// The fillet's edge placed from the bodydetails live's line after the
 /// extrude carries (no refs.jsonl line for it): of the four vertical edges,
 /// the one at (60, 40).

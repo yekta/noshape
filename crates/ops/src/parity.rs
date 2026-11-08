@@ -47,6 +47,9 @@ pub struct LiveRef {
     /// The live part a face, edge or vertex is on (two parts can have one there: cf-fill-pattern's sheet metal
     /// part and the solid both have the hole its Fill pattern patterns).
     pub body: Option<String>,
+    /// The feature parameter live evaluated it for (refs.jsonl `parameter`): a query live's fetch gave no ids for
+    /// (Flange 6's edges in c2-sm-louver) is these.
+    pub parameter: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -203,7 +206,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string) };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -1380,7 +1383,16 @@ impl<'a> Translator<'a> {
             "BTMParameterEnum" | "BTMParameterBoolean" | "BTMParameterString" => Some(p["value"].clone()),
             "BTMParameterQueryList" => {
                 self.picked.clear();
-                let queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
+                let mut queries: Vec<Value> = p["queries"].as_array().cloned().unwrap_or_default();
+                // A query live's fetch names no ids for, evaluated by live for this parameter (refs.jsonl): its ids.
+                let pid = p["parameterId"].as_str().unwrap_or("");
+                let mut evaluated: Vec<String> = self.refs.iter().filter(|((i, _), r)| *i == k && r.parameter.as_deref() == Some(pid)).map(|((_, id), _)| id.clone()).collect();
+                evaluated.sort();
+                if !evaluated.is_empty() {
+                    for q in queries.iter_mut().filter(|q| q["deterministicIds"].as_array().is_none_or(|a| a.is_empty())) {
+                        *q = json!({ "btType": q["btType"], "deterministicIds": evaluated, "queryString": "" });
+                    }
+                }
                 let mut ids = Vec::new();
                 let mut missed = Vec::new();
                 for q in &queries {

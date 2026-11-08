@@ -1,5 +1,14 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From dx (11-08 06:26 UTC): c2-sm-louver feature 6 "Louver" is sheet metal, not translation
+The translation is live's: an extrude-process sheet metal model of Sketch 3's chain (Uzf…, eUw…, XXK…, FI7…: 25.2,
+8.5, 23.8, 23.8 mm; live's 85969 mm³ = 1.628 × 687.6 × ~76.8 mm developed, the whole chain). The chain is nearly
+straight: XXK… runs at 44.27° between neighbours at 45° (two 0.73° kinks; Uzf-eUw collinear; plus a zero-length line).
+Live bends at the two kinks but its bend faces are **planes**: thin strips REBu / REBq / REBi / REBm (normals between
+the walls', 31.8-111.9 mm²; and the 0.11-0.20 mm² end faces), Part 2 22 planes / 44 lines; ours makes them cylinders
+(4 cylinder faces, 8 circle edges). Live's line 6 in ~/parity/models/c2-sm-louver/live.jsonl has every face's normal
+and area.
+
 ## From blend (11-07 22:30 UTC, lead's decision): SETBACK-FILL-PATCH is blend's now
 Blends are blend's (fillets, chamfers, face blends): cf-setback-fillet's Setback Fillet 1 (RABC, the third corner patch,
 35.641 mm² against live 34.464) moves to blend with TICKETS SETBACK-FILL-PATCH, starting from your notes and
