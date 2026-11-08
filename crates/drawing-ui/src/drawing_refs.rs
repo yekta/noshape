@@ -58,7 +58,55 @@ fn other_path(pin: Option<&PinnedVersion>) -> Option<std::path::PathBuf> {
     pin.and_then(|p| crate::derived::ExternalRef::parse(&p.id)).map(|r| r.path)
 }
 
+/// [`DrawingEditor::ext_info`]'s key of another document at a microversion.
+pub fn ext_info_key(r: &crate::derived::ExternalRef) -> String {
+    format!("{}|{}", r.microversion, r.path.display())
+}
+
 impl DrawingEditor {
+    /// Read off the UI thread the version names of the drawing's other-document references and whether a newer
+    /// version exists (the Sheets panel row's ⧫ V1 or blue update icon); `force`: all again.
+    pub fn check_ext_refs(&mut self, force: bool, cx: &mut Context<Self>) {
+        if self.ext_checking {
+            return;
+        }
+        let mut todo: Vec<crate::derived::ExternalRef> = Vec::new();
+        for p in self.drawing.sheets.iter().flat_map(|s| &s.views).filter_map(|v| v.pinned.as_ref()) {
+            let Some(r) = crate::derived::ExternalRef::parse(&p.id) else { continue };
+            if (force || !self.ext_info.contains_key(&ext_info_key(&r))) && !todo.iter().any(|t| t.path == r.path && t.microversion == r.microversion) {
+                todo.push(r);
+            }
+        }
+        if todo.is_empty() {
+            return;
+        }
+        self.ext_checking = true;
+        cx.spawn(async move |this, cx| {
+            let got: Vec<(String, (String, bool))> = cx
+                .background_spawn(async move {
+                    todo.iter()
+                        .map(|r| {
+                            let label = noshape_ops::workspace_update::version_label(r).unwrap_or_else(|| format!("state {}", r.microversion.short()));
+                            (ext_info_key(r), (label, crate::derived::newer_version(r).is_some()))
+                        })
+                        .collect()
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.ext_checking = false;
+                this.ext_info.extend(got);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// A pinned reference's version name and whether a newer one exists (another document's), once read.
+    pub fn ext_info_of(&self, pin: &PinnedVersion) -> Option<(String, bool)> {
+        let r = crate::derived::ExternalRef::parse(&pin.id)?;
+        self.ext_info.get(&ext_info_key(&r)).cloned()
+    }
+
     pub fn open_ref_manager(&mut self, cx: &mut Context<Self>) {
         let docs = self.referenced_docs(cx);
         self.ref_manager = Some(RefManager { tab: 0, docs, checked: HashSet::new(), chosen: HashMap::new() });
@@ -81,7 +129,7 @@ impl DrawingEditor {
                 let behind = own.iter().any(|p| p.as_ref().is_none_or(|p| p.id != newest.id.to_string()));
                 if behind {
                     let mut choices = vec![(branch, RefTarget::Main)];
-                    choices.extend(versions.iter().rev().map(|v| (v.name.clone(), RefTarget::Version(PinnedVersion { id: v.id.to_string(), name: v.name.clone() }))));
+                    choices.extend(versions.iter().rev().map(|v| (v.name.clone(), RefTarget::Version(PinnedVersion { locked: false, id: v.id.to_string(), name: v.name.clone() }))));
                     let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
                     out.push(RefDoc { name: dm.name(), path: None, current, choices, latest: 1, thumbnail });
                 }
@@ -89,7 +137,8 @@ impl DrawingEditor {
         }
         // Other documents (Insert view › Other documents), by file.
         let mut seen: Vec<std::path::PathBuf> = Vec::new();
-        for p in bases.iter().flatten() {
+        // (Pinned ones, Pin reference, stay at their version: live 2303.)
+        for p in bases.iter().flatten().filter(|p| !p.locked) {
             let Some(r) = crate::derived::ExternalRef::parse(&p.id) else { continue };
             if seen.contains(&r.path) {
                 continue;
@@ -118,8 +167,8 @@ impl DrawingEditor {
                     (None, RefTarget::Main) if other_path(v.pinned.as_ref()).is_none() => v.pinned = None,
                     (None, RefTarget::Version(pin)) if other_path(v.pinned.as_ref()).is_none() => v.pinned = Some(pin.clone()),
                     (Some(path), RefTarget::External(mv)) => {
-                        if let Some(r) = v.pinned.as_ref().and_then(|p| crate::derived::ExternalRef::parse(&p.id)).filter(|r| r.path == *path) {
-                            v.pinned = Some(PinnedVersion { id: crate::derived::ExternalRef { microversion: *mv, ..r }.key(), name: format!("{name} {label}") });
+                        if let Some(r) = v.pinned.as_ref().filter(|p| !p.locked).and_then(|p| crate::derived::ExternalRef::parse(&p.id)).filter(|r| r.path == *path) {
+                            v.pinned = Some(PinnedVersion { locked: false, id: crate::derived::ExternalRef { microversion: *mv, ..r }.key(), name: format!("{name} {label}") });
                         }
                     }
                     _ => {}
@@ -128,10 +177,14 @@ impl DrawingEditor {
             // BOM tables of another document's assembly (drawing.md TB14).
             if let (Some(path), RefTarget::External(mv)) = (&path, &target) {
                 for t in dr.sheets.iter_mut().flat_map(|s| s.tables.iter_mut()) {
-                    if let TableKind::Bom { source: Some(s), .. } = &mut t.kind
-                        && let Some(r) = s.version.as_deref().and_then(crate::derived::ExternalRef::parse).filter(|r| r.path == *path)
-                    {
-                        s.version = Some(crate::derived::ExternalRef { microversion: *mv, ..r }.key());
+                    // (And cut lists of its composite parts.)
+                    let version = match &mut t.kind {
+                        TableKind::Bom { source: Some(s), .. } => &mut s.version,
+                        TableKind::CutList { source: Some(s), .. } => &mut s.version,
+                        _ => continue,
+                    };
+                    if let Some(r) = version.as_deref().and_then(crate::derived::ExternalRef::parse).filter(|r| r.path == *path) {
+                        *version = Some(crate::derived::ExternalRef { microversion: *mv, ..r }.key());
                     }
                 }
             }
@@ -254,6 +307,14 @@ impl DrawingEditor {
         }
         let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
         let info = format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" });
+        // Its texts for the ui-parity runner (live 2303: a flyout of the drawing).
+        let mut text: Vec<String> = vec!["Reference manager".into(), "Update to latest".into(), "Selective update".into(), info.clone()];
+        for (i, d) in m.docs.iter().enumerate() {
+            let to = d.choices.get(m.chosen.get(&i).copied().unwrap_or(d.latest)).map(|c| c.0.clone()).unwrap_or_default();
+            text.extend([d.name.clone(), format!("{} ⇨ {to}", d.current)]);
+        }
+        text.push(if tab == 0 { "Update all".into() } else { "Update selected".into() });
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Reference manager", "text": text }));
         Some(
             v_flex()
                 .id("dr-ref-manager")

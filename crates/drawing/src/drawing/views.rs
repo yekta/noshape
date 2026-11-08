@@ -707,6 +707,45 @@ pub fn named_view_frame(nv: &crate::partstudio::NamedView) -> [[f64; 3]; 2] {
     [(q * DVec3::NEG_Z).to_array(), (q * DVec3::Y).to_array()]
 }
 
+/// Drawing properties › Projection angle (live 2313): the base and projected views of each sheet swap rows
+/// (mirrored about the middle of their rows), so a view above or below its parent keeps its orientation (Top now below
+/// the Front in first angle), one beside it turns to the other side (Right becomes Left) and an isometric keeps its
+/// look; notes grouped with a moved view go with it.
+pub fn change_projection(drawing: &mut Drawing, projection: Projection) {
+    if drawing.projection == projection {
+        return;
+    }
+    for sheet in &mut drawing.sheets {
+        let ids: Vec<ViewId> = sheet.views.iter().filter(|v| matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. })).map(|v| v.id).collect();
+        let dirs: Vec<(ViewId, [f64; 2])> = ids.iter().filter_map(|id| Some((*id, projected_direction(sheet, *id)?))).collect();
+        let ys = sheet.views.iter().filter(|v| ids.contains(&v.id)).map(|v| v.position[1]);
+        let (lo, hi) = ys.fold((f64::INFINITY, f64::NEG_INFINITY), |(lo, hi), y| (lo.min(y), hi.max(y)));
+        if lo > hi {
+            continue;
+        }
+        let mut moved: Vec<(ViewId, f64)> = Vec::new();
+        for v in sheet.views.iter_mut().filter(|v| ids.contains(&v.id)) {
+            let y = lo + hi - v.position[1];
+            moved.push((v.id, y - v.position[1]));
+            v.position[1] = y;
+            let Some(&(_, m)) = dirs.iter().find(|(i, _)| *i == v.id) else { continue };
+            if let ViewKind::Projected { direction, .. } = &mut v.kind {
+                *direction = if m[0] != 0.0 && m[1] != 0.0 {
+                    Some([-m[0], -m[1]])
+                } else {
+                    direction.map(|_| [m[0], -m[1]])
+                };
+            }
+        }
+        for a in &mut sheet.annotations {
+            if let Some(dy) = a.moves_with_view().and_then(|v| moved.iter().find(|(i, _)| *i == v)).map(|m| m.1) {
+                a.position[1] += dy;
+            }
+        }
+    }
+    drawing.projection = projection;
+}
+
 /// Snap a sheet direction to the nearest multiple of 45 degrees.
 pub fn snap_direction(d: [f64; 2]) -> [f64; 2] {
     let a = d[1].atan2(d[0]);

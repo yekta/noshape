@@ -123,6 +123,9 @@ def first_difference(a, b, path=""):
         for k in a:
             if k not in b:
                 continue
+            # Create Drawing's name field: live's recorder reads it from 11-08 on (older recordings list no fields).
+            if path == ".dialog" and k == "fields" and a.get("title") == "Create Drawing: New drawing name" and a[k] == []:
+                continue
             # Live's recorder couldn't read the sketch (`"error": "sketch model not reached"`, before a plane is picked).
             if path == ".sketch" and a.get("error") and k in ("entities", "constraints", "dimensions"):
                 continue

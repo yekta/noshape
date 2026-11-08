@@ -1867,7 +1867,7 @@ fn pinned_views_use_their_version() {
         ex.params.set("depth", ParamValue::Expr(ExprValue::new("20 mm")));
     }
     let vid = drawing.sheets[0].views[0].id;
-    let pin = PinnedVersion { id: "v1".into(), name: "V1".into() };
+    let pin = PinnedVersion { locked: false, id: "v1".into(), name: "V1".into() };
     drawing.sheets[0].views[0].pinned = Some(pin.clone());
     let (key, _) = views::view_source(&drawing.sheets[0], vid).unwrap();
     assert_eq!(key.version.as_deref(), Some("v1"), "the key carries the version");
@@ -1878,7 +1878,7 @@ fn pinned_views_use_their_version() {
     assert_eq!(Some(src.hash), views::source_hash(&v1, &key));
     assert_ne!(Some(src.hash), views::source_hash(&live, &key));
     // An unknown version leaves the source out.
-    drawing.sheets[0].views[0].pinned = Some(PinnedVersion { id: "nope".into(), name: "?".into() });
+    drawing.sheets[0].views[0].pinned = Some(PinnedVersion { locked: false, id: "nope".into(), name: "?".into() });
     let none = views::regenerate_sources_with(&live, &drawing, &versions);
     assert!(none.keys().all(|k| k.version.as_deref() != Some("nope")));
 }
@@ -5174,4 +5174,36 @@ fn merging_cells_keeps_the_columns() {
     }
     let xs = widths(&t);
     assert!(xs[3] - xs[1] >= font::text_width(long, 2.5) - 1e-6, "{xs:?}");
+}
+
+/// Projection angle Third → First (live 2313): the views swap rows; a projected view above or below its parent keeps
+/// its orientation, one beside it shows the other side, an isometric keeps its look; and back.
+#[test]
+fn projection_change_swaps_rows_as_live() {
+    let (_, mut drawing) = demo();
+    // (Only base and projected views move: sections, details and auxiliaries stay.)
+    type Row = (ViewId, [f64; 2], Option<[f64; 2]>, views::ViewFrame);
+    let frames = |d: &Drawing| -> Vec<Row> {
+        let s = &d.sheets[0];
+        s.views.iter().filter(|v| matches!(v.kind, ViewKind::Base { .. } | ViewKind::Projected { .. })).filter_map(|v| Some((v.id, v.position, views::projected_direction(s, v.id), views::view_frame(d, s, v.id)?))).collect()
+    };
+    let before = frames(&drawing);
+    assert!(before.iter().any(|b| b.2.is_some()), "the demo has projected views");
+    let other = if drawing.projection == Projection::ThirdAngle { Projection::FirstAngle } else { Projection::ThirdAngle };
+    let first = drawing.projection;
+    views::change_projection(&mut drawing, other);
+    let after = frames(&drawing);
+    let (lo, hi) = before.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), b| (l.min(b.1[1]), h.max(b.1[1])));
+    for (b, a) in before.iter().zip(&after) {
+        assert!((a.1[1] - (lo + hi - b.1[1])).abs() < 1e-9 && a.1[0] == b.1[0], "rows swap: {:?} -> {:?}", b.1, a.1);
+        let same = (a.3.dir - b.3.dir).length() < 1e-9;
+        match b.2 {
+            Some(m) if m[1] == 0.0 => assert!((a.3.dir + b.3.dir).length() < 1e-9, "beside its parent: the other side"),
+            _ => assert!(same, "above / below / diagonal / base: the same orientation"),
+        }
+    }
+    views::change_projection(&mut drawing, first);
+    for (b, a) in before.iter().zip(&frames(&drawing)) {
+        assert!((a.1[1] - b.1[1]).abs() < 1e-9 && (a.3.dir - b.3.dir).length() < 1e-9, "back where it was");
+    }
 }

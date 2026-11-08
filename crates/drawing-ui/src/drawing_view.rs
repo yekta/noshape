@@ -374,6 +374,10 @@ pub struct DrawingEditor {
     pub color_dlg: Option<crate::drawing_color::ColorDlg>,
     /// Reference manager (drawing_refs.rs).
     pub ref_manager: Option<crate::drawing_refs::RefManager>,
+    /// Other documents' versions this drawing shows: version name and whether a newer one exists, by
+    /// [`crate::drawing_refs::ext_info_key`] (read off the UI thread, drawing_refs.rs `check_ext_refs`).
+    pub ext_info: HashMap<String, (String, bool)>,
+    pub ext_checking: bool,
     /// Selected table cells (drawing_cells.rs).
     pub cell_sel: Option<crate::drawing_cells::CellSel>,
     /// The floating Cell panel of the selected general table cells.
@@ -726,6 +730,8 @@ impl DrawingEditor {
             cell_panel: None,
             note_color: None,
             ref_manager: None,
+            ext_info: HashMap::new(),
+            ext_checking: false,
             color_dlg: None,
             version_docs: HashMap::new(),
             paste_table: None,
@@ -770,6 +776,12 @@ impl DrawingEditor {
         this.update_info(cx);
         this.ensure_sources(false, cx);
         this.refresh(cx);
+        // Another document may get a newer version meanwhile (live 2303: the update icon comes without a reload).
+        this._subs.push(cx.observe_window_activation(window, |this: &mut Self, window, cx| {
+            if window.is_window_active() {
+                this.check_ext_refs(true, cx);
+            }
+        }));
         this
     }
 
@@ -967,6 +979,7 @@ impl DrawingEditor {
 
     /// Regenerate referenced sources that are missing (or all, for Update).
     pub fn ensure_sources(&mut self, all: bool, cx: &mut Context<Self>) {
+        self.check_ext_refs(false, cx);
         let mut wanted = views::referenced_sources(self.display());
         if let Tool::InsertView { source, .. } = &self.tool {
             let k = SourceKey { version: self.insert.pinned.as_ref().map(|p| p.id.clone()), ..SourceKey::studio(*source) };

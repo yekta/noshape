@@ -470,7 +470,12 @@ impl DrawingEditor {
         let key_of = |v: ViewId| views::view_source(self.current_sheet(), v).map(|(k, _)| k);
         let source_label = match &d.bom_source {
             _ if d.bom_data.is_some() => "BOM data".to_string(),
-            _ if !bom => d.cut_source.as_ref().map(|s| s.label.clone()).unwrap_or_default(),
+            // A picked composite: its Part Studio, on the Insert row's ▾ (live 2299).
+            _ if !bom && d.cut_source.is_some() => d
+                .cut_source
+                .as_ref()
+                .and_then(|c| self.sources.get(&SourceKey { version: c.version.clone(), ..SourceKey::studio(c.tab) }).map(|s| s.name.clone()).or_else(|| self.doc.read(cx).session.doc.tab(c.tab).map(|t| t.name.clone())))
+                .unwrap_or_default(),
             Some(s) => s.label.clone(),
             None => sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default(),
         };
@@ -568,7 +573,13 @@ impl DrawingEditor {
             let doc = self.doc.read(cx);
             (doc.name().to_string(), doc.session.store.branch(doc.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
         };
-        let ref_text = if bom { format!("BOM : {source_label}") } else { source_label.clone() };
+        // (Cut list table properties: "Cut list:" "Cut list : Composite part 1", live 2299.)
+        let ref_text = match (bom, &d.cut_source) {
+            (true, _) => format!("BOM : {source_label}"),
+            (false, Some(c)) => format!("Cut list : {}", c.label),
+            (false, None) => source_label.clone(),
+        };
+        let ref_label = if bom { "Reference:" } else { "Cut list:" };
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131): the selects' options too.
             let title = match (bom, editing) {
@@ -579,7 +590,7 @@ impl DrawingEditor {
             };
             let mut text: Vec<String> = vec![title.into()];
             if editing {
-                text.extend(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone(), "Reference:".into(), ref_text.clone(), "In progress".into()]);
+                text.extend(["Document:".into(), doc_name.clone(), "Workspace:".into(), ws_name.clone(), ref_label.into(), ref_text.clone(), "In progress".into()]);
             } else {
                 text.extend(["Insert".into(), source_label.clone()]);
             }
@@ -637,7 +648,7 @@ impl DrawingEditor {
                     v.child(row("Document:", div().text_size(px(12.)).child(crate::ui::user_text(doc_name.clone())).into_any_element()))
                         .child(row("Workspace:", div().text_size(px(12.)).child(ws_name.clone()).into_any_element()))
                         .child(row(
-                            "Reference:",
+                            ref_label,
                             h_flex()
                                 .gap(px(6.))
                                 .child(
@@ -656,10 +667,12 @@ impl DrawingEditor {
                 .when_some(config_line, |v, text| v.child(row("Configurations", div().text_size(px(12.)).text_color(ink).child(text).into_any_element())))
                 // A cut list: Insert opens Select a composite part (live2 2278).
                 .when(!editing && !bom, |v| {
+                    let picked = d.cut_source.is_some().then(|| source_label.clone());
                     v.child(
-                        div().px(px(4.)).pt(px(2.)).child(
+                        h_flex().px(px(4.)).pt(px(2.)).gap(px(4.)).child(
                             h_flex()
                                 .id("table-dlg-insert-composite")
+                                .flex_1()
                                 .map(|d| crate::ui_script::mark(d, || "button:Insert".into()))
                                 .h(px(26.))
                                 .justify_center()
@@ -674,9 +687,25 @@ impl DrawingEditor {
                                 .child(crate::assets::icon("insert", 14., cx))
                                 .child("Insert")
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_composite_chooser(cx))),
-                        ),
+                        )
+                        // The picked composite's Part Studio, a ▾ that opens the chooser again.
+                        .when_some(picked, |h, studio| {
+                            h.child(
+                                h_flex()
+                                    .id("table-dlg-composite-source")
+                                    .w(px(110.))
+                                    .h(px(26.))
+                                    .px(px(4.))
+                                    .border_b_1()
+                                    .border_color(gpui_kit::rgb(0xdddddd))
+                                    .cursor_pointer()
+                                    .text_size(px(12.))
+                                    .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(studio)))
+                                    .child(crate::assets::icon("drawing-tool-caret", 12., cx))
+                                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_composite_chooser(cx))),
+                            )
+                        }),
                     )
-                    .when_some(d.cut_source.as_ref().map(|s| s.label.clone()), |v, label| v.child(div().px(px(10.)).pt(px(4.)).text_size(px(12.)).child(crate::ui::user_text(label))))
                 })
                 .when(!editing && bom, |v| {
                     v.child(

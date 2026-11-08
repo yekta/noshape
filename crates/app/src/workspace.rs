@@ -1579,7 +1579,8 @@ impl Workspace {
                     .when(self.behind.contains(&id) || newer, |d| {
                         // A linked document's newer version: a click opens the Reference manager (Update to latest),
                         // as live's out-of-date icons do (a drawing's own is its Change to version…).
-                        let (doc, linked) = (self.doc.clone(), self.behind.contains(&id));
+                        // (A drawing's does nothing on a click: its Sheets panel row opens its Reference manager, live 2303.)
+                        let (doc, linked) = (self.doc.clone(), self.behind.contains(&id) && kind != "drawing");
                         d.child(
                             div()
                                 .id(SharedString::from(format!("tab-behind-{id}")))

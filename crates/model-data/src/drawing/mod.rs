@@ -3485,10 +3485,13 @@ pub struct DrawingProps {
 /// A version a view reference is pinned to.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PinnedVersion {
-    /// The store's version id (as text).
+    /// The store's version id (as text), or another document's `ext:` key.
     pub id: String,
-    /// Its name ("V1").
+    /// Its name ("V1"; another document's: "<document> V1").
     pub name: String,
+    /// Another document's version kept by Pin reference: no update notice, Update all leaves it (live 2303).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
 }
 
 /// Drawing properties › Views (per view type) and › Construction geometry.

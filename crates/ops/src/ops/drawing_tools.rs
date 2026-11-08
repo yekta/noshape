@@ -521,7 +521,7 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "properties",
             summary: "Read or change the Drawing properties (units, precision, text, arrows, views, tables, inspection...)",
-            description: "The Drawing properties panel: without `set`, replies with the properties (`properties`: field names and values, lengths in mm; unset optional fields and false flags are left out). `set` changes the fields it names (same names and value shapes; null clears an optional one), as the panel does: with `locked` on before and after, nothing else changes; choosing `units` sets the drawing's metric flag. One edit (\"Drawing properties\").",
+            description: "The Drawing properties panel: without `set`, replies with the properties (`properties`: field names and values, lengths in mm; unset optional fields and false flags are left out). `projection` (\"third_angle\" | \"first_angle\", the Views tab's Projection angle): changing it moves the views as Onshape does (the rows swap: a view above or below its parent keeps its orientation, one beside it shows the other side). `set` changes the fields it names (same names and value shapes; null clears an optional one), as the panel does: with `locked` on before and after, nothing else changes; choosing `units` sets the drawing's metric flag. One edit (\"Drawing properties\").",
             fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Fields to change (see the reply without `set`).")]),
             mutates: true,
             destructive: false,
@@ -2497,11 +2497,24 @@ fn inspection(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
-    let props = |d: &Drawing| serde_json::to_value(&d.props).expect("json");
+    // (The Views tab's Projection angle is the drawing's, not a property field.)
+    let props = |d: &Drawing| {
+        let mut j = serde_json::to_value(&d.props).expect("json");
+        j["projection"] = json!(if d.projection == noshape_model::drawing::Projection::FirstAngle { "first_angle" } else { "third_angle" });
+        j
+    };
     let Some(set) = a.object("set")? else {
         return Ok(json!({ "properties": props(&t.d) }).into());
     };
-    let mut j = props(&t.d);
+    let mut set = set.clone();
+    let projection = match set.remove("projection") {
+        None => None,
+        Some(Value::String(p)) if p == "first_angle" => Some(noshape_model::drawing::Projection::FirstAngle),
+        Some(Value::String(p)) if p == "third_angle" => Some(noshape_model::drawing::Projection::ThirdAngle),
+        Some(_) => return Err(OpError::param("set", "`projection`: third_angle or first_angle")),
+    };
+    let set = &set;
+    let mut j = serde_json::to_value(&t.d.props).expect("json");
     for (k, v) in set {
         j[k] = v.clone();
     }
@@ -2513,6 +2526,10 @@ fn properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         return Err(OpError::param("set", &format!("no property `{k}`")));
     }
     dt::set_drawing_props(&mut t.d, |p| *p = new);
+    // The views swap rows as the angle changes (live 2313).
+    if let Some(p) = projection.filter(|_| !t.d.props.locked) {
+        noshape_model::drawing::views::change_projection(&mut t.d, p);
+    }
     let sheet = t.sheet;
     commit(od, t.tab, sheet, t.d, "Drawing properties")?;
     let d = dr::drawing_of(od.doc(), t.tab).cloned().expect("drawing");

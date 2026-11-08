@@ -876,7 +876,7 @@ mod tests {
         let v = s.create_version("V1", "").unwrap().to_string();
         let tab = s.doc.tabs.iter().find(|t| matches!(t.content, TabContent::Drawing(_))).unwrap().id;
         if let Some(TabContent::Drawing(d)) = s.doc.tab_mut(tab).map(|t| &mut t.content) {
-            d.sheets[0].views[0].pinned = Some(noshape_model::drawing::PinnedVersion { id: v.clone(), name: "V1".into() });
+            d.sheets[0].views[0].pinned = Some(noshape_model::drawing::PinnedVersion { locked: false, id: v.clone(), name: "V1".into() });
         }
         s.commit(&[tab], false, "Pin view reference").unwrap();
         let docs = s.pinned_documents();

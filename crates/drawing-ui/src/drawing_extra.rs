@@ -289,6 +289,11 @@ impl DrawingEditor {
         }
     }
 
+    /// The version a view's reference is pinned to (its base view's).
+    fn reference_pin(&self, sheet: &Sheet, id: ViewId) -> Option<noshape_model::drawing::PinnedVersion> {
+        sheet.view(views::root_view(sheet, id)?)?.pinned.clone()
+    }
+
     /// The source tab and part of a view's reference.
     fn reference_source(&self, sheet: &Sheet, id: ViewId) -> Option<(TabId, Option<noshape_model::BodyId>)> {
         match &sheet.view(views::root_view(sheet, id)?)?.kind {
@@ -299,6 +304,13 @@ impl DrawingEditor {
 
     /// Pin view reference / Unpin view reference: every base view of the
     /// source (and part), on every sheet.
+    /// Pin reference / Unpin reference: another document's version kept (no update notice, Update all leaves it).
+    pub fn lock_reference(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, lock: bool, cx: &mut Context<Self>) {
+        self.edit(if lock { "Pin reference" } else { "Unpin reference" }, cx, |d| {
+            noshape_ops::workspace_update::pin_drawing_reference(d, tab, part.as_ref(), lock);
+        });
+    }
+
     pub fn pin_reference(&mut self, tab: TabId, part: Option<noshape_model::BodyId>, pin: Option<noshape_model::drawing::PinnedVersion>, cx: &mut Context<Self>) {
         let name = if pin.is_some() { "Pin view reference" } else { "Unpin view reference" };
         self.edit(name, cx, |d| {
@@ -326,15 +338,24 @@ impl DrawingEditor {
     /// Switch to reference | Replace... (on every sheet; the chooser) |
     /// Change configuration... (configured sources), then Unpin view
     /// reference on a pinned one.
-    fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
+    fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pin: Option<&noshape_model::drawing::PinnedVersion>, cx: &App) -> Vec<MenuEntry> {
+        let pinned = pin.is_some();
+        let other = pin.filter(|p| p.id.starts_with("ext:"));
         let replaced = part.clone();
         let shown = part.clone();
         let assembly = matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
+        // (Another document's version: that document opens, at its window.)
+        let other_path = other.and_then(|p| crate::derived::ExternalRef::parse(&p.id)).map(|r| r.path);
         let mut out = vec![
             // The source opens with the part selected (live2 drw-sheet-ref-switch).
-            MenuEntry::item("Switch to reference", move |_, w, cx| match shown.clone() {
-                Some(b) => crate::actions::request_activate_tab_selecting(tab, vec![noshape_model::reference::Reference::Body(b)], w, cx),
-                None => crate::actions::request_activate_tab(tab, w, cx),
+            MenuEntry::item("Switch to reference", move |t, w, cx| match (&other_path, shown.clone()) {
+                (Some(path), _) => {
+                    if let Err(e) = crate::drawing_hooks::open_document_window(path.clone(), t.gpu.clone(), cx) {
+                        t.status = Some(format!("Could not open the document: {e:#}").into());
+                    }
+                }
+                (None, Some(b)) => crate::actions::request_activate_tab_selecting(tab, vec![noshape_model::reference::Reference::Body(b)], w, cx),
+                (None, None) => crate::actions::request_activate_tab(tab, w, cx),
             }),
             MenuEntry::Separator,
             MenuEntry::item("Replace...", move |t, _, cx| {
@@ -349,6 +370,17 @@ impl DrawingEditor {
         if self.reference_configurable(tab, cx) {
             let part = part.clone();
             out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_change_config(tab, part.clone(), w, cx)));
+        }
+        // Another document's version (live 2303): Pin reference (Unpin reference once pinned), Update linked
+        // document... (the Reference manager).
+        if let Some(p) = other {
+            let part = part.clone();
+            out.push(match p.locked {
+                true => MenuEntry::item("Unpin reference", move |t, _, cx| t.lock_reference(tab, part.clone(), false, cx)),
+                false => MenuEntry::item("Pin reference", move |t, _, cx| t.lock_reference(tab, part.clone(), true, cx)),
+            });
+            out.push(MenuEntry::item("Update linked document...", |t, _, cx| t.open_ref_manager(cx)));
+            return out;
         }
         // A pinned one (from before): Unpin view reference. Live (live2 2273) has no Pin view reference for a
         // reference in this document: pinning is for another document's version.
@@ -708,15 +740,24 @@ impl DrawingEditor {
                     }),
                 )
         };
-        let ref_row = |this: &Self, key: String, name: &str, src: Option<(TabId, Option<noshape_model::BodyId>)>, config: &[(String, String)], indent: f32, cx: &mut Context<Self>| {
+        let ref_row = |this: &Self, key: String, name: &str, src: Option<(TabId, Option<noshape_model::BodyId>)>, pin: Option<noshape_model::drawing::PinnedVersion>, config: &[(String, String)], indent: f32, cx: &mut Context<Self>| {
             let (name, version) = match name.split_once('\u{1}') {
                 Some((n, v)) => (n.to_string(), Some(v.to_string())),
                 None => (name.to_string(), None),
             };
-            let menu = src.map(|(tab, part)| this.reference_menu(tab, part, version.is_some(), cx));
+            let menu = src.map(|(tab, part)| this.reference_menu(tab, part, pin.as_ref(), cx));
             let mark = name.clone();
+            // Another document's version (live 2303): "In progress", ⧫ and its version name ("V1"), the ⧫ a blue
+            // update icon while a newer version exists (not pinned); hovered, only the row's text in full.
+            let other = pin.as_ref().filter(|p| p.id.starts_with("ext:")).map(|p| {
+                let (label, newer) = this.ext_info_of(p).unwrap_or_else(|| (p.name.clone(), false));
+                (label, newer && !p.locked)
+            });
             // Live (live2 drw-sheet-ref-switch): hovered, a popup of its name and version ("Part 1 In progress").
-            let mut tip = format!("{name}  {}", version.as_deref().unwrap_or("In progress"));
+            let mut tip = match &other {
+                Some((label, _)) => format!("{name} · In progress · ⧫ {label}"),
+                None => format!("{name}  {}", version.as_deref().unwrap_or("In progress")),
+            };
             for (k, v) in config {
                 tip.push_str(&format!("\n{k}  {v}"));
             }
@@ -753,10 +794,31 @@ impl DrawingEditor {
                 .child(crate::ui::caret(true))
                 .child(sheets_icon("part", cx))
                 .child(div().min_w_0().truncate().child(crate::ui::user_text(name)))
-                // Pinned: a pin and the version name; else Onshape's "In progress" badge.
-                .child(match version {
-                    Some(v) => div().ml(px(8.)).flex().items_center().gap(px(3.)).child(crate::ui::glyph("pin", 11., rgb(0x666666))).child(div().text_size(px(11.)).child(v)),
-                    None => div().ml(px(8.)).px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"),
+                // Another document's version: the release pill, then ⧫ (or the update icon) and the version.
+                // This document pinned: a pin and the version name; else Onshape's "In progress" badge.
+                .child(match (version, other) {
+                    (_, Some((label, newer))) => div()
+                        .ml(px(8.))
+                        .flex()
+                        .items_center()
+                        .gap(px(4.))
+                        .child(div().px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"))
+                        .child(match newer {
+                            true => div()
+                                .id(SharedString::from(format!("{mark}-update")))
+                                .cursor_pointer()
+                                .tooltip(crate::ui::tooltip("Newer versions of linked documents available"))
+                                .child(crate::assets::icon("inserted-version-update", 14., cx))
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                    cx.stop_propagation();
+                                    this.open_ref_manager(cx);
+                                }))
+                                .into_any_element(),
+                            false => crate::assets::icon("version", 12., cx).into_any_element(),
+                        })
+                        .child(div().text_size(px(11.)).child(label)),
+                    (Some(v), None) => div().ml(px(8.)).flex().items_center().gap(px(3.)).child(crate::ui::glyph("pin", 11., rgb(0x666666))).child(div().text_size(px(11.)).child(v)),
+                    (None, None) => div().ml(px(8.)).px(px(4.)).rounded(px(3.)).bg(rgb(0x9ccef0)).text_size(px(11.)).text_color(rgb(0x333333)).child("In progress"),
                 })
                 .child(div().flex_1())
         };
@@ -788,7 +850,8 @@ impl DrawingEditor {
             }
             for (k, (r, vs)) in refs.iter().enumerate() {
                 let src = vs.first().and_then(|(si, v)| self.reference_source(&self.drawing.sheets[*si], v.id));
-                list = list.child(ref_row(self, format!("dr-ref-{k}"), r, src, &[], 6., cx));
+                let pin = vs.first().and_then(|(si, v)| self.reference_pin(&self.drawing.sheets[*si], v.id));
+                list = list.child(ref_row(self, format!("dr-ref-{k}"), r, src, pin, &[], 6., cx));
                 // Its sheets, with their views underneath.
                 let mut last = None;
                 for (sheet_i, v) in vs {
@@ -822,7 +885,11 @@ impl DrawingEditor {
                     let src = vs.first().and_then(|v| self.reference_source(s, v.id));
                     let key = format!("dr-sheet-ref-{i}-{k}");
                     let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
-                    text.extend([version.to_string(), name.to_string()]);
+                    // Another document's version: "In progress", its version, the name (live 2303).
+                    match vs.first().and_then(|v| self.reference_pin(s, v.id)).filter(|p| p.id.starts_with("ext:")) {
+                        Some(p) => text.extend(["In progress".to_string(), self.ext_info_of(&p).map_or(p.name.clone(), |i| i.0), name.to_string()]),
+                        None => text.extend([version.to_string(), name.to_string()]),
+                    }
                     // A configured source's selection (its views' configuration).
                     let config = match (src.as_ref(), vs.first().and_then(|v| noshape_model::drawing::views::view_source(s, v.id))) {
                         (Some((tab, _)), Some((sk, _))) if self.reference_configurable(*tab, cx) => self.config_selection(*tab, &sk.config, cx),
@@ -832,7 +899,8 @@ impl DrawingEditor {
                         text.push(format!("{name} {version}"));
                         text.extend(config.iter().flat_map(|(k, v)| [k.clone(), v.clone()]));
                     }
-                    list = list.child(ref_row(self, key, r, src, &config, 34., cx));
+                    let pin = vs.first().and_then(|v| self.reference_pin(s, v.id));
+                    list = list.child(ref_row(self, key, r, src, pin, &config, 34., cx));
                     for v in vs {
                         list = list.child(self.sheet_view_row(s, v, 75., cx));
                         text.push(self.view_row_label(s, v).0);

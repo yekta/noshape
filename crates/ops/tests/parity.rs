@@ -366,7 +366,8 @@ fn exchange_round_trip() {
                     println!("{name}: live's own {format} import is off ({:.3} mm³, its Parasolid's {:.3}): compared with the Parasolid's", volume(&own) * 1e9, volume(x) * 1e9);
                     Some(x.clone())
                 }
-                Some(x) if format != "STL" => Some(held_to_model(own, x)),
+                // (An STL mesh too: ours as close to the model as live's own STL, within its tessellation.)
+                Some(x) => Some(held_to_model(own, x)),
                 _ => Some(own),
             }
         };
@@ -419,8 +420,13 @@ fn exchange_round_trip() {
         for (format, ext) in FORMATS {
             let file = dir.join(format!("ours.{ext}"));
             let mut args = json!({ "format": format, "file": file });
+            // STL at ours closest to live.stl's tessellation, REST's default (live 2319, clamp-hms: 4,576 triangles,
+            // 16 mm³ under; ours at 0.012 mm / 30°: 5,324, 15.7 under).
             if format == "STL" {
                 args["units"] = json!("Millimeter");
+                args["resolution"] = json!("custom");
+                args["chordal_tolerance"] = json!(0.012);
+                args["angular_deviation"] = json!(30);
             }
             if let Err(e) = t.call("export_parts", args) {
                 println!("{name}: ours.{ext} not exported: {e}");

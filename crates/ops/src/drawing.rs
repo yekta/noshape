@@ -102,7 +102,11 @@ impl SheetModel {
         od.prime_drawing_sources(&drawing);
         let session = &od.session;
         let doc = &session.doc;
-        let versions = |id: &str| session.document_at_version(id).ok().flatten();
+        // This document's versions and other documents' (Insert view › Other documents: `ext:` keys).
+        let versions = |id: &str| match crate::derived::ExternalRef::parse(id) {
+            Some(r) => crate::derived::external_snapshot(&r.path, r.microversion).ok().map(|d| (*d).clone()),
+            None => session.document_at_version(id).ok().flatten(),
+        };
         let mut sources = cached_sources(doc, &drawing, &versions);
         let mut assemblies = crate::derived::assembly_evaluator(Default::default());
         // Views not updated since a change: their sources as they were made.

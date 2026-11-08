@@ -22,6 +22,9 @@ pub enum OutdatedKind {
     Derived(TabId, FeatureId, ExternalRef),
     /// A Variable Studio table from another document (element / studio tab, studio id).
     Variables(TabId, TabId),
+    /// A Drawing's views and tables of another document's version (the drawing tab, that document at that version;
+    /// pinned ones are left out).
+    Drawing(TabId, ExternalRef),
 }
 
 /// The history text of [`apply`].
@@ -60,10 +63,88 @@ pub fn outdated(doc: &Document) -> Vec<Outdated> {
             }
             TabContent::Assembly(a) => studio_refs(t.id, &a.variable_studios.inserted),
             TabContent::VariableStudio(v) => studio_refs(t.id, &v.inserted),
+            TabContent::Drawing(d) => {
+                for x in drawing_refs(d) {
+                    if let Some(v) = derived::newer_version(&x) {
+                        let doc_name = derived::external_doc_info(&x.path).map(|i| i.name).unwrap_or_default();
+                        let from = version_label(&x).unwrap_or_default();
+                        out.push(Outdated { label: format!("{doc_name} in {}", t.name), from, to: v, kind: OutdatedKind::Drawing(t.id, x) });
+                    }
+                }
+            }
             _ => {}
         }
     }
     out
+}
+
+/// A drawing's references to other documents' versions that aren't pinned (Pin reference): one per document and
+/// version (the tab part of each key is left empty).
+pub fn drawing_refs(d: &noshape_model::drawing::Drawing) -> Vec<ExternalRef> {
+    use noshape_model::drawing::TableKind;
+    let mut out: Vec<ExternalRef> = Vec::new();
+    let views = d.sheets.iter().flat_map(|s| &s.views).filter_map(|v| v.pinned.as_ref().filter(|p| !p.locked).map(|p| p.id.as_str()));
+    let tables = d.sheets.iter().flat_map(|s| &s.tables).filter_map(|t| match &t.kind {
+        TableKind::Bom { source: Some(s), .. } => s.version.as_deref(),
+        TableKind::CutList { source: Some(s), .. } => s.version.as_deref(),
+        _ => None,
+    });
+    for k in views.chain(tables) {
+        let Some(r) = ExternalRef::parse(k) else { continue };
+        let r = ExternalRef { tab: String::new(), ..r };
+        if !out.iter().any(|o| o.path == r.path && o.microversion == r.microversion) {
+            out.push(r);
+        }
+    }
+    out
+}
+
+/// The version name of another document's microversion ("V1").
+pub fn version_label(r: &ExternalRef) -> Option<String> {
+    derived::external_doc_info(&r.path).ok()?.versions.into_iter().find(|v| v.microversion == r.microversion && v.label != "Current state").map(|v| v.label)
+}
+
+/// Point a drawing's references to `path` at `from` (views and tables; pinned views stay) at version `to` of that
+/// document (`doc_name`: its name, for the views' "<document> V2"). Returns how many changed.
+pub fn repoint_drawing(d: &mut noshape_model::drawing::Drawing, path: &std::path::Path, from: noshape_store::MicroversionId, to: &VersionChoice, doc_name: &str) -> usize {
+    use noshape_model::drawing::TableKind;
+    let moved = |k: &str| ExternalRef::parse(k).filter(|r| r.path == path && r.microversion == from).map(|r| ExternalRef { microversion: to.microversion, ..r }.key());
+    let mut n = 0;
+    for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+        if let Some(p) = v.pinned.as_mut().filter(|p| !p.locked)
+            && let Some(key) = moved(&p.id)
+        {
+            (p.id, p.name) = (key, format!("{doc_name} {}", to.label));
+            n += 1;
+        }
+    }
+    for t in d.sheets.iter_mut().flat_map(|s| s.tables.iter_mut()) {
+        let version = match &mut t.kind {
+            TableKind::Bom { source: Some(s), .. } => &mut s.version,
+            TableKind::CutList { source: Some(s), .. } => &mut s.version,
+            _ => continue,
+        };
+        if let Some(key) = version.as_deref().and_then(moved) {
+            *version = Some(key);
+            n += 1;
+        }
+    }
+    n
+}
+
+/// Pin reference / Unpin reference on the views of `source` (and `part`) showing another document's version.
+/// Returns how many changed.
+pub fn pin_drawing_reference(d: &mut noshape_model::drawing::Drawing, source: TabId, part: Option<&noshape_model::BodyId>, pin: bool) -> usize {
+    use noshape_model::drawing::ViewKind;
+    let mut n = 0;
+    for v in d.sheets.iter_mut().flat_map(|s| s.views.iter_mut()) {
+        let ours = matches!(&v.kind, ViewKind::Base { source: s, part: p, .. } if *s == source && p.as_ref() == part);
+        if let Some(p) = v.pinned.as_mut().filter(|p| ours && p.locked != pin && p.id.starts_with("ext:")) {
+            p.locked = pin;
+            n += 1;
+        }
+    }
+    n
 }
 
 /// Point one outdated reference at its newest version.
@@ -75,6 +156,12 @@ pub fn apply(o: &Outdated, doc: &mut Document) {
             {
                 let key = ExternalRef { microversion: o.to.microversion, ..x.clone() }.key();
                 f.params.set("partStudio", noshape_model::params::ParamValue::Text(key));
+            }
+        }
+        OutdatedKind::Drawing(tab, x) => {
+            let name = derived::external_doc_info(&x.path).map(|i| i.name).unwrap_or_default();
+            if let Some(TabContent::Drawing(d)) = doc.tab_mut(*tab).map(|t| &mut t.content) {
+                repoint_drawing(d, &x.path, x.microversion, &o.to, &name);
             }
         }
         OutdatedKind::Variables(owner, studio) => {
@@ -117,7 +204,8 @@ pub fn version_refs(doc: &Document) -> Vec<(TabId, ExternalRef)> {
                 out.extend(a.instances.iter().filter_map(|i| ExternalRef::parse(i.source.external_key()?)).map(|x| (t.id, x)));
             }
             TabContent::VariableStudio(v) => studios(&v.inserted),
-            TabContent::Drawing(d) => out.extend(noshape_model::drawing::views::referenced_sources(d).iter().filter_map(|k| ExternalRef::parse(k.version.as_deref()?)).map(|x| (t.id, x))),
+            // (Pinned ones (Pin reference) give no notice.)
+            TabContent::Drawing(d) => out.extend(drawing_refs(d).into_iter().map(|x| (t.id, x))),
             _ => {}
         }
     }

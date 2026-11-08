@@ -392,11 +392,6 @@ pub fn composite_part(ev: &mut EvalCtx) -> FResult<()> {
 /// the feature.
 pub fn make_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32) -> FResult<()> {
     let name = format!("Composite part {}", ev.ctx.bodies.iter().filter(|b| b.name.starts_with("Composite part")).count() + 1);
-    make_named_composite(ev, idx, closed, index, name)
-}
-
-/// [`make_composite`] named `name` (a Cut list's open composite of its frames takes the feature's name, live2 2278).
-pub fn make_named_composite(ev: &mut EvalCtx, idx: &[usize], closed: bool, index: u32, name: String) -> FResult<()> {
     let members: Vec<Arc<Body>> = idx.iter().map(|&i| ev.ctx.bodies[i].clone()).collect();
     let id = BodyId { feature: ev.feature, index };
     // A new part: the next colour of the rotation (live part-studio/472:

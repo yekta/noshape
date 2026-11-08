@@ -157,6 +157,26 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "drawing",
+            verb: "pin_reference",
+            summary: "Pin reference / Unpin reference on a view of another document's version",
+            description: "The Sheets panel reference row's Pin reference (`pin` true, default) or Unpin reference (false) for a view inserted from another document's version (drawing_insert_view with `document`): every view of that reference keeps its version, with no update notice, and Update all (drawing_update_references) leaves it. One edit (\"Pin reference\" / \"Unpin reference\").",
+            fields: with(common(), vec![req("view", json!({ "type": "integer" }), "A view of the reference."), opt("pin", json!({ "type": "boolean", "default": true }), "Pin (true) or unpin (false).")]),
+            mutates: true,
+            destructive: false,
+            run: pin_reference,
+        },
+        Op {
+            group: "drawing",
+            verb: "update_references",
+            summary: "The drawing's Reference manager: views and tables of other documents' versions moved to a newer version",
+            description: "Update linked document... (the reference row's menu or its blue update icon): every view and table of another document's version (not pinned) moves to that document's latest named version (Update all), or to `version` (Selective update; `document` picks one referenced document by file name). Replies with what moved (`updated`: document, from, to) and what is still behind (`outdated`). One edit per document (\"Change to version : <version>\").",
+            fields: with(common(), vec![opt("document", s(), "Only this referenced document (file name, with or without .noshape)."), opt("version", s(), "A named version to move to (default: each document's latest).")]),
+            mutates: true,
+            destructive: false,
+            run: update_references,
+        },
+        Op {
+            group: "drawing",
             verb: "open_feature_studio",
             summary: "The Feature Studio a custom table comes from (Open Feature Studio in linked document)",
             description: "A custom table's Feature Studio: in a linked document (a table defined in another document's version) the document's path, the version and the Feature Studio tab, and with the app open (live mode) the document opens in a window, as \"Open Feature Studio in linked document\" does; in this document the tab, switched to (\"Switch to <Feature Studio>\").",
@@ -452,6 +472,71 @@ fn replicate_op(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 // ------------------------------------------------------------ navigation
 
+fn pin_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t: Target = target(od, a)?;
+    let v = view_arg(&t, a, "view")?;
+    let sheet = &t.d.sheets[t.sheet];
+    let root = noshape_model::drawing::views::root_view(sheet, v).and_then(|r| sheet.view(r)).ok_or_else(|| OpError::param("view", "the view shows no model"))?;
+    let (source, part) = match &root.kind {
+        noshape_model::drawing::ViewKind::Base { source, part, .. } => (*source, part.clone()),
+        _ => return Err(OpError::param("view", "the view shows no model")),
+    };
+    if !root.pinned.as_ref().is_some_and(|p| p.id.starts_with("ext:")) {
+        return Err(OpError::param("view", "Pin reference is for a view of another document's version (drawing_insert_view with `document`)"));
+    }
+    let pin = a.bool_or("pin", true)?;
+    crate::workspace_update::pin_drawing_reference(&mut t.d, source, part.as_ref(), pin);
+    let id = v.0;
+    done(od, t, if pin { "Pin reference" } else { "Unpin reference" }, "view", id)
+}
+
+fn update_references(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::workspace_update as wu;
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let mut t: Target = target(od, a)?;
+    let only = a.opt_str("document")?.map(|d| d.trim_end_matches(".noshape").to_string());
+    let want = a.opt_str("version")?;
+    let refs = wu::drawing_refs(&t.d);
+    let stem = |p: &std::path::Path| p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+    if let Some(o) = &only
+        && !refs.iter().any(|r| stem(&r.path) == *o)
+    {
+        let names: Vec<String> = refs.iter().map(|r| stem(&r.path)).collect();
+        return Err(OpError::param("document", &format!("the drawing has no view of `{o}`; its other documents: {}", if names.is_empty() { "none".into() } else { names.join(", ") })));
+    }
+    let mut updated = Vec::new();
+    for r in refs.iter().filter(|r| only.as_ref().is_none_or(|o| stem(&r.path) == *o)) {
+        let info = crate::derived::external_doc_info(&r.path).map_err(|e| OpError::param("document", &format!("{}: {e}", r.path.display())))?;
+        let named: Vec<&crate::derived::VersionChoice> = info.versions.iter().filter(|v| v.label != "Current state").collect();
+        let to = match want {
+            Some(w) => named.iter().find(|v| v.label == w).copied().ok_or_else(|| OpError::param("version", &format!("{} has no version `{w}`; versions: {}", info.name, named.iter().map(|v| v.label.as_str()).collect::<Vec<_>>().join(", "))))?,
+            None => match named.first() {
+                Some(v) => *v,
+                None => continue,
+            },
+        };
+        if to.microversion == r.microversion {
+            continue;
+        }
+        let from = wu::version_label(r).unwrap_or_default();
+        if wu::repoint_drawing(&mut t.d, &r.path, r.microversion, to, &info.name) > 0 {
+            updated.push(json!({ "document": info.name, "from": from, "to": to.label }));
+        }
+    }
+    let label = updated.last().and_then(|u| u["to"].as_str()).unwrap_or("").to_string();
+    let outdated: Vec<Value> = wu::drawing_refs(&t.d).iter().filter_map(|r| crate::derived::newer_version(r).map(|v| json!({ "document": crate::derived::external_doc_info(&r.path).map(|i| i.name).unwrap_or_default(), "version": wu::version_label(r), "newest": v.label }))).collect();
+    if updated.is_empty() {
+        return Ok(json!({ "updated": [], "outdated": outdated, "note": "Nothing to update: the drawing's other documents are at their newest versions (or pinned)." }).into());
+    }
+    let sheet = t.sheet;
+    commit(od, t.tab, sheet, t.d, &format!("Change to version : {label}"))?;
+    let mut out = reply(od, t.tab, sheet, false)?;
+    out["updated"] = json!(updated);
+    out["outdated"] = json!(outdated);
+    Ok(out.into())
+}
+
 fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let t: Target = target(od, a)?;
@@ -465,6 +550,12 @@ fn switch_to_reference(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
             let v = view_arg(&t, a, "view")?;
             let (key, part) = noshape_model::drawing::views::view_source(sheet, v).ok_or_else(|| OpError::param("view", "the view shows no model"))?;
+            // Another document's version: that document (the app opens it).
+            if let Some(r) = key.version.as_deref().and_then(crate::derived::ExternalRef::parse) {
+                let tab = crate::derived::external_tab(&r.key()).map(|x| x.name);
+                let o = json!({ "document": r.path, "version": crate::workspace_update::version_label(&r), "tab": tab });
+                return Ok(o.into());
+            }
             let mut o = json!({ "target": super::tab_json(od, key.tab) });
             if let Some(p) = part {
                 let name = od.regenerate(key.tab, None).ok().and_then(|r| r.display.bodies.iter().find(|b| b.id == p).map(|b| b.name.clone()));

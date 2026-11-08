@@ -1775,6 +1775,8 @@ impl DrawingEditor {
     fn alt_duplicate(&mut self, pick: Option<u32>, start: [f64; 2], cx: &mut Context<Self>) {
         let Some(sel) = self.sel_at(pick, start) else { return };
         match sel {
+            // A dimension is only moved (live 2313: Alt+drag copies a note, not a dimension).
+            Sel::Annotation(id) if self.current_sheet().annotations.iter().any(|a| a.id == id && a.kind.is_dimension()) => {}
             Sel::Annotation(id) => self.edit_sheet("Copy annotation", cx, |s| {
                 if let Some(mut a) = s.annotations.iter().find(|a| a.id == id).cloned() {
                     a.id = s.next_annotation_id();

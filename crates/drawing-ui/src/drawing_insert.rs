@@ -128,7 +128,7 @@ impl DrawingEditor {
     /// "<document> <version>").
     pub fn choose_external(&mut self, key: String, tab: TabId, part: Option<noshape_model::BodyId>, label: String, cx: &mut Context<Self>) {
         self.choose_source(tab, part, cx);
-        self.insert.pinned = Some(PinnedVersion { id: key, name: label });
+        self.insert.pinned = Some(PinnedVersion { locked: false, id: key, name: label });
         self.ensure_sources(false, cx);
         self.update_preview(cx);
     }

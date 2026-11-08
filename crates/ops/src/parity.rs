@@ -622,7 +622,10 @@ impl<'a> Translator<'a> {
             return Err("an Import after other features (ours imports into a Part Studio of its own)".into());
         }
         let y_up = file["placed"] != true && param("yAxisIsUp")["value"].as_bool() == Some(true);
-        let r = self.call("import_files", json!({ "files": [path], "y_up": y_up, "keep_files": false }))?;
+        // `flatten` (an assembly's instances as placed parts of one Part Studio, live c2-gamma-imported): ours is
+        // the dialog's single Part Studio.
+        let flatten = param("flatten")["value"].as_bool() == Some(true);
+        let r = self.call("import_files", json!({ "files": [path], "y_up": y_up, "keep_files": false, "combine": flatten }))?;
         // (A native assembly zip also makes an Assembly: the Import feature is its Part Studio's.)
         let studio = r["tabs"].as_array().into_iter().flatten().find(|t| t["kind"] == "Part Studio").and_then(|t| t["id"].as_str());
         self.tab = Some(studio.or(r["first"].as_str()).ok_or("the import made no Part Studio")?.to_string());
@@ -839,8 +842,16 @@ impl<'a> Translator<'a> {
     /// end state).
     fn derived_params(&mut self, f: &Value, problems: &mut Vec<String>) -> Result<(String, Map<String, Value>), String> {
         let param = |id: &str| f["parameters"].as_array().into_iter().flatten().find(|p| p["parameterId"] == id).cloned().unwrap_or(Value::Null);
-        let build = param("buildFunction");
+        // (The new Derived, `newUI`: a `partStudio` reference with its own `partQuery`; the old one: `buildFunction` and
+        // `parts`.)
+        let studio = param("partStudio");
+        let build = if studio.is_null() { param("buildFunction") } else { studio.clone() };
         let namespace = build["namespace"].as_str().unwrap_or("");
+        // No source at all: live's ERROR "Select entities from another Part Studio." (c2-fan-blade-sweep's source's
+        // Derived 1), ours the same.
+        if namespace.is_empty() {
+            return Ok(("importDerived".into(), Map::new()));
+        }
         let element = namespace.split("::").find_map(|s| s.strip_prefix('e')).ok_or_else(|| format!("Derived: no source element in {namespace:?}"))?.to_string();
         if !self.derived_built.contains_key(&element) {
             let built = self.derived_source(&element, problems)?;
@@ -848,7 +859,8 @@ impl<'a> Translator<'a> {
         }
         let (tab, parts) = &self.derived_built[&element];
         let mut ours = Vec::new();
-        for q in param("parts")["queries"].as_array().into_iter().flatten() {
+        let part_query = if studio.is_null() { param("parts") } else { studio["partQuery"].clone() };
+        for q in part_query["queries"].as_array().into_iter().flatten() {
             for id in q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str) {
                 ours.push(parts.get(id).cloned().ok_or_else(|| format!("Derived: the source's part {id} not built"))?);
             }

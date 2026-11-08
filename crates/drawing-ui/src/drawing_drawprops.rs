@@ -1221,8 +1221,8 @@ impl DrawingEditor {
                 .os_dropdown_menu("dp-projection-dd", true, move |m, _, _| {
                     let (a, b) = (ed2.clone(), ed2.clone());
                     // Live (live2 drw-drawprops-*): First angle, Third angle.
-                    m.item(crate::os_menu::OsMenuItem::new("First angle").checked(proj == Projection::FirstAngle).on_click(move |_, _, cx| b.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::FirstAngle))))
-                        .item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| d.projection = Projection::ThirdAngle))))
+                    m.item(crate::os_menu::OsMenuItem::new("First angle").checked(proj == Projection::FirstAngle).on_click(move |_, _, cx| b.update(cx, |t, cx| t.edit("Projection angle", cx, |d| noshape_model::drawing::views::change_projection(d, Projection::FirstAngle)))))
+                        .item(crate::os_menu::OsMenuItem::new("Third angle").checked(proj == Projection::ThirdAngle).on_click(move |_, _, cx| a.update(cx, |t, cx| t.edit("Projection angle", cx, |d| noshape_model::drawing::views::change_projection(d, Projection::ThirdAngle)))))
                 })
                 .into_any_element();
             let simp: [(&str, Simplification); 5] = [("None", Simplification::None), ("Auto", Simplification::Auto), ("Absolute", Simplification::Absolute(0.001)), ("Ratio to studio", Simplification::RatioToStudio(0.01)), ("Ratio to part", Simplification::RatioToPart(0.01))];

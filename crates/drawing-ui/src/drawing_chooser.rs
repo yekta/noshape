@@ -1104,7 +1104,7 @@ impl DrawingEditor {
                 // Version graph: the workspace, then the versions (newest first).
                 let cur = self.chooser.version.clone();
                 let mut rows: Vec<(Option<noshape_model::drawing::PinnedVersion>, String)> = vec![(None, "Main".into())];
-                rows.extend(self.doc.read(cx).session.store.list_versions().unwrap_or_default().into_iter().rev().map(|v| (Some(noshape_model::drawing::PinnedVersion { id: v.id.to_string(), name: v.name.clone() }), v.name)));
+                rows.extend(self.doc.read(cx).session.store.list_versions().unwrap_or_default().into_iter().rev().map(|v| (Some(noshape_model::drawing::PinnedVersion { locked: false, id: v.id.to_string(), name: v.name.clone() }), v.name)));
                 let mut col = v_flex().id("dr-ch-versions").flex_1().min_h_0().overflow_y_scroll();
                 for (i, (pin, label)) in rows.into_iter().enumerate() {
                     let on = pin == cur;

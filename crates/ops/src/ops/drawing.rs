@@ -105,7 +105,9 @@ pub fn ops() -> Vec<Op> {
                 doc_field(),
                 drawing_field(),
                 sheet_field(),
-                req("source", s(), "Part Studio or assembly tab."),
+                req("source", s(), "Part Studio or assembly tab (with `document`: its name in that document's version)."),
+                opt("document", s(), "Insert view › Other documents: another document's file (path); `version` names its version. The view shows that version (the Sheets panel's reference row: ⧫ and the version, Pin reference, Update linked document...: drawing_update_references)."),
+                opt("version", s(), "With `document`: its named version (\"V1\")."),
                 opt("part", s(), "Only this part (`body:…` id or name)."),
                 opt("sketch", s(), "Insert a sketch of the source Part Studio (a sketch view, facing its plane)."),
                 opt("flat", json!({ "type": "boolean", "default": false }), "A sheet metal part's flat pattern."),
@@ -407,8 +409,13 @@ fn sheet_json(m: &SheetModel, edges: bool) -> Value {
             if v.show_offset_cut_lines {
                 j["offset_cut_lines"] = json!(true);
             }
-            if v.pinned.is_some() {
+            // A version: its name ("V1"; another document's "<document> V1") and Pin reference.
+            if let Some(p) = &v.pinned {
                 j["pinned"] = json!(true);
+                j["version"] = json!(p.name);
+                if p.locked {
+                    j["reference_pinned"] = json!(true);
+                }
             }
             for (k, n) in [("hidden_parts", v.hidden_parts.len()), ("shown_sketches", v.shown_sketches.len()), ("hidden_edges", v.hidden_edges.len()), ("edge_styles", v.edge_styles.len())] {
                 if n > 0 {
@@ -900,6 +907,12 @@ fn place_view(od: &mut OpenDoc, a: &Args, tool: Tool, mut opts: ViewOptions, ext
 
 fn insert_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
+    if a.get("document").is_some() {
+        return insert_other_document_view(od, a);
+    }
+    if a.get("version").is_some() {
+        return Err(OpError::param("version", "`version` goes with `document` (another document's version)"));
+    }
     let source = source_tab(od, a, "source")?;
     let part = part_arg(od, source, a)?;
     let o = a.opt_str("orientation")?.unwrap_or("front");
@@ -914,6 +927,44 @@ fn insert_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     insert_panel(od, a, source, &mut opts.insert)?;
     let tool = Tool::InsertView { source, orientation, part };
     place_view(od, a, tool, opts, &[SourceKey::studio(source)], "Insert view")
+}
+
+/// Insert view › Other documents: a view of another document's version (`document`, `version`; `source` and `part`
+/// by name there). Only the orientation and scale apply (sketch views, named views and assembly states are this
+/// document's).
+fn insert_other_document_view(od: &mut OpenDoc, a: &Args) -> Result<OpOutput, OpError> {
+    let document = a.str("document")?;
+    let version = a.opt_str("version")?.ok_or_else(|| OpError::param("version", "the version of `document` to insert from (e.g. \"V1\")"))?;
+    if let Some(k) = ["sketch", "named_view", "explode_position", "display_state", "flat"].into_iter().find(|k| a.get(k).is_some()) {
+        return Err(OpError::param(k, "not with `document`: only this document's"));
+    }
+    let (path, v, snapshot) = crate::derived::named_version(document, version)?;
+    let name = a.str("source")?;
+    let tabs: Vec<&noshape_model::document::Tab> = snapshot.ordered_tabs().into_iter().filter(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::Assembly(_))).collect();
+    let tab = tabs.iter().find(|t| t.name == name || t.id.to_string() == name).ok_or_else(|| OpError::param("source", &format!("no Part Studio or assembly `{name}` in {} {}; there: {}", path.display(), v.label, tabs.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", "))))?;
+    let r = crate::derived::ExternalRef { path: path.clone(), microversion: v.microversion, tab: tab.id.to_string() };
+    let part = match a.opt_str("part")? {
+        None => None,
+        Some(p) => {
+            let ctx = crate::derived::external_context(&r).ok_or_else(|| OpError::param("source", "its parts can't be built"))?;
+            let b = ctx.bodies.iter().find(|b| b.name == p || refs::body_id(&b.id) == p).ok_or_else(|| OpError::param("part", &format!("no part `{p}`; parts: {}", ctx.bodies.iter().map(|b| b.name.as_str()).collect::<Vec<_>>().join(", "))))?;
+            Some(b.id.clone())
+        }
+    };
+    let o = a.opt_str("orientation")?.unwrap_or("front");
+    let orientation = ORIENTATIONS.iter().find(|x| x.0 == o).map(|x| x.1).ok_or_else(|| OpError::param("orientation", "unknown orientation"))?;
+    let mut opts = ViewOptions::default();
+    if let Some(s) = a.opt_f64("scale")? {
+        if s <= 0.0 {
+            return Err(OpError::param("scale", "must be greater than zero"));
+        }
+        opts.insert.scale = Some(s);
+    }
+    let doc_name = crate::derived::external_doc_info(&path).map(|i| i.name).unwrap_or_default();
+    let key = r.key();
+    opts.insert.pinned = Some(noshape_model::drawing::PinnedVersion { locked: false, id: key.clone(), name: format!("{doc_name} {}", v.label) });
+    let tool = Tool::InsertView { source: tab.id, orientation, part };
+    place_view(od, a, tool, opts, &[SourceKey { version: Some(key), ..SourceKey::studio(tab.id) }], "Insert view")
 }
 
 /// The Insert view panel's options from the arguments.

@@ -3345,6 +3345,22 @@ fn drawing_properties_get_and_set() {
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Drawing properties"));
     assert_eq!(r["properties"]["inspection_text_height"], 3.5, "{r}");
     assert_eq!(r["properties"]["decimal_comma"], true, "{r}");
+    // Projection angle: the views swap rows (live 2313): ISO A3 is first angle, the Top below the Front.
+    assert_eq!(r["properties"]["projection"], "first_angle", "{r}");
+    // The base view and its projected child in the same column (the Top).
+    let col = |r: &Value| -> (f64, f64) {
+        let vs = r["views"].as_array().unwrap();
+        let base = vs.iter().find(|v| v["kind"] == "base").unwrap_or_else(|| panic!("{r}"));
+        let child = vs.iter().find(|v| v["parent"] == base["id"] && (v["position"][0].as_f64().unwrap() - base["position"][0].as_f64().unwrap()).abs() < 1e-6).unwrap_or_else(|| panic!("{r}"));
+        (base["position"][1].as_f64().unwrap(), child["position"][1].as_f64().unwrap())
+    };
+    let (front, top) = col(&r);
+    assert!(top < front, "first angle: the Top below the Front");
+    let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "projection": "third_angle" } }));
+    assert_eq!(r["properties"]["projection"], "third_angle", "{r}");
+    let (front3, top3) = col(&r);
+    assert!(top3 > front3 && (front3 - top).abs() < 1e-6, "third angle: the rows swap, the Top above: {r}");
+    call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "projection": "first_angle" } }));
     // Locked: nothing but the lock changes.
     call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "locked": true } }));
     let r = call(&mut ctx, "drawing_properties", json!({ "drawing": tab, "set": { "inspection_text_height": 5.0 } }));
@@ -7186,4 +7202,56 @@ fn symmetric_about_a_point_says_what_it_takes() {
     let e = try_call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "symmetric", "entities": [pts[0], pts[2], "origin"] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("entities"), "{e:?}");
     assert!(e.message.contains("about a line") && e.message.contains("horizontal_distance"), "{e:?}");
+}
+
+/// A drawing view of another document's version (live 2303): Insert view › Other documents at V1; once that document
+/// has a V2 the reference is behind (drawing_update_references lists it, document_update_references too); Pin
+/// reference keeps it at V1 (no notice, Update leaves it); unpinned, Update moves its views to V2.
+#[test]
+fn drawing_view_of_another_documents_version() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "drawing_other_doc_lib.noshape");
+    let lib = call(&mut ctx, "document_info", json!({}))["path"].as_str().unwrap().to_string();
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    let user = scratch("drawing_other_doc_user.noshape");
+    let _ = std::fs::remove_file(format!("{}.noshape", user.display()));
+    call(&mut ctx, "document_create", json!({ "path": user.to_str().unwrap() }));
+    let d = call(&mut ctx, "drawing_create", json!({ "template": "ISO A3" }));
+    let tab = d["drawing"].as_str().unwrap().to_string();
+    let e = try_call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "document": lib, "source": "Part Studio 1", "position": [150, 150] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    let e = try_call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "document": lib, "version": "V9", "source": "Part Studio 1", "position": [150, 150] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("version"), "{e:?}");
+    let r = call(&mut ctx, "drawing_insert_view", json!({ "drawing": tab, "document": lib, "version": "V1", "source": "Part Studio 1", "position": [150, 150] }));
+    let view = r["view"].as_u64().unwrap();
+    let get = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["views"][0].clone();
+    let v = get(&mut ctx);
+    assert!(v["version"].as_str().is_some_and(|n| n.ends_with(" V1")), "{v}");
+    let up = call(&mut ctx, "drawing_update_references", json!({ "drawing": tab }));
+    assert_eq!((up["updated"].clone(), up["outdated"].clone()), (json!([]), json!([])), "nothing newer yet: {up}");
+    // The other document moves on.
+    call(&mut ctx, "feature_edit", json!({ "doc": lib, "feature": "Extrude 1", "params": { "depth": "30 mm" } }));
+    call(&mut ctx, "history_create_version", json!({ "doc": lib, "name": "V2" }));
+    let l = call(&mut ctx, "document_update_references", json!({ "doc": user.to_str().unwrap() }));
+    assert_eq!((l["outdated"][0]["from"].as_str(), l["outdated"][0]["to"].as_str()), (Some("V1"), Some("V2")), "{l}");
+    // Pin reference: kept at V1, no longer listed.
+    call(&mut ctx, "drawing_pin_reference", json!({ "doc": user.to_str().unwrap(), "drawing": tab, "view": view }));
+    assert_eq!(get(&mut ctx)["reference_pinned"], true);
+    let l = call(&mut ctx, "document_update_references", json!({ "doc": user.to_str().unwrap() }));
+    assert_eq!(l["outdated"], json!([]), "pinned: {l}");
+    let up = call(&mut ctx, "drawing_update_references", json!({ "drawing": tab }));
+    assert_eq!(up["updated"], json!([]), "{up}");
+    // Unpinned: Update all moves it to V2.
+    call(&mut ctx, "drawing_pin_reference", json!({ "drawing": tab, "view": view, "pin": false }));
+    let up = call(&mut ctx, "drawing_update_references", json!({ "drawing": tab }));
+    assert_eq!((up["updated"][0]["from"].as_str(), up["updated"][0]["to"].as_str()), (Some("V1"), Some("V2")), "{up}");
+    assert_eq!(up["outdated"], json!([]), "{up}");
+    assert!(get(&mut ctx)["version"].as_str().is_some_and(|n| n.ends_with(" V2")));
+    // Back to V1 by name (Selective update), then a reference in this document can't be pinned.
+    let up = call(&mut ctx, "drawing_update_references", json!({ "drawing": tab, "version": "V1" }));
+    assert_eq!(up["updated"][0]["to"], "V1", "{up}");
+    let e = try_call(&mut ctx, "drawing_update_references", json!({ "drawing": tab, "document": "nope" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("document"), "{e:?}");
+    let sw = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": view }));
+    assert_eq!(sw["version"], "V1", "{sw}");
 }
