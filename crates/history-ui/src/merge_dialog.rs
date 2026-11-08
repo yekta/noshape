@@ -646,9 +646,15 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                         })
                     })
                     .collect();
+                let revert_doc = doc.clone();
                 let r = doc.update(cx, |d, cx| -> anyhow::Result<()> {
-                    d.session.merge_picked(plan2.from, &plan2.source, plan2.from_branch, |n| picks.get(n).copied().unwrap_or(MergePick::Auto))?;
+                    let before = d.session.head()?;
+                    let out = d.session.merge_picked(plan2.from, &plan2.source, plan2.from_branch, |n| picks.get(n).copied().unwrap_or(MergePick::Auto))?;
                     d.reloaded(cx);
+                    // Live 2351: "Merged B1 into Main. Revert to before this merge", which restores at once.
+                    if !out.up_to_date {
+                        d.info_with_link(format!("Merged {} into {}.", plan2.source, plan2.target), "Revert to before this merge", move |_, cx| revert(&revert_doc, before, cx), cx);
+                    }
                     Ok(())
                 });
                 if let Err(e) = r {
@@ -656,5 +662,13 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                 }
                 true
             })
+    });
+}
+
+/// The Merge notice's "Revert to before this merge": the workspace as it was before (a Restore entry, live 2351).
+fn revert(doc: &Entity<DocModel>, before: MicroversionId, cx: &mut App) {
+    doc.update(cx, |d, cx| match d.session.restore(before) {
+        Ok(()) => d.reloaded(cx),
+        Err(e) => cx.emit(DocEvent::Error(format!("{e:#}"))),
     });
 }

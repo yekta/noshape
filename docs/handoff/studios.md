@@ -28,6 +28,15 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:19 UTC: the Merge notice's "Revert to before this merge" (lead: one shared toast)
+- `DocModel::info_with_link` keeps a notice's link; app-core `doc_model::notice_bubble` draws it in the Part Studio's,
+  the Assembly's and the workspace's toasts (`notice_text` for the ui-parity message). A linked notice stays 35 s
+  (live ≈ 35). Merge shows "Merged B1 into Main." with the link, which restores the workspace from before the merge
+  (a Restore entry). A merge is no undo step and clears the undo stack (live ver-merge: Undo off after it).
+  `history_merge` returns the notice and `revert_to` (history_restore to it reverts), with its e2e test.
+- Open: live's history after a merge shows a "Merge from B1" row and an automatic version of the source's head
+  ("Part Studio 1 :: Add feature : Extrude 3", version kind); ours shows neither (ver-merge step 4).
+
 ### 2026-11-08 20:04 UTC: ☰ › Print… in Part Studios and Assemblies (lead: studios' end to end)
 - Live 2349: the Print setup flyout at the graphics area's top left (Paper Letter … ANSI E, Portrait / Landscape,
   Print, Download image, ?), a dashed frame 90 % of the area in the paper's shape, the setup remembered

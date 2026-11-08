@@ -5852,16 +5852,15 @@ impl AssemblyView {
                     .pr(px(crate::ui::RAIL_W + if self.ui.list_collapsed { 0. } else { crate::ui::left_panel_w() }))
                     .flex()
                     .justify_center()
-                    .child(crate::os_ui::message_bubble(
-                        "asm-toast",
-                        kind,
-                        msg,
-                        cx.listener(|this, _: &ClickEvent, _, cx| {
-                            this.message = None;
-                            cx.notify();
-                        }),
-                        cx,
-                    ))
+                    .child({
+                        let view = cx.entity();
+                        crate::doc_model::notice_bubble("asm-toast", kind, msg.to_string(), &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
+                            view.update(cx, |this, cx| {
+                                this.message = None;
+                                cx.notify();
+                            })
+                        }, cx)
+                    })
                     .into_any_element(),
             );
         }

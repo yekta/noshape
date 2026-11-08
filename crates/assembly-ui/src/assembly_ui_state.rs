@@ -349,7 +349,7 @@ impl AssemblyView {
         let focus = focus.or_else(|| self.mate.as_ref().map(|s| s.dialog.read(cx)).filter(|d| d.active.is_some() && self.ui.mate_field_focus).map(|d| json!({ "kind": "field", "label": if matches!(d.mate_type(), MateType::Tangent) { "Face, edge or vertex" } else if d.mate_type() == MateType::Width { "Tab mate connector(s)" } else { "Mate connectors" } }))).unwrap_or_else(|| json!({ "kind": "none" }));
         let history = self.history_state(cx);
         // An open modal's info line first, as live's recorder reads the page (asm-config-input-menu-input-propagation).
-        let page = self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.panel_info_and_toast(cx));
+        let page = self.message.as_ref().map(|(_, m)| crate::doc_model::notice_text(&self.doc, m.clone(), cx)).or_else(|| self.panel_info_and_toast(cx));
         let message = match (modal.as_ref().and_then(|d| d["info"].as_str()), page) {
             (Some(info), Some(m)) => Some(format!("{info} / {m}")),
             (Some(info), None) => Some(info.to_string()),

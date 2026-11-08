@@ -101,7 +101,7 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "merge",
             summary: "Merge another branch into the current one",
-            description: "Part Studios merge feature by feature.",
+            description: "Part Studios merge feature by feature. Returns the app's notice (\"Merged B1 into Main.\") and `revert_to`: its \"Revert to before this merge\" is history_restore to that microversion.",
             fields: vec![doc_field(), req("branch", s(), "Branch to merge from (name or id).")],
             mutates: true,
             destructive: false,
@@ -204,8 +204,11 @@ fn switch_branch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn merge(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let b = branch_id(od, a.str("branch")?)?;
+    let before = od.session.head()?;
     let out = od.session.merge_from(b)?;
-    Ok(json!({ "microversion": out.microversion.to_string(), "conflicts": out.conflicts, "up_to_date": out.up_to_date }).into())
+    let name = |id| od.session.store.branch(id).map(|x| x.name).unwrap_or_default();
+    let message = (!out.up_to_date).then(|| format!("Merged {} into {}.", name(b), name(od.session.branch)));
+    Ok(json!({ "microversion": out.microversion.to_string(), "conflicts": out.conflicts, "up_to_date": out.up_to_date, "message": message, "revert_to": (!out.up_to_date).then(|| before.to_string()) }).into())
 }
 
 fn restore(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

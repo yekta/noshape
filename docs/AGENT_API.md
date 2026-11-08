@@ -5957,7 +5957,7 @@ Examples:
 
 Merge another branch into the current one (edits the document (one undoable history entry)).
 
-Part Studios merge feature by feature.
+Part Studios merge feature by feature. Returns the app's notice ("Merged B1 into Main.") and `revert_to`: its "Revert to before this merge" is history_restore to that microversion.
 
 Examples:
 

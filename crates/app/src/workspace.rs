@@ -130,8 +130,10 @@ impl Workspace {
                 // An info bubble hides by itself after ≈4.4 s (live TOAST-AUTOHIDE); an error stays until ×.
                 if info {
                     let msg = msg.clone();
+                    // A notice with a link stays longer (live 2351: the Merge toast ≈ 35 s).
+                    let ms = if this.doc.read(cx).notice_link(&msg).is_some() { 35_000 } else { 4400 };
                     cx.spawn(async move |this, cx| {
-                        cx.background_executor().timer(std::time::Duration::from_millis(4400)).await;
+                        cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
                         let _ = this.update(cx, |this, cx| {
                             if this.toast.as_ref().is_some_and(|(_, m)| *m == msg) {
                                 this.toast = None;
@@ -2451,7 +2453,7 @@ impl Workspace {
             return None;
         }
         let ws = cx.entity();
-        let said = msg.clone();
+        let said = crate::doc_model::notice_text(&self.doc, msg.clone(), cx);
         Some(
             div()
                 .absolute()
@@ -2461,7 +2463,7 @@ impl Workspace {
                 .flex()
                 .justify_center()
                 .map(|d| noshape_app_core::ui_script::mark_message(d, || said))
-                .child(crate::os_ui::message_bubble("ws-toast", kind, msg, move |_, _, cx| {
+                .child(crate::doc_model::notice_bubble("ws-toast", kind, msg, &self.doc, move |_: &ClickEvent, _: &mut Window, cx: &mut App| {
                     ws.update(cx, |this, cx| {
                         this.toast = None;
                         cx.notify();

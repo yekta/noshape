@@ -47,6 +47,8 @@ pub struct DocModel {
     /// Undo and Redo are off while a dialog edits something already there (live 2323: Undo greyed while Update
     /// Variable Studio is open).
     pub undo_held: bool,
+    /// The link of the notice shown last ([`DocModel::info_with_link`]).
+    notice_link: Option<NoticeLink>,
 }
 
 /// What the window shows, read on demand outside the document's update (see
@@ -88,12 +90,35 @@ impl PendingEdit {
 
 impl EventEmitter<DocEvent> for DocModel {}
 
+/// What a notice's link does.
+pub type NoticeAction = std::rc::Rc<dyn Fn(&mut Window, &mut App)>;
+
+/// A notice's link (live 2351: the Merge toast's "Revert to before this merge"): the notice it belongs to, its label
+/// and what it does.
+#[derive(Clone)]
+pub struct NoticeLink {
+    pub notice: String,
+    pub label: SharedString,
+    pub run: NoticeAction,
+}
+
 impl DocModel {
     /// The app's model of an opened document: every tab starts with empty
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false, notice_link: None }
+    }
+
+    /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice).
+    pub fn info_with_link(&mut self, notice: String, label: &str, run: impl Fn(&mut Window, &mut App) + 'static, cx: &mut Context<Self>) {
+        self.notice_link = Some(NoticeLink { notice: notice.clone(), label: SharedString::from(label.to_string()), run: std::rc::Rc::new(run) });
+        cx.emit(DocEvent::Info(notice));
+    }
+
+    /// The link of the notice `notice`, if it has one.
+    pub fn notice_link(&self, notice: &str) -> Option<NoticeLink> {
+        self.notice_link.clone().filter(|l| l.notice == notice)
     }
 
     /// Provider giving Derived features access to the other Part Studios.
@@ -358,6 +383,30 @@ impl Drop for DocModel {
     /// A pending edit is saved even if the app quits mid-session.
     fn drop(&mut self) {
         let _ = self.pending.flush(&mut self.session);
+    }
+}
+
+/// The message bubble of a document notice: `msg` with its link when [`DocModel::info_with_link`] gave it one (the link
+/// closes the bubble after it runs), and ×. The Part Studio's, the Assembly's and the workspace's toasts all draw it.
+pub fn notice_bubble(id: impl Into<ElementId>, kind: impl Into<crate::os_ui::BubbleKind>, msg: String, doc: &Entity<DocModel>, on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + Clone + 'static, cx: &App) -> Stateful<Div> {
+    match doc.read(cx).notice_link(&msg) {
+        Some(link) => {
+            let close = on_close.clone();
+            crate::os_ui::message_bubble_with_link(id, kind, msg, link.label.clone(), move |e, window, cx| {
+                (link.run)(window, cx);
+                close(e, window, cx);
+            }, on_close, cx)
+        }
+        None => crate::os_ui::message_bubble(id, kind, msg, on_close, cx),
+    }
+}
+
+/// The notice as the ui-parity state reads it: its text, then its link's (live "Merged B1 into Main. Revert to before
+/// this merge").
+pub fn notice_text(doc: &Entity<DocModel>, msg: String, cx: &App) -> String {
+    match doc.read(cx).notice_link(&msg) {
+        Some(link) => format!("{msg} {}", link.label),
+        None => msg,
     }
 }
 

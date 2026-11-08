@@ -706,11 +706,17 @@ fn workspace_protection() {
     // Merging into the protected workspace is allowed.
     call(&mut ctx, "history_switch_branch", json!({ "branch": main }));
     assert_eq!(call(&mut ctx, "document_info", json!({}))["protected"], true);
-    call(&mut ctx, "history_merge", json!({ "branch": "B1" }));
+    let merged = call(&mut ctx, "history_merge", json!({ "branch": "B1" }));
     assert_eq!(entities(&mut ctx, &sk, "circle").len(), 1);
+    assert_eq!(merged["message"], "Merged B1 into Main.", "{merged}");
     // Unprotected, it takes edits again.
     let info = call(&mut ctx, "document_unprotect", json!({}));
     assert_eq!(info["protected"], false);
+    // The notice's "Revert to before this merge" (live 2351): a Restore entry, the circle gone.
+    call(&mut ctx, "history_restore", json!({ "to": merged["revert_to"] }));
+    assert_eq!(entities(&mut ctx, &sk, "circle").len(), 0);
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.starts_with("Restore ") && last.contains(" back: "), "{last}");
     call(&mut ctx, "sketch_draw", json!({ "sketch": sk, "tool": "circle", "points": [[20, 0], [25, 0]] }));
 }
 

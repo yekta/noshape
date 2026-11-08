@@ -707,7 +707,6 @@ impl Session {
     /// into the current workspace with each name's strategy (`pick`: Keep =
     /// `Ours`, Replace = `Theirs`, Merge changes = `Auto`).
     pub fn merge_picked(&mut self, from: MicroversionId, from_name: &str, from_branch: Option<BranchId>, pick: impl FnMut(&str) -> noshape_store::MergePick) -> Result<noshape_store::MergeOutcome> {
-        let before = self.head()?;
         let outcome = self.store.merge_with(from, from_name, from_branch, self.branch, pick, |name, base, ours, theirs| {
             if name.starts_with("tab/") {
                 noshape_model::merge::merge_tab_blobs(base, ours, theirs)
@@ -715,8 +714,10 @@ impl Session {
                 ours.map(|o| o.to_vec())
             }
         })?;
+        // Not an undo step, and the edits before it can't be undone across it (live ver-merge: Undo off after a
+        // merge; its notice's "Revert to before this merge" is a restore).
         if !outcome.up_to_date {
-            self.undo.record(before, outcome.microversion, "Merge");
+            self.forget_undo();
             self.reload(outcome.microversion)?;
         }
         Ok(outcome)

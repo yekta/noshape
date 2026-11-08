@@ -6055,8 +6055,10 @@ impl PartStudioView {
             let dialogs = msg == NO_SKETCH_PLANE_BUBBLE || self.ui.dialog_info.as_ref() == Some(&msg);
             if st == FeatureStatus::Info && !dialogs && self.ui.message_timed.as_ref() != Some(&key) {
                 self.ui.message_timed = Some(key.clone());
+                // A notice with a link stays longer (live 2351: the Merge toast ≈ 35 s).
+                let secs = if self.doc.read(cx).notice_link(&msg).is_some() { 35 } else { 5 };
                 cx.spawn(async move |this, cx| {
-                    cx.background_executor().timer(Duration::from_secs(5)).await;
+                    cx.background_executor().timer(Duration::from_secs(secs)).await;
                     let _ = this.update(cx, |this, cx| {
                         if this.message.as_ref() == Some(&key) {
                             this.message = None;
@@ -6093,7 +6095,7 @@ impl PartStudioView {
             let bubble = if self.canceled_edit.as_ref().is_some_and(|c| c.3 == msg) {
                 crate::os_ui::message_bubble_with_link("toast", kind, msg, "Restore", move |_, window, cx| view.update(cx, |this, cx| this.restore_canceled_edit(window, cx)), close, cx)
             } else {
-                crate::os_ui::message_bubble("toast", kind, msg, close, cx)
+                crate::doc_model::notice_bubble("toast", kind, msg.to_string(), &self.doc, close, cx)
             };
             // Live (document/01; behaviours "F19", configure toast: 814,85
             // and 769,85 at 1920): at y 85 of the window, centered on the
