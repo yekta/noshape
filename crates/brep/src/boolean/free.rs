@@ -670,9 +670,10 @@ fn bezier_patches(ns: &FreeSurface, uv: [f64; 4]) -> Option<Vec<Bez>> {
 }
 
 /// Whether two Bézier patches are farther apart than `gap` by their control points' hulls, the larger one halved
-/// where they aren't, while `budget` (hull pairs) lasts.
-fn bez_apart(a: &Bez, b: &Bez, gap: f64, budget: &mut usize) -> bool {
-    if *budget == 0 {
+/// where they aren't, while `budget` (hull pairs) lasts and 64 halvings deep (a patch closing on itself, its ends'
+/// chord zero, can be halved the way that never shrinks it: CRASH-6297's stack overflow).
+fn bez_apart(a: &Bez, b: &Bez, gap: f64, budget: &mut usize, depth: u32) -> bool {
+    if *budget == 0 || depth >= 64 {
         return false;
     }
     *budget -= 1;
@@ -686,7 +687,7 @@ fn bez_apart(a: &Bez, b: &Bez, gap: f64, budget: &mut usize) -> bool {
         return false;
     }
     let (l, r) = big.halves(hbig.du.length() >= hbig.dv.length());
-    bez_apart(&l, small, gap, budget) && bez_apart(&r, small, gap, budget)
+    bez_apart(&l, small, gap, budget, depth + 1) && bez_apart(&r, small, gap, budget, depth + 1)
 }
 
 /// Whether two faces, one or both free-form, are farther apart than `gap`, as their surfaces' control points tell
@@ -715,7 +716,7 @@ pub(super) fn apart(f: &GFace, g: &GFace, gap: f64, flat: [Option<(DVec2, DVec2)
         && let (Some(a), Some(b)) = (patches(f), patches(g))
     {
         let mut budget = 20_000;
-        return a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, gap, &mut budget)));
+        return a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, gap, &mut budget, 0)));
     }
     match (pieces(f), pieces(g)) {
         (Some(a), Some(b)) => a.iter().all(|x| b.iter().all(|y| hulls_apart(x, y, gap))),
@@ -839,7 +840,7 @@ mod tests {
         let apart = |dz: f64| {
             let b = bezier_patches(&strip(-0.1, dz), [0.0; 4]).expect("its patches");
             let mut budget = 20_000;
-            a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, 1e-3, &mut budget)))
+            a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, 1e-3, &mut budget, 0)))
         };
         assert!(apart(0.3));
         assert!(!apart(0.0));
@@ -872,6 +873,19 @@ mod tests {
         assert!(off(near(1.0, 0.5, 2.0)));
         assert!(off(near(1.0, 2.0, 0.5)));
         assert!(off(near(1.0, -0.5, 0.5)));
+    }
+
+    /// A patch closing on itself (a ring, its ends' chord along v zero) against a patch touching it: halved along u
+    /// it never shrinks, so the answer (not apart) comes from the depth bound, on a small stack (CRASH-6297: 2,770
+    /// frames deep on a rayon worker).
+    #[test]
+    fn a_ring_patch_against_a_touching_one_stays_shallow() {
+        let ring = [DVec3::X, DVec3::Y, -DVec3::X, -DVec3::Y, DVec3::X];
+        let h = (0..2).flat_map(|i| ring.iter().map(move |&x| (x + DVec3::Z * (0.1 * i as f64)).extend(1.0))).collect();
+        let a = Bez { h, p: 1, q: 4, uv: [0.0, 1.0, 0.0, 1.0] };
+        let b = Bez { h: [DVec3::new(0.5, 0.0, 0.0), DVec3::new(0.5, 0.0, 0.1), DVec3::new(0.6, 0.0, 0.0), DVec3::new(0.6, 0.0, 0.1)].iter().map(|x| x.extend(1.0)).collect(), p: 1, q: 1, uv: [0.0, 1.0, 0.0, 1.0] };
+        let apart = std::thread::Builder::new().stack_size(256 << 10).spawn(move || bez_apart(&a, &b, 1e-3, &mut 20_000, 0)).expect("a thread").join().expect("no overflow");
+        assert!(!apart);
     }
 
     /// A face's curves a period past its B-spline surface's own range (OCCT's on a periodic surface; fuzz seeds 979,
