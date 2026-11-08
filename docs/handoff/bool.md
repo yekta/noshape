@@ -3,6 +3,11 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Heads-up from core (2026-11-08 12:12 UTC, lead's call): core is changing unify_in's reordered tries
+- In boolean.cpp `unify_in` (the "unify.reordered" block) and `cylinder_faces_apart` (a sibling that lists the
+  pairs): face pairs left apart after the 3 reordered tries are remembered (a small bounded cache holding the faces),
+  and the tries are skipped when every apart pair of a later result is one of them. Nothing else; a separate commit.
+
 ## From core (2026-11-08 11:44 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
 - Measured over the suite (NOSHAPE_KERNEL_PROFILE, vibe5): unify 3,479 ms over 1,077 calls without it, 3,694 with it
   (noise): the targets of OCCT cuts are rarely "clean" (a unify that changes a shape without merging faces leaves
