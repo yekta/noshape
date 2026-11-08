@@ -8664,6 +8664,40 @@ bool same_surface(const TopoDS_Face& a, const TopoDS_Face& b, bool periodic)
 }
 } // namespace
 
+// Every face on a cylinder, cone, sphere or torus bounded, its seams left out, by loops that close (each vertex begins
+// as many of its edges as it ends): a Parasolid face has no seams (a cylinder merged across a thread's helix pieces is
+// bounded through its seam: NIST's cap screw).
+bool closes_without_seams(const TopoDS_Shape& s)
+{
+  for (TopExp_Explorer fx(s, TopAbs_FACE); fx.More(); fx.Next())
+  {
+    const TopoDS_Face& f    = TopoDS::Face(fx.Current());
+    const auto         type = BRepAdaptor_Surface(f, false).GetType();
+    if (type != GeomAbs_Cylinder && type != GeomAbs_Cone && type != GeomAbs_Sphere && type != GeomAbs_Torus)
+      continue;
+    NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher> balance;
+    for (TopExp_Explorer ee(f, TopAbs_EDGE); ee.More(); ee.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ee.Current());
+      if (BRep_Tool::Degenerated(e) || BRep_Tool::IsClosed(e, f))
+        continue;
+      const TopoDS_Vertex a = TopExp::FirstVertex(e, true), b = TopExp::LastVertex(e, true);
+      if (a.IsNull() || b.IsNull())
+        return false;
+      if (!balance.IsBound(a))
+        balance.Bind(a, 0);
+      if (!balance.IsBound(b))
+        balance.Bind(b, 0);
+      ++balance.ChangeFind(a);
+      --balance.ChangeFind(b);
+    }
+    for (NCollection_DataMap<TopoDS_Shape, int, TopTools_ShapeMapHasher>::Iterator it(balance); it.More(); it.Next())
+      if (it.Value() != 0)
+        return false;
+  }
+  return true;
+}
+
 MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
 {
   require_non_null(s.shape, "shape");
@@ -8791,6 +8825,9 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     else
       joined.Nullify();
   }
+  // A merged periodic face Parasolid couldn't bound: the part merged across planes only.
+  if (periodic && !closes_without_seams(result) && closes_without_seams(s.shape))
+    return merge_same_surface_faces(s, false);
   MergedFaces out;
   out.shape = wrap(result);
   ShapeIMap nm;
