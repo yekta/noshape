@@ -1,11 +1,11 @@
 {
  "scenario": "docs-folder-open",
- "recorded": "2026-11-08T03:49:08.695Z",
+ "recorded": "2026-11-08T20:13:15.344Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -78,7 +78,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 4218
+   "t": 2298
   },
   {
    "step": 2,
@@ -91,7 +91,7 @@
    "ok": true,
    "at": [
     930,
-    574
+    585
    ],
    "state": {
     "focus": {
@@ -111,17 +111,17 @@
     "drawing": null,
     "document": null,
     "documents": {
-     "place": "Owned by me",
+     "place": "uip Folder",
      "selected": null,
      "search": "",
      "panel": "Details",
      "advanced": false,
      "columns": false
     },
-    "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
+    "url": "/documents?nodeId=dca6da9583e0bea7371a500f&resourceType=folder"
    },
-   "t": 21981
+   "t": 20001
   }
  ],
- "tabsOpened": 15
+ "tabsOpened": 14
 }
