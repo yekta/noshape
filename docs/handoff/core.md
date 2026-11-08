@@ -39,6 +39,11 @@ also feature 13 External thread 1's missing info message. Run alone: NOSHAPE_PAR
 c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54 (vibe5). (2) If live 2380 (knife) hasn't
 answered: the impeller's side faces by arc-length pairing with tangency kept (TMP_ARC_ROWS experiment broke the face
 merge: 6 faces, live 4; 257,467 vs live 257,078).**
+- 21:36 (1) done as far as data goes: with blend's b3f3df84e (chamfer, still in its queue) the source studio is 14/22;
+  External thread 1's info now as std's checkNonMatchingSize (queued; T1 features_a::an_external_thread_says_when_
+  its_size_isnt_the_cylinders): 15/22. Extrude 7: live splits Extrude 6's boss cylinder (JXC -> JaC 96.093 + JaG
+  3.203 mm², a ~0.15 mm band at its base) when only a Ø6 boss is added on the cap; cause unknown: asked live
+  (REQUESTS 2389, P1). Now (2), the impeller side faces.
 - Queued 37c477d8: the loft's V414 start-rule gate (asVersion hidden param; live 2378: cut-off V414). Suite unchanged
   (75/87, 760/951); impeller Loft Gehäuse 257,273 vs 257,078.
 - If restarted on another account: read this entry, land.sh --status, then continue (1).
