@@ -10,8 +10,30 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## Now (2026-11-08 06:14 UTC)
+- Landed b16fb21f: Hide / Show mates with nothing to change is an undo step (live2 2241 (2)), a click on a submenu row
+  opens it, ticket FACE-PATTERN-30-CUT-SLOW (core: suspension's one Circular pattern takes ~20 min in OCCT).
+- This land: one AssemblyEvaluator per document (subassembly tabs share the studio cache); translator: volume bands
+  from live's per-feature lines, an Import of a native assembly zip builds in its Part Studio, standard content live
+  didn't fetch inserted from our catalogue by part name (`standard_spec_by_part_name`); `find_occurrence` takes a name
+  with a slash as one instance (inch standard content "1/4-20" couldn't be addressed); a new List configuration input
+  opens its "Name" row for typing (live2 2208 (1)).
+- Assembly corpus: corpus8 913/1701 occurrences on 23 documents (856 on the 20 measured before, was 827), mates
+  107/286; corpus9 (std + import, 5 documents): bjr-config 102 → 119, robot-relations 100 → 121, pinslot 19 → 25,
+  corexy 24 → 26 (xdev-subs 7/286: its subassemblies). robot-relations' mates 2/5 → 0/0 in corpus9 was the slash
+  bug (fixed since, not re-measured). Part Studio suite after: 70/86, 724/934, no document worse.
+- ui-parity asm: 119/141 (01:3x, before the config fix). Left: config focus after the first step (messages "Configuration
+  copied." / "Inputs copied.", modal focus of Input propagation / Visibility conditions / Release), the right-click
+  menu's highlighted last row (6 scenarios: live's pointer lands in the "Delete" row of a menu opened above it; ours on
+  its left border: live's menu geometry not recorded), mate flip (2241 (1) not recorded), dynamic suppression toast
+  (REQUESTS 2269), Reference manager (live's lane document's version "Start"), Switch to Part Studio (live's studio is
+  "start two-blocks", ours "Part Studio 1").
+- Asked: 2267 (sketch bodies for the corpus' studios; 3 studios without any live lines), 2269 (toast fade), 2271
+  (Feature Studios and imported files not fetched). Ticket FRAME-PROFILE-OTHER-STUDIO (psui, 41 occurrences).
+- Next: re-run robot-relations + xdev-subs (why its subassemblies place 7/286), then the next gaps by occurrences.
+
 ## Paused (2026-11-07 20:08 UTC; lead: Claude quota, resume Monday 11-10)
-Where everything stands:
+Where everything stood:
 - Landed 11-07 20:23 UTC as 9cd86358: the batch below (translator for the corpus, open-composite mesh fix,
   same-connector pick, Edit dynamic suppression submenu, pin-block-apart start + asm-revolute-pin-hole-flip
   scenario). Nothing of asm's is queued or uncommitted.

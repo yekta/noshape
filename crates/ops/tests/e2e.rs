@@ -3768,6 +3768,21 @@ fn standard_content_into_a_hole() {
     assert_eq!(err.param.as_deref(), Some("size"));
 }
 
+/// An instance whose name has a slash (inch standard content, "… 1/4-20 x …") is found by its name, not read as a
+/// subassembly path.
+#[test]
+fn an_instance_named_with_a_slash_is_found_by_name() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "std-slash.noshape");
+    call(&mut ctx, "assembly_insert", json!({ "source": "Part Studio 1" }));
+    let s = call(&mut ctx, "assembly_insert_standard", json!({ "component": "Socket button head cap screw", "size": "1/4-20" }));
+    let id = s["inserted"][0].as_str().unwrap();
+    let name = s["instances"].as_array().unwrap().iter().find(|i| i["id"] == id).and_then(|i| i["name"].as_str()).unwrap().to_string();
+    assert!(name.contains('/'), "{name}");
+    let r = call(&mut ctx, "assembly_set_state", json!({ "instances": [name], "fixed": true }));
+    assert!(r["instances"].as_array().unwrap().iter().any(|i| i["id"] == id && i["fixed"] == true), "{r}");
+}
+
 /// Assembly configurations: a List input suppressing an instance in one
 /// configuration (Configure suppression), the active configuration.
 #[test]

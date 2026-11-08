@@ -609,7 +609,9 @@ impl<'a> Translator<'a> {
         }
         let y_up = file["placed"] != true && param("yAxisIsUp")["value"].as_bool() == Some(true);
         let r = self.call("import_files", json!({ "files": [path], "y_up": y_up, "keep_files": false }))?;
-        self.tab = Some(r["first"].as_str().ok_or("the import made no Part Studio")?.to_string());
+        // (A native assembly zip also makes an Assembly: the Import feature is its Part Studio's.)
+        let studio = r["tabs"].as_array().into_iter().flatten().find(|t| t["kind"] == "Part Studio").and_then(|t| t["id"].as_str());
+        self.tab = Some(studio.or(r["first"].as_str()).ok_or("the import made no Part Studio")?.to_string());
         let list = self.call("feature_list", json!({}))?;
         let first = &list["features"][0];
         let ours = first["id"].as_str().ok_or("the import's Part Studio has no feature")?.to_string();
@@ -4958,6 +4960,42 @@ fn instance_config_values(i: &Value) -> Vec<(String, f64, String)> {
         .collect()
 }
 
+/// The standard content item live names `name` ("Hex socket head cap screw M3x0.50 x 8", without " <n>"): the first
+/// catalogue component, size and length whose part name it is (for an instance whose Part Studio live didn't fetch).
+pub fn standard_spec_by_part_name(name: &str) -> Option<noshape_model::assembly::standard::StandardSpec> {
+    use noshape_model::assembly::standard::{CATALOGUE, StandardSpec};
+    for c in CATALOGUE.iter() {
+        for size in c.size_names() {
+            let Some(row) = c.size(size) else { continue };
+            // The size's label up to its length ("… M3x0.50", "… {l} x M5x0.8") starts the name.
+            let head = row.label.split(" x {l}").next().unwrap_or_default().split("{l}").next().unwrap_or_default();
+            if !name.starts_with(head.split('{').next().unwrap_or_default()) {
+                continue;
+            }
+            let mut spec = StandardSpec::new(c);
+            spec.set_size(size);
+            if spec.part_name() == name {
+                return Some(spec);
+            }
+            let lengths = spec.size_row().map(|s| c.lengths(s)).unwrap_or_default();
+            for l in lengths {
+                spec.length = Some(l);
+                if spec.part_name() == name {
+                    return Some(spec);
+                }
+            }
+        }
+    }
+    None
+}
+
+/// A part's volume band (m³, lo and hi) in an assembly corpus' parts list: `volume` [lo, hi] from `.mass.json`, else
+/// `volume_band` of live's per-feature lines (where `volume` is the number).
+fn volume_band(p: &Value) -> Option<(f64, f64)> {
+    let b = p["volume"].as_array().filter(|v| v.len() == 2).or_else(|| p["volume_band"].as_array())?;
+    Some((b.first()?.as_f64()?, b.get(1)?.as_f64()?))
+}
+
 /// An Onshape deterministic id as the number its base-64 characters write (ids made later are larger).
 /// One region named by id alone, without live's geometry: the sketch's only region inside no other's hole (a plate
 /// around its holes, a ring around its bore).
@@ -5116,7 +5154,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             studio["partOrder"] = json!(order);
         }
         if studio["partVolumes"].is_null() {
-            let bands: Vec<Value> = parts.as_array().into_iter().flatten().filter(|p| p["volume"].as_array().is_some_and(|v| v.len() == 2)).map(|p| p["volume"].clone()).collect();
+            let bands: Vec<Value> = parts.as_array().into_iter().flatten().filter_map(|p| volume_band(p).map(|(lo, hi)| json!([lo, hi]))).collect();
             studio["partVolumes"] = json!(bands);
         }
         let studio = &studio;
@@ -5175,7 +5213,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let mut taken: Vec<String> = Vec::new();
         for p in parts.as_array().into_iter().flatten() {
             let (Some(pid), Some(pname)) = (p["partId"].as_str(), p["name"].as_str()) else { continue };
-            let band = p["volume"].as_array().and_then(|b| Some((b.first()?.as_f64()?, b.get(1)?.as_f64()?)));
+            let band = volume_band(p);
             let ours = if ours_parts.iter().any(|(n, _)| n == pname) || ours_parts.is_empty() {
                 pname.to_string()
             } else if let [(only, _)] = ours_parts.as_slice() {
@@ -5232,6 +5270,27 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
             let (Some(id), Some(element)) = (i["id"].as_str(), i["elementId"].as_str()) else { continue };
             let source = if i["type"] == "Assembly" { levels.iter().find(|x| x.element == element).map(|x| x.tab.clone()) } else { tabs.get(element).cloned() };
             let Some(source) = source else {
+                // Standard content live didn't fetch: ours from the catalogue by its part name.
+                let part = i["name"].as_str().and_then(|n| n.rsplit_once(" <")).map(|(n, _)| n);
+                if i["isStandardContent"] == true
+                    && let Some(spec) = part.and_then(standard_spec_by_part_name)
+                {
+                    trace(&format!("insert standard {}", i["name"]));
+                    let mut args = json!({ "tab": l.tab, "standard": spec.standard, "category": spec.category, "class": spec.class, "component": spec.component, "size": spec.size });
+                    if let Some(len) = &spec.length {
+                        args["length"] = json!(len);
+                    }
+                    match placer.call("assembly_insert_standard", args) {
+                        Ok(r) => {
+                            let inserted = r["inserted"][0].as_str().unwrap_or_default();
+                            if let Some(n) = r["instances"].as_array().into_iter().flatten().find(|x| x["id"] == inserted).and_then(|x| x["name"].as_str()) {
+                                ours.insert((l.element.clone(), id.to_string()), n.to_string());
+                            }
+                        }
+                        Err(e) => res.untranslated.push(format!("instance {}: {e}", i["name"])),
+                    }
+                    continue;
+                }
                 res.untranslated.push(format!("instance {}: its {} {element} wasn't translated", i["name"], if i["type"] == "Assembly" { "subassembly" } else { "Part Studio" }));
                 continue;
             };

@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies};
+use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, standard_spec_by_part_name};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -2519,4 +2519,14 @@ fn area_allows_lives_short_reading_of_blend_faces() {
     assert!(!differences(&live, &[part(206.398e-6, None)]).is_empty(), "no rounds: live's band");
     assert!(!differences(&live, &[part(206.41e-6, Some(12.5e-6))]).is_empty(), "past the rounds' share");
     assert!(!differences(&live, &[part(206.34e-6, Some(12.5e-6))]).is_empty(), "under live's band: not widened");
+}
+
+/// Standard content of an assembly corpus whose Part Studio live didn't fetch is found by its part name.
+#[test]
+fn standard_content_is_found_by_its_part_name() {
+    for name in ["Hex socket head cap screw M3x0.50 x 8", "Socket button head cap screw 1/4-20 x 0.625", "Type B narrow flat washer 1/4", "PZ Pan head screw M2x0.40 x 3", "Chamfered plain washer normal M5", "Cup point hex socket set screw M4x0.7 x 4", "Socket button head cap screw #10-32 x 1.75"] {
+        let spec = standard_spec_by_part_name(name).unwrap_or_else(|| panic!("{name}: not found"));
+        assert_eq!(spec.part_name(), name);
+    }
+    assert!(standard_spec_by_part_name("Hex socket head cap screw M3x0.50 x 7.3").is_none());
 }

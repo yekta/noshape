@@ -299,7 +299,13 @@ impl AssemblyView {
         let rename = self.ui.rename.as_ref().map(|(_, st, _)| input(None, st))
             .or_else(|| self.ui.dynamic_suppression.as_ref().map(|(_, st, _)| input(Some("Unsuppressed if"), st)))
             .or_else(|| self.ui.folder_name.as_ref().map(|f| input(None, &f.input)))
-            .or_else(|| self.ui.ds_name.as_ref().filter(|_| self.ui.display_states).map(|st| input(None, st)));
+            .or_else(|| self.ui.ds_name.as_ref().filter(|_| self.ui.display_states).map(|st| input(None, st)))
+            // A configuration table cell being typed in: live's recorder reads a bare input (live2 2208).
+            .or_else(|| self.ui.cfg_edit.as_ref().map(|e| {
+                let mut f = input(None, &e.input);
+                f["kind"] = json!("other");
+                f
+            }));
         let active_field = || {
             // (A dialog with only ✕, Interference detection or Animate mate, keeps no field focused: live.)
             dialog.as_ref().filter(|d| d["kind"] == "feature" && d.get("ok").is_some()).and_then(|d| {

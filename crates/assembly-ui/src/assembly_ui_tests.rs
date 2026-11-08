@@ -496,3 +496,20 @@ fn hiding_hidden_mates_is_an_undo_step(cx: &mut TestAppContext) {
         assert!(doc.read(cx).can_redo());
     });
 }
+
+/// A new List input opens its italic "Name" row for typing, and the recorded focus is that input (live2 2208).
+#[gpui::test]
+fn a_new_list_input_types_into_its_name_row(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "cfg-name-row");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            v.add_asm_config_input("List", w, cx);
+            let input = v.assembly(cx).unwrap().configuration.inputs[0].id.clone();
+            assert_eq!(v.ui.cfg_edit.as_ref().map(|e| e.key.clone()), Some(format!("opt-new-{input}")));
+        });
+    })
+    .unwrap();
+    draw(cx, window);
+    let state = cx.update(|cx| view.read(cx).ui_state(cx));
+    assert_eq!(state["focus"]["kind"], "other", "{}", state["focus"]);
+}

@@ -41,6 +41,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - 2026-11-07 18:24 UTC: the assembly suite passes live's per-studio `<element>.live.jsonl` (live2 11-07) to the translator as its refs
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
+- 2026-11-08 05:40 UTC: a part's volume band also from live's per-feature lines (`volume_band` when `volume` is a number;
+  `.mass.json` gives `volume` [lo, hi]).
+- 2026-11-08 05:40 UTC: an Import feature whose file is a native assembly zip builds in the Part Studio the import makes,
+  not its Assembly tab (bjr-config 2d633d: "tab … is a Assembly, not a Part Studio").
+- 2026-11-08 05:40 UTC: (assembly side only) a standard content instance whose Part Studio live didn't fetch is inserted
+  from our catalogue by its part name (`standard_spec_by_part_name`: "Hex socket head cap screw M3x0.50 x 8"; 84
+  instances in xdev-subs, robot-relations, pinslot, corexy). Part Studio suite after all three: no document worse
+  (70/86, 724/934).
 
 ## 11-08 06:02 UTC: drawing match 95/158, new starts, coverage 98/102 (lead 11-08)
 - **Drawing match 95/158 scenarios, 1031/1208 states** (vibe5, before 98422063: its fixes add a few more). Fixed: the

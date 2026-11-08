@@ -3010,6 +3010,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P2 FRAME-PROFILE-OTHER-STUDIO (psui; asm 2026-11-08 01:11 UTC, the assembly corpus' pattern-std, 41 occurrences): **a Frame's
+  Sketch profile can't be a sketch of another Part Studio of the document**. Live's picker has a Current document tab
+  (behaviours "psui (2026-11-01 … D134) Frame Sketch profile picker": every other Part Studio, expandable to its
+  sketches) and stores it as `profileSketch` BTMParameterReferencePartStudio (namespace of the studio at a microversion,
+  `qCreatedBy(<sketch feature id>, BODY)`, the studio's configuration: pattern-std 8142373c's Frame 1 / 2 take studio
+  b5ec5f's sketch at List = upright_frame). Ours takes a sketch of this studio by name or a library profile only, so
+  the translator leaves those Frames "Select profile." and 4 studios have no parts.
 - [ ] P2 UIP-SELECT-OTHER-LIST (psui) **ui-parity face-menu-select-other: after the face menu's Select other…, ours reports
   no list**, live (re-recorded 11-07 03:09, 43f4389bc) a select-other list ("Front plane / Face of Extrude 1 / Part 1 / Edge of
   Extrude 1 / …") and a Select other panel. It matched before only because the old recording had no list either. Fails 4 / 4

@@ -213,14 +213,14 @@ pub(crate) fn asm_target<'a>(ctx: &'a mut Ctx, a: &Args) -> Result<(&'a mut Open
 /// Solve assembly `asm` (tab `tab`) in its current configuration.
 pub(crate) fn solve_assembly(od: &mut OpenDoc, tab: TabId, asm: &Assembly, opts: &SolveOptions) -> AssemblyResult {
     let eff = sa::effective(asm, &super::configuration::asm::values(od, tab, asm));
-    od.evaluate_assembly(tab, &eff, opts)
+    od.evaluate_assembly(&eff, opts)
 }
 
 /// Solve the assembly in its default configuration.
 fn solve(od: &mut OpenDoc, tab: TabId, opts: &SolveOptions) -> Result<AssemblyResult, OpError> {
     let a = assembly(od, tab)?;
     let asm = sa::effective(a, &super::configuration::asm::values(od, tab, a));
-    Ok(od.evaluate_assembly(tab, &asm, opts))
+    Ok(od.evaluate_assembly(&asm, opts))
 }
 
 /// Commit an assembly edit the way the view does: fold in the latest
@@ -939,11 +939,11 @@ fn mate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         // Two free parts: the one live keeps in place (the dialog's rule).
         if opts.hold.len() == 1 && m.mate_type != MateType::Width {
             let units = od.doc().settings.units;
-            let current = od.evaluate_assembly(tab, &sa::effective(&asm, &asm.configuration.defaults()), &SolveOptions::default());
+            let current = od.evaluate_assembly(&sa::effective(&asm, &asm.configuration.defaults()), &SolveOptions::default());
             opts.hold = vec![noshape_model::assembly::eval::new_mate_stays(&current, &m, &units)];
         }
     }
-    let solved = od.evaluate_assembly(tab, &preview, &opts);
+    let solved = od.evaluate_assembly(&preview, &opts);
     let ok = solved.mates.iter().find(|s| s.id == id).map(|s| (s.ok, s.message.clone()));
     let values = asm.configuration.defaults();
     commit(od, tab, &sa::mate_description(&m, editing.is_some()), &solved, |a| sa::commit_mate(a, m, editing, &values))?;
@@ -999,6 +999,10 @@ fn transform(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 /// An occurrence by path ("Sub <1>/Part 1 <1>", or Onshape's "Sub <1> > Part 1 <1>"; ids or names at each level
 /// through same-document subassemblies).
 pub(crate) fn find_occurrence(d: &noshape_model::Document, a: &Assembly, key: &str, field: &str) -> Result<Vec<InstanceId>, OpError> {
+    // A name with a slash is one instance ("Socket button head cap screw 1/4-20 x 0.625 <1>").
+    if let Some(i) = a.instances.iter().find(|i| i.name == key.trim()) {
+        return Ok(vec![i.id]);
+    }
     let mut asm = a.clone();
     let mut out = Vec::new();
     let sep = if key.contains(" > ") { " > " } else { "/" };

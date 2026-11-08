@@ -347,7 +347,7 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
         let id = super::assembly::find_instance(asm, v.as_str().unwrap_or_default(), &format!("section_exclude[{i}]"))?;
         opts.section_skip.insert(id);
     }
-    let result = od.evaluate_assembly(tab, &eff, &Default::default());
+    let result = od.evaluate_assembly(&eff, &Default::default());
     let _gpu = crate::doc::gpu_lock();
     let off = ctx.offscreen()?;
     let up = off.renderer.uploader();

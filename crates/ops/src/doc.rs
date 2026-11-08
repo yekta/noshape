@@ -18,7 +18,9 @@ pub struct OpenDoc {
     /// Regeneration caches of every Part Studio (shared with Derived sources).
     pub studio_cache: crate::derived::StudioCache,
     regens: HashMap<TabId, Regenerator>,
-    assemblies: HashMap<TabId, noshape_model::assembly::eval::AssemblyEvaluator>,
+    /// One for every assembly tab: a Part Studio used by the assembly and its subassemblies' tabs is regenerated once
+    /// (asm-suspension's 20-minute studio was regenerated for each tab inserting its parts).
+    assemblies: Option<noshape_model::assembly::eval::AssemblyEvaluator>,
     /// Each Part Studio's chosen configuration (the Configurations box's
     /// values; view state, not stored in the document).
     pub active_config: HashMap<TabId, ConfigValues>,
@@ -36,7 +38,7 @@ impl OpenDoc {
         // std's dialog logic (Extrude, Hole, …) loads in the background, so
         // the first feature_add doesn't parse std (fs, lead 10-26).
         noshape_model::custom::std_feature::prewarm();
-        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: HashMap::new(), active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
+        OpenDoc { session, studio_cache: Default::default(), regens: HashMap::new(), assemblies: None, active_config: HashMap::new(), sketch_fillet_radius: HashMap::new(), window: Default::default() }
     }
 
     pub fn doc(&self) -> &Document {
@@ -138,9 +140,9 @@ impl OpenDoc {
 
     /// Evaluate (solve) an assembly tab as given (already configured, with
     /// any previewed edits), as the Assembly view does.
-    pub fn evaluate_assembly(&mut self, tab: TabId, asm: &noshape_model::assembly::Assembly, opts: &noshape_model::assembly::eval::SolveOptions) -> noshape_model::assembly::eval::AssemblyResult {
+    pub fn evaluate_assembly(&mut self, asm: &noshape_model::assembly::Assembly, opts: &noshape_model::assembly::eval::SolveOptions) -> noshape_model::assembly::eval::AssemblyResult {
         let doc = &self.session.doc;
-        let ev = self.assemblies.entry(tab).or_insert_with(|| {
+        let ev = self.assemblies.get_or_insert_with(|| {
             let mut ev = noshape_model::assembly::eval::AssemblyEvaluator::default();
             // Instances showing a version of this or another document.
             ev.set_external(std::sync::Arc::new(crate::derived::ExternalDocs));

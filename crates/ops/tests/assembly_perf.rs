@@ -141,7 +141,7 @@ pub(crate) fn evaluated(ctx: &mut Ctx, path: &str) -> AssemblyResult {
     let od = ctx.doc(Some(path)).unwrap();
     let tab = noshape_ops::doc::find_tab(od.doc(), "Assembly 1").unwrap();
     let Some(TabContent::Assembly(asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
-    od.evaluate_assembly(tab, &asm, &SolveOptions::default())
+    od.evaluate_assembly(&asm, &SolveOptions::default())
 }
 
 /// Drag `inst`'s top centre in `steps` pointer moves along `dir` (mm per
@@ -187,7 +187,7 @@ pub(crate) fn evaluate(ctx: &mut Ctx, path: &str, edit: impl FnOnce(&mut Assembl
     let Some(TabContent::Assembly(mut asm)) = od.doc().tab(tab).map(|t| t.content.clone()) else { panic!() };
     edit(&mut asm);
     let t = Instant::now();
-    let res = od.evaluate_assembly(tab, &asm, &SolveOptions::default());
+    let res = od.evaluate_assembly(&asm, &SolveOptions::default());
     let d = t.elapsed();
     assert!(res.mates.iter().all(|m| m.ok), "a mate fails");
     d

@@ -52,16 +52,32 @@ impl AssemblyView {
 
     /// Configure Assembly ▾ / Add configuration input ▾: List, Checkbox,
     /// Configuration variable (a List is created at once, live 191).
-    fn add_asm_config_input(&mut self, kind: &'static str, cx: &mut Context<Self>) {
-        self.edit(noshape_ops::config::ADD_INPUT, cx, |a| noshape_ops::asm_config::add_input(a, kind));
+    pub(super) fn add_asm_config_input(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        let id = self.edit(noshape_ops::config::ADD_INPUT, cx, |a| noshape_ops::asm_config::add_input(a, kind));
+        // A new List: the focus is in its italic "Name" add row (live2 2208).
+        if let Some(id) = id.filter(|_| kind == "List") {
+            self.edit_cfg_cell(format!("opt-new-{id}"), String::new(), Self::add_option_commit(id), window, cx);
+        }
         cx.notify();
+    }
+
+    /// The italic "Name" row's commit: a configuration (List option) named as typed.
+    fn add_option_commit(input: String) -> CfgCommit {
+        Rc::new(move |this, v, cx| {
+            let name = v.trim().to_string();
+            if name.is_empty() {
+                return;
+            }
+            let a = input.clone();
+            this.edit(noshape_ops::config::ADD_OPTION, cx, |asm| noshape_ops::asm_config::add_option(asm, &a, &name));
+        })
     }
 
     fn kinds_menu(view: Entity<Self>, at: Point<Pixels>, anchor: Anchor, window: &mut Window, cx: &mut App) {
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
             for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                 let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, _, cx| v.update(cx, |this, cx| this.add_asm_config_input(kind, cx))));
+                m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, window, cx| v.update(cx, |this, cx| this.add_asm_config_input(kind, window, cx))));
             }
             m
         });
@@ -280,7 +296,7 @@ impl AssemblyView {
             .child(div().text_size(px(14.)).text_color(pal.text).child("Configure Assembly"))
             // Live (dom/assembly-panel-configuration).
             .tooltip(crate::ui::tooltip("Add configuration input to create multiple variants of this assembly"))
-            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)))
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_asm_config_input("List", window, cx)))
             .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this assembly".into()));
         let caret = div()
             .id("acfg-configure-more")
@@ -687,16 +703,8 @@ impl AssemblyView {
                 }
                 // The italic "Name" row adds a configuration (List).
                 if matches!(input.kind, ConfigInputKind::List { .. }) {
-                    let a = iid.clone();
                     let key = format!("opt-new-{iid}");
-                    let commit: CfgCommit = Rc::new(move |this, v, cx| {
-                        let name = v.trim().to_string();
-                        if name.is_empty() {
-                            return;
-                        }
-                        let a = a.clone();
-                        this.edit(noshape_ops::config::ADD_OPTION, cx, |asm| noshape_ops::asm_config::add_option(asm, &a, &name));
-                    });
+                    let commit = Self::add_option_commit(iid.clone());
                     let editing = self.ui.cfg_edit.as_ref().is_some_and(|e| e.key == key);
                     let el = self.cfg_cell_text(key, String::new(), (px(13.33), FontWeight::NORMAL), false, commit, cx);
                     section = section.child(
@@ -845,7 +853,7 @@ impl AssemblyView {
             .hover(|d| d.bg(pal.panel_hover))
             .child(crate::assets::icon("cfg-filter-list", 20., cx))
             .child(div().text_size(px(14.)).text_color(pal.text).child("Add configuration input"))
-            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.add_asm_config_input("List", cx)))
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.add_asm_config_input("List", window, cx)))
             .map(|d| crate::ui_script::mark(d, || "button:Add configuration input to create multiple variants of this assembly".into()));
         let caret = div()
             .id("acfg-add-input-more")
