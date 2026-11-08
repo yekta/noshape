@@ -702,7 +702,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   documents" table on all three platforms and verifies from it. Until then v0.4.32 hangs on this document on macOS / Windows.
 
 ## Rust Boolean (bool)
-- [ ] P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
+- [x] P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
   v0.4.33** (CLI fuzz seed 6297 on v0.4.35, step 97: a Shell, 2 faces, 1 mm). The fuzz document was saved with the Shell in
   it, so every open regenerates it and dies: `thread '<unknown>' has overflowed its stack` on v0.4.33, v0.4.34, v0.4.35 and
   greens 24829a72 / 4fee814c / 42ae0d85; **v0.4.32 opens it** (57 features, Shell 8 Error). gdb on 24829a72
@@ -713,6 +713,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   v0.4.33 sends this Shell through it. Repro (qa-scratch/tickets/crash6297): `python3 open.py <cli>` (open + feature_list),
   `rep.py <cli>` (open, then step 97's Shell again); vibe3:~/qa/tickets/crash6297 has the same. Not new in this cut (in
   v0.4.33–v0.4.35), so not a blocker for v0.4.36 by qa's rule, but a lost document. (qa 2026-11-08 02:47)
+  Fixed (bool 11-08): the halving picked its direction from the patch's ends' chords, zero along a patch closing on
+  itself, so it halved the way that never shrank it; it now stops 64 deep (not apart, the safe answer). The document
+  opens in 6.6 s with Shell 8 an error, as on v0.4.32. T1 brep `boolean::free::tests::a_ring_patch_against_a_touching_one_stays_shallow`
+  (overflows a 256 KB stack without the bound).
 - [ ] P0 SECTIONS-AHEAD-HANG (bool + core) **a Shell's regeneration never ends, in v0.4.33 too: the CPU budget can't stop
   OCCT's face/face sections made ahead on the thread pool.** CLI fuzz seed 5786, step 30 (a Shell, 0.5 mm, with or without
   NOSHAPE_BOOL_FALLBACK=0): on vibe3 it never finishes on v0.4.33's release CLI and on greens 91035029 / a70b2698 (4 / 4, the
@@ -727,6 +731,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   session log are in /root/qa-scratch/tickets/hang5786/ (step29.noshape + -wal, clifuzz-5786.log: step 30's
   shell-args are the faces). live: a Shell answers within seconds. Fix: the ahead jobs under the caller's budget or
   their own (break hook in the pool workers, or a wall-clock limit per pair). (qa 2026-11-06 23:17, v0.4.33 / a70b2698 / 409110dd)
+  bool 11-08, to verify on vibe3 (qa): the break hooks in the workers do run (math solves, patch 0008), but the
+  deadline they read is the launcher's thread CPU clock, which stands still while it waits. A pool job's time now
+  counts as the launcher's (its CPU when the job started plus the wall time since), and no section ahead starts once
+  the hook says stop. On vibe4 (no hang there, even under ulimit -v) step 30 still ends at the budget, 52 s for two
+  attempts ("Could not shell part with selections.").
 - [ ] P2 OPEN-SLOW-SURFACE-PATTERN (bool; psui's open-speed table, lead 11-06: document open is the number users feel
   first) **cf-surface-pattern opens in 10.3 s, live regenerates it in 4.2 s**: 7.4 s of it is one `opBoolean` in its
   custom Surface Pattern 3 (Feature Studio line 172: SUBTRACTION of the `opPattern`-ed stamp bodies from the lofted,
