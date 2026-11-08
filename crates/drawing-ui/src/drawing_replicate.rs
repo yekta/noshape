@@ -43,6 +43,8 @@ impl DrawingEditor {
                     MenuEntry::item("Region...", move |t, _, cx| {
                         t.replicate_dlg = Some(ReplicateDlg::Create { view: id, center: None, rect: None });
                         t.tool = Tool::Select;
+                        // Its dialog starts with nothing selected (live2 drw-view-replicate-region).
+                        t.selection.clear();
                         cx.notify();
                     }),
                 ],

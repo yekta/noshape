@@ -426,8 +426,10 @@ impl DrawingEditor {
         };
         // The profile field's text (live 127, 600–604: per shape until the profile exists; editing: its chip).
         let picked = self.detail_dlg.as_ref().is_some_and(|d| !d.picked.is_empty());
-        let field_text = if editing && !matches!(self.tool, Tool::Detail { .. }) {
-            "Profile"
+        // Edit detail...: the view's profile as a chip, × to draw another (live2 drw-detail-edit).
+        let chip = editing && !matches!(self.tool, Tool::Detail { .. });
+        let field_text = if chip {
+            "Edit closed profile"
         } else if placed && picked {
             "Profile selected"
         } else if placed {
@@ -445,7 +447,11 @@ impl DrawingEditor {
         };
         crate::ui_script::note_dialog(|| {
             // Every text shown, in reading order (README "### Drawings"; live 2131).
-            let mut text = vec!["Detail view", field_text, "View scale", "View label", "Profile style"];
+            let mut text = vec!["Detail view", field_text];
+            if chip {
+                text.extend(["Profile", "×"]);
+            }
+            text.extend(["View scale", "View label", "Profile style"]);
             text.extend(STYLES);
             text.extend(["Show detail view profile", "Clip border to geometry"]);
             serde_json::json!({ "kind": "drawing-panel", "title": "Detail view", "text": text })
@@ -493,7 +499,40 @@ impl DrawingEditor {
                 // exists, then "Profile created" (`#dbf1fa`, 1 px `#1b5faa`,
                 // radius 2, 12 px `#616b73`).
                 // Live drawing/127: 5 px under the field to the View scale row.
-                .child(div().id("dd-profile-field").tooltip(crate::ui::tooltip("Create closed profile for detail view boundary")).mx(px(3.)).mt(px(1.)).mb(px(5.)).h(px(26.)).px(px(7.)).flex().items_center().bg(gpui_kit::rgb(0xdbf1fa)).border_1().border_color(gpui_kit::rgb(0x1b5faa)).rounded(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb(0x616b73)).child(field_text))
+                .child(
+                    div()
+                        .id("dd-profile-field")
+                        .tooltip(crate::ui::tooltip("Create closed profile for detail view boundary"))
+                        .mx(px(3.))
+                        .mt(px(1.))
+                        .mb(px(5.))
+                        .px(px(7.))
+                        .bg(gpui_kit::rgb(0xdbf1fa))
+                        .border_1()
+                        .border_color(gpui_kit::rgb(0x1b5faa))
+                        .rounded(px(2.))
+                        .text_size(px(12.))
+                        .text_color(gpui_kit::rgb(0x616b73))
+                        .when(!chip, |f| f.h(px(26.)).flex().items_center().child(field_text))
+                        .when(chip, |f| {
+                            f.py(px(3.)).child(div().child(field_text)).child(
+                                h_flex()
+                                    .h(px(22.))
+                                    .child(div().flex_1().text_size(px(14.)).text_color(pal.text).child("Profile"))
+                                    .child(div().id("dd-profile-clear").px(px(4.)).cursor_pointer().text_color(gpui_kit::rgb(0x999999)).child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        let parent = this.detail_dlg.as_ref().and_then(|d| d.view);
+                                        if let Some(d) = &mut this.detail_dlg {
+                                            d.profile = None;
+                                            d.pts.clear();
+                                            d.picked.clear();
+                                        }
+                                        this.tool = Tool::Detail { parent, center: None, radius: None };
+                                        this.update_preview(cx);
+                                        cx.notify();
+                                    }))),
+                            )
+                        }),
+                )
                 .child(div().px(px(3.)).child(row("View scale", field(106.).child(scale_btn).into_any_element())))
                 .child(div().px(px(3.)).child(row("View label", gpui_kit::base::input::input_frame(field(110.).child(Input::new(&d.label).text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).appearance(false).small()).into_any_element()).into_any_element())))
                 .child(div().px(px(3.)).child(row("Profile style", field(117.).child(style_btn).into_any_element())))
