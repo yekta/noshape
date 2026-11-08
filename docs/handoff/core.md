@@ -33,6 +33,16 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 21:12 UTC: NEXT (lead 21:1x, in order): (1) c2-fan-blade-sweep's source studio fb207f79 at Extrude 7
+(feature 15): ours 10 faces, live 11 (one edge short), blocks Derived 1 and 53 features (blend's note with b3f3df84e);
+also feature 13 External thread 1's missing info message. Run alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/
+c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54 (vibe5). (2) If live 2380 (knife) hasn't
+answered: the impeller's side faces by arc-length pairing with tangency kept (TMP_ARC_ROWS experiment broke the face
+merge: 6 faces, live 4; 257,467 vs live 257,078).**
+- Queued 37c477d8: the loft's V414 start-rule gate (asVersion hidden param; live 2378: cut-off V414). Suite unchanged
+  (75/87, 760/951); impeller Loft Gehäuse 257,273 vs 257,078.
+- If restarted on another account: read this entry, land.sh --status, then continue (1).
+
 **State 11-08 20:20 UTC: the suite's failing features (lead 20:0x); the loft version gate waits for live.**
 - Suite 75/87 documents to the end, 760/951 features. Routed: c2-fan-blade-sweep (53 lost: its derived source's
   Chamfer 1) and c2-rings-loft's blend faces to blend.md; the fan blade's STEP import to dx.md; text indent / louver
