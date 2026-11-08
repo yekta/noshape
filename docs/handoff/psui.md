@@ -577,6 +577,18 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 19:20 UTC, early warm-up measured (perf 42504449807 on f57f96b): out.** Ours (caches cleared) vs early:
+macOS 26 662 → 715 ms (+54), macOS 15 1180 → 1802 ms (+622: window created 648 → 1652, the warm-up's GPU work on
+the one paravirtual GPU held AppKit's window); reverted, bench back to ours / warm. This run's macOS 15 was slow
+throughout (ours 1180 ms against 975 in the last; window creation 403 ms against 271): ours over 1 s on that runner.
+What is left of ours there: window creation with the Metal caches cleared (GPUI's 8 pipelines compiled for the GPU,
+~300 ms over warm) and frame 1's first GPU use (~500 ms from workspace drawn); the lever would be pipelines shipped
+compiled for the GPU (Metal binary archives / metal-tt for Apple GPU families), a bigger project. Gate flags of the
+same job: texture zoom / orbit, pan, row-click not repeated on re-measure; readback orbit UI CPU p95 repeated
+(4.12 → 5.12, again 4.70 → 6.51; macOS 26 flagged readback zoom UI CPU in the last run too): texture mode's UI CPU
+unchanged (0.81 → 0.79); readback only, nothing per-frame changed since v0.4.36 in our viewport code; watch it.
+
+
 **11-08 17:21 UTC, ui-parity leftovers.** key-rollback-bar-arrows matches (the clicked rollback bar reads as a selected
 item, live's tree node). config-variable-edit-definition: focus now "Name" as live's; its live recording reads the
 popup as a panel (recorder without live2), vs-cfg-variable-dialog as a dialog: re-record asked (REQUESTS 17:21).
