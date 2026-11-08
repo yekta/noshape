@@ -1,0 +1,59 @@
+{
+ "name": "config-variable-edit-definition",
+ "about": "config-blocks: Configuration panel › Add configuration input ▾ › Configuration variable \"len\" ✓, its ⋯ › Edit definition…, Escape",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last menus)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Add configuration input"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configuration variable"
+   }
+  },
+  {
+   "do": "type",
+   "text": "len"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": "len"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit definition…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -2949,7 +2949,8 @@ impl PartStudioView {
                     }
                     m
                 });
-                crate::os_menu::open_anchored(e.position(), Anchor::BottomLeft, menu, window, cx);
+                // Upward and leftward from the ▾ at the panel's right edge (to the right it ran off the window).
+                crate::os_menu::open_anchored(e.position(), Anchor::BottomRight, menu, window, cx);
             });
         h_flex().rounded(px(3.)).border_1().border_color(border).bg(pal.panel).child(main).child(caret).into_any_element()
     }

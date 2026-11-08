@@ -164,6 +164,7 @@ impl PartStudioView {
         let tab = |i: usize, label: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(SharedString::from(format!("vi-kind-{i}")))
+                .map(|d| crate::ui_script::mark(d, move || format!("tab:{label}")))
                 .flex_1()
                 .h(px(26.))
                 .flex()
@@ -217,6 +218,22 @@ impl PartStudioView {
         }
         let d = self.ui.var_input.as_ref()?;
         let name_missing = d.editing.is_none() && d.name.read(cx).value().trim().is_empty();
+        // The parity suite's state, as live's recorder reads the dialog (ui-parity vs-cfg-variable-dialog).
+        crate::ui_script::note_dialog(|| {
+            let value = |st: &Entity<InputState>| st.read(cx).value().to_string();
+            let num = if text { "string" } else { "number" };
+            let mut fields = Vec::new();
+            if d.editing.is_none() {
+                fields.push(serde_json::json!({ "label": "Name", "kind": "string", "text": value(&d.name) }));
+            }
+            fields.push(serde_json::json!({ "label": "Default", "kind": num, "text": value(&d.default) }));
+            if !text {
+                fields.push(serde_json::json!({ "label": "Minimum", "kind": "number", "text": value(&d.min) }));
+                fields.push(serde_json::json!({ "label": "Maximum", "kind": "number", "text": value(&d.max) }));
+            }
+            let tabs: Vec<serde_json::Value> = if d.editing.is_none() { KINDS.iter().enumerate().map(|(i, (l, _))| serde_json::json!({ "label": l, "selected": i == d.kind })).collect() } else { Vec::new() };
+            serde_json::json!({ "title": title, "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": if ok { "enabled" } else { "disabled" }, "titleState": if ok { "ok" } else { "error" } })
+        });
         Some(
             v_flex()
                 .id("variable-input")
@@ -243,8 +260,8 @@ impl PartStudioView {
                         .border_b_1()
                         .border_color(gpui_kit::rgb(0xd7d7d7))
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(gpui_kit::rgb(0xaa252d))).child(title))
-                        .child(div().id("vi-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_variable_input(cx))))
-                        .child(div().id("vi-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("vi-ok").map(|d| crate::ui_script::mark(d, || "button:ok".into())).size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::rgb_static(0xffffff))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_variable_input(cx))))
+                        .child(div().id("vi-cancel").map(|d| crate::ui_script::mark(d, || "button:cancel".into())).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., gpui_kit::rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.ui.var_input = None;
                             cx.notify();
                         }))),
