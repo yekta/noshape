@@ -167,9 +167,10 @@ if [[ -n ${LATENCY_DOC:-} && ( -z ${ONLY:-} || " $ONLY " == *" latency:"* ) ]]; 
 fi
 # STARTUP (default on; not on a re-measure, ONLY): what the cold start costs noshape apart from the runner. The job's
 # first launch (the texture orbit) is the true cold start: the OS's caches and ours cold. Two more launches of the
-# document at the end, each quitting once its model is on screen (`NOSHAPE_PERF_SCRIPT=open`): `start_ours.log` with
-# our caches cleared again (fresh config and cache dirs, the Metal shader caches removed) on the now warm OS, then
-# `start_warm.log` with nothing cleared. First launch minus start_ours is the runner's first-launch cost.
+# document at the end, each quitting once its model is on screen (`NOSHAPE_PERF_SCRIPT=open`), three of each (one
+# sample per runner swung 1.2-1.7 s): `start_ours-<n>.log` with our caches cleared again (fresh config and cache dirs,
+# the Metal shader caches removed) on the now warm OS, then `start_warm-<n>.log` with nothing cleared. First launch
+# minus the ours median is the runner's first-launch cost.
 startup() { # name config-dir cache-dir clear-shader-caches
   local name=$1 cfg=$2 cache=$3 log="$OUT/start_$1.log"
   local work; work=$(mktemp -d)
@@ -187,8 +188,13 @@ startup() { # name config-dir cache-dir clear-shader-caches
   rm -rf "$work"
 }
 if [[ ${STARTUP:-1} == 1 && -z ${ONLY:-} ]]; then
+  for n in 1 2 3; do
+    dirs=$(mktemp -d)
+    startup "ours-$n" "$dirs/config" "$dirs/cache" 1
+    rm -rf "$dirs"
+  done
   dirs=$(mktemp -d)
-  startup ours "$dirs/config" "$dirs/cache" 1
-  startup warm "$dirs/config" "$dirs/cache" 0
+  startup warm-0 "$dirs/config" "$dirs/cache" 0
+  for n in 1 2 3; do startup "warm-$n" "$dirs/config" "$dirs/cache" 0; done
   rm -rf "$dirs"
 fi

@@ -229,15 +229,28 @@ def milestones(log):
     return out
 
 
+def median_milestones(out_dir, prefix):
+    """Each milestone's median over `start_<prefix>-<n>.log` (also the single `start_<prefix>.log` of older runs)."""
+    runs = [m for m in (milestones(p) for p in sorted(glob.glob(os.path.join(out_dir, f"start_{prefix}-[1-9].log"))) + [os.path.join(out_dir, f"start_{prefix}.log")]) if m]
+    if not runs:
+        return None
+    out = {}
+    for name, _ in SPLIT:
+        vals = sorted(r[name] for r in runs if name in r)
+        if vals:
+            out[name] = vals[len(vals) // 2]
+    return out
+
+
 def cold_start_split(out_dir):
-    """The job's first launch (everything cold) beside a launch with only our caches cleared (bench.sh STARTUP) and a
-    warm one: the first minus `ours` is the runner's first-launch cost; `ours` is noshape's own cold start."""
-    first, ours, warm = (milestones(os.path.join(out_dir, n)) for n in ("texture-orbit.log", "start_ours.log", "start_warm.log"))
+    """The job's first launch (everything cold) beside launches with only our caches cleared (bench.sh STARTUP) and
+    warm ones (medians): the first minus `ours` is the runner's first-launch cost; `ours` is noshape's own cold start."""
+    first, ours, warm = milestones(os.path.join(out_dir, "texture-orbit.log")), median_milestones(out_dir, "ours"), median_milestones(out_dir, "warm")
     if not first or not ours:
         return []
     ms = lambda d, k: f"{d[k]:.0f} ms" if d and k in d else "n/a"
-    lines = ["", "Cold start split (ms from process start): the job's first launch, then one with only noshape's caches cleared "
-             "(config, display cache, Metal shader caches) and a warm one:", "",
+    lines = ["", "Cold start split (ms from process start): the job's first launch, then launches with only noshape's caches "
+             "cleared (config, display cache, Metal shader caches) and warm ones (medians of three):", "",
              "| milestone | first launch | our caches cleared | warm |", "|---|---|---|---|"]
     for name, _ in SPLIT:
         lines.append(f"| {name} | {ms(first, name)} | {ms(ours, name)} | {ms(warm, name)} |")
