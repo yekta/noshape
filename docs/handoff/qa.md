@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 04:24: the 05:00 (v0.4.36) list is in TICKETS: no blocker** (green a25df4cd: sweeps = cba0a00b; CRASH-6297 and
+SECTIONS-AHEAD-HANG verified there, the hang's repro tickets/hang5786/rep.py also on vibe3). New, the lead's call:
+P1 SAVED-SKETCH-PLANE-LOST (blend 4fee814c; per-feature tools bin/featstat.py, bin/rollstat.py). Fuzz: v3cf18.sh (v0.4.35,
+6381–6440; switch to v0.4.36 at publish), v3nf20.sh (a25df4cd, 6441–6500). At publish: on vibe3 `bash bin/qa-relsmoke.sh
+0.4.36 v0435` (+ a qa-relgui436.sh from 435), tixvol on the release CLI, docker stock 24.04, bin/agent-session.sh, bin/footer-check.sh,
+`gh workflow run qa-os.yml -R yekta/noshape -f tag=v0.4.36`, rel/latest-app update.
+
 **11-08 02:50: P0 CRASH-6297 filed (bool):** CLI fuzz seed 6297 (v0.4.35, step 97 Shell) → the saved document dies with a stack
 overflow on every open (`bez_apart` recursing ~2,770 deep on a rayon worker, free.rs), v0.4.33 through green 4fee814c; v0.4.32
 opens it. Repro tickets/crash6297/{open,rep}.py (also on vibe3); gdb by attaching to the CLI after document_open
