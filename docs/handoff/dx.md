@@ -29,7 +29,11 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   1,637,832 / 1,645,816, 4,198,382 / 4,155,356 (−0.9, −0.5, +1.0 %); pulley02-maxwell 1,056,076 / 1,064,472,
   2,105,636 / 2,121,968, 4,209,460 / 4,226,096 (−0.8, −0.8, −0.4 %). The CLI's open + export: 0.2 s (clamp),
   0.9-5.5 s (knob), 1.5-6.4 s (pulley) on vibe4; live's times asked (REQUESTS).
-- Next (lead): c2-fan-blade-sweep's single STEP import, face counts off live's (core's ticket).
+- Live's times (2380, its REST GET incl. download): clamp-hms 1.6 / 1.5 / 2.2 s, knob-jason 4.3 / 8.6 / 29.1 s,
+  pulley02 9.0 / 15.1 / 31.6 s: ours is faster at every preset. Its two probe discs (R 2 top fillet, Medium): Ø20
+  907 × 102 as the rule, ours 186,866 / live 189,404; Ø28 (1074 round, over 1024) live meshes **unstructured**, not
+  2048 × 128: live 468,788, ours 524,518 (+12 %). What makes live's grid structured (pulley, knob Fine) or not (the
+  disc) is open: more such faces from live would tell.
 
 ## 11-08 21:27 UTC: c2-fan-blade-sweep's STEP import (core's SUITE-FAN-BLADE-IMPORT, lead)
 
