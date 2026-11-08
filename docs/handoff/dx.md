@@ -67,7 +67,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   centermark recordings disagree (after Esc / at once), the sketch point listed only after Esc (1 state), EDGE vs VIEW
   on right-clicks at a view's centre (the hover pattern).
 - Waiting on live2: other-document views (REQUESTS 2300, P1), the cut list recording (2299).
-- 12:25 UTC: UIP-DRW-START-FLAKY fixed (DrawingEditor::ui_busy: sources, compute, view placements; 14 shards = 8).
+- 12:15 UTC: UIP-DRW-START-FLAKY fixed (DrawingEditor::ui_busy: sources, compute, view placements; 14 shards = 8).
   Model suite, mine: the 4 NOT BUILT documents (c2-gamma-imported, c2-wire-clip-imported: Import blobs;
   c2-fan-blade-sweep, c2-hex-bookcase-derived: Derived sources) need live's fetch (REQUESTS 11:57, layouts as
   cf-sheet-metal-hem / imports/). c2-hunting-knife: Bridging curve 1 matches now, 11/52, first difference Loft 3's
