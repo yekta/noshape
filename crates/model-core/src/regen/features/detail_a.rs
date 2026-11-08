@@ -89,9 +89,10 @@ pub fn draft_faces(ev: &mut EvalCtx, groups: BTreeMap<usize, Vec<usize>>, pull: 
         // (removed, their neighbours drafted, then re-filleted); without, the
         // drafted fillets become cones and only the fillets beside them are
         // rebuilt (Onshape D3: 7335.59 / 7353.62 mm³).
+        // Where they can't be rolled again (a fillet that only ends on a drafted face of a shelled box: the std
+        // harness), the faces are drafted with the fillets as they are.
         let blends = blends_to_reapply(&body.shape, &body.faces, &faces, refillet)?;
-        if !blends.is_empty() {
-            draft_reblend(ev, bi, &faces, &blends, pull, neutral, angle)?;
+        if !blends.is_empty() && draft_reblend(ev, bi, &faces, &blends, pull, neutral, angle).is_ok() {
             continue;
         }
         let shapes: Vec<Shape> = faces.iter().filter_map(|f| body.shape.sub_shape(ShapeType::Face, *f).ok()).collect();
