@@ -68,6 +68,7 @@
 #include <ElCLib.hxx>
 #include <BRepClass_FaceClassifier.hxx>
 #include <BRepGProp.hxx>
+#include <BRepGProp_Face.hxx>
 #include <BRepLProp_SLProps.hxx>
 #include <BRepLib.hxx>
 #include <BRepOffset_MakeSimpleOffset.hxx>
@@ -8738,13 +8739,30 @@ TopoDS_Shape tapered_prism(const TopoDS_Shape& solid, const ShapeIMap& drafted, 
   TopExp::MapShapes(bottom, TopAbs_EDGE, base_edges);
   if (base_edges.Extent() != sides)
     return TopoDS_Shape();
-  // A right prism: its far cap is its base moved, its volume the base's area times its height.
+  // A right prism: its caps alike, its sides square to them (OCCT's volume of a spline prism is 1e-4 out).
   GProp_GProps gb, gt;
   BRepGProp::SurfaceProperties(bottom, gb);
   BRepGProp::SurfaceProperties(top, gt);
   const double A = gb.Mass();
-  if (std::abs(gt.Mass() - A) > 1e-7 * A || std::abs(volume_of(solid) - A * std::abs(H)) > 1e-6 * A * std::abs(H))
+  if (std::abs(gt.Mass() - A) > 1e-5 * A)
     return TopoDS_Shape();
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face f = TopoDS::Face(e.Current());
+    if (f.IsSame(bottom) || f.IsSame(top))
+      continue;
+    double u0, u1, v0, v1;
+    BRepTools::UVBounds(f, u0, u1, v0, v1);
+    BRepGProp_Face gf(f);
+    for (const double k : {0.1, 0.5, 0.9})
+    {
+      gp_Pnt p;
+      gp_Vec nv;
+      gf.Normal(u0 + (u1 - u0) * k, v0 + (v1 - v0) * (1 - k), p, nv);
+      if (nv.Magnitude() > 1e-12 && std::abs(nv.Normalized().Dot(gp_Vec(P))) > 1e-9)
+        return TopoDS_Shape();
+    }
+  }
   const double inward = H * ta;
   // The solid from its walls: each ruled from its base edge to its top, the far cap inside the tops.
   auto build = [&](const std::vector<DraftSide>& walls, SourceMap& out) -> TopoDS_Shape {
@@ -8848,6 +8866,19 @@ TopoDS_Shape tapered_prism(const TopoDS_Shape& solid, const ShapeIMap& drafted, 
 }
 
 } // namespace
+
+TopoDS_Shape draft_prism_directly(const TopoDS_Shape& prism, const ShapeIMap& sides, const gp_Dir& pull,
+                                  const gp_Pnt& origin, double angle, HHist& history)
+{
+  Bnd_Box box;
+  BRepBndLib::Add(prism, box);
+  const double tol = 1e-7 * (std::sqrt(box.SquareExtent()) * 4 + 1);
+  SourceMap    sources;
+  const TopoDS_Shape r = tapered_prism(prism, sides, pull, origin, std::tan(angle), tol, sources);
+  if (!r.IsNull())
+    history = shell_history(prism, r, {}, {}, sources, {});
+  return r;
+}
 
 // Draft by booleans, for when BRepOffsetAPI_DraftAngle fails or builds an
 // invalid solid (faces whose drafted surface vanishes: an R3 fillet drafted

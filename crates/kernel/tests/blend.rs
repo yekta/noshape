@@ -183,6 +183,34 @@ fn a_curved_prism_drafted_about_its_base_has_steiners_volume() {
     }
 }
 
+/// An extrude with draft of a closed spline (OCCT's draft fails on it, as on a gear's involutes): built directly, its
+/// sides drafted about the sketch plane, its volume Steiner's for the convex profile; the caps keep their history.
+#[test]
+fn a_drafted_extrude_of_a_spline_has_steiners_volume() {
+    setup();
+    let points: Vec<DVec2> = (0..8).map(|k| f64::from(k) * std::f64::consts::TAU / 8.0).map(|t| DVec2::new(20.0 * t.cos(), 10.0 * t.sin()) * MM).collect();
+    let plane = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let wire = make_wire_2d(&plane, &[Segment2d::Interpolated { points, periodic: true }]).unwrap();
+    let base = make_face_from_wire(&wire, true).unwrap();
+    let a = surface_properties(&base).unwrap().mass / (MM * MM);
+    let l: f64 = wire.edges().iter().map(|e| e.length().unwrap() / MM).sum();
+    let h = 10.0;
+    for deg in [3.0, -3.0] {
+        let r = extrude_between(&base, DVec3::ZERO, DVec3::Z * h * MM, f64::to_radians(deg)).unwrap_or_else(|e| panic!("{deg}°: {e}"));
+        assert!(r.shape.is_valid(), "{deg}°");
+        let t = f64::to_radians(deg).tan();
+        let want = a * h - l * t * h * h / 2.0 + std::f64::consts::PI * t * t * h * h * h / 3.0;
+        // OCCT's volume of a spline-sided solid is ~1e-5 out (a mis-paired ruled wall is 3e-3).
+        assert!((vol_mm3(&r.shape) - want).abs() < 1e-4 * want, "{deg}°: {} vs Steiner {want}", vol_mm3(&r.shape));
+        for (rel, z) in [(Relation::First, 0.0), (Relation::Last, h)] {
+            let caps: Vec<u32> = r.history.of_input(0, ShapeType::Face, 0).filter(|x| x.relation == rel && x.output_kind == ShapeType::Face).map(|x| x.output_index).collect();
+            assert_eq!(caps.len(), 1, "{deg}° {rel:?}");
+            let c = r.shape.sub_shape(ShapeType::Face, caps[0] as usize).unwrap().bounding_box(false).unwrap().center();
+            assert!((c.z / MM - z).abs() < 1e-9, "{deg}° {rel:?} at z {}", c.z / MM);
+        }
+    }
+}
+
 /// A checked blend that OCCT builds fine must be OCCT's own result, untouched
 /// (no scaled copy): exact HLR lost fillet end arcs on a scaled-back plate
 /// (drawing test `demo_plate_views_have_expected_lines`, 6 visible lines instead of 8).

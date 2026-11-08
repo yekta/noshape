@@ -268,6 +268,11 @@ private:
 // itself when unmodified; empty when removed.
 ShapeList images_of(const occ::handle<BRepTools_History>& h, const TopoDS_Shape& s);
 
+// `prism` (standing on the plane through `origin` square to `pull`) with its `sides` drafted by `angle` about its base,
+// built directly (shell.cpp; for profiles OCCT's draft fails on: involutes, splines). Null when it isn't such a prism.
+TopoDS_Shape draft_prism_directly(const TopoDS_Shape& prism, const ShapeIMap& sides, const gp_Dir& pull,
+                                  const gp_Pnt& origin, double angle, occ::handle<BRepTools_History>& history);
+
 // Message of a failed BRepAlgoAPI / BOPAlgo algorithm (DumpErrors).
 template <class Algo>
 std::string algo_errors(const Algo& a)

@@ -2053,6 +2053,41 @@ fn sweep_from_the_middle_of_the_path_as_live() {
     assert!((v - 7853.9816).abs() < 1e-3, "{v}");
 }
 
+/// An Extrude with draft of a closed spline (OCCT's draft fails on its side, as on a gear's involutes): built, three
+/// faces, narrowing from the sketch, its volume Steiner's for the convex profile (A·h − L·tanα·h²/2 + π·tan²α·h³/3).
+#[test]
+fn a_drafted_extrude_of_a_spline_narrows_as_steiner() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let mut points: Vec<DVec2> = (0..8).map(|k| f64::from(k) * std::f64::consts::TAU / 8.0).map(|t| DVec2::new(mm(20.0 * t.cos()), mm(10.0 * t.sin()))).collect();
+    // A closed fit spline lists its first point again at the end.
+    points.push(points[0]);
+    sk.add_closed_fit_spline(&points).unwrap();
+    let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("10 mm"));
+        p.set("hasDraft", ParamValue::Bool(true));
+        p.set("draftAngle", expr("3 deg"));
+        p.set("draftPullDirection", ParamValue::Bool(true));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0].shape;
+    assert!(b.is_valid());
+    let faces = b.faces();
+    assert_eq!(faces.len(), 3);
+    let cap = |z: f64| faces.iter().find(|f| f.is_planar() && (f.centroid().unwrap().z - mm(z)).abs() < 1e-9).unwrap_or_else(|| panic!("a cap at z {z}"));
+    let (base, top) = (cap(0.0), cap(10.0));
+    let a = base.area().unwrap() / mm(1.0).powi(2);
+    assert!(top.area().unwrap() / mm(1.0).powi(2) < a, "narrowing from the sketch");
+    let l: f64 = base.edges().iter().map(|e| e.length().unwrap() / mm(1.0)).sum();
+    let (h, t) = (10.0, 3f64.to_radians().tan());
+    let want = a * h - l * t * h * h / 2.0 + std::f64::consts::PI * t * t * h * h * h / 3.0;
+    let v = volume(&r, 0) * 1e9;
+    assert!((v - want).abs() < 1e-4 * want, "{v} mm³ vs Steiner {want}");
+}
+
 /// A profile on a closed path sweeps the whole loop whichever way the path runs (cf-snap-hook's Sweep 1: a lip round
 /// a case's rim, its profile's plane crossing the rim twice): a 2 mm square on Right round a 40 × 20 mm rectangle
 /// that starts at a corner, 4 mm² × 120 mm, not half of it.

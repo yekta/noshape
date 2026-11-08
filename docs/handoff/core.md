@@ -33,7 +33,16 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 03:55 UTC (restarted 01:05): (2) landed, (4) Part Draft 3 landed (cba0a00b), now its speed.**
+**State 11-08 04:15 UTC: lead's next: Extrude with draft through the direct build, then (3) after 06:05.**
+- Extrude with draft (worktree): `op_prism` (features.cpp) builds the drafted prism directly (`draft_prism_directly`,
+  shell.cpp: tapered_prism + its history) where OCCT's DraftAngle fails (a spline or involute profile: "Failed to
+  extrude selections, check input." before); OCCT's draft stays first, so drafted extrudes that worked are unchanged.
+  tapered_prism's right-prism test is now caps alike + sides square to the pull (OCCT's volume of a spline prism is
+  1e-4 out). T1 kernel blend::a_drafted_extrude_of_a_spline_has_steiners_volume, model features_c::
+  a_drafted_extrude_of_a_spline_narrows_as_steiner. Suite run: /root/core-scratch/suite-ext.log.
+- The lead passed snap-hook's Fillet 6 to blend and Part Draft 3's 1.87 s union to bool. ae515421 landed 04:10.
+
+**State 11-08 03:55 UTC (restarted 01:05): (2) landed, (4) Part Draft 3 landed (cba0a00b, speed ae515421).**
 - Landed 02:19 as 31d9fe78: opDraft as the Draft feature, the deterministic wire (cf-lighten), the BLEND_VERTEX
   translator, a closed sweep path swept whole (cf-snap-hook 11 -> 14), and a draft whose fillets can't be rolled
   again drafting them as they are (the std harness's draft). Suite 733/934 (from 724), no document lost or slower.

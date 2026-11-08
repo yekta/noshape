@@ -547,19 +547,30 @@ OpOut op_prism(const OcShape& profile, P3 start, P3 end, double draft_angle)
           sides.Add(it.Value());
     if (sides.Extent() == 0)
       fail_invalid("draft extrude requires a face or closed wire profile");
-    for (int i = 1; i <= sides.Extent(); ++i)
+    bool added = true;
+    for (int i = 1; i <= sides.Extent() && added; ++i)
     {
       // Positive angle narrows the profile along the extrude direction.
       draft.Add(TopoDS::Face(sides(i)), pull, draft_angle, pln, true);
-      if (!draft.AddDone())
-        fail_op("draft could not be applied to a side face");
+      added = draft.AddDone();
     }
-    draft.Build();
-    if (!draft.IsDone())
-      fail_op("draft extrude failed");
-    post = modifier_history(result, draft);
-    merge_into(hist, post);
-    result = draft.Shape();
+    if (added)
+      draft.Build();
+    if (added && draft.IsDone())
+    {
+      post = modifier_history(result, draft);
+      merge_into(hist, post);
+      result = draft.Shape();
+    }
+    else
+    {
+      // OCCT's draft fails on curved sides (an involute gear, a spline): the drafted prism built directly.
+      const TopoDS_Shape drafted = draft_prism_directly(result, sides, pull, pln.Location(), draft_angle, post);
+      if (drafted.IsNull())
+        fail_op(added ? "draft extrude failed" : "draft could not be applied to a side face");
+      merge_into(hist, post);
+      result = drafted;
+    }
   }
 
   HistoryBuilder hb(args, result);
