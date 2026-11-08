@@ -324,8 +324,8 @@ impl DrawingEditor {
 
     /// The reference row's menu (live dom/context-menus-drawing-sheets.txt):
     /// Switch to reference | Replace... (on every sheet; the chooser) |
-    /// Change configuration... (configured sources), then Pin view
-    /// reference ▸ versions, or Unpin.
+    /// Change configuration... (configured sources), then Unpin view
+    /// reference on a pinned one.
     fn reference_menu(&self, tab: TabId, part: Option<noshape_model::BodyId>, pinned: bool, cx: &App) -> Vec<MenuEntry> {
         let replaced = part.clone();
         let assembly = matches!(self.doc.read(cx).session.doc.tab(tab).map(|t| &t.content), Some(noshape_model::document::TabContent::Assembly(_)));
@@ -345,22 +345,10 @@ impl DrawingEditor {
             let part = part.clone();
             out.push(MenuEntry::item("Change configuration...", move |t, w, cx| t.open_change_config(tab, part.clone(), w, cx)));
         }
+        // A pinned one (from before): Unpin view reference. Live (live2 2273) has no Pin view reference for a
+        // reference in this document: pinning is for another document's version.
         if pinned {
             out.push(MenuEntry::item("Unpin view reference", move |t, _, cx| t.pin_reference(tab, part.clone(), None, cx)));
-        } else {
-            let versions = self.doc.read(cx).session.store.list_versions().unwrap_or_default();
-            let items: Vec<MenuEntry> = versions
-                .into_iter()
-                .map(|v| {
-                    let pin = noshape_model::drawing::PinnedVersion { id: v.id.to_string(), name: v.name.clone() };
-                    let part = part.clone();
-                    MenuEntry::item(v.name, move |t, _, cx| t.pin_reference(tab, part.clone(), Some(pin.clone()), cx))
-                })
-                .collect();
-            // Pinning needs a version of the document.
-            if !items.is_empty() {
-                out.push(MenuEntry::Submenu("Pin view reference".into(), items));
-            }
         }
         out
     }

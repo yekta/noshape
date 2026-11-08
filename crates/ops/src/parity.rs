@@ -206,7 +206,8 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
     for line in text.lines().filter(|l| !l.trim().is_empty()) {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64(), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string) };
+        // A face may come as its plane's `origin` and its `area` (live 2290).
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string) };
         out.insert((k as usize, id.to_string()), r);
     }
     out

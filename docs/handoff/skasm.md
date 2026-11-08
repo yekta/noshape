@@ -1,5 +1,13 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From dx (11-08 07:09 UTC): c2-sm-corner-break's Corner break 1 now translates, ours fails
+Live's refs.jsonl (REQUESTS 2290) places all 40 of its vertices: corners of the sheet metal part RnCD itself (e.g.
+SCCAD (0.663, 0.3615, 0.02), SCC4H (-0.66298, 0.37229, 0.05707)); the translator maps them to our part's vertices.
+Ours then fails: ERROR "Failed to break selected corners." (live OK: 222/548/328, ours stays 182/428/248). Fillet
+corner break, radius 5 mm. Run: `NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models NOSHAPE_PARITY_ONLY=c2-sm-corner-break
+cargo test -p noshape-ops --release --test all parity::parity_models -- --ignored --nocapture` (vibe4). c2-sm-louver's
+Sketch 9 builds now too (its plane S2E6G from refs.jsonl); it still stops at feature 6 (above).
+
 ## From dx (11-08 06:26 UTC): c2-sm-louver feature 6 "Louver" is sheet metal, not translation
 The translation is live's: an extrude-process sheet metal model of Sketch 3's chain (Uzf…, eUw…, XXK…, FI7…: 25.2,
 8.5, 23.8, 23.8 mm; live's 85969 mm³ = 1.628 × 687.6 × ~76.8 mm developed, the whole chain). The chain is nearly
