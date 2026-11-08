@@ -576,6 +576,7 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
             // underline.
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .flex_1()
                 .h(px(32.))
                 .relative()
@@ -678,12 +679,16 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
         if files.is_empty() && other && st.opened.is_some() {
             list = list.child(div().p(px(12.)).text_size(px(13.)).text_color(pal.text_muted).child("No files of this type in this document."));
         }
+        let mut texts: Vec<String> = vec![title.into(), "Current document".into(), "Other documents".into()];
+        let names: Vec<String> = files.iter().map(|(_, n, _)| n.clone()).collect();
         for (k, (id, name, f)) in files.into_iter().enumerate() {
             let (pick, f2) = (on_pick.clone(), f.clone());
+            let mark = name.clone();
             // Live: 40 px rows, the file's icon, its name (no size).
             list = list.child(
                 h_flex()
                     .id(SharedString::from(format!("pick-{id}-{k}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("list_row:{mark}")))
                     .h(px(40.))
                     .flex_none()
                     .px(px(6.))
@@ -719,6 +724,13 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
             let d = doc.read(cx);
             (d.name(), d.session.store.branch(d.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()))
         };
+        if !other {
+            texts.extend([doc_name.clone(), branch.clone()]);
+        }
+        texts.extend(names);
+        texts.push("Import…".into());
+        // The panel's texts for the ui-parity runner (README "### Drawings": live's is a flyout of the drawing).
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": title, "text": texts }));
         let document_row = h_flex().h(px(40.)).flex_none().px(px(6.)).child(
             v_flex()
                 .flex_1()

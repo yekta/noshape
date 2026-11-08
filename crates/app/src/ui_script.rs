@@ -51,7 +51,11 @@ pub fn prepare() -> Option<PathBuf> {
     let name = scenario["start"].as_str().unwrap_or("empty").to_string();
     let starts_path = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let starts = if name == "empty" { json!({}) } else { read_json(&starts_path).unwrap_or_else(|e| fail(&e)) };
-    let start = if name == "empty" { json!({ "units": "mm", "features": [] }) } else { starts.get(&name).cloned().unwrap_or_else(|| fail(&format!("no start {name} in {}", starts_path.display()))) };
+    let mut start = if name == "empty" { json!({ "units": "mm", "features": [] }) } else { starts.get(&name).cloned().unwrap_or_else(|| fail(&format!("no start {name} in {}", starts_path.display()))) };
+    // A start's files are beside starts.json, in files/ (README "### start").
+    if start.get("files").is_some() {
+        start["files_dir"] = json!(starts_path.with_file_name("files"));
+    }
     // A page start (README "Documents page and Preferences"): its documents in the run's own documents folder.
     if start.get("page").is_some() {
         let Some(docs) = std::env::var_os("NOSHAPE_DOCUMENTS_DIR").map(PathBuf::from) else { fail("a page start needs NOSHAPE_DOCUMENTS_DIR (the run's own documents folder)") };
@@ -109,7 +113,14 @@ fn opens_on_tab() -> Option<String> {
     }
     if let Some(d) = start.get("drawing") {
         // (A drawing of the start's assembly is named after its tab.)
-        let of = if d["assembly"] == true { format!("start {name} asm") } else { d["part"].as_str().unwrap_or("Part 1").to_string() };
+        // (`"part": null`: of the whole Part Studio.)
+        let of = if d["assembly"] == true {
+            format!("start {name} asm")
+        } else if d.get("part").is_some_and(Value::is_null) {
+            "Part Studio 1".to_string()
+        } else {
+            d["part"].as_str().unwrap_or("Part 1").to_string()
+        };
         return Some(format!("{of} Drawing 1"));
     }
     start.get("assembly").map(|_| format!("start {name} asm"))

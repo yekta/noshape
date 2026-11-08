@@ -193,7 +193,7 @@ impl DrawingEditor {
         let tab = Self::image_tab(&dm.session.doc, &im);
         let rows = vec![
             ("Document", dm.name()),
-            ("Workspace", "Main".to_string()),
+            ("Workspace", dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())),
             ("Reference", tab.as_ref().map(|t| format!("{}  In progress", t.1)).unwrap_or_else(|| im.name.clone())),
             ("Sheet", self.current_sheet().name.clone()),
         ];

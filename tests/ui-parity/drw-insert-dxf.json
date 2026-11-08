@@ -1,0 +1,36 @@
+{
+  "name": "drw-insert-dxf",
+  "about": "Insert DXF or DWG: the Select a DXF or DWG file panel, the document's dx-plate.dxf, then what it asks for, then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the last uncovered drawing items, a start with files)",
+  "start": "block-drawing-files",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Insert DXF or DWG"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "dx-plate.dxf"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

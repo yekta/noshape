@@ -13,8 +13,17 @@ fn call(ctx: &mut Ctx, tool: &str, args: Value) -> Result<Value, String> {
 }
 
 /// A selection as the start names it: "Sketch 1 region 0" (the sketch's
-/// region by index), "edge through [20, 0, 10]" (also face / vertex; mm).
+/// region by index), "edge through [20, 0, 10]" (also face / vertex; mm),
+/// "Sketch 1 edges" (all its curves: a Frame's path).
 fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
+    if let Some(sketch) = name.strip_suffix(" edges") {
+        let got = call(ctx, "sketch_get", json!({ "sketch": sketch }))?;
+        let ids: Vec<Value> = got["entities"].as_array().into_iter().flatten().filter(|e| !matches!(e["type"].as_str(), Some("point")) && e["construction"] != true).filter_map(|e| e["id"].as_str().map(|id| json!(id))).collect();
+        if ids.is_empty() {
+            return Err(format!("`{name}`: {sketch} has no curves"));
+        }
+        return Ok(Value::Array(ids));
+    }
     if let Some((kind, at)) = name.split_once(" through ") {
         let at: Value = serde_json::from_str(at).map_err(|e| format!("`{name}`: {e}"))?;
         let kind = match kind {
@@ -34,8 +43,16 @@ fn entity(ctx: &mut Ctx, name: &str) -> Result<Value, String> {
 /// Selections named in a feature's params, resolved to ours.
 fn resolve(ctx: &mut Ctx, v: &Value) -> Result<Value, String> {
     match v {
-        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through "))) => {
-            items.iter().map(|s| entity(ctx, s.as_str().unwrap_or_default())).collect::<Result<Vec<_>, _>>().map(Value::Array)
+        Value::Array(items) if items.iter().all(Value::is_string) && items.iter().any(|s| s.as_str().is_some_and(|s| s.contains(" region ") || s.contains(" through ") || s.ends_with(" edges"))) => {
+            // ("Sketch 1 edges" stands for several.)
+            let mut out = Vec::new();
+            for s in items {
+                match entity(ctx, s.as_str().unwrap_or_default())? {
+                    Value::Array(many) => out.extend(many),
+                    one => out.push(one),
+                }
+            }
+            Ok(Value::Array(out))
         }
         _ => Ok(v.clone()),
     }
@@ -87,6 +104,14 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     for t in start["tabs"].as_array().into_iter().flatten() {
         build_tab(ctx, t, None)?;
     }
+    // Files (README "### start" `files`): each imported as a file tab named after it, in order; a relative name is in
+    // `files_dir` (the runner's tests/ui-parity/files).
+    let files_dir = start["files_dir"].as_str().map(std::path::PathBuf::from);
+    for f in start["files"].as_array().into_iter().flatten() {
+        let name = f.as_str().ok_or_else(|| format!("a start file that isn't a name: {f}"))?;
+        let path = files_dir.as_ref().map_or_else(|| std::path::PathBuf::from(name), |d| d.join(name));
+        call(ctx, "import_files", json!({ "files": [path] })).map_err(|e| format!("start file {name}: {e}"))?;
+    }
     // (The run opens on Part Studio 1, where the versions' features go too.)
     if start["tabs"].as_array().is_some_and(|t| !t.is_empty()) {
         call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
@@ -114,8 +139,11 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         let template = d["template"].as_str().unwrap_or("ANSI_A_INCH.dwt");
         let suggested = d["views"].as_str() == Some("suggested");
         // A part's drawing, or (`"assembly": true`) the start's assembly's.
+        // `"part": null`: Create Drawing of Part Studio 1 (all its parts).
         let made = if d["assembly"] == true {
             call(ctx, "drawing_create", json!({ "source": asm_tab, "template": template, "suggested_views": suggested }))
+        } else if d.get("part").is_some_and(Value::is_null) {
+            call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "template": template, "suggested_views": suggested }))
         } else {
             call(ctx, "drawing_create", json!({ "source": "Part Studio 1", "part": d["part"].as_str().unwrap_or("Part 1"), "template": template, "suggested_views": suggested }))
         };
@@ -344,6 +372,42 @@ mod tests {
         call(&mut again, "document_open", json!({ "path": dir.join("table.noshape").to_str().unwrap() })).unwrap();
         let r = call(&mut again, "drawing_custom_table", json!({ "drawing": "Part 1 Drawing 1", "table": "Part faces", "position": [150, 150] }));
         assert!(r.is_ok(), "reopened: {r:?}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A frame start: Frame 1 along Sketch 1's two lines, a cut list, and a drawing of the whole Part Studio whose
+    /// Cut list table lists both segments.
+    #[test]
+    fn a_frame_start_builds() {
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity/starts.json")).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("noshape-uip-frame-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("frame.noshape"), &starts["frame-drawing"]).unwrap();
+        let fs = call(&mut ctx, "feature_list", json!({ "tab": "Part Studio 1" })).unwrap();
+        let bad: Vec<&Value> = fs["features"].as_array().unwrap().iter().filter(|f| f["status"].as_str().is_some_and(|s| s != "Ok")).collect();
+        assert!(bad.is_empty(), "{bad:?}");
+        assert_eq!(fs["features"].as_array().unwrap().iter().filter(|f| f["status"] == "Ok").count(), 3, "{fs}");
+        let d = call(&mut ctx, "drawing_get", json!({ "drawing": "Part Studio 1 Drawing 1", "edges": false })).unwrap();
+        let view = d["views"][0]["id"].clone();
+        let r = call(&mut ctx, "drawing_view_table", json!({ "drawing": "Part Studio 1 Drawing 1", "kind": "cut_list", "view": view, "position": [150, 150] }));
+        assert!(r.is_ok(), "{r:?}");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A start's files (README "### start"): block-drawing-files' image and DXF are file tabs its drawing inserts.
+    #[test]
+    fn a_files_start_builds() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity");
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(format!("{root}/starts.json")).unwrap()).unwrap();
+        let mut start = starts["block-drawing-files"].clone();
+        start["files_dir"] = json!(format!("{root}/files"));
+        let dir = std::env::temp_dir().join(format!("noshape-uip-files-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("files.noshape"), &start).unwrap();
+        let r = call(&mut ctx, "drawing_insert_image", json!({ "drawing": "Part 1 Drawing 1", "file": "dx-image.png", "position": [40, 40], "to": [88, 64] }));
+        assert!(r.is_ok(), "{r:?}");
+        let r = call(&mut ctx, "drawing_insert_cad", json!({ "drawing": "Part 1 Drawing 1", "file": "dx-plate.dxf" })).unwrap();
+        assert_eq!(r["entities"], 5, "{r}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

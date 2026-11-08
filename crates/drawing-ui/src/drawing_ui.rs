@@ -84,6 +84,16 @@ impl DrawingEditor {
             Panel::BomCell { .. } => ("BOM cell", self.bom_cell_rows(cx)),
             Panel::ImageProps { rows, tab } => {
                 let tab = *tab;
+                // Its texts for the ui-parity runner (live behaviours: Document, Workspace, Reference with its "In
+                // progress" chip, Sheet).
+                crate::ui_script::note_dialog(|| {
+                    let mut text = vec!["Image properties".to_string()];
+                    for (k, v) in rows {
+                        text.push(k.to_string());
+                        text.extend(v.split("  ").map(str::to_string));
+                    }
+                    serde_json::json!({ "kind": "drawing-panel", "title": "Image properties", "text": text })
+                });
                 let rows = rows
                     .iter()
                     .map(|(k, val)| {

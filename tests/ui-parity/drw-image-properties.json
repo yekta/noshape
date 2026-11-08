@@ -1,0 +1,73 @@
+{
+  "name": "drw-image-properties",
+  "about": "An inserted image's menu › Image properties... (read-only: Document, Workspace, Reference, Sheet), then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the last uncovered drawing items, a start with files)",
+  "start": "block-drawing-files",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Insert image"
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "click",
+      "on": {
+        "list_row": "dx-image.png"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          40,
+          40
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          88,
+          64
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          64,
+          52
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Image properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "name": "drw-cut-list-table-properties",
+  "about": "A frame drawing's Cut list table (the Top view's, placed at sheet (200, 200)), its menu › Cut list table properties..., then Escape",
+  "area": "dx",
+  "ticket": "DRAWING-UI-PARITY",
+  "source": "coverage (lead 11-08: the last uncovered drawing items, a frame start)",
+  "start": "frame-drawing",
+  "steps": [
+    {
+      "do": "click",
+      "on": {
+        "tool": "Cut list table"
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "sheet_point": [
+          200,
+          200
+        ]
+      }
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    },
+    {
+      "do": "rclick",
+      "on": {
+        "sheet_point": [
+          190,
+          195
+        ]
+      }
+    },
+    {
+      "do": "click",
+      "on": {
+        "menu": "Cut list table properties..."
+      }
+    },
+    {
+      "do": "wait",
+      "until": "ms",
+      "ms": 1000
+    },
+    {
+      "do": "key",
+      "key": "Escape"
+    }
+  ]
+}

@@ -55,6 +55,11 @@ A start's `"feature_studio"` (dx, 11-07): `{"name": "Feature Studio 1", "source"
 Studio made after the features (and before a drawing) and committed, as start `block-drawing-table` (its custom table
 "Part faces").
 
+A start's `"files"` (dx, 11-08): file names in tests/ui-parity/files, each uploaded after the features (and Feature
+Studio, tabs) as a file tab named after the file, in order: start `block-drawing-files` (an image and a DXF for the
+drawing's Insert image and Insert DXF or DWG; their picker's rows are `{"list_row": "dx-image.png"}`, its tabs
+`{"tab": "Other documents"}`).
+
 A start's `"configuration"` (asm, 11-07): the Part Studio's configuration inputs, made after its features:
 `[{"type": "list", "name": "Size", "rows": ["Small", "Large"]}]` (the first row the default; nothing configured by
 them), as start `config-blocks`.
@@ -139,7 +144,9 @@ Studio, or the panel's bottom button: by their shared tooltip), `{"config_more":
 ### Drawings (dx, 11-05)
 A start may add `"drawing": {"part": "Part 1", "template": "ANSI_A_INCH.dwt", "views": "suggested" | "none"}`: Create
 Drawing of that part with that template (the dialog's Suggested views or No views), and the run opens on that drawing
-tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Create Drawing of the start's assembly. Targets in a drawing:
+tab (live's name "Part 1 Drawing 1"); `"assembly": true` instead of `"part"`: Create Drawing of the start's assembly; `"part": null`: of the whole Part
+Studio ("Part Studio 1 Drawing 1"; start `frame-drawing`, a Frame and its cut list). A Frame's `selections` may be
+`"Sketch 1 edges"` (all the sketch's curves). Targets in a drawing:
 - `{"sheet_point": [x, y]}`: a point of the sheet, mm from its lower-left corner (an ANSI A sheet is 279.4 × 215.9);
 - `{"view": "Front"}`: a view (its middle), by the name its properties show;
 - `{"view_point": {"view": "Top", "at": [x, y, z]}}`: model point (mm) where it shows in that view;
