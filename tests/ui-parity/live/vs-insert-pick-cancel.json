@@ -1,19 +1,19 @@
 {
  "scenario": "vs-insert-pick-cancel",
- "recorded": "2026-11-08T03:33:15.030Z",
+ "recorded": "2026-11-08T07:53:42.222Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "4a184a0deed07c7be368cf5f",
-  "workspace": "db3d2fa04ae02c6b2e929dca",
-  "element": "05f9e3584fd9c5d9071e83f3",
+  "document": "9219a03c67a71768793d80fd",
+  "workspace": "3e44dd5e76c172eeffb26c9c",
+  "element": "06a786a8c346485d40f81113",
   "start": "vs-two",
-  "startElement": "05f9e3584fd9c5d9071e83f3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "06a786a8c346485d40f81113",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -190,7 +190,7 @@
     },
     "featurestudio": null
    },
-   "t": 40983
+   "t": 37138
   },
   {
    "step": 2,
@@ -236,13 +236,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -351,7 +351,7 @@
     },
     "featurestudio": null
    },
-   "t": 46646
+   "t": 42530
   },
   {
    "step": 3,
@@ -396,13 +396,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -535,7 +535,7 @@
     },
     "featurestudio": null
    },
-   "t": 49615
+   "t": 45414
   },
   {
    "step": 4,
@@ -630,7 +630,7 @@
     },
     "featurestudio": null
    },
-   "t": 54185
+   "t": 50723
   }
  ]
 }

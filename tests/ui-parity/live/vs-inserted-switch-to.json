@@ -1,19 +1,19 @@
 {
  "scenario": "vs-inserted-switch-to",
- "recorded": "2026-11-08T02:35:58.365Z",
+ "recorded": "2026-11-08T08:26:04.093Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "55789cd8f2b9d61c7f8771e6",
-  "workspace": "41bc298028934955c3fa9ba3",
-  "element": "18abb9f0d778e7628fc2f042",
+  "document": "43c569c74de98498e8684e25",
+  "workspace": "eb0fd4e41781759971bfb830",
+  "element": "9174a2ac98f40a486e50964e",
   "start": "vs-two",
-  "startElement": "18abb9f0d778e7628fc2f042",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "9174a2ac98f40a486e50964e",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -184,13 +184,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 42103
+   "t": 26172
   },
   {
    "step": 2,
@@ -211,7 +212,7 @@
      "tag": "button"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -345,13 +346,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 47184
+   "t": 30951
   },
   {
    "step": 3,
@@ -371,7 +373,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -529,13 +531,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 50540
+   "t": 33469
   },
   {
    "step": 4,
@@ -648,13 +651,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 55756
+   "t": 37195
   },
   {
    "step": 5,
@@ -780,13 +784,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 60602
+   "t": 41902
   },
   {
    "step": 6,
@@ -881,13 +886,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 65064
+   "t": 45360
   }
  ]
 }

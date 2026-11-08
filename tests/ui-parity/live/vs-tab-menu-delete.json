@@ -1,18 +1,18 @@
 {
  "scenario": "vs-tab-menu-delete",
- "recorded": "2026-11-08T02:47:22.197Z",
+ "recorded": "2026-11-08T08:27:14.735Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "41cb4990279bcf13b5e7cfc4",
-  "workspace": "72a770ebd46e477bc8b6084e",
-  "element": "881861d670574671d7c6353f",
+  "document": "77b7aaaebf178be64efda979",
+  "workspace": "a1e643e491d95bb944054ee2",
+  "element": "78ea272836bccbe2d51ea881",
   "start": "vs-vars",
-  "startElement": "881861d670574671d7c6353f",
+  "startElement": "78ea272836bccbe2d51ea881",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -195,7 +195,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54561
+   "t": 30253
   },
   {
    "step": 2,
@@ -223,7 +223,7 @@
       "Delete",
       "Cancel"
      ],
-     "text": "Deleting this tab will result in failed or missing features in 2 tabs Assembly 1 Part Studio 1"
+     "text": "Deleting this tab will result in failed or missing features in 2 tabs Part Studio 1 Assembly 1"
     },
     "dialogs": [],
     "panels": null,
@@ -296,7 +296,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 60650
+   "t": 34532
   }
  ]
 }

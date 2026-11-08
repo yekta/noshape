@@ -1,18 +1,18 @@
 {
  "scenario": "fs-tab-delete",
- "recorded": "2026-11-08T01:07:51.712Z",
+ "recorded": "2026-11-08T07:20:29.056Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "deae96d788ccfb5a8b8da81f",
-  "workspace": "a699747dcad11fb2acd5c0f5",
-  "element": "f1ae4e640e6b36f27e42f432",
+  "document": "296997fc1fa06cd785da3c61",
+  "workspace": "2bcce0470dcc184601308d0a",
+  "element": "385919ff04a578556f054ee6",
   "start": "fs-studio",
-  "startElement": "f1ae4e640e6b36f27e42f432",
+  "startElement": "385919ff04a578556f054ee6",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -152,7 +152,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 29103
+   "t": 35135
   },
   {
    "step": 2,
@@ -217,7 +217,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 31557
+   "t": 38621
   }
  ]
 }

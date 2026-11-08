@@ -1,19 +1,19 @@
 {
  "scenario": "vs-inserted-table-menu",
- "recorded": "2026-11-08T02:37:10.211Z",
+ "recorded": "2026-11-08T08:27:13.882Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "af365232f3e42e61cef94816",
-  "workspace": "879ed396bc1a4f4785832af0",
-  "element": "a7369e91815af983443d0fa9",
+  "document": "19e7966d1e738fa636c412de",
+  "workspace": "7e280f3324614684e21cca3d",
+  "element": "9f93bd454cf82f0966d3f04e",
   "start": "vs-two",
-  "startElement": "a7369e91815af983443d0fa9",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "9f93bd454cf82f0966d3f04e",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -184,13 +184,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 53140
+   "t": 30719
   },
   {
    "step": 2,
@@ -211,7 +212,7 @@
      "tag": "button"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -236,13 +237,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -345,13 +346,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 58689
+   "t": 35335
   },
   {
    "step": 3,
@@ -371,7 +373,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -396,13 +398,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -529,13 +531,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 62114
+   "t": 38220
   },
   {
    "step": 4,
@@ -648,13 +651,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 66827
+   "t": 42279
   },
   {
    "step": 5,
@@ -780,13 +784,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 71944
+   "t": 46696
   },
   {
    "step": 6,
@@ -914,13 +919,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": false,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 75624
+   "t": 50052
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vh-header-repair",
- "recorded": "2026-11-08T02:27:11.977Z",
+ "recorded": "2026-11-08T07:38:21.409Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "63142feacaac3ad1dd0c2839",
-  "workspace": "42b9b6267fabdf61266799c9",
-  "element": "a4ef2be6004036338b6cd9c7",
+  "document": "41fdd7be46f6d87afc19068d",
+  "workspace": "29f6d82d176a7e0a328fbfb8",
+  "element": "fd90aa90a5a02d9e4bb1ed18",
   "start": "doc-branches",
-  "startElement": "a4ef2be6004036338b6cd9c7",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "fd90aa90a5a02d9e4bb1ed18",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -69,8 +69,8 @@
    "rollbackAfter": "Extrude 2"
   },
   "parts": [
-   "Part 1 In progress",
-   "Part 2 In progress"
+   "Part 1",
+   "Part 2"
   ],
   "partsHeading": "Parts (2)",
   "undo": {
@@ -173,8 +173,8 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1 In progress",
-     "Part 2 In progress"
+     "Part 1",
+     "Part 2"
     ],
     "partsHeading": "Parts (2)",
     "undo": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 24156
+   "t": 34787
   },
   {
    "step": 2,
@@ -300,8 +300,8 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1 In progress",
-     "Part 2 In progress"
+     "Part 1",
+     "Part 2"
     ],
     "partsHeading": "Parts (2)",
     "undo": {
@@ -357,7 +357,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30851
+   "t": 39523
   }
  ]
 }

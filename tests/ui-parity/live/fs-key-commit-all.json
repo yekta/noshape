@@ -1,18 +1,18 @@
 {
  "scenario": "fs-key-commit-all",
- "recorded": "2026-11-08T03:06:01.067Z",
+ "recorded": "2026-11-08T07:18:14.807Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "bf2fcb14fb4ec7c640e27bd7",
-  "workspace": "218dc0284b22c051f88604ec",
-  "element": "14e289c56d9e92cb175ce8b8",
+  "document": "77db4af637db5352776aa111",
+  "workspace": "9f68b7603f203fff504b109f",
+  "element": "c1357151a1b2bcbadfd125d8",
   "start": "fs-studio",
-  "startElement": "14e289c56d9e92cb175ce8b8",
+  "startElement": "c1357151a1b2bcbadfd125d8",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 52564
+   "t": 35147
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 57729
+   "t": 39016
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 59849
+   "t": 41068
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 62170
+   "t": 43007
   },
   {
    "step": 5,
@@ -477,7 +477,7 @@
      "notices": 0
     }
    },
-   "t": 65727
+   "t": 45725
   },
   {
    "step": 6,
@@ -561,7 +561,7 @@
      "notices": 0
     }
    },
-   "t": 67900
+   "t": 47733
   }
  ]
 }

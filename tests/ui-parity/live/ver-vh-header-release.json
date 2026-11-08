@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vh-header-release",
- "recorded": "2026-11-08T03:18:25.062Z",
+ "recorded": "2026-11-08T07:37:22.756Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "9f6c1b7153c4987589866157",
-  "workspace": "302e77509fcf0d30e7e79211",
-  "element": "8b2d55454f7418cf31ef3eac",
+  "document": "e2b33b6b503f09cbfd3fcaeb",
+  "workspace": "1c8d5d296593256e8a7bd230",
+  "element": "1fae2526d7f76d3b9e667d24",
   "start": "doc-branches",
-  "startElement": "8b2d55454f7418cf31ef3eac",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "1fae2526d7f76d3b9e667d24",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52111
+   "t": 40281
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 56364
+   "t": 45647
   }
  ]
 }

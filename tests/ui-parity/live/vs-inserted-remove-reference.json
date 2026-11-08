@@ -1,19 +1,19 @@
 {
  "scenario": "vs-inserted-remove-reference",
- "recorded": "2026-11-08T02:36:01.661Z",
+ "recorded": "2026-11-08T07:55:55.744Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "2d5c700d16d685e5ad93768b",
-  "workspace": "56507e839e95330033efd8b3",
-  "element": "19f6db03c1b8e9920ca14114",
+  "document": "c788ac02f2cb53ab3636d9e6",
+  "workspace": "928df69707cd912afea57e03",
+  "element": "7b2ad1f926df974ffb4df1e0",
   "start": "vs-two",
-  "startElement": "19f6db03c1b8e9920ca14114",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "7b2ad1f926df974ffb4df1e0",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -190,7 +190,7 @@
     },
     "featurestudio": null
    },
-   "t": 40741
+   "t": 32771
   },
   {
    "step": 2,
@@ -211,7 +211,7 @@
      "tag": "button"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -236,13 +236,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -351,7 +351,7 @@
     },
     "featurestudio": null
    },
-   "t": 45959
+   "t": 37579
   },
   {
    "step": 3,
@@ -371,7 +371,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": "Current document",
+     "title": null,
      "kind": "feature",
      "tabs": [
       {
@@ -396,13 +396,13 @@
        "child": false
       },
       {
-       "label": "count",
+       "label": "width",
        "kind": "boolean",
        "checked": false,
        "child": true
       },
       {
-       "label": "width",
+       "label": "count",
        "kind": "boolean",
        "checked": false,
        "child": true
@@ -535,7 +535,7 @@
     },
     "featurestudio": null
    },
-   "t": 48574
+   "t": 40425
   },
   {
    "step": 4,
@@ -654,7 +654,7 @@
     },
     "featurestudio": null
    },
-   "t": 51702
+   "t": 44114
   },
   {
    "step": 5,
@@ -786,7 +786,7 @@
     },
     "featurestudio": null
    },
-   "t": 56863
+   "t": 48365
   },
   {
    "step": 6,
@@ -881,7 +881,7 @@
     },
     "featurestudio": null
    },
-   "t": 61427
+   "t": 51777
   }
  ]
 }

@@ -1,18 +1,18 @@
 {
  "scenario": "ver-crow-compare",
- "recorded": "2026-11-08T01:17:30.673Z",
+ "recorded": "2026-11-08T07:27:00.865Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "8dcba17666198051e4740a3d",
-  "workspace": "95ddd467519d6745175eec22",
-  "element": "873d9a163eba68dc07fef79c",
+  "document": "974f0d5bd907c33016c3f620",
+  "workspace": "3f39a9264590bd951e910cd6",
+  "element": "fb7b7443ccf87393e188ec63",
   "start": "doc-branches",
-  "startElement": "873d9a163eba68dc07fef79c",
+  "startElement": "fb7b7443ccf87393e188ec63",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50340
+   "t": 41352
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54353
+   "t": 46998
   },
   {
    "step": 3,
@@ -514,7 +514,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 58378
+   "t": 49496
   },
   {
    "step": 4,
@@ -591,7 +591,7 @@
      "compare": {
       "base": "Main",
       "target": "Part Studio 1 :: Add feature : Extrude 2",
-      "only_differences": null,
+      "only_differences": true,
       "features": [],
       "selected": null
      },
@@ -615,7 +615,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 79327
+   "t": 67270
   }
  ]
 }

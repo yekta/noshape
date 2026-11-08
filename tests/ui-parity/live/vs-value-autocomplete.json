@@ -1,18 +1,18 @@
 {
  "scenario": "vs-value-autocomplete",
- "recorded": "2026-11-08T02:52:49.379Z",
+ "recorded": "2026-11-08T08:31:08.289Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "3edd6c0882ee419e6ce63804",
-  "workspace": "e43310047d7b0f092eb84245",
-  "element": "53dbeed5301285f49f571161",
+  "document": "7782f34d73c2dc712fc48f88",
+  "workspace": "ef01a7fa803c1a07e56e89d0",
+  "element": "f14c3af9daada48c54ed487c",
   "start": "vs-vars",
-  "startElement": "53dbeed5301285f49f571161",
+  "startElement": "f14c3af9daada48c54ed487c",
   "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
@@ -180,13 +180,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 55151
+   "t": 26961
   },
   {
    "step": 2,
@@ -277,13 +278,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 60231
+   "t": 31586
   },
   {
    "step": 3,
@@ -376,13 +378,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 62291
+   "t": 33391
   },
   {
    "step": 4,
@@ -482,13 +485,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 64525
+   "t": 35411
   },
   {
    "step": 5,
@@ -587,13 +591,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 68109
+   "t": 38682
   }
  ]
 }

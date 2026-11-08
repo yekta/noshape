@@ -1,19 +1,19 @@
 {
  "scenario": "ver-crow-open",
- "recorded": "2026-11-08T01:18:50.266Z",
+ "recorded": "2026-11-08T07:28:30.211Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "f51919cd463153faffa61872",
-  "workspace": "70ad36c64be70c1e3f077069",
-  "element": "00a981cf4a35d7c948ca61ea",
+  "document": "896442e34a7a9ea4643d57d9",
+  "workspace": "d5fc5ab8f1ecef476b140626",
+  "element": "d18365822792483e428f9289",
   "start": "doc-branches",
-  "startElement": "00a981cf4a35d7c948ca61ea",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "d18365822792483e428f9289",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 37293
+   "t": 34642
   },
   {
    "step": 2,
@@ -366,7 +366,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40853
+   "t": 39271
   },
   {
    "step": 3,
@@ -514,7 +514,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43316
+   "t": 43355
   },
   {
    "step": 4,
@@ -542,10 +542,51 @@
      "items": []
     },
     "features": {
-     "rows": [],
-     "rollbackAfter": null
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -589,7 +630,18 @@
       }
      ],
      "compare": null,
-     "tabs": [],
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      }
+     ],
      "folder": null,
      "renaming": null,
      "panel": "Versions and history",
@@ -598,7 +650,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 47742
+   "t": 51408
   }
  ]
 }

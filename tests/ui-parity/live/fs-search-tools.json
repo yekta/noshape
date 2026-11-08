@@ -1,19 +1,19 @@
 {
  "scenario": "fs-search-tools",
- "recorded": "2026-11-08T03:12:15.731Z",
+ "recorded": "2026-11-08T07:19:27.944Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "6a21527be1d42f66e9946504",
-  "workspace": "ec9ba160b77ebcb8a3ed3238",
-  "element": "f795301e1f81f4be55093b9f",
+  "document": "6c55e5c6b2063c1633261dfe",
+  "workspace": "7541122623fd927c209e4628",
+  "element": "90f168a80b989a12ae2066e4",
   "start": "fs-studio",
-  "startElement": "f795301e1f81f4be55093b9f",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "90f168a80b989a12ae2066e4",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 44243
+   "t": 34900
   },
   {
    "step": 2,
@@ -235,7 +235,7 @@
      "notices": 0
     }
    },
-   "t": 46290
+   "t": 36803
   }
  ]
 }

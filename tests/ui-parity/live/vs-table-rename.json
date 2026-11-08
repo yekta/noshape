@@ -1,19 +1,19 @@
 {
  "scenario": "vs-table-rename",
- "recorded": "2026-11-08T02:45:36.229Z",
+ "recorded": "2026-11-08T08:28:56.837Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "2e33181a99d376ada179afd5",
-  "workspace": "1c0439f930b314d57313d54e",
-  "element": "3ea57828e0634738595cb462",
+  "document": "bb3fc1f29ebfa37e05bdca4f",
+  "workspace": "96da3bc8607fc6c181184011",
+  "element": "8bc6c5781b838f80c6e5f34a",
   "start": "vs-vars",
-  "startElement": "3ea57828e0634738595cb462",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "8bc6c5781b838f80c6e5f34a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -180,13 +180,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 63834
+   "t": 27407
   },
   {
    "step": 2,
@@ -285,13 +286,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 68448
+   "t": 31943
   },
   {
    "step": 3,
@@ -388,13 +390,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 72096
+   "t": 35196
   },
   {
    "step": 4,
@@ -493,13 +496,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 74356
+   "t": 37014
   },
   {
    "step": 5,
@@ -590,13 +594,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 76933
+   "t": 39339
   },
   {
    "step": 6,
@@ -688,13 +693,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 78997
+   "t": 41156
   }
  ]
 }

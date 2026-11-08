@@ -1,18 +1,18 @@
 {
  "scenario": "vs-type-from-import",
- "recorded": "2026-11-08T03:20:26.558Z",
+ "recorded": "2026-11-08T08:29:31.884Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "3eb04a8d7728252412b4a2d4",
-  "workspace": "006cf8304fa8f818a460a832",
-  "element": "81edf13363d00034380dc556",
+  "document": "c6636b67bc0a39828cb5d882",
+  "workspace": "765e8482e0aada28b11b2732",
+  "element": "05f066ff7335d50b31b67d56",
   "start": "vs-vars",
-  "startElement": "81edf13363d00034380dc556",
+  "startElement": "05f066ff7335d50b31b67d56",
   "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
@@ -180,13 +180,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 57541
+   "t": 23127
   },
   {
    "step": 2,
@@ -284,13 +285,14 @@
        ]
       }
      ],
+     "configuration": null,
      "insert_into_all": true,
      "configuration_panel": false,
      "help": false
     },
     "featurestudio": null
    },
-   "t": 66079
+   "t": 32206
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "ver-vrow-open-new-tab",
- "recorded": "2026-11-08T02:27:20.495Z",
+ "recorded": "2026-11-08T07:40:39.879Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "ce6029f1df2131243b97ab14",
-  "workspace": "4d851c031daab46403066540",
-  "element": "64d71819c2abb793373740d7",
+  "document": "ad2537e2965552c309885fa2",
+  "workspace": "b0f128dd99df688caae17ff1",
+  "element": "b7d4574e441a52830fa5a520",
   "start": "doc-branches",
-  "startElement": "64d71819c2abb793373740d7",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "b7d4574e441a52830fa5a520",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -69,8 +69,8 @@
    "rollbackAfter": "Extrude 2"
   },
   "parts": [
-   "Part 1 In progress",
-   "Part 2 In progress"
+   "Part 1",
+   "Part 2"
   ],
   "partsHeading": "Parts (2)",
   "undo": {
@@ -173,8 +173,8 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1 In progress",
-     "Part 2 In progress"
+     "Part 1",
+     "Part 2"
     ],
     "partsHeading": "Parts (2)",
     "undo": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 25131
+   "t": 33298
   },
   {
    "step": 2,
@@ -315,8 +315,8 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1 In progress",
-     "Part 2 In progress"
+     "Part 1",
+     "Part 2"
     ],
     "partsHeading": "Parts (2)",
     "undo": {
@@ -372,7 +372,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 27439
+   "t": 37977
   },
   {
    "step": 3,
@@ -441,8 +441,8 @@
      "rollbackAfter": "Extrude 2"
     },
     "parts": [
-     "Part 1 In progress",
-     "Part 2 In progress"
+     "Part 1",
+     "Part 2"
     ],
     "partsHeading": "Parts (2)",
     "undo": {
@@ -498,7 +498,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 29883
+   "t": 42526
   }
  ]
 }

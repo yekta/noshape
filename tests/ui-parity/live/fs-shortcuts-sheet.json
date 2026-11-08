@@ -1,19 +1,19 @@
 {
  "scenario": "fs-shortcuts-sheet",
- "recorded": "2026-11-08T03:12:35.669Z",
+ "recorded": "2026-11-08T07:20:28.369Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "2cbf517824c539b3ac45480f",
-  "workspace": "6e9fbf636df8e63ad0c39c8c",
-  "element": "98678cd0029de141655e072d",
+  "document": "d987078fa788677a26182e52",
+  "workspace": "54be2c9ff7bfc4407029ee23",
+  "element": "1405f10e2c76369cb6d9eca8",
   "start": "fs-studio",
-  "startElement": "98678cd0029de141655e072d",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "1405f10e2c76369cb6d9eca8",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 47477
+   "t": 34826
   },
   {
    "step": 2,
@@ -235,7 +235,7 @@
      "notices": 2
     }
    },
-   "t": 49659
+   "t": 37289
   }
  ]
 }
