@@ -66,7 +66,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
   90 → 200/286.
 
-## 11-08 17:26 UTC: STL presets as Onshape's (lead), hose Parasolid confirmed, c2-fan-blade-sweep
+## 11-08 17:24 UTC: STL presets as Onshape's (lead), hose Parasolid confirmed, c2-fan-blade-sweep
 - **STL presets (lead: Onshape's own Coarse / Medium / Fine).** Live's dialog sends 0.24 / 0.12 / 0.06 mm (ours the
   same), but its facetter takes the chord as about a thousandth: clamp-hms' arcs sag 0.24 / 0.12 / 0.06 µm
   (samples/stl-res, dx-scratch/bin/stlarc.py). Ours (ops export.rs `mesh_params`): BRepMesh deflection = 0.002 × the
