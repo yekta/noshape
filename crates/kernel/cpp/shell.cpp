@@ -3155,11 +3155,17 @@ double eval_grad_near(const Surf& q, const gp_XYZ& p, gp_XYZ& g, double scale, b
   double       out0 = e;
   if (own(q.hint.X(), q.hint.Y()) && at(q.hint.X(), q.hint.Y(), out0))
     return out0;
-  // (A local search from the last foot before the global one.)
+  // (A local search from the last foot before the global one: followed from there, a foot on the surface's run past
+  // the face is the offset's own (an inlet face's offset reaching a removed plane past its end, the impeller); only
+  // short of the surface's end, where a projection is held.)
   if (q.has_hint)
   {
     const gp_Pnt2d w = q.sas->NextValueOfUV(q.hint, gp_Pnt(p), 1e-9 * scale, 1e-3 * scale);
-    if (own(w.X(), w.Y()) && at(w.X(), w.Y(), out0))
+    double         U0, U1, V0, V1;
+    q.base->Bounds(U0, U1, V0, V1);
+    const double eu = 1e-6 * (U1 - U0), ev = 1e-6 * (V1 - V0);
+    const bool   inside = w.X() > U0 + eu && w.X() < U1 - eu && w.Y() > V0 + ev && w.Y() < V1 - ev;
+    if ((own(w.X(), w.Y()) || inside) && at(w.X(), w.Y(), out0))
     {
       q.hint = w;
       return out0;
@@ -3399,6 +3405,24 @@ bool add_pcurve(const TopoDS_Edge& ne, const TopoDS_Face& nf, const TopoDS_Edge&
       pcs.Init(sn, Precision::Confusion());
       if (!pcs.Perform(c3, a, b, cn))
         cn.Nullify();
+      // (Its ends on the edge's: the projection's ran 23 µm off them where the inlet's offset meets the impeller's
+      // opening, exact between.)
+      // (Not on a closed surface, where an end on the seam can be taken to its other side.)
+      if (const occ::handle<Geom2d_BSplineCurve> bc = occ::down_cast<Geom2d_BSplineCurve>(cn); !bc.IsNull() && !bc->IsPeriodic() && !sn->IsUClosed() && !sn->IsVClosed())
+      {
+        const occ::handle<ShapeAnalysis_Surface> sas = new ShapeAnalysis_Surface(sn);
+        for (const auto [pole, at] : {std::pair{1, a}, std::pair{bc->NbPoles(), b}})
+        {
+          const gp_Pnt   P  = c3->Value(at);
+          const gp_Pnt2d q0 = bc->Value(at);
+          const double   d0 = sn->Value(q0.X(), q0.Y()).Distance(P);
+          if (d0 <= 10 * Precision::Confusion())
+            continue;
+          const gp_Pnt2d q = sas->NextValueOfUV(q0, P, Precision::Confusion());
+          if (sn->Value(q.X(), q.Y()).Distance(P) < 0.5 * d0)
+            bc->SetPole(pole, q);
+        }
+      }
 
       // An offset edge traced on the offset of the original's surface keeps the original's curve there (the same
       // parameters on both): taken where it lies closer to the edge than the projection.
@@ -3493,7 +3517,7 @@ occ::handle<Geom_BSplineSurface> continued_u(const occ::handle<Geom_BSplineSurfa
   bs->Bounds(a0, a1, b0, b1);
   // The end knot e and the span's other end o.
   const double e = at_end ? bs->UKnot(nk) : bs->UKnot(1), o = at_end ? bs->UKnot(nk - 1) : bs->UKnot(2);
-  double       speed = 0;
+  double speed = 0;
   for (int k = 0; k <= 8; ++k)
   {
     gp_Pnt P;
@@ -3586,12 +3610,16 @@ occ::handle<Geom_BSplineSurface> continued(const occ::handle<Geom_BSplineSurface
   return s;
 }
 
-bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
+// `tangent_ext`: free-form faces' offsets extended past their edges along their tangents, not by their own polynomials;
+// `continued_any` set where a face's polynomials were, `why` to the reason it failed.
+bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out,
+                      bool tangent_ext, bool& continued_any, const char*& why)
 {
   const bool dbg = std::getenv("NOSHAPE_SHELL_DEBUG") != nullptr;
-  auto       no  = [&](const char* why) {
+  auto       no  = [&](const char* w) {
+    why = w;
     if (dbg)
-      std::fprintf(stderr, "quadrics: %s\n", why);
+      std::fprintf(stderr, "quadrics: %s\n", w);
     return false;
   };
   // The offset distance against the outward normal: outward walls are the same construction at -t, the part's faces
@@ -3637,6 +3665,33 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
   std::vector<quad::Surf> sf(nf + 1);
   std::vector<char>       kept(nf + 1), collapse(nf + 1);
   bool                    curved = false;
+  ShapeAncMap             edge_faces;
+  TopExp::MapShapesAndUniqueAncestors(so, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  // How far past its edges with removed faces a kept face's offset meets those faces: t / sin of the angle between
+  // the two there (live's impeller inlet: 12.6 degrees from the top plane, its wall's rim 13 mm past the edge).
+  auto reach = [&](const TopoDS_Face& f) {
+    double r = 0;
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(x.Current());
+      if (BRep_Tool::Degenerated(e) || !edge_faces.Contains(e))
+        continue;
+      for (ShapeList::Iterator it(edge_faces.FindFromKey(e)); it.More(); it.Next())
+      {
+        const TopoDS_Face& g = TopoDS::Face(it.Value());
+        if (g.IsSame(f) || !rm.Contains(g))
+          continue;
+        BRepAdaptor_Curve c(e);
+        for (int k = 0; k <= 8; ++k)
+        {
+          const gp_Pnt p  = c.Value(c.FirstParameter() + (c.LastParameter() - c.FirstParameter()) * k / 8);
+          const double sn = gp_Vec(normal_at(f, p)).Crossed(gp_Vec(normal_at(g, p))).Magnitude();
+          r               = std::max(r, std::abs(t) / std::max(sn, 0.05));
+        }
+      }
+    }
+    return r;
+  };
   for (int i = 1; i <= nf; ++i)
   {
     const TopoDS_Face&  f = TopoDS::Face(faces(i));
@@ -3716,12 +3771,13 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
       // edges lie past the face where it flares (a vase's foot), the offsets must meet there.
       if (auto bs = occ::down_cast<Geom_BSplineSurface>(q.base); !bs.IsNull() && !bs->IsUPeriodic() && !bs->IsVPeriodic())
       {
-        const double                     len = std::min(3 * thickness, 0.5 * size);
+        const double                     len = std::min(std::max(3 * thickness, 1.25 * reach(f)), 0.5 * size);
         try
         {
           // Its own polynomials run on (live 1799); GeomLib's tangent extension where that can't be done.
-          occ::handle<Geom_BoundedSurface> ext = continued(bs, len);
-          if (ext.IsNull() || std::getenv("NOSHAPE_SHELL_TANGENT_EXTENSION"))
+          occ::handle<Geom_BoundedSurface> ext = tangent_ext ? nullptr : continued(bs, len);
+          continued_any                         = continued_any || !ext.IsNull();
+          if (ext.IsNull())
           {
             ext = occ::down_cast<Geom_BoundedSurface>(bs->Copy());
             for (const bool in_u : {true, false})
@@ -4061,6 +4117,7 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
   // Vertices: three faces (two tangent: along their offset tangent line), or a closed face's seam and one face.
   std::vector<gp_XYZ> pts(nv + 1);
+  std::vector<int>    run_corners; // (corners within a run of edges between two faces)
   // Vertices whose offsets are two corners and an edge between them (four faces, two tangent edges on one): the
   // second corner, for the tangent edge e2 and the edge w2 across; pts holds the first, for e1 and w1.
   struct SplitCorner
@@ -4441,6 +4498,36 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
         x = off_at(s1);
       }
     }
+    else if (fs.size() == 2 && es.size() == 2 && std::none_of(es.begin(), es.end(), [&](int e) { return seam[(size_t)e] != 0 || tangent[(size_t)e] != 0 || group[(size_t)e] != 0; }))
+    {
+      // A vertex within a run of edges between two faces (live's loft: its circle in arcs, its D's lines and curve):
+      // on both offsets, in the plane across the edges there.
+      // (Each edge's direction away from the vertex; the run's through it from the second to the first.)
+      gp_XYZ away[2];
+      for (int k = 0; k < 2; ++k)
+      {
+        BRepAdaptor_Curve c(TopoDS::Edge(edges(es[(size_t)k])));
+        const bool        at0 = c.Value(c.FirstParameter()).Distance(V) <= c.Value(c.LastParameter()).Distance(V);
+        gp_Pnt            p0;
+        gp_Vec            d0;
+        c.D1(at0 ? c.FirstParameter() : c.LastParameter(), p0, d0);
+        if (d0.Magnitude() < 1e-300)
+          return no("a vertex within an edge run without its direction");
+        away[k] = d0.Normalized().XYZ() * (at0 ? 1.0 : -1.0);
+      }
+      const gp_XYZ dir = away[0] - away[1];
+      if (dir.Modulus() < 1e-6)
+        return no("a vertex within an edge run turning back");
+      quad::Surf pl;
+      pl.kind               = GeomAbs_Plane;
+      pl.n                  = dir.Normalized();
+      pl.c                  = pl.n.Dot(V.XYZ());
+      const quad::Surf* s3[3] = {&sf[(size_t)fs[0]], &sf[(size_t)fs[1]], &pl};
+      x = V.XYZ() - n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) - n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0);
+      if (!quad::solve3(s3, x, size) && !(x = V.XYZ() - n_at(fs[0]) * (kept[(size_t)fs[0]] ? t : 0.0) - n_at(fs[1]) * (kept[(size_t)fs[1]] ? t : 0.0), quad::solve3_damped(s3, x, size)))
+        return no("a vertex within an edge run: its offset not found");
+      run_corners.push_back(i);
+    }
     else
       return no("a vertex not of three faces (or a seam and one)");
     if ((x - V.XYZ()).Modulus() > 1e3 * thickness + 1e3 * tol) // (a narrow corner moves t / sin(half its angle))
@@ -4820,7 +4907,31 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
           // (The point t off both faces' tangent planes: (na + nb) t / (1 + na·nb), right for tangent faces too.)
           const gp_XYZ      na    = foot[0].normal(p, 1e-6 * size), nb = foot[1].normal(p, 1e-6 * size);
           gp_XYZ            y     = p.XYZ() - (na + nb) * (t / std::max(1 + na.Dot(nb), 1e-3));
+          // (One face removed: t off the kept one's tangent plane, on the removed one's; one wall in where the two
+          // are all but parallel.)
+          if (kept[(size_t)fa] != kept[(size_t)fb])
+          {
+            const gp_XYZ nk = kept[(size_t)fa] ? na : nb, nr = kept[(size_t)fa] ? nb : na;
+            const double cc = nk.Dot(nr), den = 1 - cc * cc;
+            y               = den > 1e-3 ? p.XYZ() + nk * (-t / den) + nr * (t * cc / den) : p.XYZ() - nk * t;
+          }
+          const gp_XYZ y0m        = y;
           marched                 = quad::solve3_grad(s3, y, size) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          if (!marched)
+            marched = (y = y0m, quad::solve3_damped(s3, y, size)) && (y - p.XYZ()).Modulus() < 10 * thickness;
+          if (!marched && dbg)
+          {
+            gp_XYZ g0, g1;
+            const double e0 = quad::eval_grad_near(sf[(size_t)fa], y0m, g0, size), e1 = quad::eval_grad_near(sf[(size_t)fb], y0m, g1, size);
+            std::fprintf(stderr, "quadrics: edge %d's march step %d from %.4f %.4f %.4f failed (values there %g %g; to %.4f %.4f %.4f); ends %.4f %.4f %.4f / %.4f %.4f %.4f\n", i, k, y0m.X() * 1e3, y0m.Y() * 1e3, y0m.Z() * 1e3, e0, e1, y.X() * 1e3, y.Y() * 1e3, y.Z() * 1e3, A.X() * 1e3, A.Y() * 1e3, A.Z() * 1e3, B.X() * 1e3, B.Y() * 1e3, B.Z() * 1e3);
+            for (const int f : {fa, fb})
+              if (sf[(size_t)f].general)
+              {
+                double U0, U1, V0, V1;
+                sf[(size_t)f].base->Bounds(U0, U1, V0, V1);
+                std::fprintf(stderr, "quadrics:   face %d own [%g, %g] x [%g, %g], surface [%g, %g] x [%g, %g], hint (%g, %g)\n", f, sf[(size_t)f].own[0], sf[(size_t)f].own[1], sf[(size_t)f].own[2], sf[(size_t)f].own[3], U0, U1, V0, V1, sf[(size_t)f].hint.X(), sf[(size_t)f].hint.Y());
+              }
+          }
           q(k + 1)                = gp_Pnt(y);
         }
         q(1)     = A;
@@ -5150,6 +5261,14 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
               gp_Pnt2d w2 = p == 0 ? sas->ValueOfUV(pts3[p], 1e3 * tol) : sas->NextValueOfUV(uv((int)p), pts3[p], 1e3 * tol);
               if (p > 0 && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= 1e3 * tol)
                 w2 = sas->ValueOfUV(pts3[p], 1e3 * tol);
+              // (A free-form face's offset keeps its parameters: the nearest foot on the face's own patch, where the
+              // projections land on another sheet of the offset.)
+              if (sf[(size_t)i].general && g->Value(w2.X(), w2.Y()).Distance(pts3[p]) >= std::max(1e3 * tol, 1e-3 * size))
+              {
+                gp_XYZ gg;
+                if (std::abs(quad::eval_grad_near(sf[(size_t)i], pts3[p].XYZ(), gg, size)) < 1e299)
+                  w2 = sf[(size_t)i].hint;
+              }
               // (A free-form offset's points by a curl of its surface sit where its parametric offset folds, up to
               // ~50 µm off it: Shell 4's ramp ends; the edge's tolerance says so.)
               on = g->Value(w2.X(), w2.Y()).Distance(pts3[p]) < std::max(1e3 * tol, 1e-3 * size);
@@ -7035,10 +7154,129 @@ bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& rem
     }
   }
   lap("thin check");
+  // (One edge for each run of offset edges between the same two faces, as live (the impeller loft's offset circle
+  // and D: live's JKN and JKB): the run's curves joined end to end, its curves on the two faces projected again.)
+  HHist hu;
+  if (!run_corners.empty())
+  {
+    ShapeAncMap vedges, efaces;
+    TopExp::MapShapesAndUniqueAncestors(wall, TopAbs_VERTEX, TopAbs_EDGE, vedges);
+    TopExp::MapShapesAndUniqueAncestors(wall, TopAbs_EDGE, TopAbs_FACE, efaces);
+    ShapeIMap inner;
+    for (const int i : run_corners)
+      if (vedges.Contains(vx[(size_t)i]) && vedges.FindFromKey(vx[(size_t)i]).Extent() == 2)
+        inner.Add(vx[(size_t)i]);
+    const occ::handle<BRepTools_ReShape> rs = new BRepTools_ReShape();
+    ShapeIMap                            done;
+    bool                                 joined = false;
+    for (int k = 1; k <= vedges.Extent(); ++k)
+    {
+      // From each end of a run (a vertex not within one, an edge to a corner within one) to its other end.
+      const TopoDS_Vertex& v0 = TopoDS::Vertex(vedges.FindKey(k));
+      if (inner.Contains(v0))
+        continue;
+      for (ShapeList::Iterator it(vedges(k)); it.More(); it.Next())
+      {
+        TopoDS_Edge e = TopoDS::Edge(it.Value());
+        if (done.Contains(e) || (!inner.Contains(TopExp::FirstVertex(e)) && !inner.Contains(TopExp::LastVertex(e))))
+          continue;
+        std::vector<TopoDS_Edge> run;
+        std::vector<bool>        fwd;
+        TopoDS_Vertex            at = v0;
+        while (true)
+        {
+          run.push_back(e);
+          fwd.push_back(TopExp::FirstVertex(e).IsSame(at));
+          done.Add(e);
+          at = fwd.back() ? TopExp::LastVertex(e) : TopExp::FirstVertex(e);
+          if (!inner.Contains(at))
+            break;
+          const ShapeList& two = vedges.FindFromKey(at);
+          e                    = TopoDS::Edge(two.First().IsSame(e) ? two.Last() : two.First());
+          if (done.Contains(e))
+            break;
+        }
+        const ShapeList& fs = efaces.FindFromKey(run[0]);
+        bool             ok = run.size() >= 2 && fs.Extent() == 2 && !at.IsSame(v0);
+        for (size_t j = 1; j < run.size() && ok; ++j)
+        {
+          const ShapeList& fj = efaces.FindFromKey(run[j]);
+          ok = fj.Extent() == 2 && ((fj.First().IsSame(fs.First()) && fj.Last().IsSame(fs.Last())) || (fj.First().IsSame(fs.Last()) && fj.Last().IsSame(fs.First())));
+        }
+        if (!ok)
+          continue;
+        GeomConvert_CompCurveToBSplineCurve cat;
+        double                              etol = 0;
+        for (size_t j = 0; j < run.size() && ok; ++j)
+        {
+          double                        f0, f1;
+          const occ::handle<Geom_Curve> c = BRep_Tool::Curve(run[j], f0, f1);
+          if (c.IsNull())
+          {
+            ok = false;
+            break;
+          }
+          occ::handle<Geom_BSplineCurve> b = GeomConvert::CurveToBSplineCurve(new Geom_TrimmedCurve(c, f0, f1));
+          if (!fwd[j])
+            b->Reverse();
+          ok   = j == 0 ? cat.Add(b, 1e3 * tol) : cat.Add(b, 1e3 * tol, true);
+          etol = std::max(etol, BRep_Tool::Tolerance(run[j]));
+        }
+        if (!ok)
+          continue;
+        const occ::handle<Geom_BSplineCurve> jc = cat.BSplineCurve();
+        BRepBuilderAPI_MakeEdge              mk(jc, v0, at, jc->FirstParameter(), jc->LastParameter());
+        if (!mk.IsDone())
+          continue;
+        const TopoDS_Edge ne = mk.Edge();
+        BRep_Builder().UpdateEdge(ne, etol);
+        for (ShapeList::Iterator ft(fs); ft.More() && ok; ft.Next())
+          ok = quad::add_pcurve(ne, TopoDS::Face(ft.Value()), run[0], TopoDS::Face(ft.Value()), false, 1e3 * tol);
+        if (!ok)
+          continue;
+        BRep_Builder().SameParameter(ne, false);
+        BRepLib::SameParameter(ne, 1e3 * tol);
+        rs->Replace(run[0].Oriented(TopAbs_FORWARD), fwd[0] ? ne : TopoDS::Edge(ne.Reversed()));
+        for (size_t j = 1; j < run.size(); ++j)
+          rs->Remove(run[j]);
+        joined = true;
+      }
+    }
+    if (joined)
+    {
+      const TopoDS_Shape w2 = rs->Apply(wall);
+      if (BRepCheck_Analyzer(w2).IsValid())
+      {
+        hu = rs->History();
+        SourceMap moved;
+        for (SourceMap::Iterator it(sources); it.More(); it.Next())
+          for (const TopoDS_Shape& m : images_of(hu, it.Key()))
+            moved.Bind(m, it.Value());
+        sources = moved;
+        wall    = w2;
+      }
+      else if (dbg)
+        std::fprintf(stderr, "quadrics: a run's offset edges joined made the wall invalid\n");
+    }
+    lap("runs");
+  }
   out.result  = wall;
-  out.history = shell_history(solid, wall, {h, h2}, {}, sources, removed);
+  out.history = shell_history(solid, wall, {h, h2, hu}, {}, sources, removed);
   lap("history");
   return true;
+}
+
+// Path 2b: by_quadrics_with, again with tangent extensions where a free-form face's own polynomials curled short of
+// a removed face (live's impeller loft: the inlet's offset never reaches the opening's plane in the middle).
+bool by_quadrics(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>& removed, double thickness, double sign, Built& out)
+{
+  bool        continued_any = false;
+  const char* why           = "";
+  if (by_quadrics_with(solid, removed, thickness, sign, out, false, continued_any, why))
+    return true;
+  const bool short_of = std::strcmp(why, "no intersection of two offsets through an edge's ends") == 0 || std::strcmp(why, "a marched edge's curve on its face failed") == 0;
+  return continued_any && short_of &&
+         by_quadrics_with(solid, removed, thickness, sign, out, true, continued_any, why);
 }
 
 // Parasolid bounds an opening's cavity by the removed face's own plane, extended past its edges: a kept face meeting a

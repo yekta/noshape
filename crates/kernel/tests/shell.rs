@@ -1659,3 +1659,22 @@ fn a_ring_thinner_than_its_wall_shells_as_live() {
     assert!((471.266..479.019).contains(&v), "{v} mm³");
     assert!((a - 1086.4116).abs() < 1.0, "{a} mm²");
 }
+
+/// c2-impeller-loft's Shell Gehäuse (3 mm inward, both planar faces removed) on live's loft (REQUESTS 2228: two
+/// B-spline faces from a circle to a D, the inlet's tangent to the D's plane at x = 10): live's 6 faces, 16 edges and
+/// 12 vertices. The inlet's wall runs on past its edge until it meets the opening's plane (its own polynomials curl
+/// short of it: the tangent extension), and the offsets of the circle's three arcs and of the D's three edges are one
+/// edge each. Volume within 2e-4 of live's 45,272.92 mm³ (ours 45,280.5: the corners on the opening 34 µm from live's).
+#[test]
+fn an_impeller_lofts_shell_as_live() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/shell/impeller-loft-live.step");
+    let s = read_step(&path, LengthUnit::Meter).unwrap().remove(0).shape;
+    let planar = |f: &Shape| matches!(f.face_surface(), Ok(Surface::Plane(_)));
+    let removed: Vec<Shape> = s.faces().iter().filter(|f| planar(f)).cloned().collect();
+    assert_eq!(removed.len(), 2);
+    let r = shell_solid(&s, &removed, 3e-3, ShellSide::Inside, ShellMethod::Auto).unwrap().shape;
+    assert!(r.is_valid());
+    let v = vol(&r) * 1e9;
+    assert_eq!((r.faces().len(), r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (6, 16, 12), "path {}, {v} mm³", last_shell_path());
+    assert!((v / 45_272.92 - 1.0).abs() < 2e-4, "{v} mm³");
+}
