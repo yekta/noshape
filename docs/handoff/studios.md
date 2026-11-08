@@ -53,6 +53,9 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - An Assembly tab's Properties from the tab's menu: its mass is solved off the UI thread in a session of its own
   (assembly_mass_properties on the saved file); Calculate value says "Calculating…" until it comes
   (`properties_dialog::open_properties_mass_later`, `button:Calculate value`).
+- Focused text fields recorded as live's (`with_input_focus_in`: gpui-component's `window.focused_input` when the
+  state named no field: a modal's name field, Document details' textarea); a Variable Studio cell being typed in
+  reports what's typed; Document details focuses its description on open.
 - Open: Assembly Properties lacks Mass / Override / Subassembly
   BOM behavior; ours' modal fields aren't recorded (an Input hook in vendored gpui-component); dx has std 3112.
 

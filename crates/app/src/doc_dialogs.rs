@@ -42,6 +42,7 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
     let desc_st = cx.new(|cx| TextareaState::new(window, cx).rows(4).default_value(details.description.clone()));
     // Typing re-renders the dialog (Update turns on).
     window.subscribe(&desc_st, cx, |_, _: &gpui_kit::component::input::InputEvent, window, _| window.refresh()).detach();
+    let focus = desc_st.clone();
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
         let (d, doc, nrm2, saved) = (desc_st.clone(), doc.clone(), nrm.clone(), desc_saved.clone());
@@ -74,6 +75,8 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
                 report(&doc, r, cx)
             })
     });
+    // Live (doc-menu-details): the description has the keyboard when the modal opens.
+    window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
 }
 
 /// ☰ › Restore deleted workspaces…: deleted branches with a Restore button.

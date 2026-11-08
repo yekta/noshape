@@ -355,6 +355,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
                     s["focus"] = json!({ "kind": "other" });
                 }
+                with_input_focus(&mut s, cx);
             }
             s
         };
@@ -677,6 +678,7 @@ pub fn start_page(cx: &mut App) {
                 if s["dialog"]["kind"] == "modal" && s["focus"]["kind"] == "none" {
                     s["focus"] = json!({ "kind": "other" });
                 }
+                let _ = w.update(cx, |_, window, cx| with_input_focus_in(&mut s, window, cx));
             }
             s
         };
@@ -859,6 +861,31 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         }
     }
     s
+}
+
+/// [`with_input_focus_in`] in the window the driver runs in.
+fn with_input_focus(s: &mut Value, cx: &mut AsyncWindowContext) {
+    let _ = cx.update(|window, cx| with_input_focus_in(s, window, cx));
+}
+
+/// A text field holding the keyboard that the state didn't name (a modal's name field, Document details' textarea):
+/// live reads it as `{"kind": "other", "text", "selection", "all"}` (its tag aside).
+fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
+    use gpui_kit::component::WindowExt as _;
+    use gpui_kit::component::input::AnyInputState;
+    let named = s["focus"]["text"].is_string() || !matches!(s["focus"]["kind"].as_str(), Some("none" | "other"));
+    if named {
+        return;
+    }
+    let (text, sel) = match window.focused_input(cx) {
+        Some(AnyInputState::Input(st)) => (st.read(cx).value().to_string(), st.read(cx).selected_range()),
+        Some(AnyInputState::Textarea(st)) => (st.read(cx).value().to_string(), st.read(cx).selected_range()),
+        _ => return,
+    };
+    let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
+    let (a, b) = (chars(sel.start), chars(sel.end));
+    let all = a == 0 && b == text.chars().count() && b > 0;
+    s["focus"] = json!({ "kind": "other", "text": text, "selection": [a, b], "all": all });
 }
 
 /// The state of a tab that is no Part Studio, Assembly or Drawing (a Variable or Feature Studio, a file): the

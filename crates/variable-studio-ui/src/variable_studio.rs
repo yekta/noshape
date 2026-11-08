@@ -666,7 +666,8 @@ impl Render for VariableStudioView {
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
             if crate::ui_script::active() {
-                let value = shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text));
+                // A cell being typed in shows what's typed (live vs-edit-value: "50" before Enter).
+                let value = if editing { expr.read(cx).value().to_string() } else { shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text)) };
                 drawn.push(serde_json::json!({ "name": v.name, "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": value, "description": desc_text }));
             }
             let from_import = v.kind == Some(VarKind::FromImport);
