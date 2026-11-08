@@ -28,6 +28,21 @@ schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read
 parts (a7bd858292…, 35719e9b95…, 2ee17582b9…, 4-10 solids each) that OCCT's check flags; please rerun xdev-subs and
 tell me if those three differ from live.
 
+## Latest (2026-11-08 19:4x UTC)
+- corpus15 (full, 109 min): 1240/1701 occurrences, mates 155/345 (SCORE). Unmatched mates by cause
+  (/root/asm-scratch/bin/rank_mates.py): 516 not translated (connector origins: 227 on an edge of ours that isn't
+  there, 57 on a face: studio geometry), 96 overdefined, 78 connectors that don't resolve (infento-subs 26,
+  hand-drill-pinslot 15, welding-config 13), 15 inconsistent.
+- Fixed today: an assembly regenerates a studio with its sources (a Frame's other-studio profile; ops' assemblies had
+  none at all: Derived and custom features too), made once per evaluation (P0 speed: per studio it cloned the document
+  each time); parts map by volume first, then creator (clamp's Revolute 17: Pin and Spacer were one part). Revolute 17
+  was no morning regression: every main commit from 56603985 fails it the same way; corpus8's pass came from
+  uncommitted work.
+- Harness time: the translator reads each sketch once per step; with the sketch files the full run is ~110 min (run
+  it with `timeout 10000`).
+- Next: the 78 unresolved connectors (same studio, translator vs assembly regeneration?), then the edge-origin
+  connectors by studio.
+
 ## Latest (2026-11-08 12:2x UTC)
 - live 2267 answered: 211 studios have `studios/<element>.sketches.json` (every sketch's bodies at the final state).
   The translator reads them (`refs_from_sketches`, both harnesses: the assembly suite and a model dir's

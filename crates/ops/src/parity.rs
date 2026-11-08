@@ -5425,11 +5425,12 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         let listed: Vec<&Value> = parts.as_array().into_iter().flatten().filter(|p| p["partId"].is_string() && p["name"].is_string()).collect();
         let fitting: Vec<String> = listed.iter().flat_map(|p| fits_of(p)).collect();
         let mut taken: Vec<String> = Vec::new();
-        let mut chosen: HashMap<String, String> = HashMap::new();
+        // By the list's entries (a configured studio lists a part id once per configuration), a later one winning.
+        let mut chosen: Vec<Option<String>> = vec![None; listed.len()];
         for pass in [true, false] {
-            for p in &listed {
+            for (ix, p) in listed.iter().enumerate() {
                 let (pid, pname) = (p["partId"].as_str().unwrap_or_default(), p["name"].as_str().unwrap_or_default());
-                if chosen.contains_key(pid) {
+                if chosen[ix].is_some() {
                     continue;
                 }
                 let fits = fits_of(p);
@@ -5450,11 +5451,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                 };
                 taken.push(ours.clone());
-                chosen.insert(pid.to_string(), ours);
+                chosen[ix] = Some(ours);
             }
         }
-        for (pid, ours) in chosen {
-            part_names.insert((element.clone(), pid), ours);
+        for (p, ours) in listed.iter().zip(chosen) {
+            if let (Some(pid), Some(ours)) = (p["partId"].as_str(), ours) {
+                part_names.insert((element.clone(), pid.to_string()), ours);
+            }
         }
     }
     let occurrences: Vec<&Value> = values(&root["occurrences"]);
