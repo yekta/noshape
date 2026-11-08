@@ -393,6 +393,19 @@ impl OsMenu {
         }
     }
 
+    /// Whether `pos` is over one of the menus this submenu opened from.
+    fn parent_contains(&self, pos: Point<Pixels>, cx: &App) -> bool {
+        let mut parent = self.parent.as_ref().and_then(|p| p.upgrade());
+        while let Some(pm) = parent {
+            let pm = pm.read(cx);
+            if pm.bounds.get().contains(&pos) {
+                return true;
+            }
+            parent = pm.parent.as_ref().and_then(|p| p.upgrade());
+        }
+        false
+    }
+
     /// Whether `pos` is over this menu or its open submenus.
     fn contains(&self, pos: Point<Pixels>, cx: &App) -> bool {
         self.bounds.get().contains(&pos) || self.open_submenu().is_some_and(|m| m.read(cx).contains(pos, cx))
@@ -642,6 +655,13 @@ impl Render for OsMenu {
                     OsMenuItem::Submenu { label, icon, menu, disabled } => row(ix)
                         .text_color(if *disabled { pal.text_faint } else { pal.text })
                         .when(hovered && !*disabled, |d| d.bg(hover_bg))
+                        // A click keeps the menu and opens the submenu (live asm-menu-edit-dynamic-suppression).
+                        .when(!*disabled, |d| {
+                            d.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation()).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                this.hovered = Some(ix);
+                                cx.notify();
+                            }))
+                        })
                         .when_some(icon_el(icon, cx), |d, i| d.child(div().absolute().left(px(icon_x)).top(px((row_h - icon_sz) * 0.5)).size(px(icon_sz)).child(i)))
                         .child(div().flex_1().when(wraps || truncate, |d| d.min_w_0()).child(label_el(label, false)))
                         .child({
@@ -694,7 +714,8 @@ impl Render for OsMenu {
                 }
             }))
             .on_mouse_down_out(cx.listener(|this, e: &MouseDownEvent, window, cx| {
-                if !this.contains(e.position, cx) {
+                // A submenu stays open for a click on its parent's rows (live asm-menu-edit-dynamic-suppression).
+                if !this.contains(e.position, cx) && !this.parent_contains(e.position, cx) {
                     this.dismiss(window, cx);
                     cx.set_global(PressClosedMenu(Some(e.position)));
                 }

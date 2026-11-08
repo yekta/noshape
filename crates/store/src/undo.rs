@@ -335,6 +335,19 @@ impl UndoStack {
         Ok(after)
     }
 
+    /// [`Self::commit`], recorded as a step even when it changes nothing (live: Hide mates on a mate already hidden is
+    /// an undo step that undoes to the same look).
+    pub fn commit_step<N: AsRef<str>, B: AsRef<[u8]>>(&mut self, doc: &mut Document, changes: &[(N, Option<B>)], description: &str) -> Result<MicroversionId> {
+        let before = doc.head(self.branch)?;
+        let after = self.commit(doc, changes, description)?;
+        if before != after {
+            return Ok(after);
+        }
+        let changed = changes.iter().map(|(n, _)| n.as_ref().to_string()).collect();
+        self.push(Entry { before, after, description: description.to_string(), changed: Some(changed) });
+        Ok(after)
+    }
+
     /// Records an edit performed by other means (e.g. a restore or merge
     /// into this branch) so it can be undone. `before` is the branch head
     /// before the edit and `after` the head it produced. If `before` is not
@@ -343,16 +356,21 @@ impl UndoStack {
         if before == after {
             return;
         }
-        if self.expected_head.is_some_and(|h| h != before) {
-            self.undo.clear();
-        }
-        self.redo.clear();
-        self.undo.push(Entry {
+        self.push(Entry {
             before,
             after,
             description: description.to_string(),
             changed: None,
         });
+    }
+
+    fn push(&mut self, e: Entry) {
+        if self.expected_head.is_some_and(|h| h != e.before) {
+            self.undo.clear();
+        }
+        self.redo.clear();
+        let after = e.after;
+        self.undo.push(e);
         if self.undo.len() > self.limit {
             let excess = self.undo.len() - self.limit;
             self.undo.drain(..excess);

@@ -127,6 +127,15 @@ pub struct Session {
 /// Store names and their new content (None deletes the name).
 type Changes = Vec<(String, Option<Vec<u8>>)>;
 
+/// Whether a commit is an undo step.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Undo {
+    No,
+    Yes,
+    /// A step even when it changes nothing.
+    EvenUnchanged,
+}
+
 impl Session {
     pub fn create(path: impl AsRef<Path>, doc: Document) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
@@ -348,6 +357,15 @@ impl Session {
 
     /// Commit changed tabs (and settings) as one microversion.
     pub fn commit(&mut self, tabs: &[TabId], settings: bool, description: &str) -> Result<MicroversionId> {
+        self.commit_tabs(tabs, settings, description, Undo::Yes)
+    }
+
+    /// [`Self::commit`] of `tabs` as an undo step even when nothing changed (live's Hide mates on hidden mates).
+    pub fn commit_step(&mut self, tabs: &[TabId], description: &str) -> Result<MicroversionId> {
+        self.commit_tabs(tabs, false, description, Undo::EvenUnchanged)
+    }
+
+    fn commit_tabs(&mut self, tabs: &[TabId], settings: bool, description: &str, undo: Undo) -> Result<MicroversionId> {
         anyhow::ensure!(self.viewing.is_none(), "viewing history is read-only");
         self.ensure_unprotected()?;
         let mut changes: Vec<(String, Option<Vec<u8>>)> = Vec::new();
@@ -357,7 +375,7 @@ impl Session {
         if settings {
             changes.push((META_BLOB.to_string(), Some(self.doc.settings_blob())));
         }
-        self.write(changes, description, true)
+        self.write(changes, description, undo)
     }
 
     /// Commit the whole document as an edit Ctrl+Z can't undo (deleting a
@@ -365,7 +383,7 @@ impl Session {
     pub fn commit_all_not_undoable(&mut self, description: &str) -> Result<MicroversionId> {
         self.ensure_unprotected()?;
         let changes = self.all_changes()?;
-        self.write(changes, description, false)
+        self.write(changes, description, Undo::No)
     }
 
     /// Commit `changes` (an edit of `doc`) onto the branch head. A head
@@ -373,12 +391,13 @@ impl Session {
     /// windows, an agent writing it: qa TWO-PROCESS-LOST-EDIT) gets them
     /// merged on top, then `doc` is that result: like live, where every
     /// writer appends to one workspace and neither loses the other's edit.
-    fn write(&mut self, changes: Changes, description: &str, undoable: bool) -> Result<MicroversionId> {
+    fn write(&mut self, changes: Changes, description: &str, undo: Undo) -> Result<MicroversionId> {
         let (changes, moved) = self.rebase(changes)?;
-        let after = if undoable && !noshape_store::is_not_undoable(description) && !self.tab_bar_only(&changes)? {
-            self.undo.commit(&mut self.store, &changes, description)?
-        } else {
-            self.undo.commit_not_undoable(&mut self.store, &changes, description)?
+        let undoable = undo != Undo::No && !noshape_store::is_not_undoable(description) && !self.tab_bar_only(&changes)?;
+        let after = match undo {
+            _ if !undoable => self.undo.commit_not_undoable(&mut self.store, &changes, description)?,
+            Undo::EvenUnchanged => self.undo.commit_step(&mut self.store, &changes, description)?,
+            _ => self.undo.commit(&mut self.store, &changes, description)?,
         };
         if moved {
             self.reload(after)?;
@@ -429,7 +448,7 @@ impl Session {
     pub fn commit_all(&mut self, description: &str) -> Result<MicroversionId> {
         self.ensure_unprotected()?;
         let changes = self.all_changes()?;
-        self.write(changes, description, true)
+        self.write(changes, description, Undo::Yes)
     }
 
     /// Whether `changes` (against the head) touch nothing but the tab bar:

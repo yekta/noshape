@@ -606,7 +606,7 @@ impl AssemblyView {
     }
 
     pub(super) fn set_mates_hidden(&mut self, ids: Vec<MateId>, hidden: bool, cx: &mut Context<Self>) {
-        self.edit(if hidden { "Hide" } else { "Show" }, cx, |a| a.set_mates_hidden(&ids, hidden));
+        self.edit_step(if hidden { "Hide" } else { "Show" }, cx, |a| a.set_mates_hidden(&ids, hidden));
         if !hidden && !self.show_mates {
             // Showing a mate indicator turns mate display on.
             self.show_mates = true;

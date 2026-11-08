@@ -143,13 +143,24 @@ impl DocModel {
 
     /// Edit any tab content (assembly, drawing...).
     pub fn edit_tab<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
+        self.edit_tab_as(tab, description, false, cx, f)
+    }
+
+    /// [`Self::edit_tab`] as an undo step even when it changes nothing (live's Hide mates on hidden mates).
+    pub fn edit_tab_step<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
+        self.edit_tab_as(tab, description, true, cx, f)
+    }
+
+    fn edit_tab_as<R>(&mut self, tab: TabId, description: &str, step: bool, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
         if self.session.read_only() {
             return None;
         }
         self.flush_pending(cx);
         let tab_name = self.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         let r = f(&mut self.session.doc.tab_mut(tab)?.content);
-        if let Err(e) = self.session.commit(&[tab], false, &format!("{tab_name} :: {description}")) {
+        let description = format!("{tab_name} :: {description}");
+        let committed = if step { self.session.commit_step(&[tab], &description) } else { self.session.commit(&[tab], false, &description) };
+        if let Err(e) = committed {
             cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
         }
         cx.emit(DocEvent::TabChanged(tab));

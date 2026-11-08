@@ -1380,18 +1380,27 @@ impl AssemblyView {
     }
 
     fn edit<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
+        self.edit_as(desc, false, cx, f)
+    }
+
+    /// [`Self::edit`] as an undo step even when it changes nothing (live: Hide mates on hidden mates).
+    pub(super) fn edit_step<R>(&mut self, desc: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
+        self.edit_as(desc, true, cx, f)
+    }
+
+    fn edit_as<R>(&mut self, desc: &str, step: bool, cx: &mut Context<Self>, f: impl FnOnce(&mut Assembly) -> R) -> Option<R> {
         let result = &self.result;
         let tab = self.tab;
         self.doc.update(cx, |doc, cx| {
-            doc.edit_tab(tab, desc, cx, |c| {
+            let edit = |c: &mut TabContent| {
                 if let TabContent::Assembly(a) = c {
                     noshape_ops::assembly::fold_solved(a, result);
                     Some(f(a))
                 } else {
                     None
                 }
-            })
-            .flatten()
+            };
+            if step { doc.edit_tab_step(tab, desc, cx, edit) } else { doc.edit_tab(tab, desc, cx, edit) }.flatten()
         })
     }
 
@@ -1895,11 +1904,8 @@ impl AssemblyView {
 
     fn accept_mate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(s) = &self.mate else { return };
-        let Some(m) = s.dialog.read(cx).to_mate(cx) else {
-            self.message = Some((false, "Select two mate connectors.".into()));
-            cx.notify();
-            return;
-        };
+        // Incomplete: ✓ is disabled and Enter does nothing, no message (live asm-cylindrical-pin-hole).
+        let Some(m) = s.dialog.read(cx).to_mate(cx) else { return };
         let editing = s.editing;
         self.mate = None;
         if self.anim.as_ref().is_some_and(|a| a.preview) {

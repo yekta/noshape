@@ -573,6 +573,26 @@ fn a_noop_commit_keeps_the_previous_edit_undoable() {
     assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap(), "the edit is undone, not skipped");
 }
 
+/// live2 2241: Hide mates on a mate already hidden is an undo step that undoes to the same look, and the edit before it
+/// stays undoable after it.
+#[test]
+fn a_step_that_changes_nothing_is_undone_on_its_own() {
+    let dir = TempDir::new();
+    let (mut doc, main) = new_doc(&dir);
+    let mut undo = UndoStack::new(main);
+    let s1 = undo.commit(&mut doc, &[set("tab/a", b"1")], "Insert").unwrap();
+    let s2 = undo.commit(&mut doc, &[set("tab/a", b"2")], "Hide").unwrap();
+    assert_eq!(undo.commit_step(&mut doc, &[set("tab/a", b"2")], "Hide").unwrap(), s2);
+    assert_eq!(undo.undo_len(), 3);
+    let in_tab = |names: &[String]| names.iter().any(|n| n == "tab/a");
+    assert!(undo.can_undo_in(&doc, &in_tab));
+    let u = undo.undo_in_keeping(&mut doc, &in_tab, &|_, v| v).unwrap().unwrap();
+    assert_eq!(u, s2, "the step undoes to the same state");
+    assert!(undo.can_redo());
+    let u = undo.undo_in_keeping(&mut doc, &in_tab, &|_, v| v).unwrap().unwrap();
+    assert_eq!(*doc.manifest(u).unwrap(), *doc.manifest(s1).unwrap());
+}
+
 #[test]
 fn undo_redo() {
     let dir = TempDir::new();

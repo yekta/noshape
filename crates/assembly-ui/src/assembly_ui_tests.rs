@@ -453,3 +453,46 @@ fn a_cached_assembly_stands_in_until_the_real_one_lands(cx: &mut TestAppContext)
     assert_eq!(occs(&after), occs(&real), "the evaluated assembly is the cached one");
 }
 
+
+fn draw(cx: &mut TestAppContext, window: AnyWindowHandle) {
+    cx.update_window(window, |_, w, cx| w.draw(cx).clear(cx)).unwrap();
+    cx.run_until_parked();
+}
+
+/// live2 2241: Hide mates on mates already hidden is an undo step of its own: one Undo takes it back and changes
+/// nothing (the hide before it stays), and Redo is offered.
+#[gpui::test]
+fn hiding_hidden_mates_is_an_undo_step(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "hide-hidden");
+    cx.update(|cx| cx.bind_keys(crate::actions::default_key_bindings()));
+    cx.update_window(window, |_, w, cx| {
+        w.activate_window();
+        view.update(cx, |v, cx| {
+            let pin = instance(v, "Part 2 <1>", cx);
+            v.mc_at_instance_origin(pin, w, cx);
+            let focus = v.focus.clone();
+            w.focus(&focus, cx);
+        });
+        w.dispatch_keystroke(gpui_kit::Keystroke::parse("enter").unwrap(), cx);
+    })
+    .unwrap();
+    draw(cx, window);
+    let ids = cx.update(|cx| view.read(cx).assembly(cx).unwrap().connectors.iter().map(|c| c.id).collect::<Vec<_>>());
+    assert_eq!(ids.len(), 1, "the connector made");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.set_mates_hidden(ids.clone(), true, cx);
+            v.set_mates_hidden(ids.clone(), true, cx);
+        })
+    });
+    draw(cx, window);
+    let doc = cx.update(|cx| view.read(cx).doc.clone());
+    cx.update(|cx| doc.update(cx, |d, cx| d.undo(cx)));
+    draw(cx, window);
+    cx.update(|cx| {
+        let v = view.read(cx);
+        let a = v.assembly(cx).unwrap();
+        assert!(a.connectors.len() == 1 && a.connectors[0].hidden, "the no-change step undone, the hide kept");
+        assert!(doc.read(cx).can_redo());
+    });
+}
