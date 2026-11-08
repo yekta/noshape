@@ -134,6 +134,18 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   the tolerance) are off the face (in the WIP). Newly taken: Rotieren 1's cut (vibe4 hd/39bba82f), and corpus
   cases declining "a piece's point on another solid's face" / "an edge nearly on another argument's face" where a
   face touches another tangentially (to be listed by a decline census over the corpora before coding).
+- **Tangent contact, census and revision (11-08 17:30 UTC).** Census over every corpus + parity56 (whyall's decline
+  list): 1 case declines for a tangent reason ("a section touching a face's boundary", bool-corpus 890acd4d); none
+  "a piece's point on another solid's face" / "an edge nearly on another argument's face". So the payoff is the real
+  documents: Rotieren 1 (hd/39bba82f) and cf-surface-pattern (sp-cut), not the recorded corpora. Rotieren 1 is a true
+  tangency: the tool's revolved face's profile is a circle arc (r ~20.7 mm) touching z = 0 at radius 15.2 mm about
+  the z axis; the part's piece is a sliver between its straight edges and that circle, every point of it within
+  0.06 mm of the circle and so within the grey band (gap ~1e-7 m). Moving the point (other_points) can't leave the
+  band; the classifier must use the side: where a piece's points are within the band of a face of the other solid
+  whose normal is parallel to the piece's there, and their signed distances to it agree in sign (and aren't all
+  noise), the piece is out (or in) by that sign; coincident free-form regions (signs mixed) still decline.
+  cf-surface-pattern: with the sections refined (WIP 7d333fe5 in agent/bool's worktree: corpora unchanged, no case
+  newly taken alone) it stops at spheres 44 / 45 touching each other (a point within 30-40 um of both).
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
