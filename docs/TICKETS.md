@@ -290,6 +290,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document dead on open with a stack overflow, in v0.4.33–v0.4.35) **and SECTIONS-AHEAD-HANG** (a Shell that never ended on
   vibe3, since v0.4.33). DOCS-SELECT-LEAVES-WAL verified (1cd8f6685). Fuzz since v0.4.35: v0.4.35 120 seeds (one death:
   seed 6297 = CRASH-6297), greens b9f855f0 / 56603985 / a07f6a3b 180 seeds, 0 deaths.
+- **qa 07:40, after the release checks (v0.4.36 published 07:23, run 42452453342, cut 405d7ca81): no blocker in the code; one
+  Windows failure, the lead's call: P1 WIN-SHOW-IN-EXPLORER** (a row's Show in Explorer does nothing on Windows; the footer link
+  works there, and both work on macOS and Linux). Linux files = the smoked artifact, SHA256SUMS OK, 11 assets, every job green
+  incl. the three "Restart into" updates. CLI smoke = v0.4.35 plus CRASH-6297 / SECTIONS-AHEAD-HANG fixed; the 48 ticket documents
+  = green 5a964e07; GUI rows pixel-identical to v0.4.35 (11 / 11); stock ubuntu:24.04 runs the CLI and opens a document. Agent
+  session (Haiku, the release's MCP): finished, the block at ~/Documents/noshape/block.noshape (23,214.6 mm³), 26 tool calls,
+  1 failed (sketch_constrain symmetric on entities it doesn't take; the error named them), $0.014.
 - **qa 04:38: still no blocker on green ae515421** (core's drafted prism walls): sweeps = a25df4cd.
 - **New in this cut, not a blocker by the SAVED-CHAMFER-CHANGE precedent (lead's call): P1 SAVED-SKETCH-PLANE-LOST**
   (blend 4fee814c): a fillet that OCCT built with corners far off is rebuilt at the working scale; in qa's ticket document
@@ -1011,10 +1018,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (0x80070057)`: the documents page's paths are canonicalized (start_window.rs: `canonicalize()`, a `\\?\` verbatim path on
   Windows) and `cx.reveal_path` (start_window.rs 3816) can't take one. The click also gives no visible feedback (AGENTS.md: a
   click always does). Strip the verbatim prefix before revealing (and showing: check Details › Location too). Check:
-  `gh workflow run qa-os.yml -R yekta/noshape -f ref=<branch>` (or `-f tag=`). (qa 2026-11-08 07:40)
+  `gh workflow run qa-os.yml -R yekta/noshape -f ref=<branch>` (or `-f tag=`). (qa 2026-11-08 07:37)
 - [ ] P3 UIS-RCLICK-WINDOWS (studios / psui: the UI script) **the UI script's `rclick` on a documents page row opens no menu on
   Windows** (macOS and Linux open it; a real right-click on Windows does): qa-os.yml's show-in / details steps fail with "menu:…
-  is not shown", so .github/qa/footer.py right-clicks with mouse_event on Windows instead. (qa 2026-11-08 07:40)
+  is not shown", so .github/qa/footer.py right-clicks with mouse_event on Windows instead. (qa 2026-11-08 07:37)
 - [ ] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
   document's two sketches lose their planes**: qa's ticket document cli-fillet2-segv (vibe3 ~/qa/tickets) on 24829a72 → 4fee814c:
   its Fillet 1 (after Extrude 1, Chamfer 1, Linear pattern 1, Shell 1) changes by a hair (Part 1 45580.502 → 45580.636 mm³,
