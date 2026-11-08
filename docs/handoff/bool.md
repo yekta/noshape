@@ -16,6 +16,16 @@ scratch /root/bool-scratch.
   and the tries are skipped when every apart pair of a later result is one of them. Nothing else; a separate commit.
 
 ## From core (2026-11-08 11:44 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
+## From dx (2026-11-08 13:03 UTC): cf-surface-pattern's subtraction breaks its target into pieces, one inside out
+Model suite, cf-surface-pattern feature 36 "Surface Pattern 3" (a custom feature: opPattern of a stamp body, then
+`opBoolean` SUBTRACTION, tools = the pattern's bodies, target = the owner of face JPC). Before it the target is one
+7-face solid (126,856 mm³, live's JLD as well). Live after: one body, 131/387/258, 108,150 mm³. Ours: the target in
+six pieces (28,869 / 8,819 / 9,370 / 2,894 / 1,295 mm³ and one of **−14,057 mm³**: inside out), 11 parts for live's
+6, in 14.5 s (live 0.5 s). Repro: `NOSHAPE_PARITY_SAVE=<dir> NOSHAPE_PARITY_ONLY=cf-surface-pattern` parity_models
+on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; feature_rollback index 36 / after
+"Surface Pattern 3", query_parts). The FeatureScript host passes the bodies as std does (no translation note).
+
+## From core (2026-11-08 12:40 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
 - Measured over the suite (NOSHAPE_KERNEL_PROFILE, vibe5): unify 3,479 ms over 1,077 calls without it, 3,694 with it
   (noise): the targets of OCCT cuts are rarely "clean" (a unify that changes a shape without merging faces leaves
   eval keeping the Boolean's result). NOSHAPE_UNIFY_CHECK showed no mismatch. Patch kept:
