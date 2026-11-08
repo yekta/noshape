@@ -411,7 +411,18 @@ pub fn render_bar(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
                     .child("Reverse compare")
                     .on_click(move |_, _, cx| reverse(&d, cx)),
             )
-            .child(div().size(px(22.)).flex_none().text_color(pal.text_muted).child(crate::assets::icon("help-filled", 22., cx)))
+            // Live: help "Compare" (cshid=compare).
+            .child(
+                div()
+                    .id("compare-help")
+                    .map(|d| crate::ui_script::mark(d, || "button:Compare help".into()))
+                    .size(px(22.))
+                    .flex_none()
+                    .cursor_pointer()
+                    .text_color(pal.text_muted)
+                    .child(crate::assets::icon("help-filled", 22., cx))
+                    .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/index.htm#cshid=compare")),
+            )
             .into_any_element(),
     )
 }
@@ -550,6 +561,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
             let on = s.selected == Some(id);
             let d = doc.clone();
             let sketch = r.type_id == "newSketch" || r.type_id == "sketch";
+            let sketch_name = r.name.clone();
             // Sketches start hidden in the graphics, their names grey; the
             // row's eye shows them (live dom ui2-compare-features).
             let shown = !sketch || s.shown_sketches.contains(&id);
@@ -613,6 +625,7 @@ pub fn render_panel(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<AnyE
                     row.child(
                         div()
                             .id(SharedString::from(format!("compare-eye-{}-{rk}", id.0)))
+                            .map(|d| crate::ui_script::mark(d, || format!("button:Show sketch:{}", sketch_name)))
                             .flex_none()
                             .invisible()
                             .group_hover(group.clone(), |d| d.visible())

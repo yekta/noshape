@@ -567,7 +567,20 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             .child(same_header)
             .children(same_rows)
             .children(notice);
-        let help = div().size(px(18.)).rounded_full().flex().items_center().justify_center().text_size(px(13.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)));
+        // Live: help "Merging" (cshid=merge).
+        let help = div()
+            .id("merge-help")
+            .map(|d| crate::ui_script::mark(d, || "button:Merge help".into()))
+            .size(px(18.))
+            .rounded_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .text_size(px(13.))
+            .font_weight(FontWeight::BOLD)
+            .child(crate::ui::glyph("help-dot", 20.0, crate::theme::help_dot(0x999999)))
+            .on_click(|_, _, cx| cx.open_url("https://cad.onshape.com/help/index.htm#cshid=merge"));
         let (doc, plan2, state2) = (doc.clone(), plan.clone(), state.clone());
         os::modal(dialog, format!("Merging changes into {} from {}", plan.target, plan.source), W)
             .title(title)
