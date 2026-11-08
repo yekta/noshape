@@ -53,6 +53,11 @@ yet). What it does, and what live showed:
 - To do: apply, run ver-merge / ver-merge-* / ver-crow-* / ver-history-* (the graph's small dots: compare with
   q2383/m1-graph-zoom.png), the e2e tests that read history descriptions, then land.
 
+**2026-11-08 22:42 UTC: psui took the Variable Studio list (lead, while studios is paused until Monday).** The 30 uncovered
+items of `coverage_variable_studio.py --uncovered`: psui writes the vs-* scenarios and their `via` chains
+(universe/variable-studio.json), asks live2 for the batch, and fixes what the recordings show. Documents and versions
+stay yours.
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;
