@@ -702,6 +702,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   documents" table on all three platforms and verifies from it. Until then v0.4.32 hangs on this document on macOS / Windows.
 
 ## Rust Boolean (bool)
+- [ ] P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
+  v0.4.33** (CLI fuzz seed 6297 on v0.4.35, step 97: a Shell, 2 faces, 1 mm). The fuzz document was saved with the Shell in
+  it, so every open regenerates it and dies: `thread '<unknown>' has overflowed its stack` on v0.4.33, v0.4.34, v0.4.35 and
+  greens 24829a72 / 4fee814c; **v0.4.32 opens it** (57 features, Shell 8 Error). gdb on 24829a72
+  (qa-scratch/tickets/crash6297/gdb-24829a72-open.txt): a rayon worker under `boolean::par_map` (boolean.rs 3428) →
+  `free::apart` (free.rs 682) → `bez_apart` calling itself at free.rs 665 (now 689) about 2,770 frames deep: the recursion
+  is bounded only by the 20,000 hull-pair budget, not by depth, so a pair whose halves never fall apart (nor below `gap`)
+  recurses until the worker's stack ends. Since 5bda26e48 (11-05, in v0.4.32 too); a later change between v0.4.32 and
+  v0.4.33 sends this Shell through it. Repro (qa-scratch/tickets/crash6297): `python3 open.py <cli>` (open + feature_list),
+  `rep.py <cli>` (open, then step 97's Shell again); vibe3:~/qa/tickets/crash6297 has the same. Not new in this cut (in
+  v0.4.33–v0.4.35), so not a blocker for v0.4.36 by qa's rule, but a lost document. (qa 2026-11-08 02:47)
 - [ ] P0 SECTIONS-AHEAD-HANG (bool + core) **a Shell's regeneration never ends, in v0.4.33 too: the CPU budget can't stop
   OCCT's face/face sections made ahead on the thread pool.** CLI fuzz seed 5786, step 30 (a Shell, 0.5 mm, with or without
   NOSHAPE_BOOL_FALLBACK=0): on vibe3 it never finishes on v0.4.33's release CLI and on greens 91035029 / a70b2698 (4 / 4, the

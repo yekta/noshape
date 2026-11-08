@@ -36,6 +36,13 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 02:50: P0 CRASH-6297 filed (bool):** CLI fuzz seed 6297 (v0.4.35, step 97 Shell) → the saved document dies with a stack
+overflow on every open (`bez_apart` recursing ~2,770 deep on a rayon worker, free.rs), v0.4.33 through green 4fee814c; v0.4.32
+opens it. Repro tickets/crash6297/{open,rep}.py (also on vibe3); gdb by attaching to the CLI after document_open
+(tickets/crash6297/gdbopen.py: `handle all nostop noprint pass`, then SIGSEGV / SIGABRT stop; vibe3 has no gdb). Not new in the
+cut (shipped in 3 releases): not a v0.4.36 blocker. Greens 3950e447, f5d1d6cd, a07f6a3b, ffae56a0, 24829a72: sweeps unchanged.
+Fuzz now: v3cf17.sh (v0.4.35, 6261–6320), v3nf19.sh (a07f6a3b, 6321–6380). Crons are session-only: re-create the 04:13 / 16:47 lists.
+
 **11-08 00:45 (qa restarted ~00:25):** green 56603985: volume sweep, cf corpus, the 48 ticket documents = b9f855f0;
 **DOCS-SELECT-LEAVES-WAL verified** (0 -wal / -shm after a row click or right-click). Fuzz: nf b9f855f0 6141–6200 done, 0 deaths;
 vibe3 now runs v3cf16.sh (v0.4.35, at 6124 of 6081–6140) and v3nf18.sh (green 56603985, fallback off, 6201–6260). Suites loop
