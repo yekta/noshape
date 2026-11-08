@@ -732,6 +732,7 @@ fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         None => src_inputs.clone(),
     };
     let mut result = (Vec::new(), false);
+    let any = !copied.is_empty();
     let out = edit(od, tab, config::PASTE_INPUTS, |ps| {
         result = config::paste_inputs(ps, copied);
         Ok(json!({}))
@@ -740,6 +741,8 @@ fn copy_inputs(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     v["pasted"] = json!(result.0);
     if result.1 {
         v["info"] = json!("Visibility conditions for pasted inputs were updated.");
+    } else if any && result.0.is_empty() {
+        v["info"] = json!(config::NOTHING_PASTED);
     }
     Ok(v.into())
 }

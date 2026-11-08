@@ -4625,8 +4625,12 @@ pub struct ExternalField {
 /// A parameter's Configure / Unconfigure context-menu item (live psb 10-21 g).
 fn configure_items(m: crate::os_menu::OsMenu, view: &Entity<FeatureDialog>, param: &str, configured: bool) -> crate::os_menu::OsMenu {
     let (v, p) = (view.clone(), param.to_string());
-    m.item(crate::os_menu::OsMenuItem::new(if configured { "Unconfigure" } else { "Configure" }).on_click(move |_, _, cx| {
-        v.update(cx, |_, cx| cx.emit(if configured { DialogEvent::UnconfigureParam(p.clone()) } else { DialogEvent::ConfigureParam(p.clone()) }))
+    m.item(crate::os_menu::OsMenuItem::new(if configured { "Unconfigure" } else { "Configure" }).on_click(move |_, window, cx| {
+        v.update(cx, |_, cx| cx.emit(if configured { DialogEvent::UnconfigureParam(p.clone()) } else { DialogEvent::ConfigureParam(p.clone()) }));
+        // Live (ui-parity config-depth-configure): Configure leaves the keyboard to the page.
+        if !configured {
+            FeatureDialog::leave_keyboard_after_menu(&v, window, cx);
+        }
     }))
 }
 

@@ -960,10 +960,46 @@ impl VisibilityDialog {
     }
 }
 
+impl VisibilityDialog {
+    /// The parity suite's state, as live's recorder reads the dialog (ui-parity config-input-menu-visibility-conditions:
+    /// its Save / Cancel are inputs, its undo / redo the buttons, the text the always visible inputs' names, then the
+    /// preview's).
+    fn ui_state(&self, always: &[usize]) -> serde_json::Value {
+        let mut text: Vec<String> = always.iter().filter_map(|k| self.cfg.inputs.get(*k)).map(|i| i.name.clone()).collect();
+        text.push("Configurations".into());
+        let (vis, eff) = self.complete_only().visibility(&self.preview);
+        for (input, v) in self.cfg.inputs.iter().zip(&vis) {
+            if !v.visible && !self.show_hidden {
+                continue;
+            }
+            text.push(input.name.clone());
+            let value = eff.0.get(&input.id).cloned().unwrap_or_default();
+            match &input.kind {
+                ConfigInputKind::Checkbox { .. } => {}
+                ConfigInputKind::List { options, .. } => text.extend(options.iter().find(|o| o.id == value).map(|o| o.name.clone())),
+                _ => text.push(value),
+            }
+        }
+        text.push("Show hidden inputs".into());
+        serde_json::json!({
+            "kind": "modal",
+            "title": "Configuration visibility conditions",
+            "fields": [
+                { "label": "Show hidden inputs", "kind": "checkbox", "value": self.show_hidden },
+                { "label": null, "kind": "input", "value": "Save" },
+                { "label": null, "kind": "input", "value": "Cancel" },
+            ],
+            "buttons": ["icon:undo-button", "icon:redo-button"],
+            "text": text.join(" "),
+        })
+    }
+}
+
 impl Render for VisibilityDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let always = self.always_visible();
+        crate::ui_script::note_dialog(|| self.ui_state(&always));
         let current_index = self.current.as_ref().and_then(|c| self.cfg.inputs.iter().position(|i| &i.id == c));
         // Header: title, ⋯ (Expand / Collapse all inputs), the Inputs filter, ✕.
         let filter_label = current_index.map(|k| self.cfg.inputs[k].name.clone()).unwrap_or_else(|| "All inputs".into());

@@ -316,6 +316,8 @@ pub fn current(ps: &PartStudio, chosen: &noshape_model::configuration::ConfigVal
 // ------------------------------------------------------------ inputs between studios
 
 pub const PASTE_INPUTS: &str = "Paste configuration inputs";
+/// Paste inputs when every copied input's internal ID is taken (live ui-parity config-panel-paste-inputs).
+pub const NOTHING_PASTED: &str = "No inputs pasted. Existing inputs have the same internal FeatureScript ID.";
 
 /// Paste inputs: the copied inputs whose ids this studio doesn't have yet;
 /// visibility conditions needing missing inputs are repaired. Returns the

@@ -551,10 +551,15 @@ the graphics). Dynamic suppression's box completes like a number field ("true"),
 suppression added." / "…updated." / "…removed." (live 2289). Left, not ours: analysis-thickness ×3 (live's free account), external-thread /
 sm-form (account memory), fillet-chip ×2 ("Unknown" start), feature-menu-suppress-unsuppress (live hides the sketch
 row only after the server's regeneration), dialog-number-rclick-menu (live runner). Live 2289: "Edit dynamic
-suppression" is a hover submenu (its old recordings missed it; re-recorded 28a1e9df). Left, ours: focus kinds in
-config-* / part-menu-release / key-mod-shift-f / mirror-face-type / dialog-checkbox-convert-back,
-appearance-face-row-remove (the dialog field active), sketch-row-copy-paste-onto-front (asked live 11-07),
-variable-table-row-filter (related rows).
+suppression" is a hover submenu (its old recordings missed it; re-recorded 28a1e9df). 07:45: visibility conditions'
+modal recorded as live's recorder reads it, Paste inputs over taken IDs says "No inputs pasted. Existing inputs have
+the same internal FeatureScript ID." (ops' `info` too), the configuration ▾ holds the keyboard while open, a field's
+Configure leaves it (config-* now match but config-depth-configure: live counts Configure in the open dialog's undo;
+ours has it in the document's only). The Appearance editor's ✓ / ✕ clear its selection. Left, ours: focus kinds in
+part-menu-release / key-mod-shift-f / mirror-face-type / dialog-checkbox-convert-back, appearance-face-row-remove's
+row menu (live: Rename… · Edit appearance… · Suppress · Delete: needs model fields + ops; asked live, REQUESTS 07:01),
+sketch-row-copy-paste-onto-front (asked live 11-07), variable-table-row-filter (ours marks the row related at the
+right-click, live only after Filter feature list).
 Perf 42427964353 (main 5660398, all green), macOS 26: cold start 3446 ms (target 1000): 417 ms to the GPUI app,
 gpui-kit 470 ms (system fonts), **window creation 1044 ms** (later launches 20-100 ms; GPUI's metallib is precompiled
 in release, so it is the fresh VM's first window), first GPU frame 300 ms. Warm start 825 ms (met). Open 555 ms

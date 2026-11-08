@@ -2925,7 +2925,12 @@ impl PartStudioView {
             .child(crate::ui::glyph("ui-caret-up", 10., pal.text))
             .on_click(move |e: &ClickEvent, window, cx| {
                 let v = view.clone();
+                // The ▾ holds the keyboard while its menu is open, an item gives it to the page (live
+                // config-panel-paste-inputs: "other", then none).
+                let (held, after) = (v.read(cx).panel_row_focus.clone(), v.read(cx).focus.clone());
+                window.focus(&held, cx);
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+                    m = m.focus_after_action(after.clone());
                     for (label, icon, kind) in [("List", "cfg-filter-list", "List"), ("Checkbox", "cfg-filter-checkbox", "Checkbox"), ("Configuration variable", "cfg-filter-variable", "Variable")] {
                         let v = v.clone();
                         m = m.item(crate::os_menu::OsMenuItem::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |this, cx| if kind == "Variable" { this.open_variable_input(None, w, cx) } else { this.add_config_input(kind, cx) })));

@@ -148,6 +148,7 @@ impl PartStudioView {
     /// yet; visibility conditions needing missing inputs are repaired.
     pub(super) fn paste_config_inputs(&mut self, cx: &mut Context<Self>) {
         let copied = crate::config_visibility::copied_inputs();
+        let any = !copied.is_empty();
         let (mut pasted, mut repaired) = (Vec::new(), false);
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::config::PASTE_INPUTS, cx, |ps| (pasted, repaired) = noshape_ops::config::paste_inputs(ps, copied));
@@ -157,6 +158,8 @@ impl PartStudioView {
         } else if !pasted.is_empty() {
             // Live 439: "Size pasted."
             self.flash_success(if pasted.len() == 1 { format!("{} pasted.", pasted[0]) } else { "Inputs pasted.".into() }, cx);
+        } else if any {
+            self.flash_info(noshape_ops::config::NOTHING_PASTED.into(), cx);
         }
         self.config_dirty(cx);
     }

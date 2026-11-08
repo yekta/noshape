@@ -4141,6 +4141,7 @@ fn configuration_panel_inputs() {
     // Again: nothing new to paste.
     let again = call(&mut ctx, "config_copy_inputs", json!({ "from": "Part Studio 1", "tab": "Holder" }));
     assert_eq!(again["pasted"], json!([]));
+    assert_eq!(again["info"], json!("No inputs pasted. Existing inputs have the same internal FeatureScript ID."), "live's words: {again}");
     // A Derived feature of Part Studio 1 follows Holder's Size.
     // By tab name (stored as the tab's id); not a Part Studio: refused (qa4 CFG-MASS).
     let e = try_call(&mut ctx, "feature_add", json!({ "tab": "Holder", "type": "importDerived", "params": { "partStudio": "Assembly 1" } })).unwrap_err();
