@@ -557,8 +557,21 @@ struct PickState {
 /// tab) and inserts it. "Other documents" lists the library's documents;
 /// open one to pick from its files (live: Insert image / Select a DWT
 /// have Current document | Other documents, drawing.md EX17, S13).
+/// The open file picker's search box (the parity runner's focus: a field while it has the keyboard).
+struct PickerSearch(Option<WeakEntity<InputState>>);
+impl Global for PickerSearch {}
+
+/// Whether the file picker's search box has the keyboard.
+pub fn picker_search_focused(window: &Window, cx: &App) -> bool {
+    cx.try_global::<PickerSearch>().and_then(|p| p.0.as_ref()).and_then(|w| w.upgrade()).is_some_and(|s| s.read(cx).focus_handle(cx).is_focused(window))
+}
+
 pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [FileKind], exts: &'static [&'static str], window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
     let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search files"));
+    // Live (live2 drw-insert-image): the search box has the keyboard as the picker opens.
+    cx.set_global(PickerSearch(Some(search.downgrade())));
+    let focus = search.clone();
+    window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
     let state = cx.new(|_| PickState::default());
     let on_pick = std::rc::Rc::new(on_pick);
     // This document isn't one of the others (its path may be relative,

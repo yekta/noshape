@@ -924,6 +924,17 @@ impl DrawingEditor {
         }
         let panel = v_flex()
             .id("dr-chooser")
+            // Replace...'s chooser: Esc closes it, even from its search box (live2 drw-sheet-ref-replace).
+            .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
+                if this.insert.replace.is_some() {
+                    this.insert.chooser = None;
+                    this.insert.replace = None;
+                    this.insert.replace_part = None;
+                    window.focus(&this.focus, cx);
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
             .w(px(300.))
             .max_h(px(582.))
             .flex_none()

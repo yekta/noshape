@@ -85,7 +85,14 @@
     {
       "do": "rclick",
       "on": {
-        "annotation": "0.197"
+        "view_point": {
+          "view": "Top",
+          "at": [
+            -1,
+            1,
+            20
+          ]
+        }
       }
     },
     {

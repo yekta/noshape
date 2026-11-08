@@ -466,7 +466,8 @@ impl DrawingEditor {
                         |d| {
                             if d.standard != g {
                                 d.standard = g;
-                                d.pattern = hatch_pat::default_pattern(g);
+                                // Edit hatch section's General opens on None (live2 drw-section-hatch-general-none).
+                                d.pattern = if section_mode && g == 2 { NO_PATTERN } else { hatch_pat::default_pattern(g) };
                             }
                         },
                         cx,

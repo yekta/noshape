@@ -177,7 +177,7 @@ impl DrawingEditor {
                 // Onshape::Dimension::Ordinate "ordinate", Onshape::SurfaceFinishSymbol "surfacefinishsymbol".)
                 let k = match variant {
                     "OrdinateDimension" | "OrdinateGroup" => "ordinate",
-                    "ForeshortenedRadial" | "ForeshortenedDiameter" => "dimension",
+                    "ForeshortenedRadial" | "ForeshortenedDiameter" => "foreshortened",
                     v if v.ends_with("Dimension") => "dimension",
                     "Note" => "note",
                     "Centermark" => "centermark",
@@ -232,8 +232,9 @@ impl DrawingEditor {
             })
             .collect();
         views.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-        // Live's recorder lists no datum target (live2 drw-datum-target).
-        let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().filter(|(_, k, _)| *k != "datumtarget").map(|(_, k, t)| (k, t)).collect();
+        // Live's recorder lists no datum target (live2 drw-datum-target), nor a foreshortened dimension (live2
+        // drw-dimension-foreshorten: its export drops it).
+        let mut annotations: Vec<(&str, String)> = self.ui_annotations().into_iter().filter(|(_, k, _)| !matches!(*k, "datumtarget" | "foreshortened")).map(|(_, k, t)| (k, t)).collect();
         // A view's label is a note in live's export ("SECTION A - A", 2063); a table its drawn texts.
         if let Some(b) = &self.built {
             // (A hole table isn't in live's exports, nor its recorder's state: live 2134.)
@@ -367,6 +368,11 @@ impl DrawingEditor {
     /// drw-note-delete, drw-view-properties: list null, focus other).
     fn ui_list(&self, cx: &App) -> Option<Value> {
         if self.frame_menu.as_ref().is_some_and(|m| noshape_app_core::os_menu::is_open_menu(m, cx)) {
+            return None;
+        }
+        // A dropdown of a panel over the drawing (Drawing properties' selects, the Inspection table's ⋯): live's are
+        // in the drawing's iframe too (live2 drw-drawprops-*, drw-inspection-table-export-csv).
+        if noshape_app_core::os_menu::open_position(cx).is_some_and(|p| self.bounds.contains(&p)) {
             return None;
         }
         noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list)

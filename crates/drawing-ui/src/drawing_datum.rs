@@ -620,13 +620,28 @@ impl DrawingEditor {
                             .pl(px(10.))
                             .child(label_row)
                             .child(div().border_b_1().border_color(gpui_kit::rgb(0xcccccc)).child(mode_btn))
-                            .child(field_box(("dt-origin", k), "Origin", opts.origin.map(|_| "Point".to_string()), picking).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                                if let Some(d) = &mut this.datum_dlg {
-                                    d.picking_origin = Some(k);
-                                    d.picking_dir = None;
-                                }
-                                cx.notify();
-                            })))
+                            .child(
+                                field_box(("dt-origin", k), "Origin", opts.origin.map(|_| "Point".to_string()), picking)
+                                    .relative()
+                                    // Its chip's × clears it (live2 drw-datum-target-hide-dim).
+                                    .when(opts.origin.is_some(), |d| {
+                                        d.child(div().id(("dt-origin-x", k)).absolute().right(px(4.)).bottom(px(3.)).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                            cx.stop_propagation();
+                                            if let Some(r) = this.datum_dlg.as_mut().and_then(|d| d.rows.get_mut(k)) {
+                                                let o = r.ann.target.get_or_insert_with(Default::default);
+                                                (o.origin, o.origin_ref) = (None, None);
+                                            }
+                                            this.datum_preview(cx);
+                                        })))
+                                    })
+                                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                                        if let Some(d) = &mut this.datum_dlg {
+                                            d.picking_origin = Some(k);
+                                            d.picking_dir = None;
+                                        }
+                                        cx.notify();
+                                    })),
+                            )
                             .child(field_box(("dt-loc", k), "Target location", Some("Point".into()), false))
                             // Length: X / Y positions; Angle: Diameter distance,
                             // Radial lines, Reference line, Angle, Instance count,
@@ -901,7 +916,7 @@ fn datum_dlg_texts(d: &DatumDlg) -> Vec<String> {
         }
         out.extend(["Length", "Angle", "Origin"].map(String::from));
         if opts.origin.is_some() {
-            out.push("Point".into());
+            out.extend(["Point", "×"].map(String::from));
         }
         out.extend(["Target location", "Point"].map(String::from));
         if opts.angular {

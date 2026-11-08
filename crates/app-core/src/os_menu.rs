@@ -837,6 +837,11 @@ pub fn is_open_menu(menu: &WeakEntity<OsMenu>, cx: &App) -> bool {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).is_some_and(|(_, _, _, m, _)| m.downgrade() == *menu)
 }
 
+/// Where the open menu was opened (window coordinates).
+pub fn open_position(cx: &App) -> Option<Point<Pixels>> {
+    cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, p, _, _, _)| *p)
+}
+
 /// The open menu's rows (see [`OsMenu::labels`]).
 pub fn open_labels(cx: &App) -> Vec<String> {
     cx.try_global::<OsMenuHost>().and_then(|h| h.0.as_ref()).map(|(_, _, _, m, _)| m.read(cx).labels()).unwrap_or_default()

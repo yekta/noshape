@@ -836,7 +836,12 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         }
         s
     } else if let Some(d) = w.active_drawing() {
-        d.read(cx).ui_state(cx)
+        let mut s = d.read(cx).ui_state(cx);
+        // The Insert image / DXF picker's search box (live: a field).
+        if noshape_app_core::file_tab_view::picker_search_focused(window, cx) {
+            s["focus"] = serde_json::json!({ "kind": "field", "label": null });
+        }
+        s
     } else if let Some(a) = w.active_assembly() {
         a.read(cx).ui_state(cx)
     } else {
