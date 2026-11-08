@@ -30,7 +30,10 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
   "start two-blocks", ours "Part Studio 1").
 - Asked: 2267 (sketch bodies for the corpus' studios; 3 studios without any live lines), 2269 (toast fade), 2271
   (Feature Studios and imported files not fetched). Ticket FRAME-PROFILE-OTHER-STUDIO (psui, 41 occurrences).
-- Next: re-run robot-relations + xdev-subs (why its subassemblies place 7/286), then the next gaps by occurrences.
+- Then (06:45): a subassembly live left out of its fetch (suppressed instances) no longer stops the others being built:
+  xdev-subs 7 → 90/286, robot-relations 123/139 (mates 2/7). Corpus total ≈ 1044/1701. xdev-subs' rest: 34 vendor
+  Parasolid files our reader refuses (ticket XT-B3-BINARY-TRANSMIT, dx).
+- Next: the next gaps by occurrences (rank_studios.py on the newest log), the ui-parity config steps after step 2.
 
 ## Paused (2026-11-07 20:08 UTC; lead: Claude quota, resume Monday 11-10)
 Where everything stood:

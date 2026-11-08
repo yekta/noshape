@@ -5259,7 +5259,9 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
     let mut made: HashSet<String> = HashSet::new();
     let mut order: Vec<usize> = Vec::new();
     while order.len() + 1 < levels.len() {
-        let next = (1..levels.len()).find(|k| !order.contains(k) && levels[*k].instances.iter().all(|i| i["type"] != "Assembly" || i["elementId"].as_str().is_some_and(|e| made.contains(e))));
+        // (A subassembly live didn't send waits for nothing: its instances are reported as not translated.)
+        let sent = |e: &str| levels.iter().skip(1).any(|l| l.element == e);
+        let next = (1..levels.len()).find(|k| !order.contains(k) && levels[*k].instances.iter().all(|i| i["type"] != "Assembly" || i["elementId"].as_str().is_some_and(|e| made.contains(e) || !sent(e))));
         let Some(k) = next else {
             res.untranslated.push("subassemblies: a cycle, or one not in subAssemblies".into());
             break;

@@ -4286,6 +4286,12 @@ were checked in code by asm; "(verify)" ones need a live check first.
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P1 XT-B3-BINARY-TRANSMIT (dx; asm 2026-11-08 06:18 UTC, the assembly corpus' xdev-subs): **a Parasolid file with a text
+  header (`FORMAT=binary`) whose body starts `B3   : TRANSMIT FILE created by modeller version 2900122
+  SCH_900000_9008` is refused**: "parasolid: not a transmit file" (crates/kernel/cpp/xt_read.cpp takes `PS\0\0` binary
+  or `T` text after the header). Written by Cadenas PARTsolutions (vendor parts: SCHUNK, Misumi); Onshape imports them.
+  34 of xdev-subs' Import features fail on it, most of its 286 occurrences. Files:
+  /root/parity/models/asm-xdev-subs/studios/foreign/*.x_t (e.g. 35719e9b95115579abbe6158.x_t, 199 kB).
 - [x] (dx 11-03 07:55: live's sketch frames are now read (its fetch names them `transformMatrix`), so the face edges
   map into the sketch; the pieces whose own curves are exactly the named ones, nearest the named face edges, each
   picked once: clamp-hms Extrude 2 now takes live's 5 pieces and fails only on EXTRUDE-UP-TO-FACE-BEYOND) P2 PARITY-IMPRINT-REGION-QUERY (dx; core 11-03 from SKETCH-FACE-IMPRINT) clamp-hms Extrude 2 still "no region of
