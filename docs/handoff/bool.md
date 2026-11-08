@@ -51,6 +51,21 @@ scratch /root/bool-scratch.
   gate's first recorded exception: vibe4 ~/agents/bool-corpora/valve2/live (brep_replay reads a corpus's `live` file:
   "<case> <capture>" lines, reported "as live, OCCT differs"); valve2 added to whyall's corpora. T1
   bool_patterns::a_valve_handle_cut_past_a_cones_apex_as_occt and a_valve_handles_pattern_keeps_both_short_edges_as_live.
+- **Blend's direct ring (lead 11-08), fix 3a9d52c0 in agent/bool's worktree (checks running):** by_quadrics failed on
+  c2-rings-loft's Fillet 1 built directly, in memory, and worked after a BRep write/read. Not layout (copies, shifted
+  allocations: all fail). A diff of the two (edges' representations, flags, tolerances, curves' ends, vertices, faces:
+  /root/bool-scratch/wip/ring-direct-shell-1108.patch, on branch ring-direct-wip with blend's switch) found one thing:
+  two edges along a closed surface's u = 0 line end at u = +3.5e-18 in memory and -5.9e-17 read back. The repair then
+  found an edge's curve on the wall's face 13 (closed in v, span 0.0645) jumping across the seam and remade it walking
+  from its end, the end on the far side: 0.0496 m off, the wall invalid. Now remade from its middle outward, both
+  ways: 9e-12 off, rings-loft 12/32 in memory and read back alike. No T1: a test can't hold the in-memory sign (a
+  BRep read gives the other one); BLEND-DIRECT's own tests will. Tried and not kept: unwrapping add_pcurve's poles and
+  the marched feet on closed surfaces (not this case's).
+- **Queue from core (lead 11-08), largest first:** cf-snap-hook Snap Hook 1/2 (1.1-1.4 s, live 81 ms: OCCT cuts of
+  750-850 ms each, several), cf-snap-hook Sweep 1 (372 / 21 ms: a 577 ms cut), c2-housing-draft Rotieren 1 (323 / 13 ms:
+  a 170 ms cut); c2-valve-config Extrude 2's cut is ours with the valve land. Reproduce with NOSHAPE_PARITY_ONLY. Core
+  adds a change-scope from OCCT's history for the unify after them (noted here when it lands). Review core's
+  FACE-PATTERN-30-CUT-SLOW (boolean.cpp's pattern-cut path) against the gate when it lands.
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
