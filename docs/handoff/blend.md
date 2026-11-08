@@ -163,6 +163,16 @@ Landed 09:10 as 0cb8ba5d. rings-loft through it (branch ring-direct-wip): Fillet
 Shell 1 fails on the in-memory result and works after a BRep write/read (bool.md "From blend 05:06", update 09:54).
 DOCK-CORNER through it (branch blend-direct-wip): the corner tools (trimmed arc, common, vertical) overlap and the 2D
 splits don't close yet; next step there: fuse each corner's three small tools into one before the direct build.
+11-08 11:10, branch dock-corner2 (WIP, not landed): each corner's tools fused into one (OCCT, ~10 ms a corner), the
+direct build then makes the stand-in exactly as live (23/61/40, 8480.50537 mm³; T1 asserts it on the branch). Fixes on
+the way: part vertices seeded so cuts ending at a face's corner share its vertex; a section stopping a hair short of
+either face's edge (IntSS near a tangency) run on to it; overlaps counted only with real length (two pieces of one
+curve touch); a free end run on only for arcs and only where a probe past it is air. In the user's document Fis
+Gecidi R now builds directly (Part 1 valid, not self-intersecting, 227 faces) and so do USB Pencere R and Kapak Alt R,
+but each is slower than main's OCCT route: 275 / 225 / 517 ms against 60 / 24 / 328 (classifications against the
+tools ~0.6 ms each, 50-140 a fillet; sections ~0.5 ms each, 35-100 a fillet). Not landable as a speed regression; the
+next levers: classify by 2D position on the tools' strip faces instead of 3D solid classifiers, and skip sections
+whose faces only touch along an edge (end caps against the supports' neighbours).
 : blends built with no cut (lead 11-07 23:20: design (b))
 Why: of the blend time the suite compares with live (67 features before each document's first difference: ours 2221
 ms, live 773), two thirds is OCCT cutting the part by blend-region tools whose faces lie on its faces (rings-loft's
