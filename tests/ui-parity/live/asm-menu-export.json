@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-export",
- "recorded": "2026-11-07T00:55:26.132Z",
+ "recorded": "2026-11-08T00:04:54.094Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.1"
+  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.11"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "a0eacde55e151f60fbc91305",
+  "document": "b53c968665192de2f2abd604",
+  "workspace": "7b0b6595e901fbd641dd1a39",
+  "element": "a7222f060410368356b2ae57",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "1d65bf6416087417d0d32074",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 38441
+   "t": 27751
   },
   {
    "step": 2,
@@ -334,7 +336,7 @@
       {
        "label": "Format",
        "kind": "select",
-       "value": "STEP"
+       "value": "PARASOLID"
       },
       {
        "label": "Export models oriented Y axis up",
@@ -342,32 +344,12 @@
        "value": false
       },
       {
-       "label": "Preprocessing",
-       "kind": "select",
-       "value": "None"
-      },
-      {
        "label": "Version",
        "kind": "select",
-       "value": "AP242"
+       "value": "25.0"
       },
       {
        "label": "Use latest version",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
-       "label": "Use custom units for export",
-       "kind": "checkbox",
-       "value": false
-      },
-      {
-       "label": "Include derived tolerances in export",
-       "kind": "checkbox",
-       "value": true
-      },
-      {
-       "label": "Use custom annotation text height for MBD export",
        "kind": "checkbox",
        "value": false
       },
@@ -380,9 +362,11 @@
      "buttons": [
       "Export",
       "Cancel"
-     ]
+     ],
+     "text": "File name View export rules Format PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL Inspection list Export models oriented Y axis up Version 38.1 37.1 37.0 36.0 35.1 34.1 34.0 33.1 33.0 32.1 32.0 31.1 31.0 30.1 30.0 29.1 29.0 28.1 28.0 27.1 27.0 26.1 26.0 25.1 25.0 Use latest version Options Download Download and store file in a new tab Store file in a new tab"
     },
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -497,7 +481,7 @@
     },
     "drawing": null
    },
-   "t": 41905
+   "t": 30353
   },
   {
    "step": 3,
@@ -512,6 +496,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": null,
     "selection": {
      "count": 0,
@@ -626,7 +611,7 @@
     },
     "drawing": null
    },
-   "t": 45776
+   "t": 34000
   }
  ]
 }
