@@ -33,7 +33,7 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 21:12 UTC: NEXT (lead 21:1x, in order): (1) c2-fan-blade-sweep's source studio fb207f79 at Extrude 7
+**State 11-08 21:08 UTC: NEXT (lead 21:1x, in order): (1) c2-fan-blade-sweep's source studio fb207f79 at Extrude 7
 (feature 15): ours 10 faces, live 11 (one edge short), blocks Derived 1 and 53 features (blend's note with b3f3df84e);
 also feature 13 External thread 1's missing info message. Run alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/
 c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54 (vibe5). (2) If live 2380 (knife) hasn't

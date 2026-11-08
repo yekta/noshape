@@ -668,6 +668,26 @@ pub fn link_tapped_depths(prev: &ParamValues, now: &ParamValues, units: &noshape
     }
 }
 
+/// An external thread standard's sizes as std's searchExternalThreads lists them: each size's first pitch (its path)
+/// and that entry's hole diameter, sorted by the diameter.
+pub fn external_thread_sizes(standard_id: &str) -> Vec<(Vec<String>, f64)> {
+    let std = vec![standard_id.to_string()];
+    let Some((Entry::Level(sizes), _)) = walk(TABLE_EXTERNAL_THREAD, &std) else { return Vec::new() };
+    let mut out: Vec<(Vec<String>, f64)> = sizes
+        .entries
+        .iter()
+        .filter_map(|(size, _)| {
+            let level = vec![standard_id.to_string(), size.clone()];
+            let (Entry::Level(pitches), _) = walk(TABLE_EXTERNAL_THREAD, &level)? else { return None };
+            let path = vec![standard_id.to_string(), size.clone(), pitches.entries.first()?.0.clone()];
+            let d = table_values(TABLE_EXTERNAL_THREAD, &path)?.hole_diameter;
+            Some((path, d))
+        })
+        .collect();
+    out.sort_by(|a, b| a.1.total_cmp(&b.1));
+    out
+}
+
 pub fn external_thread_for_diameter(standard_id: &str, diameter: f64, tol: f64) -> Option<Vec<String>> {
     let std = vec![standard_id.to_string()];
     let (Entry::Level(sizes), _) = walk(TABLE_EXTERNAL_THREAD, &std)? else { return None };

@@ -678,6 +678,27 @@ fn external_thread_is_cosmetic() {
     assert!(b.shape.edges().iter().any(|e| noshape_kernel::distance(&split, e).is_ok_and(|d| d.distance < 1e-9)), "no edge at z = 10 mm");
 }
 
+/// std externalThread.fs checkNonMatchingSize (live: c2-fan-blade-sweep's source, External thread 1 on a Ø6.8 boss,
+/// ISO M7: "Exact match for thread size not found."): the standard's size nearest the cylinder against the chosen one.
+#[test]
+fn an_external_thread_says_when_its_size_isnt_the_cylinders() {
+    let status = |diameter: f64, size: &str| {
+        let mut t = T::new();
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, diameter / 2.0));
+        let r = t.regions(s)[0].clone();
+        t.extrude(r, "20 mm", "NEW");
+        let res = t.ok();
+        let edge = edge_near(&res.context.bodies[0], DVec3::new(diameter / 2.0, 0.0, 0.02));
+        t.add("externalThread", &[("entities", q(vec![edge])), ("branchOfStandard", ParamValue::Lookup(vec!["ISO".into(), size.into()]))]);
+        let res = t.ok();
+        let st = res.display.features.last().unwrap().clone();
+        (st.status, st.message.unwrap_or_default())
+    };
+    assert_eq!(status(0.008, "M8"), (FeatureStatus::Ok, String::new()));
+    assert_eq!(status(0.0079, "M8"), (FeatureStatus::Info, "Exact match for thread size not found.".to_string()));
+    assert_eq!(status(0.008, "M6"), (FeatureStatus::Info, "Non-matching thread size selected.".to_string()));
+}
+
 // ------------------------------------------------------------------ detail extras
 
 #[test]

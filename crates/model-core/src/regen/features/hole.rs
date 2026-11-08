@@ -894,6 +894,22 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
     if ev.is("depthType", "Blind") && ev.length("threadDepth")? <= 0.0 {
         return crate::regen::eval::err_at(&["threadDepth"], "Error regenerating: a parameter is out of range.");
     }
+    // std externalThread.fs checkNonMatchingSize: the standard's size nearest the cylinder, against the chosen one.
+    if let Some(r) = radius {
+        let d = 2.0 * r;
+        let minor = ht::table_values(ht::TABLE_EXTERNAL_THREAD, &path).and_then(|v| v.minor_diameter).unwrap_or(0.0);
+        if let Some((found, size)) = nearest_thread_size(&ht::external_thread_sizes(&path[0]), d) {
+            let other = found.get(1) != path.get(1);
+            if (other || (size - d).abs() > THREAD_TOL) && d < minor {
+                return err("Minor diameter cannot exceed cylinder diameter.");
+            }
+            if other {
+                ev.infos.push("Non-matching thread size selected.".into());
+            } else if (size - d).abs() > THREAD_TOL {
+                ev.infos.push("Exact match for thread size not found.".into());
+            }
+        }
+    }
     if ev.is("depthType", "Blind") && !ev.bool("addUndercut") && ev.bool("splitFace") {
         let depth = ev.length("threadDepth")?;
         for (id, center, axis, r, fi) in threads {
@@ -901,6 +917,25 @@ pub fn external_thread(ev: &mut EvalCtx) -> FResult<()> {
         }
     }
     Ok(())
+}
+
+/// std's TOLERANCE.zeroLength (metres).
+const THREAD_TOL: f64 = 1e-8;
+
+/// std externalThread.fs searchExternalThreads: the size (path, diameter) nearest `d` among `sizes` (sorted by
+/// diameter): below the first or above the last, that one; else the nearer of the two around it, the larger on a tie.
+fn nearest_thread_size(sizes: &[(Vec<String>, f64)], d: f64) -> Option<(Vec<String>, f64)> {
+    let (first, last) = (sizes.first()?, sizes.last()?);
+    if d < first.1 + THREAD_TOL {
+        return Some(first.clone());
+    }
+    if d > last.1 - THREAD_TOL {
+        return Some(last.clone());
+    }
+    let i = (1..sizes.len()).find(|&i| d <= sizes[i].1 + THREAD_TOL && d > sizes[i - 1].1 + THREAD_TOL)?;
+    let (a, b) = ((d - sizes[i - 1].1).abs(), (sizes[i].1 - d).abs());
+    let pick = if (a - b).abs() <= THREAD_TOL || a > b { i } else { i - 1 };
+    Some(sizes[pick].clone())
 }
 
 /// Split the cylindrical face `fi` of body `id` by the circle `depth` from
