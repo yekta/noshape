@@ -856,6 +856,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - The other 5 (asm-face-menu-find-in-instance-list, asm-triad-rotate-180, drw-centerline-circle-3-point,
     drw-datum-target-show-dims, ver-cmp-leave-workspace-row) match alone (load). The re-runs were on 4b09e98c, which has studios'
     3759eac77 (messages / focus recorded as live's); the 14:11 run is the first suite run with it.
+  **qa 19:20, the 14:11 run (green 4b09e98c, the first with studios' 3759eac77) against the 09:43 one:** models 74/87 → 75/87,
+  features 754 → 756/951, scenarios 886/1275 → 984/1285 (95 better, 2 worse), parity index 74.4 → 78.7. Studios' recording
+  change made no scenario worse. Flags:
+  - dx (bool / core candidates: 5df2c0e3f Shell's seam repair, ffae2904f unify's skipped tries, 60ac589cd): data exchange 75.0 →
+    74.0: "live imports ours.x_t" for cf-o-ring-generator now differs, "Part 2": 27/30/8 faces/edges/vertices, live 27/26/0 (it
+    matched at 09:43); ours reads its own .x_t back unchanged, so the written Parasolid's edges changed.
+  - core: c2-impeller-loft 14.9 → 19.8 s (×1.3; the loft start-step changes 9d81e3553 / 50eb4ecfe are in the range).
+  - Load, not regressions: asm-empty-menu, asm-face-menu-select-other (both matched alone today; UIP-ASM-FACE-MENU-FLAKY).
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
