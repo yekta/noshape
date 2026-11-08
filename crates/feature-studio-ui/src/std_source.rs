@@ -1,9 +1,9 @@
 //! Ctrl+click on a standard library symbol in a Feature Studio. Live
 //! (dom/fs-nav-shortcuts.txt): Onshape opens the "std" document at version
-//! 3095.0 in a new browser tab ("Versions are view only. Viewing 3095.0."),
+//! 3112.0 in a new browser tab ("Versions are view only. Viewing 3112.0."),
 //! on the module's tab ("evaluate.fs"), with the caret on the exported name
 //! (evArea: line 152, column 17). Here: a local "std" document with one
-//! Feature Studio per module, versioned "3095.0", built once in the config
+//! Feature Studio per module, versioned "3112.0", built once in the config
 //! directory and opened at that version in a new window.
 
 use crate::gpu::Gpu;

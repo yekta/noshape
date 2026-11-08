@@ -82,7 +82,7 @@ pub fn parse_type_id(type_id: &str) -> Option<(&str, &str)> {
 
 /// Onshape's new Feature Studio: the version header and the common.fs
 /// import, caret on line 4.
-const TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
+const TEMPLATE: &str = "FeatureScript 3112;\nimport(path : \"onshape/std/common.fs\", version : \"3112.0\");\n\n";
 
 // ---------------------------------------------------------------- custom tables
 // What a custom table (`defineTable`) or a hole table gives; tables are evaluated in noshape-custom.

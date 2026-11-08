@@ -8,7 +8,7 @@ use noshape_model::document::{TabContent, TabId};
 /// Source of a new Feature Studio (Onshape's template).
 /// A new Feature Studio: the two template lines, then empty lines 3 and 4 with the
 /// caret on 4 (live, qa5 FS1: four lines, not five).
-pub const FS_TEMPLATE: &str = "FeatureScript 3095;\nimport(path : \"onshape/std/common.fs\", version : \"3095.0\");\n\n";
+pub const FS_TEMPLATE: &str = "FeatureScript 3112;\nimport(path : \"onshape/std/common.fs\", version : \"3112.0\");\n\n";
 
 /// Tab kinds of the "+" menu: (kind id, base name).
 pub const TAB_KINDS: [(&str, &str); 6] = [

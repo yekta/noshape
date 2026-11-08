@@ -27,10 +27,10 @@ pub use compile::{CompileError, CompiledModule, Level, compile_module, std_modul
 pub use interp::{Exception, Interp, Notice, NoticeKind};
 pub use value::Value;
 
-/// The embedded standard library version (`FeatureScript 3095;`).
-pub const STD_VERSION: u32 = 3095;
+/// The embedded standard library version (`FeatureScript 3112;`): live's current release, new Feature Studios' pin.
+pub const STD_VERSION: u32 = 3112;
 /// Value of `@getLanguageVersion()`.
-pub const LANGUAGE_VERSION: u32 = 3095;
+pub const LANGUAGE_VERSION: u32 = 3112;
 
 include!(concat!(env!("OUT_DIR"), "/std_sources.rs"));
 

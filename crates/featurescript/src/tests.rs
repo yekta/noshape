@@ -547,9 +547,9 @@ fn std_unit_and_vector_operators_answer_as_their_bodies() {
 
 
 /// std_ops answers std's operators and length predicates natively from std_ops::SINCE: every shipped release from
-/// there has them as 3095 has (a new release that changes one fails here: move SINCE past it).
+/// there has them as the embedded release has (a new release that changes one fails here: move SINCE past it).
 #[test]
-fn natively_answered_std_texts_are_3095s_from_since() {
+fn natively_answered_std_texts_are_the_embedded_releases_from_since() {
     let ops = |src: &str, file: &str| -> Vec<String> {
         let heads: &[&str] = match file {
             "units.fs" => &["export operator", "export predicate isLength(val)", "export function reciprocal(", "export function unitProduct(", "export const LENGTH_UNITS"],
@@ -570,7 +570,7 @@ fn natively_answered_std_texts_are_3095s_from_since() {
         out
     };
     for file in ["units.fs", "vector.fs", "surfaceGeometry.fs", "containers.fs"] {
-        let now = ops(crate::std_source_at(crate::STD_VERSION, file).expect("3095"), file);
+        let now = ops(crate::std_source_at(crate::STD_VERSION, file).expect("embedded"), file);
         for v in crate::std_versions().into_iter().filter(|v| *v >= crate::std_ops::SINCE) {
             let theirs = ops(crate::std_source_at(v, file).expect("shipped"), file);
             let differ: Vec<&String> = now.iter().filter(|x| !theirs.contains(x) && !x.starts_with("export operator^")).collect();
