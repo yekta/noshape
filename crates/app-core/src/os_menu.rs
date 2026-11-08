@@ -58,6 +58,8 @@ pub enum MenuIcon {
     /// A color swatch: 17 px, radius 3 (live menus/rmb-ps-featurelist-sketch:
     /// "Edit sketch appearance…" shows the sketch's color).
     Swatch(Hsla),
+    /// A custom feature's initials box ("uF"; live's custom features menus).
+    Initials(SharedString),
 }
 
 /// One row of an [`OsMenu`].
@@ -125,6 +127,14 @@ impl OsMenuItem {
         self
     }
 
+    /// A custom feature's initials box at the left ("uF" for "uip Feature").
+    pub fn initials(mut self, name: &str) -> Self {
+        if let Self::Item { icon: i, .. } | Self::Submenu { icon: i, .. } = &mut self {
+            *i = Some(MenuIcon::Initials(SharedString::from(name.to_string())));
+        }
+        self
+    }
+
     /// A ✓ at the icon position (camera menu choices).
     pub fn checked(mut self, on: bool) -> Self {
         if let Self::Item { checked, .. } = &mut self {
@@ -157,6 +167,8 @@ impl OsMenuItem {
 /// clicked (also from a submenu), on Esc and on a click outside.
 pub struct OsMenu {
     items: Vec<OsMenuItem>,
+    /// Rows' side tooltips (`side_tip`), by row.
+    tips: std::collections::HashMap<usize, (SharedString, SharedString)>,
     focus: FocusHandle,
     hovered: Option<usize>,
     /// The row under a pointer that hasn't moved since the menu opened is found once, on the first paint.
@@ -232,7 +244,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, tips: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -359,6 +371,15 @@ impl OsMenu {
 
     pub fn item(mut self, item: impl Into<OsMenuItem>) -> Self {
         self.items.push(item.into());
+        self
+    }
+
+    /// The last row's side tooltip: its text, then `extra` once it has shown a while (live's custom features menu:
+    /// the name, then "Feature from current workspace").
+    pub fn side_tip(mut self, text: impl Into<SharedString>, extra: impl Into<SharedString>) -> Self {
+        if let Some(last) = self.items.len().checked_sub(1) {
+            self.tips.insert(last, (text.into(), extra.into()));
+        }
         self
     }
 
@@ -579,6 +600,7 @@ impl Render for OsMenu {
                         MenuIcon::Named(n) => crate::assets::icon(n, icon_sz, cx).into_any_element(),
                         MenuIcon::Kit(k) => div().size(px(icon_sz)).flex().items_center().justify_center().child((**k).clone().with_size(px(12.)).text_color(pal.text)).into_any_element(),
                         MenuIcon::Swatch(c) => div().size(px(icon_sz)).flex().items_center().justify_center().child(div().flex_none().size(px(17.)).rounded(px(3.)).bg(*c)).into_any_element(),
+                        MenuIcon::Initials(n) => div().size(px(icon_sz)).flex().items_center().justify_center().child(crate::ui::initials_icon(n)).into_any_element(),
                     })
                 };
                 // "Label\tbeta": the label and a blue badge (live drawing/447:
@@ -649,7 +671,11 @@ impl Render for OsMenu {
                 match item {
                     // Bootstrap dropdown dividers have 7 px margins.
                     OsMenuItem::Separator => div().h(px(1.)).w_full().when(dropdown, |d| d.my(px(7.))).bg(gpui_kit::rgb(0xdddddd)).into_any_element(),
-                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, .. } => row(ix)
+                    OsMenuItem::Item { label, icon, checked, disabled, keys, user, note, .. } => self
+                        .tips
+                        .get(&ix)
+                        .cloned()
+                        .map_or_else(|| row(ix), |(text, extra)| crate::ui::with_side_tooltip_expanded(row(ix), text, extra))
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
                         // Chrome's native list: #1967d2 / white; in dark #99c8ff / black (live dk-pref-select-open).

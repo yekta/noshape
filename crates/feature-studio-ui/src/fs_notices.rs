@@ -173,9 +173,16 @@ impl FsNoticesPanel {
                         .child(os::glyph(os::GLYPH_PULSE, 20., rgb(0x666666)))
                         .child(div().text_size(px(14.)).font_weight(FontWeight::MEDIUM).text_color(rgb(0x666666)).child("Monitor"))
                         .child(os::glyph(os::GLYPH_CARET, 8., rgb(0x1651b0)))
-                        .on_click(move |_, _, cx| {
+                        // Live 2361: a dropdown of Monitor and Profile for this studio.
+                        .on_click(move |e: &ClickEvent, window, cx| {
                             cx.stop_propagation();
-                            set_monitored(&doc, id, cx)
+                            let (d1, d2) = (doc.clone(), doc.clone());
+                            let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                                m.dropdown()
+                                    .item(crate::os_menu::OsMenuItem::new("Monitor").icon_name("fs-monitor").on_click(move |_, _, cx| set_monitored(&d1, id, cx)))
+                                    .item(crate::os_menu::OsMenuItem::new("Profile").icon_name("regen-timer").on_click(move |_, _, cx| crate::fs_profile::start(&d2, id, cx)))
+                            });
+                            crate::os_menu::open(e.position(), menu, window, cx);
                         }),
                 )
             })

@@ -50,6 +50,14 @@ impl PartStudioView {
             let mut f = crate::feature_dialog::field_focus("", st.read(cx));
             f["label"] = Value::Null;
             f
+        } else if let Some(st) = self.ui.ct.add.as_ref().and_then(|a| a.focused_input(window, cx)) {
+            // Add custom tables' search boxes (live fs-tables-add: a field without a label).
+            let mut f = crate::feature_dialog::field_focus("", st.read(cx));
+            f["label"] = Value::Null;
+            f
+        } else if self.ui.add_features.as_ref().is_some_and(|a| a.panel.read(cx).has_keyboard(window)) {
+            // Add custom features with the keyboard outside its search box (live: its clicked tab or row, a div).
+            json!({ "kind": "field", "label": null })
         } else if self.panel_row_focus.is_focused(window) || self.context_select_focus.is_focused(window) {
             // A pressed panel row, the contexts selector (live: a focused div, "other").
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
@@ -160,12 +168,22 @@ impl PartStudioView {
                                     _ => "ok",
                                 }
                             };
-                            rows.push(json!({ "name": self.shown_feature_name(f, cx), "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && state != "rolled-back" && !(editing == Some(f.id) || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx)) }));
+                            // A custom feature's row reads with its initials box first (live 2361: "uF uip Feature 1").
+                            let name = match features::get(&f.type_id).filter(|_| noshape_model::custom::is_custom(&f.type_id)) {
+                                Some(t) => format!("{} {}", crate::ui::feature_initials(t.name), self.shown_feature_name(f, cx)),
+                                None => self.shown_feature_name(f, cx),
+                            };
+                            rows.push(json!({ "name": name, "state": state, "selected": self.selected_features.contains(&f.id) || editing == Some(f.id), "editing": editing == Some(f.id), "related": related.contains(&f.id), "hidden": f.hidden && state != "rolled-back" && !(editing == Some(f.id) || self.edit_uses(f.id, cx) || self.rolled_to(f.id, cx)) }));
                         }
                         // A new feature's row while its dialog is open (red while it fails, as drawn).
                         super::ListItem::Placeholder => {
                             let state = if self.edit_invalid(cx) { "error" } else { "ok" };
-                            rows.push(json!({ "name": self.placeholder_name(cx), "state": state, "selected": true, "editing": true, "related": editing.is_some_and(|f| related.contains(&f)), "hidden": false }));
+                            let ty = self.edit.as_ref().map(|e| e.dialog.read(cx).feature.type_id.clone()).unwrap_or_default();
+                            let name = match features::get(&ty).filter(|_| noshape_model::custom::is_custom(&ty)) {
+                                Some(t) => format!("{} {}", crate::ui::feature_initials(t.name), self.placeholder_name(cx)),
+                                None => self.placeholder_name(cx),
+                            };
+                            rows.push(json!({ "name": name, "state": state, "selected": true, "editing": true, "related": editing.is_some_and(|f| related.contains(&f)), "hidden": false }));
                         }
                         // A new folder's row is related-highlighted until the next click (live ui 10-25 b (1)).
                         super::ListItem::Folder(_, fd) => rows.push(json!({ "name": format!("{} ({})", fd.name, s.folder_count(fd.id)), "state": "ok", "selected": self.ui.selected_folder == Some(fd.id), "editing": false, "related": self.ui.fresh_folder == Some(fd.id), "hidden": false })),

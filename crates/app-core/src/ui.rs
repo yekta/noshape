@@ -398,9 +398,13 @@ pub struct PlacedTooltip {
 
 impl Render for PlacedTooltip {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Noted only when drawn: not under an open right-click menu, nor while pressed.
-        if !crate::os_menu::is_open(cx) && !self.pressed.get() {
-            crate::ui_script::note_tooltip(&self.text);
+        // Noted only when drawn: not under an open right-click menu (a menu row's own, with its expanded text,
+        // is), nor while pressed; the expanded text after the title once shown (live fs-ps-ws-feature-tooltip).
+        if (!crate::os_menu::is_open(cx) || self.expanded.is_some()) && !self.pressed.get() {
+            match self.expanded.as_ref().filter(|(_, shown)| *shown) {
+                Some((extra, _)) => crate::ui_script::note_tooltip(&format!("{} {extra}", self.text)),
+                None => crate::ui_script::note_tooltip(&self.text),
+            }
         }
         let pal = p();
         let shadow = vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(2.)), blur_radius: px(3.), spread_radius: px(0.), inset: false }];
@@ -1359,15 +1363,16 @@ pub fn drop_line() -> Div {
 }
 
 /// The two letters of a custom feature's initials icon: the first letter
-/// of its first two words ("QA cube" → "Qc", "FS pack probe" → "Fp"), or
-/// the first two letters of a single word.
+/// of its first two words as written ("QA cube" → "Qc", "FS pack probe" →
+/// "Fp", "uip Feature" → "uF", live 2361), or the first two letters of a
+/// single word.
 pub fn feature_initials(name: &str) -> String {
     let mut words = name.split_whitespace();
     let first = words.next().unwrap_or_default();
-    let mut out: String = first.chars().take(1).flat_map(char::to_uppercase).collect();
+    let mut out: String = first.chars().take(1).collect();
     match words.next().and_then(|w| w.chars().next()) {
-        Some(c) => out.extend(c.to_lowercase()),
-        None => out.extend(first.chars().skip(1).take(1).flat_map(char::to_lowercase)),
+        Some(c) => out.push(c),
+        None => out.extend(first.chars().skip(1).take(1)),
     }
     out
 }
@@ -1477,6 +1482,7 @@ mod tests {
     fn custom_feature_initials_and_regen_times_read_as_onshape() {
         assert_eq!(feature_initials("QA cube"), "Qc");
         assert_eq!(feature_initials("FS pack probe"), "Fp");
+        assert_eq!(feature_initials("uip Feature"), "uF");
         assert_eq!(feature_initials("Cube"), "Cu");
         assert_eq!(regen_time_text(617.4), "617ms");
         assert_eq!(regen_time_text(1024.0), "1.02s");

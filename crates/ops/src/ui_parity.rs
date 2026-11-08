@@ -113,7 +113,7 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "import_files", json!({ "files": [path] })).map_err(|e| format!("start file {name}: {e}"))?;
     }
     // (The run opens on Part Studio 1, where the versions' features go too.)
-    if start["tabs"].as_array().is_some_and(|t| !t.is_empty()) {
+    if start["tabs"].as_array().is_some_and(|t| !t.is_empty()) || start.get("feature_studio").is_some() {
         call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
     }
     // Versions (README "Versions and history"): each made after what comes before it, then its own `features` in Main.

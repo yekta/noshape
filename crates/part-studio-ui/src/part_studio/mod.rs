@@ -65,7 +65,7 @@ use crate::gpu::Gpu;
 use crate::scene_builder::{self, BuiltScene, GpuCache, PickKind, SceneOptions};
 use crate::theme::p;
 use crate::viewport::{Viewport, ViewportEvent};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use crate::os_menu::OsContextMenuExt as _;
@@ -3461,34 +3461,34 @@ impl PartStudioView {
     /// 52 px like a split tool.
     fn custom_tools(&mut self, custom: Vec<&'static FeatureType>, cx: &mut Context<Self>) -> AnyElement {
         let view = cx.entity();
+        let button: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
+        let b2 = button.clone();
         h_flex()
             .flex_none()
             .child(
                 crate::ui::tool_button("tb-custom-features", "custom-feature", false, cx)
                     .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
                     .child(crate::ui::glyph("tool-caret", 10., p().text))
+                    .child(canvas(move |b, _, _| b2.set(b), |_, _, _, _| {}).absolute().size_full())
                     .tooltip("Custom features in this workspace")
                     .map(|d| crate::ui_script::mark(d, || "button:Custom features in this workspace".into()))
-                    // Live (part-studio/1251–1252, qa5 FS4): no heading; each
-                    // entry has its initials icon ("Qc") and the name, with
-                    // the name as a side tooltip that expands with "Feature
-                    // from current workspace".
-                    .dropdown_menu(move |mut menu, _, _| {
-                        // Live (part-studio/1252): 178 px at least.
-                        menu = menu.min_w(px(178.));
-                        for t in &custom {
-                            let v = view.clone();
-                            let (id, name): (&'static str, &'static str) = (t.id, t.name);
-                            menu = menu.item(
-                                PopupMenuItem::element(move |_, _| {
-                                    crate::ui::with_side_tooltip_expanded(h_flex().id(SharedString::from(format!("cf-{id}"))).map(|d| crate::ui_script::mark(d, || format!("menu:{name}"))).flex_1().gap(px(6.)).child(crate::ui::initials_icon(name)).child(name), name, "Feature from current workspace")
-                                })
-                                .on_click(move |_, window, cx| {
-                                    v.update(cx, |this, cx| this.start_feature(id, window, cx));
-                                }),
-                            );
-                        }
-                        menu
+                    // Live (part-studio/1251–1252, qa5 FS4): no heading; each entry has its initials icon ("Qc") and
+                    // the name, with the name as a side tooltip that expands with "Feature from current workspace";
+                    // 178 px at least, under the button.
+                    .on_click(move |_: &ClickEvent, window, cx| {
+                        let v = view.clone();
+                        let b = button.get();
+                        let custom = custom.clone();
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                            let mut m = m.dropdown().min_width(178.);
+                            for t in &custom {
+                                let (id, name): (&'static str, &'static str) = (t.id, t.name);
+                                let v = v.clone();
+                                m = m.item(crate::os_menu::OsMenuItem::new(name).user().initials(name).on_click(move |_, window, cx| v.update(cx, |this, cx| this.start_feature(id, window, cx)))).side_tip(name, "Feature from current workspace");
+                            }
+                            m
+                        });
+                        crate::os_menu::open_anchored(point(b.left(), b.bottom() + px(4.)), Anchor::TopLeft, menu, window, cx);
                     }),
             )
             .into_any_element()

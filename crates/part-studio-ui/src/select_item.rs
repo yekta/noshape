@@ -111,6 +111,8 @@ fn input_label(key: &str, input: &noshape_model::configuration::ConfigInput, edi
 
 pub struct SelectItemPanel {
     mode: PanelMode,
+    /// The panel itself with the keyboard (a click on it outside its boxes, as a page's focusable div).
+    focus: FocusHandle,
     /// This document: its tabs (at Main), name, file and the tab the panel
     /// works for (not offered).
     sources: Vec<RefSource>,
@@ -331,6 +333,7 @@ impl SelectItemPanel {
             frame_selects: HashMap::new(),
             frame_search: None,
             frame_previews: HashMap::new(),
+            focus: cx.focus_handle(),
             _subs: subs,
         };
         if features {
@@ -339,9 +342,20 @@ impl SelectItemPanel {
         panel
     }
 
+    /// The keyboard is in the panel, outside its boxes (live: a focused div, a "field" without a label).
+    pub fn has_keyboard(&self, window: &Window) -> bool {
+        self.focus.is_focused(window)
+    }
+
     /// Its search box with the keyboard, if one has it.
     pub fn focused_input(&self, window: &Window, cx: &App) -> Option<Entity<InputState>> {
         [&self.url, &self.search].into_iter().find(|i| i.read(cx).focus_handle(cx).is_focused(window)).cloned()
+    }
+
+    /// The chosen version's name in the document shown (Add custom features' "from version V1").
+    pub fn version_label(&self) -> Option<String> {
+        let d = if self.other_documents { self.other.as_ref() } else { self.current.as_ref() }?;
+        d.version.and_then(|i| d.versions.get(i)).map(|v| v.label.clone())
     }
 
     /// Other documents' filter list is shown (no document or search open).
@@ -645,6 +659,9 @@ impl SelectItemPanel {
         }
         let open = !self.collapsed.contains(&s.tab) || !query.is_empty();
         let key = s.tab.clone();
+        // As live's recorder reads the rows: check boxes, the studio's checked once one of its features is picked.
+        let picked = features.iter().any(|(t, _)| *t == self.value);
+        crate::ui_script::note_field(|| serde_json::json!({ "label": s.name, "kind": "boolean", "checked": picked, "child": false }));
         let mut out = vec![
             h_flex()
                 .id(SharedString::from(format!("sel-fs-{}", s.tab)))
@@ -669,6 +686,7 @@ impl SelectItemPanel {
         for (type_id, name) in hits {
             let on = self.value == *type_id;
             let t = type_id.clone();
+            crate::ui_script::note_field(|| serde_json::json!({ "label": format!("{} {name}", crate::ui::feature_initials(name)), "kind": "boolean", "checked": false, "child": true }));
             out.push(
                 h_flex()
                     .id(SharedString::from(format!("sel-feature-{type_id}")))
@@ -1718,16 +1736,47 @@ impl Render for SelectItemPanel {
             }
         }
         let features = mode == PanelMode::CustomFeatures;
+        // Add custom features as live's recorder reads it: a feature dialog on a document's version or a filter's
+        // documents (its search box, then the rows noted as they were built), nothing on the filters.
+        if features {
+            let rows = crate::ui_script::take_fields();
+            let search = if !self.other_documents && self.current.as_ref().is_some_and(|d| d.version.is_some()) {
+                Some(("Search features".to_string(), self.search.read(cx).value().to_string()))
+            } else if self.other_documents && self.other.is_none() && self.doc_query.is_none() {
+                self.category.map(|c| (format!("Search in \"{}\"", self.filters()[c].0), self.url.read(cx).value().to_string()))
+            } else {
+                None
+            };
+            if let Some((label, text)) = search {
+                let other = self.other_documents;
+                crate::ui_script::note_dialog(|| {
+                    let mut fields = vec![serde_json::json!({ "label": label, "kind": "string", "text": text })];
+                    fields.extend(rows);
+                    let tabs = serde_json::json!([{ "label": "Current document", "selected": !other }, { "label": "Other documents", "selected": other }]);
+                    serde_json::json!({ "title": null, "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": null, "titleState": "ok" })
+                });
+            }
+        }
         v_flex()
             .id("select-item-panel")
-            // Add custom features: Escape takes the keyboard out of its search box and leaves the panel open (live
-            // custom-features-menu-empty).
+            .track_focus(&self.focus)
+            // A click outside its boxes leaves the keyboard on the panel (live fs-ps-acf-click-adds: the clicked
+            // tab or row has it), so Escape reaches it.
             .when(features, |d| {
-                d.capture_key_down(|e, window, cx| {
-                    if e.keystroke.key == "escape" {
-                        window.blur(cx);
+                d.on_mouse_down(MouseButton::Left, cx.listener(|this, _: &MouseDownEvent, window, cx| {
+                    if this.focused_input(window, cx).is_none() {
+                        window.focus(&this.focus, cx);
                     }
-                })
+                }))
+            })
+            // Add custom features: Escape closes it (live fs-ps-acf-close, custom-features-menu-empty).
+            .when(features, |d| {
+                d.capture_key_down(cx.listener(|_, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        cx.emit(SelectItemEvent::Close);
+                    }
+                }))
             })
             .occlude()
             .w(px(300.))

@@ -38,9 +38,16 @@ impl PartStudioView {
         };
         let panel = cx.new(|cx| SelectItemPanel::new(setup, window, cx));
         let sub = cx.subscribe_in(&panel, window, |this: &mut Self, _, ev: &SelectItemEvent, window, cx| match ev {
-            SelectItemEvent::Picked(type_id) => this.add_my_feature(type_id, cx),
+            SelectItemEvent::Picked(type_id) => {
+                let version = this.ui.add_features.as_ref().and_then(|a| a.panel.read(cx).version_label());
+                this.add_my_feature(type_id, version, cx)
+            }
             SelectItemEvent::Close => {
                 this.ui.add_features = None;
+                // Its "was added to your toolbar" toast goes with it (live fs-ps-acf-click-adds).
+                if this.message.as_ref().is_some_and(|(_, m)| m.starts_with("Custom feature \"")) {
+                    this.message = None;
+                }
                 cx.notify();
             }
             SelectItemEvent::CreateVersion(None) => crate::part_studio_hooks::create_version(this.doc.clone(), window, cx),
@@ -53,13 +60,16 @@ impl PartStudioView {
         cx.notify();
     }
 
-    /// A feature picked in the panel joins the user's custom features (once).
-    fn add_my_feature(&mut self, type_id: &str, cx: &mut Context<Self>) {
+    /// A feature picked in the panel joins the user's custom features (once), with live's green toast (2361:
+    /// "Custom feature "uip Feature" was added to your toolbar from version V1.").
+    fn add_my_feature(&mut self, type_id: &str, version: Option<String>, cx: &mut Context<Self>) {
         let list = &mut self.ui.toolbar.custom_features;
         if list.iter().all(|f| f.type_id != type_id) {
             let Some(t) = noshape_model::features::get(type_id) else { return };
             list.push(CustomTool { type_id: type_id.to_string(), name: t.name.to_string() });
             self.ui.toolbar.save();
+            let from = version.map(|v| format!(" from version {v}")).unwrap_or_default();
+            self.flash_success(format!("Custom feature \"{}\" was added to your toolbar{from}.", t.name), cx);
         }
         cx.notify();
     }

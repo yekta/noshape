@@ -67,7 +67,16 @@ pub struct AddState {
     category: Option<usize>,
     doc: Option<DocAt>,
     search: Entity<InputState>,
+    /// Other documents' "Search or paste URL" (live 639), with the keyboard when the popup opens.
+    url: Entity<InputState>,
     collapsed: HashSet<TabId>,
+}
+
+impl AddState {
+    /// Its search box with the keyboard, if one has it.
+    pub fn focused_input(&self, window: &Window, cx: &App) -> Option<Entity<InputState>> {
+        [&self.url, &self.search].into_iter().find(|i| i.read(cx).focus_handle(cx).is_focused(window)).cloned()
+    }
 }
 
 /// Other documents' categories (live 639).
@@ -159,6 +168,9 @@ impl PartStudioView {
             .child(crate::os_ui::glyph(crate::os_ui::GLYPH_EXPANDED, 10., pal.text))
             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.ui.ct.list_open = !this.ui.ct.list_open;
+                if !this.ui.ct.list_open {
+                    crate::ui_script::note_list(None);
+                }
                 cx.notify();
             }));
         let more = div()
@@ -183,17 +195,22 @@ impl PartStudioView {
             });
         let mut toolbar = h_flex().h(px(41.)).flex_none().gap(px(1.)).relative().child(selector).child(more);
         if self.ui.ct.list_open {
+            // Its rows as live's recorder reads the open list (the headings left out).
+            let rows: Vec<String> = mine.iter().chain(ws.iter()).map(|t| t.display.to_string()).collect();
+            crate::ui_script::note_list(Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": null, "disabled": [] })));
             let ed = cx.entity();
             let list = ct::table_list("ct-list", &mine, &ws, Some(&shown), 218., move |t, _, cx| {
                 ed.update(cx, |this, cx| {
                     this.ui.ct.selected = Some(t);
                     this.ui.ct.list_open = false;
+                    crate::ui_script::note_list(None);
                     cx.notify();
                 })
             });
             toolbar = toolbar.child(
                 deferred(div().absolute().top(px(37.)).left(px(1.)).child(list).on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
                     this.ui.ct.list_open = false;
+                    crate::ui_script::note_list(None);
                     cx.notify();
                 })))
                 .with_priority(1),
@@ -215,6 +232,7 @@ impl PartStudioView {
         let open = !self.ui.ct.collapsed.contains(&t.title);
         let title = t.title.clone();
         let tsv = table_tsv(t);
+        let (view, copied) = (cx.entity(), t.title.clone());
         let header = h_flex()
             .id(("ct-section", index))
             .h(px(35.))
@@ -236,7 +254,15 @@ impl PartStudioView {
                     .on_click(move |e: &ClickEvent, window, cx| {
                         cx.stop_propagation();
                         let tsv = tsv.clone();
-                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(tsv.clone())))));
+                        let (v, title) = (view.clone(), copied.clone());
+                        let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
+                            m.item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| {
+                                cx.write_to_clipboard(ClipboardItem::new_string(tsv.clone()));
+                                // Live 2361: "Faces table copied to clipboard."
+                                let text = format!("{title} table copied to clipboard.");
+                                v.update(cx, |this, cx| this.flash_success(text, cx));
+                            }))
+                        });
                         crate::os_menu::open(e.position(), menu, window, cx);
                     }),
             )
@@ -341,7 +367,10 @@ impl PartStudioView {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tables"));
         let path = self.doc.read(cx).session.path.clone();
         let current = doc_at(&path);
-        self.ui.ct.add = Some(AddState { other: true, graph: false, current, category: None, doc: None, search, collapsed: HashSet::new() });
+        // Live fs-tables-add: Other documents' search box takes the keyboard.
+        let url = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search or paste URL"));
+        url.update(cx, |s, cx| s.focus(window, cx));
+        self.ui.ct.add = Some(AddState { other: true, graph: false, current, category: None, doc: None, search, url, collapsed: HashSet::new() });
         self.load_version_tables(false, cx);
         cx.notify();
     }
@@ -416,6 +445,14 @@ impl PartStudioView {
         Some(
             v_flex()
                 .id("cta-panel")
+                // Escape closes it (live fs-tables-add).
+                .capture_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                    if e.keystroke.key == "escape" {
+                        cx.stop_propagation();
+                        this.ui.ct.add = None;
+                        cx.notify();
+                    }
+                }))
                 .occlude()
                 .absolute()
                 .top_0()
@@ -461,6 +498,16 @@ impl PartStudioView {
         let mut list = v_flex().id("cta-categories").flex_1().overflow_y_scroll().pt(px(4.));
         match add.category {
             None => {
+                // Live 639: a filter icon and "Search or paste URL" over the categories.
+                list = list.child(
+                    h_flex()
+                        .h(px(38.))
+                        .flex_none()
+                        .px(px(6.))
+                        .gap(px(4.))
+                        .child(crate::ui::glyph("filter", 20., gpui_kit::rgb(0x094174)))
+                        .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).rounded(px(3.)).border_1().border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&add.url).appearance(false).text_size(px(12.)).h(px(26.))))),
+                );
                 for (i, (label, icon)) in CATEGORIES.iter().enumerate() {
                     list = list.child(
                         h_flex()

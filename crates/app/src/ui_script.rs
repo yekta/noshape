@@ -107,8 +107,10 @@ fn opens_on_tab() -> Option<String> {
     let starts = std::env::var_os("NOSHAPE_UI_STARTS").map(PathBuf::from).unwrap_or_else(|| path.with_file_name("starts.json"));
     let start = read_json(&starts).ok()?[name].clone();
     // A scenario that first clicks a document tab opens on it (live's runner: appearance-part-row-configure's start is
-    // config-blocks' Part Studio); studios' whole-document starts open on the first tab and click it (live2's runner).
-    if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()).filter(|_| scenario["area"] != "studios") {
+    // config-blocks' Part Studio); whole-document starts (studios' scenarios, a start with tabs or a Feature Studio:
+    // live2's runner builds them as documents, fs-studio / fs-custom) open on the first tab and click it.
+    let whole = scenario["area"] == "studios" || start.get("tabs").is_some_and(|t| t.as_array().is_some_and(|a| !a.is_empty())) || start.get("feature_studio").is_some();
+    if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()).filter(|_| !whole) {
         return Some(tab.to_string());
     }
     if let Some(d) = start.get("drawing") {
