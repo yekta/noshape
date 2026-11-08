@@ -105,6 +105,28 @@ fn parasolid_round_trip() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A bare binary transmit file (`B`, little-endian, as Cadenas PARTsolutions writes vendor parts:
+/// XT-B3-BINARY-TRANSMIT) reads as its text twin does: one valid solid with the same faces and volume.
+#[test]
+fn parasolid_bare_binary_reads_as_text() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-bare-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let s = part();
+    let (text, bare) = (dir.join("part.x_t"), dir.join("part-bare.x_b"));
+    write_parasolid(&text, std::slice::from_ref(&s), LengthUnit::Meter, false).unwrap();
+    write_parasolid_bare(&bare, std::slice::from_ref(&s), LengthUnit::Meter).unwrap();
+    let body = std::fs::read(&bare).unwrap();
+    let at = body.windows(15).position(|w| w == b"**END_OF_HEADER").expect("header");
+    let start = at + body[at..].iter().position(|b| *b == b'\n').unwrap() + 1;
+    assert_eq!(body[start], b'B', "a bare binary body");
+    let (a, b) = (read_parasolid(&text, LengthUnit::Meter).unwrap(), read_parasolid(&bare, LengthUnit::Meter).unwrap());
+    assert!(b.is_valid(), "bare: invalid");
+    assert_eq!((b.count(ShapeType::Solid), b.count(ShapeType::Face), b.count(ShapeType::Edge)), (a.count(ShapeType::Solid), a.count(ShapeType::Face), a.count(ShapeType::Edge)));
+    let (va, vb) = (volume_properties(&a).unwrap().mass, volume_properties(&b).unwrap().mass);
+    assert!((va - vb).abs() <= 1e-9 * va, "{vb} vs {va}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// Onshape's file of three parts (qa4 round 4 s5's Part Studio, live's export: a PART_XMT_BLOCK root in its embedded
 /// schema) reads as its three parts (the block's type described there as a new one, not a change to a known one).
 #[test]

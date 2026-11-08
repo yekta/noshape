@@ -162,8 +162,25 @@ public:
         ++at;
     }
     binary = d.compare(at, 4, std::string("PS\0\0", 4)) == 0;
+    // Bare binary (the writer's own byte order: little-endian from Windows, e.g. Cadenas PARTsolutions): 'B', then
+    // the modeller version and the schema name each after a 32-bit length, then nodes as the neutral binary's.
+    little = !binary && at < d.size() && d[at] == 'B';
     std::string archive;
-    if (binary)
+    if (little)
+    {
+      binary = true;
+      ++at;
+      const long long n1 = b32();
+      if (n1 < 0 || at + (size_t)n1 > d.size())
+        fail_invalid("parasolid: truncated file");
+      at += (size_t)n1;
+      const long long n2 = b32();
+      if (n2 < 0 || at + (size_t)n2 > d.size())
+        fail_invalid("parasolid: truncated file");
+      archive = d.substr(at, (size_t)n2);
+      at += (size_t)n2;
+    }
+    else if (binary)
     {
       at += 4;
       // Modeller version (16-bit length) and schema name (32-bit length).
@@ -268,6 +285,7 @@ private:
   std::string                                     d;
   size_t                                          at       = 0;
   bool                                            binary   = false;
+  bool                                            little   = false; // bare binary, little-endian
   bool                                            embedded = false;
   const std::map<int, std::vector<FieldSpec>>*    native   = nullptr; // version layouts (no embedded schema)
   std::map<int, std::unique_ptr<std::vector<FieldSpec>>> layouts;
@@ -300,26 +318,24 @@ private:
     return s;
   }
 
-  // ---- binary (big-endian)
+  // ---- binary (big-endian; a bare binary's `little`-endian)
   int b8() { return (unsigned char)d.at(at++); }
-  int b16()
-  {
-    const int v = (b8() << 8) | b8();
-    return (int16_t)v;
-  }
-  long long b32()
-  {
-    uint32_t v = 0;
-    for (int k = 0; k < 4; ++k)
-      v = (v << 8) | (uint32_t)b8();
-    return (int32_t)v;
-  }
-  double b64()
+  uint64_t bytes(int n)
   {
     uint64_t v = 0;
-    for (int k = 0; k < 8; ++k)
-      v = (v << 8) | (uint64_t)b8();
-    double x;
+    for (int k = 0; k < n; ++k)
+    {
+      const uint64_t b = (uint64_t)b8();
+      v                = little ? v | (b << (8 * k)) : (v << 8) | b;
+    }
+    return v;
+  }
+  int       b16() { return (int16_t)(uint16_t)bytes(2); }
+  long long b32() { return (int32_t)(uint32_t)bytes(4); }
+  double    b64()
+  {
+    const uint64_t v = bytes(8);
+    double         x;
     std::memcpy(&x, &v, 8);
     return x;
   }

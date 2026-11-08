@@ -251,8 +251,9 @@ std::vector<Node> to_version(std::vector<Node> nodes, const XtVersion& v)
 {
   const int                                    code = schema_code(v);
   std::map<int, const std::vector<FieldSpec>*> layouts;
+  // Versions before the base schema's (12.0: v9's) differ from it on their own, not on top of later ones.
   for (const auto& [c, types] : version_schemas())
-    if (c <= code)
+    if (c <= code && (c >= 12000 || code < 12000))
       for (const auto& [t, f] : types)
         layouts[t] = &f;
   if (layouts.empty())
@@ -418,23 +419,21 @@ std::string text_body(const std::vector<Node>& nodes, const XtVersion& v)
 struct Bin
 {
   std::string s;
-  void        u8(int v) { s += static_cast<char>(v & 0xff); }
-  void        i16(int v)
+  // A bare binary's byte order (little-endian, as Windows writers write it); the neutral binary is big-endian.
+  bool little = false;
+  void u8(int v) { s += static_cast<char>(v & 0xff); }
+  void bytes(uint64_t v, int n)
   {
-    u8(v >> 8);
-    u8(v);
+    for (int k = 0; k < n; ++k)
+      u8((int)(v >> (8 * (little ? k : n - 1 - k))));
   }
-  void i32(long long v)
-  {
-    for (int k = 3; k >= 0; --k)
-      u8((int)(v >> (8 * k)));
-  }
+  void i16(int v) { bytes((uint64_t)(uint16_t)v, 2); }
+  void i32(long long v) { bytes((uint64_t)(uint32_t)v, 4); }
   void f64(double v)
   {
     uint64_t b;
     std::memcpy(&b, &v, 8);
-    for (int k = 7; k >= 0; --k)
-      u8((int)(b >> (8 * k)));
+    bytes(b, 8);
   }
   void ptr(long long index)
   {
@@ -448,14 +447,24 @@ struct Bin
   }
 };
 
-std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v)
+std::string binary_body(const std::vector<Node>& nodes, const XtVersion& v, bool bare = false)
 {
   const std::string kVersion  = std::string(": TRANSMIT FILE created by modeller version ") + kModeller;
   const std::string kSchema   = v.schema;
   const double      kNullReal = -3.14158e13;
   Bin               b;
-  b.s = std::string("PS\0\0", 4);
-  b.i16((int)kVersion.size());
+  b.little = bare;
+  // Neutral: "PS\0\0" and a 16-bit length; bare: 'B' and a 32-bit one.
+  if (bare)
+  {
+    b.s = "B";
+    b.i32((long long)kVersion.size());
+  }
+  else
+  {
+    b.s = std::string("PS\0\0", 4);
+    b.i16((int)kVersion.size());
+  }
   b.s += kVersion;
   b.i32((long long)kSchema.size());
   b.s += kSchema;
@@ -2140,9 +2149,9 @@ int write_named_body(Writer& w, AttrWriter& aw, const TopoDS_Shape& s, const std
   return body;
 }
 
-void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binary, const std::string& path, const std::string& application)
+void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binary, const std::string& path, const std::string& application, bool bare = false)
 {
-  const std::string data = header(binary, path, application) + (binary ? binary_body(nodes, ver) : text_body(nodes, ver));
+  const std::string data = header(binary, path, application) + (binary ? binary_body(nodes, ver, bare) : text_body(nodes, ver));
   std::ofstream     out(path, std::ios::binary);
   if (!out)
     fail_invalid("cannot write " + path);
@@ -2151,8 +2160,22 @@ void write_file(const std::vector<Node>& nodes, const XtVersion& ver, bool binar
     fail_op("writing " + path + " failed");
 }
 
+static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary, bool bare,
+                               rust::Str version, rust::Str application);
+
 void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary, rust::Str version,
                      rust::Str application)
+{
+  write_parasolid_as(shapes, names, colours, path, binary, false, version, application);
+}
+
+void write_parasolid_bare(const OcShapeList& shapes, rust::Str path, rust::Str version, rust::Str application)
+{
+  write_parasolid_as(shapes, {}, {}, path, true, true, version, application);
+}
+
+static void write_parasolid_as(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary, bool bare,
+                               rust::Str version, rust::Str application)
 {
   const XtVersion ver = xt_version(std::string(version));
   Writer           w;
@@ -2179,7 +2202,7 @@ void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> 
       n.fields.push_back(fp(b));
     std::rotate(w.nodes.begin(), w.nodes.end() - 1, w.nodes.end());
   }
-  write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application));
+  write_file(to_version(std::move(w.nodes), ver), ver, binary, std::string(path), std::string(application), bare);
 }
 
 // An assembly as Onshape exports one (live samples/dx-nist-assembly.x_t and

@@ -81,6 +81,10 @@ static const std::map<int, BaseType>& base_schema()
 static const std::map<int, std::map<int, std::vector<FieldSpec>>>& version_schemas()
 {
   static const std::map<int, std::map<int, std::vector<FieldSpec>>> s = {
+    // Version 9.0 (SCH_900000_9008: Cadenas PARTsolutions' vendor parts, XT-B3-BINARY-TRANSMIT; worked out from
+    // their text and bare binary files): BODY without nom_geom_state, FIN without attributes_groups, CURVE_DATA
+    // without analytic_form, ATTRIB_DEF without field_names and with 13 legal owners, CHART's Chart_count a short.
+    {9000, {{12, {{"highest_node_id", 'd', 0}, {"attributes_groups", 'p', 0}, {"attribute_chains", 'p', 0}, {"surface", 'p', 0}, {"curve", 'p', 0}, {"point", 'p', 0}, {"key", 'p', 0}, {"res_size", 'f', 0}, {"res_linear", 'f', 0}, {"ref_instance", 'p', 0}, {"next", 'p', 0}, {"previous", 'p', 0}, {"state", 'u', 0}, {"owner", 'p', 0}, {"body_type", 'u', 0}, {"shell", 'p', 0}, {"boundary_surface", 'p', 0}, {"boundary_curve", 'p', 0}, {"boundary_point", 'p', 0}, {"region", 'p', 0}, {"edge", 'p', 0}, {"vertex", 'p', 0}}}, {17, {{"loop", 'p', 0}, {"forward", 'p', 0}, {"backward", 'p', 0}, {"vertex", 'p', 0}, {"other", 'p', 0}, {"edge", 'p', 0}, {"curve", 'p', 0}, {"next_at_vx", 'p', 0}, {"sense", 'c', 0}}}, {40, {{"Base_parameter", 'f', 0}, {"Base_scale", 'f', 0}, {"Chart_count", 'n', 0}, {"Chordal_error", 'f', 0}, {"Angular_error", 'f', 0}, {"Parameter_error", 'f', 2}, {"Hvec", 'h', 1}}}, {80, {{"next", 'p', 0}, {"identifier", 'p', 0}, {"type_id", 'd', 0}, {"actions", 'u', 8}, {"legal_owners", 'l', 13}, {"fields", 'u', 1}}}, {135, {{"self_int", 'u', 0}}}}},
     // Onshape's 12.0 files: the base layouts but ATTRIB_DEF without
     // field_names (embedded schemas still count from the base).
     {12000, {{80, {{"next", 'p', 0}, {"identifier", 'p', 0}, {"type_id", 'd', 0}, {"actions", 'u', 8}, {"legal_owners", 'l', 14}, {"fields", 'u', 1}}}}},

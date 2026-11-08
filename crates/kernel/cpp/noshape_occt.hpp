@@ -1038,6 +1038,8 @@ void write_iges_assembly(const OcShapeList& shapes, rust::Slice<const rust::Stri
 std::pair<std::string, const double*> name_colour(rust::Slice<const rust::String> names, rust::Slice<const double> colours, size_t i);
 void write_parasolid(const OcShapeList& shapes, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str path, bool binary,
                      rust::Str version, rust::Str application);
+// The bare binary (little-endian, as Windows writers such as Cadenas PARTsolutions write it): the reader's tests.
+void write_parasolid_bare(const OcShapeList& shapes, rust::Str path, rust::Str version, rust::Str application);
 void write_parasolid_assembly(const OcShapeList& parts, rust::Slice<const rust::String> names, rust::Slice<const double> colours, rust::Str root_name,
                               rust::Slice<const uint32_t> inst_part, rust::Slice<const double> transforms, rust::Str path, rust::Str version,
                               rust::Str application);

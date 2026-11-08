@@ -535,6 +535,16 @@ pub fn write_parasolid_version(path: &Path, shapes: &[Shape], unit: LengthUnit, 
     ck(ffi::write_parasolid(&l, &[], &[], path_str(path)?, binary, version, &format!("noshape {}", crate::VERSION)))
 }
 
+/// Parasolid's bare binary (`B`, little-endian, as Windows writers such as Cadenas PARTsolutions write vendor parts;
+/// XT-B3-BINARY-TRANSMIT). Onshape's export writes the neutral binary ([`write_parasolid`]); the reader's tests write
+/// this one.
+pub fn write_parasolid_bare(path: &Path, shapes: &[Shape], unit: LengthUnit) -> Result<()> {
+    let f = unit.mm_per_unit() * 1e-3;
+    let v = shapes.iter().map(|s| scaled(s, f)).collect::<Result<Vec<_>>>()?;
+    let l = vec_to_list(&v);
+    ck(ffi::write_parasolid_bare(&l, path_str(path)?, PARASOLID_VERSIONS[0], &format!("noshape {}", crate::VERSION)))
+}
+
 /// [`write_parasolid_version`] of named, coloured parts (sRGB 0–1): Onshape
 /// writes them as SDL/TYSA_NAME and SDL/TYSA_COLOUR_2 attributes, which
 /// imports read back (qa ASM-XT-ROUNDTRIP-NAMES).
