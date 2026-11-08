@@ -49,6 +49,15 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   from our catalogue by its part name (`standard_spec_by_part_name`: "Hex socket head cap screw M3x0.50 x 8"; 84
   instances in xdev-subs, robot-relations, pinslot, corexy). Part Studio suite after all three: no document worse
   (70/86, 724/934).
+- 2026-11-08 11:40 UTC: live's sketch bodies at a studio's final state (`<element>.sketches.json`, live 2267; also a
+  `sketches.json` beside a model's features.json) are references from each sketch on (`refs_from_sketches`: faces its
+  regions, evPlane normals kept); a query whose ids are all such regions with their areas maps by them before its
+  text (a region query's text names all the sketch's regions; asm-suspension's Extrude 1 now matches live), the text
+  when one doesn't map; and a Frame's profile of another studio (`<tab>#<sketch>.4294967295`). Part Studio suite:
+  no document worse (ps-after8: 755/951).
+- 2026-11-08 11:40 UTC, to dx: your three multi-solid Parasolid files (a7bd858292…, 35719e9b95…, 2ee17582b9…: studios
+  ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
+  90 → 200/286.
 
 ## 11-08 11:45 UTC: drawings 120/175; Cut list table by composite part; std 3112 landed
 - std 3112 landed (2f066886); studios told (handoff/studios.md).

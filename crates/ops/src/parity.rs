@@ -52,6 +52,9 @@ pub struct LiveRef {
     pub parameter: Option<String>,
     /// Its point is its plane's origin (live's evPlane, refs.jsonl `origin`), not a point on the face.
     pub plane_origin: bool,
+    /// Of live's sketch bodies file (`sketches.json`, live 2267): a sketch region as its sketch made it (a per-feature
+    /// line's may be a piece a later feature imprinted).
+    pub sketch_file: bool,
 }
 
 /// What became of one Onshape feature.
@@ -214,7 +217,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
         // A face may come as its plane's `origin` and its `area` (live 2290).
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null() };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -1418,7 +1421,14 @@ impl<'a> Translator<'a> {
                     // feature made (live's line after it): its boxes win when
                     // they tell other regions (clamp-guillem's band around a
                     // rectangle names the rectangle's sides too).
+                    // (Not when live's own regions placed every id: its sketch bodies, live 2267. A body's box covers
+                    // regions it doesn't use: asm-suspension's Knuckle around its centre disc.)
+                    let exact = queries.iter().all(|q| {
+                        let qids: Vec<&str> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+                        !qids.is_empty() && qids.iter().all(|id| (0..=k).any(|j| self.refs.get(&(j, id.to_string())).is_some_and(|r| r.sketch_file && r.kind == "SKETCH_REGION")))
+                    });
                     if regions_param
+                        && !exact
                         && let Some(better) = self.regions_by_bodies(k, &ids)
                     {
                         return Ok(Some(json!(better)));
@@ -1546,6 +1556,34 @@ impl<'a> Translator<'a> {
     fn query(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
         let ids: Vec<&str> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
         let sketch_only = !ids.is_empty() && ids.iter().all(|id| (0..=k).any(|j| self.refs.get(&(j, id.to_string())).is_some_and(|r| r.sketch)));
+        // Sketch regions with live's own geometry (its sketch bodies file: area and box, live 2267): the text's regions
+        // while their area is live's for these ids, else the ids' (a region query's text names all of its sketch's
+        // regions, qSketchRegion(…, true); asm-suspension's Extrude 1 ring, whose text names the disc inside it).
+        let live_area: Option<f64> = ids
+            .iter()
+            .map(|id| (0..=k).rev().find_map(|j| self.refs.get(&(j, id.to_string())).filter(|r| r.kind == "SKETCH_REGION" && r.sketch_file).and_then(|r| r.measure)))
+            .sum();
+        if sketch_only && let Some(want) = live_area {
+            let text = self.query_text_first(k, q);
+            if let Ok(found) = &text
+                && self.regions_area(found).is_some_and(|a| (a - want).abs() <= 1e-3 * want)
+            {
+                return text;
+            }
+            if let Ok(found) = self.query_with(k, q, true)
+                && !found.is_empty()
+            {
+                return Ok(found);
+            }
+            return text;
+        }
+        self.query_text_first(k, q)
+    }
+
+    /// [`Self::query`] for ids only a sketch body places: the query's text first, then its ids.
+    fn query_text_first(&mut self, k: usize, q: &Value) -> Result<Vec<String>, String> {
+        let ids: Vec<&str> = q["deterministicIds"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+        let sketch_only = !ids.is_empty() && ids.iter().all(|id| (0..=k).any(|j| self.refs.get(&(j, id.to_string())).is_some_and(|r| r.sketch)));
         if sketch_only && !q["queryString"].as_str().unwrap_or("").is_empty()
             && let Ok(found) = self.query_with(k, q, false)
             && !found.is_empty()
@@ -1559,6 +1597,19 @@ impl<'a> Translator<'a> {
             return Ok(vec![e]);
         }
         self.query_with(k, q, true)
+    }
+
+    /// The total area (m²) of our sketch regions `ids` ("region:<sketch>:<keys>"), when all are regions.
+    fn regions_area(&mut self, ids: &[String]) -> Option<f64> {
+        let mut total = 0.0;
+        for id in ids {
+            let sketch = id.strip_prefix("region:")?.split(':').next()?.to_string();
+            let g = self.call("sketch_get", json!({ "sketch": sketch })).ok()?;
+            let k = per_unit(&g["units"]);
+            let r = g["regions"].as_array()?.iter().find(|r| r["id"] == id.as_str())?;
+            total += r["area"].as_f64()? * k * k;
+        }
+        (!ids.is_empty()).then_some(total)
     }
 
     /// Whether a query's text names sketch curves its sketch doesn't have (written when the sketch held others: c2-duct-
@@ -4405,7 +4456,10 @@ pub fn refs_from_sketches(file: &Value, features: &[Value]) -> HashMap<(usize, S
             f["orientation"] = json!(true);
         }
         let line = json!({ "index": k, "type": "newSketch", "bodies": bodies });
-        out.extend(refs_from_bodies(std::slice::from_ref(&line)));
+        out.extend(refs_from_bodies(std::slice::from_ref(&line)).into_iter().map(|(key, mut r)| {
+            r.sketch_file = true;
+            (key, r)
+        }));
     }
     out
 }

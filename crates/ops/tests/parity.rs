@@ -56,6 +56,10 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
+    // Live's sketch bodies at the final state (sketches.json, live 2267) under both.
+    for (key, r) in refs_from_sketches(&features["sketchBodies"], features["features"].as_array().map(Vec::as_slice).unwrap_or_default()) {
+        all.entry(key).or_insert(r);
+    }
     let mut t = match Translator::open(&mut ctx, &path, features, all) {
         Ok(t) => t,
         Err(e) => {
@@ -184,6 +188,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
 pub(crate) fn read_model(dir: &Path) -> Option<(Value, Vec<Value>, String)> {
     let mut features: Value = serde_json::from_str(&std::fs::read_to_string(dir.join("features.json")).ok()?).ok()?;
     read_studios(dir, &mut features);
+    // Live's sketch bodies at the final state: sketches.json (or an assembly corpus studio's <element>.sketches.json
+    // copied beside it).
+    let sketches = std::fs::read_dir(dir).into_iter().flatten().flatten().map(|e| e.path()).find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().ends_with("sketches.json")));
+    if let Some(sk) = sketches.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+        features["sketchBodies"] = sk;
+    }
     // Import features' files: imports/<foreign id>.json names the file beside it.
     for e in std::fs::read_dir(dir.join("imports")).into_iter().flatten().flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "json")) {
         let Some(meta) = std::fs::read_to_string(&e).ok().and_then(|t| serde_json::from_str::<Value>(&t).ok()) else { continue };
@@ -2583,7 +2593,7 @@ fn live_sketch_bodies_are_the_sketches_regions() {
         "vertices": [{ "id": "JFE", "point": [0.0, -0.055, 0.0] }] }] }, { "featureId": "FGone", "bodies": [] }] });
     let refs = refs_from_sketches(&file, &features);
     let face = &refs[&(2, "JGC".to_string())];
-    assert_eq!((face.kind.as_str(), face.sketch, face.normal), ("SKETCH_REGION", true, Some([1.0, 0.0, 0.0])));
+    assert_eq!((face.kind.as_str(), face.sketch, face.sketch_file, face.normal), ("SKETCH_REGION", true, true, Some([1.0, 0.0, 0.0])));
     assert_eq!(refs[&(2, "JFN".to_string())].measure, Some(0.055));
     assert_eq!(refs[&(2, "JFE".to_string())].point, Some([0.0, -0.055, 0.0]));
     assert!(refs.keys().all(|(k, _)| *k == 2), "{:?}", refs.keys());

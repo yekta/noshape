@@ -919,6 +919,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Inserting the studio's Bearing into the assembly regenerates it again (another 1232 s), so the assembly suite never
   finished this document. Run: `NOSHAPE_PARITY_TRACE=1 NOSHAPE_PARITY_ASSEMBLIES=<dir with asm-suspension>
   cargo test -p noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture`.
+- [ ] P2 EXTRUDE-UP-TO-FACE-OFFSET (core; asm 2026-11-08 11:37 UTC, asm-suspension's Knuckle, studio 805e29): **Extrude 2
+  removes the 40–45 mm ring 30 mm deep where live removes 20 mm** (Knuckle 365,983 mm³, live 379,335; the difference is
+  the ring's 1,335.2 mm² × 10 mm). Remove, Through all with Opposite direction; Second direction Up to face JHG (Extrude
+  1's cap at x = −30 mm) with its offset 20 mm and its own Opposite direction (secondDirectionOppositeDirection), draft
+  off. With live's sketch regions read (asm 11-08: `<eid>.sketches.json`), Extrude 1 now matches live, so this is the
+  Knuckle's first difference; Circular pattern 1 then fails ("Failed to create pattern": the faces it patterns aren't
+  live's). Run alone: a model dir with the studio's JSON as features.json, its .live.jsonl as live.jsonl and its
+  .sketches.json beside them (/home/ngyekta/agents/asm/ps-knuckle/susp-knuckle on vibe3), `parity::parity_models`.
 - [x] P2 SELF-OVERLAPPING-FACE (core, fixed 11-07; psui 2026-11-07) **c2-fan-blade-sweep's Part 2 bottom face (z -5) is one face of two 2 mm
   strips joined by a zero-width bridge** (its single loop runs along y -95 twice, overlapping): area 120 mm², but its
   mesh (BRepMesh: noshape's declines it) covers 717 mm², one triangle across the 21 mm gap between the strips and half of

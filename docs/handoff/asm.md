@@ -16,6 +16,20 @@ schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read
 parts (a7bd858292…, 35719e9b95…, 2ee17582b9…, 4-10 solids each) that OCCT's check flags; please rerun xdev-subs and
 tell me if those three differ from live.
 
+## Latest (2026-11-08 12:2x UTC)
+- live 2267 answered: 211 studios have `studios/<element>.sketches.json` (every sketch's bodies at the final state).
+  The translator reads them (`refs_from_sketches`, both harnesses: the assembly suite and a model dir's
+  `*sketches.json`): hand-drill-pinslot 27 → 38/41, isaac-ball 73 → 79/121 (alone). A query of sketch regions all in
+  that file maps by their areas when its text's regions don't have live's total area (a region query's text names all
+  the sketch's regions; suspension's Extrude 1 ring, whose text names the disc). Only the file's regions: a per-feature
+  line's may be pieces a later feature imprinted (exercise-chino went 9 → 6 with them, 9/9 again).
+- Suspension measured for the first time (main with core's pattern fix d999cf37): 25/30 occurrences, 2/5 mates, the whole assembly in
+  35 s (it never finished; the Knuckle studio alone 554 ms, live 214). The Knuckle run alone (model dir on vibe3 ~/agents/asm/ps-knuckle): Extrude 1 matches live
+  now; Extrude 2 is the first difference (ticket EXTRUDE-UP-TO-FACE-OFFSET, core); its Circular pattern then fails at
+  once (core's "close round no volume" check) as its faces aren't live's.
+- corpus12 (main 10:00, full): 1216/1701, mates 112/325 (xdev-subs 200/286 with dx's reader). clamp-pattern's Revolute
+  17 stopped resolving between corpus8 and corpus11 (one mate, its connectors translate the same; not found yet).
+
 ## Latest (2026-11-08 09:3x UTC)
 - ui-parity asm 131/141. The graphics right-click menu opens where live's does (probed in live: top-left 2 px under
   the pointer's pixel; above it with its bottom 4 px under; the row under the pointer hovered only when the pointer is
