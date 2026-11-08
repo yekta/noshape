@@ -1605,7 +1605,9 @@ fn shared_mesh_copies_keep_their_own_picks_and_states() {
 /// 1.75², fract(h)) / 1.75; between them the color at 90% (10% of plane 0's
 /// black selector color); a black outline along the cap's border. A box cut
 /// at x = 0 (tangent -Y, Onshape's for a cut parallel to Right), seen head
-/// on, orthographic, at 1x and 2x.
+/// on, orthographic, at 1x and 2x. The pixels are Onshape's canvas's: CSS
+/// pixels, but device pixels on a Retina Mac (live 2255: 16 and 20 px
+/// apart at dpr 1 whatever the zoom).
 #[test]
 fn section_cap_hatch_follows_onshape() {
     let _gpu = GPU.lock().unwrap_or_else(|e| e.into_inner());
@@ -1678,9 +1680,12 @@ fn section_cap_hatch_follows_onshape() {
         let mean = profile.iter().sum::<f32>() / profile.len() as f32;
         let d: Vec<f32> = profile.iter().map(|v| v - mean).collect();
         let ac = |lag: usize| d.iter().zip(&d[lag..]).map(|(a, b)| a * b).sum::<f32>();
-        let want = 15.0 * pace * dpr;
+        let want = 15.0 * pace * if cfg!(target_os = "macos") { 1.0 } else { dpr };
         let best = ((want * 0.6) as usize..(want * 1.5) as usize).max_by(|a, b| ac(*a).total_cmp(&ac(*b))).unwrap() as f32;
         assert!((best - want).abs() <= 0.08 * want + 1.0, "{dpr}x: hatch period {best} px, Onshape's {want} px");
+        // Not half of it (its second peak would fall on `want` too).
+        let half = ac((want / 2.0).round() as usize);
+        assert!(half < 0.3 * ac(best as usize), "{dpr}x: hatch lines every {} px, Onshape's {want} px", want / 2.0);
         // Between lines: the part color at 90%.
         let light = profile.iter().cloned().fold(f32::MIN, f32::max);
         let want_light = srgb.iter().map(|c| c * 0.9 * 255.0).sum::<f32>();

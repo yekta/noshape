@@ -646,7 +646,16 @@ diffs, focus):** the 121: 65/121 scenarios, 498/589 states; all 530: 460/530, 29
   c3x/s3.noshape). The red sliver on Linux is that fold; a Mac's OCCT rounds that fillet differently, so the user's
   bigger red and the space counted as material most likely come from it. For core / blend. The corpus guard now
   also checks every face's triangles face its outward normal (`facing_problems`, any surface; the dock passes). Asked live (REQUESTS 2255) for Onshape's section
-  of two touching parts and a cavity (a stand-in, nothing of the user's).
+  of two touching parts and a cavity (a stand-in, nothing of the user's). **Live's answer (11-08 00:20) against ours**
+  (the stand-in built with noshape-cli: /root/psui-scratch/s2255/build.py, renders n-*.png): touching parts no red
+  (ours 0 red pixels front / iso / bottom), the 0.5 mm overlap flat red (ours #c50000, live #c60000), each cap its
+  colour at 90 % hatched, the ceiling its own shade. One difference fixed: the hatch spacing is Onshape's canvas
+  pixels, CSS-sized except on a Retina Mac; ours counted device pixels, so the CLI's 2× supersampled renders (and a
+  HiDPI Windows / Linux screen) hatched at half spacing (A 7 px, B 10 px; live 16 / 20; ours now 14-16 / 21; the
+  angle is the part id's hash, live's changed between two section creations too). The GPU test's period check
+  passed at half the period (the autocorrelation's second peak); it now fails on the old code. Left: live's cap
+  hover (any cap highlights every cap, #FFC685 at 0.33, kept when the pointer leaves the canvas); ours has no cap
+  picking (a pointer on a cap hovers what is behind it).
 - Focus (in this change): a right-pressed configuration / variable row takes the keyboard ("other"; a left click in
   the panel doesn't), the contexts selector does; the driver reads a state with the keyboard where the open menu returns
   it; Add custom features' search box is recorded, Escape there drops the keyboard. 

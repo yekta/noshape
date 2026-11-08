@@ -1545,12 +1545,18 @@ fn onshape_near_far(camera: &Camera, bounds: Option<(glam::Vec3, glam::Vec3)>) -
     Some((eye, near, far))
 }
 
+/// The height in Onshape's canvas pixels, which its hatch spacing counts: the canvas is CSS-sized but on a Retina
+/// Mac, where it is the display's (behaviours.md "Onshape's HiDPI rule").
+fn canvas_height(height: u32, dpr: f32) -> f32 {
+    if cfg!(target_os = "macos") { height as f32 } else { height as f32 / dpr.max(1e-3) }
+}
+
 /// The section planes' cap uniforms, and the planes to cap: those the
 /// viewer looks at from the cut-away side (Onshape skips a plane facing the
 /// viewer).
-fn section_cap_planes(scene: &Scene, camera: &Camera, view_proj: &Mat4, height: u32) -> (Vec<crate::section_caps::CapPlane>, Vec<u32>) {
+fn section_cap_planes(scene: &Scene, camera: &Camera, view_proj: &Mat4, height: f32) -> (Vec<crate::section_caps::CapPlane>, Vec<u32>) {
     let (center, diameter) = scene.bounds().map_or((Vec3::ZERO, 1.0), |(lo, hi)| ((lo + hi) * 0.5, (hi - lo).length().max(1e-6)));
-    let height = height.max(1) as f32;
+    let height = height.max(1.0);
     // Onshape (webgl bundle): the pattern scale is 30 / (P[5] * viewport
     // height) in orthographic views, 10 * (distanceToCenter + scene radius)
     // / viewport height in perspective, distanceToCenter being the bounds'
@@ -3148,7 +3154,7 @@ impl Renderer {
             }
         }
         // Section caps: the mask and its outline first.
-        let cap_planes = req.scene.clip.is_some().then(|| section_cap_planes(&req.scene, &req.camera, &Mat4::from_cols_array_2d(&globals.view_proj), height));
+        let cap_planes = req.scene.clip.is_some().then(|| section_cap_planes(&req.scene, &req.camera, &Mat4::from_cols_array_2d(&globals.view_proj), canvas_height(height, dpr)));
         ts.caps = match &cap_planes {
             Some((planes, _)) => {
                 section_caps.write_planes(queue, planes);
