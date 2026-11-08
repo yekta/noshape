@@ -33,7 +33,13 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
 - Then (06:45): a subassembly live left out of its fetch (suppressed instances) no longer stops the others being built:
   xdev-subs 7 → 90/286, robot-relations 123/139 (mates 2/7). Corpus total ≈ 1044/1701. xdev-subs' rest: 34 vendor
   Parasolid files our reader refuses (ticket XT-B3-BINARY-TRANSMIT, dx).
-- Next: the next gaps by occurrences (rank_studios.py on the newest log), the ui-parity config steps after step 2.
+- ui-parity asm 124/141 (07:4x): Copy input / Copy all inputs copy to the clipboard with "<name> copied." (live: no
+  edit; coverage now config_copy_inputs), the toast read after the panel's info line, Esc dismisses it; runner
+  `config_files` seeds live's remembered Export (asm-menu-export). Left: the two shared modals (Input propagation,
+  Visibility conditions) aren't recorded and live's title carries its lane copy's name; menu highlight; mate flip;
+  Reference manager; Switch to Part Studio (live's studio name); Create empty subassembly undo (live's shortcoming).
+- Next: the next gaps by occurrences (rank_studios.py on the newest log); most of what's left waits on live (2267,
+  2271) or other areas (XT-B3-BINARY-TRANSMIT, FRAME-PROFILE-OTHER-STUDIO, FACE-PATTERN-30-CUT-SLOW).
 
 ## Paused (2026-11-07 20:08 UTC; lead: Claude quota, resume Monday 11-10)
 Where everything stood:

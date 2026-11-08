@@ -21,5 +21,14 @@
    "do": "key",
    "key": "Escape"
   }
- ]
+ ],
+ "config_files": {
+  "export_solid.json": {
+   "format": "PARASOLID",
+   "parasolid": {
+    "version": 24,
+    "latest": false
+   }
+  }
+ }
 }

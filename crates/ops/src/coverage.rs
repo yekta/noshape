@@ -244,7 +244,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("assembly:Configure", Op("config_configure")),
     ("assembly:Configure suppression", Op("config_configure")),
     ("assembly:Copy all inputs", Op("config_copy_inputs")),
-    ("assembly:Copy input", Op("config_duplicate_input")),
+    ("assembly:Copy input", Op("config_copy_inputs")),
     ("assembly:Copy table", Op("assembly_bom")),
     ("assembly:Create empty subassembly", Op("assembly_create_subassembly")),
     ("assembly:Create Part Studio in context…", Op("assembly_create_part_studio_in_context")),

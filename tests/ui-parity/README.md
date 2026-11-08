@@ -78,6 +78,15 @@ Feature type → group ("" for values without units, "length:<unit>" / "angle:<u
 value: a list is a Lookup path, a bool a Bool, a string in a length / angle group (or a number) an expression, any
 other string an Enum id.
 
+### config_files (asm, 11-08)
+
+Other choices live's account remembers (the Export dialog's last format and version: live2 asm-menu-export) are given
+as the app's own config files, written into the run's config directory before it starts:
+
+    "config_files": {"export_solid.json": {"format": "PARASOLID", "parasolid": {"version": 24, "latest": false}}}
+
+(`export_solid.json`: crates/ops `SolidExportPrefs`; a version is its index in the format's list, 24 = Parasolid 25.0.)
+
 ### steps
 - `{"do": "click" | "dblclick" | "rclick" | "hover", "on": TARGET}`; `hover` waits `ms` (default 1500); a click may
   carry `"mods": "shift" | "mod" | "alt"`, held during the click.

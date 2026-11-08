@@ -559,7 +559,7 @@ impl AssemblyView {
                             let (v1, v2, v3, r, d, c) = (v.clone(), v.clone(), v.clone(), iid.clone(), iid.clone(), iid.clone());
                             m.list_no_icons()
                                 .item(crate::os_menu::OsMenuItem::new("Copy table").on_click(move |_, _, cx| v3.update(cx, |this, cx| this.copy_config_table(&c, cx))))
-                                .item(crate::os_menu::OsMenuItem::new("Copy input").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.duplicate_config_input(&r, cx))))
+                                .item(crate::os_menu::OsMenuItem::new("Copy input").on_click(move |_, _, cx| v1.update(cx, |this, cx| this.copy_config_inputs(Some(&r), cx))))
                                 .item(crate::os_menu::OsMenuItem::new("Rename").on_click({
                                     let (v, r) = (v.clone(), iid.clone());
                                     move |_, window, cx| {
@@ -834,8 +834,16 @@ impl AssemblyView {
         cx.write_to_clipboard(ClipboardItem::new_string(out));
     }
 
-    fn duplicate_config_input(&mut self, input: &str, cx: &mut Context<Self>) {
-        self.edit(noshape_ops::asm_config::COPY_INPUT, cx, |a| noshape_ops::asm_config::duplicate_input(a, input));
+    /// Copy input (`Some`) / Copy all inputs: to the configuration clipboard, as live (no edit), with its toast: the
+    /// input's name for one, "Inputs copied." for several (live asm-config-input-menu-copy-input: "Configuration copied.").
+    fn copy_config_inputs(&mut self, input: Option<&str>, cx: &mut Context<Self>) {
+        let inputs: Vec<_> = self.asm_configuration(cx).inputs.into_iter().filter(|i| input.is_none_or(|id| i.id == id)).collect();
+        let toast = match inputs.as_slice() {
+            [one] => format!("{} copied.", one.name),
+            _ => "Inputs copied.".to_string(),
+        };
+        crate::config_visibility::copy_inputs(inputs);
+        self.show_cfg_toast(toast, true, cx);
     }
 
     fn render_add_asm_config_input(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -985,10 +993,7 @@ impl AssemblyView {
                         let (v1, v2, ids) = (view.clone(), view.clone(), ids.clone());
                         let several = ids.len() > 1;
                         let mut m = m.list_no_icons().item(crate::os_menu::OsMenuItem::new("Copy all inputs").on_click(move |_, _, cx| {
-                            v1.update(cx, |this, cx| {
-                                crate::config_visibility::copy_inputs(this.asm_configuration(cx).inputs.clone());
-                                this.show_cfg_toast("Inputs copied.".into(), true, cx);
-                            })
+                            v1.update(cx, |this, cx| this.copy_config_inputs(None, cx))
                         }));
                         if several {
                             m = m.item(crate::os_menu::OsMenuItem::new(if all_folded { "Expand all inputs" } else { "Collapse all inputs" }).on_click(move |_, _, cx| {

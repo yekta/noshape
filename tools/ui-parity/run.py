@@ -54,6 +54,9 @@ def run_one(app, scenario, out, display, timeout):
     if seed:
         Path(config, "feature_settings.json").write_text(json.dumps(remembered_settings(seed)))
         env["NOSHAPE_UI_REMEMBERED"] = "1"
+    # Other choices live's account remembers, as the app's own config files (README "config_files").
+    for name, content in (json.loads(Path(scenario).read_text()).get("config_files") or {}).items():
+        Path(config, name).write_text(json.dumps(content))
     env.update({
         "NOSHAPE_UI_SCRIPT": str(scenario),
         "NOSHAPE_UI_STATE_OUT": str(out),

@@ -6322,8 +6322,10 @@ impl AssemblyView {
         if self.message.as_ref().is_some_and(|(err, _)| !*err) {
             self.message = None;
         }
-        // And the Named positions toast (live asm-menu-add-to-named-positions).
+        // And the Named positions and configuration toasts (live asm-menu-add-to-named-positions,
+        // asm-menu-configure-suppression).
         self.ui.np_toast = None;
+        self.ui.cfg_toast = None;
         if self.cancel_bom_cell(cx) {
             window.focus(&self.focus, cx);
         } else if self.step_edit.is_some() {

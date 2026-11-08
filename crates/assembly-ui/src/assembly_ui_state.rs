@@ -338,7 +338,7 @@ impl AssemblyView {
             "selection": { "count": items.len(), "items": items },
             "features": { "rows": rows, "rollbackAfter": null },
             "parts": [],
-            "message": self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.ui.cfg_toast.clone()).or_else(|| self.panel_info_and_toast(cx)),
+            "message": self.message.as_ref().map(|(_, m)| m.clone()).or_else(|| self.panel_info_and_toast(cx)),
             "undo": { "undo": history.0, "redo": history.1 },
             "sketch": null,
             "assembly": { "instances": instances.into_iter().chain(nested).collect::<Vec<_>>(), "mates": mates }
@@ -350,13 +350,14 @@ impl AssemblyView {
     /// The blue how-to box a right-hand panel shows, as live's recorder reads it into the message (its bold title,
     /// then its text): Exploded views with one view and no step, Named positions without driving mates, the
     /// Configuration panel with inputs and nothing configured.
-    /// The panel's how-to box, then a Named positions toast after it (live reads both: "<box> / <toast>").
+    /// The panel's how-to box, then a Named positions or configuration toast after it (live reads both: "<box> / <toast>").
     fn panel_info_and_toast(&self, cx: &App) -> Option<String> {
         // (Not while the Driving mate selector is open: live asm-mate-menu-edit-driver-mate.)
         if self.ui.np_driver.is_some() {
             return None;
         }
-        let toast = self.ui.np_toast.clone();
+        // (A configuration toast too: live asm-config-input-menu-copy-input "<box> / Configuration copied.".)
+        let toast = self.ui.np_toast.clone().or_else(|| self.ui.cfg_toast.clone());
         match (self.panel_info(cx), toast) {
             (Some(info), Some(t)) => Some(format!("{info} / {t}")),
             (info, t) => info.or(t),
