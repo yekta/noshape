@@ -33,7 +33,7 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 14:24 UTC: the Knuckle 6/28 (Extrude 4 to asm); the knife's Loft 3 measured, no cause found.**
+**State 11-08 14:20 UTC: the Knuckle 6/28 (Extrude 4 to asm); the knife's Loft 3 measured, no cause found.**
 - susp-knuckle with asm's 8c0f052e2: 1 -> 6/28. Extrude 4's regions are degenerate on our side (Sketch 2's projected
   curves not found): written to asm.md with the cut case (vibe5 ~/core-cases/knbool).
 - c2-hunting-knife Loft 3 (face JTS, a bevel from y -0.25 to y -2 mm): ours = live on its 4 boundary curves (< 0.2 µm)
