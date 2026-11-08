@@ -1,6 +1,6 @@
 {
   "name": "drw-detail-view",
-  "about": "Detail view of the Front view's right side: the default circle profile centred on the bottom-right corner vertex (20, -20, 0), its radius picked on the top-right vertex (20, -20, 20) (exactly 20 mm on both sides), placed on free sheet space",
+  "about": "Detail view of the Front view's right side: the default circle profile centred on the bottom-right corner vertex (20, -20, 0), its radius picked at the free point (8, -20, 12) (17 mm: no edge tangent to the circle, so a pick a pixel off clips the same edges), placed on free sheet space",
   "area": "dx",
   "ticket": "DRAWING-UI-PARITY",
   "source": "drawing scenarios, second batch (lead 11-05 20:3x)",
@@ -31,9 +31,9 @@
         "view_point": {
           "view": "Front",
           "at": [
-            20,
+            8,
             -20,
-            20
+            12
           ]
         }
       }

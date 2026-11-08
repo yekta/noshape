@@ -42,6 +42,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## 11-07 23:57 UTC: exports, view order, Detach, coverage (lead's items 2-3)
+- BOM table as live 2232 (`tables::text_widths`, `row_need`): columns = widest text in its weight + h/3 + padding
+  (inch drawings at least 1.0 in), rows 5/3 h (bold header 26/15 h) + padding. Live's widths are N/367 multiples (an
+  unknown font measure): ours within 2 % per column (T1 bom_table_sizes_as_lives). `TableStyle::line` is an Option:
+  never set shows 0.13 and draws 0.254 mm; once set the PDF pen and DXF lineweight follow it. The DXF grid is one
+  LINE per grid line on BYBLOCK (the border as 4 lines on screen too).
+- Suggested views in live's order: Front, Right, Top, Isometric (ids stay Front 1, Top 2, Right 3);
+  `mbd::trim_suggested_views` checks the ids as a set.
+- Detach from geometry removed (menu, op action `detach`, scene fn): no live menu has it.
+- **Exports 22/24** (final binary, compare.py): BOM table 3/3 and section view 3/3 now. drw-detail-view's DXF / PDF
+  differ by one line: live's radius came out 20.31 mm (its radius click doesn't snap; the block's top edge was tangent
+  to a 20 mm circle, so live clipped a 7 mm chord): the scenario's radius pick is now a free point (8, -20, 12),
+  re-record asked (REQUESTS 2257). Drawing scenarios 86/154 (before 87: drw-hide-inspection-items waits on the
+  bubble re-record).
+- coverage_drawing.py: menu 91/103 (Replicate annotations\tbeta now matches its scenario). New start
+  `config-block-drawing` and drw-sheet-ref-change-config (Change configuration...). Left: Cut list table
+  properties... (frames), Edit section (angular), Hide dimension (live's drw-datum-target-show-dims failed, 2243),
+  Image properties..., Merge with cell below (revision table: no account has it), None, Open Feature Studio in linked
+  document, Remove foreshorten (no UI makes one), Show (MBD panel), Unpin view reference (a version).
+
 ## 11-07 23:25 UTC: live2's drawing batches 13-21 (lead's item 1)
 - **Add stacked callouts... kept**: live2 2240's callout menu without it was the menu of two selected annotations
   (it has Group annotation and no Edit...: the zone label "1" the run had right-clicked was still selected); on one
