@@ -33,6 +33,16 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 12:29 UTC: the unify reorder retries remembered (lead: take it; heads-up in bool.md 12:12). Landing.**
+- boolean.cpp `StuckPairs` (unify_in): the pairs of faces the reordered tries left apart in every order are
+  remembered (cap 512); a later result whose apart pairs are all known skips the tries. Keyed by each face's box and
+  area, not its TShape: the faces come back rebuilt on every Boolean (identity keys never hit).
+- vibe5, 3 runs each (/root/core-scratch/prof4-after.log -> prof4-stuck.log): c2-housing-draft Rotieren 1 316 ->
+  212-237 ms, Boolesch 1 73 -> 21-29; c2-valve-config Extrude 2 99 -> 42, Circular pattern 1 290 -> 237-250.
+  Suite (suite-scope2-base -> suite-stuck): no document loses a feature or gets slower; c2-housing-draft 464 -> 271
+  ms; c2-valve-config 9 -> 10 (it flickers: 10 in suite-loftcol too).
+- Live REQUESTS 2317 (impeller loft version) and 2318 (guided-loft study, 7 cases) open.
+
 **State 11-08 12:08 UTC: live's loft captures (2276, 2291) read.**
 - 2276 (loft Start Normal to profile, magnitude 1, current version): every row of (A) □20→□10, (D)/(I) parallel
   circles offset, (G) a circle to a perpendicular circle fits 3k = 0.9 (c·n) + 0.1 |c| per pole row to 1e-4

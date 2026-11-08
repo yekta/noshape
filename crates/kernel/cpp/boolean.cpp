@@ -117,6 +117,7 @@
 #include <NCollection_DataMap.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
 #include <deque>
+#include <array>
 #include <mutex>
 #include <memory>
 #include <optional>
@@ -4423,9 +4424,11 @@ TopoDS_Shape keep_solid_order(const TopoDS_Shape& in, const TopoDS_Shape& out, c
 }
 
 namespace {
-// Two faces still meeting across an edge (not a seam) on one cylinder: USD's result depends on the faces' order.
-bool cylinder_faces_apart(const TopoDS_Shape& s)
+// Pairs of faces still meeting across an edge (not a seam) on one cylinder or cone: USD's result depends on the faces'
+// order. `all`: every pair, else the first.
+std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> faces_apart(const TopoDS_Shape& s, bool all)
 {
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> out;
   // (Cones too: a valve's conical seat cut in two by a tool, its pieces left apart by OCCT's unify in our faces'
   // order where OCCT's own result's merged.)
   ShapeIMap faces;
@@ -4448,7 +4451,7 @@ bool cylinder_faces_apart(const TopoDS_Shape& s)
     }
   }
   if (!any)
-    return false;
+    return out;
   ShapeAncMap ef;
   TopExp::MapShapesAndUniqueAncestors(s, TopAbs_EDGE, TopAbs_FACE, ef);
   for (int i = 1; i <= ef.Extent(); ++i)
@@ -4462,17 +4465,101 @@ bool cylinder_faces_apart(const TopoDS_Shape& s)
       const gp_Lin la(cyl[a]->Axis()), lb(cyl[b]->Axis());
       const double tol = 1e-9 * std::max(1.0, cyl[a]->Radius());
       if (std::abs(cyl[a]->Radius() - cyl[b]->Radius()) <= tol && la.Direction().IsParallel(lb.Direction(), 1e-9) && la.Distance(lb.Location()) <= tol)
-        return true;
+      {
+        out.emplace_back(fs.First(), fs.Last());
+        if (!all)
+          return out;
+        continue;
+      }
     }
     if (cone[a] && cone[b])
     {
       const double tol = 1e-9 * std::max(1.0, cone[a]->RefRadius());
       if (std::abs(cone[a]->SemiAngle() - cone[b]->SemiAngle()) <= 1e-12 && cone[a]->Apex().Distance(cone[b]->Apex()) <= tol &&
           cone[a]->Axis().Direction().IsParallel(cone[b]->Axis().Direction(), 1e-9))
-        return true;
+      {
+        out.emplace_back(fs.First(), fs.Last());
+        if (!all)
+          return out;
+      }
     }
   }
-  return false;
+  return out;
+}
+
+bool cylinder_faces_apart(const TopoDS_Shape& s)
+{
+  return !faces_apart(s, false).empty();
+}
+
+// Pairs of faces the reordered unify left apart in every order it tried (unify_in): a later result whose apart pairs
+// are all such gets no tries, which would merge nothing there (c2-housing-draft: 3 tries, 110 ms, on each Boolean of
+// its part). Known by their faces' boxes and areas, since the faces come back rebuilt on every Boolean; bounded.
+struct StuckPairs
+{
+  using Key = std::array<double, 14>;
+  std::mutex      lock;
+  std::deque<Key> keys;
+  static constexpr size_t cap = 512;
+  static std::array<double, 7> face_key(const TopoDS_Shape& f)
+  {
+    Bnd_Box b;
+    BRepBndLib::Add(f, b, false);
+    GProp_GProps g;
+    BRepGProp::SurfaceProperties(f, g);
+    double x0 = 0, y0 = 0, z0 = 0, x1 = 0, y1 = 0, z1 = 0;
+    if (!b.IsVoid())
+      b.Get(x0, y0, z0, x1, y1, z1);
+    return {x0, y0, z0, x1, y1, z1, g.Mass()};
+  }
+  static Key key(const std::pair<TopoDS_Shape, TopoDS_Shape>& p)
+  {
+    std::array<double, 7> a = face_key(p.first), b = face_key(p.second);
+    if (b < a)
+      std::swap(a, b);
+    Key k;
+    std::copy(a.begin(), a.end(), k.begin());
+    std::copy(b.begin(), b.end(), k.begin() + 7);
+    return k;
+  }
+  static bool same(const Key& a, const Key& b)
+  {
+    for (size_t i = 0; i < a.size(); ++i)
+      if (std::abs(a[i] - b[i]) > 1e-9 * (1e-3 + std::abs(a[i])))
+        return false;
+    return true;
+  }
+  bool known(const Key& k) const
+  {
+    return std::any_of(keys.begin(), keys.end(), [&](const Key& q) { return same(q, k); });
+  }
+  bool all_known(const std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>& ps)
+  {
+    std::vector<Key> ks;
+    for (const auto& p : ps)
+      ks.push_back(key(p));
+    const std::lock_guard<std::mutex> g(lock);
+    return !ks.empty() && std::all_of(ks.begin(), ks.end(), [&](const Key& k) { return known(k); });
+  }
+  void add(const std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>& ps)
+  {
+    std::vector<Key> ks;
+    for (const auto& p : ps)
+      ks.push_back(key(p));
+    const std::lock_guard<std::mutex> g(lock);
+    for (const Key& k : ks)
+      if (!known(k))
+      {
+        keys.push_back(k);
+        if (keys.size() > cap)
+          keys.pop_front();
+      }
+  }
+};
+StuckPairs& stuck_pairs()
+{
+  static StuckPairs s;
+  return s;
 }
 
 // The shape with each shell's faces in another order (`k` 1: reversed; 2, 3: the reversed and the plain order
@@ -4552,7 +4639,8 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
   TopoDS_Shape r      = unify_seams_in(s0, hist, sc, clean);
   // (Not for an invalid input (c2-sm-louver's fuse): a reordered try is kept only valid, and it gives none, after
   // three more passes.)
-  if (may && !r.IsSame(s0) && cylinder_faces_apart(r) && BRepCheck_Analyzer(s0).IsValid())
+  const std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> apart = may && !r.IsSame(s0) ? faces_apart(r, true) : std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>>();
+  if (!apart.empty() && !stuck_pairs().all_known(apart) && BRepCheck_Analyzer(s0).IsValid())
   {
     const KernelTimer timer("unify.reordered");
     GProp_GProps      v0;
@@ -4575,6 +4663,8 @@ TopoDS_Shape unify_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScope* sc,
           *clean = ck;
       }
     }
+    // What no order merged.
+    stuck_pairs().add(faces_apart(r, true));
   }
   return r.IsSame(s0) ? r : keep_solid_order(s0, r, hist);
 }
