@@ -33,15 +33,15 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 14:00 UTC: live's loft captures (2276, 2291) read.**
+**State 11-08 12:08 UTC: live's loft captures (2276, 2291) read.**
 - 2276 (loft Start Normal to profile, magnitude 1, current version): every row of (A) □20→□10, (D)/(I) parallel
   circles offset, (G) a circle to a perpendicular circle fits 3k = 0.9 (c·n) + 0.1 |c| per pole row to 1e-4
-  (k the first step, c the row's chord): the old rule, per row. Landing (queued 13:4x): curved sections take it
+  (k the first step, c the row's chord): the old rule, per row. Landing (queued 12:05): curved sections take it
   per pole column (Greville points), straight-sided faces keep the corner rule (A exact); a natural loft that came
   out inside out (G: -5300 mm³, every face facing in) is reversed. T1 kernel features::
   a_circle_loft_normal_to_its_start_as_live (D, I to 1e-4; G 5847 vs 5939, -1.6 %: its pairing, not settled).
 - c2-impeller-loft's V255 loft fits 0.9 (c·n)²/|c| + 0.1 |c| instead (2228): with the per-column rule ours is +2.4 %
-  (263,136 vs 257,078; was -2.3 %). Asked live (REQUESTS 13:45) for a current-version copy of that loft: if it gives
+  (263,136 vs 257,078; was -2.3 %). Asked live (REQUESTS 12:03) for a current-version copy of that loft: if it gives
   ~263,100 the feature's asVersion decides the rule (then gate on it). Patch of the squared rule:
   /root/core-scratch/features.cpp.loftrule.
 - 2291 (c2-hunting-knife's Loft 3 face): u (one cubic span) runs between the guides, v (26 C1 poles) from profile A to
@@ -50,7 +50,7 @@ What blend takes over:
   style, area -0.03 %, the blade's volume +2.9 %). Parasolid's guided-loft interpolation: needs its own live study
   (simple cases: a straight profile pair with two curved guides, the sections' bulge vs the guides' curvature).
 
-**State 11-08 12:15 UTC: the unify scope from OCCT's history (lead: take it; heads-up in bool.md).**
+**State 11-08 11:44 UTC: the unify scope from OCCT's history (lead: take it; heads-up in bool.md).**
 - Worktree (not landed): boolean.cpp `occt_unify_scope` (an OCCT result of a clean target gets a UnifyScope: the
   faces not the target's own, those across their edges and at their vertices); op_unify marks a whole unify's
   result clean (its fixed point); kernel `Shape::keep_unify_clean` + eval split_solids pass the flag to the one solid
@@ -61,7 +61,7 @@ What blend takes over:
   that part: bool's RUST-MIRROR-SPLIT-FACES retry; the lever there is remembering that reorders can't merge them.
 - Measured (NOSHAPE_KERNEL_PROFILE, /root/core-scratch/bin/unify-total.py): suite unify 3,479 ms without, 3,694 with:
   no gain, not landed (patch /root/core-scratch/unify-scope-occt.patch). The lever is unify.reordered, ~960 ms of
-  the suite's unify, all on the slow features: written to bool.md (12:40) with a cache idea.
+  the suite's unify, all on the slow features: written to bool.md (11:44) with a cache idea.
 
 **State 11-08 10:45 UTC: P0 FACE-PATTERN-30-CUT-SLOW (lead): 520 s -> the document in 264 ms.**
 - Case: asm-suspension's Part Studio 805e29 as a one-document model corpus on vibe5 (~/core-cases/asm-susp-805e29:

@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## From core (2026-11-08 12:40 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
+## From core (2026-11-08 11:44 UTC): the unify scope from OCCT's history is NOT landed; boolean.cpp untouched
 - Measured over the suite (NOSHAPE_KERNEL_PROFILE, vibe5): unify 3,479 ms over 1,077 calls without it, 3,694 with it
   (noise): the targets of OCCT cuts are rarely "clean" (a unify that changes a shape without merging faces leaves
   eval keeping the Boolean's result). NOSHAPE_UNIFY_CHECK showed no mismatch. Patch kept:
