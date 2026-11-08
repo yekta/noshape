@@ -17,6 +17,9 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   "Chamfer 1": ERROR "Failed to chamfer selections.", live OK (Fan-Connector 32/78/52 faces/edges/vertices, live
   48/110/68). Run it alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived
   NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54. The biggest cascade in the suite: yours.
+- Also yours now (lead 20:07): c2-rings-loft (12/32, 20 lost) fails at Circular pattern 1 on area alone: "Extruded
+  ring" 1192.40 mm², live 1193.07 (-0.056 %), with live's counts (273/762/508); the shortfall is the ring's blend
+  faces (core 11-07 19:56, core.md "seam pieces shown as one edge").
 
 ## Feature audit (lead 11-08 ~11:00): Fillet / Chamfer / Face blend options, tickets in TICKETS.md "Blends (blend)"
 - Landed 11-08: 823698ce (face blend empty options, partial plane end, drafted-rib full round, CHAMFER-METHOD + DA on

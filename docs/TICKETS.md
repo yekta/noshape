@@ -4039,13 +4039,20 @@ CHAMFER-ERRORS (smooth edges / adjoining edge / overlapping texts), CHAMFER-ENTI
 CHAMFER-TOLERANCE, CHAMFER-T1-DIRECTION, FACEBLEND-HELPPOINT, FACEBLEND-ASYM-HOLD (live), FACEBLEND-OPFACEBLEND (custom
 features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST, FACEBLEND-OPS-E2E.
 
+- [ ] P3 SUITE-SPRING-COINCIDENT-EDGES (core, parked by the lead 11-08 20:07): c2-extension-spring's Linear pattern 2
+  ("Spring" 20/54/36 faces/edges/vertices, live 20/56/38; 4 of 16 features lost): Part 1's end round lies on Part 2's
+  U-turn round from (11.2, -1.5) to (12.656, -2.5); live keeps a vertex at (12.656, -2.5) on the merged round's top and
+  bottom edges (0.503 + 1.936 mm), our same-domain unify joins them (both on one curve after OCCT's fuse). Likely
+  Parasolid doesn't join pieces of two different B-spline curves even where they coincide; a change to every
+  Boolean's unify for one case (core.md 11-07 19:18).
+
 ## Sketch + assembly (skasm)
 - [ ] P2 SUITE-HEX-BOOKCASE-TEXT (skasm, paused; core 2026-11-08 20:05 UTC from the model suite): c2-hex-bookcase-derived's
   "text indent" (extrude of a text sketch's regions) makes "shrunk" 43/111/70 faces/edges/vertices, live 31/87/58: the
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
 - [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
-- [ ] P2 SUITE-FAN-BLADE-IMPORT (import owner; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
+- [ ] P2 SUITE-FAN-BLADE-IMPORT (dx, lead 20:07; core 2026-11-08 20:05 UTC): c2-fan-blade-sweep's derived source
   8b633129 (one STEP Import 1): "fan blade" 68/155/95 faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live
   143/404/251 (run it alone: NOSHAPE_PARITY_MODELS=<models>/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129…).
 - [ ] P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a

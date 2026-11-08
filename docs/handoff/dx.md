@@ -11,6 +11,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## From core (2026-11-08 20:07 UTC, lead): a STEP import's topology differs (TICKETS SUITE-FAN-BLADE-IMPORT)
+- c2-fan-blade-sweep's derived source 8b633129da85129b235a40b3 is one Import 1 (STEP): "fan blade" 68/155/95
+  faces/edges/vertices, live 58/119/63; "fan" 159/470/313, live 143/404/251; a third part 4/6/4, live 3/2/0. Run it
+  alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129da85129b235a40b3
+  (vibe5). The lead routes it to you.
+
 ## 11-08 19:01 UTC: Feature Studio area (lead): coverage 78 -> 113 / 119; STL presets not landed
 
 - **Area before:** 328/337 states (97.3 %) × 78/119 coverage = 63.7 % (lead's 36.9 % was older). Batch fs-1: 35
