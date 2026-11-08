@@ -6,7 +6,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## From the user, 2026-11-04
-- [ ] P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an
+- [x] (skasm 11-08: live 2270: no constraint button is dimmed; a selection a constraint can't take (a handle arm in Concentric too) gets std's words in the yellow banner, kept until the next message, × or a constraint added, the selection cleared and no tool; Midpoint on two points and Symmetric on two lines start their tool with the picks; scene sketch_mode a_constraint_a_selection_cant_take_refuses_with_lives_words, e2e coincident_on_one_point_is_a_no_op, ui-parity sketch-constraint-refusals 91/91) P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an
   end point to its handle tip) can't be selected; in Onshape the arm is its own entity (hover, click, constraints and
   dimensions like a line). skasm 11-06 23:55: the arm is a sketch entity now (`Entity::handle_of`: a construction line
   from the spline's end point to its handle point, made with the spline's handles, removed only with the spline,

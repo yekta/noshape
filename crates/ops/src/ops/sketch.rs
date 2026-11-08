@@ -879,7 +879,7 @@ fn constrain(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     ed.selection = ids;
     if !ed.constraint_command(&mut t.data, c) {
         // (The tool shows no hint, as live; the reply says what's missing.)
-        let why = ed.message.clone().unwrap_or_else(|| {
+        let why = ed.refusal.clone().or_else(|| ed.message.clone()).unwrap_or_else(|| {
             if picked < c.arity() {
                 format!("Select {} entit{} for {}", c.arity(), if c.arity() == 1 { "y" } else { "ies" }, c.label())
             } else {

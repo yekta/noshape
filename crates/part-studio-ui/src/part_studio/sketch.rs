@@ -1122,8 +1122,17 @@ impl PartStudioView {
                 ed.selection.push(id);
             }
         }
-        if self.with_sketch(cx, |ed, data| ed.constraint_command(data, c)) == Some(true) {
+        let added = self.with_sketch(cx, |ed, data| ed.constraint_command(data, c)) == Some(true);
+        if added {
             self.regen_sync(window, cx);
+            // Live 2270: a constraint added takes the last refusal's banner away.
+            if self.message.as_ref().is_some_and(|(k, _)| *k == noshape_model::display::FeatureStatus::Warning) {
+                self.message = None;
+            }
+        }
+        // Live 2270: a refusal's words in the yellow banner, kept until the next message or ×.
+        if let Some(text) = self.sketch.as_mut().and_then(|s| s.refusal.take()) {
+            self.message = Some((noshape_model::display::FeatureStatus::Warning, text));
         }
         // "Sketch could not be solved." (live).
         if let Some(text) = self.sketch.as_mut().and_then(|s| s.toast.take()) {
@@ -4052,11 +4061,10 @@ impl PartStudioView {
         // dialog opens, all of it (Search tools too) at 25 % until the sketch
         // plane is picked.
         let disabled = self.sketch.is_none();
-        // Constraint buttons not applicable to the selection are disabled.
         let data = self.sketch_data(cx);
-        let (active, construction, selection) = match &self.sketch {
-            Some(ed) => (ed.shown_tool(), data.as_ref().is_some_and(|d| ed.construction_shown(&d.sketch)), ed.selection.clone()),
-            None => (Tool::Select, false, Vec::new()),
+        let (active, construction) = match &self.sketch {
+            Some(ed) => (ed.shown_tool(), data.as_ref().is_some_and(|d| ed.construction_shown(&d.sketch))),
+            None => (Tool::Select, false),
         };
         // Onshape's sketch toolbar has the feature toolbar's metrics (§3.10).
         // The parity driver's names: a tool by its Onshape name, a group's caret by its face's.
@@ -4179,18 +4187,12 @@ impl PartStudioView {
         } else {
             for c in CONSTRAINT_TOOLS {
                 let tool = Tool::Constraint(*c);
-                let enabled = selection.is_empty() || data.as_ref().is_some_and(|d| crate::sketch_mode::constraint_applicable(&d.sketch, *c, &selection));
-                // Not applicable to the selection: Onshape dims the tool to 40%.
+                // Live 2270: no constraint is dimmed for any selection; one that can't take it refuses with a message.
                 bar = bar.child(crate::ui::with_tool_tooltip(
                     SharedString::from(format!("skt-{tool:?}")),
                     tool.label(),
                     crate::ui::tool_button(SharedString::from(format!("sk-{tool:?}")), tool.icon(), active == tool, cx)
-                        .opacity(if enabled { 1.0 } else { 0.4 })
-                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
-                            if enabled {
-                                this.activate_tool(tool, window, cx);
-                            }
-                        })),
+                        .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.activate_tool(tool, window, cx))),
                 ));
             }
         }

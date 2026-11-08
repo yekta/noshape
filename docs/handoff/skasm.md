@@ -45,6 +45,16 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## Resume here (2026-11-08 05:50 UTC)
+- **Constraint refusals as live (2270), SKETCH-SPLINE-HANDLE-ARM closed**: `constraint_command` refuses a selection a
+  constraint can't take with std's words (`refusal_words`, `constraint_refusal` for a curve's own two points) in
+  `SketchEditor::refusal`, which the Part Studio shows as the Warning banner (kept until the next message, × or a
+  constraint added); the selection clears and no tool starts. A selection more picks could complete (`completes_later`:
+  Midpoint on points, Symmetric under three, one entity of a two-entity constraint) starts the tool with it as picks;
+  Escape drops them. No constraint button is dimmed any more. ui-parity sketch-constraint-refusals (live's q2270
+  recording, shots dropped, one 4 s wait kept) 91/91.
+- Then paused again (lead 11-08 05:19).
+
 ## Resume here (2026-11-08 01:00 UTC)
 - **Paused (lead 11-08 01:10, session quota)** until live answers REQUESTS 01:05; then build live's constraint
   refusal messages (below). Not the polygon constraints (SKETCH-POLYGON-CONSTRAINTS, P3) for now. The two Boolean

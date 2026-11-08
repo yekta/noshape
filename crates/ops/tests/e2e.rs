@@ -2095,6 +2095,9 @@ fn coincident_on_one_point_is_a_no_op() {
     // Other duplicates are one selected entity, as in the UI.
     let e = try_call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "equal", "entities": [lines[0]["id"], lines[0]["id"]] })).unwrap_err();
     assert!(e.message.contains("Select 2 entities"), "{e:?}");
+    // A selection the constraint can't take: live's words (2270), nothing added.
+    let e = try_call(&mut ctx, "sketch_constrain", json!({ "sketch": sk, "constraint": "parallel", "entities": [lines[0]["id"], corner] })).unwrap_err();
+    assert_eq!(e.message, "A parallel constraint requires two lines.", "{e:?}");
     // A dimension without a value keeps the measured one (the value box accepted unchanged).
     let d = call(&mut ctx, "sketch_dimension", json!({ "sketch": sk, "kind": "length", "entities": [lines[0]["id"]] }));
     let g = call(&mut ctx, "sketch_get", json!({ "sketch": sk }));

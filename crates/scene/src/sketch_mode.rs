@@ -572,6 +572,9 @@ pub struct SketchEditor {
     pub offset_out: bool,
     /// A warning toast for the host to show (taken once shown).
     pub toast: Option<String>,
+    /// Why the last constraint command added nothing (live 2270's banner: it stays until the next message, × or a
+    /// constraint added; taken by the host).
+    pub refusal: Option<String>,
     /// Curves of the offset being set up (preview, arrow and distance box).
     pub offset_pending: Option<Vec<EntityId>>,
     /// An offset was made: later curve clicks repeat it with the same distance.
@@ -1187,6 +1190,7 @@ impl SketchEditor {
             offset_flip: false,
             offset_out: false,
             toast: None,
+            refusal: None,
             offset_pending: None,
             offset_repeat: false,
             conic_rho: 0.5,
@@ -1400,6 +1404,11 @@ impl SketchEditor {
             return true;
         }
         if !self.clicks.is_empty() || !self.picks.is_empty() || self.chain_end.is_some() || self.mirror_axis.is_some() || self.tangent_mode {
+            // Live 2270: a constraint tool's picks (Midpoint started on two points) go with it.
+            if matches!(self.tool, Tool::Constraint(_)) {
+                let picks: Vec<EntityId> = self.picks.iter().map(|x| x.0).collect();
+                self.selection.retain(|e| !picks.contains(e));
+            }
             self.set_tool(Tool::Select);
             return true;
         }
@@ -2082,6 +2091,8 @@ impl SketchEditor {
                         && !data.sketch.constraints().any(|x| x.kind == kind)
                         && data.sketch.add_constraint(kind).is_ok()
                     {
+                        // A selection the tool started with (Midpoint on two points) goes with its constraint.
+                        self.selection.retain(|x| !ids.contains(x));
                         if !solve_after_constraint(&mut data.sketch, c, &ids) {
                             self.toast = Some(SKETCH_NOT_SOLVED.into());
                         }
@@ -4845,29 +4856,59 @@ impl SketchEditor {
         self.construction || (!curves.is_empty() && curves.iter().all(|id| sk.entity(*id).is_some_and(|e| e.construction)))
     }
 
-    /// Apply a constraint tool to the current selection if it fits; else
-    /// switch to the constraint tool.
+    /// Apply a constraint tool to the current selection if it fits; a selection that more picks could complete
+    /// starts the tool with it; one the constraint can't take is refused with live's words (live 2270: the
+    /// selection cleared, no tool, the message in [`Self::refusal`]); nothing selected starts the tool.
     pub fn constraint_command(&mut self, data: &mut SketchData, c: ConstraintTool) -> bool {
+        self.refusal = None;
         // Select-first: the constraint applies to the whole selection at once.
         if already_coincident(&data.sketch, c, &self.selection) {
             return false;
         }
-        if !self.selection.is_empty() && constraint_applicable(&data.sketch, c, &self.selection) {
-            match apply_constraint(&mut data.sketch, c, &self.selection) {
+        if self.selection.is_empty() {
+            // Tool-first: each pair of entities picked is constrained.
+            self.set_tool(Tool::Constraint(c));
+            return false;
+        }
+        if let Some(why) = constraint_refusal(&data.sketch, c, &self.selection) {
+            self.refuse(why);
+            return false;
+        }
+        if constraint_applicable(&data.sketch, c, &self.selection) {
+            return match apply_constraint(&mut data.sketch, c, &self.selection) {
                 Ok(n) if n > 0 => {
                     if !solve_after_constraint(&mut data.sketch, c, &self.selection) {
                         self.toast = Some(SKETCH_NOT_SOLVED.into());
                     }
                     self.selection.clear();
-                    return true;
+                    true
                 }
-                // Nothing added (or it couldn't be): the tool takes picks instead.
-                Ok(_) | Err(_) => {}
-            }
+                Ok(_) | Err(_) => {
+                    self.refuse(ADD_CONSTRAINT_FAILED);
+                    false
+                }
+            };
         }
-        // Tool-first: each pair of entities picked is constrained.
-        self.set_tool(Tool::Constraint(c));
+        if completes_later(&data.sketch, c, &self.selection) {
+            // Live: Midpoint on two points, Symmetric on two lines: the tool starts with them as its picks.
+            let picks: Vec<(EntityId, DVec2)> = self.selection.iter().map(|e| (*e, DVec2::ZERO)).collect();
+            if self.tool != Tool::Constraint(c) {
+                self.set_tool(Tool::Constraint(c));
+            }
+            self.picks = picks;
+            return false;
+        }
+        self.refuse(refusal_words(&data.sketch, c, &self.selection));
         false
+    }
+
+    fn refuse(&mut self, why: &str) {
+        self.refusal = Some(why.into());
+        self.selection.clear();
+        self.selected_constraints.clear();
+        if matches!(self.tool, Tool::Constraint(_)) {
+            self.set_tool(Tool::Select);
+        }
     }
 
     // ------------------------------------------------------------ overlay
@@ -7184,8 +7225,68 @@ fn make_constraint(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<C
     })
 }
 
-/// Can constraint `c` be applied to the selected entities? (Onshape enables
-/// only the applicable constraint buttons for a selection.)
+/// Live's words when nothing can be added (std SKETCH_ADD_CONSTRAINT_FAILED).
+pub const ADD_CONSTRAINT_FAILED: &str = "Could not add constraint.";
+
+/// A selection a constraint refuses though its kinds would fit (live 2270: Coincident on a curve's own two points).
+fn constraint_refusal(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> Option<&'static str> {
+    let same_curve = |a: EntityId, b: EntityId| sk.entities().any(|e| e.endpoints().is_some_and(|(s, t)| (s, t) == (a, b) || (s, t) == (b, a)));
+    match (c, ids) {
+        (ConstraintTool::Coincident, [a, b]) if is_point(sk, *a) && is_point(sk, *b) && same_curve(*a, *b) => {
+            Some("A coincident constraint cannot be added to two points from the same curve.")
+        }
+        _ => None,
+    }
+}
+
+/// A selection more picks could turn into constraint `c` (live 2270: Midpoint on two points, Symmetric on two lines
+/// start their tool with them).
+fn completes_later(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> bool {
+    let all_points = ids.iter().all(|e| is_point(sk, *e));
+    let need = match c {
+        ConstraintTool::Midpoint if all_points => 3,
+        ConstraintTool::Horizontal | ConstraintTool::Vertical if all_points => 2,
+        _ => c.arity(),
+    };
+    ids.len() < need && ids.iter().all(|e| kind_fits(sk, c, *e))
+}
+
+/// Live's words for a selection constraint `c` can't take (live 2270; std's errorstringenum).
+fn refusal_words(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> &'static str {
+    let lines = ids.iter().filter(|e| sk.kind(**e) == Some(EntityKind::Line)).count();
+    let points = ids.iter().filter(|e| is_point(sk, **e)).count();
+    match c {
+        ConstraintTool::Coincident if points == 0 => "A coincident constraint cannot be applied to two curves of different types.",
+        ConstraintTool::Concentric => "A concentric constraint can only be added to circles, arcs, ellipses and points.",
+        ConstraintTool::Parallel => "A parallel constraint requires two lines.",
+        ConstraintTool::Perpendicular if ids.len() == 2 && lines < 2 => "A perpendicular constraint requires two lines.",
+        ConstraintTool::Tangent => "A tangent constraint requires two curves, one of which must not be a line.",
+        ConstraintTool::Equal => "An equal constraint can only be added between two lines or two curves.",
+        ConstraintTool::Normal => "A normal constraint requires a line and a curve.",
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => "The entities must be all points or all lines and ellipses.",
+        ConstraintTool::Midpoint => "Midpoint constraint requires a point and a line or arc.",
+        ConstraintTool::Curvature => "An equal curvature constraint requires two curves one of which must be a conic or spline.",
+        _ => ADD_CONSTRAINT_FAILED,
+    }
+}
+
+/// Whether constraint `c` takes an entity of `e`'s kind among its picks.
+fn kind_fits(sk: &Sketch, c: ConstraintTool, e: EntityId) -> bool {
+    let Some(k) = sk.kind(e) else { return false };
+    let point = k == EntityKind::Point;
+    match c {
+        ConstraintTool::Coincident | ConstraintTool::Fix | ConstraintTool::Symmetric => true,
+        ConstraintTool::Concentric => point || k.is_circular() || k.is_elliptical(),
+        ConstraintTool::Parallel | ConstraintTool::Perpendicular => k == EntityKind::Line,
+        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature | ConstraintTool::Flow => !point,
+        ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
+        ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
+        ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
+        ConstraintTool::Horizontal | ConstraintTool::Vertical => point || k == EntityKind::Line || k == EntityKind::Ellipse,
+    }
+}
+
+/// Can constraint `c` be applied to the selected entities at once?
 pub fn constraint_applicable(sk: &Sketch, c: ConstraintTool, ids: &[EntityId]) -> bool {
     let kinds: Vec<EntityKind> = ids.iter().filter_map(|e| sk.kind(*e)).collect();
     if kinds.len() != ids.len() || kinds.is_empty() {
@@ -7254,17 +7355,7 @@ pub fn pick_fits(sk: &Sketch, c: ConstraintTool, picks: &[EntityId], e: EntityId
     if complete {
         return constraint_applicable(sk, c, &ids);
     }
-    let curve = !point;
-    match c {
-        ConstraintTool::Coincident | ConstraintTool::Fix | ConstraintTool::Symmetric => true,
-        ConstraintTool::Concentric => point || k.is_circular() || k.is_elliptical(),
-        ConstraintTool::Parallel | ConstraintTool::Perpendicular => k == EntityKind::Line,
-        ConstraintTool::Tangent | ConstraintTool::Normal | ConstraintTool::Curvature | ConstraintTool::Flow => curve,
-        ConstraintTool::Equal => k == EntityKind::Line || k.is_circular(),
-        ConstraintTool::Midpoint => point || matches!(k, EntityKind::Line | EntityKind::Arc),
-        ConstraintTool::Pierce => point || sk.entity(e).is_some_and(|x| x.external),
-        ConstraintTool::Horizontal | ConstraintTool::Vertical => point || k == EntityKind::Line || k == EntityKind::Ellipse,
-    }
+    kind_fits(sk, c, e)
 }
 
 /// Points already coincident (one point, or joined by coincident
@@ -9249,6 +9340,56 @@ mod tests {
         let grab = a + (b - a) * 0.85;
         drag(&mut ed, &mut d, grab, grab + v(0.005, 0.0));
         assert!((d.sketch.point(start).unwrap() - a).length() < 1e-9, "the spline's end stays");
+    }
+
+    /// Live 2270: a constraint pressed with a selection it can't take refuses with std's words, clears the selection
+    /// and starts no tool (a spline's handle arm too); Midpoint on two points and Symmetric on two lines start their
+    /// tool with them; Fix applies.
+    #[test]
+    fn a_constraint_a_selection_cant_take_refuses_with_lives_words() {
+        let (mut ed, mut d) = editor(Tool::Select);
+        let a = d.sketch.add_line(v(0.0, 0.0), v(0.03, 0.0));
+        let b = d.sketch.add_line(v(0.0, 0.01), v(0.03, 0.02));
+        let c = d.sketch.add_circle(v(0.05, 0.0), 0.005);
+        let p = d.sketch.add_point(v(0.06, 0.02));
+        let centre = d.sketch.entity(c).and_then(|e| e.center()).unwrap();
+        let (b0, b1) = d.sketch.endpoints(b).unwrap();
+        let s = d.sketch.add_fit_spline_with_handles(&[v(0.0, 0.03), v(0.015, 0.04), v(0.03, 0.03)]).unwrap();
+        let Some(arm) = d.sketch.handle_arms(s)[0] else { panic!("arms") };
+        let n = d.sketch.constraints().count();
+        let refused = [
+            (ConstraintTool::Concentric, vec![a, c], "A concentric constraint can only be added to circles, arcs, ellipses and points."),
+            (ConstraintTool::Concentric, vec![arm, c], "A concentric constraint can only be added to circles, arcs, ellipses and points."),
+            (ConstraintTool::Parallel, vec![a, c], "A parallel constraint requires two lines."),
+            (ConstraintTool::Perpendicular, vec![a, b, c], "Could not add constraint."),
+            (ConstraintTool::Tangent, vec![a, b], "A tangent constraint requires two curves, one of which must not be a line."),
+            (ConstraintTool::Equal, vec![a, c], "An equal constraint can only be added between two lines or two curves."),
+            (ConstraintTool::Normal, vec![c, p], "A normal constraint requires a line and a curve."),
+            (ConstraintTool::Horizontal, vec![c], "The entities must be all points or all lines and ellipses."),
+            (ConstraintTool::Coincident, vec![b0, b1], "A coincident constraint cannot be added to two points from the same curve."),
+            (ConstraintTool::Coincident, vec![a, c], "A coincident constraint cannot be applied to two curves of different types."),
+            (ConstraintTool::Pierce, vec![a, p], "Could not add constraint."),
+            (ConstraintTool::Curvature, vec![a, c], "An equal curvature constraint requires two curves one of which must be a conic or spline."),
+        ];
+        for (tool, sel, words) in refused {
+            ed.selection = sel;
+            assert!(!ed.constraint_command(&mut d, tool), "{tool:?}");
+            assert_eq!(ed.refusal.take().as_deref(), Some(words), "{tool:?}");
+            assert!(ed.selection.is_empty() && ed.tool == Tool::Select, "{tool:?}: selection cleared, no tool");
+        }
+        assert_eq!(d.sketch.constraints().count(), n, "nothing added");
+        for (tool, sel) in [(ConstraintTool::Midpoint, vec![p, centre]), (ConstraintTool::Symmetric, vec![a, b])] {
+            ed.set_tool(Tool::Select);
+            ed.selection = sel.clone();
+            assert!(!ed.constraint_command(&mut d, tool));
+            assert!(ed.refusal.is_none(), "{tool:?}: no message");
+            assert_eq!(ed.tool, Tool::Constraint(tool), "{tool:?}: its tool starts");
+            assert_eq!(ed.selection, sel, "{tool:?}: the picks stay selected");
+        }
+        ed.set_tool(Tool::Select);
+        ed.selection = vec![a];
+        assert!(ed.constraint_command(&mut d, ConstraintTool::Fix));
+        assert!(ed.refusal.is_none());
     }
 
     /// SKETCH-SPLINE-END-DERIVATIVES: a spline's end-tangent handle drags
