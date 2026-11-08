@@ -47,6 +47,14 @@ What blend takes over:
 - Defeaturing (~3.1 s): OCCT's in parallel is 2.5-3.4x faster (Delete face 1 588 -> 231, 2 1908 -> 569), but
   op_defeature is serial for the CPU budget (DRAFT-HANG / -BUDGET-POOL / -NONDETERMINISTIC): asked the lead.
   Delete face 2's OCCT result is invalid too. Recorded inputs: vibe5 ~/core-cases/defeat (TMP_DUMP_DEFEATURE hack).
+- 20:01 (lead 19:3x): Delete face 2's invalid OCCT result never reaches the part (direct.rs rejects it: "Failed
+  to delete faces."); it runs on the impeller's wrong upstream input (ours 22 faces / 298,038 mm³, live 63 / 117,831):
+  no ticket. Parallel defeaturing stays serial (lead's rule: only with a CPU budget summed over the pool's threads,
+  checked by the guard; a worker spinning outside break hooks can't be stopped by the caller's guard).
+  Surface Pattern 5: a point-to-free-face distance from our interior search + edges failed T1
+  projection::ruled_loft_interior_points (1 mm off) and was slower; Extrema_ExtFlag_MIN no gain: left at 186 vs 71.
+  Feature patterns: merged_faces / overhang_growth measure only faces in a tool face's plane: clamp-hms Mirror 1
+  42 -> 27 ms (queued). Part Draft 1 is OCCT (defeaturing 40, fillet 20).
 - Tried, no gain, not kept: Up to a parallel plane as a prism of that depth (16 extrudes in the corpus, A/B level);
   "same faces" before volumes in the miss check (OCCT rebuilds the faces).
 
