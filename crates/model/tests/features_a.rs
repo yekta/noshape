@@ -1040,6 +1040,40 @@ fn face_blend_checks_as_live() {
     }
 }
 
+/// Two distances on pins from one extrude measure Distance 1 from each pin's own sides (live c2-fan-blade-sweep's
+/// connector: four 0.7 mm pins, Chamfer 1 0.4 / 0.2 mm, 0.4 down each pin's sides; with it on a pin's top two
+/// opposite chamfers need 0.8 mm of a 0.7 mm top and fail). Two 0.7 mm pins 2 mm up out of a plate.
+#[test]
+fn two_distance_chamfers_on_pins_of_one_extrude_measure_from_each_pins_sides() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.01, 0.005, "2 mm");
+    let mut sk = noshape_sketch::Sketch::new();
+    for x in [0.002, 0.006] {
+        let c = [DVec2::new(x, 0.002), DVec2::new(x + 0.0007, 0.002), DVec2::new(x + 0.0007, 0.0027), DVec2::new(x, 0.0027)];
+        let pts: Vec<_> = c.iter().map(|q| sk.add_point(*q)).collect();
+        for i in 0..4 {
+            sk.add_line_between(pts[i], pts[(i + 1) % 4]).unwrap();
+        }
+    }
+    let up = t.add("cPlane", &[("entities", q(vec![Reference::Plane(DatumPlane::Top)])), ("cplaneType", en("OFFSET")), ("offset", e("2 mm"))]);
+    let s = t.sketch(Reference::FeaturePlane(up), sk);
+    let res = t.regen();
+    let sketch = res.display.sketches.iter().find(|x| x.feature == s).unwrap();
+    let regions: Vec<Reference> = sketch.regions.iter().filter(|r| (r.area - 0.49e-6).abs() < 1e-9).map(|r| Reference::SketchRegion { sketch: s, key: r.key.clone() }).collect();
+    assert_eq!(regions.len(), 2);
+    t.add("extrude", &[("entities", q(regions)), ("depth", e("2 mm")), ("operationType", en("ADD")), ("defaultScope", b(true))]);
+    let res = t.ok();
+    let b0 = &res.context.bodies[0];
+    let before = b0.shape.volume().unwrap();
+    let tops: Vec<Reference> = b0.shape.faces().iter().enumerate().filter(|(_, f)| f.face_plane().ok().flatten().is_some_and(|p| (p.origin.z - 0.004).abs() < 1e-9 && p.normal.z.abs() > 0.999)).map(|(i, _)| Reference::Face((*b0.faces[i]).clone())).collect();
+    assert_eq!(tops.len(), 2);
+    t.add("chamfer", &[("entities", q(tops)), ("chamferType", en("TWO_OFFSETS")), ("width1", e("0.4 mm")), ("width2", e("0.2 mm")), ("tangentPropagation", b(true))]);
+    let res = t.ok();
+    let removed = (before - res.context.bodies[0].shape.volume().unwrap()) * 1e9;
+    let per_pin = 0.5 * 0.2 * 0.4 * 4.0 * (0.7 - 2.0 * 0.2 / 3.0);
+    assert!((removed - 2.0 * per_pin).abs() < 1e-6, "{removed} mm³, want {}", 2.0 * per_pin);
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).

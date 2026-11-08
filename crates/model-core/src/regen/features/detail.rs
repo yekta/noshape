@@ -913,19 +913,34 @@ fn two_offsets(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize]
 /// in profile order (G30's block drawn (0,0)→(40,0)→(40,20)→(0,20): front,
 /// bottom, top, right, back, left). Other faces follow in name order.
 pub(crate) fn face_order(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name) -> (usize, u8, Name) {
-    let crate::reference::TopoName::Face { feature, role } = face.root() else { return (usize::MAX, 4, face.clone()) };
+    face_order_in(ev, body, face, None)
+}
+
+/// [`face_order`], each profile loop's first side its own (`adjacency`: the body's edge faces; the sides of one loop
+/// are those beside the caps this side borders): a feature's several pins each measure from their side (live
+/// c2-fan-blade-sweep's connector: four 0.7 mm pins, Chamfer 1's 0.4 mm down each pin's sides).
+fn face_order_in(ev: &EvalCtx, body: &crate::regen::context::Body, face: &Name, adjacency: Option<&[Vec<u32>]>) -> (usize, u8, Name) {
+    use crate::reference::TopoName;
+    let TopoName::Face { feature, role } = face.root() else { return (usize::MAX, 4, face.clone()) };
     let position = ev.features.iter().position(|f| f.id == *feature).unwrap_or(usize::MAX);
+    let side_of = |n: &Name| match n.root() {
+        TopoName::Face { feature: f, role: Role::Side(src) } if f == feature => Some(src.clone()),
+        _ => None,
+    };
+    let is_cap = |n: &Name| matches!(n.root(), TopoName::Face { feature: f, role: Role::CapStart(_) | Role::CapEnd(_) } if f == feature);
     let first_side = || {
-        body.faces
-            .iter()
-            .filter_map(|n| match n.root() {
-                crate::reference::TopoName::Face { feature: f, role: Role::Side(src) } if f == feature => Some(src),
-                _ => None,
-            })
-            .min()
+        let loop_sides = adjacency.and_then(|adj| {
+            let me = body.faces.iter().position(|n| n == face)?;
+            let beside = |f: usize| -> Vec<usize> {
+                adj.iter().filter(|fs| fs.contains(&(f as u32))).flat_map(|fs| fs.iter().map(|&g| g as usize)).filter(|&g| g != f).collect()
+            };
+            let caps: Vec<usize> = beside(me).into_iter().filter(|&g| is_cap(&body.faces[g])).collect();
+            caps.iter().flat_map(|&c| beside(c)).filter_map(|g| side_of(&body.faces[g])).min()
+        });
+        loop_sides.or_else(|| body.faces.iter().filter_map(side_of).min())
     };
     let class = match role {
-        Role::Side(src) if first_side() == Some(src) => 0,
+        Role::Side(src) if first_side().as_ref() == Some(src) => 0,
         Role::CapStart(_) => 1,
         Role::CapEnd(_) => 2,
         Role::Side(_) => 3,
@@ -952,7 +967,7 @@ fn distance_one_faces(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &
         // A sheet's boundary edges: the kernel's default.
         return Ok(Vec::new());
     }
-    let key = |f: usize| face_order(ev, body, &body.faces[f]);
+    let key = |f: usize| face_order_in(ev, body, &body.faces[f], Some(&adjacency));
     let ends: Vec<[glam::DVec3; 2]> = edges
         .iter()
         .map(|&e| body.shape.sub_shape(ShapeType::Edge, e).and_then(|s| s.edge_info()).map(|i| [i.start, i.end]))
