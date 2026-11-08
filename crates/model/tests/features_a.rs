@@ -2514,6 +2514,40 @@ fn variable_rounds_taller_than_their_walls_run_onto_the_floor() {
 /// Up to a cylindrical face a profile reaches past: the whole cylinder bounds it, as live's (c2-rings-loft's Extrude
 /// 3: up to the bore, of which its rounds left only the top). A 10 x 10 profile on Top up to a half cylinder (R 10, axis
 /// x, 30 mm up, its y > 0 half cut away): 10 x the integral of 30 - sqrt(100 - y^2) over y in [-5, 5].
+/// EXTRUDE-UP-TO-FACE-OFFSET (asm-suspension's Knuckle Extrude 2, live 379,335 mm³): a second direction flipped as the
+/// first runs the same way (std's isStartBoundOpposite false), and the extrude lies between its two ends: Through all
+/// one way and Up to the block's top face offset 20 mm the same way removes the circle's last 20 mm of the 30 mm block,
+/// not all 30 from the sketch.
+#[test]
+fn a_second_direction_the_same_way_extrudes_between_the_ends() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), rect(0.0, 0.0, 0.04, 0.04));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "30 mm", "NEW");
+    let res = t.ok();
+    let body = solids(&res.context)[0].clone();
+    let top = body.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.z.abs() > 0.99 && (p.origin.z - 0.03).abs() < 1e-9)).expect("the top face");
+    let face = Reference::Face((*body.faces[top]).clone());
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::new(0.02, 0.02), 0.01));
+    let r = t.regions(s)[0].clone();
+    t.add("extrude", &[
+        ("entities", q(vec![r])),
+        ("operationType", en("REMOVE")),
+        ("defaultScope", b(true)),
+        ("endBound", en("THROUGH_ALL")),
+        ("hasSecondDirection", b(true)),
+        ("secondDirectionBound", en("UP_TO_SURFACE")),
+        ("secondDirectionOppositeDirection", b(false)),
+        ("secondDirectionBoundEntityFace", q(vec![face])),
+        ("hasSecondDirectionOffset", b(true)),
+        ("secondDirectionOffsetDistance", e("20 mm")),
+    ]);
+    let res = t.ok();
+    let v = solids(&res.context)[0].shape.volume().unwrap() * 1e9;
+    let want = 40.0 * 40.0 * 30.0 - std::f64::consts::PI * 100.0 * 20.0;
+    assert!((v - want).abs() < 1e-3, "{v} mm³, want {want}");
+}
+
 #[test]
 fn up_to_a_cylinder_face_takes_the_whole_cylinder() {
     let mut t = T::new();

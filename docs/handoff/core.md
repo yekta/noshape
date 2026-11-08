@@ -33,6 +33,20 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 13:04 UTC: EXTRUDE-UP-TO-FACE-OFFSET (lead, asm's ticket); snap-hook landing; guided-loft study in.**
+- Cause: a second direction flipped as the first (secondDirectionOppositeDirection == oppositeDirection) runs the
+  same way (std isStartBoundOpposite false) and opExtrude's solid lies between the two ends; ours fused two halves
+  from the profile (the Knuckle's ring 30 mm deep, live 20). extrude.rs: same-way halves -> the longer minus the
+  shorter. T1 features_a::a_second_direction_the_same_way_extrudes_between_the_ends. The Knuckle itself needs asm's
+  08e9ee0ee (sketch regions; in asm's queue, conflicts with my tree): check it once both land.
+- Snap-hook fix queued (57a30ddb): suite unchanged, total 47.4 -> 41.7 s.
+- Live 2319 (guided lofts, 7 cases; behaviours.md "core (2319)"): ours matches areas to 3e-6 except case 3 (an arc
+  profile between straight guides: -0.07 %): live pairs the curves by arc length (a ruled arc-by-angle surface
+  gives 2130.812, live 2130.807; ours the arc's rational parameter, 2129.305). Case 6 (guides of two lines) live
+  errors "Guide curves must be smooth.", ours builds it (allowed: we do the work). Patch in progress:
+  /root/core-scratch/loft-arc.patch (face_on_edges' sides by arc length, Approx_CurvilinearParameter; NOSHAPE_LOFT_*
+  switches to try Coons vs Stretch; plus the probe test probe_guided_2319). Then the knife's Loft 3 volume.
+
 **State 11-08 12:52 UTC: cf-snap-hook's custom features; live 2317 answered.**
 - Snap Hook 1 / 2 (~1.1 / 1.4 s, live 81 / 83 ms) were nearly all `tools_reach_in` (op_boolean's check that OCCT
   didn't miss an overlap, after a cut that left the part's volume as it was): it built a BRepClass3d_SolidClassifier

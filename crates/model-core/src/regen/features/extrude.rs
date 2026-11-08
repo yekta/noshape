@@ -326,7 +326,18 @@ fn extrude_profile(ev: &EvalCtx, p: &Profile, dir: DVec3) -> FResult<NamedShape>
         let empty = crate::naming::ShapeNames::default();
         names_for(&r2.shape, ev.name_result(&[&empty], &r2.history, &r2.shape, &roles, None))
     };
-    let fused = k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&r1.shape), std::slice::from_ref(&r2.shape), &k::BooleanOptions::default())?;
+    // Both sides the same way (std's isStartBoundOpposite false): opExtrude's solid runs between the two caps, not
+    // from the profile (asm-suspension's Knuckle Extrude 2: up to a face 20 mm short of it, then through all).
+    let fused = if d2.dot(dir) > 0.0 {
+        let (long, short) = if r1.shape.volume()? >= r2.shape.volume()? { (&r1.shape, &r2.shape) } else { (&r2.shape, &r1.shape) };
+        let between = k::boolean(k::BooleanOp::Cut, std::slice::from_ref(long), std::slice::from_ref(short), &k::BooleanOptions::default())?;
+        if between.shape.count(k::ShapeType::Solid) == 0 {
+            return err("Failed to extrude selections, check input.");
+        }
+        between
+    } else {
+        k::boolean(k::BooleanOp::Fuse, std::slice::from_ref(&r1.shape), std::slice::from_ref(&r2.shape), &k::BooleanOptions::default())?
+    };
     let fnames = ev.name_result(&[&n1, &n2], &fused.history, &fused.shape, &std::collections::BTreeMap::new(), None);
     let unified = k::unify_same_domain(&fused.shape)?;
     let un = names_for(&fused.shape, fnames);
