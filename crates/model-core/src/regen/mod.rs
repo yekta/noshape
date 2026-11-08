@@ -448,11 +448,13 @@ impl Regenerator {
             let probing = opts.touch_probe == Some(f.id);
             let (ekey, elocal) = if probing { (hash_bytes(key, b"touch probe"), hash_bytes(local, b"touch probe")) } else { (key, local) };
             // Reused when its inputs are (not custom, std-run, derived or Assembly-context features: they read more
-            // than the context).
+            // than the context). A sheet metal aware one (a fillet, an extrude) runs natively without active sheet
+            // metal before it.
+            let std_run = std_route::evaluator(&f.type_id).is_some() && !(std_route::sheet_metal_aware(&f.type_id) && !ctx.sheet_metal.values().any(|d| d.active));
             let reusable = reuse
                 && f.sub_features.is_empty()
                 && !crate::custom::is_custom(&f.type_id)
-                && std_route::evaluator(&f.type_id).is_none()
+                && !std_run
                 && !crate::features::importing::is_derived(&f.type_id)
                 && studio.contexts.is_empty();
             live.push(f.id);

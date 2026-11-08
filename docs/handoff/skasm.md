@@ -61,9 +61,15 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   walls) because our `startTracking` is geometric and never found the copies, so std's reapplyJointAttributes put no
   joints on them. opPattern's body-copy transforms are now recorded (`pattern_moves`, with their op sequence) and a
   TRACKING query also looks where those after its start moved the tracked points. louver 24 -> 27/36. T2
-  sheetmetal_std a_pattern_of_a_flanged_part_copies_it_whole. Left in louver: Sketch 9 NOT BUILT (its plane's face
-  S2E6G has no live geometry: the UI-fetch, dx / live), Fillet 1's info "For active sheet metal parts use Corner
-  break." (ours OK), Linear pattern 3's Part 16 83 faces for live's 94.
+  sheetmetal_std a_pattern_of_a_flanged_part_copies_it_whole. - louver Fillet 1: a fillet / chamfer of an active sheet metal part runs std's (sheetMetalAwareFillet: a corner
+  break, live's info "For active sheet metal parts use Corner break."); an OK `reportFeatureStatus` no longer clears
+  an earlier info / warning / error (std's processSubfeatureStatus reports the corner break's OK after the info).
+  Sheet metal aware core features (fillet, chamfer, extrude, patterns...) stay reusable by incremental regeneration
+  when no active sheet metal is before them (`std_route::sheet_metal_aware`). louver 27 -> 30/36, suite 730/934.
+- Left in louver: Sketch 9 NOT BUILT (its plane's face S2E6G has no live geometry: the UI fetch, dx / live), feature 6
+  (the UI fetch), Extrude 3: live's Sketch 11 region RVHO (646 mm², down to z -46.27) has no counterpart in ours; live
+  splits the 6-line polygon along y -46.537 (SVHFE, 46.267 mm, z 0 to -46.27) where ours doesn't: why (imprint of
+  what?) is next.
 - c2-valve-config Extrude 3 (11 circle / 48 other edges for 9 / 50): not the text. Open Sans Bold's "6" has a straight
   13-unit segment (356,780)-(369,780) in both; Extrude 3 runs it up to Revolve 1's REVOLVED face, which a plane
   square to its axis cuts in a circle (Parasolid says so; OCCT's splitter gives a B-spline). Bool's `op_prism_until`.

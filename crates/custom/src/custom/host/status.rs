@@ -316,10 +316,11 @@ fn report_status(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     let id = id_arg(i, &a, 1)?;
     let mut status = a.get(2).cloned().unwrap_or_default();
     let mut st = cx.state.lock();
+    // An OK report leaves an earlier info, warning or error in place (std's processSubfeatureStatus reports a
+    // subfeature's OK after the feature's own info: c2-sm-louver's Fillet 1 keeps live's "For active sheet metal parts
+    // use Corner break."); clearFeatureStatus clears.
     let ok = status.get("statusType").as_str().is_some_and(|s| &*s == "OK");
-    if ok {
-        st.status.remove(&id);
-    } else {
+    if !ok {
         // Live "fs (10-25 e)": a report replaces the type and message but
         // faulty parameters accumulate, newest first (a bare HOLE_NO_HITS
         // thrown after opHole's mapped status keeps Merge scope red).

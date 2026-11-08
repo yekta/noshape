@@ -222,6 +222,13 @@ sheet_metal_aware! {
     sm_circular_pattern => "circularPattern", crate::regen::features::pattern::circular_pattern, "circularPattern.fs", "circularPattern", patterns_active_sheet_metal;
     sm_curve_pattern => "curvePattern", crate::regen::features::pattern::curve_pattern, "curvePattern.fs", "curvePattern", patterns_active_sheet_metal;
     sm_mirror => "mirror", crate::regen::features::pattern::mirror, "mirror.fs", "mirror", patterns_active_sheet_metal;
+    sm_fillet => "fillet", crate::regen::features::detail::fillet, "fillet.fs", "fillet", blends_active_sheet_metal;
+    sm_chamfer => "chamfer", crate::regen::features::detail::chamfer, "chamfer.fs", "chamfer", blends_active_sheet_metal;
+}
+
+/// A core feature std runs only beside active sheet metal (otherwise its native evaluator, as before: reusable).
+pub fn sheet_metal_aware(type_id: &str) -> bool {
+    SHEET_METAL_AWARE.iter().any(|(t, _)| *t == type_id) && !STD_ROUTE.with_borrow(|r| r.iter().any(|t| t == type_id))
 }
 
 /// Sheet metal runs by std (the setting; a legacy studio still runs natively).
@@ -257,6 +264,17 @@ fn patterns_active_sheet_metal(ev: &EvalCtx) -> bool {
     }
     ev.resolve_bodies(ev.query("entities")).into_iter().any(active)
         || (!matches!(ev.enum_("operationType"), "NEW" | "") && crate::regen::features::extrude::scope(ev).is_some_and(|s| s.into_iter().any(active)))
+}
+
+/// A fillet or chamfer of an active sheet metal part's edges or faces: std's sheet metal aware blend (a corner break
+/// of the model, "For active sheet metal parts use Corner break.": c2-sm-louver's Fillet 1).
+fn blends_active_sheet_metal(ev: &EvalCtx) -> bool {
+    if !ev.ctx.sheet_metal.values().any(|d| d.active) {
+        return false;
+    }
+    let refs = ev.query("entities");
+    let active = |i: usize| ev.ctx.sheet_metal.get(&ev.ctx.bodies[i].id).is_some_and(|d| d.active);
+    ev.resolve_edges(refs).into_iter().chain(ev.resolve_faces(refs)).any(|(b, _)| active(b))
 }
 
 /// The built-in feature type std's feature `name` stands for (Transform: fTransform), else `name`.
