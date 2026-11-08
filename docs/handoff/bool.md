@@ -146,6 +146,17 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   noise), the piece is out (or in) by that sign; coincident free-form regions (signs mixed) still decline.
   cf-surface-pattern: with the sections refined (WIP 7d333fe5 in agent/bool's worktree: corpora unchanged, no case
   newly taken alone) it stops at spheres 44 / 45 touching each other (a point within 30-40 um of both).
+- **Tangent contact, WIP state (11-08 17:45 UTC):** agent/bool's worktree, branch bool-refine: 7d333fe5 (refined
+  sections) + bdcfb2bd (a piece's other points; `tangent_side`: a piece within the band of a face of another solid,
+  tangent to its own there, classified by the sign of its points' signed distances when they agree; an edge tangent
+  to a face at one end off it; flat revolutions read as planes); patches in /root/bool-scratch/wip/tangent-1108/.
+  Rotieren 1 (hd/39bba82f) now gets past the classification and declines "a non-manifold result": edges at z = 0
+  near x = +-11 and the tool's faces' edges (x 11..13, y -18.49, z -0.99..-1.37) used once (debug: louver-nm-debug
+  patch's XNM prints): a piece of the plane face 0:2 or its neighbours kept / dropped inconsistently near the
+  contact circle (r 15.2), or the circle (the tool face's own edge, v = 0 of its profile) not split into the plane.
+  Next: print the plane's pieces near the circle with their states; check the tool's v = 0 circle edge is found on
+  the plane (edge_on_surface, analytic). sp-cut still declines "a piece's point on another solid's face" (spheres
+  44 / 45 touching): tangent_side gives None there (find why: normals or signs). Gate not run on the WIP.
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
