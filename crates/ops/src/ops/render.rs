@@ -73,6 +73,26 @@ pub fn ops() -> Vec<Op> {
     },
     Op {
         group: "render",
+        verb: "print",
+        summary: "☰ › Print… in a Part Studio or an Assembly: the framed view as an image (Download image) or a PDF page (Print)",
+        description: "The Print setup panel: the paper and orientation (remembered for next time, as the panel's selects) frame the middle 90 % of the graphics area in the paper's shape; that part of the view is rendered on white at about 300 dpi (Letter Portrait 2547 × 3296 px). `output` png is Download image (the file live names after the tab, \"Part Studio 1.png\"), pdf is Print's page. The view is the window's (view_camera) when it has one, else `view` as render_image's, framed as the window's graphics area of `width` × `height` (default its own); without the window the whole view is the page (886 px high in the paper's shape by default), so a fitted view fits it.",
+        fields: vec![
+            doc_field(),
+            opt("tab", s(), "Part Studio or Assembly tab, by name or id. Default: the first Part Studio."),
+            opt("paper", json!({ "type": "string", "enum": noshape_scene::print::PAPERS.iter().map(|p| p.0).collect::<Vec<_>>() }), "Paper (default the last chosen, first Letter)."),
+            opt("orientation", json!({ "type": "string", "enum": noshape_scene::print::ORIENTATIONS }), "Portrait or Landscape (default the last chosen)."),
+            opt("output", json!({ "type": "string", "enum": ["png", "pdf"] }), "png: Download image (default); pdf: Print's page."),
+            req("file", s(), "Write the image or the PDF here."),
+            opt("view", s(), "As render_image's (default \"window\" when the window shows the tab, else isometric)."),
+            opt("width", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "The graphics area's width in pixels."),
+            opt("height", json!({ "type": "integer", "minimum": 16, "maximum": 4096 }), "The graphics area's height in pixels."),
+        ],
+        mutates: false,
+        destructive: false,
+        run: print,
+    },
+    Op {
+        group: "render",
         verb: "file_page",
         summary: "Render a PDF file tab's page to a PNG image",
         description: "A PDF imported as a file tab, as its tab shows it: the page (1 = the first) on white at `scale` pixels per point (default 1.5; 1 = 72 dpi). Returns the page count; the image as MCP image content and, with `file`, written to disk.",
@@ -109,7 +129,14 @@ fn file_page(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     Ok(OpOutput { value: v, images: vec![Image { png }] })
 }
 
+/// How a prepared view becomes PNG bytes: the scene, camera, style and the image's size.
+type RenderFn<'a> = &'a dyn Fn(&mut noshape_scene::png::Offscreen, &noshape_render::Scene, &noshape_render::Camera, &noshape_render::Style, u32, u32) -> Result<Vec<u8>, String>;
+
 fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    image_with(ctx, a, &|off, scene, camera, style, w, h| off.render_png(scene, camera, style, w, h))
+}
+
+fn image_with(ctx: &mut Ctx, a: &Args, render: RenderFn) -> Result<OpOutput, OpError> {
     // `view: "window"`: the window's display settings where the call gives none.
     let merged = window_display_args(ctx, a)?;
     let held;
@@ -147,7 +174,7 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
                 return Err(OpError::param(k, "Part Studios only"));
             }
         }
-        return image_assembly(ctx, a, width, height, vo, mode, &view_name);
+        return image_assembly(ctx, a, (width, height), vo, mode, &view_name, render);
     }
     opts.highlight_boundary = a.bool_or("boundary_edges", false)?;
     let (od, tab) = studio_target(ctx, a)?;
@@ -222,13 +249,69 @@ fn image(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         vo.finish_camera(&mut camera, lo, hi, aspect);
     }
     let style = vo.style();
-    let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
+    let png = render(off, &built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
     let mut v = json!({ "width": width, "height": height, "view": if normal_to.is_some() { "normal_to".to_string() } else { view_name }, "bytes": png.len() });
     if let Some(f) = a.opt_str("file")? {
         std::fs::write(f, &png).map_err(|e| OpError::new("io", format!("writing {f}: {e}")).with_param("file"))?;
         v["file"] = json!(f);
     }
     Ok(OpOutput { value: v, images: vec![Image { png }] })
+}
+
+fn print(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use noshape_scene::print::{self as pr, PrintSetup};
+    let last = PrintSetup::load();
+    let paper = a.opt_str("paper")?.unwrap_or(&last.paper).to_string();
+    let orientation = a.opt_str("orientation")?.unwrap_or(&last.orientation).to_string();
+    let setup = PrintSetup::new(&paper, &orientation).map_err(|k| OpError::param(k, if k == "paper" { "one of the Paper select's sizes (Letter, Legal, Tabloid, A0–A10, ANSI C–E)" } else { "Portrait or Landscape" }))?;
+    let pdf = match a.opt_str("output")? {
+        None | Some("png") => false,
+        Some("pdf") => true,
+        Some(_) => return Err(OpError::param("output", "png (Download image) or pdf (Print)")),
+    };
+    let file = a.str("file")?.to_string();
+    // render_image's call for the view: the window's when it shows the tab, in its graphics area.
+    let assembly = super::configuration::asm::is_assembly(ctx, a)?;
+    let mut v = a.value.clone();
+    let windowed;
+    {
+        let od = ctx.doc(a.opt_str("doc")?)?;
+        let tab = if assembly {
+            od.tab_of_kind(a.opt_str("tab")?, "Assembly", |c| matches!(c, noshape_model::document::TabContent::Assembly(_)))?
+        } else {
+            od.tab_of_kind(a.opt_str("tab")?, "Part Studio", crate::doc::is_part_studio)?
+        };
+        let shown = od.window.cameras.contains_key(&tab);
+        let Some(m) = v.as_object_mut() else { return Err(OpError::param("file", "an object of arguments")) };
+        for k in ["paper", "orientation", "output", "file"] {
+            m.remove(k);
+        }
+        m.entry("view").or_insert_with(|| json!(if shown { "window" } else { "isometric" }));
+        // Without the window: an area of the paper's shape, all of it printed, so a fitted view fits the page.
+        windowed = m.get("view").and_then(|v| v.as_str()) == Some("window");
+        if !windowed {
+            let (pw, ph) = setup.page_inches();
+            m.entry("height").or_insert(json!(886));
+            let h = m.get("height").and_then(|v| v.as_f64()).unwrap_or(886.0);
+            m.entry("width").or_insert(json!((h * pw / ph).round().clamp(16.0, 4096.0) as u64));
+        }
+    }
+    let call = Args { op: a.op, value: &v };
+    let render = |off: &mut noshape_scene::png::Offscreen, scene: &noshape_render::Scene, camera: &noshape_render::Camera, style: &noshape_render::Style, w: u32, h: u32| {
+        let frame_h = if windowed { setup.frame((w as f64, h as f64)).3 } else { h as f64 };
+        let camera = pr::frame_camera(camera, h as f64, frame_h);
+        let (iw, ih) = setup.image_size();
+        let style = pr::print_style(style);
+        let (rw, rh, ss) = pr::render_plan(iw, ih);
+        pr::to_size(off.render_png_supersampled(scene, &camera, &style, (rw, rh), ss, pr::line_scale(rh, frame_h))?, iw, ih)
+    };
+    let out = image_with(ctx, &call, &render)?;
+    let png = out.images.into_iter().next().map(|i| i.png).ok_or_else(|| OpError::new("render_failed", "no image"))?;
+    let bytes = if pdf { pr::page_pdf(&png, &setup).map_err(|e| OpError::new("render_failed", e))? } else { png };
+    std::fs::write(&file, &bytes).map_err(|e| OpError::new("io", format!("writing {file}: {e}")).with_param("file"))?;
+    setup.save();
+    let (iw, ih) = setup.image_size();
+    Ok(json!({ "paper": setup.paper, "orientation": setup.orientation, "width": iw, "height": ih, "area": [out.value["width"], out.value["height"]], "file": file, "bytes": bytes.len(), "output": if pdf { "pdf" } else { "png" } }).into())
 }
 
 /// The `section` / `section_exclude` arguments: clip planes (normal, d:
@@ -301,7 +384,7 @@ fn named_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 
 /// render_image of an Assembly tab: the solved assembly in its active
 /// configuration, drawn as the Assembly view does.
-fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOptions, mode: DisplayMode, view_name: &str) -> Result<OpOutput, OpError> {
+fn image_assembly(ctx: &mut Ctx, a: &Args, (width, height): (u32, u32), vo: ViewOptions, mode: DisplayMode, view_name: &str, render: RenderFn) -> Result<OpOutput, OpError> {
     use noshape_model::document::TabContent;
     use noshape_scene::asm_scene::{self, AsmGpuCache, AsmSceneOptions};
     let view = VIEWS.iter().find(|v| v.0 == view_name).map(|v| v.1);
@@ -360,7 +443,7 @@ fn image_assembly(ctx: &mut Ctx, a: &Args, width: u32, height: u32, vo: ViewOpti
         vo.finish_camera(&mut camera, lo, hi, aspect);
     }
     let style = vo.style();
-    let png = off.render_png(&built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
+    let png = render(off, &built.scene, &camera, &style, width, height).map_err(|e| OpError::new("render_failed", e))?;
     let mut v = json!({ "width": width, "height": height, "view": view_name, "bytes": png.len(), "instances": result.occurrences.iter().filter(|o| !o.hidden).count() });
     if let Some(f) = a.opt_str("file")? {
         std::fs::write(f, &png).map_err(|e| OpError::new("io", format!("writing {f}: {e}")).with_param("file"))?;

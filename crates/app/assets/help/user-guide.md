@@ -91,6 +91,10 @@ Right-click another workspace › **Merge into current workspace…** brings its
 - Import STEP, IGES, Parasolid, STL, DXF, DWG, images and other files from **+ › Import…** or the documents page's **Create ▾ › Import files…**.
 - Export parts, Part Studios and Assemblies from a tab's or a part's **Export…**; drawings from the drawing tab's menu.
 
+### Printing
+
+In a Part Studio or an Assembly, **☰ › Print…** opens **Print setup** beside the feature list and draws a dashed frame over the graphics area: what is inside the frame is printed. Pick the **paper** (Letter, Legal, Tabloid, A0–A10, ANSI C–E) and the **orientation**; the frame takes the paper's shape. You can still rotate and zoom the view while the panel is open. **Download image** saves the framed view as a PNG at about 300 dpi, named after the tab; **Print** opens it on a page of that paper for your system's print dialog. The paper and orientation you chose last come back next time. In a drawing, **☰ › Print…** prints the sheets.
+
 ## Preferences
 
 On the documents page, **your name ▾ › Preferences…** sets the units of new documents, the language, the theme, mouse controls, keyboard shortcuts, the shortcut toolbars, material libraries and export rules.

@@ -28,6 +28,16 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:04 UTC: ☰ › Print… in Part Studios and Assemblies (lead: studios' end to end)
+- Live 2349: the Print setup flyout at the graphics area's top left (Paper Letter … ANSI E, Portrait / Landscape,
+  Print, Download image, ?), a dashed frame 90 % of the area in the paper's shape, the setup remembered
+  (`print_setup.json`). Download image saves the framed view on white at 299.64 dpi (Letter Portrait 2547 × 3296),
+  lines and labels as thick relative to the page as on screen; Print opens it on a PDF page of the paper. Shared:
+  app-core `print_setup.rs`, `noshape_scene::print` (frame, camera crop, sizes, PDF page); hooks in part-studio-ui
+  and assembly-ui (noted in psui.md / asm.md); op `render_print` with an e2e test; guide section "Printing".
+- Papers past 4096 px render once without supersampling, past 8192 px (A1, A0, ANSI D, E) at 8192 and scaled up
+  (the GPU's texture limit); live's size for those wasn't recorded.
+
 ### 2026-11-08 19:13 UTC: Restore to Main… dialog, Feature Studio's top-level list, Backspace keeps the list
 - Restore to <workspace>… on a version opens live's "Restoring changes into Main from V1" (the merge dialog's restore
   mode: Keep / Replace cards, "Changes in Main", Tab restore strategy, Restore / Cancel); a change row has none (live

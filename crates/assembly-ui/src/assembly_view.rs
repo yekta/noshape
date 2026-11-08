@@ -383,6 +383,8 @@ pub struct AssemblyView {
     show_connectors: bool,
     /// Onshape behaviours state (menus, filter, rename, transparency...).
     ui: AsmUi,
+    /// ☰ › Print…: the Print setup panel and its frame (app-core print_setup).
+    print: Option<crate::print_setup::PrintPanel>,
     expanded: HashSet<Vec<InstanceId>>,
     message: Option<(bool, String)>,
     /// Assembly mate connector dialog.
@@ -586,6 +588,7 @@ impl AssemblyView {
             show_connectors: false,
             // Onshape's Insert dialog starts with the Parts filter on.
             ui: AsmUi { insert_filter: (true, false), tb_prefs: toolbar::AsmToolbarPrefs::load(), list_properties: crate::assembly_hooks::instance_list_properties(), graphics: crate::graphics_prefs::get(cx), ..Default::default() },
+            print: None,
             expanded: HashSet::new(),
             message: None,
             mc: None,
@@ -5745,6 +5748,12 @@ impl AssemblyView {
             left = left.child(crate::ui::nudged_panel(el, self.ui.panels.get("asm-isolate")));
             any_left = true;
         }
+        // ☰ › Print… (live studios 2349): the panel in the dialogs' place, its frame over the graphics.
+        if let Some(state) = &self.print {
+            out.push(crate::print_setup::frame(&state.setup, &self.viewport, cx));
+            left = left.child(crate::print_setup::panel(state, &cx.entity(), Self::on_print_action));
+            any_left = true;
+        }
         if self.ui.left_open != any_left {
             self.ui.left_open = any_left;
             let inset = if any_left { 220.0 + 2.0 * 12.0 } else { 0.0 };
@@ -5754,6 +5763,31 @@ impl AssemblyView {
             out.push(left.into_any_element());
         }
         out
+    }
+
+    /// ☰ › Print… (live studios 2349): the Print setup panel and its frame over the graphics.
+    pub fn open_print(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.print = Some(crate::print_setup::PrintPanel::open(window, cx));
+        cx.notify();
+    }
+
+    fn on_print_action(&mut self, a: crate::print_setup::Action, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::print_setup::Action;
+        let Some(state) = &mut self.print else { return };
+        match a {
+            Action::Print | Action::Download => {
+                let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_else(|| "Assembly".into());
+                crate::print_setup::export(a == Action::Print, &self.viewport, &state.setup, &name, window, cx);
+                self.print = None;
+                window.focus(&self.focus, cx);
+            }
+            Action::Close => {
+                self.print = None;
+                window.focus(&self.focus, cx);
+            }
+            _ => state.apply(a),
+        }
+        cx.notify();
     }
 
     fn render_overlay(&mut self, window: &Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
@@ -6343,6 +6377,12 @@ impl AssemblyView {
     }
 
     fn on_cancel(&mut self, _: &Cancel, window: &mut Window, cx: &mut Context<Self>) {
+        // ☰ › Print…'s panel first (live studios 2349: Esc closes it).
+        if self.print.take().is_some() {
+            window.focus(&self.focus, cx);
+            cx.notify();
+            return;
+        }
         // Esc also dismisses an info notice (Onshape's go with Esc).
         if self.message.as_ref().is_some_and(|(err, _)| !*err) {
             self.message = None;

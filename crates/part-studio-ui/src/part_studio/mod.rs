@@ -470,6 +470,8 @@ pub struct PartStudioView {
     /// The "Folder name" popup: its input and what the new folder wraps.
     folder_prompt: Option<(Entity<gpui_kit::component::input::InputState>, FolderTarget, Subscription)>,
     named_views: Option<(Entity<gpui_kit::component::input::InputState>, Subscription)>,
+    /// ☰ › Print…: the Print setup panel and its frame (app-core print_setup).
+    print: Option<crate::print_setup::PrintPanel>,
     /// The Named views dialog's "Select a view" list and the view picked in it.
     named_view_picked: Option<String>,
     flat_cache: Option<fab_panel::FlatCache>,
@@ -614,6 +616,7 @@ impl PartStudioView {
             folder_renaming: None,
             folder_prompt: None,
             named_views: None,
+            print: None,
             named_view_picked: None,
             flat_cache: None,
             flat_task: None,
@@ -6033,6 +6036,11 @@ impl PartStudioView {
         if let Some(nv) = self.render_named_views(cx) {
             out.push(crate::ui::moved_panel(nv, self.ui.panels.get("ps-named-views")));
         }
+        if let Some(state) = &self.print {
+            out.push(crate::print_setup::frame(&state.setup, &self.viewport, cx));
+            let panel = crate::print_setup::panel(state, &cx.entity(), Self::on_print_action);
+            out.push(div().absolute().top(px(3.)).left(px(0.)).child(panel).into_any_element());
+        }
         // Message toast.
         // The tool-miss toast belongs to the open Remove / Intersect dialog.
         if let Some((st, msg)) = self.message.clone().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION) {
@@ -6750,6 +6758,11 @@ impl Render for PartStudioView {
                 // Esc closes transient UI first (S toolbar, Select other,
                 // zoom to window, dependencies), then the tool or dialog,
                 // then isolate / make transparent; never the selection.
+                if this.print.take().is_some() {
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                    return;
+                }
                 if this.shortcut_sheet.is_some() {
                     this.toggle_shortcut_sheet(window, cx);
                     return;
@@ -7095,6 +7108,31 @@ impl Render for PartStudioView {
 }
 
 impl PartStudioView {
+    /// ☰ › Print… (live studios 2349): the Print setup panel beside the feature list, its frame over the graphics.
+    pub fn open_print(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.print = Some(crate::print_setup::PrintPanel::open(window, cx));
+        cx.notify();
+    }
+
+    fn on_print_action(&mut self, a: crate::print_setup::Action, window: &mut Window, cx: &mut Context<Self>) {
+        use crate::print_setup::Action;
+        let name = self.studio_name(cx);
+        let Some(state) = &mut self.print else { return };
+        match a {
+            Action::Print | Action::Download => {
+                crate::print_setup::export(a == Action::Print, &self.viewport, &state.setup, &name, window, cx);
+                self.print = None;
+                window.focus(&self.focus, cx);
+            }
+            Action::Close => {
+                self.print = None;
+                window.focus(&self.focus, cx);
+            }
+            _ => state.apply(a),
+        }
+        cx.notify();
+    }
+
     /// The FeatureScript notices panel's "Result:" line for this Part Studio.
     /// Live (qa5 FS5): "Regeneration complete" also when features fail (their
     /// errors are the notices above it); a regeneration here always completes.

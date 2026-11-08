@@ -215,7 +215,13 @@ impl Gpu {
     /// thread on the GPU, but PNG encoding runs where the future is polled,
     /// so await it on a background executor.
     pub async fn render_png(&self, scene: Arc<Scene>, camera: Camera, style: Style, width: u32, height: u32) -> anyhow::Result<Vec<u8>> {
-        const SUPERSAMPLE: u32 = 2;
+        self.render_png_supersampled(scene, camera, style, (width, height), 2, 1.0).await
+    }
+
+    /// [`Self::render_png`] rendered `supersample` times larger (1: as is, for frames near the GPU's limit), its
+    /// lines and labels `scale` times as thick as on screen (a print: the image's pixels per screen pixel).
+    pub async fn render_png_supersampled(&self, scene: Arc<Scene>, camera: Camera, style: Style, (width, height): (u32, u32), supersample: u32, scale: f32) -> anyhow::Result<Vec<u8>> {
+        let ss = supersample.max(1);
         let id = self.next_target.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = async_channel::bounded(1);
         self.routes.lock().oneshots.insert(id, tx);
@@ -223,9 +229,9 @@ impl Gpu {
             target: id,
             scene,
             camera,
-            width: width * SUPERSAMPLE,
-            height: height * SUPERSAMPLE,
-            device_pixel_ratio: SUPERSAMPLE as f32,
+            width: width * ss,
+            height: height * ss,
+            device_pixel_ratio: ss as f32 * scale.max(0.1),
             style,
             pick: false,
             seq: 0,

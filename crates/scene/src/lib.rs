@@ -11,6 +11,7 @@ pub mod environment_maps;
 pub mod graphics_prefs;
 pub mod palette;
 pub mod png;
+pub mod print;
 pub mod sketch_mode;
 pub mod system_info;
 

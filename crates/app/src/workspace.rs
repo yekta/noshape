@@ -1051,7 +1051,7 @@ impl Workspace {
                         };
                         return m
                             .separator()
-                            .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
+                            .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                             .separator()
                             .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
                     }
@@ -1067,7 +1067,7 @@ impl Workspace {
                                 })
                             }))
                             .separator()
-                            .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
+                            .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                             .separator()
                             .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
                     }
@@ -1091,7 +1091,7 @@ impl Workspace {
                             })
                         }))
                         .separator()
-                        .item(I::new("Print…").on_click(move |_, _, cx| w2.update(cx, |t, cx| t.print_active(cx))))
+                        .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                         .separator()
                         .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()))
                 });
@@ -1157,9 +1157,13 @@ impl Workspace {
     }
 
     /// Document menu › Print…: a drawing opens as a print-friendly PDF.
-    fn print_active(&mut self, cx: &mut Context<Self>) {
-        if let Some(TabView::Drawing(v)) = self.active.and_then(|a| self.views.get(&a)) {
-            v.update(cx, |v, cx| v.print(cx));
+    /// ☰ › Print…: a drawing's sheets; a Part Studio's or an Assembly's Print setup (live studios 2349).
+    fn print_active(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match self.active.and_then(|a| self.views.get(&a)) {
+            Some(TabView::Drawing(v)) => v.update(cx, |v, cx| v.print(cx)),
+            Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.open_print(window, cx)),
+            Some(TabView::Assembly(v)) => v.update(cx, |v, cx| v.open_print(window, cx)),
+            _ => {}
         }
     }
 

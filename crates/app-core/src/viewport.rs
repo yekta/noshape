@@ -709,6 +709,11 @@ impl Viewport {
         self.request_frame(cx);
     }
 
+    /// What ☰ › Print… renders: the GPU, the scene shown, its camera and style (print_setup).
+    pub fn print_source(&self) -> (Gpu, Arc<Scene>, Camera, Style) {
+        (self.gpu.clone(), self.scene.clone(), self.camera, self.style)
+    }
+
     /// Size of the viewport in logical pixels.
     pub fn size(&self) -> DVec2 {
         DVec2::new(f64::from(f32::from(self.bounds.size.width)), f64::from(f32::from(self.bounds.size.height)))

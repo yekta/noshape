@@ -69,10 +69,14 @@ impl Offscreen {
 
     /// Render a scene to PNG bytes.
     pub fn render_png(&mut self, scene: &Scene, camera: &Camera, style: &Style, width: u32, height: u32) -> Result<Vec<u8>, String> {
-        let frame = self
-            .renderer
-            .render(RenderParams { scene, camera, width: width * SUPERSAMPLE, height: height * SUPERSAMPLE, device_pixel_ratio: SUPERSAMPLE as f32, style, pick: false })
-            .map_err(|e| e.to_string())?;
+        self.render_png_supersampled(scene, camera, style, (width, height), SUPERSAMPLE, 1.0)
+    }
+
+    /// [`Self::render_png`] rendered `supersample` times larger (1: as is, for frames near the GPU's limit), its
+    /// lines and labels `scale` times as thick as on screen (a print: the image's pixels per screen pixel).
+    pub fn render_png_supersampled(&mut self, scene: &Scene, camera: &Camera, style: &Style, (width, height): (u32, u32), supersample: u32, scale: f32) -> Result<Vec<u8>, String> {
+        let ss = supersample.max(1);
+        let frame = self.renderer.render(RenderParams { scene, camera, width: width * ss, height: height * ss, device_pixel_ratio: ss as f32 * scale.max(0.1), style, pick: false }).map_err(|e| e.to_string())?;
         encode_png(frame.bgra, frame.width, frame.height, width, height)
     }
 }

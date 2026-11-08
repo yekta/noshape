@@ -337,7 +337,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **analysis**: [`analysis_curvature_map`](#analysis_curvature_map), [`analysis_thickness`](#analysis_thickness), [`analysis_curvature`](#analysis_curvature), [`analysis_deviation`](#analysis_deviation), [`analysis_connection`](#analysis_connection), [`analysis_dihedral`](#analysis_dihedral), [`analysis_interference`](#analysis_interference), [`analysis_draft`](#analysis_draft), [`analysis_flatten`](#analysis_flatten)
 - **sheetmetal**: [`sheetmetal_table`](#sheetmetal_table), [`sheetmetal_edit_bend`](#sheetmetal_edit_bend), [`sheetmetal_move_bend`](#sheetmetal_move_bend), [`sheetmetal_convert_to_rip`](#sheetmetal_convert_to_rip), [`sheetmetal_edit_joint`](#sheetmetal_edit_joint), [`sheetmetal_export_flat`](#sheetmetal_export_flat)
 - **release**: [`release_create`](#release_create), [`release_revision_history`](#release_revision_history)
-- **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_file_page`](#render_file_page)
+- **render**: [`render_named_view`](#render_named_view), [`render_image`](#render_image), [`render_print`](#render_print), [`render_file_page`](#render_file_page)
 - **view**: [`view_camera`](#view_camera), [`view_display`](#view_display)
 - **export**: [`export_parts`](#export_parts)
 - **import**: [`import_files`](#import_files)
@@ -6803,6 +6803,31 @@ Examples:
 | `zebra` | object |  | Zebra stripes: {"stripes": 35, "flip": false, "show_edges": true}. |
 | `reflection` | object |  | Reflection analysis: {"image": an environment map name ("Blue sky", default the first) or an image file path, "rotation": degrees, "opposite": bool, "blur": bool, "show_edges": bool (default false)}. |
 | `file` | string |  | Also write the PNG here. |
+
+#### render_print
+
+☰ › Print… in a Part Studio or an Assembly: the framed view as an image (Download image) or a PDF page (Print).
+
+The Print setup panel: the paper and orientation (remembered for next time, as the panel's selects) frame the middle 90 % of the graphics area in the paper's shape; that part of the view is rendered on white at about 300 dpi (Letter Portrait 2547 × 3296 px). `output` png is Download image (the file live names after the tab, "Part Studio 1.png"), pdf is Print's page. The view is the window's (view_camera) when it has one, else `view` as render_image's, framed as the window's graphics area of `width` × `height` (default its own); without the window the whole view is the page (886 px high in the paper's shape by default), so a fitted view fits it.
+
+Examples:
+
+```json
+{"paper": "A4", "orientation": "Landscape", "file": "/tmp/Part Studio 1.png"}
+{"tab": "Assembly 1", "output": "pdf", "file": "/tmp/Assembly 1.pdf"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string |  | Part Studio or Assembly tab, by name or id. Default: the first Part Studio. |
+| `paper` | one of `Letter`, `Legal`, `Tabloid`, `A0`, `A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `A7`, `A8`, `A9`, `A10`, `ANSI C`, `ANSI D`, `ANSI E` |  | Paper (default the last chosen, first Letter). |
+| `orientation` | one of `Portrait`, `Landscape` |  | Portrait or Landscape (default the last chosen). |
+| `output` | one of `png`, `pdf` |  | png: Download image (default); pdf: Print's page. |
+| `file` | string | required | Write the image or the PDF here. |
+| `view` | string |  | As render_image's (default "window" when the window shows the tab, else isometric). |
+| `width` | integer |  | The graphics area's width in pixels. |
+| `height` | integer |  | The graphics area's height in pixels. |
 
 #### render_file_page
 

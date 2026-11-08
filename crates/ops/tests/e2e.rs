@@ -6271,6 +6271,35 @@ fn history_list_filters_as_the_history_panel() {
     assert_eq!(e.param.as_deref(), Some("kinds[0]"));
 }
 
+/// ☰ › Print… (live studios 2349): Download image is the framed view at about 300 dpi, Print its PDF page; the paper
+/// and orientation come back next time. GPU-less machines skip the rendering.
+#[test]
+fn render_print_frames_the_view_on_paper() {
+    let mut ctx = Ctx::new();
+    let _ = two_part_assembly(&mut ctx, "print.noshape");
+    let png = scratch("print-a6.png");
+    match try_call(&mut ctx, "render_print", json!({ "paper": "A6", "orientation": "Portrait", "file": png.to_str().unwrap() })) {
+        Ok(v) => {
+            // A6 is 105 × 148 mm: 1239 × 1746 px.
+            assert_eq!((v["width"].as_u64(), v["height"].as_u64(), v["output"].as_str()), (Some(1239), Some(1746), Some("png")), "{v}");
+            let bytes = std::fs::read(&png).unwrap();
+            assert_eq!(&bytes[1..4], b"PNG");
+            assert_eq!((u32::from_be_bytes(bytes[16..20].try_into().unwrap()), u32::from_be_bytes(bytes[20..24].try_into().unwrap())), (1239, 1746));
+            // Remembered: the next print without a paper is A6 Portrait again; Print's page is a PDF.
+            let pdf = scratch("print-asm.pdf");
+            let v = call(&mut ctx, "render_print", json!({ "tab": "Assembly 1", "orientation": "Landscape", "output": "pdf", "file": pdf.to_str().unwrap() }));
+            assert_eq!((v["paper"].as_str(), v["orientation"].as_str(), v["width"].as_u64()), (Some("A6"), Some("Landscape"), Some(1746)), "{v}");
+            assert!(std::fs::read(&pdf).unwrap().starts_with(b"%PDF-"));
+        }
+        Err(e) if e.code == "render_failed" => eprintln!("render skipped: {}", e.message),
+        Err(e) => panic!("render_print: {}", e.to_json()),
+    }
+    let e = try_call(&mut ctx, "render_print", json!({ "paper": "B5", "file": png.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("paper"));
+    let e = try_call(&mut ctx, "render_print", json!({ "output": "svg", "file": png.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("output"));
+}
+
 /// Restore to Main… as live's dialog (studios 2351): each changed tab kept or restored, the entry
 /// `Restore <m>m <s>s back: "<the restored point's change>"`.
 #[test]

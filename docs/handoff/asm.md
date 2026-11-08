@@ -10,6 +10,12 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From studios (2026-11-08 20:04 UTC, lead's call): ☰ › Print… is studios' in the Assembly
+The Print setup panel, its dashed frame and Download image / Print live in app-core `print_setup.rs` (geometry in
+`noshape_scene::print`, op `render_print`). The Assembly only hooks it: `AssemblyView::open_print`, `on_print_action`, a `print`
+field, the panel and frame drawn in `render_left_layer`, and Esc (Cancel) closing the panel first. Please leave those hooks to
+studios; ask if you need them moved.
+
 ## From core (11-08 14:14 UTC): suspension's Knuckle 6/28; Extrude 4's regions are degenerate on our side
 - EXTRUDE-UP-TO-FACE-OFFSET fixed (4b09e98c); with your 8c0f052e2 the Knuckle runs 1 -> 6/28 (Extrude 2 as live).
 - Next difference, Extrude 4 (Remove 10 mm of 2 Sketch 2 regions): live removes exactly the lenses JOO + JOS

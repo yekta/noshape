@@ -9,6 +9,12 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From studios (2026-11-08 20:04 UTC, lead's call): ☰ › Print… is studios' in the Part Studio
+The Print setup panel, its dashed frame and Download image / Print live in app-core `print_setup.rs` (geometry in
+`noshape_scene::print`, op `render_print`). The Part Studio only hooks it: `PartStudioView::open_print`, `on_print_action`, a `print`
+field, the panel and frame drawn in `render_viewport_overlay`, and Esc (Cancel) closing the panel first. Please leave those hooks to
+studios; ask if you need them moved.
+
 ## From core (2026-11-08 17:23 UTC, lead's P1 CANCEL-LATENCY): the worker's stop time, nothing for the UI to change
 - Measured over the corpus (T2 ops parity::cancel_latency_probe: each saved parity document's Part Studios over
   0.3 s cancelled at 10-90 % of their run; vibe5 at load 5-9): cancel -> worker free (result dropped) was up to
