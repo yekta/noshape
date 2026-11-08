@@ -3763,3 +3763,60 @@ fn a_tangent_loop_of_concave_rounds_has_no_slivers_as_live() {
     let cylinders = kinds.iter().filter(|k| matches!(k, noshape_kernel::Surface::Cylinder { radius, .. } if r10(*radius))).count();
     assert_eq!((tori, cylinders), (7, 1));
 }
+
+/// Live (11-08): a chamfer on the edge between a shaft's flat (x = 6) and its round (r = 10), 20 long, in every type
+/// and both measurements. Tangent measures along the faces' tangent lines from where they meet; Offset's angle is to
+/// the line from the chamfer's side to the edge. Volumes in mm³.
+#[test]
+fn a_chamfer_on_a_round_face_measures_as_live() {
+    type Case<'a> = (&'a str, Vec<(&'a str, ParamValue)>, [f64; 2]);
+    let cases: Vec<Case> = vec![
+        ("equal 2", vec![], [5353.017918, 5355.154098]),
+        ("two 2/3", vec![("chamferType", en("TWO_OFFSETS")), ("width1", expr("2 mm")), ("width2", expr("3 mm"))], [5335.898119, 5336.988307]),
+        ("two 2/3 opp", vec![("chamferType", en("TWO_OFFSETS")), ("width1", expr("2 mm")), ("width2", expr("3 mm")), ("oppositeDirection", ParamValue::Bool(true))], [5331.207197, 5341.570071]),
+        ("da 2/30", vec![("chamferType", en("OFFSET_ANGLE")), ("angle", expr("30 deg"))], [5351.799056, 5360.025994]),
+        ("da 2/30 opp", vec![("chamferType", en("OFFSET_ANGLE")), ("angle", expr("30 deg")), ("oppositeDirection", ParamValue::Bool(true))], [5351.803438, 5358.484771]),
+    ];
+    for (m, method) in ["FACE_OFFSET", "APEX_RANGE"].into_iter().enumerate() {
+        for (name, extra, live) in &cases {
+            let mut s = Studio::new();
+            let mut sk = noshape_sketch::Sketch::new();
+            sk.add_circle(DVec2::ZERO, mm(10.0));
+            let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+            let region = s.region(sid);
+            s.add("extrude", move |p| {
+                p.set("entities", q(region));
+                p.set("depth", expr("20 mm"));
+            });
+            let mut sk = noshape_sketch::Sketch::new();
+            polyline(&mut sk, &[(6.0, -20.0), (20.0, -20.0), (20.0, 20.0), (6.0, 20.0)], true);
+            let cut = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+            let cut_region = s.region(cut);
+            s.add("extrude", move |p| {
+                p.set("entities", q(cut_region));
+                p.set("depth", expr("40 mm"));
+                p.set("operationType", en("REMOVE"));
+                p.set("defaultScope", ParamValue::Bool(true));
+                p.set("endBound", en("THROUGH_ALL"));
+            });
+            let r = s.ok();
+            let b = &r.context.bodies[0];
+            let edges = b.shape.edges();
+            let v = noshape_kernel::make_vertex(DVec3::new(mm(6.0), mm(8.0), mm(10.0))).unwrap();
+            let e = edges.iter().position(|e| noshape_kernel::distance(e, &v).is_ok_and(|d| d.distance < 1e-7)).unwrap();
+            let edge = Reference::Edge((*b.edges[e]).clone());
+            let extra = extra.clone();
+            s.add("chamfer", move |p| {
+                p.set("entities", q(edge));
+                p.set("width", expr("2 mm"));
+                p.set("chamferMethod", en(method));
+                for (k, v) in extra {
+                    p.set(k, v);
+                }
+            });
+            let r = s.regen();
+            let v = volume(&r, 0) * 1e9;
+            assert!((v - live[m]).abs() < 1e-3, "{method} {name}: {v:.6} mm³, live {}", live[m]);
+        }
+    }
+}

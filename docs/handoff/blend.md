@@ -12,6 +12,16 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## Feature audit (lead 11-08 ~11:00): Fillet / Chamfer / Face blend options, tickets in TICKETS.md "Blends (blend)"
+- Landing in order: FACEBLEND-EMPTY-OPTIONS + FILLET-PARTIAL-PLANE (8daa56047), FILLET-FULLROUND-GENERAL (ba819c8c5),
+  then CHAMFER-METHOD + CHAMFER-DA-DIRECTION (live 2304: Tangent and Offset's distance-and-angle on a round face
+  converted to OCCT's two distances by a 2D section solve, `blend_section::chamfer_offsets`; T1
+  features_c a_chamfer_on_a_round_face_measures_as_live, all 10 cases to 1e-6 of live).
+- In progress: FACEBLEND-HOLD-TANGENT (live 2233): `Sides.hold`, `hold_ranges` splits the chain where the hold line's
+  radius passes the entered one; held ranges lofted (64 sections, radius per section), the rest the plain round. T1
+  features_a a_face_blend_follows_its_tangent_hold_line_as_live (4 live cases). Then c2-variable-fillet-faceblend.
+- Waiting on live 2306 (A-E): FACEBLEND-PROP-ADJACENT, -DETACH, -TRIM, -SURFACES, tapered-rib full round.
+
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
 - Corpus on vibe5, my tree rebased onto main: learning-center-michael 7 -> 5 (Fillet 2 now fails, "Failed to fillet
   selections.", after 22-52 s; live OK in 46 ms) and cf-lighten 5 -> 4 (Lighten 1's area 48549.85 mm², live

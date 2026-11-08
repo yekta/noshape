@@ -566,7 +566,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
     let picked = |ids: &[&str]| ids.iter().any(|id| !ev.query(id).is_empty());
     let items = |id: &str, field: &str| ev.params.array(id).iter().any(|item| !item.query(field).is_empty());
     let used = [
-        ("Tangent hold lines", ev.bool("tangentHoldLines") && picked(&["tangentEdges", "inverseTangentEdges"])),
+        ("Inverse tangent hold lines", ev.bool("tangentHoldLines") && picked(&["inverseTangentEdges"])),
         ("Conic hold lines", ev.bool("conicHoldLines") && picked(&["conicEdges", "inverseConicEdges"])),
         ("Cliff edges", ev.bool("hasCliffEdges") && picked(&["cliffEdges"])),
         ("Caps", ev.bool("hasCaps") && items("caps", "entity")),
@@ -638,7 +638,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
             partial: None,
             run_on: !ev.bool("propagation"),
             cliff: false,
-            sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }),
+            sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: Vec::new() }),
         };
         let blend_failed = |e: crate::regen::eval::FeatureError| if e.message == "Failed to fillet selections." { fe("Failed to blend faces.") } else { e };
         if edges.is_empty() {
@@ -671,7 +671,17 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
                 return err("Failed to blend faces.");
             }
         }
-        let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio }), ..spec };
+        let hold_edges: Vec<usize> = match ev.bool("tangentHoldLines") {
+            true => ev.resolve_edges(ev.query("tangentEdges")).into_iter().filter(|(x, _)| *x == bi).map(|(_, e)| e).collect(),
+            false => Vec::new(),
+        };
+        // A hold line on a side's boundary with another face (c2-variable-fillet-faceblend: a pocket's rim): not yet.
+        let ef = body.shape.edge_faces()?;
+        if hold_edges.iter().any(|&e| ef.get(e).is_none_or(|fs| fs.iter().any(|&f| !a.contains(&(f as usize)) && !b.contains(&(f as usize))))) {
+            return err("Tangent hold lines on a face's boundary are not supported yet");
+        }
+        let hold: Vec<Shape> = hold_edges.iter().filter_map(|&e| body.shape.sub_shape(ShapeType::Edge, e).ok()).collect();
+        let spec = super::blend_section::BlendSpec { sides: Some(super::blend_section::Sides { side1: a.clone(), ratio, hold: hold.clone() }), ..spec };
         if ev.bool("propagation") && ev.is("propagationType", "TANGENT") {
             edges = super::detail::propagate_tangent(&body.shape, &edges);
         }
@@ -692,7 +702,7 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         // OCCT's rolling ball splits a blend along other curves into patches
         // (live NE: one spline face): those go through the section sweep too.
         let other_curves = edges.iter().any(|&e| body.shape.sub_shape(ShapeType::Edge, e).and_then(|e| e.edge_info()).is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
-        if !rolling_ball || other_curves {
+        if !rolling_ball || other_curves || !hold.is_empty() {
             super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(blend_failed)?;
             done = true;
             continue;

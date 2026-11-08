@@ -63,6 +63,9 @@ pub struct Sides {
     /// Faces of side 1 (indices in the body).
     pub side1: Vec<usize>,
     pub ratio: f64,
+    /// Tangent hold lines (live 2233): where one is nearer the edge than the radius, the section is the circle touching
+    /// its face at the hold line (measured in the section plane) and the other face; elsewhere the plain round.
+    pub hold: Vec<Shape>,
 }
 
 /// A partial fillet bound along the selected chain (position 0 = the chain's
@@ -517,37 +520,56 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     if hi - lo <= 1e-12 * total {
         return Err(fail("empty partial range"));
     }
-    let partial = spec.partial.is_some();
+    // Stations along the chain: the point, its frame, whether its first face is side 1, the chain's tangent.
+    let station = |s: f64| -> FResult<(DVec3, Frame, bool, DVec3)> {
+        let mut acc = 0.0;
+        let last = chain.len() - 1;
+        for (i, c) in chain.iter().enumerate() {
+            if s <= acc + c.length || i == last {
+                let info = c.shape.edge_info()?;
+                let f = ((s - acc) / c.length).clamp(0.0, 1.0);
+                let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
+                let p = c.shape.point_at(t)?;
+                let fs = ef.get(c.index).cloned().unwrap_or_default();
+                if fs.len() != 2 {
+                    return Err(fail("the edge doesn't have two faces"));
+                }
+                let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
+                let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
+                let tangent = c.shape.tangent_at(t)?.normalize();
+                let fr = match frame_at(shape, ff, p, tangent, scale) {
+                    Ok(fr) => fr,
+                    // At a free end (a part's corner) the probes fall on the end face: orient from just inside.
+                    Err(_) => {
+                        let fi = info.first_param + (info.last_param - info.first_param) * if c.forward { f.clamp(1e-3, 1.0 - 1e-3) } else { 1.0 - f.clamp(1e-3, 1.0 - 1e-3) };
+                        let inner = frame_at(shape, ff, c.shape.point_at(fi)?, c.shape.tangent_at(fi)?.normalize(), scale)?;
+                        let mut fr = Frame { u: inner.u, m: inner.m, extent: inner.extent };
+                        for (i, face) in ff.iter().enumerate() {
+                            let n = face.normal_at_point(p)?.normalize();
+                            let dir = n.cross(tangent).normalize();
+                            fr.u[i] = if dir.dot(inner.u[i]) < 0.0 { -dir } else { dir };
+                            fr.m[i] = if n.dot(inner.m[i]) < 0.0 { -n } else { n };
+                        }
+                        fr
+                    }
+                };
+                return Ok((p, fr, side1_first, tangent));
+            }
+            acc += c.length;
+        }
+        Err(fail("empty chain"))
+    };
+    let ranges = hold_ranges(spec, lo, hi, scale, &station)?;
+    let partial = spec.partial.is_some() || ranges.len() > 1;
     // Other curves (live NE: an elliptic boss's foot): sections along the
     // whole chain, lofted into one tool (live's blend face is one spline).
     let general = chain.iter().any(|c| c.shape.edge_info().is_ok_and(|i| !matches!(i.curve, k::Curve::Line { .. } | k::Curve::Circle { .. })));
     let feature = ev.feature;
     let (mut cuts, mut adds) = (Vec::new(), Vec::new());
-    if general {
+    for &(lo, hi, held) in &ranges {
+    if general || held {
         const N: usize = 64;
         let closed = (chain[0].start - chain[chain.len() - 1].end).length() < 1e-9 && lo <= 1e-12 && hi >= total - 1e-12;
-        let station = |s: f64| -> FResult<(DVec3, Frame, bool)> {
-            let mut acc = 0.0;
-            let last = chain.len() - 1;
-            for (i, c) in chain.iter().enumerate() {
-                if s <= acc + c.length || i == last {
-                    let info = c.shape.edge_info()?;
-                    let f = ((s - acc) / c.length).clamp(0.0, 1.0);
-                    let t = info.first_param + (info.last_param - info.first_param) * if c.forward { f } else { 1.0 - f };
-                    let p = c.shape.point_at(t)?;
-                    let fs = ef.get(c.index).cloned().unwrap_or_default();
-                    if fs.len() != 2 {
-                        return Err(fail("the edge doesn't have two faces"));
-                    }
-                    let ff = [&faces[fs[0] as usize], &faces[fs[1] as usize]];
-                    let side1_first = spec.sides.as_ref().is_none_or(|sd| sd.side1.contains(&(fs[0] as usize)));
-                    let fr = frame_at(shape, ff, p, c.shape.tangent_at(t)?.normalize(), scale)?;
-                    return Ok((p, fr, side1_first));
-                }
-                acc += c.length;
-            }
-            Err(fail("empty chain"))
-        };
         let mut secs = Vec::new();
         let mut starts = Vec::new();
         let mut convex = false;
@@ -557,8 +579,12 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
             // on the edge's (the periodic faces' seam) made OCCT's boolean
             // with an elliptic boss's whole side come back empty.
             let f = if closed { (k as f64 / N as f64 + 0.25).fract() } else { k as f64 / N as f64 };
-            let (p, fr, side1_first) = station(lo + (hi - lo) * f)?;
-            let (face, _, cv) = section_face(p, &fr, spec, side1_first)?;
+            let (p, fr, side1_first, tangent) = station(lo + (hi - lo) * f)?;
+            let here = match held {
+                true => held_spec(spec, p, tangent, &fr, scale)?,
+                false => spec.clone(),
+            };
+            let (face, _, cv) = section_face(p, &fr, &here, side1_first)?;
             convex = cv;
             secs.push(face);
             starts.push(p);
@@ -583,7 +609,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         if convex { cuts.push(named) } else { adds.push(named) }
     }
     let mut at = 0.0;
-    for (ci, c) in chain.iter().enumerate().filter(|_| !general) {
+    for (ci, c) in chain.iter().enumerate().filter(|_| !general && !held) {
         let (a, b) = ((lo - at).max(0.0), (hi - at).min(c.length));
         at += c.length;
         if b <= a {
@@ -695,6 +721,7 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         let named = NamedShape::new(tool, names);
         if convex { cuts.push(named) } else { adds.push(named) }
     }
+    }
     let mut named = body_named(&body);
     for (op, tools) in [(k::BooleanOp::Cut, cuts), (k::BooleanOp::Fuse, adds)] {
         if tools.is_empty() {
@@ -703,7 +730,9 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
         let (s, n) = bool_named(ev, op, &named, &tools)?;
         named = NamedShape::new(s, n);
     }
-    let un = k::unify_same_domain(&named.shape)?;
+    // A hold line is the user's split of its face: it stays (live 2233: the top's strip beyond an r 6 round).
+    let held = spec.sides.as_ref().is_some_and(|s| !s.hold.is_empty());
+    let un = if held { k::unify_edges(&named.shape)? } else { k::unify_same_domain(&named.shape)? };
     if std::env::var_os("NOSHAPE_BLEND_DEBUG").is_some() {
         eprintln!("section blend: boolean valid {} solids {}, unified valid {} solids {}", named.shape.is_valid(), named.shape.count(ShapeType::Solid), un.shape.is_valid(), un.shape.count(ShapeType::Solid));
     }
@@ -713,6 +742,98 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
     }
     ev.replace_body(bi, un.shape, names);
     Ok(())
+}
+
+/// The radius a hold line sets at a station: the circle touching the face the hold line is on at its crossing of the
+/// section plane (through `p` across `tangent`) and the other face. None where no hold line crosses the section.
+fn hold_radius(hold: &[Shape], p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<Option<f64>> {
+    let mut best: Option<f64> = None;
+    for e in hold {
+        let info = e.edge_info()?;
+        let (t0, t1) = (info.first_param, info.last_param);
+        let g = |t: f64| -> FResult<f64> { Ok((e.point_at(t)? - p).dot(tangent)) };
+        const N: usize = 32;
+        let mut prev = (t0, g(t0)?);
+        for i in 1..=N {
+            let t = t0 + (t1 - t0) * i as f64 / N as f64;
+            let cur = (t, g(t)?);
+            if (prev.1 <= 0.0) != (cur.1 <= 0.0) || cur.1 == 0.0 {
+                let (mut a, mut b) = (prev, cur);
+                for _ in 0..60 {
+                    let m = 0.5 * (a.0 + b.0);
+                    let gm = g(m)?;
+                    if (gm <= 0.0) == (a.1 <= 0.0) {
+                        a = (m, gm);
+                    } else {
+                        b = (m, gm);
+                    }
+                }
+                let v = e.point_at(0.5 * (a.0 + b.0))? - p;
+                for u in f.u {
+                    let s = v.dot(u);
+                    if s > 0.0 && (v - u * s).length() < scale * 1e-6 && best.is_none_or(|b| s < b) {
+                        best = Some(s);
+                    }
+                }
+            }
+            prev = cur;
+        }
+    }
+    // Equal offsets d from both sides touch each at (d + d·cos θ) / sin θ from the edge (see [`Sides`]).
+    let c = f.u[0].dot(f.u[1]).clamp(-1.0, 1.0);
+    Ok(best.map(|s| s * (1.0 - c * c).sqrt() / (1.0 + c)))
+}
+
+/// A held station's spec: the radius the hold line sets, capped by the entered one.
+fn held_spec(spec: &BlendSpec, p: DVec3, tangent: DVec3, f: &Frame, scale: f64) -> FResult<BlendSpec> {
+    let hold = spec.sides.as_ref().map(|s| s.hold.as_slice()).unwrap_or(&[]);
+    let r = hold_radius(hold, p, tangent, f, scale)?.map_or(spec.r1, |h| h.min(spec.r1));
+    Ok(BlendSpec { r1: r, r2: r, ..spec.clone() })
+}
+
+type Station<'a> = dyn Fn(f64) -> FResult<(DVec3, Frame, bool, DVec3)> + 'a;
+
+/// The chain's range [lo, hi] in pieces, each held (a hold line nearer the edge than the radius: its section follows
+/// the hold line) or not (the plain round). Live 2233: the entered radius caps the hold line's.
+fn hold_ranges(spec: &BlendSpec, lo: f64, hi: f64, scale: f64, station: &Station) -> FResult<Vec<(f64, f64, bool)>> {
+    let hold = spec.sides.as_ref().map(|s| s.hold.as_slice()).unwrap_or(&[]);
+    if hold.is_empty() {
+        return Ok(vec![(lo, hi, false)]);
+    }
+    if spec.section != Section::Circular || spec.width.is_some() || (spec.r1 - spec.r2).abs() > 1e-12 * spec.r1 {
+        return Err(FeatureError::new("Tangent hold lines are supported with a symmetric circular radius only"));
+    }
+    let held = |s: f64| -> FResult<bool> {
+        let (p, fr, _, tangent) = station(s)?;
+        Ok(hold_radius(hold, p, tangent, &fr, scale)?.is_some_and(|r| r < spec.r1 * (1.0 - 1e-9)))
+    };
+    const N: usize = 64;
+    let mut ranges: Vec<(f64, f64, bool)> = Vec::new();
+    let mut start = lo;
+    let mut prev = (lo, held(lo)?);
+    for i in 1..=N {
+        let s = lo + (hi - lo) * i as f64 / N as f64;
+        let cur = (s, held(s)?);
+        if cur.1 != prev.1 {
+            // Where the hold line's distance passes the radius.
+            let (mut a, mut b) = (prev.0, cur.0);
+            for _ in 0..40 {
+                let m = 0.5 * (a + b);
+                if held(m)? == prev.1 {
+                    a = m;
+                } else {
+                    b = m;
+                }
+            }
+            let at = 0.5 * (a + b);
+            ranges.push((start, at, prev.1));
+            start = at;
+        }
+        prev = cur;
+    }
+    ranges.push((start, hi, prev.1));
+    ranges.retain(|r| r.1 - r.0 > 1e-9 * (hi - lo));
+    Ok(ranges)
 }
 
 fn rotate(p: DVec3, center: DVec3, axis: DVec3, angle: f64) -> DVec3 {
@@ -1792,4 +1913,150 @@ pub fn variable_round(ev: &mut EvalCtx, bi: usize, laws: &[(usize, RadiusLaw)]) 
     let names = ev.name_result(&[&named.names], &un.history, &un.shape, &BTreeMap::new(), None);
     ev.replace_body(bi, un.shape, names);
     Ok(())
+}
+
+/// A chamfer whose sides Onshape measures other than OCCT where a face is curved across the edge. Tangent (APEX_RANGE):
+/// `d` along each face's tangent line from where the two meet, or `d` along the reference face's and the chamfer at an
+/// angle to it. Offset's distance and angle: the angle to the straight line from the chamfer's side to the edge (OCCT:
+/// to the reference face's tangent there).
+#[derive(Clone, Copy)]
+pub enum ChamferSides {
+    Tangent(f64, f64),
+    TangentAngle(f64, f64),
+    OffsetAngle(f64, f64),
+}
+
+/// A point on a face's section across an edge and its unit tangent, at a parameter from the edge.
+type SectionCurve = Box<dyn Fn(f64) -> (glam::DVec2, glam::DVec2)>;
+
+/// A face's section across an edge: a line, or a circle about a center.
+enum Sec {
+    Line,
+    Circle(DVec3, f64),
+}
+
+/// The section of a face across edge curve `curve` at `p`, where it is the same all along the edge (a plane or a
+/// parallel cylinder along a line; a face of revolution about an arc's axis).
+fn constant_section(surface: &k::Surface, curve: &k::Curve, p: DVec3) -> Option<Sec> {
+    let parallel = |a: DVec3, b: DVec3| a.normalize().cross(b.normalize()).length() < 1e-9;
+    let on_axis = |q: DVec3, c: DVec3, axis: DVec3| (q - c).cross(axis.normalize()).length() < 1e-9;
+    match (curve, surface) {
+        (k::Curve::Line { .. }, k::Surface::Plane(_)) => Some(Sec::Line),
+        (k::Curve::Line { direction, .. }, k::Surface::Cylinder { origin, axis, radius, .. }) if parallel(*direction, *axis) => {
+            let a = axis.normalize();
+            Some(Sec::Circle(*origin + a * (p - *origin).dot(a), *radius))
+        }
+        (k::Curve::Circle { axis, .. }, k::Surface::Plane(pl)) if parallel(*axis, pl.normal) => Some(Sec::Line),
+        (k::Curve::Circle { center, axis, .. }, k::Surface::Cylinder { origin, axis: a, .. } | k::Surface::Cone { origin, axis: a, .. })
+            if parallel(*axis, *a) && on_axis(*origin, *center, *axis) =>
+        {
+            Some(Sec::Line)
+        }
+        (k::Curve::Circle { center, axis, .. }, k::Surface::Sphere { center: c, radius, .. }) if on_axis(*c, *center, *axis) => Some(Sec::Circle(*c, *radius)),
+        (k::Curve::Circle { center, axis, .. }, k::Surface::Torus { center: c, axis: a, major_radius, minor_radius }) if parallel(*axis, *a) && on_axis(*c, *center, *axis) => {
+            let a = a.normalize();
+            let radial = ((p - *c) - a * (p - *c).dot(a)).normalize_or_zero();
+            Some(Sec::Circle(*c + radial * *major_radius, *minor_radius))
+        }
+        _ => None,
+    }
+}
+
+/// A chamfer in OCCT's terms at edge `e` (an index in `shape`'s edges): the straight distances from the edge to where
+/// it meets `faces[0]` (the reference face) and `faces[1]`; Some(None) where OCCT reads `chamfer` as Onshape does. None
+/// where a face's section changes along the edge. Live (11-08, a flat on a round shaft) for all five.
+pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: ChamferSides) -> FResult<Option<Option<[f64; 2]>>> {
+    use glam::DVec2;
+    let edge = shape.sub_shape(ShapeType::Edge, e)?;
+    let info = edge.edge_info()?;
+    let mid = 0.5 * (info.first_param + info.last_param);
+    let (p, t) = (edge.point_at(mid)?, edge.tangent_at(mid)?.normalize());
+    let scale = shape.bounding_box(false).map(|b| b.diagonal()).unwrap_or(1.0).max(1e-9);
+    let mut secs = Vec::new();
+    for f in faces {
+        let Some(sec) = constant_section(&f.face_surface()?, &info.curve, p) else { return Ok(None) };
+        secs.push(sec);
+    }
+    let curved = match chamfer {
+        ChamferSides::OffsetAngle(..) => matches!(secs[0], Sec::Circle(..)),
+        _ => secs.iter().any(|s| matches!(s, Sec::Circle(..))),
+    };
+    if !curved {
+        return Ok(Some(None));
+    }
+    let frame = frame_at(shape, faces, p, t, scale)?;
+    let e1 = frame.u[0].normalize();
+    let e2 = t.cross(e1);
+    let flat = |v: DVec3| DVec2::new(v.dot(e1), v.dot(e2));
+    // Each face's section from the edge (the origin) into the face: a point and its unit tangent at parameter φ
+    // (a length along a line, an angle around a circle).
+    let curves: Vec<SectionCurve> = secs
+        .iter()
+        .zip(frame.u)
+        .map(|(sec, u)| -> SectionCurve {
+            let b = flat(u).normalize();
+            match *sec {
+                Sec::Line => Box::new(move |s| (b * s, b)),
+                Sec::Circle(c, r) => {
+                    let c = flat(c - p);
+                    let a = -c / r;
+                    Box::new(move |phi: f64| (c + (a * phi.cos() + b * phi.sin()) * r, b * phi.cos() - a * phi.sin()))
+                }
+            }
+        })
+        .collect();
+    let start = |sec: &Sec, d: f64| match sec {
+        Sec::Line => d,
+        Sec::Circle(_, r) => d / r,
+    };
+    let angle_between = |a: DVec2, b: DVec2| a.perp_dot(b).abs().atan2(a.dot(b));
+    let residual = |x: [f64; 2]| -> [f64; 2] {
+        let (p0, t0) = curves[0](x[0]);
+        let (p1, t1) = curves[1](x[1]);
+        match chamfer {
+            ChamferSides::Tangent(d0, d1) => {
+                let gap = (p0 - t0 * d0) - (p1 - t1 * d1);
+                [gap.x, gap.y]
+            }
+            ChamferSides::TangentAngle(d, angle) => {
+                let apex = p0 - t0 * d;
+                [(apex - p1).perp_dot(t1), angle_between(p1 - p0, -t0) - angle]
+            }
+            ChamferSides::OffsetAngle(d, angle) => [p0.length() - d, angle_between(p1 - p0, -p0) - angle],
+        }
+    };
+    let (d0, d1) = match chamfer {
+        ChamferSides::Tangent(a, b) => (a, b),
+        ChamferSides::TangentAngle(d, angle) | ChamferSides::OffsetAngle(d, angle) => (d, d * angle.tan()),
+    };
+    let mut x = [start(&secs[0], d0), start(&secs[1], d1)];
+    let tol = 1e-12 * scale;
+    for _ in 0..60 {
+        let f = residual(x);
+        if f[0].hypot(f[1]) < tol {
+            break;
+        }
+        let mut jac = [[0.0; 2]; 2];
+        for j in 0..2 {
+            let h = 1e-7 * x[j].abs().max(1e-3 * d0.max(1e-9));
+            let mut y = x;
+            y[j] += h;
+            let g = residual(y);
+            jac[0][j] = (g[0] - f[0]) / h;
+            jac[1][j] = (g[1] - f[1]) / h;
+        }
+        let det = jac[0][0] * jac[1][1] - jac[0][1] * jac[1][0];
+        if det.is_nan() || det.abs() <= 1e-300 {
+            return Ok(None);
+        }
+        x[0] -= (f[0] * jac[1][1] - f[1] * jac[0][1]) / det;
+        x[1] -= (jac[0][0] * f[1] - jac[1][0] * f[0]) / det;
+    }
+    let f = residual(x);
+    let inside = |sec: &Sec, v: f64| v.is_finite() && v > 0.0 && (matches!(sec, Sec::Line) || v < std::f64::consts::PI);
+    let miss = f[0].hypot(f[1]);
+    if miss.is_nan() || miss >= tol * 1e3 || !inside(&secs[0], x[0]) || !inside(&secs[1], x[1]) {
+        return Ok(None);
+    }
+    Ok(Some(Some([curves[0](x[0]).0.length(), curves[1](x[1]).0.length()])))
 }

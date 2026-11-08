@@ -3850,14 +3850,25 @@ P1
   Help point box with nothing picked fails ("… not supported yet"); std blends as usual (detail_a.rs:564-567).
 - [x] (blend 11-08: PLANE in both end filters; a plane end (datum or planar face) is where the chain crosses its plane; T1 features_a::a_partial_fillet_ends_at_a_datum_plane) P1 FILLET-PARTIAL-PLANE (blend) Partial fillet's end type Entity can't take a datum plane (filter lacks PLANE,
   part_studio/mod.rs:6240 kind_matches); the help says plane or mate connector.
-- [ ] P1 CHAMFER-METHOD (blend, live REQUESTS 11:10) Measurement Offset / Tangent (FACE_OFFSET / APEX_RANGE) is never
-  read: a chamfer beside a face curving across the edge measures the same either way.
+- [x] P1 CHAMFER-METHOD (blend, live REQUESTS 11:10) Measurement Offset / Tangent (FACE_OFFSET / APEX_RANGE) is never
+  read: a chamfer beside a face curving across the edge measures the same either way. Done for edges whose faces'
+  sections are the same along them (lines with planes / parallel cylinders, arcs with coaxial faces of revolution),
+  all five types as live's D-shaft.
+- [ ] P2 CHAMFER-METHOD-MIXED (blend) Tangent (and Offset's distance and angle on a round reference face) on edges
+  of changing section, or several edges that come to different distances: OCCT's Offset reading still (needs
+  per-edge distances in op_chamfer).
 - [ ] P1 FACEBLEND-PROP-ADJACENT (blend) Propagation Adjacent does nothing (same as off).
 - [ ] P1 FACEBLEND-DETACH (blend) Detached ("the blend a new surface") fails "not supported yet".
 - [ ] P1 FACEBLEND-TRIM (blend) Trim Walls / Short / Long / No trim never read; with "Cannot attach long and no-trim
   blends to solid parts." on a solid without Detached.
 - [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
-- [ ] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
+- [x] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
+  Tangent hold lines inside the sides done as live 2233 (radius = min(entered, the hold line's), all 4 cases).
+- [ ] P1 FACEBLEND-HOLD-RIM (blend) c2-variable-fillet-faceblend's Face blend 1: its hold lines are the top rim's
+  edges with a pocket (a side's boundary with another face), the blend takes the whole rim and runs down past the
+  pocket's floor (live 20 faces, 136943.82 mm³); ours errs "not supported yet" up front (the plain held cut split the
+  part in three).
+- [ ] P2 FACEBLEND-HOLD-INVERSE (blend, live) Inverse tangent hold lines.
 - [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
   tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
 
@@ -3886,7 +3897,9 @@ P2
   distance and angle still run on.
 - [ ] P2 CHAMFER-FS-OPCHAMFER (blend) the FS host's opChamfer (custom features, mixed sheet-metal selections) ignores
   tangentPropagation, directionOverrides, oppositeDirection for OFFSET_ANGLE and chamferMethod.
-- [ ] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle.
+- [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
+  the same face as Two distances' Distance 1; on a round reference face the angle is to the line from the chamfer's
+  side to the edge (OCCT: to the face's tangent), fixed with CHAMFER-METHOD.
 - [ ] P2 CHAMFER-SM-TESTS (blend) T1 for chamfer on active sheet metal and a mixed selection.
 - [ ] P2 FACEBLEND-PROP-CUSTOM (blend) Custom propagation with Maximum angle.
 - [ ] P2 FACEBLEND-PROP-WALLS (blend) Tangent propagation spreads the side faces, not only edge chains.

@@ -787,11 +787,23 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         }
         let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
-        let reference = if matches!(spec, k::ChamferSpec::Equal(_)) {
-            Vec::new()
-        } else {
-            let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
-            distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?
+        let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
+        use super::blend_section::ChamferSides;
+        let sides = match (ev.enum_("chamferMethod") == "APEX_RANGE", spec) {
+            (true, k::ChamferSpec::Equal(d)) => Some(ChamferSides::Tangent(d, d)),
+            (true, k::ChamferSpec::TwoDistances(a, b)) => Some(ChamferSides::Tangent(a, b)),
+            (true, k::ChamferSpec::DistanceAngle(d, angle)) => Some(ChamferSides::TangentAngle(d, angle)),
+            (false, k::ChamferSpec::DistanceAngle(d, angle)) => Some(ChamferSides::OffsetAngle(d, angle)),
+            (false, _) => None,
+        };
+        let as_offsets = match sides {
+            Some(sides) => two_offsets(ev, &body, &edges, sides, &flipped)?,
+            None => None,
+        };
+        let (spec, reference) = match as_offsets {
+            Some(offsets) => offsets,
+            None if matches!(spec, k::ChamferSpec::Equal(_)) => (spec, Vec::new()),
+            None => (spec, distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?),
         };
         if let k::ChamferSpec::Equal(d) = spec {
             match round_overrun(&body.shape, &edges, &|_, _| d) {
@@ -822,6 +834,32 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
         ev.replace_body(bi, shape, face_names);
     }
     Ok(())
+}
+
+/// A chamfer OCCT reads otherwise than Onshape (see `blend_section::ChamferSides`) as two distances, where its edges' sections are
+/// the same along them and all come to the same distances. None where OCCT reads it as Onshape does, or can't be told.
+fn two_offsets(ev: &EvalCtx, body: &crate::regen::context::Body, edges: &[usize], sides: super::blend_section::ChamferSides, flipped: &BTreeSet<usize>) -> FResult<Option<(k::ChamferSpec, Vec<k::Shape>)>> {
+    let reference = distance_one_faces(ev, body, edges, flipped, ev.bool("oppositeDirection"))?;
+    if reference.len() != edges.len() {
+        return Ok(None);
+    }
+    let adjacency = body.shape.edge_faces()?;
+    let mut offsets: Option<[f64; 2]> = None;
+    for (&e, r) in edges.iter().zip(&reference) {
+        let Some(&[a, b]) = adjacency.get(e).map(|f| f.as_slice()) else { return Ok(None) };
+        let (fa, fb) = (body.shape.sub_shape(ShapeType::Face, a as usize)?, body.shape.sub_shape(ShapeType::Face, b as usize)?);
+        let other = if fa.is_same(r) { fb } else { fa };
+        let d = match super::blend_section::chamfer_offsets(&body.shape, e, [r, &other], sides)? {
+            Some(Some(d)) => d,
+            // OCCT reads it as Onshape does (a mix of edges: OCCT's reading for now).
+            _ => return Ok(None),
+        };
+        if offsets.is_some_and(|o| (o[0] - d[0]).abs().max((o[1] - d[1]).abs()) > 1e-9 * d[0].max(d[1])) {
+            return Ok(None);
+        }
+        offsets = Some(d);
+    }
+    Ok(offsets.map(|[d0, d1]| (k::ChamferSpec::TwoDistances(d0, d1), reference)))
 }
 
 /// Onshape's entity order of faces (its deterministic ids, live G37): faces of
@@ -1115,7 +1153,7 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
             }
             let sol = m.inverse() * DVec3::new(rows[0].1, rows[1].1, rows[2].1);
             let (c2, r) = (glam::DVec2::new(sol.x, sol.y), sol.z);
-            if !(r > 1e-9) {
+            if r.is_nan() || r <= 1e-9 {
                 return err(UNSUPPORTED);
             }
             let to3 = |q: glam::DVec2| cc + ax * q.x + ay * q.y;

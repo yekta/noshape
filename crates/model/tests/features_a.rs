@@ -758,6 +758,39 @@ fn face_blend_options_ticked_with_nothing_picked_blend_as_usual() {
     assert!(near(removed, (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04, 1e-3));
 }
 
+/// Live 2233: Face blend with a tangent hold line. A block 100 × 60 × 20, its top split by a line from (−50, 25) to
+/// (50, 22); side 1 the top's two pieces, side 2 the y = 30 face. Each section is the circle touching the top at the
+/// hold line and the side (r 5 → 8 along x); the radius only caps it: r 6 holds where the line is nearer than 6, a
+/// plain r 6 round beyond; r 2 ignores the line. Live's volumes in mm³ and faces.
+#[test]
+fn a_face_blend_follows_its_tangent_hold_line_as_live() {
+    let mut out = Vec::new();
+    for (radius, hold, live, faces) in [("20 mm", true, 119077.0709, 7), ("6 mm", true, 119267.9291, 9), ("2 mm", true, 119914.1593, 8), ("5 mm", false, 119463.4954, 8)] {
+        let mut t = T::new();
+        t.block(-0.05, -0.03, 0.05, 0.03, "20 mm");
+        let res = t.ok();
+        let top = face_with_normal(&res.context.bodies[0], DVec3::Z);
+        let mut sk = noshape_sketch::Sketch::new();
+        let l = sk.add_line(DVec2::new(-0.05, 0.025), DVec2::new(0.05, 0.022));
+        let s = t.sketch(Reference::Plane(DatumPlane::Top), sk);
+        t.add("splitPart", &[("splitType", en("FACE")), ("faceTargets", q(vec![top])), ("faceTools", q(vec![Reference::SketchEntity { sketch: s, entity: l.0 }]))]);
+        let res = t.ok();
+        let b0 = &res.context.bodies[0];
+        let tops: Vec<Reference> = b0.shape.faces().iter().enumerate().filter(|(_, f)| f.face_plane().ok().flatten().is_some_and(|p| p.normal.dot(DVec3::Z) > 0.999)).map(|(i, _)| Reference::Face((*b0.faces[i]).clone())).collect();
+        assert_eq!(tops.len(), 2);
+        let side = face_with_normal(b0, DVec3::Y);
+        let line = edge_near(b0, DVec3::new(0.0, 0.0235, 0.02));
+        t.add("faceBlend", &[("side1", q(tops)), ("side2", q(vec![side])), ("radius", e(radius)), ("tangentHoldLines", b(hold)), ("tangentEdges", q(vec![line]))]);
+        let res = t.ok();
+        let v = total_volume(&res.context) * 1e9;
+        // (Live's held blend removes 0.14 mm³ more than circles at every x would: (1 − π/4)∫d² = 922.79 mm³.)
+        out.push(format!("r {radius} hold {hold}: {v:.4} mm³ (live {live}), {} faces (live {faces})", res.context.bodies[0].faces.len()));
+        if (v - live).abs() >= 0.5 || res.context.bodies[0].faces.len() != faces {
+            panic!("{out:#?}");
+        }
+    }
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).
