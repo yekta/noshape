@@ -33,6 +33,32 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-07 23:34 UTC (restarted 23:05 on a pinned account): queue 1-5 from the lead.**
+- (1) seam-split faces and (5) SELF-OVERLAPPING-FACE were already on main (18:03 / b113528b).
+- (2) cf-lighten 4/5 vs 5/5: OCCT's list form of MakeWire groups coincident ends by walking an address-hashed map and
+  puts each merged vertex at its group's bounding centre in that order, so a profile's junctions moved in their last
+  bits from run to run. `merge_coincident_ends` (build.cpp) merges them first as OCCT does (ends within the sum of
+  their tolerances, transitively; bounding centre; edges EmptyCopied onto it) but in the edges' order; the list form
+  then keeps its own edge order and orientation. (A first try joined the edges one by one: it changed a block's edge
+  order and orientation, and asm's a_patterned_flexible_subassembly_follows_its_seed, which takes "the first X edge",
+  failed the land (b3b920b2).) `union_touching` (sketch regions.rs) iterates a BTreeMap. T1 kernel_core::
+  a_wire_of_nearly_meeting_edges_is_the_same_every_run (6 child processes; without the fix 3 different bit sets).
+- (3) cf-part-draft's Spur Gear: live (behaviours.md "core (2253)") says REST's volume is 0.36 % high, the true one
+  is cap x 25.4 = ours. A HIGH-accuracy evVolume lands in live's core/q2253/fs-volume-rb9.json after 06:05 UTC 11-08:
+  then fix the corpus' value (not the harness band).
+- (4) custom-feature failures in the suite: cf-part-draft's Part Draft 1-3 ("Selected faces could not be drafted.",
+  std 336 splitPart at Top + two drafts of qSplitBy faces), cf-snap-hook's Plane 1 ("Point-Plane requires a point and
+  a plane."), cf-setback-fillet (area +0.03 %, a fillet), cf-surface-pattern (bool's 85-sphere cut).
+- 11-08 00:10: the host's opDraft is the Draft feature's per-body path (`detail_a::draft_faces`: Reapply fillet,
+  tangent propagation, steep fillets drafted along, the wedge fallback; it called k::draft bare), and a body reference
+  finds the pieces opSplitPart made of it (`split_from`, by the pieces' box centres; live's union of the part's
+  query). Part Draft 1 / 2 are live's (56/116/62, 98/216/120, volumes in band) but score only once the Spur Gear's
+  corpus volume is fixed (it's in every later state). T1 custom_features::
+  a_split_part_drafted_both_sides_with_reapplied_fillets_unions_again. Suite unchanged (70/86, 711/934).
+- Part Draft 3 (2°, no Reapply, the gear split at z 0): OCCT's draft fails on the involute B-spline faces and
+  draft_wedges only takes planes and cylinder bands. Dump with NOSHAPE_DUMP_OPS (draft-*.brep) and probe; live has
+  304 faces (every tooth face drafted). Its `tanProp` is a stale parameter (same studio microversion).
+
 **State 11-07 21:02 UTC: the custom-feature failures (corpus 689/947 at the host fixes; custom 82/113).**
 - Seam-split faces: checked in the app (c2-helical-sweep: hover and selection outline the helical strip as one face, no
   seam lines); counting, naming, measuring and finding were done at 18:03.

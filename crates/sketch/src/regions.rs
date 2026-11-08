@@ -1021,7 +1021,8 @@ pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
     let close = |a: DVec2, b: DVec2| (a - b).length() < 1e-9;
     let loops = |r: &Region| -> Vec<ProfileLoop> { std::iter::once(r.outer.clone()).chain(r.holes.iter().cloned()).collect() };
     let all: Vec<Vec<ProfileLoop>> = regions.iter().map(loops).collect();
-    let mut by_entity: std::collections::HashMap<EntityId, Vec<(usize, usize, usize)>> = std::collections::HashMap::new();
+    // (Ordered: the pairs, and so the loops joined and where they start, the same every run.)
+    let mut by_entity: std::collections::BTreeMap<EntityId, Vec<(usize, usize, usize)>> = std::collections::BTreeMap::new();
     for (ri, ls) in all.iter().enumerate() {
         for (li, lp) in ls.iter().enumerate() {
             for (si, src) in lp.sources.iter().enumerate() {

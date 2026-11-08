@@ -739,3 +739,34 @@ fn a_face_is_replaced_by_its_moved_template() {
     let tilted = transform(&moved_face(&top_of(&block, 10.0 * mm), 12, mm), &Transform::Rotate { origin: glam::DVec3::ZERO, axis: glam::DVec3::X, angle: 0.3 }, true).unwrap().shape;
     assert!(replace_face_mapped(&block, &top_of(&block, 10.0 * mm), &tilted).is_err());
 }
+
+/// A wire of edges whose ends meet within the tolerance but not bit for bit (a sketch profile's junctions: an arc's
+/// ends as OCCT computes them, the lines' as the sketch does) is the same wire in every process: OCCT's list form
+/// merged each junction's vertices in an order hashed by address, so the junctions moved in their last bits from run
+/// to run (cf-lighten's Lighten healed 7 faces or 8 after). Each child process builds it and prints its vertices' bits.
+#[test]
+fn a_wire_of_nearly_meeting_edges_is_the_same_every_run() {
+    if std::env::var_os("NOSHAPE_WIRE_BITS_CHILD").is_some() {
+        // (cf-lighten's Sketch 1 region its Extrude 1 profile came from.)
+        let segs = [
+            Segment2d::Arc { center: DVec2::ZERO, radius: 0.01905, start_angle: 1.3316034036979192, end_angle: 4.670710247962112 },
+            Segment2d::Arc { center: DVec2::new(0.06469062499999997, 0.2652761307338255), radius: 0.25400000000000056, start_angle: -1.8099892498918742, end_angle: -1.7461836980808452 },
+            Segment2d::Arc { center: DVec2::ZERO, radius: 0.025400000000000002, start_angle: 0.6401951382622604, end_angle: 5.393444495775527 },
+            Segment2d::Line { a: DVec2::new(0.015992180704553008, -0.019733478059199863), b: DVec2::new(-0.0007937500000000193, -0.019033456358147356) },
+        ];
+        let w = make_wire_2d(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), &segs).unwrap();
+        let bits: Vec<String> = w.vertices().iter().map(|v| v.vertex_point().unwrap()).map(|p| format!("{:x}/{:x}/{:x}", p.x.to_bits(), p.y.to_bits(), p.z.to_bits())).collect();
+        println!("WIREBITS {}", bits.join(" "));
+        return;
+    }
+    let exe = std::env::current_exe().unwrap();
+    let runs: Vec<String> = (0..6)
+        .map(|_| {
+            let out = std::process::Command::new(&exe).args(["--exact", "kernel_core::a_wire_of_nearly_meeting_edges_is_the_same_every_run", "--nocapture", "--test-threads=1"]).env("NOSHAPE_WIRE_BITS_CHILD", "1").output().unwrap();
+            let text = String::from_utf8_lossy(&out.stdout).to_string();
+            text.lines().find_map(|l| l.split_once("WIREBITS ").map(|(_, b)| b.to_string())).unwrap_or_else(|| format!("no wire: {text} {}", String::from_utf8_lossy(&out.stderr)))
+        })
+        .collect();
+    assert!(!runs[0].starts_with("no wire"), "{}", runs[0]);
+    assert!(runs.iter().all(|r| *r == runs[0]), "{runs:#?}");
+}

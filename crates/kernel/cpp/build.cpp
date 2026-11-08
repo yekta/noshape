@@ -19,6 +19,7 @@
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepGProp.hxx>
 #include <BRepLib.hxx>
+#include <BRepLib_MakeVertex.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepPrimAPI_MakeCone.hxx>
@@ -74,6 +75,8 @@
 #include <gp_Circ.hxx>
 #include <gp_Elips.hxx>
 #include <gp_Lin2d.hxx>
+
+#include <numeric>
 
 namespace noshape {
 
@@ -258,6 +261,97 @@ TopoDS_Edge edge_2d(const PlaneMap& pm, const Seg2d& s)
   }
 }
 
+// The edges' coincident ends merged as OCCT's list form of MakeWire merges them (ends within the sum of their
+// tolerances, transitively; one vertex at the group's bounding centre; edges copied onto it), but grouped in the
+// edges' order: OCCT walks a map hashed by address, and its bounding centre depends on that order, so a profile's
+// junctions moved in their last bits from run to run (cf-lighten's Lighten healed 7 faces or 8 after).
+static ShapeList merge_coincident_ends(const ShapeList& l)
+{
+  ShapeIMap vs;
+  for (ShapeList::Iterator it(l); it.More(); it.Next())
+    for (TopExp_Explorer x(it.Value(), TopAbs_VERTEX); x.More(); x.Next())
+      vs.Add(x.Current().Oriented(TopAbs_FORWARD));
+  const int n = vs.Extent();
+  std::vector<gp_Pnt> pts(n);
+  std::vector<double> tols(n);
+  double              max_tol = 0.0;
+  for (int i = 0; i < n; ++i)
+  {
+    pts[i]  = BRep_Tool::Pnt(TopoDS::Vertex(vs(i + 1)));
+    tols[i] = BRep_Tool::Tolerance(TopoDS::Vertex(vs(i + 1)));
+    max_tol = std::max(max_tol, tols[i]);
+  }
+  std::vector<int> root(n);
+  std::iota(root.begin(), root.end(), 0);
+  auto find = [&](int i) {
+    while (root[i] != i)
+      i = root[i] = root[root[i]];
+    return i;
+  };
+  std::vector<int> by_x(n);
+  std::iota(by_x.begin(), by_x.end(), 0);
+  std::stable_sort(by_x.begin(), by_x.end(), [&](int a, int b) { return pts[a].X() < pts[b].X(); });
+  bool merged = false;
+  for (int a = 0; a < n; ++a)
+    for (int b = a + 1; b < n && pts[by_x[b]].X() - pts[by_x[a]].X() <= tols[by_x[a]] + max_tol; ++b)
+    {
+      const int i = by_x[a], j = by_x[b];
+      const double reach = tols[i] + tols[j];
+      if (pts[i].SquareDistance(pts[j]) > reach * reach)
+        continue;
+      const int ri = find(i), rj = find(j);
+      if (ri != rj)
+      {
+        root[std::max(ri, rj)] = std::min(ri, rj);
+        merged = true;
+      }
+    }
+  if (!merged)
+    return l;
+  std::vector<TopoDS_Vertex> merged_v(n);
+  BRep_Builder               bb;
+  for (int r = 0; r < n; ++r)
+  {
+    if (find(r) != r)
+      continue;
+    NCollection_List<TopoDS_Shape> group;
+    for (int i = r; i < n; ++i)
+      if (find(i) == r)
+        group.Append(vs(i + 1));
+    if (group.Extent() < 2)
+      continue;
+    gp_Pnt c;
+    double tol = 0.0;
+    BRepLib::BoundingVertex(group, c, tol);
+    TopoDS_Vertex v = BRepLib_MakeVertex(c);
+    bb.UpdateVertex(v, tol);
+    for (int i = r; i < n; ++i)
+      if (find(i) == r)
+        merged_v[i] = v;
+  }
+  ShapeList out;
+  for (ShapeList::Iterator it(l); it.More(); it.Next())
+  {
+    const TopoDS_Edge& e   = TopoDS::Edge(it.Value());
+    bool               any = false;
+    for (TopExp_Explorer x(e, TopAbs_VERTEX); x.More() && !any; x.Next())
+      any = !merged_v[vs.FindIndex(x.Current().Oriented(TopAbs_FORWARD)) - 1].IsNull();
+    if (!any)
+    {
+      out.Append(e);
+      continue;
+    }
+    TopoDS_Shape ne = e.EmptyCopied();
+    for (TopExp_Explorer x(e, TopAbs_VERTEX); x.More(); x.Next())
+    {
+      const TopoDS_Vertex& v = merged_v[vs.FindIndex(x.Current().Oriented(TopAbs_FORWARD)) - 1];
+      bb.Add(ne, v.IsNull() ? x.Current() : v.Oriented(x.Current().Orientation()));
+    }
+    out.Append(ne);
+  }
+  return out;
+}
+
 TopoDS_Wire wire_from_edges(const std::vector<TopoDS_Shape>& edges)
 {
   if (edges.empty())
@@ -275,7 +369,7 @@ TopoDS_Wire wire_from_edges(const std::vector<TopoDS_Shape>& edges)
     else
       fail_invalid("wire input must be edges or wires");
   }
-  mk.Add(l);
+  mk.Add(merge_coincident_ends(l));
   if (mk.IsDone())
     return mk.Wire();
   // Fallback: connect with tolerance.
