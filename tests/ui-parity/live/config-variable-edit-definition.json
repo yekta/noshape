@@ -1,0 +1,930 @@
+{
+ "scenario": "config-variable-edit-definition",
+ "recorded": "2026-11-08T11:29:16.113Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.3 6f77db4f"
+ },
+ "live": {
+  "document": "372245a4cbbdaa48cb0bdfdb",
+  "workspace": "4c74b00690b3ab194f1c78a9",
+  "element": "aa7b65d855905788f87166fc",
+  "start": "config-blocks",
+  "startElement": "6cf32c83feb8722ba4c63bf7"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    },
+    {
+     "name": "Sketch 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 2",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 2"
+  },
+  "parts": [
+   "Part 1",
+   "Part 2"
+  ],
+  "partsHeading": "Parts (2)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Part Studio 1"
+    }
+   },
+   "ok": true,
+   "at": [
+    1726,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 27451
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Configuration panel"
+    }
+   },
+   "ok": true,
+   "at": [
+    1904,
+    478
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 34158
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "caret": "Add configuration input"
+    }
+   },
+   "ok": true,
+   "at": [
+    1648,
+    942
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "List",
+      "Checkbox",
+      "Configuration variable"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 36375
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Configuration variable"
+    }
+   },
+   "ok": true,
+   "at": [
+    1558,
+    903
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": ""
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 38786
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "type",
+    "text": "len"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": "Name",
+     "text": "len",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Variable input",
+      "text": "Variable input / Name / Length / Angle / Integer / Real / Text / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": "Name",
+        "value": "len"
+       },
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": "No features are configured Right click sketch dimensions, features, or feature parameters to configure them.",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 40826
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "ok"
+    }
+   },
+   "ok": true,
+   "at": [
+    1150,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "No features are configured / No features are configured",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 44064
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "config_more": "len"
+    }
+   },
+   "ok": true,
+   "at": [
+    1903,
+    411
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Copy table",
+      "Copy input",
+      "Move up",
+      "Rename",
+      "Edit definition…",
+      "Edit FeatureScript IDs…",
+      "Exclude from properties",
+      "Visibility conditions…",
+      "Input propagation…",
+      "Delete"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "No features are configured / No features are configured",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 46179
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Edit definition…"
+    }
+   },
+   "ok": true,
+   "at": [
+    1818,
+    549
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "configuration-setup-dialog",
+      "title": "Edit len",
+      "text": "Edit len / Default / Minimum / Maximum",
+      "inputs": [
+       {
+        "placeholder": null,
+        "value": "1 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "0 mm"
+       },
+       {
+        "placeholder": null,
+        "value": "100000 mm"
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "No features are configured / No features are configured",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 48340
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     1817,
+     548
+    ],
+    "hover": [],
+    "element": "div.tables-container.config-tables-container"
+   },
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [
+      {
+       "name": "Sketch 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Sketch 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
+      },
+      {
+       "name": "Extrude 2",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      }
+     ],
+     "rollbackAfter": "Extrude 2"
+    },
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
+    "undo": {
+     "undo": true,
+     "redo": false
+    },
+    "message": "No features are configured / No features are configured",
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null
+   },
+   "t": 51605
+  }
+ ]
+}
