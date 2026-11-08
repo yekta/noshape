@@ -761,7 +761,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - dx: drw-sheet-duplicate / drw-sheet-properties now differ because live2 re-recorded them through the Sheets panel
     (1eb7a579d): step 1 `.dialog.text[4]` live "Right" / ours "Top". A newly measured difference, not a regression.
   (qa 2026-11-07 22:56)
-- [ ] P2 DOCS-SELECT-LEAVES-WAL (studios) **selecting a document on the documents page leaves `<name>.noshape-wal` and
+- [x] (studios 1cd8f6685; qa verified 11-08 00:45 on green 56603985: the row click, its right-click and no step leave 0 -wal / -shm, 2 / 2 before) P2 DOCS-SELECT-LEAVES-WAL (studios) **selecting a document on the documents page leaves `<name>.noshape-wal` and
   `-shm` beside it after the app quits** (green b9f855f0, Linux; d463d9e54 says no -wal/-shm stays beside a document).
   The UI script on the docs-page start, quit by cx.quit(): no step → no files left; a click on "uip Bracket"'s row (or
   its right-click, Escape) → `uip Bracket.noshape-wal` (0 bytes) and `uip Bracket.noshape-shm` (32 KB) stay. A user's

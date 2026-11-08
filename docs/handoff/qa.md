@@ -36,6 +36,11 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 00:45 (qa restarted ~00:25):** green 56603985: volume sweep, cf corpus, the 48 ticket documents = b9f855f0;
+**DOCS-SELECT-LEAVES-WAL verified** (0 -wal / -shm after a row click or right-click). Fuzz: nf b9f855f0 6141–6200 done, 0 deaths;
+vibe3 now runs v3cf16.sh (v0.4.35, at 6124 of 6081–6140) and v3nf18.sh (green 56603985, fallback off, 6201–6260). Suites loop
+pid 1619190: next run 00:34. Next: the 05:00 list (v0.4.36) at ~04:15, then the release checks.
+
 **11-07 23:30 (qa restarted 23:08 on a pinned account):** suites loop pid 1619190 still running (next run ~00:34); the
 20:34 run's flags are SUITE-REGRESSIONS-1107 (filed 22:56). Fuzz: v34 5961–6020 and nf b3f393b8 6021–6080 done, 0 deaths;
 new on vibe3: ~/qa/bin/v3cf16.sh (v0.4.35, 6081–6140), v3nf17.sh (green b9f855f0, fallback off, 6141–6200); b9f855f0's sweeps
