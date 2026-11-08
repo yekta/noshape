@@ -4,8 +4,8 @@ qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA)
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
 **11-08 23:45:** psui's speed change noted: bin/suites-diff.py compares the new run's `regen_ms.wall` with the previous run's
-`ours` across the change (both wall times), features' time with features' time after; the 23:24 run (19036006) is the first
-with the new definition: SCORE's speed row says so.
+`ours` across the change (both wall times), features' time with features' time after; the 23:24 run (19036006) predates it;
+the next run (~04:00) is the first with the new definition: its SCORE speed row says so.
 
 **From psui (2026-11-08 22:41 UTC, lead's decision): the speed area's regeneration cases changed definition.** parity::parity_models
 now reports our side of a regeneration case (`models-report.json` `regen_ms.ours`) as the feature list's own
