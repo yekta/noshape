@@ -179,11 +179,12 @@ fn corner_patch(shape: &Shape, faces: &[Shape], ef: &[Vec<u32>], f: usize) -> bo
 pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize], refillet: bool) -> FResult<Vec<usize>> {
     let faces = shape.faces();
     let ef = shape.edge_faces()?;
-    let radius: Vec<Option<f64>> = (0..faces.len()).map(|f| blend_radius(shape, &faces, names, &ef, f)).collect();
-    // Corner patches go with the fillets they join (rolled again with them).
-    let is_blend: Vec<bool> = (0..faces.len()).map(|f| radius[f].is_some() || corner_patch(shape, &faces, &ef, f)).collect();
+    // Corner patches go with the fillets they join (rolled again with them). Worked out only for the faces asked
+    // about (every face of an involute gear's half: 0.24 s).
+    let mut known: Vec<Option<bool>> = vec![None; faces.len()];
+    let mut is_blend = |f: usize| *known[f].get_or_insert_with(|| blend_radius(shape, &faces, names, &ef, f).is_some() || corner_patch(shape, &faces, &ef, f));
     let drafted: BTreeSet<usize> = drafted.iter().copied().collect();
-    let eligible = |f: usize| is_blend[f] && (refillet || !drafted.contains(&f));
+    let may_join = |f: usize| refillet || !drafted.contains(&f);
     let mut set: BTreeSet<usize> = BTreeSet::new();
     for fs in &ef {
         if fs.len() != 2 {
@@ -191,10 +192,14 @@ pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize]
         }
         let (a, b) = (fs[0] as usize, fs[1] as usize);
         for (x, y) in [(a, b), (b, a)] {
-            if drafted.contains(&x) && !(refillet && is_blend[x]) && eligible(y) {
+            if !drafted.contains(&x) {
+                continue;
+            }
+            let x_blend = refillet && is_blend(x);
+            if !x_blend && may_join(y) && is_blend(y) {
                 set.insert(y);
             }
-            if refillet && drafted.contains(&x) && is_blend[x] {
+            if x_blend {
                 set.insert(x);
             }
         }
@@ -205,10 +210,10 @@ pub(super) fn blends_to_reapply(shape: &Shape, names: &[Name], drafted: &[usize]
         for fs in &ef {
             if fs.len() == 2 {
                 let (a, b) = (fs[0] as usize, fs[1] as usize);
-                if set.contains(&a) && eligible(b) {
+                if set.contains(&a) && !set.contains(&b) && may_join(b) && is_blend(b) {
                     set.insert(b);
                 }
-                if set.contains(&b) && eligible(a) {
+                if set.contains(&b) && !set.contains(&a) && may_join(a) && is_blend(a) {
                     set.insert(a);
                 }
             }
@@ -520,6 +525,7 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
     let Ok(ef) = shape.edge_faces() else { return seed.to_vec() };
     let mut set: BTreeSet<usize> = seed.iter().copied().collect();
     let mut stack: Vec<usize> = seed.to_vec();
+    let mut steep_known: Vec<Option<bool>> = vec![None; faces.len()];
     while let Some(f) = stack.pop() {
         for (ei, fs) in ef.iter().enumerate() {
             if fs.len() != 2 || !fs.contains(&(f as u32)) {
@@ -529,13 +535,14 @@ fn propagate_tangent_faces(shape: &Shape, seed: &[usize], pull: DVec3, angle: f6
             if set.contains(&other) {
                 continue;
             }
-            let Some((a, b)) = edge_normals(shape, &faces, &ef, ei) else { continue };
-            if a.dot(b) < 0.9998 {
+            // Steep: the face normal is within `angle` of perpendicular to pull (asked once per face, before the
+            // edge: a gear's caps meet its 150 drafted faces).
+            let steep = *steep_known[other].get_or_insert_with(|| faces.get(other).and_then(point_on_face).and_then(|p| face_normal_near(&faces[other], p)).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < angle.sin().max(1e-6) + 1e-9));
+            if !steep {
                 continue;
             }
-            // Steep: the face normal is within `angle` of perpendicular to pull.
-            let steep = faces.get(other).and_then(point_on_face).and_then(|p| face_normal_near(&faces[other], p)).is_some_and(|(_, n)| n.normalize().dot(pull).abs() < angle.sin().max(1e-6) + 1e-9);
-            if steep {
+            let Some((a, b)) = edge_normals(shape, &faces, &ef, ei) else { continue };
+            if a.dot(b) >= 0.9998 {
                 set.insert(other);
                 stack.push(other);
             }

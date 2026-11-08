@@ -33,7 +33,7 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 02:40 UTC (restarted 01:05): (2) landed, (4) Part Draft 3.**
+**State 11-08 03:55 UTC (restarted 01:05): (2) landed, (4) Part Draft 3 landed (cba0a00b), now its speed.**
 - Landed 02:19 as 31d9fe78: opDraft as the Draft feature, the deterministic wire (cf-lighten), the BLEND_VERTEX
   translator, a closed sweep path swept whole (cf-snap-hook 11 -> 14), and a draft whose fillets can't be rolled
   again drafting them as they are (the std harness's draft). Suite 733/934 (from 724), no document lost or slower.
@@ -47,9 +47,13 @@ What blend takes over:
   OCCT's ruled face otherwise pairs an ellipse's points with other points' offsets, 0.29 % low); a bore's circle on
   its own frame. T1 kernel blend::a_curved_prism_drafted_about_its_base_has_steiners_volume (within 1e-6 of
   Steiner's V = A·h − L·tanα·h²/2 + π·tan²α·h³/3, both pulls); blend::draft_wedges_like_onshape still live's. Part
-  Draft 3 builds (custom 1/4 -> scored once the Spur Gear's corpus volume is fixed), ~2 s here vs live 865 ms: the
-  arc-join offset of the 151-edge face is 0.86 s per half. Faster would be offsetting each edge exactly ourselves and
-  trimming at sharp corners. Suite: /root/core-scratch/suite-taper.log.
+  Draft 3 builds (custom 1/4; scored once the Spur Gear's corpus volume is fixed).
+- Part Draft 3's speed (5.4 s -> 2.6 s here, live 865 ms), in the worktree: each base edge offset on its own
+  (`own_offset_sides`: lines and arcs as lines and arcs, other curves Geom_OffsetCurve, sharp corners trimmed where
+  the offsets cross, by Gauss-Newton: OCCT's ExtremaCurveCurve missed those crossings), OCCT's offset only where a
+  corner opens up; draft_faces' tangent propagation and blends_to_reapply worked out only for the faces asked (258 ms
+  and 238 ms -> 32 ms and 1 ms on a gear half). Left: the union of the two drafted halves, 1.87 s (OCCT's fuse of
+  two 152-face solids glued on z 0): bool's. Suite run: /root/core-scratch/suite-own.log.
 
 **State 11-07 23:34 UTC (restarted 23:05 on a pinned account): queue 1-5 from the lead.**
 - (1) seam-split faces and (5) SELF-OVERLAPPING-FACE were already on main (18:03 / b113528b).
