@@ -2616,6 +2616,9 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
     jobs.push_back(Job{key, TopoDS::Face(input(*t_free->srcs, a.first, TopAbs_FACE, a.second)), TopoDS::Face(input(*t_free->srcs, b.first, TopAbs_FACE, b.second)), false, {}});
   }
   OSD_Parallel::For(0, static_cast<int>(jobs.size()), [&](int k) {
+    // (None started once the caller's budget or cancel says stop.)
+    if (noshape_should_break() != 0)
+      return;
     try
     {
       if (own_sections(jobs[k].fa, jobs[k].fb, jobs[k].lines))

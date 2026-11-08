@@ -349,20 +349,26 @@ namespace {
 // What a pool job's workers take from the thread that launched it (OCCT patch 0010): its cancel flag and CPU
 // deadline, so the break hooks stop OCCT's parallel face / face intersections of a cancelled Boolean on the
 // pool's threads too.
+// The deadline's clock where it is the launching thread's CPU time: that clock and the steady clock when the job
+// started (`cpu0`, `wall0`), the job's time counted as the launcher's, which waits for it without using any CPU
+// (SECTIONS-AHEAD-HANG: OCCT's sections ahead ran on, the deadline never reached).
 struct PoolContext
 {
   const std::atomic<bool>* cancel;
   Deadline*                deadline;
   std::atomic<bool>*       spent;
+  double                   cpu0, wall0;
+  const PoolContext*       clock;
 };
-thread_local PoolContext t_pool_context{nullptr, nullptr, nullptr};
+thread_local PoolContext        t_pool_context{nullptr, nullptr, nullptr, 0, 0, nullptr};
+thread_local const PoolContext* t_pool_clock = nullptr; // the job this thread is running a part of
 } // namespace
 
 extern "C" void* noshape_pool_capture()
 {
   if (t_cancel == nullptr && t_deadline == nullptr && t_spent == nullptr)
     return nullptr;
-  t_pool_context = {t_cancel, t_deadline, t_spent};
+  t_pool_context = {t_cancel, t_deadline, t_spent, t_deadline != nullptr ? deadline_now(*t_deadline) : 0, steady_seconds(), nullptr};
   return &t_pool_context;
 }
 
@@ -370,11 +376,12 @@ extern "C" void* noshape_pool_enter(void* context)
 {
   if (context == nullptr)
     return nullptr;
-  PoolContext* previous = new PoolContext{t_cancel, t_deadline, t_spent};
+  PoolContext* previous = new PoolContext{t_cancel, t_deadline, t_spent, 0, 0, t_pool_clock};
   const PoolContext* c  = static_cast<const PoolContext*>(context);
   t_cancel              = c->cancel;
   t_deadline            = c->deadline;
   t_spent               = c->spent;
+  t_pool_clock          = c;
   return previous;
 }
 
@@ -386,6 +393,7 @@ extern "C" void noshape_pool_leave(void* previous)
   t_cancel             = p->cancel;
   t_deadline           = p->deadline;
   t_spent              = p->spent;
+  t_pool_clock         = p->clock;
   delete p;
 }
 
@@ -440,7 +448,9 @@ extern "C" int noshape_should_break()
   if (now < next)
     return 0;
   next = now + 1e-3;
-  if (deadline_now(*d) > d->at)
+  const PoolContext* const job = t_pool_clock;
+  const double             at  = job != nullptr && job->deadline == d ? std::max(deadline_now(*d), job->cpu0 + (now - job->wall0)) : deadline_now(*d);
+  if (at > d->at)
   {
     d->hit.store(true);
     return 1;
