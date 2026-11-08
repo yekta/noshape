@@ -33,7 +33,7 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 20:31 UTC: the suite's failing features (lead 20:0x); the loft version gate waits for live.**
+**State 11-08 20:20 UTC: the suite's failing features (lead 20:0x); the loft version gate waits for live.**
 - Suite 75/87 documents to the end, 760/951 features. Routed: c2-fan-blade-sweep (53 lost: its derived source's
   Chamfer 1) and c2-rings-loft's blend faces to blend.md; the fan blade's STEP import to dx.md; text indent / louver
   Sketch 9 (skasm, paused) and the extension spring's edges (core, parked) in TICKETS.
