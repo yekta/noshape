@@ -1,0 +1,27 @@
+{
+ "name": "vs-fs-monitor",
+ "about": "Feature Studio 1's Monitor ▾ › Monitor Variable Studio 1 (the notices panel follows it)",
+ "area": "psui",
+ "source": "universe variable-studio vs-fs-monitor-profile (psui 11-08)",
+ "start": "fs-vs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Monitor Variable Studio 1"
+   }
+  }
+ ]
+}

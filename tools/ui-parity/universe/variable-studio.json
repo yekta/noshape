@@ -1812,7 +1812,21 @@
    "where": "Feature Studio Monitor ▾",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3185"
+   "source": "behaviours.md:3185",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Monitor"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:(Monitor|Profile) Variable Studio.*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-panel",

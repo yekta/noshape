@@ -1991,6 +1991,7 @@ impl PartStudioView {
     pub(super) fn flash_for(&mut self, status: FeatureStatus, text: String, time: Duration, cx: &mut Context<Self>) {
         let shown = (status, text);
         self.message = Some(shown.clone());
+        self.ui.flashed = Some(shown.clone());
         cx.notify();
         cx.spawn(async move |this, cx| {
             cx.background_executor().timer(time).await;
@@ -6772,6 +6773,16 @@ impl Render for PartStudioView {
                     this.draft_undo(true, window, cx);
                 } else {
                     cx.propagate();
+                }
+            }))
+            // Esc also drops a toast that hides by itself (live sketch-dim-menu-unconfigure: gone 3.8 s after it showed,
+            // at the Esc), whatever else it does.
+            .capture_action(cx.listener(|this, _: &Cancel, _, cx| {
+                if let Some(f) = this.ui.flashed.take()
+                    && this.message.as_ref() == Some(&f)
+                {
+                    this.message = None;
+                    cx.notify();
                 }
             }))
             .on_action(cx.listener(|this, _: &Cancel, window, cx| {

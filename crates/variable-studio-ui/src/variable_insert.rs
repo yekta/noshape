@@ -947,10 +947,14 @@ fn version_rows(state: &Rc<RefCell<DialogState>>, path: &std::path::Path, rows: 
 /// once, ready for input (the first studio is inserted into all; a later
 /// one, unticked, is referenced by `element`).
 pub fn create_studio(doc: &Entity<DocModel>, element: TabId, cx: &mut App) {
+    use noshape_ops::variable_studio as vs;
     doc.update(cx, |d, cx| {
-        d.edit_document(noshape_ops::variable_studio::CREATE_STUDIO_DESCRIPTION, cx, |doc| {
-            noshape_ops::variable_studio::create_studio(doc, element);
-        });
+        let mut made = None;
+        d.edit_document(vs::CREATE_STUDIO_DESCRIPTION, cx, |doc| made = Some(vs::create_studio(doc, element)));
+        // The element's reference to it: its own edit, undoable there (live vs-ps-table-create-studio).
+        if let Some((id, true)) = made {
+            d.edit_tab(element, vs::reference_description(true), cx, |c| vs::created_reference(c, id));
+        }
     });
 }
 

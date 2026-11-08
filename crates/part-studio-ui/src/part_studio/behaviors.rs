@@ -219,6 +219,8 @@ pub struct UiState {
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
     /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
     pub regen_for_arms: bool,
+    /// The last toast that hides by itself (`flash_for`): Esc drops it.
+    pub flashed: Option<(noshape_model::display::FeatureStatus, String)>,
     /// "Show dependencies" panel for a feature.
     pub dependencies: Option<FeatureId>,
     pub cube_hover: Option<super::view_cube::CubeCell>,
@@ -668,6 +670,7 @@ impl UiState {
             list_autoscrolling: false,
             rollback_keyboard: None,
             regen_for_arms: false,
+            flashed: None,
             dependencies: None,
             cube_hover: None,
             cube_origin: None,

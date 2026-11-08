@@ -425,7 +425,10 @@ fn create_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         }
         None => od.tab_of_kind(None, "Part Studio", doc::is_part_studio)?,
     };
-    let id = od.session.edit_document(vs::CREATE_STUDIO_DESCRIPTION, |d| vs::create_studio(d, element))?;
+    let (id, referenced) = od.session.edit_document(vs::CREATE_STUDIO_DESCRIPTION, |d| vs::create_studio(d, element))?;
+    if referenced {
+        od.session.edit_tab(element, vs::reference_description(true), |c| vs::created_reference(c, id))?;
+    }
     let mut v = tables_json(od.doc(), element);
     v["created"] = json!({ "id": id.to_string(), "name": od.doc().tab(id).map(|t| t.name.clone()) });
     Ok(v.into())

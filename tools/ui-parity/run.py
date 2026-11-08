@@ -170,6 +170,8 @@ def all_differences(a, b, path=""):
 
 
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
+# Live's info bubbles hide by themselves after ≈4.4 s (live TOAST-AUTOHIDE; app workspace.rs).
+TOAST_MS = 4400
 INPUT_BUTTONS = {"Apply", "Cancel", "Save", "OK"}
 
 # Tooltips live draws as an element's native `title` (the OS's tooltip, which its recorder can't read): ours' is read as
@@ -462,22 +464,31 @@ def compare(live, ours, whole_document=True):
     """(matched steps, total steps, first difference or None). `whole_document`: the scenario starts on a whole
     document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
     tab bar isn't the start's, so `document` isn't compared."""
-    pairs = [("start", live.get("start"), ours.get("start"), None)]
+    pairs = [("start", live.get("start"), ours.get("start"), None, None)]
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
     for s in live.get("steps", []):
         o = ours_steps.get(s.get("step"), {})
         # A step ours couldn't do (its target not found) while live did: a difference, whatever the state after.
         failed = o.get("error") if o.get("ok") is False and s.get("ok") is not False else None
-        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state"), failed))
+        pairs.append((f"step {s.get('step')}", s.get("state"), o.get("state"), failed, s.get("t")))
     matched, first = 0, None
-    for name, a, b, failed in pairs:
+    # Live's toasts by when they first showed (live's own clock, `t` ms): one live had dropped by its timeout (an
+    # info bubble ≈4.4 s, TOAST-AUTOHIDE) while ours still shows it isn't a difference: the runner doesn't wait live's
+    # seconds between steps (sketch-dim-menu-unconfigure, feature-menu-edit-expression, vs-cfg-value-unconfigure).
+    toast_shown = {}
+    for name, a, b, failed, t in pairs:
         if failed:
             if first is None:
                 first = (name, ".step", "ok", f"failed: {failed}")
             CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
             continue
         a = normalize_live(json.loads(json.dumps(a)))
+        if isinstance((a or {}).get("message"), str) and t is not None:
+            toast_shown.setdefault(a["message"], t)
+        if a is not None and a.get("message") is None and isinstance((b or {}).get("message"), str) and t is not None \
+                and t - toast_shown.get(b["message"], t) >= TOAST_MS:
+            b = dict(b, message=None)
         keys = KEYS + [k for k in LATER_KEYS if k in (a or {}) and (whole_document or k != "document")]
         if (a or {}).get("drawing"):
             keys = [k for k in keys if k not in NOT_IN_DRAWINGS]

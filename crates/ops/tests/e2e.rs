@@ -7396,3 +7396,22 @@ fn stl_fillet_torus_on_onshapes_grid() {
     let mid = rings[rings.len() / 2];
     assert!((536..=537).contains(&mid), "{mid} nodes round a middle ring, live's rule 537 steps: {rings:?}");
 }
+
+/// Live vs-ps-table-create-studio: a later Variable Studio created from a Part Studio's Variable table is inserted
+/// there as that Part Studio's own edit, so its Undo takes the insertion back (the new tab itself, a tab edit, stays).
+#[test]
+fn a_studio_created_from_a_part_studios_table_is_undone_there() {
+    let mut ctx = Ctx::new();
+    let path = scratch("vs-create-undo.noshape");
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "variable_create_studio", json!({}));
+    let c = call(&mut ctx, "variable_create_studio", json!({ "tab": "Part Studio 1" }));
+    assert_eq!(c["created"]["name"], "Variable Studio 2", "{c}");
+    let titles = |v: &Value| v.as_array().map(|a| a.iter().map(|t| t["studio"].as_str().unwrap_or("").to_string()).collect::<Vec<_>>()).unwrap_or_default();
+    assert!(titles(&c["tables"]).contains(&"Variable Studio 2".to_string()), "inserted: {c}");
+    let u = call(&mut ctx, "history_undo", json!({ "tab": "Part Studio 1" }));
+    assert_eq!(u["description"], "Part Studio 1 :: Insert Variable Studio", "{u}");
+    let t = call(&mut ctx, "variable_list", json!({ "tab": "Part Studio 1" }));
+    assert!(!titles(&t["studio_tables"]).contains(&"Variable Studio 2".to_string()), "taken back: {t}");
+    assert!(call(&mut ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().any(|t| t["name"] == "Variable Studio 2"), "the tab stays");
+}

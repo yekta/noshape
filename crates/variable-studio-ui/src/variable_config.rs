@@ -465,7 +465,7 @@ impl VariableStudioView {
                 .text_color(pal.info_text)
                 .child(div().font_weight(FontWeight::BOLD).child("No variables are configured"))
                 .when(second, |d| d.child("Right click a variable value or description to configure them."))
-                .map(|d| crate::ui_script::mark_message(d, || if second { "No variables are configured Right click a variable value or description to configure them.".into() } else { "No variables are configured".into() }))
+                .map(|d| crate::ui_script::mark_note(d, || if second { "No variables are configured Right click a variable value or description to configure them.".into() } else { "No variables are configured".into() }))
         };
         if rows.is_empty() {
             // A configuration variable: no table (live vs-914); the notice

@@ -276,9 +276,10 @@ pub fn noted_message() -> Option<String> {
     message_slot().lock().ok()?.clone()
 }
 
-/// Alert boxes and message bubbles by where they were painted (a window, the top-left corner in whole pixels): live's
-/// recorder reads every alert of the page as `message`, several joined by " / " top to bottom.
-type PaintedMessages = Mutex<std::collections::BTreeMap<(u64, i32, i32), String>>;
+/// Alert boxes and message bubbles by where they were painted (a window, notes before toasts, the top-left corner in
+/// whole pixels): live's recorder reads every alert of the page as `message`, several joined by " / ", a panel's info
+/// box before a toast (DOM order: vs-cfg-input-propagation's notice above its toast in the text), else top to bottom.
+type PaintedMessages = Mutex<std::collections::BTreeMap<(u64, u8, i32, i32), String>>;
 
 fn painted_messages() -> &'static PaintedMessages {
     static M: OnceLock<PaintedMessages> = OnceLock::new();
@@ -287,6 +288,15 @@ fn painted_messages() -> &'static PaintedMessages {
 
 /// `el` (an alert box, a message bubble) recording `text` as a `message` each time it is painted.
 pub fn mark_message<E: ParentElement>(el: E, text: impl FnOnce() -> String) -> E {
+    mark_message_ranked(el, 1, text)
+}
+
+/// [`mark_message`] for a panel's info box: read before the toasts whatever their place.
+pub fn mark_note<E: ParentElement>(el: E, text: impl FnOnce() -> String) -> E {
+    mark_message_ranked(el, 0, text)
+}
+
+fn mark_message_ranked<E: ParentElement>(el: E, rank: u8, text: impl FnOnce() -> String) -> E {
     if !active() {
         return el;
     }
@@ -296,7 +306,7 @@ pub fn mark_message<E: ParentElement>(el: E, text: impl FnOnce() -> String) -> E
             move |b, window, _| {
                 let id = window.window_handle().window_id().as_u64();
                 if let Ok(mut m) = painted_messages().lock() {
-                    m.insert((id, f32::from(b.origin.y).round() as i32, f32::from(b.origin.x).round() as i32), text.clone());
+                    m.insert((id, rank, f32::from(b.origin.y).round() as i32, f32::from(b.origin.x).round() as i32), text.clone());
                 }
             },
             |_, _, _, _| {},

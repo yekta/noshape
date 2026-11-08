@@ -1,0 +1,33 @@
+{
+ "name": "vs-fs-profile",
+ "about": "Feature Studio 1's Monitor ▾ › Profile Variable Studio 1, then Monitor ▾ again (its row reads Profiling)",
+ "area": "psui",
+ "source": "universe variable-studio vs-fs-monitor-profile (psui 11-08)",
+ "start": "fs-vs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Profile Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  }
+ ]
+}

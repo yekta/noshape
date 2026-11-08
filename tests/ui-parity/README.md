@@ -316,6 +316,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 
 ### Feature Studio (studios, 11-07)
 - Start `fs-studio`: a whole document with a new "Feature Studio 1" (its own new-studio text).
+- Start `fs-vs` (psui, 11-08): `fs-studio` and "Variable Studio 1" with width 40 mm (a Variable Studio to monitor or profile from the Feature Studio).
 - `{"editor": "code"}`: the code editor (a click there, then keys: `mod+End` puts the caret at the end); the toolbar's
   buttons by tooltip without their key (`"Commit Feature Studio"`, `"New feature"`, `"Format Feature Studio"`,
   `"Import"`, `"Module outline"`, `"Undo"`, `"Redo"`).

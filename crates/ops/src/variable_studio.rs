@@ -266,23 +266,25 @@ pub fn move_reference(doc: &Document, tab: TabId, studio: TabId, down: bool) -> 
 /// The history text of [`create_studio`].
 pub const CREATE_STUDIO_DESCRIPTION: &str = "Insert tab : Variable Studio";
 
-/// A Variable table's "Create Variable Studio": a new studio tab right
-/// after `element`, shown in its Variable table at once (the document's
-/// first studio is inserted into all; a later one, unticked, is referenced
-/// by `element`). Returns the new tab.
-pub fn create_studio(doc: &mut Document, element: TabId) -> TabId {
+/// Create Variable Studio from `element`'s Variable table: the new tab, after `element` in the tab bar (not an undo
+/// step: Onshape's tab edits aren't). Also whether `element` takes it in its table ([`created_reference`]): not when
+/// it goes into every Part Studio and Assembly already (the document's first studio).
+pub fn create_studio(doc: &mut Document, element: TabId) -> (TabId, bool) {
     let name = doc.next_tab_name("Variable Studio");
     let studio = vars::new_studio(doc);
     let all = studio.insert_into_all;
     let id = doc.add_tab(&name, TabContent::VariableStudio(studio));
-    if !all && let Some(c) = doc.tab_mut(element).map(|t| &mut t.content) {
-        set_reference(c, id, Some(StudioRef::whole(id)));
-    }
     let order = &mut doc.settings.tab_order;
     order.retain(|t| *t != id);
     let at = order.iter().position(|t| *t == element).map(|i| i + 1).unwrap_or(order.len());
     order.insert(at, id);
-    id
+    (id, !all)
+}
+
+/// The new studio in its element's table: the element's own edit, undoable there (live vs-ps-table-create-studio:
+/// Undo on in the Part Studio after Create Variable Studio).
+pub fn created_reference(c: &mut TabContent, studio: TabId) {
+    set_reference(c, studio, Some(StudioRef::whole(studio)));
 }
 
 /// A Variable Studio's "Insert into all Part Studios and Assemblies"
