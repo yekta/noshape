@@ -992,30 +992,16 @@ impl<'a> EvalCtx<'a> {
                 // split its edges where they meet (a cylinder tangent to the
                 // tool's sides) without changing it; live reports that as a
                 // miss too.
-                let same = |a: &Shape, b: &Shape| -> bool {
-                    if a.count(ShapeType::Face) != b.count(ShapeType::Face) {
-                        return false;
-                    }
-                    let (Ok(ba), Ok(bb)) = (a.bounding_box(false), b.bounding_box(false)) else { return false };
-                    let tol = 1e-6 * ba.diagonal().max(1e-12);
-                    if (ba.min - bb.min).abs().max_element() > tol || (ba.max - bb.max).abs().max_element() > tol {
-                        return false;
-                    }
-                    match (a.volume(), b.volume()) {
-                        (Ok(va), Ok(vb)) => (va - vb).abs() <= 1e-9 * va.abs().max(1e-12),
-                        _ => false,
-                    }
-                };
-                let mut unchanged = !before.is_empty();
+                let mut all_as_before = !before.is_empty();
                 for old in &before {
                     match self.ctx.bodies.iter().position(|b| b.id == old.id) {
                         // The part as it was, without the touching tool's
                         // imprint.
-                        Some(i) if same(&old.shape, &self.ctx.bodies[i].shape) => self.ctx.bodies[i] = old.clone(),
-                        _ => unchanged = false,
+                        Some(i) if unchanged(&old.shape, &self.ctx.bodies[i].shape) => self.ctx.bodies[i] = old.clone(),
+                        _ => all_as_before = false,
                     }
                 }
-                if unchanged {
+                if all_as_before {
                     self.infos.push(if op == "ADD" { NO_GEOMETRY_CHANGE } else { TOOLS_MISS_TARGETS }.into());
                 }
                 Ok(())
@@ -1856,6 +1842,23 @@ pub fn sweep_names(ev: &EvalCtx, profile: &Profile, res: &k::OpResult, start_cap
 /// studio saved before that, [`noshape_kernel::legacy_topology`]).
 pub fn unify_merged(before: &Shape, after: &Shape) -> bool {
     after.count(ShapeType::Face) < before.count(ShapeType::Face) || (!noshape_kernel::legacy_topology() && after.count(ShapeType::Edge) < before.count(ShapeType::Edge))
+}
+
+/// A part a Boolean left as it was: the same face count and box, then the same volume (measured only then: two volumes
+/// per Boolean were most of a cut's time on curved parts, REGEN-SPEED).
+pub fn unchanged(a: &Shape, b: &Shape) -> bool {
+    if a.count(ShapeType::Face) != b.count(ShapeType::Face) {
+        return false;
+    }
+    let (Ok(ba), Ok(bb)) = (a.bounding_box(false), b.bounding_box(false)) else { return false };
+    let tol = 1e-6 * ba.diagonal().max(1e-12);
+    if (ba.min - bb.min).abs().max_element() > tol || (ba.max - bb.max).abs().max_element() > tol {
+        return false;
+    }
+    match (a.volume(), b.volume()) {
+        (Ok(va), Ok(vb)) => (va - vb).abs() <= 1e-9 * va.abs().max(1e-12),
+        _ => false,
+    }
 }
 
 /// Whether the tools can account for a cut that leaves nothing of `target`

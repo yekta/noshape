@@ -113,10 +113,10 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                 return Ok(());
             }
             let bop = if op == "SUBTRACTION" { k::BooleanOp::Cut } else { k::BooleanOp::Common };
-            let before: Vec<(crate::reference::BodyId, f64)> = targets.iter().map(|&i| (ev.ctx.bodies[i].id.clone(), ev.ctx.bodies[i].shape.volume().unwrap_or(0.0))).collect();
+            let before: Vec<(crate::reference::BodyId, k::Shape)> = targets.iter().map(|&i| (ev.ctx.bodies[i].id.clone(), ev.ctx.bodies[i].shape.clone())).collect();
             ev.boolean_into(&targets, tools, bop)?;
             // A subtraction that leaves every target as it was (live oracle_p1 B5).
-            if op == "SUBTRACTION" && before.iter().all(|(id, v)| ev.ctx.bodies.position_id(id).and_then(|i| ev.ctx.bodies[i].shape.volume().ok()).is_some_and(|after| (after - v).abs() <= 1e-9 * v.abs().max(1e-12))) {
+            if op == "SUBTRACTION" && before.iter().all(|(id, s)| ev.ctx.bodies.position_id(id).is_some_and(|i| crate::regen::eval::unchanged(s, &ev.ctx.bodies[i].shape))) {
                 ev.infos.push(crate::regen::eval::TOOLS_MISS_TARGETS.into());
             }
             if !ev.bool("keepTools") {
