@@ -1974,6 +1974,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   docs/handoff/core.md).
   core 11-01 08:10, round 9 (rust_boolean.cpp's build of noshape's result checks the cancel): vibe4 at load 64-75
   on 16 cores, cancel at 0.5-20 s: **27-128 ms at every point** (12 points), from 10-19 s before round 1.
+  core 11-08 17:23 (lead's go): over the whole corpus (T2 ops parity::cancel_latency_probe, every Part Studio over
+  0.3 s cancelled at 10-90 %, vibe5 at load 5-9) the worst was 529-586 ms (sheet metal rebuild, the Boolean's tool
+  grouping), 124-211 ms (Part Draft 3); fixed (a0a3e5b8): every cancel under ~100 ms, most under 50. Lead: close?
 - [x] 801e98e9 (core 11-02 23:50: OCCT's two patches per corner, meeting in a degenerated edge whose vertex lay 0.9 mm off the
   top face, become live's one face: the R2 ball rolling on the top and the R3 cylinder, its spine the ellipse where
   their offsets meet, ends where each drafted side is tangent to the R3 cylinder (kernel vertex_blend.cpp `Rolling`):
