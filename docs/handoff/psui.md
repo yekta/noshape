@@ -567,6 +567,14 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 17:21 UTC, ui-parity leftovers.** key-rollback-bar-arrows matches (the clicked rollback bar reads as a selected
+item, live's tree node). config-variable-edit-definition: focus now "Name" as live's; its live recording reads the
+popup as a panel (recorder without live2), vs-cfg-variable-dialog as a dialog: re-record asked (REQUESTS 17:21).
+sketch-dim-menu-unconfigure step 16: live's toast had timed out (5.5 s between its steps; ours replays in ~1 s): the
+runner doesn't pace by live's `t`, not a behaviour. For studios: vs-cfg-variable-dialog step 5, the Variable Studio's
+own Variable input (variable_config.rs) reports no focus label ("Name" in live).
+
+
 **11-08 17:13 UTC, cold start split (perf 42489298913 on 80cf796).** noshape's own cold start (our caches cleared,
 the OS warm, medians of three): macOS 26 **697 ms**, macOS 15 **975 ms** (samples 772-1098), target 1000 met on both;
 the runner's first launch adds 1572 / 2114 ms (window creation 750-1000 ms of it, the fresh VM's). Ours, macOS 15:
