@@ -777,8 +777,10 @@ struct OcMeshFaces
   std::vector<FaceTri> faces;
 };
 
+// `exact`: BRepMesh alone (an export at Onshape's facet tolerances: its counts follow the settings as
+// Parasolid's do; noshape's display mesher doesn't take faces).
 std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, bool relative,
-                                     bool parallel)
+                                     bool parallel, bool exact)
 {
   require_non_null(s.shape, "shape");
   if (!(lin > 0) || !std::isfinite(lin))
@@ -892,7 +894,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
         set = mesh_set(lin, ang);
     };
     const auto rust_t0 = std::chrono::steady_clock::now();
-    const int ntaken = !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys, locked ? std::function<void(bool)>() : unlocked) : 0;
+    const int ntaken = !exact && !relative && !mesh_faces && rust_mesh_on() ? rust_mesh_faces(m->faces, m->edges, m->vertices, fresh, lin, ang, parallel, taken, rust_meshes, rust_polys, locked ? std::function<void(bool)>() : unlocked) : 0;
     m->rust_faces            = (size_t)ntaken;
     if (std::getenv("NOSHAPE_MESH_DEBUG"))
       std::fprintf(stderr, "mesh: noshape's mesher took %d of %d faces in %.1f ms\n", ntaken, nfresh, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - rust_t0).count());

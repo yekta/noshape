@@ -2155,7 +2155,8 @@ fn export_custom_resolution_drives_the_mesh() {
     assert!(fine > coarse * 2, "{fine} vs {coarse}");
     let medium = triangles(&mut ctx, "preset_medium.stl", json!({ "resolution": "Medium" }));
     assert_eq!(triangles(&mut ctx, "custom_default.stl", json!({})), medium, "Custom starts at Medium's values");
-    assert_eq!(triangles(&mut ctx, "custom_medium.stl", json!({ "chordal_tolerance": 0.12, "angular_deviation": 6.25 })), medium);
+    // (Custom's fields are in the STL's units, metres by default: 0.12 mm in millimetres.)
+    assert_eq!(triangles(&mut ctx, "custom_medium.stl", json!({ "units": "Millimeter", "chordal_tolerance": 0.12, "angular_deviation": 6.25 })), medium);
     assert!(triangles(&mut ctx, "preset_fine.stl", json!({ "resolution": "Fine" })) > medium);
     // 0.12 mm in inches (and the file in inches).
     assert_eq!(triangles(&mut ctx, "custom_inch.stl", json!({ "units": "Inch", "chordal_tolerance": 0.12 / 25.4, "angular_deviation": 6.25 })), medium);
@@ -7317,4 +7318,36 @@ fn drawing_view_of_another_documents_version() {
     assert_eq!(e.param.as_deref(), Some("document"), "{e:?}");
     let sw = call(&mut ctx, "drawing_switch_to_reference", json!({ "drawing": tab, "view": view }));
     assert_eq!(sw["version"], "V1", "{sw}");
+}
+
+/// STL presets as Onshape's facetter takes them (live 2319: its Medium cuts clamp-hms' 7.5 mm arcs into 0.085 mm
+/// segments, a sag of 0.12 µm): the 5 mm hole's rim on the top face in about 2π·5 / (0.085·√(5/7.5)) ≈ 453 segments at
+/// Medium, √2 more at Fine, √2 fewer at Coarse (lead 11-08: the same file sizes and smoothness as Onshape's).
+#[test]
+fn stl_presets_facet_as_onshapes() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "stl_presets.noshape");
+    let rim = |ctx: &mut Ctx, resolution: &str| -> usize {
+        let file = scratch(&format!("stl_presets_{resolution}.stl"));
+        call(ctx, "export_parts", json!({ "format": "STL", "file": file.to_str().unwrap(), "units": "Millimeter", "resolution": resolution }));
+        let b = std::fs::read(&file).unwrap();
+        let n = u32::from_le_bytes(b[80..84].try_into().unwrap()) as usize;
+        let mut pts = std::collections::HashSet::new();
+        for i in 0..n {
+            for k in 0..3 {
+                let o = 84 + i * 50 + 12 + k * 12;
+                let f = |j: usize| f32::from_le_bytes(b[o + 4 * j..o + 4 * j + 4].try_into().unwrap());
+                let (x, y, z) = (f(0), f(1), f(2));
+                if (z - 20.0).abs() < 1e-3 && ((x * x + y * y).sqrt() - 5.0).abs() < 1e-3 {
+                    pts.insert((x.to_bits(), y.to_bits()));
+                }
+            }
+        }
+        pts.len()
+    };
+    let medium = rim(&mut ctx, "medium");
+    assert!((medium as f64 - 453.0).abs() < 45.0, "Medium: {medium} rim points, Onshape's ≈ 453");
+    let (coarse, fine) = (rim(&mut ctx, "coarse"), rim(&mut ctx, "fine"));
+    let r = |a: usize, b: usize| a as f64 / b as f64;
+    assert!((r(fine, medium) - 2f64.sqrt()).abs() < 0.15 && (r(medium, coarse) - 2f64.sqrt()).abs() < 0.15, "coarse {coarse}, medium {medium}, fine {fine}");
 }

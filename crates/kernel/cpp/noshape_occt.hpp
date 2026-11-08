@@ -1008,7 +1008,7 @@ std::unique_ptr<OcShape> project_normal(const OcShape& curves, const OcShape& ta
 
 // ---- tessellation (mesh.cpp)
 std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, bool relative,
-                                     bool parallel);
+                                     bool parallel, bool exact);
 MeshCounts              mesh_counts(const OcMesh& m);
 void mesh_fill(const OcMesh& m, rust::Slice<float> positions, rust::Slice<float> normals,
                rust::Slice<uint32_t> indices, rust::Slice<uint32_t> face_ranges,
