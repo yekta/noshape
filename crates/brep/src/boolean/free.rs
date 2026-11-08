@@ -575,11 +575,13 @@ fn hulls_apart(a: &Hull, b: &Hull, gap: f64) -> bool {
     false
 }
 
-/// A Bézier patch of a NURBS surface: its homogeneous control points by row (along u) then column, its degrees.
+/// A Bézier patch of a NURBS surface: its homogeneous control points by row (along u) then column, its degrees, its
+/// parameter range (u0, u1, v0, v1).
 pub(super) struct Bez {
     h: Vec<DVec4>,
     p: usize,
     q: usize,
+    uv: [f64; 4],
 }
 
 impl Bez {
@@ -593,6 +595,14 @@ impl Bez {
         let (lo, hi) = pts.iter().fold((DVec3::INFINITY, DVec3::NEG_INFINITY), |(lo, hi), &x| (lo.min(x), hi.max(x)));
         let (du, dv) = (self.pt(self.p, self.q / 2) - self.pt(0, self.q / 2), self.pt(self.p / 2, self.q) - self.pt(self.p / 2, 0));
         Hull { pts, lo, hi, du, dv, uv: [0.0; 4] }
+    }
+
+    /// Whether its control net is longer along u than along v (its longest row against its longest column: a patch
+    /// closing on itself has ends that meet).
+    fn longer_along_u(&self) -> bool {
+        let row = |j: usize| (0..self.p).map(|i| (self.pt(i + 1, j) - self.pt(i, j)).length()).sum::<f64>();
+        let col = |i: usize| (0..self.q).map(|j| (self.pt(i, j + 1) - self.pt(i, j)).length()).sum::<f64>();
+        (0..=self.q).map(row).fold(0.0, f64::max) >= (0..=self.p).map(col).fold(0.0, f64::max)
     }
 
     /// Its halves along u or v (de Casteljau at the middle).
@@ -610,14 +620,26 @@ impl Bez {
                 }
             }
         }
-        (Bez { h: l, ..*self }, Bez { h: r, ..*self })
+        let [u0, u1, v0, v1] = self.uv;
+        let (lu, ru) = if along_u { ([u0, 0.5 * (u0 + u1), v0, v1], [0.5 * (u0 + u1), u1, v0, v1]) } else { ([u0, u1, v0, 0.5 * (v0 + v1)], [u0, u1, 0.5 * (v0 + v1), v1]) };
+        (Bez { h: l, uv: lu, ..*self }, Bez { h: r, uv: ru, ..*self })
     }
 }
 
-/// A NURBS surface's Bézier patches (its spans each way, by knot insertion), None where a weight isn't positive or
-/// its knots aren't clamped.
-fn bezier_patches(ns: &FreeSurface) -> Option<Vec<Bez>> {
-    let FreeSurface::Nurbs(s) = ns else { return None };
+/// A NURBS surface's Bézier patches (its spans each way, by knot insertion), an extrusion's over `uv`'s heights; None
+/// where a weight isn't positive or its knots aren't clamped.
+fn bezier_patches(ns: &FreeSurface, uv: [f64; 4]) -> Option<Vec<Bez>> {
+    let ext;
+    let s = match ns {
+        FreeSurface::Nurbs(s) => s,
+        FreeSurface::Extrusion { c, d } => {
+            let poles = c.poles.iter().flat_map(|&x| [x + *d * uv[2], x + *d * uv[3]]).collect();
+            let weights = c.weights.iter().flat_map(|&w| [w, w]).collect();
+            ext = crate::nurbs::NurbsSurface { udegree: c.degree, vdegree: 1, uknots: c.knots.clone(), vknots: vec![uv[2], uv[2], uv[3], uv[3]], nu: c.poles.len(), nv: 2, poles, weights };
+            &ext
+        }
+        _ => return None,
+    };
     let (p, q) = (s.udegree, s.vdegree);
     if s.weights.iter().any(|&w| w <= 0.0) || s.poles.len() != s.nu * s.nv {
         return None;
@@ -638,8 +660,10 @@ fn bezier_patches(ns: &FreeSurface) -> Option<Vec<Bez>> {
         if nv == 0 || rows.iter().any(|r| r.spans().len() != nv) {
             return None;
         }
+        let (u0, u1) = (cols[0].spans()[ku].0, cols[0].spans()[ku].1);
         for kv in 0..nv {
-            out.push(Bez { h: rows.iter().flat_map(|r| r.spans()[kv].2.iter().copied()).collect(), p, q });
+            let (v0, v1) = (rows[0].spans()[kv].0, rows[0].spans()[kv].1);
+            out.push(Bez { h: rows.iter().flat_map(|r| r.spans()[kv].2.iter().copied()).collect(), p, q, uv: [u0, u1, v0, v1] });
         }
     }
     Some(out)
@@ -667,13 +691,25 @@ fn bez_apart(a: &Bez, b: &Bez, gap: f64, budget: &mut usize) -> bool {
 
 /// Whether two faces, one or both free-form, are farther apart than `gap`, as their surfaces' control points tell
 /// (a Bézier surface against another or a plane; NURBS surfaces of several spans by their patches, halved while
-/// they meet (neighbouring helical gear flanks); else false).
-pub(super) fn apart(f: &GFace, g: &GFace, gap: f64) -> bool {
+/// they meet (neighbouring helical gear flanks); else false). `flat`: each face's box in its parameter plane where
+/// it is a plane or cylinder face and has one ([`Ctx::face_box`]).
+pub(super) fn apart(f: &GFace, g: &GFace, gap: f64, flat: [Option<(DVec2, DVec2)>; 2]) -> bool {
     fn pieces(x: &GFace) -> Option<&[Hull]> {
         x.hulls.get_or_init(|| x.ns.as_deref().and_then(hulls)).as_deref()
     }
     fn patches(x: &GFace) -> Option<&[Bez]> {
-        x.bez.get_or_init(|| x.ns.as_deref().and_then(bezier_patches)).as_deref()
+        x.bez.get_or_init(|| bezier_patches(x.ns.as_deref()?, pole_box(x)?)).as_deref()
+    }
+    // (A free-form face and a plane or cylinder face: the patches the face's curves on it reach, each clear of the
+    // other face's box or of its surface, halved while neither (c2-rings-loft's 51 cutters against the ring's faces:
+    // 900 empty sections, 15 s of OCCT's).)
+    for (x, y, yb) in [(f, g, flat[1]), (g, f, flat[0])] {
+        if matches!(y.s, Surf::Plane { .. } | Surf::Cyl { k: 0.0, .. })
+            && let Some(a) = patches(x)
+            && off_face(a, x, y, yb, gap)
+        {
+            return true;
+        }
     }
     if (pieces(f).is_none() || pieces(g).is_none())
         && let (Some(a), Some(b)) = (patches(f), patches(g))
@@ -697,6 +733,89 @@ pub(super) fn apart(f: &GFace, g: &GFace, gap: f64) -> bool {
     }
 }
 
+/// The box (u0, u1, v0, v1) of a free-form face's curves on it by their control points (holding them), None where a
+/// weight isn't positive.
+fn pole_box(f: &GFace) -> Option<[f64; 4]> {
+    let (mut lo, mut hi) = (DVec2::splat(f64::INFINITY), DVec2::splat(f64::NEG_INFINITY));
+    for (c, _, _) in f.pcurves.values() {
+        if c.weights.iter().any(|&w| w <= 0.0) {
+            return None;
+        }
+        for x in &c.poles {
+            lo = lo.min(x.truncate());
+            hi = hi.max(x.truncate());
+        }
+    }
+    (lo.is_finite() && hi.is_finite()).then_some([lo.x, hi.x, lo.y, hi.y])
+}
+
+/// Whether free-form face `f` (its Bézier patches `a`) is farther than `gap` from plane or cylinder face `g`: each
+/// patch within `f`'s curves' box on it outside `g`'s box grown by `gap` or clear of its surface ([`off_surface`]),
+/// halved while neither (64 halvings in all).
+fn off_face(a: &[Bez], f: &GFace, g: &GFace, flat: Option<(DVec2, DVec2)>, gap: f64) -> bool {
+    let Some(uv) = pole_box(f) else { return false };
+    let reaches = |b: &Bez| b.uv[1] >= uv[0] && b.uv[0] <= uv[1] && b.uv[3] >= uv[2] && b.uv[2] <= uv[3];
+    let (glo, ghi) = (g.lo - DVec3::splat(gap), g.hi + DVec3::splat(gap));
+    let mut todo: Vec<Bez> = a.iter().filter(|b| reaches(b)).map(|b| Bez { h: b.h.clone(), ..*b }).collect();
+    let mut budget = 64usize;
+    while let Some(b) = todo.pop() {
+        let h = b.hull();
+        if !reaches(&b) || (h.lo - ghi).max_element() > 0.0 || (glo - h.hi).max_element() > 0.0 || off_surface(&h.pts, g, flat, gap) {
+            continue;
+        }
+        if budget == 0 {
+            return false;
+        }
+        budget -= 1;
+        let (l, r) = b.halves(b.longer_along_u());
+        todo.extend([l, r]);
+    }
+    true
+}
+
+/// Whether the convex hull of `pts` is farther than `gap` from plane or cylinder face `g` (`flat` its box in its
+/// parameter plane): all on one side of its plane or outside that box; inside its cylinder, beyond a line along it,
+/// outside its heights or outside the wedge of its angles (less than half a turn).
+fn off_surface(pts: &[DVec3], g: &GFace, flat: Option<(DVec2, DVec2)>, gap: f64) -> bool {
+    let extent = |f: &dyn Fn(DVec3) -> f64| pts.iter().fold((f64::INFINITY, f64::NEG_INFINITY), |(l, h), &x| (l.min(f(x)), h.max(f(x))));
+    let outside = |(lo, hi): (f64, f64), (a, b): (f64, f64)| lo > b + gap || hi < a - gap;
+    match g.s {
+        Surf::Plane { n, d, origin, u, v, .. } => {
+            let (lo, hi) = extent(&|x| n.dot(x) - d);
+            if lo > gap || hi < -gap {
+                return true;
+            }
+            let Some((flo, fhi)) = flat else { return false };
+            outside(extent(&|x| (x - origin).dot(u)), (flo.x, fhi.x)) || outside(extent(&|x| (x - origin).dot(v)), (flo.y, fhi.y))
+        }
+        Surf::Cyl { o, a, x, y, r, r0, k: 0.0, flip, full, .. } => {
+            let across = |p: DVec3| {
+                let w = p - o;
+                w - a * w.dot(a)
+            };
+            if pts.iter().all(|&p| across(p).length() < r0 - gap) {
+                return true;
+            }
+            let c = pts.iter().map(|&p| across(p)).sum::<DVec3>() / pts.len().max(1) as f64;
+            if c.length() > 0.0 && extent(&|p| across(p).dot(c.normalize())).0 > r0 + gap {
+                return true;
+            }
+            let Some((flo, fhi)) = flat else { return false };
+            let s = if flip { -1.0 } else { 1.0 };
+            if outside(extent(&|p| s * (p - o).dot(a)), (flo.y, fhi.y)) {
+                return true;
+            }
+            let (t0, t1) = (flo.x / r, fhi.x / r);
+            if full || t1 - t0 >= 3.0 {
+                return false;
+            }
+            let (n0, n1) = (x * t0.sin() - y * t0.cos(), y * t1.cos() - x * t1.sin());
+            extent(&|p| across(p).dot(n0)).0 > gap || extent(&|p| across(p).dot(n1)).0 > gap
+        }
+        _ => false,
+    }
+}
+
 /// Whether `p` is farther than `gap` from face `g`'s Bézier surface (outside all its pieces' boxes grown by it).
 pub(super) fn clearly_off(g: &GFace, p: DVec3, gap: f64) -> bool {
     let Some(ns) = g.ns.as_deref() else { return false };
@@ -715,15 +834,44 @@ mod tests {
             let poles = (0..5).flat_map(|i| (0..2).map(move |j| DVec3::new(i as f64, j as f64, if i % 2 == 0 { wave } else { -wave } + dz))).collect();
             FreeSurface::Nurbs(crate::nurbs::NurbsSurface { udegree: 2, vdegree: 1, uknots: vec![0.0, 0.0, 0.0, 1.0, 2.0, 3.0, 3.0, 3.0], vknots: vec![0.0, 0.0, 1.0, 1.0], nu: 5, nv: 2, poles, weights: Vec::new() })
         };
-        let a = bezier_patches(&strip(0.1, 0.0)).expect("its patches");
+        let a = bezier_patches(&strip(0.1, 0.0), [0.0; 4]).expect("its patches");
         assert_eq!(a.len(), 3);
         let apart = |dz: f64| {
-            let b = bezier_patches(&strip(-0.1, dz)).expect("its patches");
+            let b = bezier_patches(&strip(-0.1, dz), [0.0; 4]).expect("its patches");
             let mut budget = 20_000;
             a.iter().all(|x| b.iter().all(|y| bez_apart(x, y, 1e-3, &mut budget)))
         };
         assert!(apart(0.3));
         assert!(!apart(0.0));
+    }
+
+    /// A patch closing on itself along v (a ring's loft: its ends' chord along v is zero) is halved along v, its
+    /// longer control net, not along its short u forever (c2-rings-loft's 51-tool cut).
+    #[test]
+    fn a_closed_patch_halves_along_its_longer_net() {
+        let ring = [DVec3::X, DVec3::Y, -DVec3::X, -DVec3::Y, DVec3::X];
+        let h = (0..2).flat_map(|i| ring.iter().map(move |&x| (x + DVec3::Z * (0.1 * i as f64)).extend(1.0))).collect();
+        let b = Bez { h, p: 1, q: 4, uv: [0.0, 1.0, 0.0, 1.0] };
+        let hull = b.hull();
+        assert!(hull.du.length() > hull.dv.length());
+        assert!(!b.longer_along_u());
+    }
+
+    /// Points clear of a cylinder face (axis z, radius 1, heights 0 to 1, angles 0 to 1 rad) by being inside it,
+    /// beyond a line along it, above it or outside its angles' wedge; not where they lie on it.
+    #[test]
+    fn hulls_off_a_cylinder_face() {
+        let s = Surf::Cyl { o: DVec3::ZERO, a: DVec3::Z, x: DVec3::X, y: DVec3::Y, r: 1.0, r0: 1.0, k: 0.0, flip: false, th0: 0.0, full: false };
+        let g = GFace { arg: 0, index: 0, t: 0.0, solid: 0, s, edges: Vec::new(), loop_lens: Vec::new(), bound: Default::default(), bound_spans: Default::default(), bound_pts: Default::default(), right: Vec::new(), wrap_eps: 0.0, lo: DVec3::new(0.0, 0.0, 0.0), hi: DVec3::new(1.0, 1.0, 1.0), ns: None, uvbox: [0.0; 4], pcurves: HashMap::default(), grid: Default::default(), patches: Default::default(), hulls: Default::default(), bez: Default::default(), inner: Vec::new() };
+        let flat = Some((DVec2::new(0.0, 0.0), DVec2::new(1.0, 1.0)));
+        let near = |r: f64, th: f64, z: f64| [-0.01, 0.01].into_iter().flat_map(|d| [DVec3::new(r * (th + d).cos(), r * (th + d).sin(), z + d), DVec3::new((r + d) * th.cos(), (r + d) * th.sin(), z)]).collect::<Vec<_>>();
+        let off = |pts: Vec<DVec3>| off_surface(&pts, &g, flat, 0.005);
+        assert!(!off(near(1.0, 0.5, 0.5)));
+        assert!(off(near(0.5, 0.5, 0.5)));
+        assert!(off(near(2.0, 0.5, 0.5)));
+        assert!(off(near(1.0, 0.5, 2.0)));
+        assert!(off(near(1.0, 2.0, 0.5)));
+        assert!(off(near(1.0, -0.5, 0.5)));
     }
 
     /// A face's curves a period past its B-spline surface's own range (OCCT's on a periodic surface; fuzz seeds 979,

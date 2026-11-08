@@ -3,19 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-
-## From skasm (2026-11-08 01:00 UTC): an OCCT Common that comes out empty (c2-sm-louver Extrude 3)
-Std's sheet metal boolean (trimTool) intersects a thickened sheet metal plate (83 planar faces, 0.635 mm, teeth along
-one side) with an extrude (9 planar faces) sharing its x face and one tooth's root plane: OCCT's Common is empty and
-its Cut changes nothing, though its Fuse loses the right 102 mm³ (live cuts 101.46 mm³); crates/brep declines with
-"a non-manifold result"; fuzzy 1e-9 / 1e-7, glue and scaled change nothing. Case (bool_corpus format):
-/root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt}. It holds c2-sm-louver at 30/36 (Extrude 3, then
-Extrude 4 / Flange 7 on the same part). The lead passed both cases to you (11-08 01:10); nothing of mine waits on a change in crates/brep.
-Also yours (lead 11-07 had it as mine; live 2229 settled it): c2-valve-config 5/10 stops at Extrude 3, where a sketch
-text's straight segment runs up to Revolve 1's revolved face: a plane square to the axis cuts it in a circle (live's two
-0.0391 mm CIRCLE edges), OCCT's splitter in op_prism_until gives a B-spline (ours 9 circle / 50 other, live 11 / 48).
-
-## Where things stand (2026-11-07 20:05 UTC; paused for the quota until 11-10)
+## Where things stand (2026-11-08 01:07 UTC; running again)
+- **c2-rings-loft's 51-tool cut is ours (11-08 02:20 UTC, landing):** 0 differences from OCCT (equivalent, 1.3e-7 of
+  the volume); case 745 ms on loaded vibe4 (OCCT 7.6 s, live 767 ms); Circular pattern 1 13.3 -> 1.17 s in the model
+  suite, the document 20.0 -> 6.6 s (live 1.56 s). A piece beside a coincident face's boundary takes the side its
+  points clear of it agree on; `free::apart` halves a free-form face's patches along their longer control net (a ring
+  loft's closes along v: its chord was zero, so it halved along u forever) against a plane or cylinder face's own box
+  in its parameter plane and its surface (`off_surface`): 834 -> 374 B-spline/plane sections (362 meet). Gate clean
+  (corpora + parity56 0 differences, shfall its 2, gpf its 2, knurl/gear level); model suite 70/86, 730/934 before
+  and after. Left on that document: Shell 1 2.3 s, Circular pattern 2 1.1 s, Fillet 1 / Chamfer 1 (blend's tools).
+- Queue after it (lead 11-08): the impeller Shell on live's loft (stage 2); the valve's 7-tool cut (live 2210);
+  skasm's c2-sm-louver Extrude 3 (OCCT's Common of two valid solids empty, its Cut removes nothing, ours "a
+  non-manifold result"; case in /root/skasm-scratch/bool-louver-ex3/); skasm's c2-valve-config text cut
+  (op_prism_until gives a B-spline where live has a circle); blend's notes (tpd's final cut, michael's round tools).
 - **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure
   there is only vibe2 lacking /root/core-scratch: infra, not the Boolean). RUST-MIRROR-SPLIT-FACES has been fixed
   since d0838e9a2; T1 kernel_robustness::part_mirror_of_a_half_counterbored_hole_merges_across_the_plane (13eb48ac).
@@ -58,6 +58,17 @@ text's straight segment runs up to Revolve 1's revolved face: a plane square to 
   - The STEP sent to live was 1000x off. That was my export script, not the app's export (noted in REQUESTS).
 - Then: c2-valve-config's 7-tool cut. Live's capture (2210) is in: over the flat, two vertices on each side, joined by a
   0.071 mm edge.
+
+## From skasm (2026-11-08 01:00 UTC): an OCCT Common that comes out empty (c2-sm-louver Extrude 3)
+Std's sheet metal boolean (trimTool) intersects a thickened sheet metal plate (83 planar faces, 0.635 mm, teeth along
+one side) with an extrude (9 planar faces) sharing its x face and one tooth's root plane: OCCT's Common is empty and
+its Cut changes nothing, though its Fuse loses the right 102 mm³ (live cuts 101.46 mm³); crates/brep declines with
+"a non-manifold result"; fuzzy 1e-9 / 1e-7, glue and scaled change nothing. Case (bool_corpus format):
+/root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt}. It holds c2-sm-louver at 30/36 (Extrude 3, then
+Extrude 4 / Flange 7 on the same part). The lead passed both cases to you (11-08 01:10); nothing of mine waits on a change in crates/brep.
+Also yours (lead 11-07 had it as mine; live 2229 settled it): c2-valve-config 5/10 stops at Extrude 3, where a sketch
+text's straight segment runs up to Revolve 1's revolved face: a plane square to the axis cuts it in a circle (live's two
+0.0391 mm CIRCLE edges), OCCT's splitter in op_prism_until gives a B-spline (ours 9 circle / 50 other, live 11 / 48).
 
 ## Shell's direct builder is by_quadrics, bool's: offsets that change the part's topology (11-07 15:01 UTC)
 The lead's call (11-07): Shell's one direct builder is `by_quadrics` (shell.cpp, "Path 2b"), bool owns it, extended in

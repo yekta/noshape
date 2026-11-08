@@ -1249,6 +1249,16 @@ impl Ctx<'_> {
         self.faces[f].bound.get_or_init(make).as_deref().map_err(|e| *e)
     }
 
+    /// A plane or cylinder face's box in its parameter plane (its boundary curves' quick boxes); None for other faces
+    /// or where a curve has none.
+    fn face_box(&self, f: usize) -> Option<(DVec2, DVec2)> {
+        if !matches!(self.faces[f].s, Surf::Plane { .. } | Surf::Cyl { .. }) {
+            return None;
+        }
+        let (b, spans) = (self.bound(f).ok()?, self.bound_spans(f).ok()?);
+        b.iter().zip(spans).try_fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(l, h), (c, s)| c.quick_box_by(Some(s)).map(|(a, b)| (l.min(a), h.max(b))))
+    }
+
     /// The distance from `q` to face `f`'s boundary in its parameter plane.
     fn bound_distance(&self, f: usize, q: DVec2) -> R<f64> {
         let b = self.bound(f)?;
@@ -2071,7 +2081,7 @@ impl Ctx<'_> {
         if let Some(&x) = self.apart.get(&(fs, ft)) {
             return x;
         }
-        let x = free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6));
+        let x = free::apart(&self.faces[fs], &self.faces[ft], GREY * self.tol.max(5e-6), [self.face_box(fs), self.face_box(ft)]);
         self.apart.insert((fs, ft), x);
         x
     }
@@ -4193,7 +4203,10 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             }
         }
         // (Which are clearly apart, on all threads, kept for the pairing.)
-        let apart = par_map(pairs.len(), &|k| free::apart(&cx.faces[pairs[k].0], &cx.faces[pairs[k].1], GREY * tol.max(5e-6)))?;
+        let apart = par_map(pairs.len(), &|k| {
+            let (fs, ft) = pairs[k];
+            free::apart(&cx.faces[fs], &cx.faces[ft], GREY * tol.max(5e-6), [cx.face_box(fs), cx.face_box(ft)])
+        })?;
         let mut ahead: Vec<FacePair> = Vec::new();
         let mut seen: HashSet<FacePair> = HashSet::default();
         for (&(fs, ft), x) in pairs.iter().zip(apart) {
@@ -5377,7 +5390,33 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     });
                     match side {
                         Some(along) => along == same,
-                        None => return Err(Decline("a piece's point near a coincident face's boundary")),
+                        None => {
+                            // (A piece beside that face's boundary, not across it (c2-rings-loft's pattern: slivers of a
+                            // tool's cap 11-30 um from a neighbour's coplanar cap's edge; tol 12 um): its point and points
+                            // between it and its curves' that are two tolerances clear of that boundary, all on one side.)
+                            let pb = pieces[pi].loops.iter().flatten().map(|&(sg, _)| cx.c2_of(g, &sedges[sg].seg, 0, None)).collect::<R<Vec<C2>>>()?;
+                            let bound = cx.bound(g)?;
+                            let mut sides = (false, false);
+                            let mut seen = |x: DVec2| if inside2(x, bound) { sides.0 = true } else { sides.1 = true };
+                            if d > 2.0 * tol {
+                                seen(q);
+                            }
+                            for c in &pb {
+                                for fr in [0.25, 0.5, 0.75] {
+                                    let b = c.at(c.at_fraction(fr));
+                                    for k in [0.3, 0.6, 0.9] {
+                                        let x = q + (b - q) * k;
+                                        if distance2(x, &pb) > 0.25 * tol && inside2(x, &pb) && cx.bound_distance(g, x)? > 2.0 * tol {
+                                            seen(x);
+                                        }
+                                    }
+                                }
+                            }
+                            if sides.0 == sides.1 {
+                                return Err(Decline("a piece's point near a coincident face's boundary"));
+                            }
+                            sides.0
+                        }
                     }
                 } else {
                     inside2(q, cx.bound(g)?)
