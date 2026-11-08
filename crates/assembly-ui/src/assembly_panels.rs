@@ -84,13 +84,40 @@ pub struct McSession {
     pub moving: bool,
     /// Fields configured from the dialog (right-click Configure, live 2209): configured with the connector on ✓.
     pub cfg_pending: Vec<&'static str>,
+    /// The picks before each viewport pick, and those Undo took back (live asm-mate-connector-on-face: Undo takes the
+    /// pick, as a mate dialog's).
+    pub picks_undo: Vec<McPicks>,
+    pub picks_redo: Vec<McPicks>,
+    /// A viewport pick took the keyboard from the field (live: focus none after the pick, the field still active).
+    pub picked: bool,
     /// Origin type and Rotation axis selects.
     origin_sel: Entity<crate::os_select::OsSelect>,
     axis_sel: Entity<crate::os_select::OsSelect>,
     _subs: Vec<Subscription>,
 }
 
+/// A Mate connector dialog's picks: the origin entity, the extra entities and the field taking picks.
+#[derive(Clone)]
+pub struct McPicks {
+    on: Option<MateConnectorRef>,
+    extra: [Option<MateConnectorRef>; 3],
+    slot: usize,
+}
+
 impl McSession {
+    pub fn picks(&self) -> McPicks {
+        McPicks { on: self.on.clone(), extra: self.extra.clone(), slot: self.slot }
+    }
+
+    /// Undo (`redo` false) or redo the newest pick. False when there is none.
+    pub fn undo_pick(&mut self, redo: bool) -> bool {
+        let Some(state) = (if redo { self.picks_redo.pop() } else { self.picks_undo.pop() }) else { return false };
+        let now = self.picks();
+        if redo { self.picks_undo.push(now) } else { self.picks_redo.push(now) }
+        (self.on, self.extra, self.slot) = (state.on, state.extra, state.slot);
+        true
+    }
+
     /// The implicit connector reference with this session's flip, reorient
     /// and Move values.
     pub fn to_implicit(&self, cx: &App) -> Option<MateConnectorRef> {
@@ -439,6 +466,9 @@ impl AssemblyView {
             implicit: false,
             moving,
             cfg_pending: Vec::new(),
+            picks_undo: Vec::new(),
+            picks_redo: Vec::new(),
+            picked: false,
             origin_sel,
             axis_sel,
             _subs: subs,
@@ -626,6 +656,7 @@ impl AssemblyView {
                         }
                         m.active = true;
                         m.slot = slot;
+                        m.picked = false;
                     }
                     this.update_capture(cx);
                     this.refresh_scene(false, cx);

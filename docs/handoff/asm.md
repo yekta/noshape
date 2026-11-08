@@ -33,7 +33,7 @@ Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fu
 - Then (06:45): a subassembly live left out of its fetch (suppressed instances) no longer stops the others being built:
   xdev-subs 7 → 90/286, robot-relations 123/139 (mates 2/7). Corpus total ≈ 1044/1701. xdev-subs' rest: 34 vendor
   Parasolid files our reader refuses (ticket XT-B3-BINARY-TRANSMIT, dx).
-- ui-parity asm 124/141 (07:4x): Copy input / Copy all inputs copy to the clipboard with "<name> copied." (live: no
+- ui-parity asm 125/141 (with the Mate connector dialog's picks: selected, an undo step of the dialog, focus none after a pick): Copy input / Copy all inputs copy to the clipboard with "<name> copied." (live: no
   edit; coverage now config_copy_inputs), the toast read after the panel's info line, Esc dismisses it; runner
   `config_files` seeds live's remembered Export (asm-menu-export). Left: the two shared modals (Input propagation,
   Visibility conditions) aren't recorded and live's title carries its lane copy's name; menu highlight; mate flip;

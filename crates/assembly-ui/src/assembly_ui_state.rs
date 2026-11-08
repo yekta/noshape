@@ -147,7 +147,8 @@ impl AssemblyView {
             // Related through a selected mate (live: a selected row alone isn't).
             let selected = self.selected.contains(&i.id)
                 || self.ui.group.as_ref().is_some_and(|(_, ids)| ids.contains(&i.id))
-                || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id);
+                || matches!(&self.ui.dynamic_suppression, Some((super::props::DynTarget::Instance(x), _, _)) if *x == i.id)
+                || self.mc_picks().iter().any(|c| c.instance == i.id);
             // (Dynamically suppressed too: the evaluation's node, live asm-menu-add-expression.)
             let suppressed = i.suppressed || self.result.node(&[i.id]).is_some_and(|n| n.suppressed);
             rows.push(row(&i.name, if suppressed { "suppressed" } else { "ok" }, selected, false, related.contains(&i.id), i.hidden));
@@ -264,6 +265,23 @@ impl AssemblyView {
             Some(behaviors::PsOrigin::Connector(_)) => items.push(json!({ "kind": "FEATURE", "owner": null })),
             _ => {}
         }
+        // The Mate connector dialog's picked entities are selected, owned by their part (live asm-mate-connector-on-face:
+        // FACE of "Part 2").
+        {
+            items.extend(self.mc_picks().into_iter().map(|c| {
+                let r = match &c.reference {
+                    Reference::Implicit { on, .. } => &**on,
+                    r => r,
+                };
+                let kind = match r {
+                    Reference::Edge(_) => "EDGE",
+                    Reference::Vertex(_) => "VERTEX",
+                    _ => "FACE",
+                };
+                let path: Vec<InstanceId> = std::iter::once(c.instance).chain(c.path.iter().copied()).collect();
+                json!({ "kind": kind, "owner": self.result.occurrences.iter().find(|o| o.path == path).map(|o| o.body_name.clone()) })
+            }));
+        }
         // A mate dialog's picked connectors are selected (live: implicit mate connector FEATUREs).
         if let Some(d) = self.mate.as_ref().map(|s| s.dialog.read(cx)) {
             items.extend([&d.a, &d.b].into_iter().flatten().map(|_| json!({ "kind": "FEATURE", "owner": null })));
@@ -323,7 +341,8 @@ impl AssemblyView {
         };
         let focus = focus.or_else(|| self.ui.panel_focus.then(|| json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })));
         let focus = focus.or_else(|| self.ui.checkbox_focus.zip(dialog.as_ref()).map(|(label, d)| json!({ "kind": "field", "label": label, "dialog": d["title"] })));
-        let focus = focus.or_else(|| if self.mate.is_none() { active_field() } else { None });
+        // (The Mate connector dialog's field keeps no keyboard after a viewport pick: live asm-mate-connector-on-face.)
+        let focus = focus.or_else(|| if self.mate.is_none() && !self.mc.as_ref().is_some_and(|m| m.picked) { active_field() } else { None });
         // The Driving mate selector's box has the keyboard (live asm-mate-menu-edit-driver-mate).
         let focus = focus.or_else(|| self.ui.np_driver.as_ref().map(|_| json!({ "kind": "field", "label": "Mates to drive positions", "dialog": "Driving mate selector" })));
         // The mate dialog's query box has the focus while it takes picks (live: field "Mate connectors").
@@ -347,6 +366,13 @@ impl AssemblyView {
 }
 
 impl AssemblyView {
+    /// The Mate connector dialog's entities picked in the graphics (not an instance origin it opened with: live
+    /// asm-menu-connector-at-origin selects nothing).
+    fn mc_picks(&self) -> Vec<&MateConnectorRef> {
+        let Some(m) = self.mc.as_ref().filter(|m| !m.picks_undo.is_empty()) else { return Vec::new() };
+        m.on.iter().chain(m.extra.iter().flatten()).filter(|c| c.instance != InstanceId::ORIGIN && !matches!(c.reference, Reference::Origin)).collect()
+    }
+
     /// The blue how-to box a right-hand panel shows, as live's recorder reads it into the message (its bold title,
     /// then its text): Exploded views with one view and no step, Named positions without driving mates, the
     /// Configuration panel with inputs and nothing configured.

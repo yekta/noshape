@@ -1860,6 +1860,16 @@ impl AssemblyView {
         true
     }
 
+    /// Undo / redo in an open Mate connector dialog: its picks. False when none is open.
+    fn mc_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        let Some(m) = &mut self.mc else { return false };
+        if m.undo_pick(redo) {
+            self.schedule_eval(window, cx);
+        }
+        cx.notify();
+        true
+    }
+
     /// Undo / redo in an open mate dialog: its connector picks (live 1962).
     /// False when no mate dialog is open (the document's undo then).
     fn mate_undo(&mut self, redo: bool, cx: &mut Context<Self>) -> bool {
@@ -1891,6 +1901,7 @@ impl AssemblyView {
     pub(super) fn history_state(&self, cx: &App) -> (bool, bool) {
         match &self.mate {
             Some(m) => m.dialog.read(cx).pick_history(),
+            None if self.mc.is_some() => self.mc.as_ref().map_or((false, false), |m| (!m.picks_undo.is_empty(), !m.picks_redo.is_empty())),
             None if self.ui.group.is_some() => (!self.ui.group_picks.0.is_empty(), !self.ui.group_picks.1.is_empty()),
             None if self.pattern.is_some() => self.pattern.as_ref().map_or((false, false), |p| (!p.toggle_history.0.is_empty(), !p.toggle_history.1.is_empty())),
             // The Driving mate selector has no picks to undo (live asm-mate-menu-edit-driver-mate).
@@ -2418,6 +2429,10 @@ impl AssemblyView {
                 self.message = Some((false, "Pick geometry or the origin for a mate connector.".into()));
                 return;
             }
+            let before = m.picks();
+            m.picks_undo.push(before);
+            m.picks_redo.clear();
+            m.picked = true;
             match m.slot {
                 0 => m.on = Some(c),
                 s => m.extra[s - 1] = Some(c),
@@ -6491,13 +6506,13 @@ impl AssemblyView {
             .on_action(cx.listener(Self::on_cancel))
             .on_action(cx.listener(Self::on_accept))
             // Live 1962: in an open mate dialog Undo / Redo take its connector picks back (the dialog stays).
-            .on_action(cx.listener(|this, _: &Undo, _, cx| {
-                if !this.mate_undo(false, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && this.ui.np_driver.is_none() {
+            .on_action(cx.listener(|this, _: &Undo, window, cx| {
+                if !this.mate_undo(false, cx) && !this.mc_undo(false, window, cx) && !this.group_undo(false, cx) && !this.pattern_undo(false, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))
-            .on_action(cx.listener(|this, _: &Redo, _, cx| {
-                if !this.mate_undo(true, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && this.ui.np_driver.is_none() {
+            .on_action(cx.listener(|this, _: &Redo, window, cx| {
+                if !this.mate_undo(true, cx) && !this.mc_undo(true, window, cx) && !this.group_undo(true, cx) && !this.pattern_undo(true, cx) && this.ui.np_driver.is_none() {
                     cx.propagate();
                 }
             }))

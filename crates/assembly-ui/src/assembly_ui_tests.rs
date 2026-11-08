@@ -513,3 +513,27 @@ fn a_new_list_input_types_into_its_name_row(cx: &mut TestAppContext) {
     let state = cx.update(|cx| view.read(cx).ui_state(cx));
     assert_eq!(state["focus"]["kind"], "other", "{}", state["focus"]);
 }
+
+/// The Mate connector dialog's viewport pick is selected and is an undo step of the dialog (live
+/// asm-mate-connector-on-face): Undo takes the pick back, the dialog stays.
+#[gpui::test]
+fn a_mate_connector_pick_is_selected_and_undone_in_the_dialog(cx: &mut TestAppContext) {
+    let (window, view) = pattern_assembly(cx, "mc-pick-undo");
+    cx.update_window(window, |_, w, cx| {
+        view.update(cx, |v, cx| {
+            let part = instance(v, "Part 2 <1>", cx);
+            v.open_mc(None, w, cx);
+            let c = face_connector(v, "Part 2 <1>", true, cx);
+            v.deliver_connector(c, w, cx);
+            assert!(v.mc.as_ref().is_some_and(|m| m.on.as_ref().is_some_and(|o| o.instance == part)));
+            let state = v.ui_state(cx);
+            assert_eq!(state["selection"]["count"], 1, "{}", state["selection"]);
+            assert_eq!(state["focus"]["kind"], "none");
+            assert_eq!(v.history_state(cx), (true, false));
+            assert!(v.mc_undo(false, w, cx));
+            assert!(v.mc.as_ref().is_some_and(|m| m.on.is_none()), "the pick taken back, the dialog open");
+            assert_eq!(v.history_state(cx), (false, true));
+        });
+    })
+    .unwrap();
+}
