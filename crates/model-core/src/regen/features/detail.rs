@@ -775,16 +775,7 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
     for (bi, edges) in groups.into_iter().rev() {
         let body = ev.ctx.bodies[bi].clone();
         let propagate = ev.bool("tangentPropagation");
-        if let k::ChamferSpec::Equal(d) = spec
-            && !propagate
-            && propagate_tangent(&body.shape, &edges).len() > edges.len()
-        {
-            // OCCT runs a chamfer on along tangent edges; Onshape stops at the
-            // selection and runs the section out onto the neighbour (G7).
-            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1: d, r2: d, width: None, partial: None, run_on: true, cliff: false, sides: None };
-            super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
-            continue;
-        }
+        let stops = !propagate && propagate_tangent(&body.shape, &edges).len() > edges.len();
         let edges = if propagate { propagate_tangent(&body.shape, &edges) } else { edges };
         let shapes: Vec<k::Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
         let flipped: BTreeSet<usize> = overrides.iter().filter(|(b, _)| *b == bi).map(|&(_, e)| e).collect();
@@ -805,6 +796,23 @@ pub fn chamfer(ev: &mut EvalCtx) -> FResult<()> {
             None if matches!(spec, k::ChamferSpec::Equal(_)) => (spec, Vec::new()),
             None => (spec, distance_one_faces(ev, &body, &edges, &flipped, ev.bool("oppositeDirection"))?),
         };
+        // OCCT runs a chamfer on along tangent edges; Onshape stops at the selection and runs the section out onto the
+        // neighbour (G7). (Two distances: one edge, its distance 1 on the reference face.)
+        let distances = match spec {
+            _ if !stops => None,
+            k::ChamferSpec::Equal(d) => Some((d, d)),
+            k::ChamferSpec::TwoDistances(a, b) if edges.len() == 1 => {
+                let first = body.shape.edge_faces()?.get(edges[0]).and_then(|f| f.first().copied()).map(|f| body.shape.sub_shape(ShapeType::Face, f as usize)).transpose()?;
+                let on_first = first.is_some_and(|f| reference.first().is_some_and(|r| r.is_same(&f)));
+                Some(if on_first { (a, b) } else { (b, a) })
+            }
+            _ => None,
+        };
+        if let Some((r1, r2)) = distances {
+            let spec = super::blend_section::BlendSpec { section: super::blend_section::Section::Chamfer, r1, r2, width: None, partial: None, run_on: true, cliff: false, sides: None };
+            super::blend_section::section_blend(ev, bi, &edges, &spec).map_err(|e| blend_failed("Failed to chamfer selections.", e.message))?;
+            continue;
+        }
         if let k::ChamferSpec::Equal(d) = spec {
             match round_overrun(&body.shape, &edges, &|_, _| d) {
                 Some(Overrun::PastSelected) => return err("End boundary intersects unchamfered edge."),

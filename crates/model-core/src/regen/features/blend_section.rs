@@ -250,6 +250,8 @@ fn setbacks(f: &Frame, spec: &BlendSpec, first_is_side1: bool) -> FResult<(f64, 
     let half = f.m[0].dot(f.m[1]).clamp(-1.0, 1.0).acos() / 2.0;
     let Some(sides) = &spec.sides else {
         return Ok(match spec.width {
+            // A chamfer's distances lie along the faces.
+            None if spec.section == Section::Chamfer => (spec.r1, spec.r2),
             Some(w) => {
                 let s = w / (2.0 * half.cos());
                 (s, s)

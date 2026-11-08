@@ -3764,6 +3764,59 @@ fn a_tangent_loop_of_concave_rounds_has_no_slivers_as_live() {
     assert_eq!((tori, cylinders), (7, 1));
 }
 
+/// A chamfer stopped at its selection (tangent propagation off, the edge running on into an arc) sets back its
+/// distance along each face, at a drafted wall's 100° as at 90°: a stadium (lines y = ±5, x −10..10, ends r 5) drafted
+/// 10°, 10 high, its top front line chamfered 1 mm.
+#[test]
+fn a_chamfer_stopped_at_its_selection_sets_back_its_distance_on_a_drafted_wall() {
+    let lines_at = |shape: &noshape_kernel::Shape| -> Vec<(DVec3, DVec3)> {
+        shape.edges().iter().filter_map(|e| e.edge_info().ok()).filter(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. })).map(|i| (i.start, i.end)).collect()
+    };
+    let top = mm(10.0);
+    // Two distances: 1 and 2 mm, one on each face.
+    for (extra, sizes) in [(vec![("width", expr("1 mm"))], [1.0, 1.0]), (vec![("chamferType", en("TWO_OFFSETS")), ("width1", expr("1 mm")), ("width2", expr("2 mm"))], [1.0, 2.0])] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        sk.add_line(DVec2::new(mm(-10.0), mm(-5.0)), DVec2::new(mm(10.0), mm(-5.0)));
+        sk.add_arc(DVec2::new(mm(10.0), 0.0), DVec2::new(mm(10.0), mm(-5.0)), DVec2::new(mm(10.0), mm(5.0)));
+        sk.add_line(DVec2::new(mm(10.0), mm(5.0)), DVec2::new(mm(-10.0), mm(5.0)));
+        sk.add_arc(DVec2::new(mm(-10.0), 0.0), DVec2::new(mm(-10.0), mm(5.0)), DVec2::new(mm(-10.0), mm(-5.0)));
+        let sid = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let region = s.region(sid);
+        s.add("extrude", move |p| {
+            p.set("entities", q(region));
+            p.set("depth", expr("10 mm"));
+            p.set("hasDraft", ParamValue::Bool(true));
+            p.set("draftAngle", expr("10 deg"));
+        });
+        let r = s.ok();
+        let b = &r.context.bodies[0];
+        let front = lines_at(&b.shape).into_iter().find(|(a, c)| (a.z - top).abs() < 1e-9 && (c.z - top).abs() < 1e-9 && a.y < 0.0).unwrap();
+        let y0 = front.0.y;
+        let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (i.start.z - top).abs() < 1e-9 && (i.end.z - top).abs() < 1e-9 && i.start.y < 0.0)).unwrap();
+        let edge = Reference::Edge((*b.edges[e]).clone());
+        s.add("chamfer", move |p| {
+            p.set("entities", q(edge));
+            p.set("tangentPropagation", ParamValue::Bool(false));
+            for (k, v) in extra {
+                p.set(k, v);
+            }
+        });
+        let r = s.ok();
+        let lines = lines_at(&r.context.bodies[0].shape);
+        // On the top in from the old edge; down the wall along its 10° slope.
+        let wall = (DVec3::new(0.0, mm(-5.0), 0.0) - DVec3::new(0.0, y0, top)).normalize();
+        let has = |d_top: f64, d_wall: f64| {
+            let want_wall = DVec3::new(0.0, y0, top) + wall * mm(d_wall);
+            lines.iter().any(|(a, c)| (a.z - top).abs() < 1e-9 && (c.z - top).abs() < 1e-9 && (a.y - (y0 + mm(d_top))).abs() < 1e-7)
+                && lines.iter().any(|(a, c)| (a.z - want_wall.z).abs() < 1e-7 && (c.z - want_wall.z).abs() < 1e-7 && (a.y - want_wall.y).abs() < 1e-7)
+        };
+        assert!(has(sizes[0], sizes[1]) || has(sizes[1], sizes[0]), "{sizes:?}: {lines:?}");
+        // It stops at the selection: the back top edge stays.
+        assert!(lines.iter().any(|(a, c)| (a.z - top).abs() < 1e-9 && (c.z - top).abs() < 1e-9 && (a.y + y0).abs() < 1e-9), "{sizes:?}: {lines:?}");
+    }
+}
+
 /// Live (11-08): a chamfer on the edge between a shaft's flat (x = 6) and its round (r = 10), 20 long, in every type
 /// and both measurements. Tangent measures along the faces' tangent lines from where they meet; Offset's angle is to
 /// the line from the chamfer's side to the edge. Volumes in mm³.

@@ -3893,8 +3893,10 @@ P2
 - [ ] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
   some parts." and keeps the others?
 - [ ] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
-- [ ] P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
+- [x] P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
   distance and angle still run on.
+  Two distances on one edge done (and the stopped chamfer's setback, d·tan(half) at a non-right edge, fixed);
+  Distance and angle and several edges still run on.
 - [ ] P2 CHAMFER-FS-OPCHAMFER (blend) the FS host's opChamfer (custom features, mixed sheet-metal selections) ignores
   tangentPropagation, directionOverrides, oppositeDirection for OFFSET_ANGLE and chamferMethod.
 - [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
