@@ -1,6 +1,6 @@
 {
  "scenario": "fs-snippet-placeholders",
- "recorded": "2026-11-08T14:03:05.165Z",
+ "recorded": "2026-11-08T15:31:52.530Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "1999eeae6feb6ef4540eee10",
-  "workspace": "305f447ea49e3365b2fde815",
-  "element": "72286e78222e192f60743133",
+  "document": "719e9fb087114e5e61c168b9",
+  "workspace": "29c1fa4260dbee8b93c10b84",
+  "element": "01eac721d83f2ace8f7e036b",
   "start": "fs-studio",
-  "startElement": "72286e78222e192f60743133",
+  "startElement": "01eac721d83f2ace8f7e036b",
   "runner": "live2 "
  },
  "start": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 23268
+   "t": 35422
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 25468
+   "t": 40554
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 27293
+   "t": 42514
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 29170
+   "t": 44518
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 31012
+   "t": 46682
   },
   {
    "step": 6,
@@ -511,7 +511,10 @@
     "list": {
      "kind": "autocomplete",
      "rows": [
-      "Define"
+      "Define feature"
+     ],
+     "meta": [
+      "snippet"
      ],
      "highlighted": 0,
      "disabled": []
@@ -565,10 +568,10 @@
      "line": "defineFeature",
      "lines": 6,
      "committed": false,
-     "notices": 1
+     "notices": 0
     }
    },
-   "t": 34768
+   "t": 50293
   },
   {
    "step": 7,
@@ -652,7 +655,7 @@
      "notices": 0
     }
    },
-   "t": 36708
+   "t": 52288
   },
   {
    "step": 8,
@@ -736,7 +739,7 @@
      "notices": 0
     }
    },
-   "t": 38564
+   "t": 54271
   }
  ]
 }

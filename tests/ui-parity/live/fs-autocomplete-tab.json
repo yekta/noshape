@@ -1,19 +1,19 @@
 {
  "scenario": "fs-autocomplete-tab",
- "recorded": "2026-11-08T02:58:41.984Z",
+ "recorded": "2026-11-08T15:30:28.406Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "d800ecaface97ffbf0bb4364",
-  "workspace": "0d61d054a4af32ec643541f8",
-  "element": "1f21db09e4be1221883f7951",
+  "document": "bce00bcf2359753abc433798",
+  "workspace": "da7cd0ceb31d3bf4d830aeb1",
+  "element": "32b95f9524bac2c4f3322fbd",
   "start": "fs-studio",
-  "startElement": "1f21db09e4be1221883f7951",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "32b95f9524bac2c4f3322fbd",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 40279
+   "t": 32756
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 43784
+   "t": 35254
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 45731
+   "t": 37166
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 47626
+   "t": 39200
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 49467
+   "t": 41183
   },
   {
    "step": 6,
@@ -511,7 +511,10 @@
     "list": {
      "kind": "autocomplete",
      "rows": [
-      "Define"
+      "Define feature"
+     ],
+     "meta": [
+      "snippet"
      ],
      "highlighted": 0,
      "disabled": []
@@ -565,10 +568,10 @@
      "line": "defineF",
      "lines": 6,
      "committed": false,
-     "notices": 0
+     "notices": 1
     }
    },
-   "t": 52900
+   "t": 44095
   },
   {
    "step": 7,
@@ -652,7 +655,7 @@
      "notices": 1
     }
    },
-   "t": 55388
+   "t": 46063
   }
  ]
 }

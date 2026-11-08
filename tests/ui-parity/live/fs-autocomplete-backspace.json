@@ -1,19 +1,19 @@
 {
  "scenario": "fs-autocomplete-backspace",
- "recorded": "2026-11-08T02:57:15.314Z",
+ "recorded": "2026-11-08T15:24:26.946Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "30d5dd6341ed11e4f95a4e07",
-  "workspace": "29689da5ad47b2b3009acb3a",
-  "element": "312c31d106c45df78ddec389",
+  "document": "7341463b0e1eeb686b21385a",
+  "workspace": "e223bf1fb098542c82fa817c",
+  "element": "c68baaa11578364da927fe10",
   "start": "fs-studio",
-  "startElement": "312c31d106c45df78ddec389",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "c68baaa11578364da927fe10",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 45909
+   "t": 65049
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 51080
+   "t": 68130
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 53279
+   "t": 70104
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 55540
+   "t": 72012
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 57642
+   "t": 73990
   },
   {
    "step": 6,
@@ -511,7 +511,10 @@
     "list": {
      "kind": "autocomplete",
      "rows": [
-      "Define"
+      "Define feature"
+     ],
+     "meta": [
+      "snippet"
      ],
      "highlighted": 0,
      "disabled": []
@@ -565,10 +568,10 @@
      "line": "defineF",
      "lines": 6,
      "committed": false,
-     "notices": 1
+     "notices": 0
     }
    },
-   "t": 61373
+   "t": 78588
   },
   {
    "step": 7,
@@ -602,9 +605,14 @@
     "list": {
      "kind": "autocomplete",
      "rows": [
-      "Define",
-      "Define",
-      "Define"
+      "Define feature",
+      "Define table",
+      "Define computed property"
+     ],
+     "meta": [
+      "snippet",
+      "snippet",
+      "snippet"
      ],
      "highlighted": 0,
      "disabled": []
@@ -658,10 +666,10 @@
      "line": "define",
      "lines": 6,
      "committed": false,
-     "notices": 1
+     "notices": 0
     }
    },
-   "t": 63956
+   "t": 81235
   },
   {
    "step": 8,
@@ -695,13 +703,14 @@
     "list": {
      "kind": "autocomplete",
      "rows": [
-      "Defin",
-      "Defin",
-      "Defin",
-      "Feature",
-      "Table",
-      "Computed property",
-      "Function"
+      "Define feature",
+      "Define table",
+      "Define computed property"
+     ],
+     "meta": [
+      "snippet",
+      "snippet",
+      "snippet"
      ],
      "highlighted": 0,
      "disabled": []
@@ -755,10 +764,10 @@
      "line": "defin",
      "lines": 6,
      "committed": false,
-     "notices": 1
+     "notices": 0
     }
    },
-   "t": 66403
+   "t": 83644
   }
  ]
 }
