@@ -28,6 +28,8 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   0.1 r past the hold line into the pocket (`rim_section_face`): valid, main solid 136951.04 (live 136943.82) but 32
   faces and two stray solids; cut one by one, piece 3 (round the y 25..75 end, r up to 13.9) breaks it: its loft's
   box is ±230 mm. Next: that piece's sections (twist / a jump in r at the chain's vertex at (50, 25)).
+  Tried 15:10: sections all started on side 1 (the frame swapped where the edge lists the wall first): the lofts
+  come out invalid (7 faces each), still 3 solids (patch hold-rim-wip2.patch). Stopped there (time box).
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
