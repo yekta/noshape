@@ -1,0 +1,39 @@
+{
+ "name": "ver-cmp-sketch-eye",
+ "about": "Compare V1, Only show differences off, then Sketch 1's eye in the compare list: the sketch shows in the graphics, its name black",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Only show differences"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show sketch:Sketch 1"
+   }
+  }
+ ]
+}

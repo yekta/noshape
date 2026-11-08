@@ -32,7 +32,21 @@
    "where": "Part Studio/Assembly Variable table footer split ▴ › Create Variable Studio",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1570"
+   "source": "behaviours.md:1570",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Insert Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "menu": "Create Variable Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-tab-rename",
@@ -1357,7 +1371,21 @@
    "where": "Part Studio right strip › Variable table",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:1570"
+   "source": "behaviours.md:1570",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 1"
+      }
+     },
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-insert-split",
@@ -1366,7 +1394,16 @@
    "where": "Variable table footer",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:28442"
+   "source": "behaviours.md:28442",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Insert Variable Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-empty-state",
@@ -1393,7 +1430,21 @@
    "where": "Assembly right strip › Variable table",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1269"
+   "source": "behaviours.md:1269",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Assembly 1"
+      }
+     },
+     {
+      "on": {
+       "button": "Variable table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-ps-new-variable-from-hash",

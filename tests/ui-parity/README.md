@@ -270,6 +270,8 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 - On a Variable Studio tab the state has `"variables": {"tables": [{"title": "Variable Studio 1", "rows": [{"name",
   "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
   (an expression's result while the cell isn't being edited).
+- A Part Studio's or Assembly's Variable table footer (studios, 11-08): the split button `{"button": "Insert Variable
+  Studio"}` (or `"Create Variable Studio"` while the document has none) and its ▴ `{"caret": "Insert Variable Studio"}`.
 - A Variable Studio's Configuration panel (studios, 11-08) takes the Part Studio's targets: `{"button": "Configure
   Variable Studio"}` (the empty panel's button; it adds a List input) and `{"caret": "Configure Variable Studio"}` its
   ▾, `{"button": "Add configuration input"}` / `{"caret": "Add configuration input"}` once configured,
@@ -286,7 +288,10 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   names the marks: ">" (only in the base) added, "<" (only in the target) removed, `indicator` the mark; `null`
   elsewhere; `features` and `parts` are empty and `document.workspace` null while comparing, the panel standing in
   for the list and the compare bar for the navbar's workspace); targets
-  `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`;
+  `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`,
+  `{"button": "Show sketch:<sketch>"}` (a sketch row's eye, shown on hover), `{"button": "Compare help"}` (the bar's ?);
+  the merge dialog's footer ? `{"button": "Merge help"}`; Workspace protection's link
+  `{"button": "Learn more about workspace protection"}` (help links open a browser tab: the state stays);
   `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
   from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
   (the workspace "Main", a version, a history entry), `{"button": "Show changes:Main"}` a row's Show changes…, the

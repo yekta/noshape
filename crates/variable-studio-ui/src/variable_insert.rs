@@ -968,6 +968,7 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
     h_flex()
         .child(
             Button::new("vt-create")
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{label}")))
                 .custom(variant)
                 .h(px(35.))
                 .px(px(10.5))
@@ -980,6 +981,7 @@ pub fn panel_footer(doc: Entity<DocModel>, element: TabId, cx: &App) -> AnyEleme
         )
         .child(
             Button::new("vt-more")
+                .map(|d| crate::ui_script::mark(d, move || format!("caret:{label}")))
                 .custom(variant)
                 .h(px(35.))
                 .w(px(26.))

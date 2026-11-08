@@ -545,7 +545,21 @@
    "where": "every edit (each drag, each Undo : 1 step) is its own entry \"<tab> :: <action> : <target>\"; no merging",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:16770"
+   "source": "behaviours.md:16770",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Unsuppress"
+      }
+     },
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "docs-page-vh-panel",
@@ -1620,7 +1634,16 @@
    "where": "Workspace protection dialog link (help)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3347"
+   "source": "behaviours.md:3347",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Learn more about workspace protection"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "wp-protected-state",
@@ -2078,7 +2101,16 @@
    "where": "compare bar ? icon",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2629"
+   "source": "behaviours.md:2629",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Compare help"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-tab-dots",
@@ -2210,7 +2242,16 @@
    "where": "hover a sketch row in the compare list › eye toggle",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4746"
+   "source": "behaviours.md:4746",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Show sketch:Sketch 1"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-graphics-pick",
@@ -2508,7 +2549,16 @@
    "where": "merge dialog footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5071"
+   "source": "behaviours.md:5071",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Merge help"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-into-protected",

@@ -1096,7 +1096,14 @@
    "where": "after a dot",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20397"
+   "source": "behaviours.md:20397",
+   "via": [
+    [
+     {
+      "text": "EntityType."
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-enum-name-insert",

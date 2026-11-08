@@ -1815,7 +1815,22 @@
    "where": "documents page › right strip (empty state when nothing selected)",
    "freq": 2,
    "cloud": false,
-   "source": "dom/documents-details-panel.txt"
+   "source": "dom/documents-details-panel.txt",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Details"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-share-panel",
@@ -3829,7 +3844,27 @@
    "where": "after ✓ in Workspace units",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:6773"
+   "source": "behaviours.md:6773",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Workspace units…"
+      }
+     },
+     {
+      "on": {
+       "field": "Length default unit",
+       "pick": "Inch"
+      }
+     },
+     {
+      "on": {
+       "button": "ok"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-click-a-tab-to-switch-to-it",
@@ -5108,7 +5143,22 @@
    "where": "tab menu › Delete on a tab used by another tab",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:18637"
+   "source": "behaviours.md:18637",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "doc_tab": "Variable Studio 1"
+      }
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-properties-part-studio-tree-card-name-description-category-title-1-3-not-",
@@ -5524,7 +5574,15 @@
    "where": "shift+/",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1189"
+   "source": "behaviours.md:1189",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "shift+/"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-keyboard-shortcuts-sheet-search-shortcuts",

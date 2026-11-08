@@ -1,0 +1,45 @@
+{
+ "name": "ver-history-entry-per-edit",
+ "about": "Suppress Extrude 2 then Unsuppress it, then Versions and history: each edit is its own entry, newest first (no merging)",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unsuppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  }
+ ]
+}

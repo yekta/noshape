@@ -1,0 +1,39 @@
+{
+ "name": "ver-merge-help",
+ "about": "Merge into current workspace… from B1, then the dialog footer's (?): help \"Merging\", the dialog stays; Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge help"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

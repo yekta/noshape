@@ -1,0 +1,39 @@
+{
+ "name": "ver-wp-learn-more",
+ "about": "Main's Workspace protection…, then \"Learn more about workspace protection\": help in a new browser tab, the dialog stays; Cancel",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace protection…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Learn more about workspace protection"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

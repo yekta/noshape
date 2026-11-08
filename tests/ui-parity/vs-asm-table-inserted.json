@@ -1,0 +1,21 @@
+{
+ "name": "vs-asm-table-inserted",
+ "about": "Assembly 1's Variable table with Variable Studio 1 inserted into all",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  }
+ ]
+}

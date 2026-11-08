@@ -1,0 +1,31 @@
+{
+ "name": "vs-ps-table-split-menu",
+ "about": "Part Studio 1's Variable table footer: the [Insert Variable Studio][▴] split button's ▴: Insert Variable Studio, Create Variable Studio; Escape",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Variable table"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

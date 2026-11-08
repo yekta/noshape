@@ -1,0 +1,33 @@
+{
+ "name": "ver-cmp-help",
+ "about": "Compare V1 with Main, then the compare bar's (?): help \"Compare\" in a new browser tab, the compare stays",
+ "area": "studios",
+ "source": "everyday (studios 11-08, coverage batch 6)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Compare help"
+   }
+  }
+ ]
+}
