@@ -3,7 +3,7 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
-## Where things stand (2026-11-08 04:45 UTC)
+## Where things stand (2026-11-08 05:20 UTC)
 - **Landed 11-08:** c2-rings-loft's 51-tool cut ours (42ae0d85: Circular pattern 1 13.3 -> 1.17 s, live 767 ms);
   P0 CRASH-6297 (3f3fe564: free::apart's halving 64 deep at most) and P0 SECTIONS-AHEAD-HANG (f210258f: a pool job's
   time counts against its launcher's CPU deadline; qa to verify on vibe3, where it hung); the impeller Shell on live's
@@ -14,14 +14,23 @@ scratch /root/bool-scratch.
   inlet inner 1001.45 (live 998.76), z rim 1359.38 (1356.94). Live asked for points along JKF / JKB / JKJ (REQUESTS
   11-08 02:45). The real document's loft is still core's (251,071 against live's 257,078 mm3). Speed: the first
   (polynomial) attempt fails, then the tangent one builds; 1.65 s, mostly OCCT on B-spline offsets.
-- **Now: cf-part-draft's union (lead 11-08), in bool-b (777b522a, not landed).** In the document ours declined "an
-  edge on another argument's free-form face" after 1.16 s, then OCCT 1.9 s (replay takes it, 1.0 s: the recorded
-  input differs). New `fuse_glued` (boolean.cpp, op_boolean before on_face): two solids meeting on one planar face
-  each, the same outline edge for edge, each on its own side: their shells sewn along it (BRepBuilderAPI_Sewing
-  without analysis or cutting), both solids Deleted as OCCT records: 138 ms, OCCT's result and history exactly.
-  T1 bool_patterns::cylinders_meeting_on_a_whole_face_fuse_glued. Corpus: vibe4 ~/agents/bool-corpora/pd3 (its
-  87332476 differs in history on main too). Checking: bool_replay over every corpus, main against it
-  (/root/bool-scratch/boolrep.sh, br-main.txt / br-glued.txt), then the model suite.
+- **cf-part-draft's union (lead 11-08), queued 86c8445e:** in the document ours declined "an edge on another
+  argument's free-form face" after 1.16 s, then OCCT 1.9 s. `fuse_glued` (boolean.cpp): two solids meeting on one
+  planar face each, the same outline edge for edge, each on its own side, sharing no vertex: their shells sewn along
+  it (BRepBuilderAPI_Sewing without analysis or cutting); history as OCCT's (both solids Deleted; the outline's
+  vertices, the edges at them and their faces Modified even where the sewing kept them). First where either solid
+  has free-form faces, else after noshape's Boolean declines (it is quicker on planes and cylinders: 1-35 ms against
+  2-57 ms). Union 3.1 s -> 0.13 s; Part Draft 3 4.0 -> 1.18 s, the document 4.94 -> 2.10 s (live 1.24 s); model suite
+  71/86, 736/934 before and after; bool_replay over every corpus: the same differences as main (its glued case only
+  pd3's). T1 bool_patterns::cylinders_meeting_on_a_whole_face_fuse_glued.
+- **skasm's c2-sm-louver Extrude 3 (11-08 05:20 UTC): waiting on the lead (design).** Ours declines "a non-manifold
+  result" because the result is non-manifold: the Common's two lumps meet along one 0.635 mm edge (x 426.06-426.69,
+  y -58.54, z -8.49: the plate's faces 5 and 6 and two pieces of the extrude's face 8 use it), and the Cut of the
+  same inputs leaves the plate's faces 5, 6, 7 on one edge at x 401.29. OCCT gives an empty Common and a Cut that
+  removes nothing (wrong; live cuts 101.46 mm3). Taking it means ours building results whose lumps touch along
+  an edge (separate solids, the edge in each), and a gate exception with a live capture. Debug prints:
+  /root/bool-scratch/wip/louver-nm-debug-1108.patch; cases vibe4 ~/agents/bool-corpora/louver-ex3 (and -3c, as a
+  cut).
 - Queue after it (lead 11-08): the valve's 7-tool cut (live 2210; parked valve-handle-cut / valve-rim-regroup
   patches conflict with main now); skasm's c2-sm-louver Extrude 3 (OCCT's Common of two valid solids empty, its Cut
   removes nothing, ours "a non-manifold result"; case in /root/skasm-scratch/bool-louver-ex3/); skasm's
