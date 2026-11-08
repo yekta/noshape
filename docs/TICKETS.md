@@ -3076,7 +3076,9 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   qa 17:46: the 16:34 run (3 shards, niced) had asm-face-menu-find-in-instance-list and asm-face-menu-section-view differ the
   same way, and asm-empty-menu (step 1 `.list`, the empty-space menu); asm-empty-menu matches 2 / 2 run alone.
   (qa 2026-11-07 14:30)
-- [ ] P2 UIP-DRW-START-FLAKY (dx) **drawing scenarios differ at their start state in the 6-shard suite run, not alone**:
+- [x] P2 UIP-DRW-START-FLAKY (dx; done 11-08: the runner's settle waits for the drawing's sources, compute and every
+  view's placement (DrawingEditor::ui_busy), not only `computing`; 14 shards on vibe5 give the 8-shard result, 0 start
+  flakes) **drawing scenarios differ at their start state in the 6-shard suite run, not alone**:
   `.drawing.views[0].scale` live "1:1" / ours null at the start (the view not ready when the state is read). 10 drw-*
   scenarios at 01:25 (green 04121633: bom-table, broken-out-section, centerline-circle-3-point, centermark, detail-view,
   dimension point-to-line / point-to-point, hole-table, tool-shortcuts, view-properties), drw-note at 05:25; each matches

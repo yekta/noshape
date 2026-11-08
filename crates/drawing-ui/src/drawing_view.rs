@@ -1192,6 +1192,16 @@ impl DrawingEditor {
         cx.notify();
     }
 
+    /// Work still to show (the parity runner's settle, UIP-DRW-START-FLAKY: the start state read before the views on
+    /// a loaded machine): a source regenerating, the views computing, or a view whose source is here not placed yet.
+    pub fn ui_busy(&self) -> bool {
+        if self.computing || self.compute_task.is_some() || !self.regenerating.is_empty() {
+            return true;
+        }
+        let sheet = self.current_sheet();
+        sheet.real_views().any(|v| views::view_source(sheet, v.id).is_some_and(|(k, _)| self.sources.contains_key(&k)) && self.placement(v.id).is_none())
+    }
+
     fn schedule_compute(&mut self, exact: bool, cx: &mut Context<Self>) {
         if self.compute_task.is_some() {
             self.compute_again = true;

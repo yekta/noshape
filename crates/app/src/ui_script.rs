@@ -330,7 +330,7 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
                 let drawing = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
                 let busy = match (studio(cx), drawing) {
                     (Some(ps), _) => cx.update(|_, cx| ps.read(cx).ui_busy()).unwrap_or(false),
-                    (None, Some(d)) => cx.update(|_, cx| d.read(cx).computing).unwrap_or(false),
+                    (None, Some(d)) => cx.update(|_, cx| d.read(cx).ui_busy()).unwrap_or(false),
                     (None, None) => ws.update(cx, |w, cx| w.ui_view_pending(cx)).unwrap_or(false),
                 };
                 if !busy || t.elapsed() > Duration::from_secs(30) {

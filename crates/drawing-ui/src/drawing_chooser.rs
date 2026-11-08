@@ -315,8 +315,10 @@ impl DrawingEditor {
                         for part in parts {
                             let mut d = display.clone();
                             if let Some(p) = &part {
+                                // An open composite has no mesh of its own: its members show it (Select a composite part).
+                                let members: Vec<BodyId> = display.bodies.iter().find(|b| &b.id == p).and_then(|b| b.composite.as_ref()).map(|c| c.members.clone()).unwrap_or_default();
                                 for b in &mut d.bodies {
-                                    b.hidden = &b.id != p;
+                                    b.hidden = &b.id != p && !members.contains(&b.id);
                                 }
                             }
                             let opts = crate::scene_builder::SceneOptions { show_planes: false, show_sketches: false, show_origin: false, ..Default::default() };
