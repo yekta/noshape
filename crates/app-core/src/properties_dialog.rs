@@ -145,6 +145,8 @@ pub struct MetaForm {
     /// Calculate value was clicked (the button goes away) / it failed.
     mass_computed: bool,
     mass_failed: bool,
+    /// The computed mass is still being worked out off the UI thread (an assembly's, from its tab's menu).
+    mass_pending: bool,
     bom: usize,
     /// Custom properties (Company settings › Custom properties): the active
     /// ones for the item's category, at the bottom of the dialog, and the
@@ -248,6 +250,7 @@ impl MetaForm {
             mass_on,
             mass_computed: false,
             mass_failed: false,
+            mass_pending: false,
             bom: v.bom,
             custom,
             custom_rest,
@@ -662,13 +665,19 @@ impl Render for MetaForm {
                                     .bg(rgb(0xffffff))
                                     .cursor_pointer()
                                     .tooltip(crate::ui::tooltip("Calculate value"))
+                                    .map(|d| crate::ui_script::mark(d, || "button:Calculate value".into()))
                                     .child(svg().path(crate::assets::icon_path("calculate-button")).size(px(20.)).text_color(rgb(0x333333)))
                                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                                         // Without a material Onshape reports "Computation
                                         // failed" / "No material assigned." and hides the button.
+                                        this.mass_computed = true;
+                                        if this.mass_pending {
+                                            this.mass.update(cx, |s, cx| s.set_placeholder("Calculating…", window, cx));
+                                            cx.notify();
+                                            return;
+                                        }
                                         let text = computed.clone().unwrap_or_else(|| "No material assigned.".into());
                                         this.mass_failed = computed.is_none();
-                                        this.mass_computed = true;
                                         this.mass.update(cx, |s, cx| s.set_placeholder(text, window, cx));
                                         cx.notify();
                                     })),
@@ -863,6 +872,38 @@ pub fn open_properties(spec: MetaSpec, on_save: impl Fn(MetaValues, &mut Window,
     let name = form.read(cx).name.clone();
     window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     // Live: the first field (Name) has the focus when the modal opens.
+    name.update(cx, |s, cx| s.focus(window, cx));
+}
+
+/// [`open_properties`] whose computed mass arrives later (`mass`, worked out off the UI thread: an assembly's from
+/// its tab's menu): Calculate value says "Calculating…" until then, and shows it when it comes.
+pub fn open_properties_mass_later(spec: MetaSpec, mass: Task<Option<String>>, on_save: impl Fn(MetaValues, &mut Window, &mut App) + 'static, window: &mut Window, cx: &mut App) {
+    let on_save: SaveFn = Rc::new(on_save);
+    let form = cx.new(|cx| {
+        let mut f = MetaForm::new(spec, on_save, window, cx);
+        f.mass_pending = true;
+        f
+    });
+    let weak = form.downgrade();
+    let handle = window.window_handle();
+    cx.spawn(async move |cx| {
+        let computed = mass.await;
+        let _ = handle.update(cx, |_, window, cx| {
+            let _ = weak.update(cx, |f, cx| {
+                f.mass_pending = false;
+                f.computed_mass = computed.clone();
+                if f.mass_computed {
+                    f.mass_failed = computed.is_none();
+                    let text = computed.unwrap_or_else(|| "No material assigned.".into());
+                    f.mass.update(cx, |s, cx| s.set_placeholder(text, window, cx));
+                }
+                cx.notify();
+            });
+        });
+    })
+    .detach();
+    let name = form.read(cx).name.clone();
+    window.open_dialog(cx, move |dialog, _, _| resizable_props(bootstrap_modal(dialog, "Properties", props_size().0, 15.).keyboard(false).child(form.clone())));
     name.update(cx, |s, cx| s.focus(window, cx));
 }
 

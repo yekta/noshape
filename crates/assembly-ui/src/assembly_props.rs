@@ -988,6 +988,16 @@ pub use crate::assembly_context::StaleContexts;
 /// Properties…; live 1738): `computed` is the Mass row's computed value,
 /// when the assembly is the one shown.
 pub fn open_assembly_metadata(doc: Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, computed: Option<String>, window: &mut Window, cx: &mut App) {
+    open_assembly_metadata_with(doc, tab, computed, None, window, cx)
+}
+
+/// [`open_assembly_metadata`] whose computed mass is still being worked out (from the tab's menu, the assembly not
+/// open): Calculate value shows it when `mass` comes.
+pub fn open_assembly_metadata_mass_later(doc: Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, mass: Task<Option<String>>, window: &mut Window, cx: &mut App) {
+    open_assembly_metadata_with(doc, tab, None, Some(mass), window, cx)
+}
+
+fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: noshape_model::document::TabId, computed: Option<String>, mass_later: Option<Task<Option<String>>>, window: &mut Window, cx: &mut App) {
     let (name, props) = {
         let doc = &doc.read(cx).session.doc;
         let Some(t) = doc.tab(tab) else { return };
@@ -1009,28 +1019,27 @@ pub fn open_assembly_metadata(doc: Entity<crate::doc_model::DocModel>, tab: nosh
             bom: BomBehavior::ALL.iter().position(|b| *b == props.bom_behavior).unwrap_or(0),
         },
     };
-    crate::properties_dialog::open_properties(
-        spec,
-        move |v, _, cx| {
-            doc.update(cx, |d, cx| {
-                d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
-                    if let Some(t) = document.tab_mut(tab) {
-                        t.name = v.name.clone();
-                        if let TabContent::Assembly(a) = &mut t.content {
-                            a.properties.description = Some(v.description.clone()).filter(|s| !s.is_empty());
-                            a.properties.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
-                            a.properties.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
-                            a.properties.meta = v.meta.clone();
-                            a.properties.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
-                            a.properties.mass_override = v.mass_override.as_deref().and_then(parse_mass);
-                        }
+    let on_save = move |v: crate::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
+        doc.update(cx, |d, cx| {
+            d.edit_document(&format!("Properties : {}", v.name), cx, |document| {
+                if let Some(t) = document.tab_mut(tab) {
+                    t.name = v.name.clone();
+                    if let TabContent::Assembly(a) = &mut t.content {
+                        a.properties.description = Some(v.description.clone()).filter(|s| !s.is_empty());
+                        a.properties.part_number = Some(v.part_number.clone()).filter(|s| !s.is_empty());
+                        a.properties.revision = Some(v.revision.clone()).filter(|s| !s.is_empty());
+                        a.properties.meta = v.meta.clone();
+                        a.properties.bom_behavior = BomBehavior::ALL.get(v.bom).copied().unwrap_or_default();
+                        a.properties.mass_override = v.mass_override.as_deref().and_then(parse_mass);
                     }
-                })
-            });
-        },
-        window,
-        cx,
-    );
+                }
+            })
+        });
+    };
+    match mass_later {
+        Some(mass) => crate::properties_dialog::open_properties_mass_later(spec, mass, on_save, window, cx),
+        None => crate::properties_dialog::open_properties(spec, on_save, window, cx),
+    }
 }
 
 #[cfg(test)]

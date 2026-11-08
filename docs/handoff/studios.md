@@ -50,7 +50,10 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - Measured with live2's ver/vs/fs batch (394 recorded, before the batch above): 128 scenarios, 1221/1814 states
   (67.3 %): documents 76.1 %, versions 74.9 %, Variable Studio 48.6 % (mostly `variables.configuration` and messages,
   fixed above), Feature Studio 59.6 % (the std 3112 line: dx).
-- Open: Assembly Properties' Calculate from the tab menu has no computed mass ("No material assigned."); Assembly Properties lacks Mass / Override / Subassembly
+- An Assembly tab's Properties from the tab's menu: its mass is solved off the UI thread in a session of its own
+  (assembly_mass_properties on the saved file); Calculate value says "Calculating…" until it comes
+  (`properties_dialog::open_properties_mass_later`, `button:Calculate value`).
+- Open: Assembly Properties lacks Mass / Override / Subassembly
   BOM behavior; ours' modal fields aren't recorded (an Input hook in vendored gpui-component); dx has std 3112.
 
 ### 2026-11-08 06:44 UTC: first match numbers; fixes from live's batch 1

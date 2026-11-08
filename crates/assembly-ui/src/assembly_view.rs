@@ -138,7 +138,7 @@ mod thumbs;
 mod interference;
 #[path = "assembly_props.rs"]
 mod props;
-pub use props::open_assembly_metadata;
+pub use props::{open_assembly_metadata, open_assembly_metadata_mass_later};
 #[path = "assembly_search.rs"]
 mod search;
 #[path = "assembly_positions.rs"]

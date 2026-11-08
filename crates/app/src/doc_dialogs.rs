@@ -576,6 +576,20 @@ impl Global for CopiedTab {}
 /// the metadata Properties dialog (live 2159, 3021: Part number and
 /// Revision fill its title block's DWG NO. and REV; drawing.md S15).
 /// `thumb`: the tab's picture (the Part Studio card in the left tree).
+/// An assembly's computed mass ("12.3456 kg") for its Properties opened from the tab's menu, the assembly perhaps
+/// never opened: solved off the UI thread in a session of its own on the saved file (as an agent's
+/// assembly_mass_properties). None without materials or when it can't be solved.
+fn assembly_mass_later(doc: &Entity<DocModel>, tab: String, cx: &mut App) -> Task<Option<String>> {
+    let path = doc.read(cx).session.path.to_string_lossy().to_string();
+    cx.background_spawn(async move {
+        let mut ctx = noshape_ops::Ctx::new();
+        let op = noshape_ops::registry::by_tool_name("assembly_mass_properties")?;
+        let r = noshape_ops::registry::run(&mut ctx, op, &serde_json::json!({ "doc": path, "tab": tab })).ok()?.value;
+        let kg = r["mass_kg"].as_f64()?;
+        Some(format!("{} kg", noshape_units::to_fixed(kg, 4)))
+    })
+}
+
 pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId, thumb: Option<std::sync::Arc<RenderImage>>, window: &mut Window, cx: &mut App) {
     let drawing = {
         let d = &doc.read(cx).session.doc;
@@ -625,7 +639,10 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
         let d = &doc.read(cx).session.doc;
         let Some(t) = d.tab(tab) else { return };
         let category = match &t.content {
-            TabContent::Assembly(_) => return crate::assembly_view::open_assembly_metadata(doc, tab, None, window, cx),
+            TabContent::Assembly(_) => {
+                let mass = assembly_mass_later(&doc, t.name.clone(), cx);
+                return crate::assembly_view::open_assembly_metadata_mass_later(doc, tab, mass, window, cx);
+            }
             TabContent::PartStudio(_) => "Onshape Part Studio",
             TabContent::VariableStudio(_) => "Onshape Variable Studio",
             TabContent::FeatureStudio(_) => "Onshape Feature Studio",
