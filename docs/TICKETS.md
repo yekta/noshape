@@ -3929,6 +3929,12 @@ P2
   flipped on a closed chain.
 - [ ] P2 FILLET-ASYM-SIDE (blend, live) which face is first for an asymmetric fillet on chains and loops.
 - [ ] P2 FILLET-FULLROUND-PROP (blend) Full round ignores Tangent propagation; "Cannot select separate center face sets."
+- [ ] P2 SNAP-FILLET-SPEED (blend) cf-snap-hook (18/18 as live) Fillet 3 88 ms / Fillet 5 ~100-128 ms / Fillet 6 ~110-150
+  ms, live 7 / 6 / 8. Fillet 3 (blend_direct): 65 of 88 ms in 66 sections (GeomInt_IntSS), cone × torus and torus ×
+  torus pairs ~1.5 ms each, about half with no curve; a sampled distance pre-check skipped only 4 (the empty pairs lie
+  close). Next: analytic sections (IntAna_QuadQuadGeo for plane / cylinder / cone / sphere pairs; tori by marching
+  from the touch curves' crossings). Fillet 5: op_boolean, the Rust Boolean's sections_ahead 50 ms then OCCT's 38 ms
+  (bool's: a decline found late).
 - [ ] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
   some parts." and keeps the others?
 - [x] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
