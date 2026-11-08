@@ -17,6 +17,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   alone: NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=8b633129da85129b235a40b3
   (vibe5). The lead routes it to you.
 
+## 11-08 21:17 UTC: Feature Studio fs-1 recorded by live2 (cd5f2212, 2361): 522 → 574 / 593 states
+
+- Area now 574/593 states × 113/119 coverage = 91.9 % (fs-* with live recordings: 84/95 scenarios).
+- Fixed: Add custom features recorded as live's dialog (tabs, its search box, studio / feature rows), the panel
+  takes the keyboard on a click (focus "field"), Escape closes it (2361 and custom-features-menu-empty; the unit
+  test said otherwise), a feature picked shows live's toast ("Custom feature … was added to your toolbar from
+  version V1.", gone with the panel); "Custom features in this workspace ▾" is an OsMenu (recorded; rows with the
+  initials box and the side tooltip, `OsMenu::side_tip`); initials keep the letters' case ("uF"); custom feature rows
+  read "uF uip Feature 1"; Custom tables' selector list recorded, Copy table's toast, Add custom tables' "Search or
+  paste URL" focused and Escape closing it; the notices panel's Monitor ▾ (Monitor, Profile); whole-document starts
+  (tabs or a Feature Studio) open on Part Studio 1 as live2's runner builds them.
+- Left: fs-tables-selector (live's account has an old "FS sizes" table), fs-tables-switch-to-studio (live's recorder
+  doesn't read that ⋯ menu), fs-ps-show-code / fs-shortcuts-sheet (live side), fs-ed-fold-arrows (Ace puts the caret
+  past a fold's "{...}" on the closing line), fs-compare / fs-ps-custom-feature-error (live's code area is shorter: a
+  click on its middle lands on line 18, ours 27), fs-ed-ctrl-click-std, fs-ed-error-squiggle (notices 1 vs 2),
+  fs-notices-expand-stack, fs-tb-redo (studios').
+
 ## 11-08 19:01 UTC: Feature Studio area (lead): coverage 78 -> 113 / 119; STL presets not landed
 
 - **Area before:** 328/337 states (97.3 %) × 78/119 coverage = 63.7 % (lead's 36.9 % was older). Batch fs-1: 35
