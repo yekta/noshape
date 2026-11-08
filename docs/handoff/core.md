@@ -33,6 +33,17 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 14:24 UTC: the Knuckle 6/28 (Extrude 4 to asm); the knife's Loft 3 measured, no cause found.**
+- susp-knuckle with asm's 8c0f052e2: 1 -> 6/28. Extrude 4's regions are degenerate on our side (Sketch 2's projected
+  curves not found): written to asm.md with the cut case (vibe5 ~/core-cases/knbool).
+- c2-hunting-knife Loft 3 (face JTS, a bevel from y -0.25 to y -2 mm): ours = live on its 4 boundary curves (< 0.2 µm)
+  but 9-163 µm outward inside (live's 25 points, fs-bar12.json; probe: export_parts STEP at the bar after Loft 3 via
+  noshape-cli batch, then project live's points). Live's face isn't a Coons patch of its own boundaries either (own
+  or arc-length parameters: up to ±80 µm; /root/core-scratch/knife_coons.py, live poles knife286.npy). Its sections
+  bulge 1.2-1.8 % of the chord (not 10 %: that earlier note was wrong), more than either profile in absolute terms.
+  Parked: Parasolid's guided-loft interior needs a study with curved guides and a curved profile (2319 had only one of
+  each at a time).
+
 **State 11-08 14:02 UTC: the loft start rule by the condition's own section (live 2318's impeller export).**
 - 2318's face #65 runs from a curved section (Normal to profile there) to a straight one, and each row's first step
   is (0.9 (c·n) + 0.1 |c|) / 3 for its end poles' chord (row 1: 0.0035428 vs live 0.00354282). So the per-column rule
