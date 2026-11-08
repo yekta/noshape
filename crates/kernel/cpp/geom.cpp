@@ -482,20 +482,29 @@ static bool face_interior_nearest(const TopoDS_Face& f, const gp_Pnt& p, double&
   {
     double d, u, v;
   };
-  std::vector<Sample> samples;
+  std::vector<Sample> grid;
   const int           N = 24;
   for (int i = 0; i <= N; ++i)
     for (int j = 0; j <= N; ++j)
     {
       const double uu = u0 + (u1 - u0) * (i + 0.5) / (N + 1), vv = v0 + (v1 - v0) * (j + 0.5) / (N + 1);
-      if (cl.Perform(gp_Pnt2d(uu, vv)) != TopAbs_IN)
-        continue;
-      samples.push_back({p.SquareDistance(s.Value(uu, vv)), uu, vv});
+      grid.push_back({p.SquareDistance(s.Value(uu, vv)), uu, vv});
     }
+  // The 4 nearest inside the face: classified nearest first, only until 4 are found (classifying all 625 was most of
+  // a point-to-face distance: cf-surface-pattern's 11,700, 0.76 s).
+  std::stable_sort(grid.begin(), grid.end(), [](const Sample& a, const Sample& b) { return a.d < b.d; });
+  std::vector<Sample> samples;
+  for (const Sample& g : grid)
+  {
+    if (cl.Perform(gp_Pnt2d(g.u, g.v)) != TopAbs_IN)
+      continue;
+    samples.push_back(g);
+    if (samples.size() == 4)
+      break;
+  }
   if (samples.empty())
     return false;
-  const size_t k = std::min<size_t>(4, samples.size());
-  std::partial_sort(samples.begin(), samples.begin() + k, samples.end(), [](const Sample& a, const Sample& b) { return a.d < b.d; });
+  const size_t k = samples.size();
   double best = 1e300;
   for (size_t i = 0; i < k; ++i)
   {
