@@ -2649,7 +2649,22 @@
    "where": "part / Assembly / Drawing / file tab right-click (Upgrade badge in live Free)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:220"
+   "source": "behaviours.md:220",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "part": "Part 1"
+      }
+     },
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-upsell",
@@ -2657,8 +2672,9 @@
    "name": "Explore Onshape's premium features (Release management upsell)",
    "where": "Release… on live's Free plan",
    "freq": 3,
-   "cloud": false,
-   "source": "behaviours.md:220"
+   "cloud": true,
+   "source": "behaviours.md:220",
+   "not_counted": "live's Free plan offering an upgrade; noshape has release management (parity, not a plan's limit); studios 11-08"
   },
   {
    "id": "rel-rc-dialog",
@@ -2667,7 +2683,22 @@
    "where": "Release… / panel header Release…: items with Revision, State, Part number",
    "freq": 2,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "part": "Part 1"
+      }
+     },
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-add-items",
@@ -2676,7 +2707,16 @@
    "where": "Create Release candidate dialog (pick from the version graph)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:61"
+   "source": "behaviours.md:61",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add to Release…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-filter",
@@ -2685,7 +2725,23 @@
    "where": "Create Release candidate dialog › search, type filter icons, Clear",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Search items"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Filter"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-edit-props",
@@ -2694,7 +2750,16 @@
    "where": "Create Release candidate dialog › per-item properties view, Apply / Go back",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Edit properties"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-attention",
@@ -2703,7 +2768,16 @@
    "where": "Create Release candidate dialog › error count toggle",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Show only items that need attention"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-generate-pn",
@@ -2712,7 +2786,16 @@
    "where": "Create Release candidate dialog",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Generate missing part numbers"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-refresh",
@@ -2721,7 +2804,16 @@
    "where": "Create Release candidate dialog title button",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Refresh"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-revert",
@@ -2730,7 +2822,16 @@
    "where": "State column button per item / on the header",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Revert unchanged items to their last revision"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-save-draft",
@@ -2739,7 +2840,16 @@
    "where": "Create Release candidate dialog bottom left",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Save draft"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-drafts-panel",
@@ -2748,7 +2858,22 @@
    "where": "Release drafts panel: edit, submit, delete a draft",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_typical_release_workflow.htm"
+   "source": "ui2-help/raw/Release_typical_release_workflow.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Release drafts"
+      }
+     },
+     {
+      "do": "dblclick",
+      "on": {
+       "panel_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-release",
@@ -2757,7 +2882,21 @@
    "where": "Create Release candidate dialog (release immediately; creates a version)",
    "freq": 2,
    "cloud": false,
-   "source": "ui2-help/raw/Release_release_management.htm"
+   "source": "ui2-help/raw/Release_release_management.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Release…"
+      }
+     },
+     {
+      "on": {
+       "button": "Release"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rc-submit",
@@ -2765,8 +2904,9 @@
    "name": "Submit",
    "where": "Create Release candidate dialog with approvers",
    "freq": 3,
-   "cloud": false,
-   "source": "ui2-help/raw/Release_release_management.htm"
+   "cloud": true,
+   "source": "ui2-help/raw/Release_release_management.htm",
+   "not_counted": "submits to other users for approval (approvers, Approve / Reject are cloud too); studios 11-08"
   },
   {
    "id": "rel-graph-icons",
@@ -2775,7 +2915,21 @@
    "where": "version graph icons for pending (△) and released (▲) versions",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:56"
+   "source": "behaviours.md:56",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Release"
+      }
+     },
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-revision-history",
@@ -2784,7 +2938,16 @@
    "where": "released part / tab right-click › Revision history dialog",
    "freq": 2,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Revision history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rh-view-release",
@@ -2793,7 +2956,16 @@
    "where": "Revision history dialog › Review release dialog",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "View release"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rh-export",
@@ -2802,7 +2974,21 @@
    "where": "Revision history dialog row",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Revision history"
+      }
+     },
+     {
+      "on": {
+       "button": "Export"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-rh-open-version",
@@ -2811,7 +2997,21 @@
    "where": "Revision history dialog › click the version name (new browser tab)",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Revision history"
+      }
+     },
+     {
+      "on": {
+       "history_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-obsolete-revision",
@@ -2820,7 +3020,16 @@
    "where": "Revision history dialog › Create Obsolete candidate",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Obsolete revision"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-obsolete-rereleasable",
@@ -2829,7 +3038,16 @@
    "where": "Create Obsolete candidate checkbox",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Mark revision as re-releasable"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-obsolete-add-items",
@@ -2838,7 +3056,16 @@
    "where": "Create Obsolete candidate › Add Items to Obsolete candidate › Add",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add to Obsoletion…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-obsolete-commit",
@@ -2847,7 +3074,16 @@
    "where": "Create Obsolete candidate (no approver)",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Obsolete"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-view-obsoletion",
@@ -2856,7 +3092,16 @@
    "where": "Revision history dialog after obsoleting",
    "freq": 3,
    "cloud": false,
-   "source": "ui2-help/raw/Release_obsoleting_parts.htm"
+   "source": "ui2-help/raw/Release_obsoleting_parts.htm",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "View obsoletion"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-props-revision-state",
@@ -2865,7 +3110,21 @@
    "where": "part / tab Properties… fields (State In progress / Pending / Released / Obsolete / Rejected / Discarded)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:29640"
+   "source": "behaviours.md:29640",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Release"
+      }
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-settings",
@@ -2874,7 +3133,16 @@
    "where": "company settings › Release management: revision scheme, part numbering, release conditions, watermarks, revision tools",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:9231"
+   "source": "behaviours.md:9231",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Company settings"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-workflow-diagrams",
@@ -2883,7 +3151,16 @@
    "where": "Release management settings tabs (Onshape default workflows)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:9238"
+   "source": "behaviours.md:9238",
+   "via": [
+    [
+     {
+      "on": {
+       "tab": "Obsoletion workflow"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-revtable-template",
@@ -2892,7 +3169,16 @@
    "where": "Release management settings › Revisions and part numbers › Revision table template › Edit",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:11502"
+   "source": "behaviours.md:11502",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Edit revision table template"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-revision-table",
@@ -2901,7 +3187,16 @@
    "where": "drawing toolbar table group (absent on live's Free plan; unrecordable)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1405"
+   "source": "behaviours.md:1405",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Revision table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-revision-table-props",
@@ -2910,7 +3205,16 @@
    "where": "right-click a revision table (unrecordable on Free)",
    "freq": 3,
    "cloud": false,
-   "source": "REQUESTS.md (dx 17:57, answered)"
+   "source": "REQUESTS.md (dx 17:57, answered)",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Revision table properties..."
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-revision-callout",
@@ -2919,7 +3223,16 @@
    "where": "right-click a revision table (unrecordable on Free)",
    "freq": 3,
    "cloud": false,
-   "source": "REQUESTS.md (dx 17:57, answered)"
+   "source": "REQUESTS.md (dx 17:57, answered)",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Add revision callout"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "rel-approve-reject",

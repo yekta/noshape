@@ -1,0 +1,66 @@
+{
+ "name": "rel-rc-revert",
+ "about": "After releasing Part 1 at A: Release… again (revision B), then Revert unchanged items to their last revision",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number:Part 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN-0001"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "R1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Release"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Revert unchanged items to their last revision"
+   }
+  }
+ ]
+}

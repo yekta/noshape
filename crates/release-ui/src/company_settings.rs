@@ -72,6 +72,18 @@ pub fn show(section: Section, cx: &mut App) {
     match crate::os_menu::open_window(options, cx, |window, cx| {
         window.set_window_title("Company settings — noshape");
         let view = cx.new(|cx| CompanySettingsView::new(section, window, cx));
+        // The ui-parity driver's state of this window: the section shown, the open dialog and menu, the message.
+        let weak = view.downgrade();
+        crate::ui_script::register_page(window.window_handle().window_id(), move |window, cx| {
+            let section = weak.upgrade().map(|v| v.read(cx).section.label());
+            serde_json::json!({
+                "focus": { "kind": "none" },
+                "dialog": crate::ui_script::open_dialog(),
+                "list": crate::os_menu::ui_state(cx).or_else(crate::ui_script::open_list),
+                "message": crate::ui_script::window_message(window.window_handle().window_id()),
+                "company": { "section": section },
+            })
+        });
         let fh = view.read(cx).focus.clone();
         window.defer(cx, move |window, cx| fh.focus(window, cx));
         view
@@ -142,6 +154,7 @@ impl CompanySettingsView {
             let active = s == self.section;
             h_flex()
                 .id(SharedString::from(format!("company-nav-{}", s.label())))
+                .map(|d| crate::ui_script::mark(d, move || format!("nav:{}", s.label())))
                 .h(px(NAV_ROW))
                 .pl(px(20.))
                 .relative()

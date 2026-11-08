@@ -1,0 +1,34 @@
+{
+ "name": "rel-workflow-diagrams",
+ "about": "Company settings › Release management: the Release workflow, then the Obsoletion workflow",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Account menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Company settings"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Obsoletion workflow"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Release workflow"
+   }
+  }
+ ]
+}

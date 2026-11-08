@@ -1,0 +1,28 @@
+{
+ "name": "rel-rc-attention",
+ "about": "Release…, then Show only items that need attention: the list keeps Part 1 (no part number), the toggle on",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show only items that need attention"
+   }
+  }
+ ]
+}

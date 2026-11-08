@@ -1,0 +1,60 @@
+{
+ "name": "rel-props-after-release",
+ "about": "After releasing Part 1 as PN-0001: Part 1 › Properties…: the Part number the release gave it, the Revision and State fields",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Part number:Part 1"
+   }
+  },
+  {
+   "do": "type",
+   "text": "PN-0001"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Release name"
+   }
+  },
+  {
+   "do": "type",
+   "text": "R1"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Release"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  }
+ ]
+}

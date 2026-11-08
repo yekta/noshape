@@ -1,0 +1,50 @@
+{
+ "name": "rel-rc-filter",
+ "about": "Release…, search 'Part', then the type filter: Parts on, Clear",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search items"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Part"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Filter"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Filter:part"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Clear"
+   }
+  }
+ ]
+}

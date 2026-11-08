@@ -1,0 +1,28 @@
+{
+ "name": "rel-rc-dialog",
+ "about": "Part 1 › Release…: the Create Release candidate dialog (Part 1 at revision A, In progress, no part number: 1 item needs attention, Release name required), Close",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

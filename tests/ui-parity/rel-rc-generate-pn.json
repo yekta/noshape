@@ -1,0 +1,69 @@
+{
+ "name": "rel-rc-generate-pn",
+ "about": "Company settings › Part numbering: Parts sequential (PRT-, 3 digits). Release…, then the Part number header's # Generate missing part numbers: Part 1 gets PRT-001",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "part": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Release…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Generate missing part numbers"
+   }
+  }
+ ],
+ "config_files": {
+  "numbering_schemes.json": {
+   "release_objects": {
+    "sequential": true,
+    "prefixes": [
+     "PRT-",
+     "ASM-",
+     "DRW-",
+     "VS-",
+     "FILE-"
+    ],
+    "min_length": 3,
+    "next": 1
+   },
+   "standard_content": {
+    "sequential": false,
+    "prefixes": [
+     ""
+    ],
+    "min_length": 3,
+    "next": 1
+   },
+   "items": {
+    "sequential": false,
+    "prefixes": [
+     ""
+    ],
+    "min_length": 3,
+    "next": 1
+   },
+   "release_names": {
+    "sequential": false,
+    "prefixes": [
+     ""
+    ],
+    "min_length": 3,
+    "next": 1
+   },
+   "drawing_reuse": false
+  }
+ }
+}

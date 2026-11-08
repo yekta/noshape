@@ -1,0 +1,34 @@
+{
+ "name": "rel-settings",
+ "about": "Documents page › your name ▾ › Company settings: Release management (revision scheme, part numbering, release conditions, watermarks); Numbering schemes",
+ "area": "studios",
+ "source": "spec from Onshape docs, not recordable on live's plan (studios 11-08, release batch 1)",
+ "recordable": false,
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Account menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Company settings"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Numbering schemes"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Release management"
+   }
+  }
+ ]
+}

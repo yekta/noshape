@@ -272,6 +272,7 @@ impl Render for ReleasePrefsView {
             let active = self.workflow_tab == i;
             div()
                 .id(SharedString::from(format!("rm-workflow-tab-{i}")))
+                .map(|d| crate::ui_script::mark(d, move || format!("tab:{t}")))
                 .pb(px(2.))
                 .text_size(px(14.))
                 .cursor_pointer()

@@ -465,6 +465,8 @@ impl Workspace {
             Some("Versions and history")
         } else if self.units_panel.is_some() {
             Some("Workspace units")
+        } else if self.release_drafts.is_some() {
+            Some("Release drafts")
         } else {
             match &self.doc_panel {
                 Some((DocPanel::Notes(_), _)) => Some("Document notes"),

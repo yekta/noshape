@@ -3747,6 +3747,7 @@ fn user_menu(cx: &App) -> AnyElement {
     let name = noshape_store::local_user_name();
     let variant = ButtonCustomVariant::new(cx).color(gpui_kit::transparent_white()).foreground(pal.text.into()).hover(pal.border.into()).active(pal.border.into()).shadow(false);
     Button::new("user-menu")
+        .map(|d| crate::ui_script::mark(d, || "button:Account menu".into()))
         .custom(variant)
         .h(px(30.))
         .px(px(4.))

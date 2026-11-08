@@ -28,6 +28,23 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 16:12 UTC: release management covered (lead 11-08: spec from Onshape docs, not recordable)
+- 22 scenarios rel-* (`"recordable": false`, README): Release… on a part, the Create Release candidate dialog (Generate
+  missing part numbers with a seeded numbering scheme, needs-attention filter, search and type filter, Add to Release…,
+  Edit properties, Refresh, Revert unchanged items, Save draft, Release drafts panel and Delete draft, Release),
+  Revision history (View release, Export, the version name opens it), Obsolete revision (re-releasable, notes required,
+  Obsolete, View obsoletion, Add to Obsoletion…), Properties after a release, Company settings (Release management,
+  Numbering schemes, the workflows, Edit revision table template); dx's drw-revision-* cover the revision table.
+  Versions coverage 65.7 % → 83.8 %, release 29/29 (Submit and live's Free-plan upsell not counted: Submit goes to
+  other users for approval, cloud as approvers; the upsell is a plan's limit).
+- Driver targets added: the release dialog's buttons by tooltip / label, its fields (`Part number:<item>`,
+  `Revision:<item>`, `Release name`, `Release notes`, `Search items`), `caret:Save draft`, the drafts panel's rows,
+  the Revision history's version name (`history_row`), `button:Account menu` (documents page), Company settings' `nav`
+  and the workflow `tab`s; the release dialog records `dialog` (title, an item per row, the release name); Company
+  settings records `company.section`; `document.panel` "Release drafts".
+- Open: after a release, the workspace part's Properties show Revision empty and State In progress (Onshape's docs to
+  check what the workspace shows after release).
+
 ### 2026-11-08 15:50 UTC: help links open the offline guide (lead 11-08)
 - No link to Onshape's website from the app: every "?" and "Learn more" (compare, merge, Workspace protection,
   Variable Studios, Variable tables, Configurations, Custom tables, Inspection data, Custom features, Custom materials,

@@ -1343,6 +1343,8 @@ impl Render for ReleaseDialog {
                 .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
                 .child(crate::assets::icon(icon, 18., cx))
                 .when(!tip.is_empty(), |d| d.tooltip(crate::ui::tooltip(tip)))
+                // The ui-parity driver's `{"button": "<tooltip>"}` (a row's: the first row's).
+                .when(!tip.is_empty(), |d| crate::ui_script::mark(d, move || format!("button:{tip}")))
         };
         let small = |id: &'static str, icon: &'static str, tip: &'static str, cx: &mut Context<Self>| {
             div()
@@ -1357,6 +1359,7 @@ impl Render for ReleaseDialog {
                 .hover(|d| d.bg(gpui_kit::rgb(0xeaeaea)))
                 .child(crate::assets::icon(icon, 18., cx))
                 .tooltip(crate::ui::tooltip(tip))
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{tip}")))
         };
         // Header: search, filter, add buttons | Revision | State | Part number |
         // "N item(s) needs attention" (toggles the problem filter).
@@ -1377,7 +1380,7 @@ impl Render for ReleaseDialog {
                     .px(px(6.))
                     .gap(px(4.))
                     .font_weight(FontWeight::NORMAL)
-                    .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).child(Input::new(&self.search).appearance(false).small())))
+                    .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(28.)).flex().items_center().border_1().rounded(px(3.)).border_color(gpui_kit::rgb(0xcccccc)).map(|d| crate::ui_script::mark(d, || "field:Search items".into())).child(Input::new(&self.search).appearance(false).small())))
                     .child(small("rel-filter", "filter", "Filter", cx).when(self.filter_open || !self.kinds.is_empty(), |d| d.bg(gpui_kit::rgb(0xeaeaea))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.filter_open = !this.filter_open;
                         cx.notify();
@@ -1439,7 +1442,7 @@ impl Render for ReleaseDialog {
         });
         let overflow = div()
             .relative()
-            .child(boxed("rel-overflow".into(), "more", "", cx).when(self.overflow_open, |d| d.bg(gpui_kit::rgb(0xd7d7d7))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+            .child(boxed("rel-overflow".into(), "more", "", cx).map(|d| crate::ui_script::mark(d, || "button:Release menu".into())).when(self.overflow_open, |d| d.bg(gpui_kit::rgb(0xd7d7d7))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                 this.overflow_open = !this.overflow_open;
                 cx.notify();
             })))
@@ -1499,6 +1502,7 @@ impl Render for ReleaseDialog {
                 let on = self.kinds.contains(&k);
                 div()
                     .id(SharedString::from(format!("rel-kind-{icon}")))
+                    .map(|d| crate::ui_script::mark(d, move || format!("button:Filter:{icon}")))
                     .size(px(26.))
                     .flex()
                     .items_center()
@@ -1642,7 +1646,7 @@ impl Render for ReleaseDialog {
                             )
                         }),
                 )
-                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
+                .child(div().w(px(COL_REVISION)).flex_none().flex().justify_end().px(px(10.)).child(div().w(px(64.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Revision:{n}")) }).child(field(&row.revision, row_issues.iter().any(|x| matches!(x, Issue::InvalidRevision | Issue::RevisionTooLow { .. })), editing && !row.item.not_revision_managed, reverted))))
                 .child(h_flex().w(px(COL_STATE)).flex_none().px(px(10.)).gap(px(6.)).child(state).when(since.is_some(), |d| {
                     d.child(
                         boxed(SharedString::from(format!("rel-revert-{i}")), "undo", if reverted { "Use the workspace item" } else { "Revert to last revision" }, cx)
@@ -1650,7 +1654,7 @@ impl Render for ReleaseDialog {
                             .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.set_reverted(i, !reverted, window, cx))),
                     )
                 }))
-                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).child(field(&row.part_number, missing, pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
+                .child(div().w(px(COL_PART_NUMBER)).flex_none().px(px(10.)).map(|d| { let n = row.item.name.clone(); crate::ui_script::mark(d, move || format!("field:Part number:{n}")) }).child(field(&row.part_number, missing, pn_modified, reverted).when(self.seq_parts && editing && !reverted, |d| {
                     // The field's # ("Generate next part number"), greyed once
                     // the item has a number.
                     let empty = pn.trim().is_empty();
@@ -1764,7 +1768,7 @@ impl Render for ReleaseDialog {
                     .child(
                         h_flex()
                             .gap(px(4.))
-                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
+                            .child(gpui_kit::base::input::input_frame(div().flex_1().h(px(30.)).flex().items_center().border_1().rounded(px(3.)).border_color(if name_empty { red } else { gpui_kit::rgb(0xcccccc) }).map(|d| crate::ui_script::mark(d, || "field:Release name".into())).child(Input::new(&self.name).appearance(false).small().disabled(read_only))))
                             // Numbering schemes › Release names: "Generate next
                             // release name" (not for obsoletions).
                             .when(self.seq_names && self.mode == Mode::Release, |d| {
@@ -1783,7 +1787,7 @@ impl Render for ReleaseDialog {
                             }),
                     )
                     .child(div().pt(px(6.)).child(label(notes_label, notes_required, notes_required && notes_empty && self.mode == Mode::Release)))
-                    .child(Textarea::new(&self.notes).disabled(read_only))
+                    .child(div().map(|d| crate::ui_script::mark(d, || "field:Release notes".into())).child(Textarea::new(&self.notes).disabled(read_only)))
                     .when(self.mode == Mode::Obsolete, |d| {
                         let on = self.re_releasable;
                         d.child(div().pt(px(6.)).child(os::checkbox("rel-rerelease", "Mark revision as re-releasable", on).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -1808,6 +1812,7 @@ impl Render for ReleaseDialog {
                 .when(!enabled, |d| d.opacity(0.5))
                 .when(enabled, |d| d.cursor_pointer())
                 .child(text)
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{text}")))
         };
         let close = |window: &mut Window, cx: &mut App| window.close_dialog(cx);
         // Help (savedraftbutton-relcandidatedialog): Save draft at the
@@ -1845,12 +1850,12 @@ impl Render for ReleaseDialog {
                 left = left.child(
                     div()
                         .relative()
-                        .child(os::secondary_button("rel-draft-menu", "▴", cx).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(os::secondary_button("rel-draft-menu", "▴", cx).map(|d| crate::ui_script::mark(d, || "caret:Save draft".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.draft_menu = !this.draft_menu;
                             cx.notify();
                         })))
                         .when(open, |d| {
-                            let item = |id: &'static str, label: &'static str| div().id(id).px(px(12.)).py(px(6.)).text_size(px(13.)).text_color(pal.accent).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xf2f2f2))).child(label);
+                            let item = |id: &'static str, label: &'static str| div().id(id).px(px(12.)).py(px(6.)).text_size(px(13.)).text_color(pal.accent).cursor_pointer().hover(|d| d.bg(gpui_kit::rgb(0xf2f2f2))).child(label).map(|d| crate::ui_script::mark(d, move || format!("menu:{label}")));
                             d.child(
                                 v_flex()
                                     .absolute()
@@ -1927,6 +1932,16 @@ impl Render for ReleaseDialog {
             Mode::Review => format!("Review Release: {}", self.name.read(cx).value()),
             Mode::Obsolete => "Create Obsolete candidate".into(),
         };
+        // The ui-parity state's `dialog`: the title, a field per item (its revision and part number), the release name.
+        crate::ui_script::note_dialog(|| {
+            let mut fields: Vec<serde_json::Value> = self
+                .rows
+                .iter()
+                .map(|r| serde_json::json!({ "label": r.item.name, "kind": "item", "revision": r.revision.read(cx).value().to_string(), "part_number": r.part_number.read(cx).value().to_string() }))
+                .collect();
+            fields.push(serde_json::json!({ "label": "Release name", "kind": "input", "value": self.name.read(cx).value().to_string() }));
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields })
+        });
         let workflow = self.render_workflow(window, cx);
         v_flex()
             .w_full()
@@ -2042,6 +2057,7 @@ impl Render for ReleaseDraftsPanel {
             };
             h_flex()
                 .id(SharedString::from(format!("draft-{i}")))
+                .map(|el| { let n = d.name.clone(); crate::ui_script::mark(el, move || format!("panel_row:{n}")) })
                 .px(px(12.))
                 .py(px(8.))
                 .gap(px(16.))
@@ -2118,6 +2134,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                             .child(h_flex().gap_1().text_color(pal.text_muted).child("Version:").child(
                                 div()
                                     .id(SharedString::from(format!("rh-ver-{k}")))
+                                    .map(|el| { let n = version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| pkg.name.clone()); crate::ui_script::mark(el, move || format!("history_row:{n}")) })
                                     .text_color(pal.accent)
                                     .cursor_pointer()
                                     .child(version.as_ref().map(|v| v.name.clone()).unwrap_or_else(|| pkg.name.clone()))
@@ -2169,7 +2186,7 @@ pub fn open_revision_history(doc: Entity<DocModel>, part_number: String, window:
                     })
                     .when(e.obsoleted_by.is_none(), |d| {
                         let item = item.clone();
-                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").on_click(move |_, window, cx| {
+                        d.child(div().id(SharedString::from(format!("rh-obs-{k}"))).px(px(10.)).py(px(4.)).rounded(px(3.)).cursor_pointer().text_size(px(13.)).text_color(gpui_kit::rgb_static(0xffffff)).bg(gpui_kit::rgb(0xbd3039)).child("Obsolete revision").map(|d| crate::ui_script::mark(d, || "button:Obsolete revision".into())).on_click(move |_, window, cx| {
                             window.close_dialog(cx);
                             if let Some(it) = item.clone() {
                                 let name = format!("Obsolete {} {}", it.part_number, it.revision);

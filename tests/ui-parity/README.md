@@ -37,6 +37,11 @@ Layout:
 `expect` is optional: what qa already knows of live, to sanity-check a recording. The comparison is always against
 the live recording.
 
+`"recordable": false` (lead 11-08): a scenario built from Onshape's help documentation for what live's plan can't
+show (release management on the Free plan), with `source` "spec from Onshape docs, not recordable on live's plan". It
+counts toward coverage, never toward match (live has no recording of it); live's runners skip it. `--all` runs it on
+ours.
+
 ### start
 A name from `starts.json`: a units setting and a feature list in FeatureScript terms (std's feature types and
 parameter ids; sketches as shapes with corner / centre points in mm on a named plane), so live builds it over REST
