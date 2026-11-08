@@ -28,6 +28,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:44 UTC: every top-level snippet inserts live's text (live 2337)
+- Feature / Table / Computed property definition, Function, Type, Enum, Predicate, Operator, Constant declarations,
+  New feature / table / computed property and Import insert live's texts with its selection after Enter and its Tab
+  stops (the feature rows now also stop on the two comments). No stand-ins left; fs autocomplete scenarios 14/14.
+
 ### 2026-11-08 20:38 UTC: the greyed "Insert into all" takes the keyboard (time-boxed item, ~10 min)
 - Cause: gpui-base's disabled Button stops the mouse-down from bubbling, so no parent listener ran. The footer takes
   the press in the capture phase (`capture_any_mouse_down`) and focuses the studio; vs-cfg-insert-all-disabled now

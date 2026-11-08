@@ -559,26 +559,30 @@ fn top_level() -> &'static [TopSnippet] {
             out + rest
         };
         let snippet = |triggers: &'static [&'static str], caption: &str, template: String| TopSnippet { triggers, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: plain(&template), template, doc: String::new(), rank: 0 } };
-        let feature = crate::feature_studio::NEW_FEATURE.replacen("\"My Feature\"", "\"${1:My Feature}\"", 1).replacen("myFeature", "${2:myFeature}", 1);
-        let function = "function ${1:name}(${2:arg})\n{\n    ${3:// Define the function}\n}\n$0".to_string();
+        // Live studios 2334 / 2337: each text, what Enter selects and where each Tab goes.
+        let feature = crate::feature_studio::NEW_FEATURE
+            .replacen("\"My Feature\"", "\"${1:My Feature}\"", 1)
+            .replacen("myFeature", "${2:myFeature}", 1)
+            .replacen("// Define the parameters of the feature type", "${3:// Define the parameters of the feature type}", 1)
+            .replacen("// Define the function's action", "${4:// Define the function's action}", 1)
+            + "$0";
         let mut out = vec![
-            // Enter inserts the New feature template, "My Feature" selected; Tab goes on to myFeature (live fs-snippet-placeholders).
             snippet(&["defineFeature"], "Define feature", feature.clone()),
             snippet(&["defineTable"], "Define table", DEFINE_TABLE.into()),
             snippet(&["defineComputedProperty"], "Define computed property", DEFINE_PROPERTY.into()),
             snippet(&["featureDefinition", "def"], "Feature definition", feature.clone()),
             snippet(&["tableDefinition", "def"], "Table definition", DEFINE_TABLE.into()),
             snippet(&["computedPropertyDefinition", "def"], "Computed property definition", DEFINE_PROPERTY.into()),
-            snippet(&["functionDefinition", "def"], "Function definition", function),
-            snippet(&["typeDeclaration", "dec"], "Type declaration", "export type ${1:MyType} typecheck ${2:canBeMyType};\n$0".into()),
-            snippet(&["enumDeclaration", "dec"], "Enum declaration", "export enum ${1:MyEnum}\n{\n    ${2:VALUE}\n}\n$0".into()),
-            snippet(&["predicateDeclaration", "dec"], "Predicate declaration", "export predicate ${1:canBeMyType}(${2:value})\n{\n    ${3:// Define the predicate}\n}\n$0".into()),
-            snippet(&["operatorDeclaration", "dec"], "Operator declaration", "export operator+(${1:lhs} is ${2:MyType}, ${3:rhs} is MyType) returns MyType\n{\n    ${4:// Define the operator}\n}\n$0".into()),
-            snippet(&["constantDeclaration", "dec"], "Constant declaration", "const ${1:constName} = ${2:0};".into()),
+            snippet(&["functionDefinition", "def"], "Function definition", "function ${1:functionName}(${2:/* parameters */})\n$3{\n    $4\n}\n$0".into()),
+            snippet(&["typeDeclaration", "dec"], "Type declaration", "type ${1:TypeName} typecheck canBeTypeName;\n\nexport predicate canBeTypeName(value)\n{\n    $2\n}\n$0".into()),
+            snippet(&["enumDeclaration", "dec"], "Enum declaration", "enum ${1:EnumName}\n{\n    ${2:/* List of possible values */}\n}\n$0".into()),
+            snippet(&["predicateDeclaration", "dec"], "Predicate declaration", "predicate ${1:predicateName}(${2:/* Parameters */})\n{\n    $3\n}\n$0".into()),
+            snippet(&["operatorDeclaration", "dec"], "Operator declaration", "operator${1:+}(${2:leftHandSide} is ${3:number}, ${4:rightHandSide} is ${5:number})\n{\n    $6\n}\n$0".into()),
+            snippet(&["constantDeclaration", "dec"], "Constant declaration", "const ${1:constName} = ${2:0};$0".into()),
             snippet(&["newFeature", "feature"], "New feature", feature),
             snippet(&["newTable", "table"], "New table", DEFINE_TABLE.into()),
             snippet(&["newComputedProperty", "computedProperty", "property"], "New computed property", DEFINE_PROPERTY.into()),
-            snippet(&["import"], "Import", "import(path : \"${1:onshape/std/common.fs}\", version : \"${2:3112.0}\");\n$0".into()),
+            snippet(&["import"], "Import", "import(path : \"$1\", version : \"\");$0".into()),
         ];
         const KEYWORDS: [&[&str]; 7] = [&["const"], &["enum"], &["export"], &["function"], &["operator"], &["predicate"], &["type"]];
         for triggers in KEYWORDS {
@@ -714,6 +718,11 @@ mod tests {
         assert_eq!(names("e"), ["export", "Enum declaration", "enum"]);
         assert_eq!(names("p"), ["Predicate declaration", "predicate", "New computed property"]);
         assert!(names("a").is_empty() && names("if").is_empty());
+        // Live 2337: the texts as inserted (their placeholders' defaults).
+        let text = |n: &str| top_level().iter().find(|t| t.entry.name == n).map(|t| t.entry.snippet.clone()).expect(n);
+        assert_eq!(text("Operator declaration"), "operator+(leftHandSide is number, rightHandSide is number)\n{\n    \n}\n");
+        assert_eq!(text("Import"), "import(path : \"\", version : \"\");");
+        assert_eq!(text("Function definition"), "function functionName(/* parameters */)\n{\n    \n}\n");
         let table = top_level().iter().find(|t| t.entry.name == "Define table").map(|t| &t.entry).expect("Define table");
         assert!(table.snippet.starts_with("annotation { \"Table Type Name\" : \"My Table\" }\nexport const myTable = defineTable(") && table.snippet.ends_with("    });\n"), "{}", table.snippet);
         let feature = &top_level()[0].entry;
