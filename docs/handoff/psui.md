@@ -560,8 +560,10 @@ gpui-kit 470 ms (system fonts), **window creation 1044 ms** (later launches 20-1
 in release, so it is the fresh VM's first window), first GPU frame 300 ms. Warm start 825 ms (met). Open 555 ms
 (target 500): the first frame's GPU 143 ms is the runners' first-frame stall. First frames (camera starts after an
 idle) GPU 19-244 ms, steady 6 ms: the paravirtual GPU's idle stall (N000000000). Fixed here: NIST's first model
-frame compiled `silhouette-pulled` in the frame (62 ms), now in the deferred set. Next: NIST's 372 ms between "full
-display in" and "frame 3 scene set", and frame 3's 180 ms beyond its pipeline and color pass.
+frame compiled `silhouette-pulled` in the frame (62 ms), now in the deferred set. NIST's 327-372 ms between "full
+display in" and its scene: the 36 meshes' uploads (silhouette edges, picks, edge levels) one after another; now on
+every core (`upload_bodies_in_parallel`, perf line "scene: N body meshes uploaded in"): ~80 ms on vibe5. Next: frame
+3's ~180 ms on macOS beyond its pipeline and color pass (perf on main once this lands).
 
 
 **11-07 08:58 UTC, lead's order (the 121's final count, then Add custom features, the std tool dialogs, the sketch tool

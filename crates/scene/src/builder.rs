@@ -557,6 +557,11 @@ pub fn build(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache,
     cache.tangent.retain(|_, (w, _)| w.strong_count() > 0);
     cache.images.retain(|_, (w, _)| w.strong_count() > 0);
     cache.picks.retain(|_, (w, _)| w.strong_count() > 0);
+    let t_upload = std::time::Instant::now();
+    let uploaded = upload_bodies_in_parallel(display, opts, cache, up);
+    if uploaded > 0 && noshape_render::perf::enabled() {
+        log::info!(target: "perf", "scene: {uploaded} body meshes uploaded in {:.1} ms", t_upload.elapsed().as_secs_f64() * 1000.0);
+    }
     let mut bodies = 0u32;
     let bodies_from = scene.instances.len();
     for (part_index, b) in display.bodies.iter().enumerate().filter(|(_, b)| !b.hidden) {
@@ -1165,6 +1170,53 @@ fn decode_image(data_base64: &str) -> Option<ImageData> {
     let rgba = image::load_from_memory(&bytes).ok()?.to_rgba8();
     let (width, height) = rgba.dimensions();
     Some(ImageData { corners: [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 1.0, 0.0], [0.0, 1.0, 0.0]], width, height, rgba: rgba.into_raw() })
+}
+
+/// The display levels [`build`] draws for each shown body that aren't uploaded yet, uploaded on every core (NIST's
+/// 400 bodies took ~330 ms on one, mostly their silhouette edges); returns how many.
+fn upload_bodies_in_parallel(display: &StudioDisplay, opts: &SceneOptions, cache: &mut GpuCache, up: &Uploader) -> usize {
+    let mut todo: Vec<Arc<noshape_model::display::MeshBuffers>> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for b in display.bodies.iter().filter(|b| !b.hidden) {
+        let colors = opts.vertex_colors.as_ref().and_then(|m| m.get(&b.id)).filter(|c| c.len() == b.mesh.positions.len());
+        let replaced = opts.replaced_meshes.as_ref().and_then(|m| m.get(&b.id));
+        let shared = SharedMesh::of(display, b).filter(|_| colors.is_none() && replaced.is_none() && !noshape_render::renderer::instancing_disabled());
+        let finest = shared.map_or(&b.mesh, |s| &s.mesh);
+        let coarser: &[Arc<noshape_model::display::MeshBuffers>] = if colors.is_some() || replaced.is_some() { &[] } else { shared.map_or(&b.coarser[..], |s| &s.coarser[..]) };
+        for m in coarser.iter().chain(std::iter::once(finest)) {
+            let key = Arc::as_ptr(m) as usize;
+            if !cache.bodies.contains_key(&key) && seen.insert(key) {
+                todo.push(m.clone());
+            }
+        }
+    }
+    if todo.len() < 2 {
+        return 0;
+    }
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()).min(todo.len());
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let done: Vec<(usize, CachedBody)> = std::thread::scope(|s| {
+        let workers: Vec<_> = (0..threads)
+            .map(|_| {
+                s.spawn(|| {
+                    let mut out = Vec::new();
+                    loop {
+                        let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let Some(m) = todo.get(i) else { break };
+                        out.push((i, upload_body(m, up)));
+                    }
+                    out
+                })
+            })
+            .collect();
+        workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+    });
+    let n = done.len();
+    for (i, body) in done {
+        let m = &todo[i];
+        cache.bodies.insert(Arc::as_ptr(m) as usize, (Arc::downgrade(m), Arc::new(body)));
+    }
+    n
 }
 
 fn upload_body(m: &noshape_model::display::MeshBuffers, up: &Uploader) -> CachedBody {
