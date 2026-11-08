@@ -209,14 +209,16 @@ fn a_cone_to_its_apex_and_a_sphere_mesh_as_brepmesh_meshes_them() {
 }
 
 #[test]
-fn faces_on_curves_brepmesh_splits_stay_brepmesh_and_the_mesh_stays_watertight() {
-    // A hole drilled at an angle: its rims are ellipses (BRepMesh's), so the hole and the faces it cuts are
-    // BRepMesh's; the plate's sides are ours.
+fn a_hole_drilled_on_a_slant_meshes_here_with_its_elliptical_rims() {
+    // A hole drilled at an angle: its rims are ellipses, BRepMesh's until they were edges here too (cf-o-ring-generator's
+    // seven rings each had one: 1.3 s of BRepMesh in its 1.5 s); now every face is ours, within BRepMesh's area,
+    // watertight.
     let plate = make_box_corners(DVec3::ZERO, DVec3::new(40.0, 20.0, 5.0) * MM).unwrap();
     let axis = DVec3::new(0.3, 0.0, 1.0).normalize();
     let hole = make_cylinder(&Plane::new(DVec3::new(20.0, 10.0, -5.0) * MM, axis, DVec3::Y), 2.0 * MM, 15.0 * MM, TAU).unwrap();
     let s = boolean(BooleanOp::Cut, &[plate], &[hole], &BooleanOptions::default()).unwrap().shape;
-    assert_eq!(same_as_brepmesh(&s), 4, "the four sides");
+    assert!(s.sub_shapes(ShapeType::Edge).iter().any(|e| matches!(e.edge_curve(), Ok(Curve::Ellipse { .. }))), "an elliptical rim");
+    assert_hose_meshes_here(&s);
 }
 
 #[test]
@@ -598,3 +600,4 @@ fn a_revolved_spline_meshes_here() {
         assert_hose_meshes_here(&s);
     }
 }
+

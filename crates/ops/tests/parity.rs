@@ -154,8 +154,27 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res.open_ms = t0.elapsed().as_secs_f64() * 1000.0;
     let list = opened.then(|| noshape_ops::registry::by_tool_name("feature_list").map(|op| noshape_ops::registry::run(&mut fresh, op, &json!({})))).flatten();
     res.list_ms = t0.elapsed().as_secs_f64() * 1000.0 - res.open_ms;
+    let t_query = std::time::Instant::now();
     if opened && run(&mut fresh, "query_parts", json!({})) {
         res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
+        // NOSHAPE_PARITY_SPLIT: where the time goes (open, list, parts), then each Part Studio regenerated again from
+        // scratch split into its features and the display (meshes).
+        if std::env::var_os("NOSHAPE_PARITY_SPLIT").is_some() {
+            let query_ms = t_query.elapsed().as_secs_f64() * 1000.0;
+            eprintln!("SPLIT {name}: open {:.0} ms, feature_list {:.0} ms, query_parts {query_ms:.0} ms, total {:.0} ms", res.open_ms, res.list_ms, res.regen_ms.map_or(0.0, |r| r.0));
+            let mut again = noshape_ops::Ctx::new();
+            if let Ok(od) = again.open(&path) {
+                let tabs: Vec<_> = od.doc().ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
+                for tab in tabs {
+                    let t = std::time::Instant::now();
+                    let Ok(r) = od.regenerate(tab, None) else { continue };
+                    let total = t.elapsed().as_secs_f64() * 1000.0;
+                    let tris: usize = r.display.bodies.iter().map(|b| b.mesh.indices.len() / 3).sum();
+                    let features: f64 = r.display.features.iter().map(|f| f.time_ms as f64).sum();
+                    eprintln!("SPLIT {name}:   regenerate {total:.0} ms: features {features:.0} ms, display {:.0} ms, {} bodies, {tris} triangles", total - features, r.display.bodies.len());
+                }
+            }
+        }
         // Its slowest features (the Regeneration times panel's).
         if let Some(Ok(list)) = list {
             res.features_ms = list.value["regen_ms"].as_f64();

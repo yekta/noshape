@@ -393,3 +393,19 @@ fn a_whole_cylinder_under_a_slanted_cut_is_meshed_across_its_seam() {
     assert_eq!(up.len(), 2);
     assert_ne!(up, down);
 }
+
+#[test]
+fn an_elliptical_edge_is_split_on_its_ellipse_within_the_deflections() {
+    let (a, b) = (0.03, 0.01);
+    let vertices = vec![DVec3::new(a, 0.0, 0.0)];
+    let edge = MeshEdge { curve: Some(Curve::Ellipse { center: DVec3::ZERO, normal: DVec3::Z, xdir: DVec3::X, major: a, minor: b, faces: [(0, 0); 2] }), v: [0, 0], t0: 0.0, t1: std::f64::consts::TAU };
+    let defl = Deflection { linear: 1e-4, angular: 0.35 };
+    let n = edge_nodes(&vertices, &edge, defl).expect("nodes");
+    assert_eq!((n.points.first(), n.points.last()), (Some(&vertices[0]), Some(&vertices[0])));
+    for (w, t) in n.points.windows(2).zip(n.params.windows(2)) {
+        // On the ellipse, and the chord's middle within the linear deflection of the curve's point there.
+        let at = |t: f64| DVec3::new(a * t.cos(), b * t.sin(), 0.0);
+        assert!((w[0] - at(t[0])).length() < 1e-12);
+        assert!(((w[0] + w[1]) * 0.5 - at(0.5 * (t[0] + t[1]))).length() <= defl.linear, "sag at t {}", t[0]);
+    }
+}

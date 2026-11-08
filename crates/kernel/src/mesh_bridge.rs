@@ -101,6 +101,12 @@ fn mesh_into(vertices: &[f64], edges: &[u32], curves: &[f64], surfaces: &[f64], 
                 1 => Some(Curve::Circle { center: v3(c, 1), normal: v3(c, 4), xdir: v3(c, 7), radius: c[10] }),
                 2 => Some(Curve::Degenerate),
                 5 => nurbs_at(c[1], false).map(|index| Curve::Nurbs { index, t0: c[11], t1: c[12] }),
+                // An ellipse: its centre, major and minor axis vectors (`faces` is a Boolean's, unused here).
+                6 => {
+                    let (major, minor) = (v3(c, 4), v3(c, 7));
+                    let normal = major.cross(minor).normalize_or_zero();
+                    (normal != DVec3::ZERO).then(|| Curve::Ellipse { center: v3(c, 1), normal, xdir: major.normalize(), major: major.length(), minor: minor.length(), faces: [(0, 0); 2] })
+                }
                 _ => None,
             };
             MeshEdge { curve, v: [input.edges[2 * i], input.edges[2 * i + 1]], t0: c[11], t1: c[12] }

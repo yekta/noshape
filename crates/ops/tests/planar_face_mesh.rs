@@ -402,6 +402,14 @@ fn corpus_triangle_counts_against_brepmesh() {
         for tab in tabs {
             let Ok(r) = od.regenerate(tab, None) else { continue };
             for b in r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid) {
+                if std::env::var_os("NOSHAPE_EDGE_KINDS").is_some() {
+                    let mut kinds = std::collections::BTreeMap::new();
+                    for e in b.shape.sub_shapes(ShapeType::Edge) {
+                        let k = e.edge_curve().map(|c| format!("{c:?}").split([' ', '(', '{']).next().unwrap_or("").to_string()).unwrap_or_else(|err| format!("err {err}"));
+                        *kinds.entry(k).or_insert(0) += 1;
+                    }
+                    eprintln!("EDGES {stem} / {}: {kinds:?}", b.name);
+                }
                 let display = noshape_model::regen::display_deflection(&b.shape, 1.0, false);
                 let medium = (noshape_ops::export::PRESETS[1].0 / 1000.0, noshape_ops::export::PRESETS[1].1.to_radians());
                 for (setting, (lin, ang)) in [display, medium].into_iter().enumerate() {

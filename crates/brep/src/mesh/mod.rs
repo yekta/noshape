@@ -140,6 +140,56 @@ pub fn edge_nodes_with(vertices: &[DVec3], edge: &MeshEdge, defl: Deflection, nu
             }
             Some(EdgeNodes { points, params })
         }
+        Some(Curve::Ellipse { center, normal, xdir, major, minor, .. }) => {
+            // Steps of its parameter by its bending where they are (half the deflections, as a circle's): a chord's
+            // sag under `|P''| h² / 8`, a step's turn (`a b / |P'|²` per unit of t) under the angle; spread by their
+            // density over the range, as a B-spline face's grid steps.
+            let arc = edge.t1 - edge.t0;
+            if !(arc > 0.0 && arc <= std::f64::consts::TAU + 1e-9 && minor > 1e-7 && major >= minor) {
+                return None;
+            }
+            let (lin, ang) = (0.5 * defl.linear, 0.5 * defl.angular);
+            let density = |t: f64| {
+                let (c, s) = (t.cos(), t.sin());
+                let second = (major * major * c * c + minor * minor * s * s).sqrt();
+                let turn = major * minor / (major * major * s * s + minor * minor * c * c);
+                let h = (8.0 * lin / second).sqrt().min(ang / turn).max(1e-7 / major);
+                1.0 / h
+            };
+            const SAMPLES: usize = 256;
+            let dt = arc / SAMPLES as f64;
+            let mut at = Vec::with_capacity(SAMPLES + 1);
+            at.push(0.0);
+            for k in 0..SAMPLES {
+                // (The denser end of each sample: the bending peaks at the axes' ends.)
+                let d = density(edge.t0 + k as f64 * dt).max(density(edge.t0 + (k + 1) as f64 * dt));
+                at.push(at[k] + d * dt);
+            }
+            let total = at[SAMPLES];
+            let n = (total.ceil().min(1e6) as usize).max(3);
+            let ydir = normal.cross(xdir);
+            let mut points = Vec::with_capacity(n + 1);
+            let mut params = Vec::with_capacity(n + 1);
+            let mut k = 0;
+            for i in 0..=n {
+                let t = if i == n {
+                    edge.t1
+                } else {
+                    let c = total * i as f64 / n as f64;
+                    while k + 1 < SAMPLES && at[k + 1] < c {
+                        k += 1;
+                    }
+                    edge.t0 + (k as f64 + ((c - at[k]) / (at[k + 1] - at[k]).max(1e-300)).clamp(0.0, 1.0)) * dt
+                };
+                params.push(t);
+                points.push(match i {
+                    0 => a,
+                    _ if i == n => b,
+                    _ => center + major * t.cos() * xdir + minor * t.sin() * ydir,
+                });
+            }
+            Some(EdgeNodes { points, params })
+        }
         _ => None,
     }
 }

@@ -336,7 +336,7 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
   for (int i = 1; i <= vertices.Extent(); ++i)
     push3(in.vertices, BRep_Tool::Pnt(TopoDS::Vertex(vertices(i))).XYZ());
   // Edges: kind (0 line, 1 circle, 3 another curve or none), centre, normal, x direction, radius, parameter
-  // range (13 numbers); start and end vertex. Each edge's own slots, read in parallel (OCCT's pool, as
+  // range (13 numbers); 6 an ellipse: centre, major and minor axis vectors, parameter range; start and end vertex. Each edge's own slots, read in parallel (OCCT's pool, as
   // BRepMesh's InParallel under the same lock).
   sub = std::make_unique<KernelTimer>("mesh.rust.in.edges");
   const int ne = edges.Extent();
@@ -372,6 +372,14 @@ int rust_mesh_faces(const ShapeIMap& faces, const ShapeIMap& edges, const ShapeI
       put3(cv + 4, g.Axis().Direction().XYZ());
       put3(cv + 7, g.XAxis().Direction().XYZ());
       cv[10] = g.Radius();
+    }
+    else if (const occ::handle<Geom_Ellipse> el = bc.IsNull() ? occ::handle<Geom_Ellipse>() : occ::down_cast<Geom_Ellipse>(bc); !el.IsNull())
+    {
+      const gp_Elips g = el->Elips().Transformed(loc.Transformation());
+      cv[0]            = 6;
+      put3(cv + 1, g.Location().XYZ());
+      put3(cv + 4, g.XAxis().Direction().XYZ() * g.MajorRadius());
+      put3(cv + 7, g.YAxis().Direction().XYZ() * g.MinorRadius());
     }
     else if (!bc.IsNull() && !occ::down_cast<Geom_BSplineCurve>(bc).IsNull())
       cv[0] = 5; // a B-spline: flattened below, in turn
