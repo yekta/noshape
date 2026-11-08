@@ -22,6 +22,9 @@ impl PartStudioView {
         let in_dialog = dialog.and_then(|d| d.ui_focus(window, cx));
         let focus = if let Some(f) = in_dialog.clone() {
             f
+        } else if let Some((label, st)) = self.ui.var_input.as_ref().and_then(|d| d.focused_field(window, cx)) {
+            // The Variable input dialog's field (live: its label, "Name" on opening).
+            crate::feature_dialog::field_focus(label, st)
         } else if let Some(st) = dim_box {
             // Live: an input outside the dialogs.
             let mut f = crate::feature_dialog::field_focus("", st);
@@ -203,6 +206,11 @@ impl PartStudioView {
                 gap = false;
                 parts.push(b.name.clone());
             }
+        }
+        // The rollback bar a click gave the keyboard is a selected item in live's reader (its tree node, no kind).
+        let mut items = items;
+        if self.edit.is_none() && self.ui.list_focus.is_focused(window) && self.ui.rollback_keyboard.as_ref() == Some(&self.selected_features) {
+            items.push(json!({ "kind": null, "owner": null, "id": "rollback-bar", "name": null }));
         }
         let message = self.message.as_ref().filter(|(_, m)| self.edit.is_some() || m != behaviors::NO_INTERSECTION).map(|(_, m)| m.clone());
         // A sketch tool's prompt at the bottom of the view is live's message too.

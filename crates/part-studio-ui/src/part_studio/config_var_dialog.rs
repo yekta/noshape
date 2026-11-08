@@ -73,6 +73,11 @@ pub fn range_error(dim: Option<Dim>, values: [&str; 3], units: &UnitPrefs) -> Op
 }
 
 impl VarInputDialog {
+    /// The focused field and its label (the parity suite's focus).
+    pub(crate) fn focused_field<'a>(&self, window: &Window, cx: &'a App) -> Option<(&'static str, &'a InputState)> {
+        [("Name", &self.name), ("Default", &self.default), ("Minimum", &self.min), ("Maximum", &self.max)].into_iter().map(|(l, e)| (l, e.read(cx))).find(|(_, st)| st.focus_handle(cx).is_focused(window))
+    }
+
     fn texts(&self, cx: &App) -> [String; 3] {
         [&self.default, &self.min, &self.max].map(|s| s.read(cx).value().to_string())
     }
