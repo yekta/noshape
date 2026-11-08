@@ -587,6 +587,8 @@ compiled for the GPU (Metal binary archives / metal-tt for Apple GPU families), 
 same job: texture zoom / orbit, pan, row-click not repeated on re-measure; readback orbit UI CPU p95 repeated
 (4.12 → 5.12, again 4.70 → 6.51; macOS 26 flagged readback zoom UI CPU in the last run too): texture mode's UI CPU
 unchanged (0.81 → 0.79); readback only, nothing per-frame changed since v0.4.36 in our viewport code; watch it.
+WATCH (lead 11-08): readback orbit UI CPU p95. Flagged twice (11-08 macOS 26 readback zoom, macOS 15 readback orbit);
+a third flag on a quiet runner (its other rows steady) → bisect it.
 
 
 **11-08 17:21 UTC, ui-parity leftovers.** key-rollback-bar-arrows matches (the clicked rollback bar reads as a selected
