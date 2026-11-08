@@ -50,6 +50,8 @@ pub struct VariableStudioView {
     cell_focus: HashMap<String, FocusHandle>,
     cell_selected: Option<String>,
     cell_editing: Option<String>,
+    /// A Value cell's `#` list (live vs-value-autocomplete), keyed by the cell.
+    completion: Option<crate::var_complete::VarCompletion>,
     /// The rows last drawn, as the ui-parity state lists them (`ui_rows`).
     ui_drawn: Vec<serde_json::Value>,
     /// The right edge's Configuration panel (variable_config.rs).
@@ -150,6 +152,7 @@ impl VariableStudioView {
             cell_focus: HashMap::new(),
             cell_selected: None,
             cell_editing: None,
+            completion: None,
             ui_drawn: Vec::new(),
             config_open: false,
             cfg_cell: None,
@@ -256,6 +259,37 @@ impl VariableStudioView {
         cx.notify();
     }
 
+    /// What a Value cell's `#` list offers in row `row`: the variables above it (with the inserted tables'), and the
+    /// units of its type.
+    fn scope_above(&self, row: usize, cx: &App) -> (std::collections::BTreeMap<String, noshape_units::Quantity>, Option<noshape_units::Dim>) {
+        let Some(studio) = self.studio(cx) else { return Default::default() };
+        let below: Vec<&str> = studio.variables.iter().skip(row).map(|v| v.name.as_str()).collect();
+        let eval = noshape_model::variables::studio_evaluation(&self.doc.read(cx).session.doc, self.tab);
+        let scope = eval.values.iter().filter(|(n, _)| !below.contains(&n.as_str())).map(|(n, q)| (n.clone(), *q)).collect();
+        (scope, studio.variables.get(row).and_then(|v| v.kind).and_then(|k| k.dim()))
+    }
+
+    /// The `#` list shown (or closed), as the ui-parity state's list.
+    fn set_completion(&mut self, c: Option<crate::var_complete::VarCompletion>) {
+        if c.is_none() && self.completion.is_some() {
+            crate::ui_script::note_list(None);
+        }
+        self.completion = c;
+    }
+
+    /// The `#` list's entry `index` (the selected one when `None`) put in the cell; `commit`: Enter's, which then
+    /// commits the cell as its Enter does.
+    fn accept_completion(&mut self, index: Option<usize>, commit: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(c) = self.completion.take() else { return };
+        crate::ui_script::note_list(None);
+        let Some((st, _)) = self.inputs.get(&c.key).cloned() else { return };
+        c.accept(index, &st, window, cx);
+        if commit {
+            window.defer(cx, |window, cx| window.dispatch_action(Box::new(gpui_kit::component::input::Enter { secondary: false, shift: false }), cx));
+        }
+        cx.notify();
+    }
+
     /// The focus handle of a cell (one per cell, always tracked, so a click
     /// can focus it right away).
     fn cell_focus_handle(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
@@ -334,6 +368,22 @@ impl VariableStudioView {
         let add_row = key == "new";
         let k = key.clone();
         let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| {
+            // A Value cell's `#` list: the variables above the row, as the Part Studio's table (no "New variable…").
+            if let Some(row) = k.strip_prefix('e').and_then(|n| n.parse::<usize>().ok()) {
+                match ev {
+                    InputEvent::Change if this.cell_editing.as_deref() == Some(k.as_str()) => {
+                        let (scope, dim) = this.scope_above(row, cx);
+                        let c = crate::var_complete::VarCompletion::compute(&k, st.read(cx), &scope, dim).map(|mut c| {
+                            c.new_variable = None;
+                            c
+                        });
+                        this.set_completion(c);
+                        cx.notify();
+                    }
+                    InputEvent::Blur | InputEvent::PressEnter { .. } => this.set_completion(None),
+                    _ => {}
+                }
+            }
             if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
                 let v = st.read(cx).value().to_string();
                 // A cell's editor closes: Enter keeps the cell focused, a
@@ -788,20 +838,65 @@ impl Render for VariableStudioView {
                         .into_any_element()
                 }
                 // Editing: the field inside the focused cell's blue border.
-                _ if self.cell_editing.as_deref() == Some(format!("e{i}").as_str()) => gpui_kit::base::input::input_frame(
-                    cell_div(2)
-                        .id(("vs-val", i))
-                        .border_2()
-                        .border_color(rgb(0x1651b0))
-                        .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
-                            if e.keystroke.key == "escape" {
-                                cx.stop_propagation();
-                                this.revert_cell_edit(&format!("e{i}"), window, cx);
-                            }
-                        }))
-                        .child(cell_input(&expr)),
-                )
-                .into_any_element(),
+                _ if self.cell_editing.as_deref() == Some(format!("e{i}").as_str()) => {
+                    let key = format!("e{i}");
+                    let open = self.completion.as_ref().is_some_and(|c| c.key == key);
+                    let list = self.completion.as_ref().filter(|_| open).map(|c| {
+                        let (scope, _) = self.scope_above(i, cx);
+                        let units = self.doc.read(cx).session.doc.settings.units;
+                        crate::ui_script::note_list(Some(c.ui_state(Some((&scope, &units)))));
+                        let view = cx.entity();
+                        c.render(&scope, &units, move |k, window, cx| view.update(cx, |this, cx| this.accept_completion(Some(k), false, window, cx)))
+                    });
+                    use gpui_kit::component::input::{Enter, MoveDown, MoveUp};
+                    gpui_kit::base::input::input_frame(
+                        cell_div(2)
+                            .id(("vs-val", i))
+                            .relative()
+                            .border_2()
+                            .border_color(rgb(0x1651b0))
+                            // Esc closes an open `#` list first (live: the cell stays in edit with its text).
+                            .capture_key_down(cx.listener(move |this, e: &KeyDownEvent, window, cx| {
+                                if e.keystroke.key == "escape" {
+                                    cx.stop_propagation();
+                                    if this.completion.is_some() {
+                                        this.set_completion(None);
+                                        cx.notify();
+                                    } else {
+                                        this.revert_cell_edit(&format!("e{i}"), window, cx);
+                                    }
+                                }
+                            }))
+                            // The list open: ↑ / ↓ move, Enter inserts and commits, Tab inserts.
+                            .when(open, |d| {
+                                d.capture_action(cx.listener(|this, _: &MoveUp, _, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(c) = &mut this.completion {
+                                        c.move_selection(-1);
+                                    }
+                                    cx.notify();
+                                }))
+                                .capture_action(cx.listener(|this, _: &MoveDown, _, cx| {
+                                    cx.stop_propagation();
+                                    if let Some(c) = &mut this.completion {
+                                        c.move_selection(1);
+                                    }
+                                    cx.notify();
+                                }))
+                                .capture_action(cx.listener(|this, _: &Enter, window, cx| {
+                                    cx.stop_propagation();
+                                    this.accept_completion(None, true, window, cx);
+                                }))
+                                .capture_action(cx.listener(|this, _: &crate::actions::DialogTab, window, cx| {
+                                    cx.stop_propagation();
+                                    this.accept_completion(None, false, window, cx);
+                                }))
+                            })
+                            .child(cell_input(&expr))
+                            .children(list),
+                    )
+                    .into_any_element()
+                }
                 // The cell: its value (an expression's result), the stored text
                 // as the tooltip, red with the error when it fails.
                 shown => {

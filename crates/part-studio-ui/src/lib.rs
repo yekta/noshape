@@ -19,7 +19,6 @@ pub mod part_studio_hooks;
 pub mod select_item;
 pub mod sketch_fonts;
 pub mod sketch_mode;
-pub mod var_complete;
 
 // UI tests get their own settings directory, not the user's ~/.config/noshape (noshape-ui-test-support).
 #[cfg(test)]

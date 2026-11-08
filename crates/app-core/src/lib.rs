@@ -59,4 +59,5 @@ pub mod ui_script;
 pub mod user_units;
 pub mod view_cube;
 pub mod print_setup;
+pub mod var_complete;
 pub mod viewport;

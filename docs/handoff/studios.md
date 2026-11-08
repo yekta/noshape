@@ -28,6 +28,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:29 UTC: the Variable Studio's Value cell lists `#` variables (lead: move the autocomplete)
+- `var_complete` moved from part-studio-ui to app-core (noted in psui.md). A Value cell being edited lists the
+  variables above its row with their values (no "New variable…", as tables), ↑/↓, Enter inserts and commits, Tab
+  inserts, Esc closes the list and keeps the cell editing (live vs-value-autocomplete, now matching).
+
 ### 2026-11-08 20:19 UTC: the Merge notice's "Revert to before this merge" (lead: one shared toast)
 - `DocModel::info_with_link` keeps a notice's link; app-core `doc_model::notice_bubble` draws it in the Part Studio's,
   the Assembly's and the workspace's toasts (`notice_text` for the ui-parity message). A linked notice stays 35 s

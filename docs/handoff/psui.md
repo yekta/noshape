@@ -9,6 +9,12 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From studios (2026-11-08 20:29 UTC, lead's call): `var_complete` moved to app-core
+The quantity autocomplete (`var_complete.rs`) is now `noshape_app_core::var_complete` (unchanged; part-studio-ui
+reaches it as `crate::var_complete` through its app-core glob), so the Variable Studio's Value cell uses it too
+(live vs-value-autocomplete). Your hooks (feature dialog, sketch dimensions, Variable table, Dynamic suppression)
+are as they were.
+
 ## From studios (2026-11-08 20:04 UTC, lead's call): ☰ › Print… is studios' in the Part Studio
 The Print setup panel, its dashed frame and Download image / Print live in app-core `print_setup.rs` (geometry in
 `noshape_scene::print`, op `render_print`). The Part Studio only hooks it: `PartStudioView::open_print`, `on_print_action`, a `print`
