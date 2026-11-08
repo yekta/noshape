@@ -1,0 +1,39 @@
+{
+ "name": "fs-ps-acf-click-adds",
+ "about": "Add custom features, Current document at V1: click uip Feature: it joins the toolbar (please remove it from the account afterwards)",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-acf-click-adds (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Current document"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "uip Feature"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

@@ -1,0 +1,55 @@
+{
+ "name": "fs-notices-println",
+ "about": "uip Feature inserted, Monitor Part Studio 1, the notices panel: its println and Result: Regeneration complete",
+ "area": "dx",
+ "source": "universe feature-studio fs-notices-println (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "uip Feature"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Monitor Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "FeatureScript notices"
+   }
+  }
+ ]
+}

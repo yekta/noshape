@@ -1,0 +1,31 @@
+{
+ "name": "fs-tables-add",
+ "about": "Custom tables: Add custom tables (its popup), Escape",
+ "area": "dx",
+ "source": "universe feature-studio fs-tables-add (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom tables"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add custom tables"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

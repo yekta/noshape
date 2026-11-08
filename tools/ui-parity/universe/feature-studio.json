@@ -696,7 +696,22 @@
    "where": "editor gutter",
    "freq": 1,
    "cloud": false,
-   "source": "dom/feature-studio-editor.txt"
+   "source": "dom/feature-studio-editor.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "gutter": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-fold-arrows",
@@ -705,7 +720,22 @@
    "where": "editor gutter",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1572"
+   "source": "behaviours.md:1572",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "fold": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-error-gutter",
@@ -740,7 +770,27 @@
    "where": "editor text",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:6668"
+   "source": "behaviours.md:6668",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "code": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-parse-notices",
@@ -794,7 +844,23 @@
    "where": "editor",
    "freq": 1,
    "cloud": false,
-   "source": "dom/fs-nav-shortcuts.txt"
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "code": "re:my\\w+|uip\\w*"
+      },
+      "mods": "mod"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-hold-ctrl-hover",
@@ -812,7 +878,23 @@
    "where": "editor",
    "freq": 2,
    "cloud": false,
-   "source": "dom/fs-nav-shortcuts.txt"
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "code": "re:define\\w+|op\\w+|q\\w+"
+      },
+      "mods": "mod"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ed-undo-granularity",
@@ -926,7 +1008,20 @@
    "where": "autocomplete list",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:23725"
+   "source": "behaviours.md:23725",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*OperationType"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-list-look",
@@ -956,7 +1051,23 @@
    "where": "right of the list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20380"
+   "source": "behaviours.md:20380",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Down"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-enter-accepts",
@@ -990,7 +1101,25 @@
    "where": "autocomplete list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:20388"
+   "source": "behaviours.md:20388",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "click",
+      "on": {
+       "list_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-tab-not-accept",
@@ -1112,7 +1241,24 @@
    "where": "autocomplete",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:22372"
+   "source": "behaviours.md:22372",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*EntityTy.*"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-overloads",
@@ -1121,7 +1267,20 @@
    "where": "autocomplete list",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:22325"
+   "source": "behaviours.md:22325",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re:.*qCreatedBy"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-no-list-in-string-comment",
@@ -1181,7 +1340,31 @@
    "where": "inserted snippet",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:23716"
+   "source": "behaviours.md:23716",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     },
+     {
+      "do": "key",
+      "key": "Tab"
+     },
+     {
+      "do": "key",
+      "key": "shift+Tab"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-reindent",
@@ -1190,7 +1373,28 @@
    "where": "inserted snippet",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:22318"
+   "source": "behaviours.md:22318",
+   "via": [
+    [
+     {
+      "on": {
+       "editor": "code"
+      }
+     },
+     {
+      "do": "type",
+      "text": "re: +\\w+"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     },
+     {
+      "do": "key",
+      "key": "Tab"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-imp-panel",
@@ -1422,7 +1626,22 @@
    "where": "notices panel row",
    "freq": 2,
    "cloud": false,
-   "source": "dom/fs-notices-panel-style.txt"
+   "source": "dom/fs-notices-panel-style.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "notice": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-monitor-dropdown",
@@ -1431,7 +1650,21 @@
    "where": "notices panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:15679"
+   "source": "behaviours.md:15679",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     },
+     {
+      "on": {
+       "button": "re:Monitor:.*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-println",
@@ -1440,7 +1673,31 @@
    "where": "notices panel (monitored)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:15679"
+   "source": "behaviours.md:15679",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom features in this workspace"
+      }
+     },
+     {
+      "on": {
+       "menu": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Monitor .*"
+      }
+     },
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-notices-close",
@@ -1541,7 +1798,22 @@
    "where": "editor top-left while profiling",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3182"
+   "source": "behaviours.md:3182",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "profile_badge": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-profile-line-bars",
@@ -1550,7 +1822,22 @@
    "where": "editor gutter while profiling",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3186"
+   "source": "behaviours.md:3186",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "heat": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-profile-refresh-on-commit",
@@ -1582,7 +1869,32 @@
    "where": "Commit",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:6667"
+   "source": "behaviours.md:6667",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom features in this workspace"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "menu": "*"
+      }
+     },
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      }
+     },
+     {
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-module-outline-search",
@@ -1853,7 +2165,26 @@
    "where": "Versions and history › Compare",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4723"
+   "source": "behaviours.md:4723",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "on": {
+       "history_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-view-version-readonly",
@@ -1894,7 +2225,21 @@
    "where": "Part Studio right strip › Custom tables",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1626"
+   "source": "behaviours.md:1626",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      }
+     },
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-selector",
@@ -1903,7 +2248,21 @@
    "where": "Custom tables panel",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1643"
+   "source": "behaviours.md:1643",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "on": {
+       "button": "Table selector"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-switch-to-studio",
@@ -1912,7 +2271,26 @@
    "where": "Custom tables panel ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1628"
+   "source": "behaviours.md:1628",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "on": {
+       "button": "Custom tables more"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Switch to .*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-copy-table",
@@ -1921,7 +2299,26 @@
    "where": "table section ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1629"
+   "source": "behaviours.md:1629",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "on": {
+       "button": "re:Table more:.*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-row-hover",
@@ -1930,7 +2327,22 @@
    "where": "Custom tables row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1642"
+   "source": "behaviours.md:1642",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "table_cell": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-cell-tooltips",
@@ -1939,7 +2351,22 @@
    "where": "Custom tables cells",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1638"
+   "source": "behaviours.md:1638",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "table_cell": "re:.*:Check"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tables-add",
@@ -1948,7 +2375,21 @@
    "where": "Custom tables footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1644"
+   "source": "behaviours.md:1644",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom tables"
+      }
+     },
+     {
+      "on": {
+       "button": "Add custom tables"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-ws-custom-features-menu",
@@ -1957,7 +2398,21 @@
    "where": "Part Studio toolbar right end",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:20960"
+   "source": "behaviours.md:20960",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      }
+     },
+     {
+      "on": {
+       "button": "Custom features in this workspace"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-ws-feature-tooltip",
@@ -1966,7 +2421,22 @@
    "where": "Custom features in this workspace ▾ row hover",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:6659"
+   "source": "behaviours.md:6659",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom features in this workspace"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "menu": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-insert-custom-feature",
@@ -1975,7 +2445,22 @@
    "where": "Custom features in this workspace ▾ item",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:6662"
+   "source": "behaviours.md:6662",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Custom features in this workspace"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "menu": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-custom-feature-error",
@@ -1984,7 +2469,27 @@
    "where": "Part Studio feature list",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:6672"
+   "source": "behaviours.md:6672",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      }
+     },
+     {
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      }
+     },
+     {
+      "do": "hover",
+      "on": {
+       "feature": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-add-custom-features",
@@ -2031,7 +2536,26 @@
    "where": "Add custom features dialog",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:37255"
+   "source": "behaviours.md:37255",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      }
+     },
+     {
+      "on": {
+       "tab": "Current document"
+      }
+     },
+     {
+      "on": {
+       "list_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-acf-other-documents",
@@ -2040,7 +2564,26 @@
    "where": "Add custom features dialog",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:37232"
+   "source": "behaviours.md:37232",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      }
+     },
+     {
+      "on": {
+       "tab": "Other documents"
+      }
+     },
+     {
+      "on": {
+       "list_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-acf-public-samples",
@@ -2067,7 +2610,21 @@
    "where": "Add custom features dialog",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:37262"
+   "source": "behaviours.md:37262",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      }
+     },
+     {
+      "on": {
+       "button": "Close"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-acf-learn",
@@ -2076,7 +2633,21 @@
    "where": "Add custom features dialog footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:37230"
+   "source": "behaviours.md:37230",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      }
+     },
+     {
+      "on": {
+       "button": "Learn about FeatureScript"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-added-tool-menu",
@@ -2085,7 +2656,27 @@
    "where": "added custom feature toolbar button right-click",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:37258"
+   "source": "behaviours.md:37258",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Add custom features"
+      }
+     },
+     {
+      "on": {
+       "list_row": "*"
+      }
+     },
+     {
+      "do": "rclick",
+      "on": {
+       "tool": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ps-show-code",

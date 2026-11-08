@@ -1,0 +1,33 @@
+{
+ "name": "fs-notices-monitor-dropdown",
+ "about": "the notices panel's Part Studio 1 Monitor ▾, then Monitor",
+ "area": "dx",
+ "source": "universe feature-studio fs-notices-monitor-dropdown (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "FeatureScript notices"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor:Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Monitor Part Studio 1"
+   }
+  }
+ ]
+}

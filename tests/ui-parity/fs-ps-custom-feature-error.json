@@ -1,0 +1,73 @@
+{
+ "name": "fs-ps-custom-feature-error",
+ "about": "uip Feature inserted, then a broken line committed: its row in Part Studio 1 and its tooltip",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-custom-feature-error (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "uip Feature"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "uip("
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Commit Feature Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "feature": "uip Feature 1"
+   }
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "name": "fs-tables-selector",
+ "about": "Custom tables: the table selector ▾ (My / Workspace custom tables)",
+ "area": "dx",
+ "source": "universe feature-studio fs-tables-selector (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom tables"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Table selector"
+   }
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "fs-tables-cell-tooltips",
+ "about": "Custom tables: hover the error cell, then the info cell",
+ "area": "dx",
+ "source": "universe feature-studio fs-tables-cell-tooltips (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom tables"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "table_cell": "Part 1:Check"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "table_cell": "Part 1:Info"
+   }
+  }
+ ]
+}

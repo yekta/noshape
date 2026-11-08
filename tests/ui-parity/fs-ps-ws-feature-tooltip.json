@@ -1,0 +1,27 @@
+{
+ "name": "fs-ps-ws-feature-tooltip",
+ "about": "hover uip Feature in Custom features in this workspace ▾: Feature from current workspace",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-ws-feature-tooltip (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "menu": "uip Feature"
+   }
+  }
+ ]
+}

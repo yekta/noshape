@@ -1,0 +1,28 @@
+{
+ "name": "fs-ed-gutter-line-numbers",
+ "about": "click line 2's number in the gutter, then shift+click line 1's",
+ "area": "dx",
+ "source": "universe feature-studio fs-ed-gutter-line-numbers (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "gutter": 2
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "gutter": 1
+   },
+   "mods": "shift"
+  }
+ ]
+}

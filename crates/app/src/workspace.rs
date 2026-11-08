@@ -417,6 +417,14 @@ impl Workspace {
         }
     }
 
+    /// The active tab's Feature Studio, if it is one (ui-parity driver).
+    pub(crate) fn active_feature_studio(&self) -> Option<Entity<crate::feature_studio::FeatureStudioView>> {
+        match self.active.and_then(|t| self.views.get(&t)) {
+            Some(TabView::FeatureStudio(v)) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     /// The active tab's Assembly view, if it is one (ui-parity driver).
     pub(crate) fn active_assembly(&self) -> Option<Entity<AssemblyView>> {
         match self.active.and_then(|t| self.views.get(&t)) {

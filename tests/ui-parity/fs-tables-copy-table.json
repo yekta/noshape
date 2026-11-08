@@ -1,0 +1,33 @@
+{
+ "name": "fs-tables-copy-table",
+ "about": "Custom tables: the Faces table's ⋯ › Copy table",
+ "area": "dx",
+ "source": "universe feature-studio fs-tables-copy-table (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom tables"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Table more:Faces"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy table"
+   }
+  }
+ ]
+}

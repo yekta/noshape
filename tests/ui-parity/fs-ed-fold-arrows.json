@@ -1,0 +1,69 @@
+{
+ "name": "fs-ed-fold-arrows",
+ "about": "New feature, fold line 8 (its precondition's {): Down from line 8 skips the fold; unfold, Up",
+ "area": "dx",
+ "source": "universe feature-studio fs-ed-fold-arrows (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "New feature"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "fold": 8
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "code": "precondition"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Down"
+  },
+  {
+   "do": "key",
+   "key": "Down"
+  },
+  {
+   "do": "click",
+   "on": {
+    "fold": 8
+   }
+  },
+  {
+   "do": "key",
+   "key": "Up"
+  },
+  {
+   "do": "key",
+   "key": "Up"
+  }
+ ]
+}

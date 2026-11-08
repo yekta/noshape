@@ -26,6 +26,9 @@ use crate::{
 /// hold its popover).
 pub static SELECTED_ROW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+/// NOSHAPE PATCH: where the open Ace-style list's rows were painted, by label (the ui-parity driver's `list_row`).
+pub static ROW_BOUNDS: std::sync::Mutex<Vec<(SharedString, gpui::Bounds<gpui::Pixels>)>> = std::sync::Mutex::new(Vec::new());
+
 struct ContextMenuDelegate {
     query: SharedString,
     ace: bool,
@@ -39,6 +42,9 @@ impl ContextMenuDelegate {
         self.items = items.into_iter().map(Rc::new).collect();
         self.selected_ix = 0;
         SELECTED_ROW.store(0, std::sync::atomic::Ordering::Relaxed);
+        if let Ok(mut rows) = ROW_BOUNDS.lock() {
+            rows.clear();
+        }
     }
 
     fn selected_item(&self) -> Option<&Rc<CompletionItem>> {
@@ -158,8 +164,23 @@ impl RenderOnce for CompletionMenuItem {
                     )
                 })
                 .collect();
+            let label = SharedString::from(item.label.clone());
             return h_flex()
                 .id(self.ix)
+                .relative()
+                .child(
+                    gpui::canvas(
+                        move |b, _, _| {
+                            if let Ok(mut rows) = ROW_BOUNDS.lock() {
+                                rows.retain(|(l, _)| *l != label);
+                                rows.push((label.clone(), b));
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .size_full(),
+                )
                 .h(px(20.))
                 .px(px(4.))
                 .justify_between()

@@ -311,6 +311,24 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 - State on a Feature Studio tab: `"featurestudio": {"caret": [line, column], "line": "<the caret's line>", "lines":
   n, "committed": true, "notices": n}` (from 0; `committed`: the text is what was last committed; `notices`: the
   studio's notices after the last commit); the autocomplete is `list` (`"kind": "autocomplete"`, its rows' names).
+- Code targets (dx, 11-08): `{"code": "myFeature", "nth": 2}` the middle of that text's nth occurrence in the editor
+  (default 1st); `{"gutter": 3}` line 3's number cell (1-based; a text instead: the first line holding it);
+  `{"fold": 8}` line 8's fold arrow (Ace's ▾; only lines whose last open bracket closes on a later line have one);
+  `{"heat": "println"}` while profiling, the heat bar beside that line; `{"profile_badge": "total"}` the profile's
+  total-time badge. `{"list_row": "Define feature"}` an autocomplete row by its caption. Profile times (in `tooltip`
+  and `panels`) are compared as `<time>`.
+- The FeatureScript notices panel: `{"notice": "uip too deep"}` a notice row by (part of) its message;
+  `{"button": "Monitor:Part Studio 1"}` a Part Studio section's Monitor ▾.
+- Start `fs-custom` (dx, 11-08): block's box, then Feature Studio 1 (committed) with the custom feature "uip Feature"
+  (a Depth length; it printlns "uip depth …" and throws "uip too deep" past 30 mm) and the custom table "Part faces"
+  (table "Faces": Part, Faces, an error cell Check "?" with "uip check", Info 0 with the info "uip info"), then V1.
+  In Part Studio 1: `{"button": "Custom features in this workspace"}` (its rows are `menu`); the right strip's
+  `{"button": "Custom tables"}` panel: `{"button": "Table selector"}` (badge + name ▾), `{"button": "Custom tables
+  more"}` (the panel's ⋯), `{"button": "Table more:Faces"}` (a table section's ⋯), `{"table_cell": "Part 1:Check"}`
+  a cell by its row's first cell and its column, `{"button": "Add custom tables"}`. The toolbar's ⊞ `{"tool": "Add
+  custom features"}` panel: `{"tab": "Current document"}` / `"Other documents"`, its rows `{"list_row": "Owned by
+  me"}` (a filter, a document, a feature), `{"button": "Close"}` (✕), `{"button": "Learn about FeatureScript"}` and
+  its `{"button": "?"}`.
 
 ### Documents page and Preferences (studios, 11-07)
 A start with `"page"` opens on a page instead of a document: `"documents"` (the documents page, on Owned by me) or

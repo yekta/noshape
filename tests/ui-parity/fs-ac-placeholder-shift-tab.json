@@ -1,0 +1,57 @@
+{
+ "name": "fs-ac-placeholder-shift-tab",
+ "about": "opExtrude snippet: Tab, Tab, Shift+Tab x3 (stays on the first)",
+ "area": "dx",
+ "source": "universe feature-studio fs-ac-placeholder-shift-tab (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "type",
+   "text": "opExtrude"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "key",
+   "key": "Tab"
+  },
+  {
+   "do": "key",
+   "key": "shift+Tab"
+  },
+  {
+   "do": "key",
+   "key": "shift+Tab"
+  },
+  {
+   "do": "key",
+   "key": "shift+Tab"
+  }
+ ]
+}

@@ -11,6 +11,23 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-08 19:01 UTC: Feature Studio area (lead): coverage 78 -> 113 / 119; STL presets not landed
+
+- **Area before:** 328/337 states (97.3 %) × 78/119 coverage = 63.7 % (lead's 36.9 % was older). Batch fs-1: 35
+  scenarios (tests/ui-parity/fs-ac-*, fs-ed-*, fs-notices-*, fs-profile-*, fs-tables-*, fs-ps-*, fs-commit-regenerates,
+  fs-compare), start `fs-custom`, `via` chains in universe/feature-studio.json: coverage 113/119. Generator:
+  dx-scratch/fsb1/gen.py. New targets (README "Feature Studio"): `code`, `gutter`, `fold`, `heat`, `profile_badge`,
+  `notice`, `button:Monitor:<studio>`, `table_cell`, custom tables' and Add custom features' buttons, editor
+  autocomplete `list_row` (a vendor patch: ROW_BOUNDS). All 35 run on ours; asked live for recordings.
+- Fixed on the way: hovering the profile's total badge crashed the app (`hidden().group_hover(block)`: GPUI's
+  "must call prepaint before paint"); the editor had no fold arrows (Ace's C-style folds now, `fold_lines`).
+- Ours lacks, live will show: the notices panel's Monitor ▾ is no dropdown (ours sets the monitor at once); an added
+  custom feature has no toolbar button of its own (fs-ps-added-tool-menu's last step).
+- Not covered yet (6): fs-tb-undo-compact, -snippet-compact, -import-compact, -collapse-breakpoints (need a narrow
+  window step), fs-ed-dark-theme, fs-ed-hold-ctrl-hover (cursor not in the state).
+- **STL presets (dx-stl-presets): not landed**, see the 17:24 entry: live2's knob-jason / pulley02 files are 1.5-3x
+  denser than ours.
+
 ## From the lead (2026-11-08 14:08 UTC), for when dx resumes
 - Done 11-08 (dx): Create Drawing records its "New drawing name" field as live's recorder does from 11-08 (the runner
   skips the field against older recordings without it). (From studios: it recorded no fields.)
@@ -74,8 +91,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   doubled, through `k::tessellate_export` (BRepMesh alone via `mesh_prepare(exact)`, on a 1000× copy, psui's
   closed-mesh repairs, positions back in f64). clamp-hms 24,596 / 34,712 / 49,044 triangles for live's 24,608 /
   34,732 / 49,056, but knob-jason 560k / 1.10M / 2.02M and pulley02-maxwell 362k / 828k / 1.77M (freeform faces
-  refined both ways). **Land only when live's preset files (REQUESTS 16:24) put those two within ~10 %; if they
-  don't come by 11-09 04:00 UTC: cap the presets at a sane triangle density for freeform faces and tell the lead.**
+  refined both ways). **Live2's files (2335, 11-08 18:47) are denser still: knob-jason 832k / 1.65M / 4.16M,
+  pulley02-maxwell 1.06M / 2.12M / 4.23M, so ours is 33-51 % and 58-66 % short: not landed.** Where: pulley02's
+  revolved groove (r 60-75) has circumferential edges of 0.186 mm in live, 0.334 in ours (the R 64 circle's sag
+  would allow 0.35 at 0.24 µm): live sizes a face's facets (and its boundary edges) by its smallest curvature
+  radius, isotropically; BRepMesh discretises an edge by its own curvature. knob-jason is denser everywhere by 1.5x.
+  dx-scratch/bin/stlvox.py, stldir.py. The 04:00 fallback no longer applies (live answered).
 - **cf-hose-routing Parasolid:** live 2334 confirms all 8 parts import. Only the surface half was needed (a closed
   B-spline surface periodic only when its seam knot comes down, else split: our hoses read back 22 faces for the
   model's 12, still a count difference); the edge half split motor-mount-jack's rings (16/48/48) and is reverted;

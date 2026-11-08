@@ -14,6 +14,7 @@ mod overlay;
 pub(crate) mod popovers;
 /// NOSHAPE PATCH: the open completion list's highlighted row (the ui-parity driver).
 pub use popovers::completion_menu::SELECTED_ROW as COMPLETION_SELECTED_ROW;
+pub use popovers::completion_menu::ROW_BOUNDS as COMPLETION_ROW_BOUNDS;
 mod search;
 mod syntax_context;
 

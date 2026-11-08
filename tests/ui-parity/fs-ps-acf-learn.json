@@ -1,0 +1,33 @@
+{
+ "name": "fs-ps-acf-learn",
+ "about": "Add custom features: Learn about FeatureScript (a browser tab), the ? help",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-acf-learn (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Learn about FeatureScript"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "?"
+   }
+  }
+ ]
+}

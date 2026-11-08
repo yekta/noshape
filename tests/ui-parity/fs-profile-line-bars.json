@@ -1,0 +1,55 @@
+{
+ "name": "fs-profile-line-bars",
+ "about": "uip Feature inserted, Profile Part Studio 1, hover the println line's heat bar",
+ "area": "dx",
+ "source": "universe feature-studio fs-profile-line-bars (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "uip Feature"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Profile Part Studio 1"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "heat": "println"
+   }
+  }
+ ]
+}

@@ -84,7 +84,10 @@ def run_one(app, scenario, out, display, timeout):
         return "timed out"
     err = proc.stderr.read()
     if not out.exists():
-        return "no recording: " + " | ".join(l for l in err.splitlines() if "UI-SCRIPT" in l or "panicked" in l)[:300]
+        lines = err.splitlines()
+        # A panic first, with its message (the line after "panicked at"), then the steps that ran.
+        panic = [" ".join(lines[i:i + 2]) for i, l in enumerate(lines) if "panicked" in l][:1]
+        return "no recording: " + " | ".join(panic + [l for l in lines if "UI-SCRIPT" in l])[:600]
     return None
 
 
@@ -499,6 +502,14 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             if isinstance(side.get("list"), dict) and side["list"].get("kind") == "autocomplete" and isinstance(side.get("featurestudio"), dict):
                 side["featurestudio"].pop("notices", None)
+        # A profile's times (Feature Studio Monitor › Profile: its badge, line bars and their tooltips) are the machine's.
+        timed = lambda t: re.sub(r"\b\d+(\.\d+)? ?(ms|s)\b", "<time>", t) if isinstance(t, str) else t
+        for side in (a, b):
+            if isinstance(side.get("featurestudio"), dict):
+                side["tooltip"] = timed(side.get("tooltip"))
+                for pn in side.get("panels") or []:
+                    if isinstance(pn, dict):
+                        pn["text"] = timed(pn.get("text"))
         # Live lists a studio's child rows (Insert Variable Studio's variables) in a different order on each run.
         for side in (a, b):
             if isinstance(side.get("dialog"), dict) and isinstance(side["dialog"].get("fields"), list):

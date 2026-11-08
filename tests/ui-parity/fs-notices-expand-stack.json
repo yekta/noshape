@@ -1,0 +1,79 @@
+{
+ "name": "fs-notices-expand-stack",
+ "about": "uip Feature inserted at Depth 40 mm (it throws), Monitor, notices panel, expand the error to its stack",
+ "area": "dx",
+ "source": "universe feature-studio fs-notices-expand-stack (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "uip Feature"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "40"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Monitor Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "FeatureScript notices"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "notice": "uip too deep"
+   }
+  }
+ ]
+}

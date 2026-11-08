@@ -1,0 +1,21 @@
+{
+ "name": "fs-tables-panel",
+ "about": "Part Studio 1's Custom tables panel: the workspace's Part faces table",
+ "area": "dx",
+ "source": "universe feature-studio fs-tables-panel (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom tables"
+   }
+  }
+ ]
+}

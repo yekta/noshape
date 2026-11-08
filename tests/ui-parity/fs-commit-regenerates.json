@@ -1,0 +1,59 @@
+{
+ "name": "fs-commit-regenerates",
+ "about": "uip Feature inserted (Depth 25 mm), its limit 30 edited to 20 and committed: Part Studio 1 regenerates (the feature fails)",
+ "area": "dx",
+ "source": "universe feature-studio fs-commit-regenerates (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "uip Feature"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "dblclick",
+   "on": {
+    "code": "30"
+   }
+  },
+  {
+   "do": "type",
+   "text": "20"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Commit Feature Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  }
+ ]
+}

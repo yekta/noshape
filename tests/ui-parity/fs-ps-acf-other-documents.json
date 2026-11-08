@@ -1,0 +1,33 @@
+{
+ "name": "fs-ps-acf-other-documents",
+ "about": "Add custom features: Other documents, then Owned by me",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-acf-other-documents (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Other documents"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "Owned by me"
+   }
+  }
+ ]
+}

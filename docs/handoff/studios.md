@@ -28,6 +28,20 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 19:01 UTC: dx takes the Feature Studio area's uncovered items (lead 11-08)
+- docs/parity/INDEX.md gives "Feature Studio and FeatureScript editor" to dx. dx takes these 35 (batch fs-1, start
+  `fs-custom`): fs-ac-click-accepts, -overloads, -tie-order, -enum-name-insert, -doc-tooltip, -placeholder-shift-tab,
+  -reindent; fs-ed-gutter-line-numbers, -fold-arrows, -ctrl-click-definition, -ctrl-click-std, -error-squiggle;
+  fs-notices-println, -expand-stack, -monitor-dropdown; fs-profile-total-badge, -line-bars; fs-commit-regenerates;
+  fs-compare; fs-tables-panel, -selector, -switch-to-studio, -copy-table, -row-hover, -cell-tooltips, -add;
+  fs-ps-ws-custom-features-menu, -ws-feature-tooltip, -insert-custom-feature, -custom-feature-error, -acf-click-adds,
+  -acf-other-documents, -acf-close, -acf-learn, -added-tool-menu; and the fs-* mismatches that aren't yours
+  (fs-ps-show-code, fs-shortcuts-sheet, the notices counts). Yours stay yours: Define table / Define computed
+  property, fs-autocomplete-backspace, fs-tb-redo. Left for later: the narrow-toolbar items (fs-tb-*-compact,
+  fs-tb-collapse-breakpoints) and fs-ed-dark-theme, fs-ed-hold-ctrl-hover.
+
+### 2026-11-08 17:58 UTC: Preferences 49/56 scenarios (from 43)
+
 ### 2026-11-08 18:47 UTC: Variable Studio types keep their values; live's answers 2336
 - A Variable Studio row keeps one value per type (`VariableDef::other_values`, as FeatureScript's Variable): a new
   type starts at 0 in the workspace unit, going back restores the old value (live vs-type-*). The table's title reads

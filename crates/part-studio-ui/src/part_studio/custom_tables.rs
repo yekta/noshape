@@ -145,6 +145,7 @@ impl PartStudioView {
         // The selector (live: 220 × 33, #aaa border, badge + name ▾) and ⋯.
         let selector = h_flex()
             .id("ct-selector")
+            .map(|d| crate::ui_script::mark(d, || "button:Table selector".into()))
             .w(px(220.))
             .h(px(33.))
             .px(px(5.))
@@ -162,6 +163,7 @@ impl PartStudioView {
             }));
         let more = div()
             .id("ct-more")
+            .map(|d| crate::ui_script::mark(d, || "button:Custom tables more".into()))
             .w(px(42.))
             .h(px(33.))
             .flex()
@@ -229,6 +231,7 @@ impl PartStudioView {
             .child(
                 div()
                     .id(("ct-section-more", index))
+                    .map(|d| crate::ui_script::mark(d, || format!("button:Table more:{}", t.title)))
                     .child(crate::os_ui::glyph(crate::os_ui::GLYPH_OVERFLOW, 20., gpui_kit::rgb(0x094174)))
                     .on_click(move |e: &ClickEvent, window, cx| {
                         cx.stop_propagation();
@@ -275,8 +278,10 @@ impl PartStudioView {
                         cx.notify();
                     }
                 }));
+            let first = t.columns.first().map(|c| row.text(&c.id).to_string()).unwrap_or_default();
             for (ci, c) in t.columns.iter().enumerate() {
                 let value = row.cell(&c.id);
+                let mark = format!("table_cell:{first}:{}", c.name);
                 let text = row.text(&c.id).to_string();
                 let right = c.alignment.as_deref() == Some("RIGHT");
                 let center = c.alignment.as_deref() == Some("CENTER");
@@ -284,6 +289,7 @@ impl PartStudioView {
                 let info = value.and_then(|v| v.info.clone());
                 let content = h_flex()
                     .id(SharedString::from(format!("ct-cell-{index}-{ri}-{ci}")))
+                    .map(|d| crate::ui_script::mark(d, || mark))
                     .size_full()
                     .px(px(7.))
                     .bg(if error.is_some() { gpui_kit::rgb(0xf9ebec) } else { gpui_kit::rgb(0xf5f5f5) })
@@ -314,6 +320,7 @@ impl PartStudioView {
         let pal = p();
         h_flex()
             .id("add-custom-tables")
+            .map(|d| crate::ui_script::mark(d, || "button:Add custom tables".into()))
             .h(px(33.))
             .px(px(10.))
             .gap(px(3.))

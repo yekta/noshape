@@ -223,7 +223,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "editor", "cp_header"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "editor", "cp_header", "notice", "profile_badge", "table_cell"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
@@ -255,13 +255,14 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 }
             }
         }
-        // A field named by part of its label ("Distance" for "Offset distance"), a button by the words of its tooltip
-        // ("Mass properties" for "Display mass and section properties", as live's runner), when only one matches.
-        for kind in ["field:", "button:"] {
+        // A field named by part of its label ("Distance" for "Offset distance"), a notice by part of its message, a
+        // button by the words of its tooltip ("Mass properties" for "Display mass and section properties", as live's
+        // runner), when only one matches.
+        for kind in ["field:", "button:", "notice:"] {
             if let Some(f) = name.strip_prefix(kind).map(str::to_lowercase) {
                 let has = |k: &str| {
                     let k = k[kind.len()..].to_lowercase();
-                    if kind == "field:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }
+                    if kind != "button:" { k.contains(&f) } else { f.split_whitespace().all(|w| k.split_whitespace().any(|x| x == w)) }
                 };
                 let near: Vec<_> = noshape_app_core::ui_script::named(kind).into_iter().filter(|(k, _)| has(k)).collect();
                 if let [(_, b)] = near.as_slice() {
@@ -416,8 +417,9 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let ps = studio(cx);
             let asm = ws.update(cx, |w, _| w.active_assembly()).ok().flatten();
             let drw = ws.update(cx, |w, _| w.active_drawing()).ok().flatten();
+            let fsv = ws.update(cx, |w, _| w.active_feature_studio()).ok().flatten();
             let result: Result<(), String> = match what {
-                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| locate(&target, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| fsv.as_ref().and_then(|v| v.read(cx).ui_target_point(&target, cx)).unwrap_or_else(|| locate(&target, &ps, &asm, &drw, cx))).unwrap_or_else(|e| Err(e.to_string())) {
                     Ok(at) => {
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let from = pointer.unwrap_or(at);

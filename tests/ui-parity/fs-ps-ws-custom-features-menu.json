@@ -1,0 +1,21 @@
+{
+ "name": "fs-ps-ws-custom-features-menu",
+ "about": "Part Studio 1: Custom features in this workspace ▾ lists uip Feature",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-ws-custom-features-menu (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Custom features in this workspace"
+   }
+  }
+ ]
+}

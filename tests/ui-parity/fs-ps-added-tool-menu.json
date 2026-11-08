@@ -1,0 +1,45 @@
+{
+ "name": "fs-ps-added-tool-menu",
+ "about": "uip Feature added from V1, then its toolbar button right-clicked (remove it from the account afterwards)",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-added-tool-menu (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tab": "Current document"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "uip Feature"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "tool": "uip Feature"
+   }
+  }
+ ]
+}

@@ -523,6 +523,8 @@ pub struct FeatureStudioView {
     /// a new session takes the account's checkbox; the AI service itself is
     /// cloud-only and not built, so the switch does nothing else).
     co_complete: bool,
+    /// The pointer is over the profile's total badge (its sentence and heading show).
+    badge_hover: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -557,6 +559,43 @@ impl FeatureStudioView {
             completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
             completion_kinds: menu.open.then(|| menu.items.iter().map(|i| i.detail.clone().unwrap_or_default()).collect()),
         }
+    }
+
+    /// Where a ui-parity target in the code shows (tests/ui-parity/README.md "Feature Studio"): `code` the middle of a
+    /// text's `nth` occurrence; `gutter`, `fold`, `heat` a line's number cell, fold arrow and profile bar (a line
+    /// number, or the first line holding that text). `None`: not an editor target.
+    pub fn ui_target_point(&self, t: &serde_json::Value, cx: &App) -> Option<Result<Point<Pixels>, String>> {
+        let ed = self.editor.read(cx);
+        let text = ed.value().to_string();
+        // The autocomplete's rows by their caption.
+        if let Some(row) = t.get("list_row").and_then(|v| v.as_str()).filter(|_| ed.completion_menu_state().open) {
+            let rows = gpui_kit::component::input::COMPLETION_ROW_BOUNDS.lock().map(|r| r.clone()).unwrap_or_default();
+            return Some(rows.iter().find(|(l, _)| l.as_ref() == row).map(|(_, b)| b.center()).ok_or_else(|| format!("list_row:{row} is not shown")));
+        }
+        if let Some(code) = t.get("code").and_then(|v| v.as_str()) {
+            let nth = t.get("nth").and_then(|v| v.as_u64()).unwrap_or(1).max(1) as usize;
+            let at = text.match_indices(code).nth(nth - 1).map(|(i, _)| i);
+            return Some(at.and_then(|i| ed.range_to_bounds(&(i..i + code.len()))).map(|b| b.center()).ok_or_else(|| format!("code:{code} is not shown")));
+        }
+        let (key, spec) = ["gutter", "fold", "heat"].into_iter().find_map(|k| t.get(k).map(|v| (k, v)))?;
+        let lines: Vec<&str> = text.split('\n').collect();
+        let line = match (spec.as_u64(), spec.as_str()) {
+            (Some(n), _) => (n as usize).checked_sub(1).filter(|i| *i < lines.len()),
+            (_, Some(s)) => lines.iter().position(|l| l.contains(s)),
+            _ => None,
+        };
+        let Some(line) = line else { return Some(Err(format!("{key}:{spec} is no line"))) };
+        if key == "heat" {
+            return Some(crate::ui_script::bounds_of(&format!("heat:{}", line + 1)).map(|b| b.center()).ok_or_else(|| format!("heat:{spec} is not shown")));
+        }
+        let start: usize = lines[..line].iter().map(|l| l.len() + 1).sum();
+        let (Some(at), Some(text_box)) = (ed.range_to_bounds(&(start..start)), ed.text_bounds()) else { return Some(Err(format!("{key}:{spec} is not shown"))) };
+        // The gutter: the numbers, then the fold column, a margin and the gap to the text (`CodeGutterMetrics`).
+        let m = cx.try_global::<gpui_kit::base::input::CodeGutterMetrics>();
+        let (fold_w, margin, gap) = m.map_or((px(14.), px(0.), px(4.)), |m| (m.fold_width, m.right_margin, m.text_gap));
+        let fold_right = at.left() - gap - margin;
+        let x = if key == "fold" { fold_right - fold_w / 2. } else { (text_box.left() + fold_right - fold_w) / 2. };
+        Some(Ok(point(x, at.center().y)))
     }
 
     /// Every toolbar control repainted (a cached slice): the ui-parity driver's marks.
@@ -600,7 +639,7 @@ impl FeatureStudioView {
             DocEvent::Reloaded | DocEvent::TabsChanged => this.sync_from_doc(window, cx),
             _ => {}
         }));
-        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, _subs: subs };
+        let mut this = Self { tab, doc, editor, synced: source.clone(), notices: Vec::new(), save_task: None, compile_task: None, outline: None, nav: Vec::new(), caret_before_click: None, nav_at: 0, focus: cx.focus_handle(), import_panel: None, import_anchor: Default::default(), tb: ToolbarFit::default(), outline_anchor: Default::default(), hover_at: None, toolbar: None, co_complete: { let p = crate::preferences_window::ListPrefs::load(); p.labs && p.labs_co_complete }, badge_hover: false, _subs: subs };
         this.recompile(source, cx);
         this
     }
@@ -657,6 +696,7 @@ impl FeatureStudioView {
                 out.push(
                     div()
                         .id(SharedString::from(format!("fs-prof-{line}")))
+                        .map(|d| crate::ui_script::mark(d, || format!("heat:{line}")))
                         .absolute()
                         .top(top)
                         .left_0()
@@ -683,10 +723,16 @@ impl FeatureStudioView {
         out.push(
             div()
                 .id("fs-prof-badge")
+                .map(|d| crate::ui_script::mark(d, || "profile_badge:total".into()))
                 .absolute()
                 .top(px(2.))
                 .left(px(2.))
-                .group("fs-prof-badge")
+                .on_hover(cx.listener(|this, h: &bool, _, cx| {
+                    if this.badge_hover != *h {
+                        this.badge_hover = *h;
+                        cx.notify();
+                    }
+                }))
                 .child(
                     v_flex()
                         .min_w(px(53.))
@@ -700,9 +746,9 @@ impl FeatureStudioView {
                                 .gap(px(4.))
                                 .child(crate::assets::icon("regen-timer", 14., cx))
                                 .child(div().text_size(px(12.)).text_color(rgb(0x333333)).child(total.clone()))
-                                .child(div().hidden().group_hover("fs-prof-badge", |d| d.block()).text_size(px(12.)).text_color(rgb(0x333333)).whitespace_nowrap().child(long.trim_start_matches(&total).to_string())),
+                                .when(self.badge_hover, |d| d.child(div().text_size(px(12.)).text_color(rgb(0x333333)).whitespace_nowrap().child(long.trim_start_matches(&total).to_string()))),
                         )
-                        .child(div().hidden().group_hover("fs-prof-badge", |d| d.block()).px(px(6.)).pb(px(4.)).text_size(px(12.)).text_color(rgb(0x666666)).child("Longest execution steps in this Feature Studio:")),
+                        .when(self.badge_hover, |d| d.child(div().px(px(6.)).pb(px(4.)).text_size(px(12.)).text_color(rgb(0x666666)).child("Longest execution steps in this Feature Studio:"))),
                 )
                 .into_any_element(),
         );
@@ -1924,6 +1970,43 @@ const KEYWORDS: &[&str] = &[
     "undefined", "map", "array", "string", "boolean", "number", "builtin", "box",
 ];
 
+/// Ace's C-style fold arrows (live document/70): a line folds when the first opening bracket after its last closing
+/// one, or a leading `/*`, closes on a later line. The fold hides the lines after it through the closing one (Ace
+/// shows that line's rest after `{...}`), so the caret steps over them.
+fn fold_lines(src: &str, tokens: &[(Range<usize>, Tok)]) -> Vec<gpui_kit::component::input::FoldRange> {
+    let token_at = |at: usize| tokens.get(tokens.partition_point(|(r, _)| r.end <= at)).filter(|(r, _)| r.start <= at);
+    let quoted = |at: usize| token_at(at).is_some_and(|(_, t)| matches!(t, Tok::Comment | Tok::String));
+    let starts: Vec<usize> = std::iter::once(0).chain(src.match_indices('\n').map(|(i, _)| i + 1)).collect();
+    let line_of = |at: usize| starts.partition_point(|&s| s <= at) - 1;
+    let mut close_of = std::collections::HashMap::new();
+    let mut open: [Vec<usize>; 3] = Default::default();
+    for (i, c) in src.char_indices() {
+        let Some(k) = "{[(".find(c).or_else(|| "}])".find(c)) else { continue };
+        if quoted(i) {
+            continue;
+        }
+        if "{[(".contains(c) {
+            open[k].push(i);
+        } else if let Some(o) = open[k].pop() {
+            close_of.insert(o, i);
+        }
+    }
+    let mut out = Vec::new();
+    for (line, &start) in starts.iter().enumerate() {
+        let text = &src[start..starts.get(line + 1).map_or(src.len(), |e| e - 1)];
+        let end = if text.trim_start().starts_with("/*") {
+            token_at(start + text.len() - text.trim_start().len()).filter(|(_, t)| matches!(t, Tok::Comment)).map(|(r, _)| line_of(r.end.saturating_sub(1)))
+        } else {
+            let after = text.rfind(['}', ']', ')']).map_or(0, |i| i + 1);
+            text[after..].find(['{', '[', '(']).and_then(|i| close_of.get(&(start + after + i))).map(|&c| line_of(c))
+        };
+        if let Some(end) = end.filter(|e| *e > line) {
+            out.push(gpui_kit::component::input::FoldRange::new(line, end + 1));
+        }
+    }
+    out
+}
+
 fn lex(src: &str) -> Vec<(Range<usize>, Tok)> {
     let b = src.as_bytes();
     let mut out = Vec::new();
@@ -2088,14 +2171,26 @@ impl InputHighlighter for ScriptHighlighter {
         split
     }
 
-    fn fold_ranges(&self, _text: &gpui_kit::component::input::Rope) -> Vec<gpui_kit::component::input::FoldRange> {
-        Vec::new()
+    fn fold_ranges(&self, text: &gpui_kit::component::input::Rope) -> Vec<gpui_kit::component::input::FoldRange> {
+        let src = text.to_string();
+        if src.len() == self.len { fold_lines(&src, &self.tokens) } else { fold_lines(&src, &lex(&src)) }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Tok, changed_end, lex};
+    use super::{NEW_FEATURE, Tok, changed_end, fold_lines, lex};
+
+    /// Ace's fold arrows on New feature's text (live document/70): the two `{` lines, not defineFeature's (its last
+    /// open bracket closes on the line); a fold hides through its closing line.
+    #[test]
+    fn fold_arrows_as_aces() {
+        let folds: Vec<(usize, usize)> = fold_lines(NEW_FEATURE, &lex(NEW_FEATURE)).iter().map(|f| (f.start_line, f.end_line)).collect();
+        assert_eq!(folds, vec![(3, 6), (6, 9)]);
+        let src = "/* a\n b */\nconst x = [1,\n 2];\nconst s = \"(\";\n";
+        let folds: Vec<(usize, usize)> = fold_lines(src, &lex(src)).iter().map(|f| (f.start_line, f.end_line)).collect();
+        assert_eq!(folds, vec![(0, 2), (2, 4)]);
+    }
 
     /// After an undo or redo the caret goes to the end of what changed (live fs-tb-redo).
     #[::core::prelude::v1::test]

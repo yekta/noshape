@@ -672,6 +672,7 @@ impl SelectItemPanel {
             out.push(
                 h_flex()
                     .id(SharedString::from(format!("sel-feature-{type_id}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("list_row:{name}")))
                     .h(px(40.))
                     .flex_none()
                     .pl(px(80.))
@@ -1420,6 +1421,7 @@ impl SelectItemPanel {
                 list = list.child(
                     h_flex()
                         .id(SharedString::from(format!("sel-filter-{i}")))
+                        .map(|d| crate::ui_script::mark(d, || format!("list_row:{label}")))
                         .h(px(32.))
                         .pl(px(6.))
                         .gap(px(6.))
@@ -1584,6 +1586,7 @@ impl Render for SelectItemPanel {
         let tab = |id: &'static str, label: &'static str, on: bool, cx: &mut Context<Self>| {
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                 .w(px(tab_w))
                 .h_full()
                 .p(px(5.))
@@ -1757,6 +1760,7 @@ impl Render for SelectItemPanel {
                         .child(
                             div()
                                 .id("sel-close")
+                                .map(|d| crate::ui_script::mark(d, || "button:Close".into()))
                                 .debug_selector(|| "sel-close".into())
                                 .size(px(28.))
                                 .flex()
@@ -1790,8 +1794,8 @@ impl Render for SelectItemPanel {
                         .px(px(4.))
                         .border_t_1()
                         .border_color(line)
-                        .child(div().id("sel-learn-fs").flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| noshape_app_core::help::open("Custom features", cx)))
-                        .child(crate::ui::glyph("help-dot", 12., crate::theme::help_dot(0xaaaaaa))),
+                        .child(div().id("sel-learn-fs").map(|d| crate::ui_script::mark(d, || "button:Learn about FeatureScript".into())).flex_1().text_size(px(13.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().child("Learn about FeatureScript").on_click(|_, _, cx| noshape_app_core::help::open("Custom features", cx)))
+                        .child(div().id("sel-learn-help").map(|d| crate::ui_script::mark(d, || "button:?".into())).cursor_pointer().child(crate::ui::glyph("help-dot", 12., crate::theme::help_dot(0xaaaaaa))).on_click(|_, _, cx| noshape_app_core::help::open("Custom features", cx))),
                 )
             })
             // Live 1726: no Import… on the Libraries tab.

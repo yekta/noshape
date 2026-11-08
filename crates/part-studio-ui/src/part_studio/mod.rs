@@ -3447,6 +3447,7 @@ impl PartStudioView {
                     .w(px(crate::ui::TOOL_CELL + crate::ui::TOOL_CARET_W))
                     .child(crate::ui::glyph("tool-caret", 10., p().text))
                     .tooltip("Custom features in this workspace")
+                    .map(|d| crate::ui_script::mark(d, || "button:Custom features in this workspace".into()))
                     // Live (part-studio/1251–1252, qa5 FS4): no heading; each
                     // entry has its initials icon ("Qc") and the name, with
                     // the name as a side tooltip that expands with "Feature
@@ -3459,7 +3460,7 @@ impl PartStudioView {
                             let (id, name): (&'static str, &'static str) = (t.id, t.name);
                             menu = menu.item(
                                 PopupMenuItem::element(move |_, _| {
-                                    crate::ui::with_side_tooltip_expanded(h_flex().id(SharedString::from(format!("cf-{id}"))).flex_1().gap(px(6.)).child(crate::ui::initials_icon(name)).child(name), name, "Feature from current workspace")
+                                    crate::ui::with_side_tooltip_expanded(h_flex().id(SharedString::from(format!("cf-{id}"))).map(|d| crate::ui_script::mark(d, || format!("menu:{name}"))).flex_1().gap(px(6.)).child(crate::ui::initials_icon(name)).child(name), name, "Feature from current workspace")
                                 })
                                 .on_click(move |_, window, cx| {
                                     v.update(cx, |this, cx| this.start_feature(id, window, cx));

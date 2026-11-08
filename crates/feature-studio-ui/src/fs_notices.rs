@@ -117,8 +117,10 @@ impl FsNoticesPanel {
     /// A Monitor entry: the notice, then its stack rows (`line:col`, place).
     fn monitor_item(&self, id: String, e: noshape_model::custom::run::MonitorEntry, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
+        let mark = format!("notice:{}", e.message);
         let mut item = v_flex()
             .id(SharedString::from(id))
+            .map(|d| crate::ui_script::mark(d, || mark))
             .cursor_pointer()
             .hover(|d| d.bg(rgb(0xf5f5f5)))
             .child(
@@ -148,6 +150,7 @@ impl FsNoticesPanel {
         let open = !self.collapsed.contains(&id);
         let text = rgb(if gray { 0xaaaaaa } else { 0x666666 });
         let doc = self.doc.clone();
+        let mark = format!("button:Monitor:{name}");
         h_flex()
             .id(SharedString::from(format!("fsn-h-{id}")))
             .h(px(41.))
@@ -161,6 +164,7 @@ impl FsNoticesPanel {
                 d.child(
                     h_flex()
                         .id(SharedString::from(format!("fsn-mon-{id}")))
+                        .map(|d| crate::ui_script::mark(d, || mark))
                         .h(px(30.))
                         .px(px(5.))
                         .gap(px(5.))
@@ -286,9 +290,11 @@ impl Render for FsNoticesPanel {
             if !self.collapsed.contains(&tab) {
                 for (i, n) in shown.into_iter().enumerate() {
                     let (line, col) = (n.line, n.column);
+                    let mark = format!("notice:{}", n.message);
                     body = body.child(
                         v_flex()
                             .id(SharedString::from(format!("fsn-{tab}-{i}")))
+                            .map(|d| crate::ui_script::mark(d, || mark))
                             .cursor_pointer()
                             .hover(|d| d.bg(rgb(0xf5f5f5)))
                             .child(

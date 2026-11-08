@@ -1,0 +1,37 @@
+{
+ "name": "fs-ps-acf-close",
+ "about": "Add custom features: Escape and a graphics click leave it open, ✕ closes it",
+ "area": "dx",
+ "source": "universe feature-studio fs-ps-acf-close (batch fs-1 (dx 11-08, Feature Studio coverage))",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Add custom features"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "click",
+   "on": {
+    "empty": true
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}
