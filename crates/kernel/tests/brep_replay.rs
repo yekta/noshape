@@ -122,6 +122,10 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
     let only = std::env::var("NOSHAPE_BREP_ONLY").ok();
     let diff = std::env::var_os("NOSHAPE_BREP_DIFF").is_some();
     let unstable: Vec<String> = std::fs::read_to_string(dir.join("unstable")).map(|t| t.lines().map(|l| l.trim().to_string()).collect()).unwrap_or_default();
+    // (Cases where ours is live's and OCCT's differs, each with its capture: "<case> <why>" a line; docs/handoff/bool.md
+    // "The gate and live".)
+    let live: Vec<(String, String)> = std::fs::read_to_string(dir.join("live")).map(|t| t.lines().filter_map(|l| l.trim().split_once(' ').map(|(c, w)| (c.to_string(), w.trim().to_string()))).collect()).unwrap_or_default();
+    let mut as_live: Vec<String> = Vec::new();
     let mut bad = Vec::new();
     let mut report = String::new();
     let mut declines: BTreeMap<String, usize> = BTreeMap::new();
@@ -236,6 +240,12 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
             equivalents.push(format!("{name} ({:?}, {} tools): {}; {deltas}", c.op, c.tools.len(), d.join(", ")));
             d.clear();
         }
+        if !d.is_empty()
+            && let Some((_, why)) = live.iter().find(|(c, _)| *c == name)
+        {
+            as_live.push(format!("{name}: {} (ours = live: {why})", d.join(", ")));
+            d.clear();
+        }
         if !d.is_empty() {
             let mut line = format!("{name} ({:?}, {} tools, recorded path {}): {}", c.op, c.tools.len(), c.path, d.join(", "));
             if let Some(dump) = std::env::var_os("NOSHAPE_BREP_DUMP") {
@@ -289,6 +299,9 @@ fn replay(dir: &Path) -> (usize, usize, Vec<String>, String) {
     report += &format!("{accepted} of {n} cases taken, {} differ from OCCT, {} equivalent\n", bad.len(), equivalents.len());
     for x in &equivalents {
         report += &format!("  equivalent: {x}\n");
+    }
+    for x in &as_live {
+        report += &format!("  as live, OCCT differs: {x}\n");
     }
     for (why, k) in &declines {
         report += &format!("  declined {k}: {why}\n");

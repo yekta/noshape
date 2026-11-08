@@ -619,13 +619,13 @@ impl Pool {
         self.find_tol(p, self.floor)
     }
 
-    /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
-    /// two's own where that's more (OCCT's rule for tolerant vertices); none past that.
-    fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
-        if let Some(g) = self.groups.iter().find(|g| (p - g.0).length() <= g.1 + tp) {
-            return Ok(Some(g.2));
-        }
-        // (Each vertex within reach: its distance and reach.)
+    /// The group holding `p` (its own tolerance `tp`), if any.
+    fn in_group(&self, p: DVec3, tp: f64) -> Option<u32> {
+        self.groups.iter().find(|g| (p - g.0).length() <= g.1 + tp).map(|g| g.2)
+    }
+
+    /// Each vertex within reach of `p` (its own tolerance `tp`): its index, distance and reach (no groups).
+    fn near_tol(&self, p: DVec3, tp: f64) -> Vec<(u32, f64, f64)> {
         let mut near: Vec<(u32, f64, f64)> = Vec::new();
         let mut take = |i: u32| {
             let ti = self.t[i as usize];
@@ -662,6 +662,16 @@ impl Pool {
         for &i in &self.huge {
             take(i);
         }
+        near
+    }
+
+    /// The vertex `p` (its own tolerance `tp`) is: one within the Boolean's tolerance, or within the sum of the
+    /// two's own where that's more (OCCT's rule for tolerant vertices); none past that.
+    fn find_tol(&self, p: DVec3, tp: f64) -> R<Option<u32>> {
+        if let Some(g) = self.in_group(p, tp) {
+            return Ok(Some(g));
+        }
+        let mut near = self.near_tol(p, tp);
         if near.len() <= 1 {
             return Ok(near.first().map(|x| x.0));
         }
@@ -1257,6 +1267,35 @@ impl Ctx<'_> {
         }
         let (b, spans) = (self.bound(f).ok()?, self.bound_spans(f).ok()?);
         b.iter().zip(spans).try_fold((DVec2::INFINITY, DVec2::NEG_INFINITY), |(l, h), (c, s)| c.quick_box_by(Some(s)).map(|(a, b)| (l.min(a), h.max(b))))
+    }
+
+    /// Face `f`'s boundary closed where two curves' ends at one vertex are apart on the face, a tolerant vertex's (an
+    /// arc at its circle's height, the B-spline it meets 0.1 mm off it: c2-valve-config's countersink): a straight
+    /// piece between them, for the rays [`inside2`] casts (one went through the gap). Not a seam's two copies, a turn
+    /// apart.
+    fn closed_bound(&self, f: usize) -> R<Vec<C2>> {
+        let mut bound = self.bound(f)?.to_vec();
+        let mut ends: HashMap<u32, Vec<DVec2>> = HashMap::default();
+        for (k, &(e, _)) in self.faces[f].edges.iter().enumerate() {
+            let v = self.edge_seg(e).v;
+            ends.entry(v[0]).or_default().push(bound[k].at(0.0));
+            ends.entry(v[1]).or_default().push(bound[k].at(1.0));
+        }
+        let mut keys: Vec<u32> = ends.keys().copied().collect();
+        keys.sort_unstable();
+        for w in keys {
+            let reach = 4.0 * self.pool.t[w as usize].max(self.tol);
+            let pts = &ends[&w];
+            for (i, &a) in pts.iter().enumerate() {
+                for &b in &pts[i + 1..] {
+                    let d = (b - a).length();
+                    if d > 1e-9 * a.abs().max_element().max(1e-3) && d <= reach {
+                        bound.push(C2::Seg { a, b });
+                    }
+                }
+            }
+        }
+        Ok(bound)
     }
 
     /// The distance from `q` to face `f`'s boundary in its parameter plane.
@@ -2613,8 +2652,9 @@ impl Ctx<'_> {
             if !boxes_meet(c, c, lo, hi, GREY * tol + rc.abs()) {
                 return Ok(());
             }
-            // (Through the apex exactly: only the apex in common, a vertex the plane holds; no section.)
-            if rc.abs() <= tol {
+            // (Through the apex exactly: only the apex in common, a vertex the plane holds; no section. Past it, on
+            // the other nappe (a radius below zero: a valve seat's cone and a plane beyond its apex): none either.)
+            if rc.abs() <= tol || rc < -GREY * tol {
                 return Ok(());
             }
             if rc <= GREY * tol {
@@ -3146,6 +3186,26 @@ impl Ctx<'_> {
             }
         }
         on.sort_by(|x, y| x.0.total_cmp(&y.0));
+        // (An end of OCCT's section of two quadrics with another vertex on both its faces within the section's
+        // tolerance and theirs: one vertex, the other's, as OCCT puts that vertex on the curve there (c2-valve-config:
+        // a handle's section of 0.206 mm ends 0.2065 mm off the vertex where it leaves a cone's rim; two vertices left
+        // a 0.2 mm sliver); again with the two merged. Not with a free-form face: a knurl's sections end micrometres
+        // off their crossings' vertices, k25-25 then declined.)
+        if let Geo::Nurbs { id, .. } = s.g
+            && let Some((faces, _, _)) = &self.ncurves[id as usize].sec
+            && faces.iter().all(|&g| !matches!(self.faces[g].s, Surf::Nurbs { .. }))
+        {
+            let stol = self.ncurves[id as usize].tol;
+            for v in s.v {
+                let pv = self.p(v);
+                let tv = self.pool.t[v as usize];
+                let on_both = |w: u32| faces.iter().all(|&g| free::surface_distance(&self.faces[g], self.p(w)) <= self.pool.pair(self.pool.t[w as usize], self.faces[g].t));
+                if let Some((w, d, _)) = self.pool.near_tol(pv, stol.max(tv)).into_iter().filter(|x| x.0 != v && x.1 > self.pool.pair(tv, self.pool.t[x.0 as usize]) && on_both(x.0)).min_by(|a, b| a.1.total_cmp(&b.1)) {
+                    let tw = self.pool.t[w as usize].max(self.pool.floor);
+                    self.pool.regroup.lock().expect("a group").push((self.p(w), tw.max(d + tv.max(self.pool.floor))));
+                }
+            }
+        }
         // (Two split points nearer along it than the tolerance, different vertices (each within the section's
         // reach, a micrometre apart across it: a knurl section's 11 nm piece between them): one vertex, as OCCT's
         // pave; again with the two merged.)
@@ -5195,6 +5255,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             segs.sort_unstable();
             loop_segs.contains(&segs)
         };
+        let closed: std::cell::OnceCell<R<Vec<C2>>> = std::cell::OnceCell::new();
         for mut r in regions(&pts, &lsegs)? {
             if beyond(&r) {
                 continue;
@@ -5214,7 +5275,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if dist <= tol && cx.near_bound(f, r.inside)? {
                 return Err(Decline("a piece's point near its face's boundary"));
             }
-            if !inside2(r.inside, cx.bound(f)?) {
+            if !inside2(r.inside, closed.get_or_init(|| cx.closed_bound(f)).as_deref().map_err(|e| *e)?) {
                 continue;
             }
             let inside3 = cx.faces[f].to3(r.inside);

@@ -1507,3 +1507,42 @@ fn cylinders_meeting_on_a_whole_face_fuse_glued() {
     assert!(g.shape.is_valid());
     k::set_rust_boolean(None);
 }
+
+/// c2-valve-config's Extrude 2 (recorded): a valve body cut by a handle whose end plane crosses the seat cone's axis
+/// past its apex, and whose face's section with the body's chamfer cone (OCCT's, of 0.206 mm) ends 0.2065 mm off where
+/// it leaves the cone's rim: no section on the other nappe, the section's end the rim's vertex (OCCT's bound pave);
+/// taken, as OCCT's (it declined "a plane through a cone's apex", then "an invalid result" from a 0.2 mm sliver).
+#[test]
+fn a_valve_handle_cut_past_a_cones_apex_as_occt() {
+    valid_as_occt("81493b18e2677a24", 1e-9);
+}
+
+/// c2-valve-config's Circular pattern 1 (recorded): the valve body cut by 7 handle tools at once. Where the -90°
+/// handle's countersink meets the 0.036 mm chamfer strip over the flat at y = -70 mm, live keeps two vertices on each
+/// side, joined by a 0.0712 mm edge (REQUESTS 2210: (±2.9371, -70, 0.0356) and (±2.9318, -69.9386, 0) mm); OCCT joins
+/// them on one side only, an edge and a vertex fewer. Ours is live's: OCCT's faces and volume, one edge and one
+/// vertex more, the short edge on both sides (the gate's recorded exception).
+#[test]
+fn a_valve_handles_pattern_keeps_both_short_edges_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "42cf72780eec3242").expect("the recorded case");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})")).shape;
+    k::set_rust_boolean(Some(false));
+    let o = k::boolean(c.op, &c.objects, &c.tools, &c.opts).expect("OCCT's").shape;
+    k::set_rust_boolean(None);
+    assert!(r.is_valid());
+    assert_eq!(r.count(k::ShapeType::Face), o.count(k::ShapeType::Face));
+    assert_eq!((r.count(k::ShapeType::Edge), r.count(k::ShapeType::Vertex)), (o.count(k::ShapeType::Edge) + 1, o.count(k::ShapeType::Vertex) + 1));
+    let (v, w) = (r.volume().unwrap(), o.volume().unwrap());
+    assert!((v - w).abs() <= 1e-8 * w, "volume {v} against OCCT's {w}");
+    for x in [-1.0, 1.0] {
+        let at = DVec3::new(x * 2.93442e-3, -69.96929e-3, 0.01778e-3);
+        let short = r.edges().into_iter().any(|e| (e.length().unwrap() - 0.07117e-3).abs() < 0.5e-6 && e.edge_info().is_ok_and(|i| ((i.start + i.end) * 0.5 - at).length() < 5e-6));
+        assert!(short, "no 0.0712 mm edge at x {}", x * 2.934);
+    }
+}
