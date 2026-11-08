@@ -239,8 +239,11 @@ impl RenderOnce for Button {
                         .tab_stop(self.tab_stop),
                 )
             })
+            // NOSHAPE PATCH: a disabled button lets its press through, as a browser's disabled control: its
+            // ancestors see the mouse-down (their listeners; focus moves to a focusable ancestor, so a field loses
+            // it). Only their click is blocked: the release stops here, before their bubble-phase click.
             .when(disabled, |this| {
-                this.on_mouse_down(MouseButton::Left, |_, _, cx| {
+                this.on_mouse_up(MouseButton::Left, |_, _, cx| {
                     cx.stop_propagation();
                 })
             })

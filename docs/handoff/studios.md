@@ -28,6 +28,67 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:57 UTC: PAUSED (lead: quota). Restart from here on Monday
+**Landed / landing today:** Print setup (Part Studio, Assembly), the Merge notice's Revert link (shared notice
+bubble), Restore to Main… dialog, the Variable Studio's `#` autocomplete (`var_complete` now in app-core), live's
+top-level snippet texts, and last: **the disabled-Button root fix** (vendored gpui-base `button.rs`, NOSHAPE PATCH): a
+disabled Button no longer stops the mouse-down, so ancestors see the press and a focusable ancestor takes the focus
+(a browser's disabled control: live vs-cfg-insert-all-disabled, focus leaves the field); only the release stops, which
+keeps an ancestor's click from firing (gpui-base's test `disabled_button_is_inert_and_blocks_parent_activation` still
+holds by design; gpui-base's tests don't run in the workspace). The Variable Studio footer workaround is gone.
+Regression check: 129 of 486 studios scenarios re-run with the fix, none worse from it.
+
+**In flight, not landed: the merge rows (live 2383, REQUESTS 2383, shots studios/q2383/).** Patch:
+`/root/studios-scratch/keep/merge-rows.patch` (apply with `git apply`; built and store tests passed, no scenario run
+yet). What it does, and what live showed:
+- Two history-panel row kinds, `RowKind::Merge` (the merge microversion in the target: "Merge from B1", bold,
+  version-name style, a small dot on its lane, Show changes…) and `RowKind::Merged` (the source's microversion the
+  merge took, named by its change, a small dot where the source lane leaves). Each later merge adds another pair.
+  Both read as kind "version" for the recorder. Not added when a version or Start is already at that point.
+- Menus (live m1-results.json): Merge row Open, Open in new browser tab, (Copy link), Compare, View in repair,
+  Restore to Main…, Create version here…; Merged row Open, Open in new browser tab, (Copy link), Compare, Create
+  version here….
+- Opening the Merged row shows "B1" in the navbar (`Session::shown_workspace_name`: a viewed point's own workspace).
+- The store's merge entry is "Merge from B1" (was `Merge "B1" into "Main"`; store test updated).
+- To do: apply, run ver-merge / ver-merge-* / ver-crow-* / ver-history-* (the graph's small dots: compare with
+  q2383/m1-graph-zoom.png), the e2e tests that read history descriptions, then land.
+
+**Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
+Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
+them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;
+71 / 29 / 27 of the uncovered have no `via` yet). Batch 7 (documents, not started) as designed:
+- Add `via` only (already exercised): Search results view ← docs-search (field Search, Enter); Export (tab) ←
+  doc-tab-menu-export (rclick doc_tab, menu Export…).
+- New scenarios (start docs-page): Folders collapse/expand (button Folders ×2); folder breadcrumb (dblclick doc_row
+  uip Folder, button "Owned by me"); sort by column (button Name); Folders sort / grid-list toggle; column chooser
+  Search… (button Add, field Search…); Advanced search ? (caret Search, button help); Notes / Properties / Versions
+  and history panels on a selected row (rail buttons; Properties: Description edit, Undo / Apply); row inline icons;
+  Account menu (button Account menu), › My account, › View in dark mode beta (and back: ask live2 to restore).
+- Preferences (start prefs-page): Units › Learn more…; Environment profile Create → Save profile settings → select
+  → Delete profile (via already in the universe).
+- Documents (start doc-tabs / block-drawing / block-drawing-files): Keyboard shortcuts sheet › Search shortcuts /
+  Customize keyboard shortcuts / pop out; tab manager Help ?, Toggle preview, type filters, keyboard ↓ ↵; tab menu
+  on file tabs (dx-plate.dxf, dx-image.png) Download / Update… / Import… (via already there); Properties… of a drawing
+  tab and of a file tab; drawing tab Export… (Export Drawing); Create Material Library and its tab menu; Shift+click /
+  Ctrl+click a tab; image tab viewer; Document notes (Edit notes, Cancel), Performance, { } notices; Undo/Redo
+  toolbar buttons after an edit; Copy version… while viewing V1 (doc-versions); New document › Document labels /
+  location browser / Sort; Copy workspace's location browser.
+- Our page needs marks for several of these (the documents page has only ~15: `start_window.rs`); add them with the
+  scenarios. Then ask live2 for the batch (README "TARGET" for new target names), fix what the recordings show, then
+  the Variable Studio list, then versions.
+
+**Other open items:**
+- doc-shortcuts-sheet: in a Part Studio, live reads the Shift+/ sheet as no dialog, while the Help menu's Keyboard
+  shortcuts read a modal (doc-help-menu-keyboard-shortcuts); ours notes a modal for both since 20:04 (2/3). Check the
+  two recordings' dates; one may need a run.py rule or a re-record.
+- ver-create-version-edit-props / ver-version-menu-branch: live still shows the dialog a step after Create (re-record?).
+- vs-type-*: live's type picker leaves an empty input focused (focus only).
+- prefs-units-frequency: live keeps the native select focused after Esc ("0: hertz"); docs-folder-open and
+  docs-trash-row-menu re-records asked (REQUESTS 18:15); Labels… on the documents page asked there too.
+- Print on A1, A0, ANSI D and E renders at 8192 px and scales up (live's size not recorded).
+- Scratch: displays :196–:199 were mine (killed at pause); builds via rb.sh on vibe3; helper scripts in
+  /root/studios-scratch/bin (run-half.sh for split runs).
+
 ### 2026-11-08 20:44 UTC: every top-level snippet inserts live's text (live 2337)
 - Feature / Table / Computed property definition, Function, Type, Enum, Predicate, Operator, Constant declarations,
   New feature / table / computed property and Import insert live's texts with its selection after Enter and its Tab
