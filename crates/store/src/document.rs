@@ -1062,19 +1062,16 @@ impl Document {
     /// content equals `to` (which may be from any branch). History is kept.
     /// Returns the head unchanged if the content already matches.
     pub fn restore(&mut self, branch: BranchId, to: MicroversionId) -> Result<MicroversionId> {
-        let target = self.microversion(to)?;
-        let version_name: Option<String> = self
-            .conn()?
-            .prepare_cached(
-                "SELECT name FROM versions WHERE microversion = ?1 ORDER BY seq LIMIT 1",
-            )?
-            .query_row([to], |r| r.get(0))
-            .optional()?;
-        let description = match version_name {
-            Some(v) => format!("Restore to version \"{v}\""),
-            None => format!("Restore to \"{}\"", target.description),
-        };
+        let description = self.restore_description(to)?;
         self.restore_with_description(branch, to, &description)
+    }
+
+    /// Onshape's restore entry (live 2351): the time since the restored point, then that point's change,
+    /// `Restore 2m 55s back: "Part Studio 1 :: Add feature : Extrude 1"`.
+    pub fn restore_description(&self, to: MicroversionId) -> Result<String> {
+        let target = self.microversion(to)?;
+        let secs = (now_ms() - target.created).max(0) / 1000;
+        Ok(format!("Restore {}m {}s back: \"{}\"", secs / 60, secs % 60, target.description))
     }
 
     /// [`Document::restore`] with an explicit description.

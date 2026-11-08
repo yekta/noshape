@@ -28,6 +28,18 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 19:13 UTC: Restore to Main… dialog, Feature Studio's top-level list, Backspace keeps the list
+- Restore to <workspace>… on a version opens live's "Restoring changes into Main from V1" (the merge dialog's restore
+  mode: Keep / Replace cards, "Changes in Main", Tab restore strategy, Restore / Cancel); a change row has none (live
+  2351). The entry reads `Restore 2m 55s back: "<the restored point's change>"` (store); `history_restore` takes
+  `keep` (tabs kept as they are, `Session::restore_picked`).
+- Feature Studio, top level: live's rows per first letter (studios 2334: Define table / Define computed property
+  verbatim, their Tab stops); rows live hasn't shown the text of (Feature definition, Type declaration, Import…) insert
+  our best FeatureScript until asked. Backspace refines an open list (vendored NOSHAPE PATCH in gpui-base: a
+  deletion leaves the list to `handle_completion_trigger`).
+- Open: the Merge toast's "Revert to before this merge" (live 2351: blue, ≈35 s; reverts at once with a Restore entry)
+  needs an Info event with an action through the Part Studio, Assembly and workspace toasts; Print setup (live 2349).
+
 ### 2026-11-08 19:01 UTC: dx takes the Feature Studio area's uncovered items (lead 11-08)
 - docs/parity/INDEX.md gives "Feature Studio and FeatureScript editor" to dx. dx takes these 35 (batch fs-1, start
   `fs-custom`): fs-ac-click-accepts, -overloads, -tie-order, -enum-name-insert, -doc-tooltip, -placeholder-shift-tab,
@@ -40,7 +52,6 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   property, fs-autocomplete-backspace, fs-tb-redo. Left for later: the narrow-toolbar items (fs-tb-*-compact,
   fs-tb-collapse-breakpoints) and fs-ed-dark-theme, fs-ed-hold-ctrl-hover.
 
-### 2026-11-08 17:58 UTC: Preferences 49/56 scenarios (from 43)
 
 ### 2026-11-08 18:47 UTC: Variable Studio types keep their values; live's answers 2336
 - A Variable Studio row keeps one value per type (`VariableDef::other_values`, as FeatureScript's Variable): a new

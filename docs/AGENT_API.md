@@ -5974,7 +5974,7 @@ Examples:
 
 Restore the document to an earlier microversion or version (edits the document (one undoable history entry)).
 
-Adds a new microversion with that state (history is kept).
+Adds a new microversion with that state (history is kept), named `Restore 2m 55s back: "<the restored point's change>"`. The Restore dialog's Keep per tab: `keep` lists the tabs that stay as they are.
 
 Examples:
 
@@ -5986,6 +5986,7 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `to` | string | required | Microversion id or version name/id (from history_list). |
+| `keep` | array of string |  | Tabs (names or ids) kept as they are (Tab restore strategy: Keep); the others are restored. |
 
 ### part
 

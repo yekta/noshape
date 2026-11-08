@@ -538,16 +538,16 @@ fn restore_creates_new_microversion() {
     assert_eq!(*doc.manifest(r).unwrap(), *doc.manifest(root).unwrap());
     let info = doc.microversion(r).unwrap();
     assert_eq!(info.parents, vec![mv1]);
-    assert_eq!(info.description, "Restore to version \"V1\"");
+    // Live 2351: `Restore <m>m <s>s back: "<the restored point's change>"`, a version's too.
+    let back = |d: &str, to: &str| d.starts_with("Restore ") && d.contains("m ") && d.ends_with(&format!("s back: \"{to}\""));
+    let root_desc = doc.microversion(root).unwrap().description;
+    assert!(back(&info.description, &root_desc), "{}", info.description);
     assert_eq!(doc.history(main).unwrap().len(), 3);
     // Restoring to the current content is a no-op.
     assert_eq!(doc.restore(main, root).unwrap(), r);
     // Restore without a version uses the target description.
     let r2 = doc.restore(main, mv1).unwrap();
-    assert_eq!(
-        doc.microversion(r2).unwrap().description,
-        "Restore to \"Edit\""
-    );
+    assert!(back(&doc.microversion(r2).unwrap().description, "Edit"));
     // Restore content from another branch.
     let feat = doc.create_branch(root, "feature").unwrap();
     let f = doc.commit(feat, &[set("tab/z", b"z")], "z").unwrap();

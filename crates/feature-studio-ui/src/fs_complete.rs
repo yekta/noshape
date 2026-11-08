@@ -510,26 +510,80 @@ pub fn complete_at(text: &str, offset: usize) -> Option<(usize, Vec<Match<'stati
     (!rows.is_empty()).then_some((start, rows))
 }
 
-/// A top-level snippet: what typing starts it, its caption in the list, its text and as an Ace snippet.
+/// A top-level row: the words that start it (any of them, by prefix), its caption and kind, its text and as an Ace
+/// snippet.
 struct TopSnippet {
-    trigger: &'static str,
+    triggers: &'static [&'static str],
     entry: Entry,
 }
 
-/// What the list offers outside every function (live 2331: on a new Feature Studio's empty line "defineF" lists
-/// only "Define feature" (snippet), "const" lists "Constant declaration" (snippet) then const (keyword)): the
-/// snippets, then FeatureScript's top-level keywords. Inside a function std's names are offered ([`complete_at`]).
+/// Live's top-level rows for each first letter, in its order (studios 2334: a new Feature Studio's empty line, one
+/// letter typed); letters not listed show no list. Longer words keep the rows one of whose triggers they start.
+const TOP_BY_LETTER: &[(char, &[&str])] = &[
+    ('c', &["Computed property definition", "Constant declaration", "const", "New computed property"]),
+    ('d', &["Define feature", "Define table", "Define computed property", "Feature definition", "Table definition", "Computed property definition", "Function definition", "Type declaration", "Enum declaration", "Predicate declaration", "Operator declaration", "Constant declaration"]),
+    ('e', &["export", "Enum declaration", "enum"]),
+    ('f', &["Feature definition", "Function definition", "function", "New feature"]),
+    ('i', &["Import"]),
+    ('n', &["New feature", "New table", "New computed property"]),
+    ('o', &["Operator declaration", "operator"]),
+    ('p', &["Predicate declaration", "predicate", "New computed property"]),
+    ('t', &["Table definition", "Type declaration", "type", "New table"]),
+];
+
+/// Define table as live inserts it (studios 2334): "My Table" selected, then Tab to myTable, the two comments, the end.
+const DEFINE_TABLE: &str = "annotation { \"Table Type Name\" : \"${1:My Table}\" }\nexport const ${2:myTable} = defineTable(function(context is Context, definition is map) returns Table\n    precondition\n    {\n        ${3:// Define the parameters of the table type}\n    }\n    {\n        var columnDefinitions = [];\n        var rows = [];\n        \n        ${4:// Compute the table}\n        \n        return table(\"My Table\", columnDefinitions, rows);\n    });\n$0";
+
+/// Define computed property as live inserts it (studios 2334): "My Property", myProperty, the comment, the end.
+const DEFINE_PROPERTY: &str = "annotation { \"Property Function Name\" : \"${1:My Property}\" }\nexport const ${2:myProperty} = defineComputedPartProperty(function(context is Context, part is Query, definition is map) returns ValueWithUnits\n    {\n        ${3:// Define the property computation and return the result}\n    });\n$0";
+
+/// What the list offers outside every function ([`TOP_BY_LETTER`]); inside a function std's names ([`complete_at`]).
 fn top_level() -> &'static [TopSnippet] {
     static TOP: LazyLock<Vec<TopSnippet>> = LazyLock::new(|| {
-        let snippet = |trigger: &'static str, caption: &str, text: String, template: String| TopSnippet { trigger, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: text, template, doc: String::new(), rank: 0 } };
-        let feature = crate::feature_studio::NEW_FEATURE;
+        // An Ace snippet's text as shown: its placeholders' defaults.
+        let plain = |template: &str| {
+            let mut out = String::new();
+            let mut rest = template;
+            while let Some(i) = rest.find('$') {
+                out.push_str(&rest[..i]);
+                rest = &rest[i + 1..];
+                if let Some(r) = rest.strip_prefix('{') {
+                    let colon = r.find(':').unwrap_or(0);
+                    let close = r.find('}').unwrap_or(r.len());
+                    out.push_str(&r[(colon + 1).min(close)..close]);
+                    rest = r.get(close + 1..).unwrap_or("");
+                } else {
+                    rest = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+                }
+            }
+            out + rest
+        };
+        let snippet = |triggers: &'static [&'static str], caption: &str, template: String| TopSnippet { triggers, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: plain(&template), template, doc: String::new(), rank: 0 } };
+        let feature = crate::feature_studio::NEW_FEATURE.replacen("\"My Feature\"", "\"${1:My Feature}\"", 1).replacen("myFeature", "${2:myFeature}", 1);
+        let function = "function ${1:name}(${2:arg})\n{\n    ${3:// Define the function}\n}\n$0".to_string();
         let mut out = vec![
             // Enter inserts the New feature template, "My Feature" selected; Tab goes on to myFeature (live fs-snippet-placeholders).
-            snippet("defineFeature", "Define feature", feature.to_string(), feature.replacen("\"My Feature\"", "\"${1:My Feature}\"", 1).replacen("myFeature", "${2:myFeature}", 1)),
-            snippet("const", "Constant declaration", "const constName = 0;".into(), "const ${1:constName} = ${2:0};".into()),
+            snippet(&["defineFeature"], "Define feature", feature.clone()),
+            snippet(&["defineTable"], "Define table", DEFINE_TABLE.into()),
+            snippet(&["defineComputedProperty"], "Define computed property", DEFINE_PROPERTY.into()),
+            snippet(&["featureDefinition", "def"], "Feature definition", feature.clone()),
+            snippet(&["tableDefinition", "def"], "Table definition", DEFINE_TABLE.into()),
+            snippet(&["computedPropertyDefinition", "def"], "Computed property definition", DEFINE_PROPERTY.into()),
+            snippet(&["functionDefinition", "def"], "Function definition", function),
+            snippet(&["typeDeclaration", "dec"], "Type declaration", "export type ${1:MyType} typecheck ${2:canBeMyType};\n$0".into()),
+            snippet(&["enumDeclaration", "dec"], "Enum declaration", "export enum ${1:MyEnum}\n{\n    ${2:VALUE}\n}\n$0".into()),
+            snippet(&["predicateDeclaration", "dec"], "Predicate declaration", "export predicate ${1:canBeMyType}(${2:value})\n{\n    ${3:// Define the predicate}\n}\n$0".into()),
+            snippet(&["operatorDeclaration", "dec"], "Operator declaration", "export operator+(${1:lhs} is ${2:MyType}, ${3:rhs} is MyType) returns MyType\n{\n    ${4:// Define the operator}\n}\n$0".into()),
+            snippet(&["constantDeclaration", "dec"], "Constant declaration", "const ${1:constName} = ${2:0};".into()),
+            snippet(&["newFeature", "feature"], "New feature", feature),
+            snippet(&["newTable", "table"], "New table", DEFINE_TABLE.into()),
+            snippet(&["newComputedProperty", "computedProperty", "property"], "New computed property", DEFINE_PROPERTY.into()),
+            snippet(&["import"], "Import", "import(path : \"${1:onshape/std/common.fs}\", version : \"${2:3112.0}\");\n$0".into()),
         ];
-        for kw in ["annotation", "const", "enum", "export", "function", "import", "predicate", "type"] {
-            out.push(TopSnippet { trigger: kw, entry: Entry { name: kw.into(), kind: "keyword".into(), snippet: kw.into(), template: kw.into(), doc: String::new(), rank: 0 } });
+        const KEYWORDS: [&[&str]; 7] = [&["const"], &["enum"], &["export"], &["function"], &["operator"], &["predicate"], &["type"]];
+        for triggers in KEYWORDS {
+            let kw = triggers[0];
+            out.push(TopSnippet { triggers, entry: Entry { name: kw.into(), kind: "keyword".into(), snippet: kw.into(), template: kw.into(), doc: String::new(), rank: 0 } });
         }
         out
     });
@@ -567,7 +621,7 @@ pub fn at_top_level(before: &str) -> bool {
     depth <= 0
 }
 
-/// [`complete_at`] at the top level: the snippets whose trigger starts with the word, then the keywords.
+/// [`complete_at`] at the top level: live's rows for the word's first letter that one of whose triggers it starts.
 pub fn complete_top_level(line: &str) -> Option<(usize, Vec<Match<'static>>)> {
     let word_len: usize = line.chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').map(char::len_utf8).sum();
     let start = line.len() - word_len;
@@ -575,7 +629,14 @@ pub fn complete_top_level(line: &str) -> Option<(usize, Vec<Match<'static>>)> {
     if word.is_empty() || line[..start].ends_with('.') || line[..start].contains("//") {
         return None;
     }
-    let rows: Vec<Match> = top_level().iter().filter(|t| t.trigger.to_lowercase().starts_with(&word)).map(|t| Match { entry: &t.entry, hits: Vec::new() }).collect();
+    let first = word.chars().next()?;
+    let (_, order) = TOP_BY_LETTER.iter().find(|(c, _)| *c == first)?;
+    let rows: Vec<Match> = order
+        .iter()
+        .filter_map(|name| top_level().iter().find(|t| t.entry.name == *name))
+        .filter(|t| t.triggers.iter().any(|g| g.to_lowercase().starts_with(&word)))
+        .map(|t| Match { entry: &t.entry, hits: Vec::new() })
+        .collect();
     (!rows.is_empty()).then_some((start, rows))
 }
 
@@ -645,6 +706,16 @@ mod tests {
         let rows = |w: &str| complete_top_level(w).map(|(_, r)| r.iter().map(|m| (m.entry.name.clone(), m.entry.kind.clone())).collect::<Vec<_>>()).unwrap_or_default();
         assert_eq!(rows("defineF"), [("Define feature".to_string(), "snippet".to_string())]);
         assert_eq!(rows("const"), [("Constant declaration".to_string(), "snippet".to_string()), ("const".to_string(), "keyword".to_string())]);
+        // Live 2334: each letter's rows in its order, longer words narrowing them.
+        let names = |w: &str| rows(w).into_iter().map(|(n, _)| n).collect::<Vec<_>>();
+        assert_eq!(names("d").len(), 12);
+        assert_eq!(names("defin"), ["Define feature", "Define table", "Define computed property"]);
+        assert_eq!(names("c"), ["Computed property definition", "Constant declaration", "const", "New computed property"]);
+        assert_eq!(names("e"), ["export", "Enum declaration", "enum"]);
+        assert_eq!(names("p"), ["Predicate declaration", "predicate", "New computed property"]);
+        assert!(names("a").is_empty() && names("if").is_empty());
+        let table = top_level().iter().find(|t| t.entry.name == "Define table").map(|t| &t.entry).expect("Define table");
+        assert!(table.snippet.starts_with("annotation { \"Table Type Name\" : \"My Table\" }\nexport const myTable = defineTable(") && table.snippet.ends_with("    });\n"), "{}", table.snippet);
         let feature = &top_level()[0].entry;
         assert!(feature.template.starts_with("annotation { \"Feature Type Name\" : \"${1:My Feature}\"") && feature.template.contains("export const ${2:myFeature} = defineFeature("), "{}", feature.template);
     }

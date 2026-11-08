@@ -4031,7 +4031,12 @@ impl<M: InputModeKind> InputBaseState<M> {
 
         // Every edit invalidates provider responses for the previous document,
         // including deletion and indentation which do not trigger completion.
-        M::hide_context_menu(self, cx);
+        // NOSHAPE PATCH: a deletion leaves an open list to `on_text_typed`, which refines or closes it (Ace: Backspace
+        // keeps the list, live fs-autocomplete-backspace).
+        let deleting_with_list = edits.iter().all(|(_, t)| t.is_empty()) && M::is_context_menu_open(self, cx);
+        if !deleting_with_list {
+            M::hide_context_menu(self, cx);
+        }
         M::clear_inline_completion(self, cx);
 
         // Sort descending by start so applying front-of-vec first edits the

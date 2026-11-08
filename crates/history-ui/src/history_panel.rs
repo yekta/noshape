@@ -382,14 +382,6 @@ impl HistoryPanel {
         cx.notify();
     }
 
-    fn restore(&mut self, mv: MicroversionId, cx: &mut Context<Self>) {
-        let r = self.doc.update(cx, |d, _| d.session.restore(mv));
-        match r {
-            Ok(()) => self.after_change(cx),
-            Err(e) => self.error(e, cx),
-        }
-    }
-
     fn switch_branch(&mut self, b: BranchId, cx: &mut Context<Self>) {
         let r = self.doc.update(cx, |d, _| d.session.switch_branch(b));
         match r {
@@ -956,7 +948,6 @@ impl Render for HistoryPanel {
         let current_branch = session.branch;
         let viewing = session.viewing;
         let current_name = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main".into());
-        let current_head = graph.branches.iter().find(|b| b.id == current_branch).map(|b| b.head);
         let mut lanes: Vec<BranchId> = graph.branches.iter().filter(|b| !b.deleted).map(|b| b.id).collect();
         lanes.sort_by_key(|b| !graph.branches.iter().any(|x| x.id == *b && x.is_default));
         let rows = build_rows(&graph, &lanes);
@@ -1405,8 +1396,9 @@ impl Render for HistoryPanel {
                                 }
                             }))
                             ;
-                        // The workspace's latest change has nothing to restore (live ver-crow-restore).
-                        let m = if kind == RowKind::Change && Some(mv) == current_head { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, _, cx| v4.update(cx, |t, cx| t.restore(mv, cx)))) };
+                        // A version's Restore to <workspace>… opens the restore dialog; a change row has none (live 2351).
+                        let (dr, rn) = (d.clone(), name.clone());
+                        let m = if kind == RowKind::Change { m } else { m.item(crate::os_menu::OsMenuItem::new(format!("Restore to {cur1}…")).on_click(move |_, window, cx| crate::merge_dialog::open_restore(dr.clone(), mv, rn.to_string(), window, cx))) };
                         // Live rp-904: a change row ends with "Create version here…".
                         let dc = d.clone();
                         let m = if kind == RowKind::Change { m.item(crate::os_menu::OsMenuItem::new("Create version here…").on_click(move |_, window, cx| open_create_version_at(dc.clone(), mv, window, cx))) } else { m };

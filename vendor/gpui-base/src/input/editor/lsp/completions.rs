@@ -249,6 +249,26 @@ impl InputBaseState<EditorMode> {
             return;
         };
 
+        // NOSHAPE PATCH: Backspace inside the word an open list was opened for refines that list (Ace; live
+        // fs-autocomplete-backspace: "defineF" ⌫ lists the three Define rows); back past its start closes it.
+        if new_text.is_empty() && self.extras.context_menu_content.completion.open {
+            let latched = self.extras.context_menu_content.completion.trigger_start_offset.filter(|&l| l < new_offset && self.text.is_char_boundary(l));
+            let Some(latched) = latched else {
+                self.hide_context_menu(cx);
+                return;
+            };
+            let query = self.text.slice(latched..new_offset).to_string();
+            self.request_completions(
+                provider,
+                latched,
+                query.clone(),
+                CompletionContext { trigger_kind: lsp_types::CompletionTriggerKind::TRIGGER_CHARACTER, trigger_character: Some(query) },
+                window,
+                cx,
+            );
+            return;
+        }
+
         if !provider.is_completion_trigger(start, new_text, cx) {
             // Typing something that starts no completion (a space, Tab's
             // indentation) closes an open list.

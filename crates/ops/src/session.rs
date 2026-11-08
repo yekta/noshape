@@ -620,6 +620,41 @@ impl Session {
         self.reload(after)
     }
 
+    /// Restore to <workspace>… with the dialog's picks (live 2351): the tabs whose blob `keep` names stay as they
+    /// are, every other tab as at `to`.
+    pub fn restore_picked(&mut self, to: MicroversionId, keep: impl Fn(&str) -> bool) -> Result<()> {
+        self.ensure_unprotected()?;
+        let kept: Vec<TabId> = {
+            let at = Document::from_blobs(&self.store.read_all(to)?)?;
+            self.doc.tabs.iter().map(|t| t.id).chain(at.tabs.iter().map(|t| t.id)).filter(|id| keep(&Document::blob_name(*id))).collect()
+        };
+        if kept.is_empty() {
+            return self.restore(to);
+        }
+        let before = self.head()?;
+        let description = self.store.restore_description(to)?;
+        let mut result = Document::from_blobs(&self.store.read_all(to)?)?;
+        for id in kept {
+            match self.doc.tabs.iter().find(|t| t.id == id) {
+                Some(ours) => match result.tabs.iter_mut().find(|t| t.id == id) {
+                    Some(t) => *t = ours.clone(),
+                    None => result.tabs.push(ours.clone()),
+                },
+                None => result.tabs.retain(|t| t.id != id),
+            }
+        }
+        let mut changes: Vec<(String, Option<Vec<u8>>)> = result.to_blobs().into_iter().map(|(k, v)| (k, Some(v))).collect();
+        for name in self.store.names(before)? {
+            if !changes.iter().any(|(k, _)| *k == name) {
+                changes.push((name, None));
+            }
+        }
+        let after = self.store.commit(self.branch, &changes, &description)?;
+        self.undo.record(before, after, "Restore");
+        self.viewing = None;
+        self.reload(after)
+    }
+
     /// The document as it was at a version (`id` as text), for drawing views
     /// pinned to it (drawings, asb). None when there is no such version.
     pub fn document_at_version(&self, id: &str) -> Result<Option<Document>> {

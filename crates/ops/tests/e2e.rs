@@ -6271,6 +6271,28 @@ fn history_list_filters_as_the_history_panel() {
     assert_eq!(e.param.as_deref(), Some("kinds[0]"));
 }
 
+/// Restore to Main… as live's dialog (studios 2351): each changed tab kept or restored, the entry
+/// `Restore <m>m <s>s back: "<the restored point's change>"`.
+#[test]
+fn history_restore_keeps_the_picked_tabs() {
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": scratch("restore_keep.noshape").to_str().unwrap() }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "A" }));
+    call(&mut ctx, "tab_create", json!({ "kind": "variablestudio", "name": "B" }));
+    call(&mut ctx, "history_create_version", json!({ "name": "V1" }));
+    call(&mut ctx, "variable_create", json!({ "tab": "A", "name": "a", "value": 1 }));
+    call(&mut ctx, "variable_create", json!({ "tab": "B", "name": "b", "value": 2 }));
+    call(&mut ctx, "history_restore", json!({ "to": "V1", "keep": ["B"] }));
+    let count = |ctx: &mut Ctx, tab: &str| call(ctx, "variable_list", json!({ "tab": tab }))["variables"].as_array().map_or(0, Vec::len);
+    assert_eq!((count(&mut ctx, "A"), count(&mut ctx, "B")), (0, 1));
+    let last = call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().to_string();
+    assert!(last.starts_with("Restore ") && last.contains("s back: \""), "{last}");
+    call(&mut ctx, "history_restore", json!({ "to": "V1" }));
+    assert_eq!(count(&mut ctx, "B"), 0);
+    let e = try_call(&mut ctx, "history_restore", json!({ "to": "V1", "keep": ["nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("keep"));
+}
+
 /// ui_list on a Variable Studio: its Configurations panel's Expand all /
 /// Collapse all, and Collapse all tables (also from a Part Studio's
 /// Variable table panel).

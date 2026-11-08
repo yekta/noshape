@@ -111,8 +111,8 @@ pub fn ops() -> Vec<Op> {
             group: "history",
             verb: "restore",
             summary: "Restore the document to an earlier microversion or version",
-            description: "Adds a new microversion with that state (history is kept).",
-            fields: vec![doc_field(), req("to", s(), "Microversion id or version name/id (from history_list).")],
+            description: "Adds a new microversion with that state (history is kept), named `Restore 2m 55s back: \"<the restored point's change>\"`. The Restore dialog's Keep per tab: `keep` lists the tabs that stay as they are.",
+            fields: vec![doc_field(), req("to", s(), "Microversion id or version name/id (from history_list)."), opt("keep", json!({ "type": "array", "items": { "type": "string" } }), "Tabs (names or ids) kept as they are (Tab restore strategy: Keep); the others are restored.")],
             mutates: true,
             destructive: false,
             run: restore,
@@ -216,7 +216,12 @@ fn restore(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         Some(v) => v.microversion,
         None => key.parse().map_err(|_| OpError::param("to", "not a microversion or version"))?,
     };
-    od.session.restore(mv)?;
+    let mut keep = Vec::new();
+    for v in a.opt_array("keep")?.into_iter().flatten() {
+        let key = v.as_str().ok_or_else(|| OpError::param("keep", "each entry is a tab name or id"))?;
+        keep.push(noshape_model::document::Document::blob_name(doc::find_tab(&od.session.doc, key).map_err(|_| OpError::param("keep", &format!("no tab \"{key}\"")))?));
+    }
+    od.session.restore_picked(mv, |blob| keep.iter().any(|k| k == blob))?;
     Ok(json!({ "restored_to": mv.to_string() }).into())
 }
 
