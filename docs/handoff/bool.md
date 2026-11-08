@@ -23,18 +23,23 @@ scratch /root/bool-scratch.
   2-57 ms). Union 3.1 s -> 0.13 s; Part Draft 3 4.0 -> 1.18 s, the document 4.94 -> 2.10 s (live 1.24 s); model suite
   71/86, 736/934 before and after; bool_replay over every corpus: the same differences as main (its glued case only
   pd3's). T1 bool_patterns::cylinders_meeting_on_a_whole_face_fuse_glued.
-- **skasm's c2-sm-louver Extrude 3 (11-08 05:20 UTC): waiting on the lead (design).** Ours declines "a non-manifold
-  result" because the result is non-manifold: the Common's two lumps meet along one 0.635 mm edge (x 426.06-426.69,
-  y -58.54, z -8.49: the plate's faces 5 and 6 and two pieces of the extrude's face 8 use it), and the Cut of the
-  same inputs leaves the plate's faces 5, 6, 7 on one edge at x 401.29. OCCT gives an empty Common and a Cut that
-  removes nothing (wrong; live cuts 101.46 mm3). Taking it means ours building results whose lumps touch along
-  an edge (separate solids, the edge in each), and a gate exception with a live capture. Debug prints:
-  /root/bool-scratch/wip/louver-nm-debug-1108.patch; cases vibe4 ~/agents/bool-corpora/louver-ex3 (and -3c, as a
-  cut).
-- Queue after it (lead 11-08): the valve's 7-tool cut (live 2210; parked valve-handle-cut / valve-rim-regroup
-  patches conflict with main now); skasm's c2-sm-louver Extrude 3 (OCCT's Common of two valid solids empty, its Cut
-  removes nothing, ours "a non-manifold result"; case in /root/skasm-scratch/bool-louver-ex3/); skasm's
-  c2-valve-config text cut (op_prism_until gives a B-spline where live has a circle); cf-surface-pattern's Surface
+- **skasm's c2-sm-louver Extrude 3 (11-08 06:45 UTC): live 2277 says the input differs, not the Boolean.** Ours declines
+  "a non-manifold result": its Common's two lumps meet along one 0.635 mm edge (x 426.06-426.69, y -58.54, z -8.49) and
+  its Cut leaves three plate faces on one edge at x 401.29; OCCT gives an empty Common and a Cut removing nothing. Live
+  (behaviours.md "bool (2277)"): one plate body before and after (Part 16: 94/276/184 -> 86/252/168, 5677.865 ->
+  5576.409 mm3); the 0.635 mm edge is an ordinary edge of a tooth end that Extrude 3 removes whole (101.456 mm3), and live's
+  plate has no edge near x 401.29 at either bar. So live never builds pieces touching along an edge here: our input
+  plate (skasm's, 83 faces) differs from live's there. Asked the lead whether to still build edge-touching results
+  without a live example. Debug prints: /root/bool-scratch/wip/louver-nm-debug-1108.patch; cases vibe4
+  ~/agents/bool-corpora/louver-ex3 (and -3c, as a cut).
+- **c2-valve-config to the end (10/10), 11-08:** the circle fix landing (357c5e87: an edge between a plane and a surface
+  of revolution about its normal made a circle in op_boolean's and op_prism_until's results; Extrude 3 5 -> 9/10) and in
+  bool-b 54d07771: the parked handle-cut and rim-regroup patches on main (Extrude 2's 1-tool cut and Circular pattern
+  1's 7 tools ours), the 7-tool cut as live 2210 (two vertices and a 0.0712 mm edge each side; OCCT one side only), the
+  gate's first recorded exception: vibe4 ~/agents/bool-corpora/valve2/live (brep_replay reads a corpus's `live` file:
+  "<case> <capture>" lines, reported "as live, OCCT differs"); valve2 added to whyall's corpora. T1
+  bool_patterns::a_valve_handle_cut_past_a_cones_apex_as_occt and a_valve_handles_pattern_keeps_both_short_edges_as_live.
+- Queue after it (lead 11-08): cf-surface-pattern's Surface
   Pattern 3 (85 spheres cut, OCCT invalid, see core's note below); blend's notes (tpd's final cut, michael's round
   tools).
 - **P1 tickets: all three closed.** PVZ-RUST-BOOL passes in the 11-06 nightly (bool_corpus_replay's T2 failure
