@@ -2621,7 +2621,8 @@ impl FeatureDialog {
                     .w_full()
                     .child(div().w(px(96.)).flex_none().text_xs().text_color(pal.text_muted).child(crate::ui::spec_text(s.label)))
                     .child(div().flex_1().child(e))
-                    .os_context_menu(move |m, window, cx| {
+                    // Over the input too: this menu, not the input's own Cut / Copy / Paste.
+                    .os_context_menu_over_inputs(move |m, window, cx| {
                         // The field keeps the keyboard with its text all selected (the input's own press put the caret
                         // under the pointer; live dialog-checkbox-convert-back: [0, 5]).
                         if let Some(st) = view.read(cx).inputs.get(&p2).cloned() {
@@ -2632,12 +2633,14 @@ impl FeatureDialog {
                         }
                         let v = view.clone();
                         let p = p2.clone();
-                        m.item(crate::os_menu::OsMenuItem::new("Convert to checkbox").on_click(move |_, _, cx| {
+                        m.item(crate::os_menu::OsMenuItem::new("Convert to checkbox").on_click(move |_, window, cx| {
                             v.update(cx, |this, cx| {
                                 this.inputs.remove(&p);
                                 this.parse_errors.remove(&p);
                                 this.set_value(&p, ParamValue::Bool(false), cx);
-                            })
+                            });
+                            // The text field is gone: the keyboard leaves the dialog (live: none).
+                            Self::leave_keyboard_after_menu(&v, window, cx);
                         }))
                     })
                     .into_any_element()

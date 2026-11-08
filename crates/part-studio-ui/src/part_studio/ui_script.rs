@@ -84,6 +84,8 @@ impl PartStudioView {
         } else if crate::ui_script::open_dialog().is_some_and(|d| d["kind"] == "modal") {
             // A modal holds the keyboard (live part-menu-properties: "other").
             json!({ "kind": "other", "label": null, "text": null, "selection": null, "all": false })
+        } else if let Some(f) = crate::ui_script::noted_focus() {
+            f
         } else {
             json!({ "kind": "none", "label": null, "text": null, "selection": null, "all": false })
         };

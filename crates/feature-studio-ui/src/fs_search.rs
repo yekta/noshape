@@ -373,7 +373,16 @@ impl FsSearchPane {
 }
 
 impl Render for FsSearchPane {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Live (ui-parity key-mod-shift-f-featurescript-search): Find text holds the keyboard, read as "other".
+        if self.find.read(cx).focus_handle(cx).is_focused(window) {
+            crate::ui_script::note_focus(|| {
+                let mut f = crate::ui_script::field_focus("", self.find.read(cx));
+                f["kind"] = "other".into();
+                f["label"] = serde_json::Value::Null;
+                f
+            });
+        }
         let pal = p();
         let primary = |id: &'static str, label: &'static str| Button::new(id).primary().h(px(30.)).px(px(10.5)).rounded(px(5.25)).child(div().text_size(px(14.)).child(label));
         let field = |st: &Entity<InputState>| crate::os_ui::input_h(Input::new(st), 30.).text_size(px(14.));
@@ -496,6 +505,11 @@ impl Render for FsSearchPane {
         });
         let results = self.render_results(cx);
         v_flex()
+            // Esc closes the pane, also from its text boxes (live key-mod-shift-f-featurescript-search).
+            .capture_action(cx.listener(|_, _: &gpui_kit::component::input::Escape, _, cx| {
+                cx.stop_propagation();
+                cx.emit(FsSearchEvent::Close);
+            }))
             .h(px(300.))
             .flex_none()
             .bg(rgb(0xffffff))

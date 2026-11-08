@@ -560,8 +560,11 @@ suppression" is a hover submenu (its old recordings missed it; re-recorded 28a1e
 modal recorded as live's recorder reads it, Paste inputs over taken IDs says "No inputs pasted. Existing inputs have
 the same internal FeatureScript ID." (ops' `info` too), the configuration ▾ holds the keyboard while open, a field's
 Configure leaves it (config-* now match but config-depth-configure: live counts Configure in the open dialog's undo;
-ours has it in the document's only). The Appearance editor's ✓ / ✕ clear its selection. Left, ours: focus kinds in
-part-menu-release / key-mod-shift-f / mirror-face-type / dialog-checkbox-convert-back, appearance-face-row-remove's
+ours has it in the document's only). The Appearance editor's ✓ / ✕ clear its selection. 08:30: dialog-checkbox-convert-back
+(its field's menu over the input) and key-mod-shift-f (the search pane's Find text noted as "other", Esc closes it)
+match; part-menu-release is live's Release paywall; mirror-face-type: live moves the keyboard to the query after
+Face mirror and Chamfer's Two distances only (9 other recorded type switches keep it on the select: a DOM detail,
+left). Left, ours: appearance-face-row-remove's
 row menu (live: Rename… · Edit appearance… · Suppress · Delete: needs model fields + ops; asked live, REQUESTS 07:01),
 sketch-row-copy-paste-onto-front (asked live 11-07), variable-table-row-filter (ours marks the row related at the
 right-click, live only after Filter feature list).

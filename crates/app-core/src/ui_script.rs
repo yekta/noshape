@@ -252,6 +252,27 @@ pub fn noted_message() -> Option<String> {
     message_slot().lock().ok()?.clone()
 }
 
+fn focus_slot() -> &'static Mutex<Option<serde_json::Value>> {
+    static F: OnceLock<Mutex<Option<serde_json::Value>>> = OnceLock::new();
+    F.get_or_init(Default::default)
+}
+
+/// A page-level panel's text box drawn now with the keyboard (the Feature Studio search pane's Find text): the
+/// focus a studio reports when none of its own controls has it.
+pub fn note_focus(focus: impl FnOnce() -> serde_json::Value) {
+    if !active() {
+        return;
+    }
+    if let Ok(mut f) = focus_slot().lock() {
+        *f = Some(focus());
+    }
+}
+
+/// The focus noted since the last [`clear_dialog`].
+pub fn noted_focus() -> Option<serde_json::Value> {
+    focus_slot().lock().ok()?.clone()
+}
+
 /// Whether the noted dialog is a [`note_modal`] one, which takes the buttons drawn after it ([`note_button`]).
 static TITLE_ONLY_MODAL: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -294,6 +315,9 @@ pub fn clear_dialog() {
     TITLE_ONLY_MODAL.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut m) = message_slot().lock() {
         *m = None;
+    }
+    if let Ok(mut f) = focus_slot().lock() {
+        *f = None;
     }
     DIALOG_PINNED.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut f) = fields_slot().lock() {
