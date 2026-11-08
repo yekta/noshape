@@ -1704,6 +1704,9 @@ impl<'a> Translator<'a> {
         if let Some(r) = self.blended_face_from_query(text) {
             return r.map(|e| vec![e]);
         }
+        if let Some(r) = self.blend_vertex_from_query(text) {
+            return r.map(|e| vec![e]);
+        }
         if let Some(r) = self.region_from_query(text)? {
             return Ok(vec![r]);
         }
@@ -2207,9 +2210,53 @@ impl<'a> Translator<'a> {
         best.map(|b| Some(whole(&b.1))).ok_or_else(|| format!("no region of ours inside sketch {sk}'s curves {:?}", strings.iter().filter(|e| self.curves.contains_key(&(sk.clone(), (*e).clone()))).collect::<Vec<_>>()))
     }
 
-    /// A sketch curve or point named by its Onshape id (packed
-    /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
-    /// from it).
+    /// A fillet's vertex by Onshape's written name (`makeQuery(id+"F….opFillet","BLEND_VERTEX",EntityType.VERTEX,
+    /// {"blendedFrom":[an Extrude's swept edge, …],"blendedInto":[two of its faces]})`, cf-snap-hook's Plane 1): ours
+    /// where those two faces meet, nearest the line the swept edge ran along. `None`: not such a query.
+    fn blend_vertex_from_query(&mut self, text: &str) -> Option<Result<String, String>> {
+        if !text.contains("\"BLEND_VERTEX\",EntityType.VERTEX") {
+            return None;
+        }
+        let query = inline_query_vars(text)?;
+        let list = |key: &str| top_level_items(query.split(&format!("\"{key}\":[")).nth(1)?);
+        let (Some(into), Some(from)) = (list("blendedInto"), list("blendedFrom")) else { return Some(Err("BLEND_VERTEX: no blendedFrom / blendedInto".into())) };
+        let mut faces = Vec::new();
+        for f in &into {
+            match self.written_extrude_name(f) {
+                Some(Ok(id)) => faces.push(id),
+                Some(Err(e)) => return Some(Err(format!("BLEND_VERTEX: {e}"))),
+                None => return Some(Err("BLEND_VERTEX: a face it lies on is not an Extrude's".into())),
+            }
+        }
+        let Some(edge) = from.iter().find(|e| e.contains("\"SWEPT_EDGE\"")) else { return Some(Err("BLEND_VERTEX: not blended from a swept edge".into())) };
+        let mut sk = None;
+        let mut curves = Vec::new();
+        for q in edge.split("sketchEntityQuery(id+\"").skip(1) {
+            let Some((s, after)) = q.split_once(".wireOp\"") else { continue };
+            curves.extend(after.split('"').nth(1).and_then(|e| self.curve_of(s, e)));
+            sk = Some(s.to_string());
+        }
+        let (Some(sk), [a, b]) = (sk, curves.as_slice()) else { return Some(Err(format!("BLEND_VERTEX: {} of its swept edge's 2 curves translated", curves.len()))) };
+        let ends = |c: &Vec<[f64; 2]>| [c[0], c[c.len() - 1]];
+        let Some(corner) = ends(a).into_iter().find(|p| ends(b).iter().any(|q| (p[0] - q[0]).hypot(p[1] - q[1]) < 1e-7)) else { return Some(Err("BLEND_VERTEX: its swept edge's curves don't meet".into())) };
+        let Some([o, x, y]) = self.frames.get(&sk).copied() else { return Some(Err(format!("BLEND_VERTEX: sketch {sk}'s frame"))) };
+        let at: [f64; 3] = std::array::from_fn(|i| o[i] + x[i] * corner[0] + y[i] * corner[1]);
+        let n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+        let found = match self.call("query_entities", json!({ "kind": "vertices", "of": faces })) {
+            Ok(f) => f,
+            Err(e) => return Some(Err(e)),
+        };
+        let unit = per_unit(&found["units"]);
+        let best = found["vertices"].as_array().into_iter().flatten().filter_map(|v| {
+            let p = f3(&v["position"])?;
+            let w: [f64; 3] = std::array::from_fn(|i| p[i] * unit - at[i]);
+            let t = w[0] * n[0] + w[1] * n[1] + w[2] * n[2];
+            let off: f64 = (0..3).map(|i| (w[i] - t * n[i]).powi(2)).sum::<f64>().sqrt();
+            Some((off, v["id"].as_str()?.to_string()))
+        }).min_by(|a, b| a.0.total_cmp(&b.0));
+        Some(best.map(|(_, id)| id).ok_or_else(|| "BLEND_VERTEX: its two faces share no vertex of ours".to_string()))
+    }
+
     /// The fillet face a packed query names `blendedFrom` an Extrude's swept edge at the corner of two sketch curves
     /// (a Hole's in-feature mate connector placed at the CENTER of a rounded corner, clamp-hms): ours, the cylinder
     /// whose axis runs along the extrude next to that corner. `None`: not such a query.
@@ -2256,6 +2303,9 @@ impl<'a> Translator<'a> {
         Some(best.map(|(_, id)| id).ok_or_else(|| format!("blended edge of sketch {sk}: no rounded corner of ours there")))
     }
 
+    /// A sketch curve or point named by its Onshape id (packed
+    /// `SKETCH_ENTITY` query of a sketch's own wire, not of a feature made
+    /// from it).
     fn sketch_entity_from_query(&self, text: &str) -> Option<String> {
         let packed = text.split("qCompressed(1.0,\"").nth(1)?.split('"').next()?;
         let tree = noshape_model::custom::host::packed::unpack(packed).ok()?;
@@ -3882,6 +3932,53 @@ fn packed_order(p: &noshape_model::custom::host::packed::Packed) -> Option<usize
     }
 }
 
+/// A written query with its `var subQk=…;` definitions put in where they are used: `{var subQ0=A;query=f(subQ0);}`
+/// → `f(A)`.
+fn inline_query_vars(text: &str) -> Option<String> {
+    let body = text.trim().trim_start_matches('{').trim_end_matches('}');
+    let mut vars: Vec<(String, String)> = Vec::new();
+    let mut query = None;
+    for part in body.split(';').map(str::trim).filter(|p| !p.is_empty()) {
+        if let Some((name, value)) = part.strip_prefix("var ").and_then(|v| v.split_once('=')) {
+            vars.push((name.trim().to_string(), value.to_string()));
+        } else if let Some(q) = part.strip_prefix("query=") {
+            query = Some(q.to_string());
+        }
+    }
+    let mut query = query?;
+    // (subQ10 before subQ1.)
+    vars.sort_by_key(|(name, _)| std::cmp::Reverse(name.len()));
+    for (name, value) in &vars {
+        query = query.replace(name.as_str(), value);
+    }
+    Some(query)
+}
+
+/// The items of a written list up to its closing `]`, split at its own commas: `a(1,2),b]…` → [`a(1,2)`, `b`].
+fn top_level_items(rest: &str) -> Option<Vec<String>> {
+    let (mut depth, mut start, mut quoted) = (0i32, 0, false);
+    let mut items = Vec::new();
+    for (i, c) in rest.char_indices() {
+        match c {
+            '"' => quoted = !quoted,
+            _ if quoted => {}
+            '(' | '[' | '{' => depth += 1,
+            ')' | '}' => depth -= 1,
+            ']' if depth == 0 => {
+                items.push(rest[start..i].trim().to_string());
+                return Some(items.into_iter().filter(|s| !s.is_empty()).collect());
+            }
+            ']' => depth -= 1,
+            ',' if depth == 0 => {
+                items.push(rest[start..i].trim().to_string());
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 fn packed_strings_of(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     if let Some(packed) = text.split("qCompressed(1.0,\"").nth(1).and_then(|r| r.split('"').next())
@@ -5322,6 +5419,16 @@ fn pattern_alias(sketch: &Value, id: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    /// A written query's `var subQk=…;` definitions put in where they're used (subQ10 not read as subQ1 + "0"), and
+    /// a written list split at its own commas only.
+    #[test]
+    fn a_written_querys_vars_are_inlined_and_its_lists_split_at_their_own_commas() {
+        let q = super::inline_query_vars("{var subQ1=a(\"x\",1);var subQ10=b(2,3);query=f(subQ10,subQ1);}").unwrap();
+        assert_eq!(q, "f(b(2,3),a(\"x\",1))");
+        let items = super::top_level_items("g(1,[2,3]),\"p,q\", h({\"k\":4}) ],rest").unwrap();
+        assert_eq!(items, ["g(1,[2,3])", "\"p,q\"", "h({\"k\":4})"]);
+    }
 
     /// A packed face query's own edges, not the curves its vertices meet (named one level down): live's query for one
     /// of c2-sm-exhaust-clamp's small disks, a circle touching a line and a ring, names all three, its own edges only
