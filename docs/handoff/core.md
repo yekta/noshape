@@ -33,19 +33,23 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 01:24 UTC (restarted 01:05): landing the stack, then (4).**
-- Queued: 1c3afa52 (opDraft as the Draft feature + the deterministic wire, squashed from 3 commits) and a26bed33
-  (translator: live's written BLEND_VERTEX query, cf-snap-hook 11 -> 13). The queue's check of the opDraft commit
-  failed custom_features::std_features_run_in_custom_features (the harness's draft: a fillet only ending on the drafted
-  face of a shelled box can't be rolled again). Fix in the worktree: where the reblend fails, draft with the fillets
-  as they are (detail_a draft_faces).
-- cf-snap-hook's Sweep 1: its profile (on Plane 1, x 58.56) sits on a closed rim path whose plane crosses the rim
-  twice; `half_path` cut the loop and swept one side (1235 of live's 1705 mm³). A closed path is now swept whole,
-  rotated to start at the crossing nearest the profile (`closed_path_from`, solid_a.rs). T1 features_c::
-  a_profile_on_a_closed_path_sweeps_the_whole_loop (240 -> 480 mm³). Suite run: /root/core-scratch/suite-sweep2.log.
-- Set aside (not in the tree): Part Draft 3's WIP (C++ `tapered_prism` for a drafted right prism + Rust
-  `draft_about_neutral_edges`, the latter timed out at 94 s): /root/core-scratch/wip-0108.patch (stash core-wip-0108).
-  Part Draft 3 can't score until the Spur Gear's corpus volume is fixed (live's evVolume after 06:05 UTC).
+**State 11-08 02:40 UTC (restarted 01:05): (2) landed, (4) Part Draft 3.**
+- Landed 02:19 as 31d9fe78: opDraft as the Draft feature, the deterministic wire (cf-lighten), the BLEND_VERTEX
+  translator, a closed sweep path swept whole (cf-snap-hook 11 -> 14), and a draft whose fillets can't be rolled
+  again drafting them as they are (the std harness's draft). Suite 733/934 (from 724), no document lost or slower.
+- cf-snap-hook's next difference is Fillet 6 (102/196/98 vs live 84/160/80, +9 mm³): blend's. Snap Hook 1/2's
+  opDraft then fails on the case (OCCT: "draft left a tolerance past a hundredth of the part"), downstream of it.
+- Part Draft 3 (the gear's halves drafted 2° about z 0): `tapered_prism` (shell.cpp, first in op_draft_wedges): a
+  right prism on the neutral plane with every side drafted is built directly: the base face offset (OCCT's arc join,
+  the intersection join where an arc join would add corner arcs; the intersection join spends 3 s failing on
+  involutes), each side face ruled from its base edge to its offset; lines and arcs from OCCT's offset (exact), other
+  curves from their exact offset (Geom_OffsetCurve) on their own parameter (B-spline approximations that keep it:
+  OCCT's ruled face otherwise pairs an ellipse's points with other points' offsets, 0.29 % low); a bore's circle on
+  its own frame. T1 kernel blend::a_curved_prism_drafted_about_its_base_has_steiners_volume (within 1e-6 of
+  Steiner's V = A·h − L·tanα·h²/2 + π·tan²α·h³/3, both pulls); blend::draft_wedges_like_onshape still live's. Part
+  Draft 3 builds (custom 1/4 -> scored once the Spur Gear's corpus volume is fixed), ~2 s here vs live 865 ms: the
+  arc-join offset of the 151-edge face is 0.86 s per half. Faster would be offsetting each edge exactly ourselves and
+  trimming at sharp corners. Suite: /root/core-scratch/suite-taper.log.
 
 **State 11-07 23:34 UTC (restarted 23:05 on a pinned account): queue 1-5 from the lead.**
 - (1) seam-split faces and (5) SELF-OVERLAPPING-FACE were already on main (18:03 / b113528b).

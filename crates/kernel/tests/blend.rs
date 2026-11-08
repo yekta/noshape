@@ -2,7 +2,7 @@
 //! metres with the working scale the model uses: cases where OCCT on its own
 //! fails or builds an invalid solid. Volumes in mm³ are Onshape's (live capture).
 
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use noshape_kernel::*;
 
 const MM: f64 = 1e-3;
@@ -148,6 +148,37 @@ fn draft_wedges_like_onshape() {
         for f in &sides {
             let i = s.index_of(f, ShapeType::Face).unwrap() as u32;
             assert!(r.history.of_input(0, ShapeType::Face, i).any(|h| h.relation == Relation::Modified), "{deg}° face {i}");
+        }
+    }
+}
+
+/// A prism whose sides are all drafted about its base, its profile curved (an ellipse in two arcs, which OCCT offsets
+/// as B-spline pieces, as a gear's involutes): its far cap is the base offset inward, each side ruled from its base
+/// edge to that edge's offset. For a convex smooth profile the volume is Steiner's: V = A·h − L·tanα·h²/2 +
+/// π·tan²α·h³/3, narrowing with the pull (and widening against it).
+#[test]
+fn a_curved_prism_drafted_about_its_base_has_steiners_volume() {
+    setup();
+    let ellipse = |start: f64, end: f64| Segment2d::EllipseArc { center: DVec2::ZERO, major_radius: 20.0 * MM, minor_radius: 10.0 * MM, rotation: 0.0, start_angle: start, end_angle: end };
+    let top = Plane::from_normal(DVec3::ZERO, DVec3::Z);
+    let wire = make_wire_2d(&top, &[ellipse(0.0, std::f64::consts::PI), ellipse(std::f64::consts::PI, std::f64::consts::TAU)]).unwrap();
+    let base = make_face_from_wire(&wire, true).unwrap();
+    let (h, alpha) = (10.0, 5f64.to_radians());
+    let prism = extrude(&base, DVec3::Z * h * MM).unwrap().shape;
+    let sides: Vec<Shape> = prism.faces().into_iter().filter(|f| !matches!(f.face_surface().unwrap(), Surface::Plane(_))).collect();
+    assert_eq!(sides.len(), 2);
+    let a = std::f64::consts::PI * 20.0 * 10.0;
+    let l: f64 = wire.edges().iter().map(|e| e.length().unwrap() / MM).sum();
+    for pull in [1.0, -1.0] {
+        let r = draft_wedges(&prism, &sides, DVec3::Z * pull, &top, alpha).unwrap();
+        assert!(r.shape.is_valid(), "pull {pull}");
+        assert_eq!(r.shape.faces().len(), 4, "pull {pull}");
+        let t = alpha.tan() * pull;
+        let want = a * h - l * t * h * h / 2.0 + std::f64::consts::PI * t * t * h * h * h / 3.0;
+        assert!((vol_mm3(&r.shape) - want).abs() < 1e-6 * want, "pull {pull}: {} vs Steiner {want}", vol_mm3(&r.shape));
+        for f in &sides {
+            let i = prism.index_of(f, ShapeType::Face).unwrap() as u32;
+            assert!(r.history.of_input(0, ShapeType::Face, i).any(|h| h.relation == Relation::Modified), "pull {pull}: face {i}");
         }
     }
 }

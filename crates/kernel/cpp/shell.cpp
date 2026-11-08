@@ -36,6 +36,12 @@
 #include <GeomLProp_SLProps.hxx>
 #include <GeomAPI_Interpolate.hxx>
 #include <BRepFill.hxx>
+#include <BRepOffsetAPI_MakeOffset.hxx>
+#include <Geom_BSplineCurve.hxx>
+#include <GeomConvert_ApproxCurve.hxx>
+#include <Geom_OffsetCurve.hxx>
+#include <BRepAlgo.hxx>
+#include <BRepBuilderAPI_Transform.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 
 #include <BRepAdaptor_Curve.hxx>
@@ -8114,6 +8120,295 @@ void bind_wedge(const TopoDS_Shape& w, const TopoDS_Face& f, const gp_Pnt& o, co
   }
 }
 
+// `c` between `f` and `l` as a polynomial B-spline on the same parameter, within `tol`.
+occ::handle<Geom_BSplineCurve> bspline_on_own_parameter(const occ::handle<Geom_Curve>& c, double f, double l, double tol)
+{
+  GeomConvert_ApproxCurve approx(occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c, f, l)), tol, GeomAbs_C2, 64, 9);
+  return approx.HasResult() ? approx.Curve() : occ::handle<Geom_BSplineCurve>();
+}
+
+// The edge `e` on the neutral plane offset in its plane by `d` and raised by `H` along `P`, between the ends of `approx`
+// (OCCT's offset of it, running as `e` runs): the exact offset curve, on `e`'s own parameter, so a ruled face from `e`
+// to it pairs each point with its own offset. Null where `approx`'s ends aren't on it within `tol` or run past `e`.
+TopoDS_Edge exact_offset_edge(const TopoDS_Edge& e, const TopoDS_Edge& approx, const gp_Dir& P, double H, double d,
+                              double tol)
+{
+  double                         f, l;
+  const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+  if (c.IsNull() || l - f < Precision::PConfusion())
+    return TopoDS_Edge();
+  BRepAdaptor_Curve ac(approx);
+  const gp_Pnt      approx_mid = ac.Value((ac.FirstParameter() + ac.LastParameter()) / 2);
+  gp_Pnt            a = BRep_Tool::Pnt(TopExp::FirstVertex(approx, true)), b = BRep_Tool::Pnt(TopExp::LastVertex(approx, true));
+  if (e.Orientation() == TopAbs_REVERSED)
+    std::swap(a, b);
+  occ::handle<Geom_Curve> best;
+  double                  best_off = RealLast();
+  for (const double side : {1.0, -1.0})
+  {
+    occ::handle<Geom_Curve> oc(new Geom_OffsetCurve(occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c, f, l)), side * d, P));
+    oc->Translate(gp_Vec(P) * H);
+    GeomAPI_ProjectPointOnCurve pm(approx_mid, oc);
+    if (pm.NbPoints() > 0 && pm.LowerDistance() < best_off)
+    {
+      best_off = pm.LowerDistance();
+      best     = oc;
+    }
+  }
+  if (best.IsNull())
+    return TopoDS_Edge();
+  GeomAPI_ProjectPointOnCurve pa(a, best), pb(b, best);
+  if (pa.NbPoints() == 0 || pb.NbPoints() == 0 || pa.LowerDistance() > tol || pb.LowerDistance() > tol)
+    return TopoDS_Edge();
+  const double ta = pa.LowerDistanceParameter(), tb = pb.LowerDistanceParameter();
+  if (!(ta < tb) || ta < f - Precision::PConfusion() || tb > l + Precision::PConfusion())
+    return TopoDS_Edge();
+  const occ::handle<Geom_BSplineCurve> top = bspline_on_own_parameter(best, ta, tb, tol / 10);
+  if (top.IsNull())
+    return TopoDS_Edge();
+  const occ::handle<Geom_Curve> as_curve(top);
+  BRepBuilderAPI_MakeEdge        mk(as_curve);
+  if (!mk.IsDone())
+    return TopoDS_Edge();
+  TopoDS_Edge r = mk.Edge();
+  if (e.Orientation() == TopAbs_REVERSED)
+    r.Reverse();
+  return r;
+}
+
+// `e` for a ruled face to its exact offset: a B-spline on its own parameter (OCCT's ruled face converts an ellipse
+// to a rational B-spline on another parameter, so its points would pair with other points' offsets).
+TopoDS_Edge ruling_base(const TopoDS_Edge& e, double tol)
+{
+  double                        f, l;
+  const occ::handle<Geom_Curve> c = BRep_Tool::Curve(e, f, l);
+  if (c.IsNull())
+    return TopoDS_Edge();
+  if (c->IsKind(STANDARD_TYPE(Geom_BSplineCurve)))
+    return e;
+  const occ::handle<Geom_BSplineCurve> b = bspline_on_own_parameter(c, f, l, tol / 10);
+  if (b.IsNull())
+    return TopoDS_Edge();
+  const occ::handle<Geom_Curve> as_curve(b);
+  BRepBuilderAPI_MakeEdge        mk(as_curve);
+  if (!mk.IsDone())
+    return TopoDS_Edge();
+  TopoDS_Edge r = mk.Edge();
+  if (e.Orientation() == TopAbs_REVERSED)
+    r.Reverse();
+  return r;
+}
+
+// A right prism standing on the neutral plane with every side face drafted (an extruded gear's half, its involute
+// flanks B-splines OCCT's draft doesn't take): built directly. Its far cap is the neutral face offset inward by
+// H·tan(angle) with sharp corners kept (Parasolid's drafted faces run on until they meet), each side face the ruled
+// surface from its edge on the neutral plane to that edge's offset. Null when `solid` isn't such a prism.
+TopoDS_Shape tapered_prism(const TopoDS_Shape& solid, const ShapeIMap& drafted, const gp_Dir& P, const gp_Pnt& O,
+                           double ta, double tol, SourceMap& sources)
+{
+  TopoDS_Face bottom, top;
+  double      H     = 0;
+  int         sides = 0;
+  for (TopExp_Explorer e(solid, TopAbs_FACE); e.More(); e.Next())
+  {
+    const TopoDS_Face   f = TopoDS::Face(e.Current());
+    BRepAdaptor_Surface s(f, false);
+    if (s.GetType() == GeomAbs_Plane && s.Plane().Axis().Direction().IsParallel(P, 1e-9))
+    {
+      const double h = gp_Vec(O, s.Plane().Location()).Dot(gp_Vec(P));
+      const bool   on_neutral = std::abs(h) < tol;
+      if (!(on_neutral ? bottom : top).IsNull())
+        return TopoDS_Shape();
+      (on_neutral ? bottom : top) = f;
+      if (!on_neutral)
+        H = h;
+      continue;
+    }
+    if (!drafted.Contains(f))
+      return TopoDS_Shape();
+    ++sides;
+  }
+  if (bottom.IsNull() || top.IsNull())
+    return TopoDS_Shape();
+  ShapeIMap base_edges;
+  TopExp::MapShapes(bottom, TopAbs_EDGE, base_edges);
+  if (base_edges.Extent() != sides)
+    return TopoDS_Shape();
+  // A right prism: its far cap is its base moved, its volume the base's area times its height.
+  GProp_GProps gb, gt;
+  BRepGProp::SurfaceProperties(bottom, gb);
+  BRepGProp::SurfaceProperties(top, gt);
+  const double A = gb.Mass();
+  if (std::abs(gt.Mass() - A) > 1e-7 * A || std::abs(volume_of(solid) - A * std::abs(H)) > 1e-6 * A * std::abs(H))
+    return TopoDS_Shape();
+  const double inward = H * ta;
+  // The neutral face offset inward by H·tan(angle). OCCT's intersection join fails slowly on involute B-splines (3 s
+  // on a gear's face); its arc join builds the same loops where no corner opens up, i.e. where every offset edge comes
+  // from a base edge. Which sign shrinks the face depends on its orientation: the one whose outer loop encloses less.
+  const TopoDS_Face base       = TopoDS::Face(bottom.Oriented(TopAbs_FORWARD));
+  const gp_Pln      base_plane = BRepAdaptor_Surface(base).Plane();
+  auto              loop_area  = [&](const TopoDS_Shape& w) {
+    BRepBuilderAPI_MakeFace lf(base_plane, TopoDS::Wire(w), true);
+    GProp_GProps            g;
+    if (lf.IsDone())
+      BRepGProp::SurfaceProperties(lf.Face(), g);
+    return std::abs(g.Mass());
+  };
+  const double base_outer = loop_area(BRepTools::OuterWire(base));
+  auto         offset     = [&](GeomAbs_JoinType join) -> std::unique_ptr<BRepOffsetAPI_MakeOffset> {
+    for (const double by : {-inward, inward})
+    {
+      auto m = std::make_unique<BRepOffsetAPI_MakeOffset>(base, join);
+      m->Perform(by);
+      if (!m->IsDone())
+        return nullptr;
+      double largest = 0;
+      for (TopExp_Explorer w(m->Shape(), TopAbs_WIRE); w.More(); w.Next())
+        largest = std::max(largest, loop_area(w.Current()));
+      if ((largest < base_outer) != (inward > 0))
+        continue;
+      ShapeIMap offset_edges, generated;
+      TopExp::MapShapes(m->Shape(), TopAbs_EDGE, offset_edges);
+      for (int i = 1; i <= base_edges.Extent(); ++i)
+        for (ShapeList::Iterator it(m->Generated(base_edges(i))); it.More(); it.Next())
+          generated.Add(it.Value());
+      return generated.Extent() == offset_edges.Extent() ? std::move(m) : nullptr;
+    }
+    return nullptr;
+  };
+  std::unique_ptr<BRepOffsetAPI_MakeOffset> made = offset(GeomAbs_Arc);
+  if (!made)
+    made = offset(GeomAbs_Intersection);
+  if (!made)
+    return TopoDS_Shape();
+  BRepOffsetAPI_MakeOffset& mo = *made;
+  gp_Trsf up;
+  up.SetTranslation(gp_Vec(P) * H);
+  BRepBuilderAPI_Transform moved(mo.Shape(), up, true);
+  if (!moved.IsDone())
+    return TopoDS_Shape();
+  ShapeAncMap edge_faces;
+  TopExp::MapShapesAndUniqueAncestors(solid, TopAbs_EDGE, TopAbs_FACE, edge_faces);
+  BRepBuilderAPI_Sewing sew(tol * 10);
+  occ::handle<NCollection_HSequence<TopoDS_Shape>> top_edges(new NCollection_HSequence<TopoDS_Shape>());
+  for (int i = 1; i <= base_edges.Extent(); ++i)
+  {
+    const TopoDS_Edge& e   = TopoDS::Edge(base_edges(i));
+    const ShapeList&   gen = mo.Generated(e);
+    if (gen.IsEmpty())
+      return TopoDS_Shape();
+    // A B-spline's offset comes back in pieces: one edge again.
+    TopoDS_Edge top_edge;
+    if (gen.Extent() == 1)
+      top_edge = TopoDS::Edge(moved.ModifiedShape(gen.First()));
+    else
+    {
+      BRepBuilderAPI_MakeWire pieces;
+      ShapeList               moved_pieces;
+      for (ShapeList::Iterator it(gen); it.More(); it.Next())
+        moved_pieces.Append(moved.ModifiedShape(it.Value()));
+      pieces.Add(moved_pieces);
+      if (!pieces.IsDone())
+        return TopoDS_Shape();
+      top_edge = BRepAlgo::ConcatenateWireC0(pieces.Wire());
+      if (top_edge.IsNull())
+        return TopoDS_Shape();
+    }
+    // Running as its base edge runs (the ruled face pairs their starts). A closed circle (a bore): its offset
+    // circle on the base circle's own frame, so the ruled face doesn't twist.
+    if (BRep_Tool::IsClosed(e))
+    {
+      BRepAdaptor_Curve bc(e), tc(top_edge);
+      if (bc.GetType() != GeomAbs_Circle || tc.GetType() != GeomAbs_Circle)
+        return TopoDS_Shape();
+      gp_Ax2 frame = bc.Circle().Position();
+      frame.Translate(gp_Vec(P) * H);
+      top_edge = BRepBuilderAPI_MakeEdge(gp_Circ(frame, tc.Circle().Radius()), bc.FirstParameter(), bc.LastParameter());
+      if (e.Orientation() == TopAbs_REVERSED)
+        top_edge.Reverse();
+    }
+    const gp_Pnt e0 = BRep_Tool::Pnt(TopExp::FirstVertex(e, true));
+    if (e0.Distance(BRep_Tool::Pnt(TopExp::LastVertex(top_edge, true))) < e0.Distance(BRep_Tool::Pnt(TopExp::FirstVertex(top_edge, true))))
+      top_edge.Reverse();
+    // Lines and arcs offset exactly; other curves (an involute) from their exact offsets.
+    TopoDS_Edge  rule_from = e;
+    const auto   kind      = BRepAdaptor_Curve(e).GetType();
+    if (!BRep_Tool::IsClosed(e) && kind != GeomAbs_Line && kind != GeomAbs_Circle)
+    {
+      const TopoDS_Edge exact = exact_offset_edge(e, top_edge, P, H, std::abs(inward), tol * 10);
+      const TopoDS_Edge from  = exact.IsNull() ? TopoDS_Edge() : ruling_base(e, tol * 10);
+      if (!from.IsNull())
+      {
+        top_edge  = exact;
+        rule_from = from;
+      }
+    }
+    top_edges->Append(top_edge);
+    const TopoDS_Face rf = BRepFill::Face(rule_from, top_edge);
+    if (rf.IsNull())
+      return TopoDS_Shape();
+    const ShapeList* fs = edge_faces.Seek(e);
+    if (!fs)
+      return TopoDS_Shape();
+    for (ShapeList::Iterator it(*fs); it.More(); it.Next())
+      if (!it.Value().IsSame(bottom))
+        sources.Bind(rf, Source{it.Value(), (uint8_t)REL_MODIFIED});
+    sew.Add(rf);
+  }
+  // The cap: the offset's largest loop, the others holes in it.
+  const gp_Pln             cap_plane(gp_Pnt(O.XYZ() + gp_Vec(P).XYZ() * H), P);
+  std::vector<TopoDS_Wire> loops;
+  std::vector<double>      signed_areas;
+  int                      outer = -1;
+  double                   outer_area = 0;
+  const occ::handle<NCollection_HSequence<TopoDS_Shape>> top_wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(top_edges, tol * 10, false);
+  for (int w = 1; !top_wires.IsNull() && w <= top_wires->Length(); ++w)
+  {
+    loops.push_back(TopoDS::Wire(top_wires->Value(w)));
+    BRepBuilderAPI_MakeFace lf(cap_plane, loops.back(), true);
+    if (!lf.IsDone())
+      return TopoDS_Shape();
+    GProp_GProps lg;
+    BRepGProp::SurfaceProperties(lf.Face(), lg);
+    signed_areas.push_back(lg.Mass());
+    if (std::abs(lg.Mass()) > outer_area)
+    {
+      outer_area = std::abs(lg.Mass());
+      outer      = (int)loops.size() - 1;
+    }
+  }
+  if (outer < 0)
+    return TopoDS_Shape();
+  // The outer loop runs counter-clockwise about the cap's normal, the holes clockwise.
+  auto oriented = [&](int i) {
+    const bool reverse = (i == outer) == (signed_areas[i] < 0);
+    return reverse ? TopoDS::Wire(loops[i].Reversed()) : loops[i];
+  };
+  BRepBuilderAPI_MakeFace cap(cap_plane, oriented(outer), true);
+  for (int i = 0; i < (int)loops.size(); ++i)
+    if (i != outer)
+      cap.Add(oriented(i));
+  if (!cap.IsDone())
+    return TopoDS_Shape();
+  ShapeFix_Face fix(cap.Face());
+  fix.FixOrientation();
+  fix.Perform();
+  sources.Bind(fix.Face(), Source{top, (uint8_t)REL_MODIFIED});
+  sources.Bind(bottom, Source{bottom, (uint8_t)REL_MODIFIED});
+  sew.Add(bottom);
+  sew.Add(fix.Face());
+  sew.Perform();
+  // The faces as sewn stand for the ones bound above.
+  SourceMap sewn;
+  for (SourceMap::Iterator it(sources); it.More(); it.Next())
+    sewn.Bind(sew.IsModified(it.Key()) ? sew.Modified(it.Key()) : it.Key(), it.Value());
+  const TopoDS_Shape r = solid_of(sew.SewedShape());
+  if (!valid_solid(r) || solid_count(r) != 1)
+    return TopoDS_Shape();
+  sources = sewn;
+  return r;
+}
+
 } // namespace
 
 // Draft by booleans, for when BRepOffsetAPI_DraftAngle fails or builds an
@@ -8146,6 +8441,23 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
   auto         height = [&](const gp_Pnt& p) { return gp_Vec(O, p).Dot(gp_Vec(P)); };
   ShapeList    removal, addition;
   SourceMap    sources;
+  {
+    ShapeIMap drafted;
+    for (const TopoDS_Shape& fx : faces.items)
+    {
+      const int i = all.FindIndex(fx);
+      if (i <= 0)
+        fail_invalid("face to draft is not a face of the solid");
+      drafted.Add(all(i));
+    }
+    const TopoDS_Shape r = tapered_prism(solid.shape, drafted, P, O, ta, tol, sources);
+    if (!r.IsNull())
+    {
+      HHist h = shell_history(solid.shape, r, {}, {}, sources, {});
+      return make_result({solid.shape}, r, h.get());
+    }
+    sources.Clear();
+  }
   for (const TopoDS_Shape& fx : faces.items)
   {
     const int i = all.FindIndex(fx);
