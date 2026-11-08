@@ -36,6 +36,10 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 10:30 (lead):** studios' a3f21859 (queued) records every alert box / toast's `message` through one hook as live's
+recorder does, and run.py compares a clicked button's focus as equal: every area's scenarios can move on the first suite run
+with it. A scenario that gets worse because of it: flag to studios and the area's owner (not as the area's regression).
+
 **11-08 07:40: v0.4.36 checked (published 07:23): no code blocker; P1 WIN-SHOW-IN-EXPLORER filed** (the lead's call). Details in
 TICKETS' 05:00 list. qa-os.yml now works: macOS checks Finder by window names (no Documents permission for paths), Windows
 right-clicks with mouse_event (the UI script's rclick opens no menu there: P3 UIS-RCLICK-WINDOWS) at uip Bracket's spot on the
