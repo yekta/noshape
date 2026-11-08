@@ -304,6 +304,12 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   cb0bee39 / 38b6159b 180 seeds, 0 deaths. Suites (SUITE-REGRESSIONS-1108): the 09:43 run's flags are slowdowns and
   scenario differences, none a crash or a lost document.
 - **qa 16:58: still no blocker on green 3137184e** (blend's tangent-chain rounds, dx's other-document views and Parasolid writer, studios): sweeps = 3fd65b5c.
+- **qa 19:02, after the release checks (v0.4.37 published 18:17, run 42504414894, cut 3fd65b5c9): no blocker.** Linux files = the
+  smoked artifact, SHA256SUMS OK, 11 assets, every job green incl. the three "Restart into" updates. CLI smoke = v0.4.36; the 48
+  ticket documents = green 3fd65b5c; GUI rows pixel-identical to v0.4.36 (11 / 11); stock ubuntu:24.04 OK; Linux footer OK; macOS
+  footer and Show in Finder OK; Windows footer OK, **Show in Explorer still fails** (WIN-SHOW-IN-EXPLORER, the same `\\?\` error:
+  not fixed in this cut). Agent session (Haiku, the release's MCP): 6 tool calls, 0 failed, the block right (23,214.6 mm³) but its
+  sketch left without dimensions (the agent said so). Fuzz: v0.4.36 180 seeds, 0 deaths; now on v0.4.37.
 - Open, not new in this cut (both shipped in v0.4.36): P1 WIN-SHOW-IN-EXPLORER (studios; no fix on main yet, so the cut still
   has it), P1 SAVED-SKETCH-PLANE-LOST (blend). Fixed since v0.4.36: P0 FACE-PATTERN-30-CUT-SLOW (core d999cf379).
 - Open P0s, long-running, not new: BLEND-RUST, SHELL-SLOW, REGEN-SPEED. At publish: the smoke, sweeps on the release CLI, the agent

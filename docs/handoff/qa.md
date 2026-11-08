@@ -36,6 +36,12 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 19:02: v0.4.37 checked (published 18:17): no blocker; agent session 6 calls, 0 failed.** WIN-SHOW-IN-EXPLORER still fails
+on Windows (no fix yet). qa-os.yml's Windows right-click now aims at the list's last row by its text (v0.4.37's page has a Last
+opened section, and the UI script's clicks don't select rows on Windows). Fuzz: v3cf22.sh (v0.4.37, 6861–6920), v3nf24.sh
+(d6904caf, 6921–6980). Suite runs are back to back (~4.5 h each); the 14:11 run (4b09e98c) is the first with studios' message /
+focus recording. rel/latest-app = 0.4.37.
+
 **11-08 10:30 (lead):** studios' a3f21859 (queued) records every alert box / toast's `message` through one hook as live's
 recorder does, and run.py compares a clicked button's focus as equal: every area's scenarios can move on the first suite run
 with it. A scenario that gets worse because of it: flag to studios and the area's owner (not as the area's regression).
