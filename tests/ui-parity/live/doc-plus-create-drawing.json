@@ -1,6 +1,6 @@
 {
  "scenario": "doc-plus-create-drawing",
- "recorded": "2026-11-08T04:39:16.187Z",
+ "recorded": "2026-11-08T06:19:34.757Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "aa6072aa29dfe394fe914476",
-  "workspace": "20ab9ae029aaa8b25e480736",
-  "element": "095f0dfa71abb91081823865",
+  "document": "d763270bca032e0499536bc5",
+  "workspace": "8c531e035a25a99b494640f5",
+  "element": "b072959d793701a7c586a6a3",
   "start": "doc-tabs",
-  "startElement": "095f0dfa71abb91081823865",
+  "startElement": "b072959d793701a7c586a6a3",
   "runner": "live2 "
  },
  "start": {
@@ -100,7 +100,7 @@
    ],
    "folder": null,
    "renaming": null,
-   "panel": "Tabs",
+   "panel": null,
    "switcher": null
   },
   "variables": null,
@@ -117,7 +117,7 @@
    },
    "ok": true,
    "at": [
-    438,
+    57,
     977
    ],
    "state": {
@@ -226,13 +226,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 66382
+   "t": 95676
   },
   {
    "step": 2,
@@ -244,7 +244,7 @@
    },
    "ok": true,
    "at": [
-    502,
+    121,
     861
    ],
    "state": {
@@ -348,13 +348,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 71477
+   "t": 101930
   }
  ]
 }

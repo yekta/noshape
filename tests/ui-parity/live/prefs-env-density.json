@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-env-density",
- "recorded": "2026-11-08T02:12:57.453Z",
+ "recorded": "2026-11-08T06:31:16.720Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.3 29238546"
  },
  "live": {
   "page": "preferences"
@@ -342,12 +342,14 @@
    "do": {
     "do": "click",
     "on": {
-     "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
-     "pick": "On"
+     "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)"
     }
    },
-   "ok": false,
-   "error": "locator.selectOption: Timeout 10000ms exceeded.\nCall log:\n  - waiting for locator('[data-uip-t=\"1\"]')\n    - locator resolved to <select disabled data-uip-t=\"1\" name=\"retinaDisplaySetting\" class=\"form-control os-user-preference-form-control ng-untouched ng-pristine\">…</select>\n  - attempting select o",
+   "ok": true,
+   "at": [
+    386,
+    557
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -674,8 +676,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 14239
+   "t": 2424
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 14
 }

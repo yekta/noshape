@@ -1,6 +1,6 @@
 {
  "scenario": "doc-tab-drag-reorder",
- "recorded": "2026-11-08T04:11:43.814Z",
+ "recorded": "2026-11-08T06:36:23.359Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "d4e9069bfed4247cbcba8924",
-  "workspace": "420a6c865a018b103a2b43ce",
-  "element": "57131c13a346c1ce2b885e66",
+  "document": "0863416f82dd80077e478b13",
+  "workspace": "26dc615b290acd0a1d36f6e4",
+  "element": "6b1a666112b1340f6d1573cf",
   "start": "doc-tabs",
-  "startElement": "57131c13a346c1ce2b885e66",
+  "startElement": "6b1a666112b1340f6d1573cf",
   "runner": "live2 "
  },
  "start": {
@@ -126,7 +126,7 @@
      976
     ],
     [
-     179,
+     85,
      976
     ]
    ],
@@ -183,14 +183,14 @@
      "compare": null,
      "tabs": [
       {
-       "name": "Part Studio 1",
-       "kind": "partstudio",
-       "active": true
-      },
-      {
        "name": "Variable Studio 1",
        "kind": "variablestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
       },
       {
        "name": "Assembly 1",
@@ -221,7 +221,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 116218
+   "t": 98104
   }
  ]
 }

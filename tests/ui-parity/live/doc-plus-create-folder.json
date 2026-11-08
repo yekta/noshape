@@ -1,6 +1,6 @@
 {
  "scenario": "doc-plus-create-folder",
- "recorded": "2026-11-08T04:41:39.593Z",
+ "recorded": "2026-11-08T06:22:01.277Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "7712eba0acc5f3dda633c757",
-  "workspace": "6333949026b1ff1ab9ab6cda",
-  "element": "484d4b02bfb86a7309fb4cb3",
+  "document": "4e982a6861cc7bcdc32e1b19",
+  "workspace": "c964adb85bc9d85859e00759",
+  "element": "b1e53e367c68b7980a543939",
   "start": "doc-new",
-  "startElement": "484d4b02bfb86a7309fb4cb3",
+  "startElement": "b1e53e367c68b7980a543939",
   "runner": "live2 "
  },
  "start": {
@@ -59,7 +59,7 @@
    ],
    "folder": null,
    "renaming": null,
-   "panel": "Tabs",
+   "panel": null,
    "switcher": null
   },
   "variables": null,
@@ -76,7 +76,7 @@
    },
    "ok": true,
    "at": [
-    438,
+    57,
     977
    ],
    "state": {
@@ -144,13 +144,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 24497
+   "t": 36205
   },
   {
    "step": 2,
@@ -162,7 +162,7 @@
    },
    "ok": true,
    "at": [
-    502,
+    121,
     888
    ],
    "state": {
@@ -221,13 +221,13 @@
      ],
      "folder": null,
      "renaming": "Folder 1",
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 30161
+   "t": 41143
   },
   {
    "step": 3,
@@ -292,13 +292,13 @@
      ],
      "folder": null,
      "renaming": "Folder 1",
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 33026
+   "t": 43916
   },
   {
    "step": 4,
@@ -309,7 +309,7 @@
    "ok": true,
    "pointer": {
     "at": [
-     502,
+     121,
      888
     ],
     "hover": [],
@@ -364,13 +364,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 34898
+   "t": 45880
   }
  ]
 }

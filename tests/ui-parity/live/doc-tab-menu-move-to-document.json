@@ -1,6 +1,6 @@
 {
  "scenario": "doc-tab-menu-move-to-document",
- "recorded": "2026-11-08T04:18:31.070Z",
+ "recorded": "2026-11-08T06:34:07.803Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "6dd178fef68beedc759f5aaf",
-  "workspace": "404efaa092a4ef0b75372189",
-  "element": "ec0081ac3216a3b681cc712c",
+  "document": "69872346ea7bc2e0ca280cbd",
+  "workspace": "e27425582c1fa5f10bba689f",
+  "element": "b0d4751c88d352b2e57fbd46",
   "start": "doc-tabs",
-  "startElement": "ec0081ac3216a3b681cc712c",
+  "startElement": "b0d4751c88d352b2e57fbd46",
   "runner": "live2 "
  },
  "start": {
@@ -100,7 +100,7 @@
    ],
    "folder": null,
    "renaming": null,
-   "panel": "Tabs",
+   "panel": null,
    "switcher": null
   },
   "variables": null,
@@ -200,13 +200,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 53823
+   "t": 70380
   },
   {
    "step": 2,
@@ -218,7 +218,7 @@
    },
    "ok": true,
    "at": [
-    964,
+    583,
     976
    ],
    "state": {
@@ -321,13 +321,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 58885
+   "t": 74969
   },
   {
    "step": 3,
@@ -339,7 +339,7 @@
    },
    "ok": true,
    "at": [
-    968,
+    587,
     950
    ],
    "state": {
@@ -454,13 +454,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 63886
+   "t": 84691
   },
   {
    "step": 4,
@@ -581,13 +581,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 69044
+   "t": 89584
   }
  ]
 }

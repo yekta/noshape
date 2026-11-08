@@ -1,6 +1,6 @@
 {
  "scenario": "doc-plus-create-part-studio",
- "recorded": "2026-11-08T04:42:53.955Z",
+ "recorded": "2026-11-08T06:23:40.633Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "2823d9edbbfaf6d4b79f7bf8",
-  "workspace": "1a1b89da2241c1b6f6439fec",
-  "element": "eb4fc9ee72880000419c6b0e",
+  "document": "e37b94f897627fc7c4b5b4ba",
+  "workspace": "ac68d71b467aead6a17a1d7f",
+  "element": "79983aa04134322d89498f32",
   "start": "doc-new",
-  "startElement": "eb4fc9ee72880000419c6b0e",
+  "startElement": "79983aa04134322d89498f32",
   "runner": "live2 "
  },
  "start": {
@@ -59,7 +59,7 @@
    ],
    "folder": null,
    "renaming": null,
-   "panel": "Tabs",
+   "panel": null,
    "switcher": null
   },
   "variables": null,
@@ -76,7 +76,7 @@
    },
    "ok": true,
    "at": [
-    438,
+    57,
     977
    ],
    "state": {
@@ -144,13 +144,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 25648
+   "t": 51435
   },
   {
    "step": 2,
@@ -162,7 +162,7 @@
    },
    "ok": true,
    "at": [
-    502,
+    121,
     778
    ],
    "state": {
@@ -214,13 +214,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 35344
+   "t": 59659
   }
  ]
 }

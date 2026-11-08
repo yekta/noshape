@@ -1,6 +1,6 @@
 {
  "scenario": "doc-plus-import",
- "recorded": "2026-11-08T04:45:52.922Z",
+ "recorded": "2026-11-08T06:27:36.401Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "e3793a4e6af0339b9d812447",
-  "workspace": "5423c58072034e0bbd18e328",
-  "element": "78496351c24e3c4554838641",
+  "document": "f2c08ed03d4c0f76c7505f25",
+  "workspace": "25c51afe24af34e3bd2854b2",
+  "element": "c406679c8af3bad42b602516",
   "start": "doc-tabs",
-  "startElement": "78496351c24e3c4554838641",
+  "startElement": "c406679c8af3bad42b602516",
   "runner": "live2 "
  },
  "start": {
@@ -100,7 +100,7 @@
    ],
    "folder": null,
    "renaming": null,
-   "panel": "Tabs",
+   "panel": null,
    "switcher": null
   },
   "variables": null,
@@ -117,7 +117,7 @@
    },
    "ok": true,
    "at": [
-    438,
+    57,
     977
    ],
    "state": {
@@ -226,13 +226,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 53017
+   "t": 77826
   },
   {
    "step": 2,
@@ -244,7 +244,7 @@
    },
    "ok": true,
    "at": [
-    502,
+    121,
     916
    ],
    "state": {
@@ -332,13 +332,13 @@
      ],
      "folder": null,
      "renaming": null,
-     "panel": "Tabs",
+     "panel": null,
      "switcher": null
     },
     "variables": null,
     "featurestudio": null
    },
-   "t": 58209
+   "t": 82900
   }
  ]
 }
