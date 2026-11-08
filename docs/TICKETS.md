@@ -922,6 +922,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P3 SETLIB-TOLERANCES (core, studios 11-08, lead ruling) Set library's "My default tolerances": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `tolerances` to the folder the user chose (Documents › a
+  folder's Set library ▸ "My default tolerances", op `documents_set_library`; `libraries.json` in the config dir; one folder per
+  library, setting another replaces it). The default tolerance tables (model-data fits/tables.rs: the hole and dimension tolerance pickers) should list, next to Onshape's own library, a "My default tolerances" entry holding
+  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
+  tolerance tables, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
 - [ ] P2 BAD-FACE-DISPLAY-60S (core 2026-11-08, found while fixing c2-hunting-knife's Loft 3; owner to route: the
   display / meshing path) **feature_list's display took 60.6 s** where the document's features regenerate in 473 ms.
   Cause upstream (fixed in eb200af6): a guided surface loft sampled its composite guide off the curve, so the fitted
@@ -3078,6 +3083,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   for the app's sheet metal table (shared logic).
 
 ## Part Studio UI (psui)
+- [ ] P3 SETLIB-FRAME-PROFILES (psui, studios 11-08, lead ruling) Set library's "My frame profiles library": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `frame_profiles` to the folder the user chose (Documents › a
+  folder's Set library ▸ "My frame profiles library", op `documents_set_library`; `libraries.json` in the config dir; one folder per
+  library, setting another replaces it). The Frame feature's profile picker (select_item.rs; today only "Onshape frame profiles", model-core frame_library.rs) should list, next to Onshape's own library, a "My frame profiles library" entry holding
+  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
+  sketches usable as frame profiles, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
 - [x] P2 FRAME-PROFILE-OTHER-STUDIO (psui; asm 2026-11-08 01:11 UTC, the assembly corpus' pattern-std, 41 occurrences): **a Frame's
   Sketch profile can't be a sketch of another Part Studio of the document**. Live's picker has a Current document tab
   (behaviours "psui (2026-11-01 … D134) Frame Sketch profile picker": every other Part Studio, expandable to its
@@ -3778,6 +3788,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Assemblies (asm)
+- [ ] P3 SETLIB-STANDARD-CONTENT (asm, studios 11-08, lead ruling) Set library's "My standard content": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `standard_content` to the folder the user chose (Documents › a
+  folder's Set library ▸ "My standard content", op `documents_set_library`; `libraries.json` in the config dir; one folder per
+  library, setting another replaces it). The assembly's Insert › Standard content (assembly-ui assembly_standard.rs) should list, next to Onshape's own library, a "My standard content" entry holding
+  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
+  Part Studios and Assemblies, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
 
 From asm's feature audit of 2026-11-07 01:5x (every assembly tool and option in Onshape's help pages,
 /root/onshape-research/docs-raw/md/Assembly__*.md, against crates/model-data, assembly, assembly-ui and ops). The P0s
@@ -3971,6 +3986,11 @@ CHAMFER-TOLERANCE, CHAMFER-T1-DIRECTION, FACEBLEND-HELPPOINT, FACEBLEND-ASYM-HOL
 features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST, FACEBLEND-OPS-E2E.
 
 ## Sketch + assembly (skasm)
+- [ ] P3 SETLIB-SHEET-METAL-FORMS (skasm, studios 11-08, lead ruling) Set library's "My sheet metal forms": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `sheet_metal_forms` to the folder the user chose (Documents › a
+  folder's Set library ▸ "My sheet metal forms", op `documents_set_library`; `libraries.json` in the config dir; one folder per
+  library, setting another replaces it). The sheet metal Form feature's form picker (custom host/sheetmetal.rs) should list, next to Onshape's own library, a "My sheet metal forms" entry holding
+  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
+  Part Studios usable as forms, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
 - [ ] P3 SKETCH-POLYGON-CONSTRAINTS (skasm) a polygon's constraints aren't Onshape's: ui-parity sketch-circumscribed-polygon
   (hexagon) live 2 × CIRCULAR_PATTERN, 4 × COINCIDENT, HORIZONTAL; ours 10 × CIRCULAR_PATTERN (one link per instance
   point, shapes.rs `polygon`), 3 × COINCIDENT, HORIZONTAL. Same geometry; the constraint list (Constraint manager, the
@@ -4476,6 +4496,11 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
+- [ ] P3 SETLIB-IMAGES (dx, studios 11-08, lead ruling) Set library's "My images": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `images` to the folder the user chose (Documents › a
+  folder's Set library ▸ "My images", op `documents_set_library`; `libraries.json` in the config dir; one folder per
+  library, setting another replaces it). Insert image in drawings (drawing-ui drawing_images.rs) should list, next to Onshape's own library, a "My images" entry holding
+  that folder's `.noshape` documents (its subfolders as folders, as the documents page shows them), each document's
+  image file tabs, picked like a document from Other documents (inserted at its latest version). No folder set: no entry.
 - [x] (dx 11-08 09:29: fe7b499c, bare binary and v9 schema read; xdev-subs' 34 files + 1 text read, 32 valid) P1 XT-B3-BINARY-TRANSMIT (dx; asm 2026-11-08 06:18 UTC, the assembly corpus' xdev-subs): **a Parasolid file with a text
   header (`FORMAT=binary`) whose body starts `B3   : TRANSMIT FILE created by modeller version 2900122
   SCH_900000_9008` is refused**: "parasolid: not a transmit file" (crates/kernel/cpp/xt_read.cpp takes `PS\0\0` binary

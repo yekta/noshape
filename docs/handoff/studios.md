@@ -63,19 +63,10 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   (live vs-table-menu, vs-inserted-table-menu, vs-cfg-input-menu; as psui's configuration panel). The + menu stayed
   open in one recording (vs-tab-menu-copy-clipboard) but the ☰ menu closes: not changed on one recording.
 
-### Set library: who reads the library folders (for the lead to route)
-`noshape_ops::prefs::LibraryFolders::load().0` maps a library key to its folder (op `documents_set_library`); each
-consumer lists that folder's `.noshape` documents (and their elements) next to Onshape's own library, as live's "My …"
-entries. Nothing reads them yet:
-- `frame_profiles` "My frame profiles library": the Frame feature's profile picker (part-studio-ui `select_item.rs`,
-  model-core `regen/features/frame_library.rs`: today only "Onshape frame profiles"): core / psui.
-- `sheet_metal_forms` "My sheet metal forms": the sheet metal Form feature's form picker (custom
-  `host/sheetmetal.rs`, model-core `regen`): core (sheet metal).
-- `tolerances` "My default tolerances": the default tolerance tables (model-data `fits/tables.rs`, the hole and
-  dimension tolerance pickers in Part Studios and drawings): core + dx.
-- `images` "My images": Insert image in drawings (drawing-ui `drawing_images.rs`) and sketches: dx + skasm.
-- `standard_content` "My standard content": the assembly's Insert › Standard content (assembly-ui
-  `assembly_standard.rs`): asm.
+### Set library: who reads the library folders
+`noshape_ops::prefs::LibraryFolders::load().0` maps a library key to its folder (op `documents_set_library`). Ticketed
+(P3, docs/TICKETS.md, lead 11-08): SETLIB-FRAME-PROFILES (psui), SETLIB-SHEET-METAL-FORMS (skasm), SETLIB-TOLERANCES
+(core), SETLIB-IMAGES (dx), SETLIB-STANDARD-CONTENT (asm).
 
 ### 2026-11-08 13:42 UTC: whole-suite measure 82.1 %; Move to document…, Set library, modal fields, Feature Studio editor
 - Measured (uip12, every studios scenario on b66c324a + the batch below in progress): 181/390 scenarios, 1475/1796
