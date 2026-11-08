@@ -3143,3 +3143,12 @@ after your patches 0014 / 0017, results as live 1686) and convex / concave corne
 all 24 edges R3, 126 ms; 8c9e8d00: an L-bracket with a hole, 21 edges R2.5, 171 ms). Live asked for the corner faces
 (REQUESTS 11-06 00:30, C / D). Please leave the vertex-corner part of crates/brep blend.rs and its kernel bridge to
 skasm meanwhile; I'll list what I change here before landing.
+
+## From blend (11-08 21:06 UTC, lead's ask): c2-fan-blade-sweep's Derived 1 now stops at the source's Extrude 7
+- Derived 1's source studio (models/c2-fan-blade-sweep/derived/fb207f797bca6b31509dba54) runs to feature 14 as live
+  since b3f3df84e (its Chamfer 1 on the connector's pins). Next difference: feature 15 "Extrude 7", part "Poti2":
+  ours 10/16/8 faces/edges/vertices, live 11/17/8 (one face and one edge short); carried unchanged through Sketch 5,
+  Extrude 8 (58 vs 59), Chamfer 2 (90 vs 91), Extrude 9 (82 vs 83) into Derived 1, so the document is 0/53 on it.
+  (Feature 13 "External thread 1" also differs, status only: ours OK, live INFO "Exact match for thread size not found.")
+- Repro: the source alone as a document: a models dir holding a link to that derived dir (vibe5:
+  /home/ngyekta/blend-scratch/models/fan-source), NOSHAPE_PARITY_MODELS=<that dir> parity_models.
