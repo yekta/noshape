@@ -34,6 +34,35 @@ schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read
 parts (a7bd858292…, 35719e9b95…, 2ee17582b9…, 4-10 solids each) that OCCT's check flags; please rerun xdev-subs and
 tell me if those three differ from live.
 
+## Paused (2026-11-08 20:58 UTC; lead: Claude quota, restart fresh Monday 11-10)
+Where it stands:
+- Everything of asm's is on main (last: f22e34ec, the part-name rule) but 541ff4f0 (NOSHAPE_PARITY_TRACE prints the
+  live part → our part mapping), queued 20:42: check `tools/tiers/land.sh --status` first; a failure there is the first
+  task. Nothing uncommitted.
+- Assembly corpus, corpus15 (main 17:40, full run, 109 min; SCORE row): 1240/1701 occurrences, 155/345 mates. Since
+  then welding-config mates 12 → 20/26 (part-name rule), not in a full run yet. Full runs need `timeout 10000` (the
+  sketch bodies made translation slower: real work, sketches now map their references).
+- ui-parity asm 131/141 (09:3x). Left, with their reasons, in "Latest (09:3x)" below.
+- Speed: an assembly evaluation builds its studios' source options once (b142ef36); a full corpus run is the check.
+
+Next items, in order:
+1. Unresolved mates (corpus15: 78 translate but don't resolve). welding-config 13 done. hand-drill-pinslot's 15 are all
+   on its Chuck to Gearbox Shaft (studio 7ed710): Fill 1's and External thread 1's queries are empty in live's fetch:
+   waits on REQUESTS 2381 (204 empty queries in 22 studios). infento-subs' 26: run it alone with
+   NOSHAPE_PARITY_TRACE=1 (~65 min on vibe3; dir ~/agents/asm/parity-inf) and look at which live part each failing
+   mate's instance became (`live part … -> ours …` lines): so far every case was a wrong part mapping or a part whose
+   geometry differs from live.
+2. Then the 516 untranslated mates: connector origins on an edge (227) or face (57) we don't have: rank by studio,
+   most are studio-geometry gaps (dx / core tickets) or wait on live (2271 Feature Studios and files, 2381).
+3. The now-active mates that pull parts ~1e-4 rad off live (pattern-std's frame parts, infento-subs): one frame part's
+   connector is off; compare its face normals with live's per-feature lines.
+4. ui-parity: 2241 (1) mate flip, 2296 Align with Z, 2269 toast fade: re-run those scenarios when live2 answers.
+- Waiting on others: core EXTRUDE-UP-TO-FACE-OFFSET (suspension's Knuckle Extrude 2; then time its Circular pattern on
+  the real Knuckle), live 2271 / 2381, live2 2241 / 2269 / 2296.
+- Scratch: /root/asm-scratch (bin/: rank_mates.py, rank_studios.py, ps_compare.py, clamptest.sh); on vibe3
+  ~/agents/asm/{target, target-app} (two target dirs: corpus runs in target, single-document runs in target-app),
+  model dirs ps-knuckle / ps-shaft for running one studio alone with parity_models.
+
 ## Latest (2026-11-08 19:4x UTC)
 - corpus15 (full, 109 min): 1240/1701 occurrences, mates 155/345 (SCORE). Unmatched mates by cause
   (/root/asm-scratch/bin/rank_mates.py): 516 not translated (connector origins: 227 on an edge of ours that isn't
