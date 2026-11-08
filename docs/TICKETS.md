@@ -834,6 +834,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P0 FACE-PATTERN-30-CUT-SLOW (core; asm 2026-11-08 00:10 UTC, the assembly corpus' suspension): **one Circular
+  pattern takes 1167 s** (vibe3, debug test profile; the rest of the 30-part document takes ~27 s). asm-suspension's
+  Part Studio 805e29 (`/root/parity/models/asm-suspension/studios/805e29e8b6ebcba128c41f64.json`, feature 27 "Circular
+  pattern 1": a FACE pattern of 3 faces × 30, 360°, onto Knuckle). Live: OK, Knuckle 58 → 174 faces, 385484.403 →
+  378158.838 mm³ (a cut). `stitch_copies` declines, then `apply_tools`' one glued cut (Glue::InsideChecked) of the 30
+  tool copies sits in OCCT's BOPAlgo_BuilderSolid (ShellSplitter::SplitBlock / PerformAreas, gdb samples on vibe5).
+  Inserting the studio's Bearing into the assembly regenerates it again (another 1232 s), so the assembly suite never
+  finished this document. Run: `NOSHAPE_PARITY_TRACE=1 NOSHAPE_PARITY_ASSEMBLIES=<dir with asm-suspension>
+  cargo test -p noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture`.
 - [x] P2 SELF-OVERLAPPING-FACE (core, fixed 11-07; psui 2026-11-07) **c2-fan-blade-sweep's Part 2 bottom face (z -5) is one face of two 2 mm
   strips joined by a zero-width bridge** (its single loop runs along y -95 twice, overlapping): area 120 mm², but its
   mesh (BRepMesh: noshape's declines it) covers 717 mm², one triangle across the 21 mm gap between the strips and half of
