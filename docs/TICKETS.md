@@ -297,6 +297,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   documents): 5a964e07 → 3fd65b5c, 18 greens, all unchanged. Fuzz since v0.4.36's publish: v0.4.36 163 seeds, greens f31db8f7 /
   cb0bee39 / 38b6159b 180 seeds, 0 deaths. Suites (SUITE-REGRESSIONS-1108): the 09:43 run's flags are slowdowns and
   scenario differences, none a crash or a lost document.
+- **qa 16:58: still no blocker on green 3137184e** (blend's tangent-chain rounds, dx's other-document views and Parasolid writer, studios): sweeps = 3fd65b5c.
 - Open, not new in this cut (both shipped in v0.4.36): P1 WIN-SHOW-IN-EXPLORER (studios; no fix on main yet, so the cut still
   has it), P1 SAVED-SKETCH-PLANE-LOST (blend). Fixed since v0.4.36: P0 FACE-PATTERN-30-CUT-SLOW (core d999cf379).
 - Open P0s, long-running, not new: BLEND-RUST, SHELL-SLOW, REGEN-SPEED. At publish: the smoke, sweeps on the release CLI, the agent
