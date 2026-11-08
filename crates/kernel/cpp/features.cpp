@@ -1771,7 +1771,8 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
       return g / deg;
     };
     // Rows that are straight lines (a square's sides): the corner rule above, as live's faces of degree 1 along them
-    // (10-24, 2276 (A)); curved rows: per pole column (2276 (G)).
+    // (10-24, 2276 (A)); every row curved: per pole column (2276 (G)). A straight row to a curved one (10-24's square
+    // to a circle) keeps the corner rule, which live's volumes there fit (the column rule is 0.05 % off).
     auto straight = [&](const occ::handle<Geom_BSplineCurve>& c) {
       const gp_Pnt a = c->Pole(1), b = c->Pole(c->NbPoles());
       const gp_Lin line(a, gp_Vec(a, b).Magnitude() > 0 ? gp_Dir(gp_Vec(a, b)) : gp_Dir(0, 0, 1));
@@ -1780,7 +1781,7 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
           return false;
       return true;
     };
-    const bool curved = !std::all_of(rows.begin(), rows.end(), straight);
+    const bool curved = std::none_of(rows.begin(), rows.end(), straight);
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
