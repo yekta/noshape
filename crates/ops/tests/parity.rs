@@ -26,6 +26,8 @@ struct ModelResult {
     untranslated: Vec<String>,
     /// Full regeneration: ours (reopened) and live's, ms.
     regen_ms: Option<(f64, Option<f64>)>,
+    /// Reopened, listed and its parts queried (the wall time; `regen_ms` is the features' own).
+    wall_ms: f64,
     /// Of it, opening the file and regenerating it (feature_list), ms; the
     /// rest is query_parts' measures.
     open_ms: f64,
@@ -52,7 +54,7 @@ struct ModelResult {
 fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelResult {
     let mut ctx = Ctx::new();
     let path = scratch(&format!("{name}.noshape"));
-    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
+    let mut res = ModelResult { name: name.to_string(), features: 0, compared: 0, matching: 0, first: None, differing: Vec::new(), untranslated: Vec::new(), regen_ms: None, wall_ms: 0.0, open_ms: 0.0, list_ms: 0.0, features_ms: None, slowest: Vec::new(), slow_features: Vec::new(), custom_compared: 0, custom_matching: 0, custom: Vec::new(), std_pins: Vec::new(), unfetched: Vec::new() };
     // refs.jsonl wins over the geometry read from live's bodydetails.
     let mut all = refs_from_bodies(live);
     all.extend(parse_refs(refs));
@@ -146,7 +148,7 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     // Live's regeneration time of each feature, by our feature id.
     let live_times: std::collections::HashMap<String, f64> = live.iter().find_map(|l| l["per_feature_ms"].as_object()).into_iter().flatten().filter_map(|(id, ms)| Some((t.ours(id)?.to_string(), ms.as_f64()?))).collect();
     drop(t);
-    // Our full regeneration: the document reopened, its parts queried.
+    // Our full regeneration: the document reopened, its features listed (their regeneration times), its parts queried.
     let mut fresh = Ctx::new();
     let t0 = std::time::Instant::now();
     let run = |ctx: &mut Ctx, tool: &str, args: Value| noshape_ops::registry::by_tool_name(tool).is_some_and(|op| noshape_ops::registry::run(ctx, op, &args).is_ok());
@@ -156,12 +158,14 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
     res.list_ms = t0.elapsed().as_secs_f64() * 1000.0 - res.open_ms;
     let t_query = std::time::Instant::now();
     if opened && run(&mut fresh, "query_parts", json!({})) {
-        res.regen_ms = Some((t0.elapsed().as_secs_f64() * 1000.0, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
+        let wall_ms = t0.elapsed().as_secs_f64() * 1000.0;
+        res.wall_ms = wall_ms;
+        res.regen_ms = Some((wall_ms, live.iter().find_map(|l| l["full_regen_ms"].as_f64())));
         // NOSHAPE_PARITY_SPLIT: where the time goes (open, list, parts), then each Part Studio regenerated again from
         // scratch split into its features and the display (meshes).
         if std::env::var_os("NOSHAPE_PARITY_SPLIT").is_some() {
             let query_ms = t_query.elapsed().as_secs_f64() * 1000.0;
-            eprintln!("SPLIT {name}: open {:.0} ms, feature_list {:.0} ms, query_parts {query_ms:.0} ms, total {:.0} ms", res.open_ms, res.list_ms, res.regen_ms.map_or(0.0, |r| r.0));
+            eprintln!("SPLIT {name}: open {:.0} ms, feature_list {:.0} ms, query_parts {query_ms:.0} ms, total {wall_ms:.0} ms", res.open_ms, res.list_ms);
             let mut again = noshape_ops::Ctx::new();
             if let Ok(od) = again.open(&path) {
                 let tabs: Vec<_> = od.doc().ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
@@ -191,6 +195,12 @@ fn run_model(name: &str, features: &Value, live: &[Value], refs: &str) -> ModelR
             let mut times: Vec<(String, f64)> = list.value["features"].as_array().into_iter().flatten().filter_map(|f| Some((f["name"].as_str()?.to_string(), f["regen_ms"].as_f64()?))).collect();
             times.sort_by(|a, b| b.1.total_cmp(&a.1));
             res.slowest = times.into_iter().take(3).filter(|t| t.1 >= 1.0).collect();
+        }
+        // The speed case compares like with like (lead 11-08): live's `full_regen_ms` is its Regeneration times panel,
+        // the features' regeneration alone, so ours is the feature list's (our panel's) total, not the wall time with
+        // the parts' mass properties and the display build (the opens cases time the shown model).
+        if let (Some(features), Some(r)) = (res.features_ms, res.regen_ms.as_mut()) {
+            r.0 = features;
         }
     }
     // NOSHAPE_PARITY_SAVE=<dir>: the translated document kept there (its
@@ -598,8 +608,8 @@ fn parity_models() {
         };
         let r = run_model(&name, &features, &live, &refs);
         let speed = match r.regen_ms {
-            Some((ours, Some(l))) => format!("; regenerated in {:.0} ms, live {l:.0} ms (its features' times; reopened, listed and measured in {ours:.0} ms: open {:.0} ms, feature list {:.0} ms with the display)", r.features_ms.unwrap_or(r.list_ms), r.open_ms, r.list_ms),
-            Some((ours, None)) => format!("; reopened and regenerated in {ours:.0} ms (open {:.0} ms, regenerate {:.0} ms)", r.open_ms, r.list_ms),
+            Some((ours, Some(l))) => format!("; regenerated in {ours:.0} ms, live {l:.0} ms (its features' times; reopened, listed and measured in {:.0} ms: open {:.0} ms, feature list {:.0} ms with the display)", r.wall_ms, r.open_ms, r.list_ms),
+            Some((_, None)) => format!("; reopened and regenerated in {:.0} ms (open {:.0} ms, regenerate {:.0} ms)", r.wall_ms, r.open_ms, r.list_ms),
             None => String::new(),
         };
         let speed = if r.slowest.is_empty() { speed } else { format!("{speed} (slowest: {})", r.slowest.iter().map(|(n, ms)| format!("{n} {ms:.0} ms")).collect::<Vec<_>>().join(", ")) };
@@ -669,7 +679,7 @@ fn parity_models() {
         println!("  cause: {n} × {c}");
     }
     println!("{}", score_row(docs, whole.len(), matching, total, (custom_matching, custom_total), &causes));
-    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l })), "slowest": r.slowest, "first_difference": r.first, "differing": r.differing, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
+    let report: Vec<Value> = results.iter().map(|r| json!({ "name": r.name, "features": r.features, "compared": r.compared, "matching": r.matching, "regen_ms": r.regen_ms.map(|(o, l)| json!({ "ours": o, "live": l, "wall": r.wall_ms })), "slowest": r.slowest, "first_difference": r.first, "differing": r.differing, "custom_features": { "compared": r.custom_compared, "matching": r.custom_matching, "failures": r.custom, "std": r.std_pins }, "untranslated": r.untranslated, "unfetched": r.unfetched })).collect();
     let _ = std::fs::write(root.with_file_name("report.json"), serde_json::to_string_pretty(&json!({ "documents_matching": docs, "documents": whole.len(), "features_matching": matching, "features": total, "causes": causes.iter().map(|(c, n)| json!({ "cause": c, "documents": n })).collect::<Vec<_>>(), "models": report,
         "speed": { "timed": timed, "slower_than_live": slower.iter().map(|(x, n, o, l)| json!({ "document": n, "ours_ms": o.round(), "live_ms": l.round(), "ratio": (x * 10.0).round() / 10.0 })).collect::<Vec<_>>(),
             "slow_features": results.iter().flat_map(|r| r.slow_features.iter().map(move |(f, o, l)| json!({ "document": r.name, "feature": f, "ours_ms": o.round(), "live_ms": l.round() }))).collect::<Vec<_>>() } })).unwrap());

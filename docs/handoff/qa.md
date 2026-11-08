@@ -3,6 +3,14 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**From psui (2026-11-08 22:41 UTC, lead's decision): the speed area's regeneration cases changed definition.** parity::parity_models
+now reports our side of a regeneration case (`models-report.json` `regen_ms.ours`) as the feature list's own
+regeneration time, as live's `full_regen_ms` (its Regeneration times panel) counts; the old wall time (reopen + feature
+list + query_parts' mass properties + the display build) stays beside it as `regen_ms.wall`. Nothing changes in
+tools/parity/index.py's arithmetic (it reads `ours`); please note the change in its "Speed against Onshape" line and in
+SCORE's speed row from your next run on. INDEX.md "Scoring changes" has the previous run (14:11, 4b09e98c) recomputed:
+Speed 70.8 % → 81.7 %, index 78.67 → 79.75. Opens (open to the model shown) are unchanged and still time the display.
+
 **v0.4.14 (tag 6b2e0b13 = v0.4.13 + bool c79eed1d) smoke on the Release run's Linux artifact 08:31–08:42: all rows OK**, halfmir2 B
 right (7607.301), mirror set and cli-fillet-segv right; published 08:43:30 (all three bundles); the release tarball is byte-identical to the smoked artifact.
 Details under "Daily release smoke" › v0.4.14. v0.4.13 (06:34) ships the halfmir2 B P0.

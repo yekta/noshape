@@ -25,7 +25,7 @@ Twelve areas, weighted by how much of a user's time and trust they carry. Each a
 | Drawing interaction | 5 | ui-parity `drw-*` states × coverage | dx |
 | Drawing export | 5 | exports matching live's files (tools/drawing-export/compare.py) | dx |
 | Data exchange | 5 | exchange suite: mean of "ours imports live's" and "live imports ours" | dx |
-| Speed against Onshape | 10 | share of timed cases at or under live's time: corpus regenerations, document opens, the interaction suite's dialog and click latencies (each case 1 if ours ≤ live, else live/ours) | everyone; bool and psui first |
+| Speed against Onshape | 10 | share of timed cases at or under live's time: corpus regenerations (the features' own regeneration time, as live's Regeneration times panel counts), document opens (open to the model shown), the interaction suite's dialog and click latencies (each case 1 if ours ≤ live, else live/ours) | everyone; bool and psui first |
 | Feature Studio and FeatureScript editor | 5 | no suite yet: 0 | dx |
 | Variable Studio | 3 | no suite yet: 0 | psui |
 | Versions, branches, history, release | 5 | no suite yet: 0 | skasm |
@@ -42,3 +42,15 @@ live and run in qa's 4-hourly run; coverage then grows as the owner writes more.
   is written next to the exclusion with its evidence, as PARITY-SUITES.md already requires.
 - The index never goes up by changing the scoring alone: a scoring change is landed with the index recomputed for the
   day before it, both written down.
+
+## Scoring changes
+
+- 2026-11-08 22:40 UTC (lead, psui): **Speed's regeneration cases compare like with like.** Live's `full_regen_ms` is its
+  Regeneration times panel (the features' regeneration alone); ours was the wall time of reopening the document,
+  listing its features and querying its parts (`query_parts`' mass properties, 0.1-1.6 s on some documents, and our
+  display build). Ours is now the feature list's own regeneration time (crates/ops/tests/parity.rs; the wall time stays
+  in models-report.json as `regen_ms.wall`); the time to a shown model stays measured by the opens cases. The last
+  complete run before it (qa 2026-11-08 14:11, 4b09e98c), recomputed from its models.log (each document slower than
+  live is listed there with its feature-list time; the others are at or under live by it): **Speed 70.8 % → 81.7 %**
+  (40 → 60 of 98 cases at or under live), **index 78.67 → 79.75**.
+
