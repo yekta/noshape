@@ -55,6 +55,8 @@ pub struct LiveRef {
     /// Of live's sketch bodies file (`sketches.json`, live 2267): a sketch region as its sketch made it (a per-feature
     /// line's may be a piece a later feature imprinted).
     pub sketch_file: bool,
+    /// Live's sketch feature whose region it is (the sketch bodies file).
+    pub sketch_of: Option<String>,
 }
 
 /// What became of one Onshape feature.
@@ -152,6 +154,8 @@ pub struct Translator<'a> {
     pub other_studios: HashMap<String, (String, HashMap<String, String>)>,
     /// Their configurations' defaults (element → input id → value).
     pub other_defaults: HashMap<String, HashMap<String, Value>>,
+    /// Our sketches' sketch_get within the current step (a studio's every region query read every sketch).
+    sketch_cache: HashMap<String, Value>,
     /// Import features' files (features.json `foreignFiles`: foreign id →
     /// `{ "path", "placed" }`, placed: live's export of the Part Studio).
     foreign: HashMap<String, Value>,
@@ -217,7 +221,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
         // A face may come as its plane's `origin` and its `area` (live 2290).
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null(), sketch_file: false, sketch_of: None };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -313,7 +317,7 @@ impl<'a> Translator<'a> {
             // (A boolean configuration's default is a JSON boolean.)
             .filter_map(|c| Some((c["parameterId"].as_str()?.to_string(), c["defaultValue"].as_str().map(str::to_string).or_else(|| c["defaultValue"].as_bool().map(|b| b.to_string()))?)))
             .collect();
-        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new() })
+        Ok(Self { ctx, features, refs, feature_ids: HashMap::new(), sub_params: HashMap::new(), sketch_entities: HashMap::new(), sketch_points: Vec::new(), frames, curves: HashMap::new(), construction: Default::default(), config_defaults, sketch_edits: 0, handle_lines: HashMap::new(), sketch_before: Value::Null, sketch_map: SketchMap::default(), circles: HashMap::new(), ellipses: HashMap::new(), picked: Default::default(), tab: None, first_move: None, studios: HashMap::new(), notes: Vec::new(), custom_failures: Vec::new(), partial: Vec::new(), solved, used: Default::default(), placeholder: None, std_pins: Vec::new(), foreign, derived_sources: doc["derivedSources"].as_object().cloned().unwrap_or_default(), derived_built: HashMap::new(), part_order: doc["partOrder"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_string)).collect(), part_volumes: doc["partVolumes"].as_array().into_iter().flatten().filter_map(|v| Some([v[0].as_f64()?, v[1].as_f64()?])).collect(), other_studios: HashMap::new(), other_defaults: HashMap::new(), sketch_cache: HashMap::new() })
     }
 
     /// A Feature Studio custom features come from (features.json
@@ -561,6 +565,7 @@ impl<'a> Translator<'a> {
 
     /// Rebuilds feature `k` (after features 0 … k−1).
     pub fn step(&mut self, k: usize) -> Step {
+        self.sketch_cache.clear();
         let f = self.features[k].clone();
         let mut step = Step { index: k, name: f["name"].as_str().unwrap_or("").to_string(), feature_type: f["featureType"].as_str().unwrap_or("").to_string(), ..Default::default() };
         step.custom = f["namespace"].as_str().is_some_and(|n| !n.is_empty());
@@ -1611,12 +1616,22 @@ impl<'a> Translator<'a> {
         self.query_with(k, q, true)
     }
 
+    /// Our sketch `id`'s sketch_get (cached within a step); None for a feature that isn't a sketch.
+    fn sketch_geometry(&mut self, id: &str) -> Option<Value> {
+        if let Some(g) = self.sketch_cache.get(id) {
+            return (!g.is_null()).then(|| g.clone());
+        }
+        let g = self.call("sketch_get", json!({ "sketch": id })).unwrap_or(Value::Null);
+        self.sketch_cache.insert(id.to_string(), g.clone());
+        (!g.is_null()).then_some(g)
+    }
+
     /// The total area (m²) of our sketch regions `ids` ("region:<sketch>:<keys>"), when all are regions.
     fn regions_area(&mut self, ids: &[String]) -> Option<f64> {
         let mut total = 0.0;
         for id in ids {
             let sketch = id.strip_prefix("region:")?.split(':').next()?.to_string();
-            let g = self.call("sketch_get", json!({ "sketch": sketch })).ok()?;
+            let g = self.sketch_geometry(&sketch)?;
             let k = per_unit(&g["units"]);
             let r = g["regions"].as_array()?.iter().find(|r| r["id"] == id.as_str())?;
             total += r["area"].as_f64()? * k * k;
@@ -2929,7 +2944,7 @@ impl<'a> Translator<'a> {
                     .and_then(|b| b["id"].as_str().map(str::to_string))
                     .ok_or_else(|| format!("{id}: no part of ours"))
             }
-            "SKETCH_REGION" => self.region_at(p, r.measure),
+            "SKETCH_REGION" => self.region_at(p, r.measure, r.sketch_of.as_deref()),
             other => Err(format!("{id}: reference kind {other} not mapped")),
         }
     }
@@ -2938,7 +2953,7 @@ impl<'a> Translator<'a> {
     fn sketch_point_at(&mut self, p: [f64; 3]) -> Option<String> {
         let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
         for s in sketches {
-            let Ok(g) = self.call("sketch_get", json!({ "sketch": s })) else { continue };
+            let Some(g) = self.sketch_geometry(&s) else { continue };
             let k = per_unit(&g["units"]);
             let (Some(o), Some(x), Some(y)) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"])) else { continue };
             for e in g["entities"].as_array().into_iter().flatten().filter(|e| e["type"] == "point") {
@@ -2957,7 +2972,7 @@ impl<'a> Translator<'a> {
     fn sketch_line_at(&mut self, mid: [f64; 3], length: Option<f64>) -> Option<String> {
         let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
         for s in sketches {
-            let Ok(g) = self.call("sketch_get", json!({ "sketch": s })) else { continue };
+            let Some(g) = self.sketch_geometry(&s) else { continue };
             let k = per_unit(&g["units"]);
             let (Some(o), Some(x), Some(y)) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"])) else { continue };
             let entities = g["entities"].as_array().cloned().unwrap_or_default();
@@ -3074,11 +3089,15 @@ impl<'a> Translator<'a> {
     /// The sketch region of ours with live's area (when given) nearest
     /// live's point, over every sketch built so far. (Our region `center`
     /// is a label point, not the centroid live gives: area decides.)
-    fn region_at(&mut self, p: [f64; 3], area: Option<f64>) -> Result<String, String> {
-        let sketches: Vec<String> = self.feature_ids.values().cloned().collect();
+    fn region_at(&mut self, p: [f64; 3], area: Option<f64>, sketch_of: Option<&str>) -> Result<String, String> {
+        // Its own sketch when live's file names it, else every one of ours.
+        let sketches: Vec<String> = match sketch_of.and_then(|f| self.feature_ids.get(f)) {
+            Some(ours) => vec![ours.clone()],
+            None => self.feature_ids.values().cloned().collect(),
+        };
         let mut best: Option<(f64, String)> = None;
         for s in sketches {
-            let Ok(g) = self.call("sketch_get", json!({ "sketch": s })) else { continue };
+            let Some(g) = self.sketch_geometry(&s) else { continue };
             let (o, x, y) = (f3(&g["frame"]["origin"]), f3(&g["frame"]["x"]), f3(&g["frame"]["y"]));
             let (Some(o), Some(x), Some(y)) = (o, x, y) else { continue };
             for r in g["regions"].as_array().into_iter().flatten() {
@@ -4468,8 +4487,10 @@ pub fn refs_from_sketches(file: &Value, features: &[Value]) -> HashMap<(usize, S
             f["orientation"] = json!(true);
         }
         let line = json!({ "index": k, "type": "newSketch", "bodies": bodies });
+        let of = s["featureId"].as_str().map(str::to_string);
         out.extend(refs_from_bodies(std::slice::from_ref(&line)).into_iter().map(|(key, mut r)| {
             r.sketch_file = true;
+            r.sketch_of = of.clone();
             (key, r)
         }));
     }

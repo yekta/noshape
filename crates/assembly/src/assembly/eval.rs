@@ -1174,6 +1174,10 @@ pub struct AssemblyEvaluator {
     subs_dof: HashMap<u64, (usize, HashMap<InstanceId, usize>)>,
     /// Mate connector frames of parts (see [`ConnectorMemo`]).
     connectors: ConnectorMemo,
+    /// The sources' regeneration options made once for the current `evaluate` (making them clones the document and
+    /// compiles its Feature Studios: per studio and evaluation, asm-infento-subs' rebuild took 3× as long). Empty
+    /// outside `evaluate`.
+    sources_opts: Option<RegenOptions>,
 }
 
 /// A subassembly's preparation and solve, as [`AssemblyEvaluator::prepare_subassembly`] makes them.
@@ -2084,7 +2088,14 @@ impl AssemblyEvaluator {
         // sources' versions are part of the cache key.
         let needs_sources = ps.features.iter().any(|f| crate::features::importing::source_studio(f).is_some() || crate::custom::is_custom(&f.type_id));
         let mut opts = match self.studio_options.as_ref().filter(|_| needs_sources) {
-            Some(make) => make(doc),
+            Some(_) if self.evaluating && self.sources_opts.is_some() => self.sources_opts.clone().unwrap_or_default(),
+            Some(make) => {
+                let o = make(doc);
+                if self.evaluating {
+                    self.sources_opts = Some(o.clone());
+                }
+                o
+            }
             None => RegenOptions::default(),
         };
         // The Variable Studio tables the Part Studio shows (its #names).
@@ -2238,12 +2249,14 @@ impl AssemblyEvaluator {
         let mut visited = Vec::new();
         self.evaluating = true;
         self.studios_checked.clear();
+        self.sources_opts = None;
         self.subs_done.clear();
         self.subs_dof.clear();
         self.connectors.prune(&doc.settings.units);
         let (leaves, nodes, prepared) = self.prepare_inner(doc, assembly, &mut visited);
         self.evaluating = false;
         self.studios_checked.clear();
+        self.sources_opts = None;
         self.subs_done.clear();
         self.subs_dof.clear();
         let solved = prepared.solve(opts);

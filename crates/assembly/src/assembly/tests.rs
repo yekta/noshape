@@ -3803,6 +3803,40 @@ fn derived_parts_are_insertable() {
     assert!(!r.display.bodies.is_empty(), "listed in the Insert dialog");
 }
 
+/// An evaluation makes the sources' regeneration options once, however many Part Studios need them (making them
+/// clones the document and compiles its Feature Studios: per studio, asm-infento-subs' rebuild took 3× as long).
+#[test]
+fn an_evaluation_makes_the_sources_options_once() {
+    let mut f = doc_with(vec![block_studio()]);
+    let units = UnitPrefs::default();
+    let mut derived = Vec::new();
+    for n in 0..2 {
+        let mut ps = PartStudio::new();
+        let mut d = ps.new_feature("importDerived", &units).unwrap();
+        d.params.set("partStudio", ParamValue::Text(f.studios[0].to_string()));
+        ps.features.push(d);
+        derived.push(f.doc.add_tab(&format!("Derived {n}"), TabContent::PartStudio(ps)));
+    }
+    let made = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let mut ev = AssemblyEvaluator::new();
+    let counter = made.clone();
+    ev.set_studio_options(std::sync::Arc::new(move |d: &Document| {
+        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        RegenOptions { derived: Some(std::sync::Arc::new(DocSources(d.clone()))), ..Default::default() }
+    }));
+    let bodies: Vec<BodyId> = derived.iter().map(|t| body_of(&mut ev, &f.doc, *t).0).collect();
+    made.store(0, std::sync::atomic::Ordering::Relaxed);
+    let asm = Assembly {
+        instances: vec![
+            part_instance(1, "A <1>", derived[0], bodies[0].clone(), DVec3::ZERO, true),
+            part_instance(2, "B <1>", derived[1], bodies[1].clone(), DVec3::new(0.1, 0.0, 0.0), true),
+        ],
+        ..Default::default()
+    };
+    ev.evaluate(&f.doc, &asm, &SolveOptions::default(), None);
+    assert_eq!(made.load(std::sync::atomic::Ordering::Relaxed), 1);
+}
+
 /// A new mate's Offset rotation defaults to "Rotate about X" (qa5 MT6: Fastened; live behaviours 1256, 19950:
 /// Revolute too).
 #[test]
