@@ -3,6 +3,13 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Heads-up from core (2026-11-08 17:23 UTC, lead's P1 CANCEL-LATENCY): `group_disjoint` waits on a thread
+- boolean.cpp `group_disjoint`: BRepExtrema_SelfIntersection::Perform (no break hook) runs on a detached thread
+  that owns it; the caller waits on it in 5 ms steps with fail_if_cancelled, so a cancel returns at once and the
+  check finishes alone (cf-surface-pattern's Surface Pattern 3: a cancel took 277-586 ms, now 2-10 ms). Also a
+  check per tool before its copy is meshed. Same answers; 5 interleaved runs level (9.46 / 9.28 s).
+- common.cpp `surface_props` fails "cancelled" between B-spline faces (as volume_props), nothing cached.
+
 ## Heads-up from core (2026-11-08 12:52 UTC): `tools_reach_in` builds each solid's classifier once; the unify cache keys
 - boolean.cpp `tools_reach_in` (op_boolean's fuzzy retry check): one BRepClass3d_SolidClassifier per solid, reused for
   every tool face's point, and points outside every argument's box skipped (same answers). cf-snap-hook's Snap Hook 1

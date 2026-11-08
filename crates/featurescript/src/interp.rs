@@ -1647,6 +1647,9 @@ impl Interp {
     }
 
     pub(crate) fn call_native_as(&mut self, n: NativeFn, name: &Name, mut a: Vec<Value>, kind: NativeArgs) -> R<Value> {
+        // A cancel stops a script between its natives too (cf-part-draft's Part Draft 3: 1,242 face areas, ~0.6 ms each,
+        // in fewer steps than the tick's 16k).
+        self.cancelled()?;
         // The host reads maps and arrays: its natives' arguments without compact values all the way down; this
         // crate's natives that only move elements need their top level so (no scan of a big array per call).
         // (@size of a compact value: its length, without making its array; std's preconditions ask per element.)

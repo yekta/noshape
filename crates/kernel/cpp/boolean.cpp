@@ -119,6 +119,7 @@
 #include <deque>
 #include <array>
 #include <mutex>
+#include <condition_variable>
 #include <memory>
 #include <optional>
 #include <algorithm>
@@ -7179,6 +7180,7 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   {
     if (!close[(size_t)i])
       continue;
+    fail_if_cancelled();
     const TopoDS_Shape c = BRepBuilderAPI_Copy(t[(size_t)i], true, false).Shape();
     BRepMesh_IncrementalMesh(c, defl, false, 0.5);
     for (TopExp_Explorer f(c, TopAbs_FACE); f.More(); f.Next())
@@ -7189,12 +7191,53 @@ static std::vector<TopoDS_Shape> group_disjoint(const std::vector<TopoDS_Shape>&
   // (None meshed: no two can meet, one group.)
   if (!owner.IsEmpty())
   {
+    // On a thread of its own, so a cancel needn't wait for it (one OCCT call over every tool's mesh without a break
+    // hook: cf-surface-pattern's 85 tools, 0.6 s): the worker leaves it to finish alone.
+    struct Check
+    {
+      std::mutex                                    m;
+      std::condition_variable                       cv;
+      bool                                          done = false, ok = false;
+      std::shared_ptr<BRepExtrema_SelfIntersection> si;
+    };
+    auto job = std::make_shared<Check>();
     try
     {
-      BRepExtrema_SelfIntersection si(copies, 2 * defl);
-      si.Perform();
-      if (!si.IsDone())
-        return t;
+      job->si = std::make_shared<BRepExtrema_SelfIntersection>(copies, 2 * defl);
+    }
+    catch (const Standard_Failure&)
+    {
+      return t;
+    }
+    std::thread([job] {
+      bool ok = false;
+      try
+      {
+        job->si->Perform();
+        ok = job->si->IsDone();
+      }
+      catch (...)
+      {
+      }
+      const std::lock_guard<std::mutex> g(job->m);
+      job->ok   = ok;
+      job->done = true;
+      job->cv.notify_all();
+    }).detach();
+    {
+      std::unique_lock<std::mutex> l(job->m);
+      while (!job->cv.wait_for(l, std::chrono::milliseconds(5), [&] { return job->done; }))
+      {
+        l.unlock();
+        fail_if_cancelled();
+        l.lock();
+      }
+    }
+    if (!job->ok)
+      return t;
+    try
+    {
+      const BRepExtrema_SelfIntersection& si = *job->si;
       for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator it(si.OverlapElements()); it.More(); it.Next())
       {
         const int* a = owner.Seek(si.GetSubShape(it.Key()));

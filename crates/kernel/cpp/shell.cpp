@@ -8507,6 +8507,7 @@ std::vector<DraftSide> own_offset_sides(const TopoDS_Face& bottom, const gp_Dir&
     std::vector<Piece> loop;
     for (BRepTools_WireExplorer wx(TopoDS::Wire(wi.Value()), bottom); wx.More(); wx.Next())
     {
+      fail_if_cancelled();
       Piece p;
       p.e = wx.Current();
       p.c = BRep_Tool::Curve(p.e, p.f, p.l);
@@ -8559,6 +8560,7 @@ std::vector<DraftSide> own_offset_sides(const TopoDS_Face& bottom, const gp_Dir&
     }
     for (const Piece& p : loop)
     {
+      fail_if_cancelled();
       const bool   reversed = p.e.Orientation() == TopAbs_REVERSED;
       const double lo = std::min(p.ts, p.te), hi = std::max(p.ts, p.te);
       // Each offset runs the edge's way (a crossing past its other end: its offset vanished).
@@ -8621,6 +8623,7 @@ std::vector<DraftSide> occt_offset_sides(const TopoDS_Face& bottom, const gp_Dir
   auto         offset     = [&](GeomAbs_JoinType join) -> std::unique_ptr<BRepOffsetAPI_MakeOffset> {
     for (const double by : {-inward, inward})
     {
+      fail_if_cancelled();
       auto m = std::make_unique<BRepOffsetAPI_MakeOffset>(base, join);
       m->Perform(by);
       if (!m->IsDone())
@@ -8653,6 +8656,7 @@ std::vector<DraftSide> occt_offset_sides(const TopoDS_Face& bottom, const gp_Dir
   std::vector<DraftSide> sides;
   for (int i = 1; i <= base_edges.Extent(); ++i)
   {
+    fail_if_cancelled();
     const TopoDS_Edge& e   = TopoDS::Edge(base_edges(i));
     const ShapeList&   gen = mo.Generated(e);
     if (gen.IsEmpty())
@@ -8776,6 +8780,7 @@ TopoDS_Shape tapered_prism(const TopoDS_Shape& solid, const ShapeIMap& drafted, 
     occ::handle<NCollection_HSequence<TopoDS_Shape>> top_edges(new NCollection_HSequence<TopoDS_Shape>());
     for (const DraftSide& side : walls)
     {
+      fail_if_cancelled();
       const TopoDS_Edge& e = side.base;
       top_edges->Append(side.top);
       const TopoDS_Face rf = BRepFill::Face(side.rule_from, side.top);
@@ -8798,6 +8803,7 @@ TopoDS_Shape tapered_prism(const TopoDS_Shape& solid, const ShapeIMap& drafted, 
     const occ::handle<NCollection_HSequence<TopoDS_Shape>> top_wires = ShapeAnalysis_FreeBounds::ConnectEdgesToWires(top_edges, tol * 10, false);
     for (int w = 1; !top_wires.IsNull() && w <= top_wires->Length(); ++w)
     {
+      fail_if_cancelled();
       loops.push_back(TopoDS::Wire(top_wires->Value(w)));
       BRepBuilderAPI_MakeFace lf(cap_plane, loops.back(), true);
       if (!lf.IsDone())
@@ -8933,6 +8939,7 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
   }
   for (const TopoDS_Shape& fx : faces.items)
   {
+    fail_if_cancelled();
     const int i = all.FindIndex(fx);
     if (i <= 0)
       fail_invalid("face to draft is not a face of the solid");
@@ -9046,6 +9053,7 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
     }
     for (const auto& pc : pieces)
     {
+      fail_if_cancelled();
       double rmid = 0;
       for (const auto& [r, h] : pc)
         rmid += r;
@@ -9073,6 +9081,7 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
       (removes ? removal : addition).Append(w);
     }
   }
+  fail_if_cancelled();
   TopoDS_Shape       r = solid.shape;
   std::vector<HHist> chain;
   if (!removal.IsEmpty())
@@ -9097,6 +9106,7 @@ OpOut op_draft_wedges(const OcShape& solid_in, const OcShapeList& faces_in, P3 p
     r = fu_out;
     chain.push_back(fu_hist);
   }
+  fail_if_cancelled();
   ShapeUpgrade_UnifySameDomain usd(r, true, true, false);
   usd.SetLinearTolerance(1e-7);
   usd.Build();

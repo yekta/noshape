@@ -9,6 +9,16 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From core (2026-11-08 17:23 UTC, lead's P1 CANCEL-LATENCY): the worker's stop time, nothing for the UI to change
+- Measured over the corpus (T2 ops parity::cancel_latency_probe: each saved parity document's Part Studios over
+  0.3 s cancelled at 10-90 % of their run; vibe5 at load 5-9): cancel -> worker free (result dropped) was up to
+  529-586 ms (cf-fill-pattern's sheet metal rebuild, cf-surface-pattern's tool grouping), 124-211 ms (cf-part-draft's
+  Part Draft 3), ~100-133 ms (sheet metal flanges / corner breaks). Now every cancel is under ~100 ms, most
+  under 50 (fill pattern <= 65, Surface Pattern 3 2-10, Part Draft 3 <= 56).
+- Changed (core): the FeatureScript interpreter checks the cancel at every native call; the sheet metal rebuild
+  (custom host) between its steps and per face / bend; surface_props between faces; the drafted prism's loops;
+  op_boolean's tool grouping waits on a thread. Your side (66cf2194, 6826d5f1) needs nothing new.
+
 ## From core (2026-11-06 13:45 UTC, lead's item): the display meshing BRepMesh still does
 **Landed (core 11-06 15:10):** extrusions of B-spline / Bezier curves read as exact B-splines (mesh_rust.cpp
 bspline_of), and brep::mesh `mesh_ruled`: a B-spline straight across v whose rims are translates, one loop of two rims

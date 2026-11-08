@@ -1750,8 +1750,14 @@ GProp_GProps surface_props(const TopoDS_Shape& s)
   out = GProp_GProps(gp::Origin());
   if (analytic.NbChildren())
     BRepGProp::SurfaceProperties(analytic, out, props_eps(1e-7), true);
+  // (A cancelled regeneration's: stopped between faces, nothing cached; a gear body's centroid for qSplitBy took 0.2 s.)
+  const std::atomic<bool>* cancel = thread_cancel_flag();
   for (const TopoDS_Face& f : wrapping)
+  {
+    if (cancel != nullptr && cancel->load(std::memory_order_relaxed))
+      fail_op("cancelled");
     out.Add(MomentProps(face_moments(f, false)));
+  }
   return out;
 }
 

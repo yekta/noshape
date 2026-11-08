@@ -1907,7 +1907,8 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
             extremes(v, true)
         }
         "LARGEST" | "SMALLEST" => {
-            let v: Vec<(Ent, f64)> = sub(i, "subquery")?.into_iter().filter_map(|e| q.measure(&e).map(|m| (e, m))).collect();
+            // (Cancelled: the rest unmeasured, each ~0.6 ms on a gear's B-spline faces; the script stops at its next call.)
+            let v: Vec<(Ent, f64)> = sub(i, "subquery")?.into_iter().filter_map(|e| if k::thread_cancelled() { None } else { q.measure(&e).map(|m| (e, m)) }).collect();
             extremes(v, &*kind == "LARGEST")
         }
         "TANGENT_CONNECTED_FACES" | "TANGENT_FACES" => {

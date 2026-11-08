@@ -306,7 +306,7 @@ fn ev_face_tangent_planes_at_edge(i: &mut Interp, a: Vec<Value>) -> R<Value> {
 fn sum_measure(i: &mut Interp, a: &[Value], key: &str, want: EType) -> R<f64> {
     let cx = context_arg(i, a)?;
     with_ents(i, &cx, &field(a, key), |_, q, ents| {
-        Ok(ents.iter().filter(|e| entity_type_of(e) == want).filter_map(|e| q.measure(e)).sum())
+        Ok(ents.iter().filter(|e| entity_type_of(e) == want && !k::thread_cancelled()).filter_map(|e| q.measure(e)).sum())
     })
 }
 

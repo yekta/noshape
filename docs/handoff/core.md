@@ -33,6 +33,31 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 17:23 UTC: P1 CANCEL-LATENCY (lead): every cancel under ~100 ms over the corpus; landing.**
+- Probe (T2, crates/ops/tests/parity.rs `cancel_latency_probe`): NOSHAPE_CANCEL_DOCS=<dir of .noshape> (vibe5
+  ~/core-cases/corpus-docs from NOSHAPE_PARITY_SAVE), NOSHAPE_CANCEL_FRACTIONS, NOSHAPE_CANCEL_GDB=<ms> (sudo gdb
+  stacks to /tmp/cancel-stacks-*.txt when the worker still runs; to a file: a pipe deadlocked gdb). Prints the
+  time to return and to drop.
+- Found and fixed: sheet metal rebuild (custom host, ~1.2 s unchecked: build_part / part_sources / keep_names),
+  surface_props over B-spline faces (Part Draft 3's qSplitBy centroids), op_boolean's group_disjoint
+  (BRepExtrema_SelfIntersection, on a thread now), the interpreter per native call, draft_prism_directly's loops,
+  qLargest / evArea's measuring. Before -> after: fill pattern 529-582 -> <= 65 ms, Surface Pattern 3 277-586 ->
+  2-10, Part Draft 3 124-211 -> <= 56, corner break / flange ~100-133 -> <= 40.
+- Speed: interleaved A/B (bin/ab2.sh) level; single suite runs aren't evidence (load).
+
+**State 11-08 15:02 UTC: degenerate cut tools (lead 1), CANCEL-LATENCY measuring (lead 2).**
+- Degenerate tools: region_profile fails a region enclosing no area (`encloses_no_area`, 2D, free); queued
+  2081227a. Tried first and dropped: a tool-volume check before every Boolean (~10 %) and "a cut never makes a part
+  bigger" after every cut (c2-valve-config 440 -> 1,140 ms, the knife 640 -> 960: volumes of curved results);
+  interleaved A/B: /root/core-scratch/bin/ab.sh, ab-checks.log.
+- **The suite compare script's speed check was broken until 14:40** (bin/cmp-suite.py never read the regeneration
+  time: no SLOWER ever printed). Fixed; but single suite runs on vibe5 swing 30-100 % per document (load 7-8):
+  judge speed by ab.sh's interleaved runs, not by two suite runs.
+- CANCEL-LATENCY: T2 probe parity::cancel_latency_probe (crates/ops/tests/parity.rs, not landed yet):
+  NOSHAPE_CANCEL_DOCS=<dir of .noshape> (vibe5 ~/core-cases/corpus-docs, saved by NOSHAPE_PARITY_SAVE), cancels each
+  Part Studio over 0.3 s at NOSHAPE_CANCEL_FRACTIONS of its time, prints cancel -> worker free (result dropped) and
+  the feature running. Live REQUESTS 2324 (guided lofts, curved guide + curved profile, P3) filed 14:21.
+
 **State 11-08 14:20 UTC: the Knuckle 6/28 (Extrude 4 to asm); the knife's Loft 3 measured, no cause found.**
 - susp-knuckle with asm's 8c0f052e2: 1 -> 6/28. Extrude 4's regions are degenerate on our side (Sketch 2's projected
   curves not found): written to asm.md with the cut case (vibe5 ~/core-cases/knbool).

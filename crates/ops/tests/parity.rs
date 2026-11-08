@@ -2604,3 +2604,82 @@ fn live_sketch_bodies_are_the_sketches_regions() {
     assert_eq!(refs[&(2, "JFE".to_string())].point, Some([0.0, -0.055, 0.0]));
     assert!(refs.keys().all(|(k, _)| *k == 2), "{:?}", refs.keys());
 }
+
+/// P1 CANCEL-LATENCY over the corpus (T2 probe): each Part Studio of each `.noshape` in NOSHAPE_CANCEL_DOCS (a dir,
+/// e.g. one NOSHAPE_PARITY_SAVE filled) regenerated once whole, then again cancelled at NOSHAPE_CANCEL_FRACTIONS of
+/// that time (default 0.1,0.3,0.5,0.7,0.9); prints the time from the cancel until the worker is free (the result
+/// dropped too) and the feature running then.
+#[test]
+#[ignore = "T2: probe (NOSHAPE_CANCEL_DOCS)"]
+fn cancel_latency_probe() {
+    use noshape_model::regen::RegenCancel;
+    let Some(dir) = std::env::var_os("NOSHAPE_CANCEL_DOCS") else { return };
+    let fractions: Vec<f64> = std::env::var("NOSHAPE_CANCEL_FRACTIONS").unwrap_or("0.1,0.3,0.5,0.7,0.9".into()).split(',').filter_map(|x| x.trim().parse().ok()).collect();
+    let mut docs: Vec<PathBuf> = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "noshape")).collect();
+    docs.sort();
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    for path in docs {
+        let name = path.file_stem().unwrap().to_string_lossy().to_string();
+        let Ok(session) = noshape_ops::session::Session::open(&path) else { continue };
+        let tabs: Vec<_> = session.doc.tabs.iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
+        drop(session);
+        for tab in tabs {
+            let mut doc = noshape_ops::doc::OpenDoc::new(noshape_ops::session::Session::open(&path).unwrap());
+            let t0 = std::time::Instant::now();
+            let Ok(full) = doc.regenerate(tab, None) else { continue };
+            let total = t0.elapsed().as_secs_f64();
+            if total < 0.3 {
+                continue;
+            }
+            // Each feature's start, from its time in the whole run.
+            let mut starts: Vec<(f64, String)> = Vec::new();
+            let mut at = 0.0;
+            let names: std::collections::HashMap<_, _> = noshape_ops::doc::studio(doc.doc(), tab).unwrap().features.iter().map(|f| (f.id, f.name.clone())).collect();
+            for f in &full.display.features {
+                starts.push((at, names.get(&f.id).cloned().unwrap_or_default()));
+                at += f.time_ms as f64 / 1e3;
+            }
+            drop(full);
+            for &fr in &fractions {
+                let mut doc = noshape_ops::doc::OpenDoc::new(noshape_ops::session::Session::open(&path).unwrap());
+                let cancel = RegenCancel::default();
+                let c2 = cancel.clone();
+                let (latency, cancelled) = std::thread::scope(|s| {
+                    let h = s.spawn(move || {
+                        let r = doc.regenerate_with(tab, None, |o| o.cancel = Some(c2));
+                        let returned = std::time::Instant::now();
+                        let cancelled = r.as_ref().is_ok_and(|r| r.cancelled);
+                        drop(r);
+                        drop(doc);
+                        (std::time::Instant::now(), returned, cancelled)
+                    });
+                    std::thread::sleep(std::time::Duration::from_secs_f64(total * fr));
+                    let aborted = std::time::Instant::now();
+                    cancel.abort();
+                    // NOSHAPE_CANCEL_GDB=<ms>: every thread's stack (sudo gdb) when the worker still runs that long after
+                    // the cancel.
+                    if let Some(ms) = std::env::var("NOSHAPE_CANCEL_GDB").ok().and_then(|v| v.parse::<u64>().ok()) {
+                        std::thread::sleep(std::time::Duration::from_millis(ms));
+                        if !h.is_finished() {
+                            // (To a file: gdb stops this process, which then can't drain a pipe.)
+                            let file = format!("/tmp/cancel-stacks-{}-{name}-{fr}.txt", std::process::id());
+                            let cmd = format!("sudo -n gdb -p {} -batch -ex 'thread apply all bt 90' > {file} 2>&1", std::process::id());
+                            let _ = std::process::Command::new("sh").args(["-c", &cmd]).status();
+                            println!("STACKS {file}");
+                        }
+                    }
+                    let (done, returned, cancelled) = h.join().unwrap();
+                    println!("  returned {:.0} ms after the cancel, dropped {:.0} ms later", returned.saturating_duration_since(aborted).as_secs_f64() * 1e3, done.saturating_duration_since(returned).as_secs_f64() * 1e3);
+                    (done.saturating_duration_since(aborted).as_secs_f64() * 1e3, cancelled)
+                });
+                let running = starts.iter().rev().find(|(s, _)| *s <= total * fr).map(|x| x.1.clone()).unwrap_or_default();
+                println!("CANCEL {name} tab {tab:?} at {:.2} s of {total:.2}: {latency:.0} ms{} ({running})", total * fr, if cancelled { "" } else { ", ran to the end" });
+                worst.push((latency, format!("{name} at {:.2} s ({running})", total * fr)));
+            }
+        }
+    }
+    worst.sort_by(|a, b| b.0.total_cmp(&a.0));
+    for (ms, what) in worst.iter().take(15) {
+        println!("WORST {ms:.0} ms: {what}");
+    }
+}

@@ -1312,6 +1312,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     let mut setbacks: BTreeMap<usize, f64> = BTreeMap::new();
     let mut bends = Vec::new();
     for (&e, &radius) in &def.bends {
+        stop_if_cancelled()?;
         let faces = &topo.edge_faces[e];
         if faces.len() != 2 {
             continue;
@@ -1340,6 +1341,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     // Walls with curved sides: their pulled face (definition plane).
     let mut exact: BTreeMap<usize, Shape> = BTreeMap::new();
     for (fi, face) in topo.faces.iter().enumerate() {
+        stop_if_cancelled()?;
         if face.face_plane().map_err(|e| fe(e.to_string()))?.is_none() {
             outlines.push(None);
             continue;
@@ -1457,6 +1459,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     };
     let (clips, extends, mut cuts, wraps) = corner_reliefs(def, &topo, &outlines, &bends, &setbacks)?;
     for (e, fa, fb, b) in bends {
+        stop_if_cancelled()?;
         // The bend runs where both walls do (a simple corner ends it where
         // the neighbouring bend starts: live sm4, sm6), less a corner relief.
         let (mut t0, mut t1) = (0.0, b.len);
@@ -1702,6 +1705,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
     // Walls: pulled back from their bends and thickened.
     let mut wall_solid: BTreeMap<usize, usize> = BTreeMap::new();
     for (fi, outline) in outlines.iter().enumerate() {
+        stop_if_cancelled()?;
         let Some((l, n, pulled)) = outline else {
             if plain.contains(&fi) {
                 wall_solid.insert(fi, solids.len());
@@ -1743,6 +1747,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         // A bend on a hole's side (a louver's flange on its slot): the wall pulled back from it by the setback, as from
         // an outer side (live c2-sm-corner-break: else the bend overlaps the wall and the flap comes off as its own part).
         for (hole, edges) in &mut holes {
+            stop_if_cancelled()?;
             if !edges.iter().any(|e| setbacks.get(e).is_some_and(|s| *s > TOL)) {
                 continue;
             }
@@ -1796,6 +1801,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
         if !holes.is_empty() {
             let mut tools = Vec::with_capacity(holes.len());
             for (hole, edges) in &holes {
+                stop_if_cancelled()?;
                 let base = hole.translated(-n * (back + front + back)).map_err(|e| fe(e.to_string()))?;
                 let tool = k::extrude(&base, n * (front + back) * 3.0).map_err(|e| fe(e.to_string()))?.shape;
                 // Its sides come from the hole's definition edges.
@@ -1825,6 +1831,7 @@ fn build_part(def: &Definition, shape: &Shape) -> FResult<Built> {
             }
         }
         for f in slab.faces() {
+            stop_if_cancelled()?;
             let from = match f.face_surface() {
                 Ok(k::Surface::Plane(pl)) if pl.unit_normal().cross(n).length() < 1e-9 => Def::Face(fi),
                 _ => {
@@ -2100,6 +2107,9 @@ fn keep_names(part: &Shape, names: &mut [crate::naming::Name], before: &Shape, b
     };
     let mut of: Vec<Vec<usize>> = vec![Vec::new(); old.len()];
     for (i, f) in new.iter().enumerate() {
+        if k::thread_cancelled() {
+            return;
+        }
         let hit = (0..old.len()).find(|&j| (in_box(&old_boxes[j], &old_planes[j], &new_probes[i]) && new_probes[i].is_some_and(|x| on(&old[j], x))) || (in_box(&new_boxes[i], &new_planes[i], &old_probes[j]) && old_probes[j].is_some_and(|x| on(f, x))));
         if let Some(j) = hit.filter(|&j| j < before_names.len()) {
             of[j].push(i);
@@ -2134,6 +2144,10 @@ fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<D
         .faces()
         .iter()
         .map(|f| {
+            // (Cancelled: the rest unmatched, the rebuild stops after.)
+            if k::thread_cancelled() {
+                return Def::Face(0);
+            }
             let Some(p) = inner_point(f) else { return Def::Face(0) };
             // A piece through the point that faces the same way (a unified wall's
             // middle can lie on the edge of a side piece).
@@ -2179,6 +2193,15 @@ fn part_sources(part: &Shape, pieces: &[Piece], topo: &Topo) -> (Vec<Def>, Vec<D
         })
         .collect();
     (faces, edges, vertices)
+}
+
+/// A cancelled regeneration stops the rebuild between its steps (cf-fill-pattern's thousand-hole plate: 1.2 s of
+/// rebuild ran on after a cancel).
+fn stop_if_cancelled() -> FResult<()> {
+    if k::thread_cancelled() {
+        return Err(fe("cancelled"));
+    }
+    Ok(())
 }
 
 fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
@@ -2243,6 +2266,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
             let Some(bi) = ev.ctx.bodies.iter().position(|b| b.id == def.body) else { continue };
             let shape = ev.ctx.bodies[bi].shape.clone();
             let Built { mut part, mut pieces, topo, wall_flats, strips } = build_part(def, &shape)?;
+            stop_if_cancelled()?;
             let births = births(&mut ev.ctx.sm_births, def, &topo);
             // Forms: the parts to remove cut, then the parts to add united;
             // their faces belong to the wall they sit on.
@@ -2292,6 +2316,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     PartOf { solid, names: Vec::new(), sources, members }
                 })
                 .collect();
+            stop_if_cancelled()?;
             parts.sort_by_key(|p| p.members.first().copied().unwrap_or(usize::MAX));
             let mut others = BTreeMap::new();
             let mut taken: std::collections::HashSet<crate::naming::Name> = ev.ctx.bodies.iter().flat_map(|b| b.faces.iter().cloned()).collect();
@@ -2319,6 +2344,7 @@ fn update_sheet_metal_geometry(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                     }
                 }
             }
+            stop_if_cancelled()?;
             for (k, p) in parts.into_iter().enumerate() {
                 let walls: Vec<(usize, Shape)> = wall_flats.iter().filter(|w| p.members.contains(&w.0)).cloned().collect();
                 let own: Vec<Strip> = strips.iter().filter(|s| p.members.contains(&s.wall_a)).cloned().collect();
