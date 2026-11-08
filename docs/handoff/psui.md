@@ -548,10 +548,10 @@ greyed, live 2212; a view cube submenu reads "camera-submenu" with its checks; i
 Part Studio in context was "out of date" at once (the assembly compared it by primary instance; now ops'
 `out_of_date_in`), a page dropdown reads its top level and highlights its chosen row, its actions hand the keyboard to
 the graphics). Dynamic suppression's box completes like a number field ("true"), ✓ deselects and says "Dynamic
-suppression added." (first expression). Left, not ours: analysis-thickness ×3 (live's free account), external-thread /
+suppression added." / "…updated." / "…removed." (live 2289). Left, not ours: analysis-thickness ×3 (live's free account), external-thread /
 sm-form (account memory), fillet-chip ×2 ("Unknown" start), feature-menu-suppress-unsuppress (live hides the sketch
-row only after the server's regeneration), dialog-number-rclick-menu (live runner). Asked live: "Edit dynamic
-suppression" with an expression (REQUESTS 05:58: no submenu in live's recordings). Left, ours: focus kinds in
+row only after the server's regeneration), dialog-number-rclick-menu (live runner). Live 2289: "Edit dynamic
+suppression" is a hover submenu (its old recordings missed it; re-recorded 28a1e9df). Left, ours: focus kinds in
 config-* / part-menu-release / key-mod-shift-f / mirror-face-type / dialog-checkbox-convert-back,
 appearance-face-row-remove (the dialog field active), sketch-row-copy-paste-onto-front (asked live 11-07),
 variable-table-row-filter (related rows).

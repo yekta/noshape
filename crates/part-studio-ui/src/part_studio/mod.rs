@@ -6724,12 +6724,7 @@ impl Render for PartStudioView {
                 // Live (behaviours request 1663 (a)): one Esc cancels every
                 // appearance editor, even typing in its hex field.
                 if let Some(e) = this.ui.appearance_edit.take() {
-                    // (What it selected goes with it: live ui-parity face-menu-add-appearance-to-face.)
-                    if matches!(e.target, appearance::EditTarget::Faces(..) | appearance::EditTarget::Feature(..) | appearance::EditTarget::Features(_)) {
-                        this.selection.clear();
-                        this.selected_features.clear();
-                        this.refresh_scene(false, cx);
-                    }
+                    this.appearance_closed(&e.target, cx);
                     window.focus(&this.focus, cx);
                     cx.notify();
                     return;

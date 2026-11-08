@@ -1719,9 +1719,7 @@ impl PartStudioView {
                 DynTarget::Feature(id) => self.studio(cx).and_then(|s| s.feature(id)).is_some_and(|f| f.suppression_expr.is_some()),
                 DynTarget::Folder(_) => false,
             };
-            if !had {
-                self.flash_info("Dynamic suppression added.".into(), cx);
-            }
+            self.flash_info(if had { "Dynamic suppression updated." } else { "Dynamic suppression added." }.into(), cx);
             self.doc.update(cx, |doc, cx| {
                 doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(Some(&text)), cx, |ps| match target {
                     DynTarget::Feature(id) => noshape_ops::studio::set_suppression_expr(ps, id, Some(text.clone())),

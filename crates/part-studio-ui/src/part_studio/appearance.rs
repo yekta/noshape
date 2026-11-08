@@ -388,8 +388,19 @@ impl PartStudioView {
     }
 
     /// Apply the editor (✓).
+    /// The editor closed (✓, ✕ or Esc): what its faces or features field selected goes with it (live ui-parity
+    /// face-menu-add-appearance-to-face, appearance-face-row-remove).
+    pub(super) fn appearance_closed(&mut self, target: &EditTarget, cx: &mut Context<Self>) {
+        if matches!(target, EditTarget::Faces(..) | EditTarget::Feature(..) | EditTarget::Features(_)) {
+            self.selection.clear();
+            self.selected_features.clear();
+            self.refresh_scene(false, cx);
+        }
+    }
+
     fn accept_appearance(&mut self, cx: &mut Context<Self>) {
         let Some(e) = self.ui.appearance_edit.take() else { return };
+        self.appearance_closed(&e.target, cx);
         let color = [srgb_to_lin(e.rgb[0]), srgb_to_lin(e.rgb[1]), srgb_to_lin(e.rgb[2]), 1.0 - e.transparency];
         let tess = e.tessellation;
         if let EditTarget::ConfiguredCell(part, row) = &e.target {
@@ -743,7 +754,9 @@ impl PartStudioView {
                                 .cursor(CursorStyle::Arrow)
                                 .child(crate::assets::icon("dialog-cancel", 24., cx))
                                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    this.ui.appearance_edit = None;
+                                    if let Some(e) = this.ui.appearance_edit.take() {
+                                        this.appearance_closed(&e.target, cx);
+                                    }
                                     cx.notify();
                                 })),
                         ),

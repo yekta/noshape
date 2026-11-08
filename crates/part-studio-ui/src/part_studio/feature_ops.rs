@@ -58,6 +58,7 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| ps.set_folder_suppression_expr(folder, None));
         });
+        self.flash_info("Dynamic suppression removed.".into(), cx);
     }
 
     /// Whether any feature in a folder has a dynamic suppression expression
@@ -71,6 +72,8 @@ impl PartStudioView {
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(self.tab, noshape_ops::studio::suppression_expr_description(None), cx, |ps| noshape_ops::studio::set_suppression_expr(ps, id, None));
         });
+        // Live 2289: "Dynamic suppression added." / "…updated." / "…removed.".
+        self.flash_info("Dynamic suppression removed.".into(), cx);
     }
 
     /// The folder row's Delete: the folder with everything in it.
