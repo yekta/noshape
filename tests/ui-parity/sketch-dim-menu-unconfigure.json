@@ -1,0 +1,121 @@
+{
+ "name": "sketch-dim-menu-unconfigure",
+ "about": "config-blocks: a 30 mm line on Top below the parts, its dimension; right-click it › Configure dimension, then right-click › Unconfigure dimension",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last menus)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Sketch"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "plane": "Top"
+   }
+  },
+  {
+   "do": "key",
+   "key": "l"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     0,
+     -20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     30,
+     -20
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "d"
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     -20
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "sketch_point": [
+     15,
+     -28
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     15,
+     -28
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure dimension"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "sketch_point": [
+     15,
+     -28
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Unconfigure dimension"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

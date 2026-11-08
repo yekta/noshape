@@ -2818,7 +2818,7 @@ impl PartStudioView {
                 if let Some(feature) = self.sketch.as_ref().map(|s| s.feature) {
                     // Live (request 1703): "Sketch 1 length removed from Size".
                     let input = self.dimension_configuration(cid, cx).map(|c| c.0);
-                    let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).unwrap_or_default(), input.and_then(|id| s.configuration.inputs.iter().find(|i| i.id == id).map(|i| i.name.clone())).unwrap_or_default()));
+                    let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).or_else(|| self.open_sketch_name(cx)).unwrap_or_default(), input.and_then(|id| s.configuration.inputs.iter().find(|i| i.id == id).map(|i| i.name.clone())).unwrap_or_default()));
                     let noun = self.dimension_noun(cid, cx);
                     let tab = self.tab;
                     self.doc.update(cx, |doc, cx| {
@@ -2841,6 +2841,11 @@ impl PartStudioView {
     /// Configure dimension with a configuration input: each option starts
     /// with the dimension's current value (edit them in the configuration
     /// table, or edit the dimension with that configuration active).
+    /// The open sketch's name, also while it is new (not in the studio yet: "Sketch 3").
+    fn open_sketch_name(&self, cx: &App) -> Option<String> {
+        self.edit.as_ref().map(|e| e.dialog.read(cx).feature.name.clone())
+    }
+
     fn configure_dimension(&mut self, cid: noshape_sketch::ConstraintId, input: &str, cx: &mut Context<Self>) {
         let Some(feature) = self.sketch.as_ref().map(|s| s.feature) else { return };
         let units = self.doc.read(cx).session.doc.settings.units;
@@ -2848,7 +2853,7 @@ impl PartStudioView {
         let (input, tab) = (input.to_string(), self.tab);
         // Live (request 1703): the toast "Sketch 1 length added to Size"
         // ("angle" for an angle dimension).
-        let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).unwrap_or_default(), s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone()).unwrap_or_default()));
+        let names = self.studio(cx).map(|s| (s.feature(feature).map(|f| f.name.clone()).or_else(|| self.open_sketch_name(cx)).unwrap_or_default(), s.configuration.inputs.iter().find(|i| i.id == input).map(|i| i.name.clone()).unwrap_or_default()));
         let noun = self.dimension_noun(cid, cx);
         self.doc.update(cx, |doc, cx| {
             doc.edit_studio(tab, noshape_ops::studio::CONFIGURE_DIMENSION, cx, |ps| {
