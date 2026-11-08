@@ -3846,9 +3846,9 @@ part-studio-ui and ops). Onshape has no separate Edge blend feature (live 2302).
 defaults, bounds and visibility; the gaps are in the evaluators. "(live)" = live's behaviour to capture first.
 
 P1
-- [ ] P1 FACEBLEND-EMPTY-OPTIONS (blend) a ticked Tangent hold lines / Conic hold lines / Cliff edges / Caps / Limits /
+- [x] (blend 11-08: an option counts only with something picked; T1 features_a::face_blend_options_ticked_with_nothing_picked_blend_as_usual) P1 FACEBLEND-EMPTY-OPTIONS (blend) a ticked Tangent hold lines / Conic hold lines / Cliff edges / Caps / Limits /
   Help point box with nothing picked fails ("… not supported yet"); std blends as usual (detail_a.rs:564-567).
-- [ ] P1 FILLET-PARTIAL-PLANE (blend) Partial fillet's end type Entity can't take a datum plane (filter lacks PLANE,
+- [x] (blend 11-08: PLANE in both end filters; a plane end (datum or planar face) is where the chain crosses its plane; T1 features_a::a_partial_fillet_ends_at_a_datum_plane) P1 FILLET-PARTIAL-PLANE (blend) Partial fillet's end type Entity can't take a datum plane (filter lacks PLANE,
   part_studio/mod.rs:6240 kind_matches); the help says plane or mate connector.
 - [ ] P1 CHAMFER-METHOD (blend, live REQUESTS 11:10) Measurement Offset / Tangent (FACE_OFFSET / APEX_RANGE) is never
   read: a chamfer beside a face curving across the edge measures the same either way.

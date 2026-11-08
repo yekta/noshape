@@ -77,6 +77,9 @@ pub enum Bound {
     OffsetFromEnd(f64),
     /// The chain point nearest this point (a vertex, or a face's nearest point).
     Point(DVec3),
+    /// Where the chain first crosses this plane (origin, normal): a datum plane or a planar face; the chain's nearest
+    /// point to it if it doesn't.
+    Plane(DVec3, DVec3),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -169,7 +172,7 @@ pub fn check_partial(shape: &Shape, edges: &[usize], p: &Partial) -> FResult<()>
             Bound::Fraction(f) => f,
             Bound::Offset(d) => d / total,
             Bound::OffsetFromEnd(d) => (total - d) / total,
-            Bound::Point(_) => return Ok(None),
+            Bound::Point(_) | Bound::Plane(..) => return Ok(None),
         };
         if matches!(b, Bound::Offset(_) | Bound::OffsetFromEnd(_)) && !(0.0..=1.0).contains(&t) {
             let field = if second { "endPartialOffset" } else { "startPartialOffset" };
@@ -466,6 +469,34 @@ pub fn section_blend(ev: &mut EvalCtx, bi: usize, edges: &[usize], spec: &BlendS
                     acc += c.length;
                 }
                 where_
+            }
+            Bound::Plane(o, n) => {
+                // (The first sign change of the distance to the plane, else the nearest approach.)
+                let (mut best, mut acc, mut where_, mut prev): (f64, f64, f64, Option<(f64, f64)>) = (f64::INFINITY, 0.0, 0.0, None);
+                let mut crossing = None;
+                'chain: for c in &chain {
+                    let info = c.shape.edge_info()?;
+                    for i in 0..=64 {
+                        let t = i as f64 / 64.0;
+                        let prm = info.first_param + (info.last_param - info.first_param) * if c.forward { t } else { 1.0 - t };
+                        let d = (c.shape.point_at(prm)? - o).dot(n);
+                        let at = acc + t * c.length;
+                        if let Some((pd, pat)) = prev
+                            && pd != 0.0
+                            && (pd < 0.0) != (d < 0.0)
+                        {
+                            crossing = Some(pat + (at - pat) * pd / (pd - d));
+                            break 'chain;
+                        }
+                        if d.abs() < best {
+                            best = d.abs();
+                            where_ = at;
+                        }
+                        prev = Some((d, at));
+                    }
+                    acc += c.length;
+                }
+                crossing.unwrap_or(where_)
             }
         })
     };

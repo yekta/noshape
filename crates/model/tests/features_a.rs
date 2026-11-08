@@ -722,6 +722,42 @@ fn face_blend_adjacent_faces() {
     assert!(near(removed, (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04, 1e-3));
 }
 
+/// FILLET-PARTIAL-PLANE: a partial fillet's end can be a datum plane (std: a face, which a plane is in Onshape, or a
+/// point): the round stops where the edge crosses it. The Right plane halves the block's top front edge.
+#[test]
+fn a_partial_fillet_ends_at_a_datum_plane() {
+    let mut t = T::new();
+    t.block(-0.02, 0.0, 0.02, 0.04, "20 mm");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.0, 0.0, 0.02));
+    let v0 = total_volume(&res.context);
+    t.add("fillet", &[("entities", q(vec![edge])), ("radius", e("4 mm")), ("isPartial", b(true)), ("startPartialType", ParamValue::Enum("ENTITY".into())), ("startPartialEntity", q(vec![Reference::Plane(DatumPlane::Right)]))]);
+    let res = t.ok();
+    let removed = v0 - total_volume(&res.context);
+    let full = (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04;
+    assert!(near(removed, full / 2.0, 1e-2), "{removed} of {full}");
+}
+
+/// FACEBLEND-EMPTY-OPTIONS: a ticked Tangent hold lines / Conic hold lines / Cliff edges / Caps / Limits / Help point
+/// box with nothing picked blends as without it (std reads only what is picked).
+#[test]
+fn face_blend_options_ticked_with_nothing_picked_blend_as_usual() {
+    let mut t = T::new();
+    t.block(0.0, 0.0, 0.04, 0.04, "20 mm");
+    let res = t.ok();
+    let b0 = res.context.bodies[0].clone();
+    let top = face_with_normal(&b0, DVec3::Z);
+    let side = face_with_normal(&b0, DVec3::X);
+    let flags = ["tangentHoldLines", "conicHoldLines", "hasCliffEdges", "hasCaps", "hasLimits", "hasHelpPoint"];
+    let mut params: Vec<(&str, ParamValue)> = vec![("side1", q(vec![top])), ("side2", q(vec![side])), ("radius", e("4 mm"))];
+    params.extend(flags.iter().map(|f| (*f, b(true))));
+    t.add("faceBlend", &params);
+    let res = t.ok();
+    assert_eq!(res.context.bodies[0].faces.len(), 7);
+    let removed = 0.04 * 0.04 * 0.02 - total_volume(&res.context);
+    assert!(near(removed, (1.0 - PI / 4.0) * 0.004f64.powi(2) * 0.04, 1e-3));
+}
+
 /// A picked face's fillet leaves the face's tangent edges alone (live 2202: cf-surface-pattern's Fillet 1 blends the
 /// picked top's sharp edges, not its 0° edge to the cut face): a block's top, one of its edges already rounded 3 mm,
 /// filleted 1 mm as a face. The 3 mm round stays (its edge with the top was a fillet of a smooth edge: OCCT fails).

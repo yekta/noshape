@@ -562,10 +562,20 @@ pub fn face_blend(ev: &mut EvalCtx) -> FResult<()> {
         None
     };
     let shape_kind = ev.enum_("crossSectionShape").to_string();
-    for (flag, what) in [("tangentHoldLines", "Tangent hold lines"), ("conicHoldLines", "Conic hold lines"), ("hasCliffEdges", "Cliff edges"), ("hasCaps", "Caps"), ("hasLimits", "Limits"), ("hasHelpPoint", "Help point"), ("detach", "Detached face blends")] {
-        if ev.bool(flag) {
-            return err(format!("{what} are not supported yet"));
-        }
+    // A ticked option with nothing picked blends as without it (as std).
+    let picked = |ids: &[&str]| ids.iter().any(|id| !ev.query(id).is_empty());
+    let items = |id: &str, field: &str| ev.params.array(id).iter().any(|item| !item.query(field).is_empty());
+    let used = [
+        ("Tangent hold lines", ev.bool("tangentHoldLines") && picked(&["tangentEdges", "inverseTangentEdges"])),
+        ("Conic hold lines", ev.bool("conicHoldLines") && picked(&["conicEdges", "inverseConicEdges"])),
+        ("Cliff edges", ev.bool("hasCliffEdges") && picked(&["cliffEdges"])),
+        ("Caps", ev.bool("hasCaps") && items("caps", "entity")),
+        ("Limits", ev.bool("hasLimits") && (picked(&["limitPlane1", "limitPlane2", "faceLimits"]) || items("edgeLimits", "edge"))),
+        ("Help point", ev.bool("hasHelpPoint") && picked(&["helpPoint"])),
+        ("Detached face blends", ev.bool("detach")),
+    ];
+    if let Some((what, _)) = used.iter().find(|(_, on)| *on) {
+        return err(format!("{what} are not supported yet"));
     }
     let side1 = ev.resolve_faces(ev.query("side1"));
     let side2 = ev.resolve_faces(ev.query("side2"));

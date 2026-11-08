@@ -306,8 +306,16 @@ pub fn fillet(ev: &mut EvalCtx) -> FResult<()> {
                     "OFFSET" => Bound::Offset(ev.length(off)?),
                     "ENTITY" => {
                         let r = ev.query(ent).first().ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?;
-                        let p = ev.resolve_vertex_point(r).or_else(|| ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok()));
-                        Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?)
+                        // A vertex or mate connector's point; a plane (datum or planar face) where the chain crosses it; another
+                        // face's centroid.
+                        if let Some(p) = ev.resolve_vertex_point(r) {
+                            Bound::Point(p)
+                        } else if let Some(pl) = ev.resolve_plane(r) {
+                            Bound::Plane(pl.origin, pl.normal)
+                        } else {
+                            let p = ev.resolve_faces(std::slice::from_ref(r)).first().and_then(|&(b, f)| ev.ctx.bodies[b].shape.sub_shape(ShapeType::Face, f).ok()?.centroid().ok());
+                            Bound::Point(p.ok_or_else(|| crate::regen::eval::FeatureError::new("Select an entity for the partial fillet end type."))?)
+                        }
                     }
                     _ => Bound::Fraction(ev.real(frac)?),
                 })
