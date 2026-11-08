@@ -1998,11 +1998,12 @@ impl PartStudioView {
         self.edit.as_ref().map_or((false, false), |e| e.history.can())
     }
 
-    /// The document was edited while the dialog is open (its Configure): Undo there undoes that.
+    /// The document was edited while the dialog is open (its Configure): Undo there undoes that. (Read in the sketch
+    /// toolbar's every render: the undo stack's top first, `can_undo` walks the stack's changes.)
     pub(super) fn doc_edited_in_dialog(&self, cx: &App) -> bool {
         let Some(e) = &self.edit else { return false };
         let d = self.doc.read(cx);
-        d.can_undo() && d.session.undo_tops().0 != e.doc_undo_at_open
+        d.session.undo_tops().0 != e.doc_undo_at_open && d.can_undo()
     }
 
     /// Ctrl+Z / Ctrl+Y while a feature dialog (or sketch) is open.
