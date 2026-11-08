@@ -1958,7 +1958,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   extrude) lofted corner to corner (an L of 10 + 10 mm, 20 mm, 1 mm: 380 / 420 mm³, 8 faces; was 343 / 330); Flip wall
   off grows to the right of the drawing direction as live 1677 (420 / 2500 at 1 / 5 mm, 380 / 1500 flipped, its boxes);
   straight single lines keep k::thicken (exact, live's side).
-- [x] P1 CANCEL-LATENCY (user 11-01 00:24, core; psui the UI side; closed core 11-08 17:49 on the lead's rule: worst < 150 ms) cancelling a long regeneration (the printable
+- [x] P1 CANCEL-LATENCY (user 11-01 00:24, core; psui the UI side; closed core 11-08 17:50 on the lead's rule: worst < 150 ms) cancelling a long regeneration (the printable
   knurl at 45° / 45°, which runs long and fails) took seconds to take effect (the spinner went on): cancel must free
   the worker within ~100 ms. core 10-31 23:30: the custom feature's FeatureScript thread ran outside the
   regeneration's cancel scope (the kernel's flag is per thread), so neither its interpreter nor its Booleans saw the

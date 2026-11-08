@@ -33,6 +33,23 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 19:27 UTC: speed in core's area (lead 17:5x): slower-than-live features outside Booleans / blends.**
+- Per-document profile: /root/core-scratch/bin/featprof.sh (vibe5, every suite document alone with
+  NOSHAPE_KERNEL_PROFILE) + featprof.py (ours, live, Boolean, blend, rest). Kernel profiles of the build pass include
+  the harness's own calls (our_parts' areas / volumes): read the reopen block.
+- List (rest - live, biggest first): c2-impeller-loft Delete face 2 (2085 vs 12 ms, OCCT defeaturing), Delete face 1
+  (622 vs 69), cf-lighten Lighten 1 (446 vs 87, defeaturing 246), cf-part-draft Part Draft 2 (370 vs 39, defeaturing
+  228), cf-surface-pattern Surface Pattern 5 (187 vs 71, point-to-face distances), impeller Boolean 2 (64 vs 13),
+  c2-valve-config Extrude 3 (143 vs 56, up-to a non-planar face 79), Part Draft 1, clamp-hms Mirror 1 (small).
+  Sheet metal (skasm's): c2-sm-louver Flange 9 / 7, Extrude 3 / 4, Sketch 10, c2-sm-corner-break Corner break 1.
+- Done: Boolean 2 64 -> 16 ms (Boolean subtract's miss check as Extrude's: `eval::unchanged`); point-to-face
+  distance's interior search (cf-surface-pattern's distances 1.22 -> 0.61 s).
+- Defeaturing (~3.1 s): OCCT's in parallel is 2.5-3.4x faster (Delete face 1 588 -> 231, 2 1908 -> 569), but
+  op_defeature is serial for the CPU budget (DRAFT-HANG / -BUDGET-POOL / -NONDETERMINISTIC): asked the lead.
+  Delete face 2's OCCT result is invalid too. Recorded inputs: vibe5 ~/core-cases/defeat (TMP_DUMP_DEFEATURE hack).
+- Tried, no gain, not kept: Up to a parallel plane as a prism of that depth (16 extrudes in the corpus, A/B level);
+  "same faces" before volumes in the miss check (OCCT rebuilds the faces).
+
 **State 11-08 17:23 UTC: P1 CANCEL-LATENCY (lead): every cancel under ~100 ms over the corpus; landing.**
 - Probe (T2, crates/ops/tests/parity.rs `cancel_latency_probe`): NOSHAPE_CANCEL_DOCS=<dir of .noshape> (vibe5
   ~/core-cases/corpus-docs from NOSHAPE_PARITY_SAVE), NOSHAPE_CANCEL_FRACTIONS, NOSHAPE_CANCEL_GDB=<ms> (sudo gdb
