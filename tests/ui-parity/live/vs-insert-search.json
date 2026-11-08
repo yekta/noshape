@@ -1,0 +1,760 @@
+{
+ "scenario": "vs-insert-search",
+ "recorded": "2026-11-08T03:26:08.637Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+ },
+ "live": {
+  "document": "90467f4eae0d8c089d3bf1b8",
+  "workspace": "89ec6766830cf88244258bcc",
+  "element": "fe9221b21f8430dd09f0193a",
+  "start": "vs-two",
+  "startElement": "fe9221b21f8430dd09f0193a",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [
+    {
+     "name": "Sketch 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": true,
+     "cls": "ns-list-item-hidden"
+    },
+    {
+     "name": "Extrude 1",
+     "state": "ok",
+     "selected": false,
+     "editing": false,
+     "related": false,
+     "hidden": false,
+     "cls": ""
+    }
+   ],
+   "rollbackAfter": "Extrude 1"
+  },
+  "parts": [
+   "Part 1"
+  ],
+  "partsHeading": "Parts (1)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Variable Studio 1",
+     "kind": "variablestudio",
+     "active": false
+    },
+    {
+     "name": "Variable Studio 2",
+     "kind": "variablestudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "doc_tab": "Variable Studio 2"
+    }
+   },
+   "ok": true,
+   "at": [
+    785,
+    976
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 2",
+       "kind": "variablestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": {
+     "tables": [
+      {
+       "title": "Variable Studio 2",
+       "collapsed": false,
+       "rows": [
+        {
+         "name": "depth",
+         "type": "Length",
+         "value": "5 mm",
+         "description": ""
+        },
+        {
+         "name": "width",
+         "type": "Length",
+         "value": "60 mm",
+         "description": ""
+        }
+       ]
+      }
+     ],
+     "insert_into_all": false,
+     "configuration_panel": false,
+     "help": false
+    },
+    "featurestudio": null
+   },
+   "t": 49568
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Insert Variable Studio"
+    }
+   },
+   "ok": true,
+   "at": [
+    979,
+    98
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "button"
+    },
+    "dialog": {
+     "title": null,
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Variable Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "Variable Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "count",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      },
+      {
+       "label": "width",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      },
+      {
+       "label": "height",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [
+     {
+      "title": "Insert Variable Studio",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Standard",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 2",
+       "kind": "variablestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": {
+     "tables": [
+      {
+       "title": "Variable Studio 2",
+       "collapsed": false,
+       "rows": [
+        {
+         "name": "depth",
+         "type": "Length",
+         "value": "5 mm",
+         "description": ""
+        },
+        {
+         "name": "width",
+         "type": "Length",
+         "value": "60 mm",
+         "description": ""
+        }
+       ]
+      }
+     ],
+     "insert_into_all": false,
+     "configuration_panel": false,
+     "help": false
+    },
+    "featurestudio": null
+   },
+   "t": 55034
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "click",
+    "on": {
+     "field": "Search Variable Studios"
+    }
+   },
+   "ok": true,
+   "at": [
+    381,
+    201
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false,
+     "dialog": "Insert Variable Studio"
+    },
+    "dialog": {
+     "title": null,
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Variable Studios",
+       "kind": "string",
+       "text": ""
+      },
+      {
+       "label": "Variable Studio 1",
+       "kind": "boolean",
+       "checked": false,
+       "child": false
+      },
+      {
+       "label": "count",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      },
+      {
+       "label": "width",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      },
+      {
+       "label": "height",
+       "kind": "boolean",
+       "checked": false,
+       "child": true
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [
+     {
+      "title": "Insert Variable Studio",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Standard",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 2",
+       "kind": "variablestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": {
+     "tables": [
+      {
+       "title": "Variable Studio 2",
+       "collapsed": false,
+       "rows": [
+        {
+         "name": "depth",
+         "type": "Length",
+         "value": "5 mm",
+         "description": ""
+        },
+        {
+         "name": "width",
+         "type": "Length",
+         "value": "60 mm",
+         "description": ""
+        }
+       ]
+      }
+     ],
+     "insert_into_all": false,
+     "configuration_panel": false,
+     "help": false
+    },
+    "featurestudio": null
+   },
+   "t": 57872
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "type",
+    "text": "zzz"
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "zzz",
+     "selection": [
+      3,
+      3
+     ],
+     "all": false,
+     "dialog": "Insert Variable Studio"
+    },
+    "dialog": {
+     "title": null,
+     "kind": "feature",
+     "tabs": [
+      {
+       "label": "Current document",
+       "selected": true
+      },
+      {
+       "label": "Other documents",
+       "selected": false
+      }
+     ],
+     "fields": [
+      {
+       "label": "Search Variable Studios",
+       "kind": "string",
+       "text": "zzz"
+      }
+     ],
+     "error": null,
+     "ok": null,
+     "titleState": "ok"
+    },
+    "dialogs": [
+     {
+      "title": "Insert Variable Studio",
+      "titleState": "error",
+      "kind": "feature",
+      "tabs": [],
+      "fields": [
+       {
+        "label": "Standard",
+        "kind": "text",
+        "text": "",
+        "focused": false,
+        "state": "ok"
+       }
+      ],
+      "error": null,
+      "ok": "disabled"
+     }
+    ],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 2",
+       "kind": "variablestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": {
+     "tables": [
+      {
+       "title": "Variable Studio 2",
+       "collapsed": false,
+       "rows": [
+        {
+         "name": "depth",
+         "type": "Length",
+         "value": "5 mm",
+         "description": ""
+        },
+        {
+         "name": "width",
+         "type": "Length",
+         "value": "60 mm",
+         "description": ""
+        }
+       ]
+      }
+     ],
+     "insert_into_all": false,
+     "configuration_panel": false,
+     "help": false
+    },
+    "featurestudio": null
+   },
+   "t": 60477
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "cancel"
+    }
+   },
+   "ok": true,
+   "at": [
+    532,
+    93
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": null,
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 1",
+       "kind": "variablestudio",
+       "active": false
+      },
+      {
+       "name": "Variable Studio 2",
+       "kind": "variablestudio",
+       "active": true
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": {
+     "tables": [
+      {
+       "title": "Variable Studio 2",
+       "collapsed": false,
+       "rows": [
+        {
+         "name": "depth",
+         "type": "Length",
+         "value": "5 mm",
+         "description": ""
+        },
+        {
+         "name": "width",
+         "type": "Length",
+         "value": "60 mm",
+         "description": ""
+        }
+       ]
+      }
+     ],
+     "insert_into_all": false,
+     "configuration_panel": false,
+     "help": false
+    },
+    "featurestudio": null
+   },
+   "t": 64883
+  }
+ ]
+}
