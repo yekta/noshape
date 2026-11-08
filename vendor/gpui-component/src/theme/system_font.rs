@@ -22,7 +22,6 @@
 
 use gpui::{App, SharedString, font};
 
-use super::mono_font::installed_font_names;
 
 /// The virtual family GPUI resolves on every platform.
 const SYSTEM_UI_FONT: &str = ".SystemUIFont";
@@ -33,15 +32,14 @@ pub(super) fn resolve_default_font(cx: &mut App) {
     if cx.global::<super::Theme>().font_family != SYSTEM_UI_FONT {
         return;
     }
-    let installed = installed_font_names(cx);
-    if installed.is_empty() {
-        return;
-    }
     let text_system = cx.text_system();
     let resolved = text_system
         .get_font_for_id(text_system.resolve_font(&font(SYSTEM_UI_FONT)))
         .map(|font| font.family);
-    let Some(family) = substitute(SYSTEM_UI_FONT, resolved.as_deref(), installed) else {
+    // NOSHAPE PATCH (agent psui): the family GPUI loaded is installed; listing every family to check it took ~100 ms
+    // of a warm macOS launch (desktop only: no font-less web start).
+    let installed: Vec<String> = resolved.iter().map(|f| f.to_string()).collect();
+    let Some(family) = substitute(SYSTEM_UI_FONT, resolved.as_deref(), &installed) else {
         return;
     };
     tracing::info!("UI font {SYSTEM_UI_FONT:?} resolves to {family:?}, naming it on the theme.");

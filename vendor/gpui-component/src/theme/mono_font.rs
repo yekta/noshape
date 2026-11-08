@@ -50,7 +50,14 @@ fn installed_default_mono_font_family(cx: &App) -> SharedString {
     RESOLVED
         .get_or_init(|| {
             let default = default_mono_font_family();
-            let family = first_installed(&default, MONO_FONT_ALTERNATES, installed_font_names(cx));
+            // NOSHAPE PATCH (agent psui): only the candidates are looked up, not every installed family (listing
+            // them took ~100 ms of a warm macOS launch and several hundred of a cold one).
+            let installed: Vec<String> = std::iter::once(default.as_ref())
+                .chain(MONO_FONT_ALTERNATES.iter().copied())
+                .filter(|name| resolves_to_itself(cx, name))
+                .map(str::to_string)
+                .collect();
+            let family = first_installed(&default, MONO_FONT_ALTERNATES, &installed);
             if family != default {
                 tracing::warn!(
                     "Monospace font {default:?} is not installed, using {family:?} instead."
@@ -61,14 +68,12 @@ fn installed_default_mono_font_family(cx: &App) -> SharedString {
         .clone()
 }
 
-/// The families installed on the machine, listed once per process.
-///
-/// Enumerating fonts costs around a hundred milliseconds on macOS, and the
-/// answer only depends on the system fonts, which do not change while the
-/// process runs.
-pub(super) fn installed_font_names(cx: &App) -> &'static [String] {
-    static NAMES: OnceLock<Vec<String>> = OnceLock::new();
-    NAMES.get_or_init(|| cx.text_system().all_font_names())
+/// Whether `family` is installed: GPUI loads it rather than a fallback.
+pub(super) fn resolves_to_itself(cx: &App, family: &str) -> bool {
+    let text_system = cx.text_system();
+    text_system
+        .get_font_for_id(text_system.resolve_font(&gpui::font(family.to_string())))
+        .is_some_and(|font| font.family.as_ref() == family)
 }
 
 /// `default` when it is installed, else the first installed alternate, else
