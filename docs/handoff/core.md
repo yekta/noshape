@@ -33,6 +33,23 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 14:00 UTC: live's loft captures (2276, 2291) read.**
+- 2276 (loft Start Normal to profile, magnitude 1, current version): every row of (A) □20→□10, (D)/(I) parallel
+  circles offset, (G) a circle to a perpendicular circle fits 3k = 0.9 (c·n) + 0.1 |c| per pole row to 1e-4
+  (k the first step, c the row's chord): the old rule, per row. Landing (queued 13:4x): curved sections take it
+  per pole column (Greville points), straight-sided faces keep the corner rule (A exact); a natural loft that came
+  out inside out (G: -5300 mm³, every face facing in) is reversed. T1 kernel features::
+  a_circle_loft_normal_to_its_start_as_live (D, I to 1e-4; G 5847 vs 5939, -1.6 %: its pairing, not settled).
+- c2-impeller-loft's V255 loft fits 0.9 (c·n)²/|c| + 0.1 |c| instead (2228): with the per-column rule ours is +2.4 %
+  (263,136 vs 257,078; was -2.3 %). Asked live (REQUESTS 13:45) for a current-version copy of that loft: if it gives
+  ~263,100 the feature's asVersion decides the rule (then gate on it). Patch of the squared rule:
+  /root/core-scratch/features.cpp.loftrule.
+- 2291 (c2-hunting-knife's Loft 3 face): u (one cubic span) runs between the guides, v (26 C1 poles) from profile A to
+  B. Its cross-sections bulge up to ~10 % of their chord mid-span (profiles: A 1.6 %, B 0; end tangents 1-13° off
+  the chord, not a constant angle to either guide), so it isn't a Coons patch of the four curves (ours: Stretch
+  style, area -0.03 %, the blade's volume +2.9 %). Parasolid's guided-loft interpolation: needs its own live study
+  (simple cases: a straight profile pair with two curved guides, the sections' bulge vs the guides' curvature).
+
 **State 11-08 12:15 UTC: the unify scope from OCCT's history (lead: take it; heads-up in bool.md).**
 - Worktree (not landed): boolean.cpp `occt_unify_scope` (an OCCT result of a clean target gets a UnifyScope: the
   faces not the target's own, those across their edges and at their vertices); op_unify marks a whole unify's
