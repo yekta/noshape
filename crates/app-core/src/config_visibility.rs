@@ -962,8 +962,8 @@ impl VisibilityDialog {
 
 impl VisibilityDialog {
     /// The parity suite's state, as live's recorder reads the dialog (ui-parity config-input-menu-visibility-conditions:
-    /// its Save / Cancel are inputs, its undo / redo the buttons, the text the always visible inputs' names, then the
-    /// preview's).
+    /// its undo / redo, then Save / Cancel the buttons (run.py reads live's `<input type="button">` so), the text the
+    /// always visible inputs' names, then the preview's).
     fn ui_state(&self, always: &[usize]) -> serde_json::Value {
         let mut text: Vec<String> = always.iter().filter_map(|k| self.cfg.inputs.get(*k)).map(|i| i.name.clone()).collect();
         text.push("Configurations".into());
@@ -984,12 +984,8 @@ impl VisibilityDialog {
         serde_json::json!({
             "kind": "modal",
             "title": "Configuration visibility conditions",
-            "fields": [
-                { "label": "Show hidden inputs", "kind": "checkbox", "value": self.show_hidden },
-                { "label": null, "kind": "input", "value": "Save" },
-                { "label": null, "kind": "input", "value": "Cancel" },
-            ],
-            "buttons": ["icon:undo-button", "icon:redo-button"],
+            "fields": [{ "label": "Show hidden inputs", "kind": "checkbox", "value": self.show_hidden }],
+            "buttons": ["icon:undo-button", "icon:redo-button", "Save", "Cancel"],
             "text": text.join(" "),
         })
     }

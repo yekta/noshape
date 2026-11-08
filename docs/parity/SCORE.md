@@ -103,6 +103,13 @@ field's right-click focus, the server round trip after Suppress, "Unknown of" ch
 three sketch scenarios, SKETCH-MIRROR-LINE-SELECTED. Coverage: toolbar 76/76, sketch tools 55/55, menus 92/117,
 shortcuts 78/89 (batches 10-14 with live).
 
+psui 11-08 19:44: the Part Studio scenarios (538 with a live recording) on main 4cd99fe9 + my queued commits (vibe5):
+**518/538, 3096/3138 states**; since, plane-line-angle (the open dialog's info bubble no longer times out after 5 s:
+live keeps it 12 s through an edit) and config-input-menu-visibility-conditions (Save / Cancel read as buttons, as
+run.py now reads live's) match: 520/538. New left, live's side: config-variable-edit-definition (re-recorded from the
+Assembly tab), shortcut-shift-slash (an 11-04 recorder that read no modal), appearance-face-row-remove (asked again);
+sketch-dim-menu-unconfigure step 16 a toast's timeout (the runner doesn't wait live's seconds between steps).
+
 psui 11-08 10:05: the Part Studio scenarios (area psui, 530 with a live recording) on my tree at 09:28 (main 065c55f7's
 changes; vibe5, uip-psui.sh): **514/530 scenarios, 3040/3069 states** (11-08 01:08 on 11-07's binary: 493/530, 2994/3069).
 Since, config-depth-configure matches too (queued). Left, not ours: analysis-thickness ×3 (live's free account),

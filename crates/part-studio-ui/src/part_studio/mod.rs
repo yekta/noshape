@@ -6040,9 +6040,12 @@ impl PartStudioView {
             // set (live: message bubbles auto-dismiss after 5000 ms; qa5 C5 /
             // SM10); errors and warnings stay until closed, and so does the
             // Sketch dialog's "Select a sketch plane" until a plane is picked
-            // (live ui-parity sketch-*: still there steps later).
+            // (live ui-parity sketch-*: still there steps later), and the open
+            // dialog's own info for as long as it reports it (live
+            // plane-line-angle: 12 s, through an edit and its regeneration).
             let key = (st, msg.clone());
-            if st == FeatureStatus::Info && msg != NO_SKETCH_PLANE_BUBBLE && self.ui.message_timed.as_ref() != Some(&key) {
+            let dialogs = msg == NO_SKETCH_PLANE_BUBBLE || self.ui.dialog_info.as_ref() == Some(&msg);
+            if st == FeatureStatus::Info && !dialogs && self.ui.message_timed.as_ref() != Some(&key) {
                 self.ui.message_timed = Some(key.clone());
                 cx.spawn(async move |this, cx| {
                     cx.background_executor().timer(Duration::from_secs(5)).await;
