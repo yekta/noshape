@@ -1415,6 +1415,9 @@ struct LoftEnds
   int    end       = 0;
   double end_mag   = 0;
   gp_Vec end_dir;
+  // A loft made before Onshape's rule change (its FeatureScript version): the start step per pole column is
+  // (0.9 (c·n)² + 0.1 |c|²) / |c| (live 2228 / 2317: c2-impeller-loft's Loft Gehäuse at V255), not 0.9 (c·n) + 0.1 |c|.
+  bool squared_rule = false;
 };
 
 // Natural cubic spline through rows R[k] (each `dim` doubles) at parameters
@@ -1815,7 +1818,8 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
           // round it): 0.9 (c·n) + 0.1 |c| for the chord c between the sections' points at the pole's Greville
           // parameter (a rational circle's poles sit off it).
           const gp_Vec on(rows[a]->Value(greville(j)), rows[b]->Value(greville(j)));
-          v = nrm * (mag * (0.9 * std::abs(on.Dot(nrm)) + 0.1 * on.Magnitude()));
+          const double along = std::abs(on.Dot(nrm)), len = on.Magnitude();
+          v = nrm * (mag * (ends.squared_rule && len > 0 ? (0.9 * along * along + 0.1 * len * len) / len : 0.9 * along + 0.1 * len));
         }
         else if (kind == 1)
           v = nrm * (mag * (r0 + (r1 - r0) * step(j)));
@@ -3292,10 +3296,10 @@ OpOut op_loft(const OcShapeList& sections, bool solid, bool ruled, bool closed,
               int32_t path_count)
 {
   LoftEnds ends;
-  if (conditions.size() == 10)
+  if (conditions.size() >= 10)
   {
     const auto& c = conditions;
-    ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9])};
+    ends = {(int)c[0], c[1], gp_Vec(c[2], c[3], c[4]), (int)c[5], c[6], gp_Vec(c[7], c[8], c[9]), conditions.size() > 10 && c[10] != 0};
   }
   return loft_impl(sections, solid, ruled, closed, start_points, ends, true, path.shape, path_count);
 }

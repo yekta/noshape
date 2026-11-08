@@ -256,6 +256,10 @@ pub struct LoftOptions {
     /// Onshape's Path: the path and its section count (two profiles).
     #[serde(skip)]
     pub path: Option<(Shape, usize)>,
+    /// The start magnitude's rule before Onshape changed it (a feature at an older FeatureScript version): per pole
+    /// column, 3 × the first step = (0.9 (c·n)² + 0.1 |c|²) / |c| instead of 0.9 (c·n) + 0.1 |c|.
+    #[serde(default)]
+    pub squared_start_rule: bool,
 }
 
 /// A loft end condition (Onshape's start / end profile condition) with its
@@ -309,7 +313,7 @@ pub fn loft(sections: &[Shape], opts: &LoftOptions) -> Result<OpResult> {
         None => Vec::new(),
     };
     let l = vec_to_list(sections);
-    let conditions: Vec<f64> = opts.start.ffi().into_iter().chain(opts.end.ffi()).collect();
+    let conditions: Vec<f64> = opts.start.ffi().into_iter().chain(opts.end.ffi()).chain([if opts.squared_start_rule { 1.0 } else { 0.0 }]).collect();
     let (path, count) = match &opts.path {
         Some((p, n)) => (p.clone(), *n as i32),
         None => (Shape::default(), 0),

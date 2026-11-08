@@ -334,6 +334,37 @@ fn loft_connections_take_each_edges_parameter_as_std() {
     }
 }
 
+/// Live 2378: a Loft made before FeatureScript V414 takes its start step per pole column as (0.9 (c·n)² + 0.1 |c|²) /
+/// |c| (c2-impeller-loft's Loft Gehäuse: 257,007 mm³ through V413, 263,071 from V414); its asVersion says which. A
+/// circle lofted to a circle on a perpendicular plane (live 2276 (G)) shows it: V413's differs, V414's is today's.
+#[test]
+fn a_loft_takes_its_start_rule_from_its_version() {
+    let run = |version: &str| -> f64 {
+        let mut t = T::new();
+        let s1 = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.01));
+        let s2 = t.sketch(Reference::Plane(DatumPlane::Right), circle(DVec2::new(0.0, 0.015), 0.01));
+        let item = |r: Reference| {
+            let mut v = ParamValues::default();
+            v.set("sheetProfileEntities", q(vec![r]));
+            v
+        };
+        let (r1, r2) = (t.regions(s1)[0].clone(), t.regions(s2)[0].clone());
+        t.add(
+            "loft",
+            &[
+                ("sheetProfilesArray", ParamValue::Array(vec![item(r1), item(r2)])),
+                ("startCondition", en("NORMAL_TO_PROFILE")),
+                ("startMagnitude", e("1")),
+                ("asVersion", ParamValue::Text(version.into())),
+            ],
+        );
+        total_volume(&t.ok().context) * 1e9
+    };
+    let (today, v414, v413) = (run(""), run("V414_ASYMMETRIC_CHAMFER_MIRROR_BUG"), run("V413_SOMETHING"));
+    assert!((v414 - today).abs() < 1e-9 * today, "V414 {v414} vs today {today}");
+    assert!((v413 - today).abs() > 1e-3 * today, "V413 {v413} vs today {today}");
+}
+
 /// Live "psb (10-24) loft end derivative" and its follow-up: two-profile
 /// lofts from □20 on Top with end conditions (Normal: 3·ΔCP1 = m·(0.9 h +
 /// 0.1 chord) at each corner column, blended along each face).

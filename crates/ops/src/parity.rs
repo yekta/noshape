@@ -703,7 +703,8 @@ impl<'a> Translator<'a> {
         });
         for p in f["parameters"].as_array().into_iter().flatten() {
             let Some(id) = p["parameterId"].as_str() else { continue };
-            if INTERNAL.contains(&id) {
+            // (asVersion where noshape keeps it: the Loft, whose start rule changed between versions.)
+            if INTERNAL.contains(&id) && !(id == "asVersion" && known.iter().any(|n| n == id)) {
                 continue;
             }
             // Its "Custom" standard (std's tappedOrClearanceHoleTable): no

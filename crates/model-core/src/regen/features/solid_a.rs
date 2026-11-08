@@ -940,6 +940,7 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
     let (first, last) = (&sections[0], &sections[sections.len() - 1]);
     opts.start = loft_end(ev, vals, ["startCondition", "startMagnitude", "startDirection"], &first.shape, normal(first), "start")?;
     opts.end = loft_end(ev, vals, ["endCondition", "endMagnitude", "endDirection"], &last.shape, normal(last), "end")?;
+    opts.squared_start_rule = feature_version(ev.params.text("asVersion")).is_some_and(|v| v < LOFT_START_RULE_VERSION);
     // loft.fs Path (live "psb (10-24 f)"): the loft runs through Section
     // count sections taken along the path; it needn't touch the profiles.
     if ev.bool("addSections") && !ev.query("spine").is_empty() {
@@ -1416,6 +1417,17 @@ fn thicken_names(ev: &EvalCtx, inp: &ThickenInput, out: &Shape, tmax: f64) -> Ve
 }
 
 // ------------------------------------------------------------------ enclose
+
+/// The first FeatureScript version whose Loft takes its start magnitude per pole column as 0.9 (c·n) + 0.1 |c|: V414
+/// (live 2378's bisection of c2-impeller-loft's Loft Gehäuse over every version: 257,007 mm³ through V413, 263,071
+/// from V414; V255 had (0.9 (c·n)² + 0.1 |c|²) / |c|, live 2317).
+const LOFT_START_RULE_VERSION: u32 = 414;
+
+/// The version number of Onshape's asVersion text ("V255_HOLE_FEATURE_FIX_ERROR_DISPLAY": 255).
+fn feature_version(text: &str) -> Option<u32> {
+    let digits: String = text.strip_prefix('V')?.chars().take_while(char::is_ascii_digit).collect();
+    digits.parse().ok()
+}
 
 /// Whether `region` is `part`'s material: the same volume, and a point just inside it inside `part`.
 fn is_material_of(region: &Shape, part: &Shape) -> bool {

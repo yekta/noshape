@@ -266,6 +266,9 @@ pub fn loft() -> FeatureType {
     p.push(ParamSpec::bool("trimEnds", "Trim ends", true).visible(|v| v.is("bodyType", "THIN")));
     p.extend(merge_scope());
     p.push(hidden(ParamSpec::bool("makePeriodic", "Make periodic", false)));
+    // The FeatureScript version a loft was made at (Onshape's asVersion, "V255_..."; empty: today's): its start
+    // magnitude's rule changed between versions (live 2317).
+    p.push(hidden(ParamSpec::text("asVersion", "Version", "")));
     FeatureType::new("loft", "Loft", Category::Solid, p).describe("Create a solid or surface transitioning between profiles")
 }
 
