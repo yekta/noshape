@@ -500,6 +500,8 @@ fn entities(ctx: &mut Ctx, sketch: &str, ty: &str) -> Vec<Value> {
 
 fn new_sketch(ctx: &mut Ctx, file: &str, plane: &str) -> String {
     let path = scratch(file);
+    // document_create adds `.noshape`: a run whose process id an earlier one had would find its file.
+    let _ = std::fs::remove_file(format!("{}.noshape", path.display()));
     call(ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
     call(ctx, "sketch_create", json!({ "plane": plane }))["sketch"].as_str().unwrap().to_string()
 }
