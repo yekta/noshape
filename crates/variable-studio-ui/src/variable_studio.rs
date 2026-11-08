@@ -610,6 +610,13 @@ impl VariableStudioView {
             .bg(rgb(0xeeeeee))
             .border_t_1()
             .border_color(rgb(0xcccccc))
+            // Greyed, the checkbox takes no click, yet the press still takes the keyboard from a field (live
+            // vs-cfg-insert-all-disabled: focus none). Before the button: a disabled one stops the press.
+            .capture_any_mouse_down(cx.listener(|this, e: &MouseDownEvent, window, cx| {
+                if e.button == MouseButton::Left {
+                    window.focus(&this.focus, cx);
+                }
+            }))
             .child(
                 Button::new("vs-insert-all")
                     .map(|d| crate::ui_script::mark(d, || "checkbox:Insert into all Part Studios and Assemblies".into()))

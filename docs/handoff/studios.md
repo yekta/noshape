@@ -28,6 +28,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 20:38 UTC: the greyed "Insert into all" takes the keyboard (time-boxed item, ~10 min)
+- Cause: gpui-base's disabled Button stops the mouse-down from bubbling, so no parent listener ran. The footer takes
+  the press in the capture phase (`capture_any_mouse_down`) and focuses the studio; vs-cfg-insert-all-disabled now
+  matches. (Worth knowing elsewhere: a parent's `on_mouse_down` never sees a press on a disabled Button.)
+
 ### 2026-11-08 20:29 UTC: the Variable Studio's Value cell lists `#` variables (lead: move the autocomplete)
 - `var_complete` moved from part-studio-ui to app-core (noted in psui.md). A Value cell being edited lists the
   variables above its row with their values (no "New variable…", as tables), ↑/↓, Enter inserts and commits, Tab
