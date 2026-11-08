@@ -106,7 +106,7 @@ pub enum TabStatus {
     Differs,
     /// No differences (no dot).
     Same,
-    /// White, tab disabled: "Compare not supported for this tab." (drawings).
+    /// White, tab disabled: "Compare not supported for this tab." (drawings, assemblies).
     NotSupported,
     /// Red, tab disabled: "Tab only exists in 'Main'."
     OnlyInBase,

@@ -188,12 +188,13 @@ pub fn ops() -> Vec<Op> {
             group: "tab",
             verb: "move_to_document",
             summary: "Move tabs to a new or another document (Tab › Move to document…)",
-            description: "The tabs (or tab folders, with what they hold) go to a new document named `name` (\"Untitled document\" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.",
+            description: "The tabs (or tab folders, with what they hold), and the tabs they use unless `referenced` is false, go to a new document named `name` (\"Untitled document\" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.",
             fields: vec![
                 doc_field(),
                 req("tabs", json!({ "type": "array", "items": { "type": "string" } }), "Tabs or folders (names or ids) to move."),
                 opt("name", s(), "The new document's name (default \"Untitled document\")."),
                 opt("document", s(), "An existing document's path to move them into instead (Other documents)."),
+                opt("referenced", json!({ "type": "boolean", "default": true }), "Move all referenced tabs: the tabs the moved ones use (a Part Studio's Variable Studio) go too."),
             ],
             mutates: true,
             destructive: true,
@@ -295,12 +296,17 @@ fn tab_move_to_document(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         let Some(k) = k.as_str() else { return Err(OpError::param("tabs", "tab names or ids (strings)")) };
         ids.push(find_tab_or_folder(od.doc(), k, "tabs")?);
     }
+    if a.bool_or("referenced", true)? {
+        ids.extend(crate::tab_move::referenced(od.doc(), &ids));
+    }
+    let names: Vec<String> = ids.iter().filter_map(|t| od.doc().tab(*t).map(|x| x.name.clone()).or_else(|| od.doc().folder(*t).map(|f| f.name.clone()))).collect();
     let dest = match &target {
         Some(t) => crate::tab_move::Destination::Existing(t),
         None => crate::tab_move::Destination::New(&name),
     };
     let path = crate::tab_move::move_tabs(&mut od.session, &ids, dest).map_err(|e| OpError::invalid(format!("{e:#}")).with_param(if target.is_some() { "document" } else { "tabs" }))?;
-    Ok(json!({ "moved": keys, "document": path.display().to_string(), "tabs": describe(od)["tabs"] }).into())
+    let to = noshape_store::Document::open_read_only(&path).ok().and_then(|d| d.meta().ok()).map(|m| m.name).unwrap_or_else(|| name.clone());
+    Ok(json!({ "moved": names, "document": path.display().to_string(), "message": crate::tab_move::moved_message(&names, &to), "tabs": describe(od)["tabs"] }).into())
 }
 
 fn tab_folder_unpack(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

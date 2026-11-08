@@ -4104,6 +4104,18 @@ fn tab_move_to_document() {
     assert_eq!(names(&n), ["Variable Studio 1"], "{n}");
     assert_eq!(n["name"], "move-new", "{n}");
     let _ = std::fs::remove_file(&new);
+    // A Part Studio's referenced tabs (its Variable Studio) go with it (live 2323), unless `referenced` is false.
+    let refs = scratch("move-refs.noshape");
+    call(&mut ctx, "document_create", json!({ "path": refs.to_str().unwrap() }));
+    call(&mut ctx, "variable_create_studio", json!({}));
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Part Studio 2" }));
+    let r = call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Part Studio 2"], "name": "move-refs-to", "referenced": false }));
+    assert_eq!(r["moved"], json!(["Part Studio 2"]), "{r}");
+    let _ = std::fs::remove_file(r["document"].as_str().unwrap());
+    call(&mut ctx, "tab_create", json!({ "kind": "partstudio", "name": "Part Studio 2" }));
+    let r = call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Part Studio 2"], "name": "move-refs-to" }));
+    assert_eq!((r["moved"].clone(), r["message"].as_str()), (json!(["Part Studio 2", "Variable Studio 1"]), Some("Part Studio 2, Variable Studio 1 have been moved to move-refs-to.")), "{r}");
+    let _ = std::fs::remove_file(r["document"].as_str().unwrap());
 }
 
 /// The documents page through its ops: folders, labels, rename, move, copy, details and the trash, each as the page

@@ -673,7 +673,7 @@ Examples:
 
 Move tabs to a new or another document (Tab › Move to document…) (edits the document (one undoable history entry); deletes or overwrites).
 
-The tabs (or tab folders, with what they hold) go to a new document named `name` ("Untitled document" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.
+The tabs (or tab folders, with what they hold), and the tabs they use unless `referenced` is false, go to a new document named `name` ("Untitled document" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.
 
 Examples:
 
@@ -688,6 +688,7 @@ Examples:
 | `tabs` | array of string | required | Tabs or folders (names or ids) to move. |
 | `name` | string |  | The new document's name (default "Untitled document"). |
 | `document` | string |  | An existing document's path to move them into instead (Other documents). |
+| `referenced` | boolean |  | Move all referenced tabs: the tabs the moved ones use (a Part Studio's Variable Studio) go too. |
 
 #### tab_folder_unpack
 

@@ -737,19 +737,25 @@ fn element_code(name: &str, content: &TabContent) -> String {
 /// selected) | Other documents (pick one), the tabs being moved, [Move] [Cancel]. The tabs go to the other document
 /// and are deleted here (op `tab_move_to_document`).
 pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document::TabId>, window: &mut Window, cx: &mut App) {
-    #[derive(Default)]
     struct State {
         other: bool,
         picked: Option<std::path::PathBuf>,
+        /// "Move all referenced tabs" (on) and its Show details list (off).
+        all_refs: bool,
+        details: bool,
     }
     let path = doc.read(cx).session.path.clone();
     let docs = crate::doc_files::other_documents(&path);
-    let state = Rc::new(std::cell::RefCell::new(State::default()));
+    let state = Rc::new(std::cell::RefCell::new(State { other: false, picked: None, all_refs: true, details: false }));
     let name_st = cx.new(|cx| InputState::new(window, cx).default_value("Untitled document"));
     let focus = name_st.clone();
-    let names: Vec<String> = {
+    // Live 2323: the tabs these use go along ("Move all referenced tabs"); moving a tab others use says so.
+    let (names, refs, ref_names, used_elsewhere) = {
         let d = &doc.read(cx).session.doc;
-        tabs.iter().filter_map(|t| d.tab(*t).map(|x| x.name.clone()).or_else(|| d.folder(*t).map(|f| f.name.clone()))).collect()
+        let name_of = |t: &noshape_model::document::TabId| d.tab(*t).map(|x| x.name.clone()).or_else(|| d.folder(*t).map(|f| f.name.clone()));
+        let refs = noshape_ops::tab_move::referenced(d, &tabs);
+        let ref_names: Vec<String> = refs.iter().filter_map(name_of).collect();
+        (tabs.iter().filter_map(name_of).collect::<Vec<String>>(), refs, ref_names, noshape_ops::tab_move::used_elsewhere(d, &tabs))
     };
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
@@ -805,22 +811,76 @@ pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document
             1 => "1 tab selected".to_string(),
             n => format!("{n} tabs selected"),
         };
+        let (all_refs, details) = {
+            let s = state.borrow();
+            (s.all_refs, s.details)
+        };
         let moved = v_flex().pt(px(8.)).gap(px(2.)).child(div().text_size(px(13.)).text_color(pal.text_muted).child(count)).children(names.iter().map(|n| div().pl(px(8.)).text_size(px(14.)).child(crate::ui::user_text(n.clone()))));
-        let (doc, tabs, n, st) = (doc.clone(), tabs.clone(), name_st.clone(), state.clone());
+        let references: Option<AnyElement> = if !ref_names.is_empty() {
+            let n = ref_names.len();
+            let line = if n == 1 { "1 referenced tab will be moved".to_string() } else { format!("{n} referenced tabs will be moved") };
+            let (st_d, st_c) = (state.clone(), state.clone());
+            Some(
+                v_flex()
+                    .pt(px(8.))
+                    .gap(px(2.))
+                    .child(
+                        h_flex()
+                            .gap(px(6.))
+                            .text_size(px(13.))
+                            .child(div().text_color(pal.text_muted).child(line))
+                            .child(
+                                div()
+                                    .id("mtd-details")
+                                    .cursor_pointer()
+                                    .text_color(pal.accent)
+                                    .child(if details { "Hide details" } else { "Show details" })
+                                    .map(|d| noshape_app_core::ui_script::mark(d, || if details { "button:Hide details".into() } else { "button:Show details".into() }))
+                                    .on_click(move |_, window, _| {
+                                        let d = st_d.borrow().details;
+                                        st_d.borrow_mut().details = !d;
+                                        window.refresh();
+                                    }),
+                            ),
+                    )
+                    .when(details, |d| d.children(ref_names.iter().map(|n| div().pl(px(8.)).text_size(px(14.)).child(crate::ui::user_text(n.clone())))))
+                    .child(os::checkbox("mtd-all-refs", "Move all referenced tabs", all_refs).on_click(move |_, window, _| {
+                        let on = st_c.borrow().all_refs;
+                        st_c.borrow_mut().all_refs = !on;
+                        window.refresh();
+                    }))
+                    .into_any_element(),
+            )
+        } else if used_elsewhere {
+            Some(os::info_box("One or more tabs being moved contain workspace references. All referenced tabs will be moved as part of this operation.").mt(px(8.)).into_any_element())
+        } else {
+            None
+        };
+        let (doc, tabs, n, st, refs) = (doc.clone(), tabs.clone(), name_st.clone(), state.clone(), refs.clone());
         os::modal(dialog, "Move to document", 460.)
             .child(
                 os::modal_body()
                     .child(h_flex().border_b_1().border_color(rgb(0xeeeeee)).child(tab("mtd-new", "New document", !other, false)).child(tab("mtd-other", "Other documents", other, true)))
                     .when(!other, |d| d.child(os::field_label("Document name")).child(os::input_h(os::modal_input(Some("Document name"), &name_st, cx), 32.).text_size(px(14.))))
                     .when(other, |d| d.child(v_flex().id("mtd-rows").max_h(px(300.)).overflow_y_scroll().children(rows)))
-                    .child(moved),
+                    .child(moved)
+                    // (Noted here: the block was built before the modal.)
+                    .when(!ref_names.is_empty(), |d| {
+                        noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": "Move all referenced tabs", "kind": "checkbox", "value": all_refs }));
+                        d
+                    })
+                    .children(references),
             )
             .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
             .on_ok(move |_, _, cx| {
-                let (to_other, picked) = {
+                let (to_other, picked, all_refs) = {
                     let s = st.borrow();
-                    (s.other, s.picked.clone())
+                    (s.other, s.picked.clone(), s.all_refs)
                 };
+                let mut tabs = tabs.clone();
+                if all_refs {
+                    tabs.extend(refs.iter().copied());
+                }
                 let name = n.read(cx).value().trim().to_string();
                 let r = match (to_other, picked) {
                     (true, None) => return false,
@@ -845,8 +905,12 @@ fn move_out(doc: &Entity<DocModel>, tabs: &[noshape_model::document::TabId], des
         let s = &doc.read(cx).session;
         (s.doc.clone(), s.path.clone())
     };
-    noshape_ops::tab_move::copy_out(&src, &path, tabs, dest)?;
+    let to = noshape_ops::tab_move::copy_out(&src, &path, tabs, dest)?;
     let what = noshape_ops::tab_move::description(&src, tabs);
     doc.update(cx, |d, cx| d.edit_document_not_undoable(&what, cx, |document| noshape_ops::tab_move::remove(document, tabs)));
+    // Live 2323: the document stays open, a bubble names what went where.
+    let names: Vec<String> = tabs.iter().filter_map(|t| src.tab(*t).map(|x| x.name.clone()).or_else(|| src.folder(*t).map(|f| f.name.clone()))).collect();
+    let to_name = noshape_store::Document::open_read_only(&to).ok().and_then(|d| d.meta().ok()).map(|m| m.name).unwrap_or_default();
+    doc.update(cx, |_, cx| cx.emit(DocEvent::Info(noshape_ops::tab_move::moved_message(&names, &to_name))));
     Ok(())
 }

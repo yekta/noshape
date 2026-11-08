@@ -1201,6 +1201,8 @@ impl FeatureStudioView {
             }
             m
         });
+        // A toolbar dropdown: Escape leaves it open (live fs-monitor-menu).
+        crate::os_menu::mark_page_dropdown(&menu, cx);
         crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
     }
 
@@ -1240,6 +1242,10 @@ impl FeatureStudioView {
                     .when(clean, |b| b.opacity(0.5))
                     .map(|d| crate::ui_script::mark(d, || "caret:Commit Feature Studio".into()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        // Live fs-commit-menu: with nothing to commit the ▾ is disabled, no menu.
+                        if clean {
+                            return;
+                        }
                         let b = anchor.get();
                         this.open_commit_menu(point(b.left(), b.bottom() + px(2.)), window, cx);
                     })),

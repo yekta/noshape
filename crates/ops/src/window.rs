@@ -332,7 +332,8 @@ impl TabCompare {
 pub fn tab_compare(base: &Document, target: &Document, tab: TabId) -> Option<TabCompare> {
     let b = base.tab(tab)?;
     let Some(t) = target.tab(tab) else { return Some(TabCompare::OnlyInBase) };
-    if matches!(b.content, TabContent::Drawing(_)) {
+    // Live 2323: an Assembly tab is greyed and disabled too ("Compare not supported for this tab.").
+    if matches!(b.content, TabContent::Drawing(_) | TabContent::Assembly(_)) {
         return Some(TabCompare::NotSupported);
     }
     let same = b.name == t.name && serde_json::to_value(&b.content).ok() == serde_json::to_value(&t.content).ok();

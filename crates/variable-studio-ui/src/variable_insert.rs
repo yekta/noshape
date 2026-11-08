@@ -37,9 +37,17 @@ pub fn set_ref(doc: &Entity<DocModel>, target: InsertTarget, studio: TabId, r: O
     });
 }
 
+/// Other documents' places (live 2323: Recent, then the documents page's). Shared with me and Public are cloud
+/// places: they list nothing here.
+const PLACES: [&str; 6] = ["Recent", "Owned by me", "Recently opened", "Created by me", "Shared with me", "Public"];
+
 /// Dialog state kept across re-renders.
 #[derive(Default)]
 struct DialogState {
+    /// Other documents: the place picked (`PLACES`), None: the list of places.
+    place: Option<usize>,
+    /// Edit reference…: "Update Variable Studio" (live 2323), Undo held while it's open.
+    update: bool,
     /// Studios folded with their caret (live: they open expanded).
     collapsed: HashSet<(Option<std::path::PathBuf>, TabId)>,
     other: bool,
@@ -421,8 +429,27 @@ fn host_studios(doc: &noshape_model::Document, target: InsertTarget) -> (TabId, 
     (host, refs.iter().filter(|r| r.external.is_none()).map(|r| r.studio).collect())
 }
 
-fn end_preview() {
+fn end_preview(doc: &Entity<DocModel>, cx: &mut App) {
     PREVIEW.with(|p| p.borrow_mut().take());
+    doc.update(cx, |d, cx| {
+        d.undo_held = false;
+        cx.notify();
+    });
+}
+
+/// Edit reference… on `studio`'s table in `target`: the dialog as "Update Variable Studio", the studio's table a
+/// preview until ✓, Undo held while it's open (live 2323, vs-inserted-edit-reference).
+pub fn open_update(doc: Entity<DocModel>, target: InsertTarget, studio: TabId, window: &mut Window, cx: &mut App) {
+    open_with(doc.clone(), target, DialogState { update: true, ..Default::default() }, window, cx);
+    PREVIEW.with(|p| {
+        if let Some((_, before)) = p.borrow_mut().as_mut() {
+            before.retain(|s| *s != studio);
+        }
+    });
+    doc.update(cx, |d, cx| {
+        d.undo_held = true;
+        cx.notify();
+    });
 }
 
 /// Open the dialog for `target`.
@@ -445,12 +472,32 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             }
         })
         .detach();
+    // Other documents' "Search or paste URL" (a document's path picks it).
+    let url = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).select_on_focus(false).placeholder("Search or paste URL"));
+    let st_url = state.clone();
+    window
+        .subscribe(&url, cx, move |st, ev: &gpui_kit::component::input::InputEvent, window, cx| match ev {
+            gpui_kit::component::input::InputEvent::Change => window.refresh(),
+            gpui_kit::component::input::InputEvent::PressEnter { .. } => {
+                let path = std::path::PathBuf::from(st.read(cx).value().trim().trim_start_matches("file://"));
+                if path.extension().is_some_and(|e| e == "noshape") && path.exists() {
+                    let mut s = st_url.borrow_mut();
+                    s.document = Some(path);
+                    s.version = None;
+                    s.error = None;
+                    window.refresh();
+                }
+            }
+            _ => {}
+        })
+        .detach();
     let (doc_c, before_c) = (doc.clone(), before.clone());
     // Live (part-studio/158, document/47, dom/dialog-insert-variable-studio):
     // the same 300 px feature-style dialog at the top left, from a Part
     // Studio, an Assembly or a Variable Studio; not modal.
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
+        let title = if state.borrow().update { "Update Variable Studio" } else { "Insert Variable Studio" };
         let (current, path, doc_name, branch) = {
             let d = doc.read(cx);
             let s = &d.session;
@@ -498,11 +545,63 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             }
         } else {
             let chosen = state.borrow().document.clone();
+            let url_q = url.read(cx).value().trim().to_lowercase();
+            let place = state.borrow().place;
             match chosen {
+                None if place.is_none() && url_q.is_empty() => {
+                    for (k, label) in PLACES.iter().enumerate() {
+                        let st = state.clone();
+                        rows.push(
+                            h_flex()
+                                .id(("ivs-place", k))
+                                .h(px(32.))
+                                .px(px(10.))
+                                .gap(px(8.))
+                                .text_size(px(14.))
+                                .cursor_pointer()
+                                .hover(|d| d.bg(rgb(0xdef1fb)))
+                                .child(os::glyph(if k == 0 { os::GLYPH_DOCUMENT } else { os::GLYPH_FOLDER }, 18., pal.text_muted))
+                                .child(div().flex_1().truncate().child(*label))
+                                .map(|d| crate::ui_script::mark(d, move || format!("panel_row:{label}")))
+                                .on_click(move |_, window, _| {
+                                    st.borrow_mut().place = Some(k);
+                                    window.refresh();
+                                })
+                                .into_any_element(),
+                        );
+                    }
+                }
                 None => {
-                    let docs = crate::doc_files::other_documents(&path);
+                    // A place's documents, or the search's (all of them).
+                    let me = crate::doc_files::canonical(&path);
+                    let docs: Vec<std::path::PathBuf> = match place {
+                        Some(0 | 2) => crate::doc_files::recent().into_iter().filter(|d| crate::doc_files::canonical(d) != me).collect(),
+                        Some(4 | 5) => Vec::new(),
+                        _ => crate::doc_files::other_documents(&path),
+                    };
+                    let name_of = |d: &std::path::Path| crate::derived::external_doc_info(d).map(|i| i.name).unwrap_or_else(|_| d.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
+                    let docs: Vec<std::path::PathBuf> = docs.into_iter().filter(|d| url_q.is_empty() || name_of(d).to_lowercase().contains(&url_q)).collect();
+                    let back = place.map(|k| PLACES[k].to_string()).unwrap_or_else(|| format!("Results for \"{url_q}\""));
+                    let st = state.clone();
+                    rows.push(
+                        h_flex()
+                            .id("ivs-place-back")
+                            .h(px(32.))
+                            .px(px(6.))
+                            .gap(px(4.))
+                            .text_size(px(14.))
+                            .font_weight(FontWeight::MEDIUM)
+                            .cursor_pointer()
+                            .child(os::glyph(os::GLYPH_BACK, 16., pal.text))
+                            .child(back)
+                            .on_click(move |_, window, _| {
+                                st.borrow_mut().place = None;
+                                window.refresh();
+                            })
+                            .into_any_element(),
+                    );
                     if docs.is_empty() {
-                        rows.push(os::info_box("No other documents.").m(px(10.)).into_any_element());
+                        rows.push(os::info_box("No documents.").m(px(10.)).into_any_element());
                     }
                     for (k, d) in docs.into_iter().enumerate() {
                         let name = crate::derived::external_doc_info(&d).map(|i| i.name).unwrap_or_else(|_| d.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default());
@@ -662,8 +761,8 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .text_size(px(13.))
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(if changed { pal.text } else { rgb(0xaa252d) })
-                    .when(!changed, |d| d.tooltip(crate::ui::tooltip("Insert Variable Studio did not regenerate properly: Error regenerating.")))
-                    .child("Insert Variable Studio"),
+                    .when(!changed, |d| d.tooltip(crate::ui::tooltip(format!("{title} did not regenerate properly: Error regenerating."))))
+                    .child(title),
             )
             .child(
                 div()
@@ -677,7 +776,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .on_click(move |_, window, cx| {
                         let _ = (&doc_ok, &st_ok);
                         if changed {
-                            end_preview();
+                            end_preview(&doc_ok, cx);
                             window.close_dialog(cx);
                             window.refresh();
                         }
@@ -693,7 +792,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .justify_center()
                     .child(crate::assets::icon("dialog-cancel", 24., cx))
                     .on_click(move |_, window, cx| {
-                        end_preview();
+                        end_preview(&doc_x, cx);
                         if let Some(b) = before_x.clone() {
                             restore(&doc_x, target, b, undo_mark, cx);
                         }
@@ -710,14 +809,24 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 .bg(crate::theme::p().panel)
                 .child(gpui_kit::component::input::Input::new(&search).appearance(false).text_size(px(13.33)).pl(px(5.))),
         );
+        let url_row = div().flex_none().py(px(6.)).px(px(6.)).map(|d| crate::ui_script::mark(d, || "field:Search or paste URL".into())).child(
+            h_flex()
+                .h(px(30.))
+                .rounded(px(3.))
+                .border_1()
+                .border_color(rgb(0xaaaaaa))
+                .bg(crate::theme::p().panel)
+                .child(gpui_kit::component::input::Input::new(&url).appearance(false).text_size(px(13.33)).pl(px(5.)))
+                .child(div().px(px(6.)).child(os::glyph(os::GLYPH_SEARCH, 14., crate::theme::p().text_muted))),
+        );
         let (doc_e, before_e) = (doc_c.clone(), before_c.clone());
         // The studios' rows (noted as they were built) after the search box, as `state.dialog`.
         crate::ui_script::note_dialog(|| {
-            let mut fields = vec![serde_json::json!({ "label": "Search Variable Studios", "kind": "string", "text": search.read(cx).value().to_string() })];
+            let mut fields = vec![if other { serde_json::json!({ "label": "Search or paste URL", "kind": "string", "text": url.read(cx).value().to_string() }) } else { serde_json::json!({ "label": "Search Variable Studios", "kind": "string", "text": search.read(cx).value().to_string() }) }];
             fields.extend(crate::ui_script::take_fields());
             let tabs = serde_json::json!([{ "label": "Current document", "selected": !other }, { "label": "Other documents", "selected": other }]);
             let title_state = if changed { "ok" } else { "error" };
-            serde_json::json!({ "title": "Insert Variable Studio", "titleState": title_state, "ok": "enabled", "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
+            serde_json::json!({ "title": title, "titleState": title_state, "ok": "enabled", "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
         });
         dialog
             .w(px(300.))
@@ -732,7 +841,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             .bg(gpui_kit::rgba(0xfffffff2))
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .on_cancel(move |_, _, cx| {
-                end_preview();
+                end_preview(&doc_e, cx);
                 if let Some(b) = before_e.clone() {
                     restore(&doc_e, target, b, undo_mark, cx);
                 }
@@ -744,6 +853,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .child(header)
                     .child(h_flex().flex_none().border_b_1().border_color(rgb(0xeeeeee)).child(tab("ivs-current", "Current document", !other, state.clone())).child(tab("ivs-other", "Other documents", other, state.clone())))
                     .when(!other, |d| d.child(document_row).child(search_row))
+                    .when(other && state.borrow().document.is_none(), |d| d.child(url_row))
                     .child(v_flex().id("ivs-rows").flex_1().min_h_0().overflow_y_scroll().pt(px(1.)).children(rows))
                     // Live: a 22 px footer under a #eaeaea rule with the ? at the right.
                     .child(

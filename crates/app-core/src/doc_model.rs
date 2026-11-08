@@ -44,6 +44,9 @@ pub struct DocModel {
     /// The open window's state (tab shown, cameras, selection), read by the
     /// live-mode server before each agent call (set by the workspace).
     pub window_snapshot: Option<WindowSnapshotFn>,
+    /// Undo and Redo are off while a dialog edits something already there (live 2323: Undo greyed while Update
+    /// Variable Studio is open).
+    pub undo_held: bool,
 }
 
 /// What the window shows, read on demand outside the document's update (see
@@ -90,7 +93,7 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false }
     }
 
     /// Provider giving Derived features access to the other Part Studios.
@@ -216,12 +219,12 @@ impl DocModel {
 
     /// Undo is possible (a pending edit counts: Undo commits then reverts it).
     pub fn can_undo(&self) -> bool {
-        self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo()
+        !self.undo_held && (self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo())
     }
 
     /// Redo is possible (not over a pending edit, whose commit clears it).
     pub fn can_redo(&self) -> bool {
-        self.pending.0.is_none() && (self.client_step_here(true) || self.session.can_redo())
+        !self.undo_held && self.pending.0.is_none() && (self.client_step_here(true) || self.session.can_redo())
     }
 
     /// Push a client-only undo step over the last commit (see
@@ -276,6 +279,9 @@ impl DocModel {
     }
 
     pub fn undo(&mut self, cx: &mut Context<Self>) {
+        if self.undo_held {
+            return;
+        }
         self.flush_pending(cx);
         if self.client_step_here(false) {
             let redo_top = self.session.undo_tops().1;
@@ -294,6 +300,9 @@ impl DocModel {
     }
 
     pub fn redo(&mut self, cx: &mut Context<Self>) {
+        if self.undo_held {
+            return;
+        }
         self.flush_pending(cx);
         if self.client_step_here(true) {
             if let Some(c) = &mut self.client_step {

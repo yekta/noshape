@@ -1040,7 +1040,7 @@ impl Render for VariableStudioView {
                                         let m = if k > 0 { m.item(item("Move up").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d1, target, me, false, cx))) } else { m };
                                         let m = if k + 1 < n { m.item(item("Move down").on_click(move |_, _, cx| crate::variable_insert::move_ref(&d2, target, me, true, cx))) } else { m };
                                         m.item(collapse)
-                                            .item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open(d4.clone(), target, window, cx)))
+                                            .item(item("Edit reference…").on_click(move |_, window, cx| crate::variable_insert::open_update(d4.clone(), target, me, window, cx)))
                                             .item(item("Remove reference").on_click(move |_, _, cx| crate::variable_insert::set_ref(&d3, target, me, None, cx)))
                                     }
                                     // Own table: only with inserted tables to collapse

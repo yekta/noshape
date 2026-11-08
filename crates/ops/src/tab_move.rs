@@ -15,6 +15,24 @@ pub enum Destination<'a> {
     Existing(&'a Path),
 }
 
+/// The tabs `tabs` reference (live 2323: the Variable Studio a moved Part Studio uses), the moved ones aside, in tab
+/// order: Move to document… moves them along ("Move all referenced tabs").
+pub fn referenced(doc: &Document, tabs: &[TabId]) -> Vec<TabId> {
+    doc.ordered_tabs().into_iter().map(|t| t.id).filter(|x| !tabs.contains(x) && doc.tab_users(*x).iter().any(|u| tabs.contains(u))).collect()
+}
+
+/// Whether another tab uses one of `tabs` (live 2323: moving a Variable Studio the Part Studios use shows "One or more
+/// tabs being moved contain workspace references. …").
+pub fn used_elsewhere(doc: &Document, tabs: &[TabId]) -> bool {
+    tabs.iter().any(|t| doc.tab_users(*t).iter().any(|u| !tabs.contains(u)))
+}
+
+/// Live's bubble after the move: "Part Studio 2, Variable Studio 1 have been moved to move 2323."
+pub fn moved_message(names: &[String], to: &str) -> String {
+    let verb = if names.len() == 1 { "has" } else { "have" };
+    format!("{} {verb} been moved to {to}.", names.join(", "))
+}
+
 /// The new document's file: `<name>.noshape` in `dir`, `<name> (2)` and on when taken.
 pub fn new_document_file(dir: &Path, name: &str) -> PathBuf {
     (1..)

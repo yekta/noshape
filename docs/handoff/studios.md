@@ -28,6 +28,22 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 15:12 UTC: live's answers to 2323 applied
+- Compare: an Assembly tab is greyed and disabled ("Compare not supported for this tab.", ops `tab_compare` too):
+  ver-compare-assembly matches.
+- Edit reference… opens "Update Variable Studio": the edited studio's table a preview, Undo and Redo held while it's
+  open (`DocModel::undo_held`, `variable_insert::open_update`): vs-inserted-edit-reference matches.
+- Move to document…: the tabs the moved ones use (`tab_move::referenced`: a Part Studio's Variable Studio) as
+  "N referenced tab(s) will be moved", Show details / Hide details, ☑ Move all referenced tabs; a moved tab others
+  use shows live's info box; after the move the bubble "Part Studio 2, Variable Studio 1 have been moved to …"
+  (op `tab_move_to_document` `referenced`, `message`). Not done: the bubble's "Open in new tab" link (the toast has
+  no action; each studio shows its own messages), live's ~6 s "Moving 2 tabs to …" (server time).
+- Feature Studio: Commit ▾ opens nothing with nothing to commit; Monitor ▾ is a page dropdown (Escape leaves it open):
+  fs-commit-menu, fs-monitor-menu, fs-monitor-part-studio match.
+- Insert Variable Studio › Other documents as live's: "Search or paste URL" (a path picks that document), the places
+  Recent, Owned by me, Recently opened, Created by me, Shared with me, Public (the last two cloud: empty), a place's
+  documents with ‹ back. Not drawn: live's filter funnel before the box.
+
 ### 2026-11-08 14:55 UTC: Feature Studio undo as live's
 - Ctrl+Z / Ctrl+Y in the code are the document's Undo / Redo (the editor's own history isn't used; what's typed is
   saved first), as are the toolbar's buttons (they save on press); after either the caret sits at the end of what
