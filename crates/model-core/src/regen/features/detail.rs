@@ -1342,12 +1342,22 @@ fn coaxial_round_tool(faces: &[Shape], cyl: k::Plane, rc: f64, sides: [DVec3; 2]
     let [z1, z2] = sides.map(|s| (s - cyl.origin).dot(cyl.normal));
     let (lo, hi) = (z1.min(z2), z1.max(z2));
     let margin = r * 1e-3;
-    let at = |z: f64| k::Plane::new(cyl.origin + cyl.normal * z, cyl.normal, cyl.x_dir);
-    let (inner, outer) = if bore { (rc - margin, core) } else { (core, rc + margin) };
-    let h = hi - lo + 2.0 * margin;
-    let ring = k::cut(&k::make_cylinder(&at(lo - margin), outer, h, std::f64::consts::TAU).ok()?, &k::make_cylinder(&at(lo - 2.0 * margin), inner, h + 2.0 * margin, std::f64::consts::TAU).ok()?).ok()?.shape;
-    let torus = k::make_torus(&at(0.5 * (lo + hi)), core, r, std::f64::consts::TAU).ok()?;
-    k::cut(&ring, &torus).ok().map(|o| o.shape)
+    // One revolve of its meridian section (the ring's rectangle less the torus' half disc), no Booleans (motor-mount-
+    // jack's Fillet 2: two of its three Booleans).
+    let at = |rho: f64, z: f64| cyl.origin + cyl.x_dir * rho + cyl.normal * z;
+    let mid = 0.5 * (lo + hi);
+    let (rect, bulge) = if bore { (rc - margin, core - r) } else { (rc + margin, core + r) };
+    let wire = k::make_wire(&[
+        k::make_line(at(rect, lo - margin), at(core, lo - margin)).ok()?,
+        k::make_line(at(core, lo - margin), at(core, lo)).ok()?,
+        k::make_arc_3pts(at(core, lo), at(bulge, mid), at(core, hi)).ok()?,
+        k::make_line(at(core, hi), at(core, hi + margin)).ok()?,
+        k::make_line(at(core, hi + margin), at(rect, hi + margin)).ok()?,
+        k::make_line(at(rect, hi + margin), at(rect, lo - margin)).ok()?,
+    ])
+    .ok()?;
+    let profile = k::make_face_from_wire(&wire, true).ok()?;
+    k::revolve(&profile, cyl.origin, cyl.normal, std::f64::consts::TAU).ok().map(|o| o.shape)
 }
 
 #[cfg(test)]
