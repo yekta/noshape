@@ -46,7 +46,10 @@ What blend takes over:
 - Impeller: per-face arc-length rows (TMP_ARC_ROWS) move away from live at both rules (today 263,385 vs ours 263,136,
   live 263,076; V255 257,467 vs 257,273, live 257,078) and break the face merge; live itself changes 0.03 % at V386.
   Not pursued.
-- Live 2380 (knife guided-loft cases 12-14) answered 20:4x: not read yet.
+- Live 2380 (cases 12-14): (12) two-arc guides and (13) line + tangent arc guides match ours; (14) a fit-spline profile
+  is kept in its own parameter (live's face: one cubic, the line's poles at the spline's Greville x): queued 22:28
+  (loft_guided.cpp chain_bspline: polynomial splines stretched, conics by arc length; T1 a_guided_surface_loft_as_live
+  case "a spline profile"). Knife Loft 3 5137 -> 5116 (live 4987): still off; suite unchanged (75/87, 760/951).
 
 **State 11-08 21:08 UTC: NEXT (lead 21:1x, in order): (1) c2-fan-blade-sweep's source studio fb207f79 at Extrude 7
 (feature 15): ours 10 faces, live 11 (one edge short), blocks Derived 1 and 53 features (blend's note with b3f3df84e);
