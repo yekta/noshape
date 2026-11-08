@@ -882,6 +882,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P2 BAD-FACE-DISPLAY-60S (core 2026-11-08, found while fixing c2-hunting-knife's Loft 3; owner to route: the
+  display / meshing path) **feature_list's display took 60.6 s** where the document's features regenerate in 473 ms.
+  Cause upstream (fixed in eb200af6): a guided surface loft sampled its composite guide off the curve, so the fitted
+  face wiggled (a 72 mm side along a 55 mm guide) and was sewn into the blade sheet. The lone face meshes in ~4 s
+  (imported as BREP, listed and rendered), so the minute comes with the sheet or the features after it. Repro (vibe5
+  or here): apply /root/core-scratch/repro-60s/repro-variant.patch (brings back the old sampling), then NOSHAPE_PARITY_ONLY
+  =c2-hunting-knife parity_models: "reopened, listed and measured in 61039 ms: feature list 60855 ms"; also there:
+  knife-badloft.noshape (saved by that build), core-loft3-bad.brep (the face). A bad face shouldn't cost a minute to
+  show: find which body and step, and bound it.
 - [ ] P0 FACE-PATTERN-30-CUT-SLOW (core; asm 2026-11-08 00:10 UTC, the assembly corpus' suspension): **one Circular
   pattern takes 1167 s** (vibe3, debug test profile; the rest of the 30-part document takes ~27 s). asm-suspension's
   Part Studio 805e29 (`/root/parity/models/asm-suspension/studios/805e29e8b6ebcba128c41f64.json`, feature 27 "Circular

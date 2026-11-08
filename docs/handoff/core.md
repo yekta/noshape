@@ -33,6 +33,19 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 07:50 UTC: c2-hunting-knife's Loft 3 landed (eb200af6); the 60 s reopen ticketed.**
+- Loft 3: a guide of several curves is one composite curve (`guide_curve`); a guide's points by a dense arc-length
+  table (`G::tabulate`: GCPnts_AbscissaPoint failed across the composite's joint and the code extrapolated off the
+  guide: a 72 mm side on a 55 mm guide, and the 60 s reopen); a single patch with guides along both sides is a Stretch
+  style GeomFill patch through the four chains exactly, bounded by the profiles' and guides' own edges
+  (`face_on_edges`); the loft's surface Add goes through bshared::surface_result (std: makeSolid for loft / fill /
+  bsurf). The blade closes into live's solid, 14/38/25, area in band; volume 5,129.1 vs 4,986.8 (+2.9 %; Coons style
+  +5.1 %): the inside isn't Parasolid's, asked live for the face's B-spline (REQUESTS 07:00). T1 kernel features::
+  a_loft_along_guides_of_several_curves_runs_through_them. Suite 745/951 (corpus now 87 documents).
+- The 60 s: feature_list's display, only with the broken loft (now 0.5-0.8 s). The lone bad face meshes in ~4 s, so
+  something with the sewn sheet or later features: TICKETS BAD-FACE-DISPLAY-60S with a repro patch.
+- Open in core's TICKETS: P0 FACE-PATTERN-30-CUT-SLOW (asm 00:10): next.
+
 **State 11-08 06:20 UTC: (3) done: cf-part-draft 13/13 to the end, custom 4/4.**
 - Landed 05:44 (2a99078c): opCreateBSplineCurve of one straight span is a line (Parasolid; std's bridging curve with
   Position at both ends); translator: a vertex a split imprinted where two sketch curves meet (IMPRINT_ON_FACE).
