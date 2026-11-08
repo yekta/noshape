@@ -292,6 +292,19 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
     ),
 ];
 
+/// Where `new` stops differing from `old` (a byte offset in `new`, on a character boundary): the end of the text that
+/// replaced the old one's, or where removed text was.
+fn changed_end(old: &str, new: &str) -> usize {
+    let prefix = old.char_indices().zip(new.chars()).take_while(|((_, a), b)| a == b).map(|((i, a), _)| i + a.len_utf8()).last().unwrap_or(0);
+    let room = old.len().min(new.len()) - prefix;
+    let suffix = old.bytes().rev().zip(new.bytes().rev()).take(room).take_while(|(a, b)| a == b).count();
+    let mut end = new.len() - suffix;
+    while !new.is_char_boundary(end) {
+        end += 1;
+    }
+    end.max(prefix)
+}
+
 /// A new Feature Studio (live document/70).
 pub const FS_TEMPLATE: &str = noshape_ops::docedit::FS_TEMPLATE;
 
@@ -604,8 +617,14 @@ impl FeatureStudioView {
         }
         self.save_task = None;
         self.synced = src.clone();
-        if self.editor.read(cx).value().as_ref() != src {
-            self.editor.update(cx, |e, cx| e.set_value(src.clone(), window, cx));
+        let before = self.editor.read(cx).value().to_string();
+        if before != src {
+            // The caret at the end of what changed (live fs-tb-redo: an undone word leaves it where the word began).
+            let at = changed_end(&before, &src);
+            self.editor.update(cx, |e, cx| {
+                e.set_value(src.clone(), window, cx);
+                e.set_selected_range(at..at, cx);
+            });
         }
         self.recompile(src, cx);
     }
@@ -776,6 +795,16 @@ impl FeatureStudioView {
             let _ = this.update(cx, |this: &mut Self, cx| this.save(cx));
         }));
         cx.notify();
+    }
+
+    /// Undo (`undo`) or Redo from the code: the document's, after saving what's typed.
+    fn code_undo(&mut self, undo: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.editor.read(cx).focus_handle(cx).is_focused(window) {
+            return;
+        }
+        cx.stop_propagation();
+        self.save(cx);
+        self.doc.update(cx, |d, cx| if undo { d.undo(cx) } else { d.redo(cx) });
     }
 
     /// Save the editor's text into the document (Onshape saves as you type;
@@ -1469,7 +1498,8 @@ impl FeatureStudioView {
             (d.session.can_undo(), d.session.can_redo())
         };
         let undo_area: AnyElement = if stage >= 1 {
-            div().flex_none().relative().child(crate::ui::undo_redo(&self.doc, cx)).child(probe(&self.tb.undo_full)).into_any_element()
+            // The typing not yet saved goes in before the toolbar's Undo / Redo.
+            div().flex_none().relative().capture_any_mouse_down(cx.listener(|this, _: &MouseDownEvent, _, cx| this.save(cx))).child(crate::ui::undo_redo(&self.doc, cx)).child(probe(&self.tb.undo_full)).into_any_element()
         } else {
             // Undo ▾ (Redo folded in; the ▾ is inert without history).
             let (anchor, d) = (BoundsCell::default(), self.doc.clone());
@@ -1749,6 +1779,10 @@ impl Render for FeatureStudioView {
             .on_action(cx.listener(|this, _: &CommitAll, _, cx| this.commit_all(cx)))
             .on_action(cx.listener(|_, _: &SearchStudios, _, cx| cx.emit(FeatureStudioEvent::OpenSearch)))
             .on_action(cx.listener(|this, _: &ModuleOutline, window, cx| this.toggle_outline(window, cx)))
+            // Ctrl+Z / Ctrl+Y in the code are the document's Undo / Redo (live fs-undo: Redo is on after it), not the
+            // editor's own history; the typing not yet saved goes in first.
+            .capture_action(cx.listener(|this, _: &gpui_kit::base::input::Undo, window, cx| this.code_undo(true, window, cx)))
+            .capture_action(cx.listener(|this, _: &gpui_kit::base::input::Redo, window, cx| this.code_undo(false, window, cx)))
             .on_action(cx.listener(|this, _: &BackReference, window, cx| this.navigate(-1, window, cx)))
             .on_action(cx.listener(|this, _: &ForwardReference, window, cx| this.navigate(1, window, cx)))
             .bg(rgb(0xffffff))
@@ -2015,7 +2049,16 @@ impl InputHighlighter for ScriptHighlighter {
 
 #[cfg(test)]
 mod tests {
-    use super::{Tok, lex};
+    use super::{Tok, changed_end, lex};
+
+    /// After an undo or redo the caret goes to the end of what changed (live fs-tb-redo).
+    #[::core::prelude::v1::test]
+    fn caret_after_undo_and_redo() {
+        assert_eq!(changed_end("a\n// uip\n", "a\n// u\n"), 6, "undone: where the removed text was");
+        assert_eq!(changed_end("a\n// u\n", "a\n// uip\n"), 8, "redone: after the text put back");
+        assert_eq!(changed_end("x", "x"), 1);
+        assert_eq!(changed_end("ä", "äb"), 3);
+    }
 
     // Plain std test attribute (`gpui_kit::*` brings in gpui's `test` macro).
     #[::core::prelude::v1::test]

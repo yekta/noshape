@@ -28,6 +28,13 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 14:55 UTC: Feature Studio undo as live's
+- Ctrl+Z / Ctrl+Y in the code are the document's Undo / Redo (the editor's own history isn't used; what's typed is
+  saved first), as are the toolbar's buttons (they save on press); after either the caret sits at the end of what
+  changed (`changed_end`). fs-undo, fs-redo, fs-undo-button, fs-new-feature(-undo), fs-key-back/forward-reference
+  match. fs-tb-redo still differs: live saved partway through "// uip" (its Undo took back "ip" only), a save timing
+  we don't copy.
+
 ### 2026-11-08 14:37 UTC: documents-page ops; ⋯ table menus stay open on Escape
 - The documents page's file logic moved down into ops (`noshape_ops::doc_library`: naming, rename, move, copy,
   details, labels, the recent and watched-folder lists, and shared actions `rename_doc`, `move_doc`, `create_folder`,
@@ -85,8 +92,7 @@ entries. Nothing reads them yet:
   `cell_selected` / `cell_editing` by input key); a rename follows in every tab that sees the studio with live's
   toast ("Renamed variable 'w' to 'width' in 3 tabs in this workspace."), a taken name becomes `<name>_0` ("Changed
   some variable names to avoid name conflicts."), in the op too (`variable_studio::rename_everywhere`).
-- Next (not started): the FS editor's undo as live's (the toolbar's Undo / Redo act on Ace's history, by word groups,
-  the caret at the change; Ctrl+Z makes Redo available); documents-page ops (trash, folders, labels, moves: none exist); the
+- Next (then): documents-page ops (trash, folders, labels, moves: none exist); the
   Tabs panel's menus as live's (a row: Create…, then the tab bar's menu without Properties… and with Add selection to
   folder; a folder: Create…, Rename, Add selected to folder, Unpack, Move to document…), which needs the workspace's
   tab menu shared with the panel. For psui: the S shortcut toolbar opens on a key with the pointer off the graphics
