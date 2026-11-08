@@ -13,14 +13,16 @@ Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
 ## Feature audit (lead 11-08 ~11:00): Fillet / Chamfer / Face blend options, tickets in TICKETS.md "Blends (blend)"
-- Queued 0c20bd03 (5 commits; suites audit2-4 on vibe5 clean, "slower" reruns noise): face blend empty options,
-  partial plane end, drafted-rib full round, CHAMFER-METHOD + DA direction (`blend_section::chamfer_offsets`),
-  FACEBLEND-HOLD-TANGENT (`Sides.hold`, `hold_ranges`), stopped chamfer setbacks + two distances, face blend
-  Adjacent / Custom propagation (`grow_side`), Detached, Long / No trim error (live 2306 A-C).
-- Landed 823698ce (the 5 above). Suite audit6 (base 0c20bd035) covers: tapered-rib full round as a cone
-  (`tapered_round_tool`, live 2306 E), CHAMFER-ANGLE-OVER-90 (90° and over as two distances), opChamfer through the
-  Chamfer evaluator (builtin.rs). After it (need audit7): FACEBLEND-SURFACES (`sheet_blend`, live 2321's
-  alignment rule, 8 cases), detached No trim run-on (`run_on_round`).
+- Landed 11-08: 823698ce (face blend empty options, partial plane end, drafted-rib full round, CHAMFER-METHOD + DA on
+  a round face (`blend_section::chamfer_offsets`), FACEBLEND-HOLD-TANGENT (`Sides.hold`, `hold_ranges`), stopped
+  chamfer setbacks, face blend Adjacent / Custom (`grow_side`), Detached, Long / No trim error); 660f7ddd (tapered-rib
+  cone `tapered_round_tool`, chamfer angle >= 90°, FACEBLEND-SURFACES `sheet_blend` (live 2321's alignment rule),
+  detached No trim `run_on_round`); 66bf6d57 (blend_direct skips sections of rounds tangent along a shared circle:
+  cf-snap-hook Fillet 3 91 -> 54 ms). Queued 116f47c6: variable fillet warnings (live 2325 A) and constant case.
+- Every change ran the before/after suite on vibe5 (audit2..10); flagged "slower" documents re-run alternately
+  were noise each time.
+- opChamfer: routing it through the Chamfer evaluator broke cf-snap-hook; "Opposite off = the edge's second face"
+  (live 2325 D) broke cf-spur-gear: both reverted; asked live 16:34 for the rule (caps / sides / version).
 - Parked: FACEBLEND-HOLD-RIM (c2-variable-fillet-faceblend's Face blend 1, the only blend first-difference in the
   suite), branch `hold-rim-wip` (patch /root/blend-scratch/patches/hold-rim-wip.patch, ZZ_HOLD_RIM / ZZ_ONE_BY_ONE
   debug env). Radii match live (13.858 at (50, 25): live's JPC down to z 1.14) and the tool removes 5897 mm³ (live
