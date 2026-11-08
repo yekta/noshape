@@ -6,6 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
+| 2026-11-08 | 3950e447 (qa 04:55: the 00:34 run of qa-suites.sh, models on vibe2) | 70/86 | 724/934 (custom 97/107) | 729/864 (4874/5239 states) | the run's flags: SUITE-REGRESSIONS-1108; 51 of 85 documents regenerate slower than live (c2-rings-loft ×26.8, cf-snap-hook ×22.0, learning-center-michael ×21.6) |
 | 2026-11-03 | dx 21:29 (run 45; 3 dead-studio documents unscored; prize-wheel-tim refetched, its Hole as live) | 26/55 | 303/480 (custom 7/109) | – |
 | 2026-11-03 | dx 22:49 (run 47: valuesSortedById in feature order, cf-parameter-pattern 9/9; old studios' lowercase types, id-only faces by tessellated area: cf-o-ring-generator 10/11) | 27/55 | 308/480 (custom 12/109) | – |
 | 2026-11-03 | dx 23:17 (run 48: pinned studio imports, opSplitFace edges / leaveOpen / makeSolid in the host: cf-setback-fillet runs; custom-failing documents 8 → 6) | 27/55 | 308/480 (custom 12/109) | – |
@@ -98,6 +99,13 @@ questions with live (Surfaces collapsed?, Bend's title, Face mirror focus, a che
 field's right-click focus, the server round trip after Suppress, "Unknown of" chips, a new sketch's owner, skasm's
 three sketch scenarios, SKETCH-MIRROR-LINE-SELECTED. Coverage: toolbar 76/76, sketch tools 55/55, menus 92/117,
 shortcuts 78/89 (batches 10-14 with live).
+
+## Parity index (qa, daily; docs/parity/INDEX.md, `tools/parity/index.py` over one suite run)
+
+| date | green | index | part studio geometry | part studio + sketch interaction | assembly results | assembly interaction | drawing interaction | drawing export | data exchange | speed against Onshape | feature studio | variable studio | versions / history / release | documents / tabs / start / preferences |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-07 | 843a9357 (20:34 run) | 57.5 | 71.2 | 93.2 | 25.5 | 87.5 | 73.8 | 79.2 | 75.0 | 62.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+| 2026-11-08 | 3950e447 (00:34 run) | 61.6 | 77.5 | 93.6 | 53.4 | 87.8 | 75.1 | 83.3 | 75.0 | 61.3 | 0.0 | 0.0 | 0.0 | 0.0 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 

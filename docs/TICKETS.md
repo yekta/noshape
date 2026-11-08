@@ -781,6 +781,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   - bool 06:06: found while checking that fix: tickets/halfmir2.py **variant B** (blind half pocket on the mirror plane) went wrong with the Rust Boolean from 2520afc4 (10-29 01:36) to c79eed1d: 7869.1 mm³ with a −78.54 mm² face (OCCT 7607.301). Fixed in c79eed1d (it declines a cylinder piece across its surface's seam angle, whose loop order OCCT's unify then turned over after the mirror; also faces of one cylinder from two inputs with their seams apart, which unify left invalid). With a CLI of it: halfmir2 A 9130.973, B 7607.301, C 7434.513; mirhole 7 faces; halfmir 7214.602 / 7; rust-mirror-min 19; bin/volsweep.sh: the 19 documents identical with NOSHAPE_BOOL_RUST=0 and 1.
 
 ## Lead / build
+- [ ] P1 SUITE-REGRESSIONS-1108 (blend, skasm, dx, core: each its own line) **qa's 00:34 suite run (green 3950e447) against
+  the 20:34 one (843a9357), both on vibe2: features that built and now fail, regenerations > 30 % and > 0.5 s slower, and
+  scenarios that newly differ** (qa-scratch/suites/1108-0034-3950e447/worse.txt; candidates are the range's commits, not bisected):
+  - blend: cf-snap-hook Fillet 6 now "Failed to fillet selections." (built before); 9a16bdddb (the boss tori where they meet
+    the floor, cf-snap-hook's Fillet 5) is in the range.
+  - skasm: c2-sm-corner-break 4.0 → 5.5 s (×1.4); the range has skasm's sheet metal (56603985 c2-sm-louver's flanges).
+  - core / bool: cf-fix-pcb 0.9 → 1.5 s (×1.7).
+  - dx: drw-hide-inspection-items now differs, alone too on green 8f6f6fd2: step 7 `.drawing.annotations[1].text` live null /
+    ours "1"; 9765bd7a0 made the record list a bubble by its number. drw-detail-view, drw-note-bring-to-front, drw-table,
+    drw-table-cells-resize also differed in the run but match alone (load, UIP-DRW-START-FLAKY).
+  - From SUITE-REGRESSIONS-1107, now fixed in this run: learning-center-michael 7/7 again (2.4 s), cf-t-slot-joint 18/18.
+  Totals: models 63/88 → 70/86, features 674/947 → 724/934, scenarios 732/861 → 729/864; parity index 57.5 → 61.6. (qa 2026-11-08 04:55)
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
