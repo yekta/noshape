@@ -1227,6 +1227,52 @@ fn move_face_rotate_up_to_translate_and_create() {
     assert!(near(bb.max.z, mm(30.0), 1e-6), "{bb:?}");
 }
 
+/// FILLET-FULLROUND-GENERAL: a full round on a drafted rib (sides not parallel): every section the circle tangent to
+/// both sides and the top, a cylinder along the rib. Section (-5, 0) (5, 0) (3, 20) (-3, 20), 40 long: r = 60 / (20.0998
+/// - 2) mm, centre 20 - r up.
+#[test]
+fn a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    polyline(&mut sk, &[(-5.0, 0.0), (5.0, 0.0), (3.0, 20.0), (-3.0, 20.0)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("40 mm"));
+    });
+    let r = s.ok();
+    let b = &r.context.bodies[0];
+    // The faces by their outward normals: sides tilt out, top +Z.
+    let pick = |want: DVec3| -> Reference {
+        let i = b.shape.faces().iter().position(|f| f.face_plane().ok().flatten().is_some_and(|p| p.normal.normalize().dot(want.normalize()) > 0.999)).unwrap();
+        Reference::Face((*b.faces[i]).clone())
+    };
+    let (s1, s2, top) = (pick(DVec3::new(-20.0, 0.0, 2.0)), pick(DVec3::new(20.0, 0.0, 2.0)), pick(DVec3::Z));
+    let v0 = volume(&r, 0);
+    s.add("fillet", move |p| {
+        p.set("filletType", en("FULL_ROUND"));
+        p.set("side1Face", q(s1));
+        p.set("side2Face", q(s2));
+        p.set("centerFaces", q(top));
+    });
+    let r = s.ok();
+    let len = (20.0f64 * 20.0 + 2.0 * 2.0).sqrt();
+    let rr = 60.0 / (len - 2.0);
+    assert!(r.context.bodies[0].shape.faces().iter().any(|f| matches!(f.face_surface().unwrap(), noshape_kernel::Surface::Cylinder { radius, .. } if near(radius, mm(rr), 1e-9))));
+    // Removed: between the sides above the tangent points, less the arc's segment above the centre.
+    let c = 20.0 - rr;
+    let n = DVec2::new(20.0, 2.0) / len;
+    let t = DVec2::new(n.x * rr, c + n.y * rr);
+    let corner = |y: f64| 5.0 - 2.0 * y / 20.0;
+    // The trapezoid between y = t.y and 20, less the circle's part above y = t.y (a segment of half-angle acos(n.y)).
+    let trapezoid = (corner(t.y) + corner(20.0)) * (20.0 - t.y);
+    let half = (n.y).acos();
+    let segment = rr * rr * (half - half.sin() * half.cos());
+    let removed = (trapezoid - segment) * 40.0;
+    assert!(near(v0 - volume(&r, 0), mm(1.0).powi(3) * removed, 1e-6), "{} vs {}", (v0 - volume(&r, 0)) * 1e9, removed);
+}
+
 #[test]
 fn full_round_fillet_parting_draft_swept_blend() {
     // Full round on a 100 x 10 x 25 rib: the top becomes a half cylinder of R5.

@@ -3858,7 +3858,7 @@ P1
   blends to solid parts." on a solid without Detached.
 - [ ] P1 FACEBLEND-SURFACES (blend, live) face blends between surface bodies (one body, two bodies) untested / refused.
 - [ ] P1 FACEBLEND-HOLD-TANGENT (blend, live 2233) Tangent / Inverse tangent hold lines (c2-variable-fillet-faceblend).
-- [ ] P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
+- [x] (blend 11-08: planar sides need not be parallel, only along one direction with the center (a drafted rib): the circle tangent to all three, a cylinder; T1 features_c::a_full_round_on_a_drafted_rib_is_tangent_to_both_sides_and_the_top. Left: a tapered rib (sides not along one direction), live asked 11:24 E) P1 FILLET-FULLROUND-GENERAL (blend) Full round only between parallel planes or a coaxial bore / boss; a drafted or
   tapered rib fails "Failed to fillet selections." (detail.rs:1064-1083).
 
 P2

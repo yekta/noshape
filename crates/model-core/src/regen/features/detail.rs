@@ -1052,7 +1052,7 @@ fn on_faces(shape: &k::Shape, p: glam::DVec3, tol: f64) -> bool {
 /// faces become a half cylinder tangent to both sides (radius = half the
 /// distance between them).
 fn full_round(ev: &mut EvalCtx) -> FResult<()> {
-    use super::sheetmetal_util::{bool_named, body_named, oriented_box, plane_of, tool_named};
+    use super::sheetmetal_util::{bool_named, body_named, plane_of, tool_named};
     use crate::reference::TopoName;
     use std::sync::Arc;
     let s1 = ev.resolve_faces(ev.query("side1Face"));
@@ -1075,47 +1075,78 @@ fn full_round(ev: &mut EvalCtx) -> FResult<()> {
     let (Some((p1, n1)), Some((p2, n2))) = (plane_of(&face(f1)?), plane_of(&face(f2)?)) else {
         return err(UNSUPPORTED);
     };
-    if n1.dot(n2) > -1.0 + 1e-7 {
-        return err(UNSUPPORTED);
-    }
-    let w = (p2 - p1).dot(n1).abs();
-    if w < 1e-9 {
-        return err(UNSUPPORTED);
-    }
-    let r = w * 0.5;
     let cf = face(center[0].1)?;
     let tool = match cf.face_surface() {
         // A bore or boss between the sides: a half torus (live motor-mount-jack's Fillet 2).
         Ok(k::Surface::Cylinder { origin, axis, x_dir, radius }) if axis.normalize().cross(n1).length() < 1e-9 => {
+            if n1.dot(n2) > -1.0 + 1e-7 {
+                return err(UNSUPPORTED);
+            }
+            let w = (p2 - p1).dot(n1).abs();
+            if w < 1e-9 {
+                return err(UNSUPPORTED);
+            }
+            let r = w * 0.5;
             let faces: Vec<Shape> = center.iter().map(|c| face(c.1)).collect::<Result<_, _>>()?;
             let Some(tool) = coaxial_round_tool(&faces, k::Plane::new(origin, axis.normalize(), x_dir), radius, [p1, p2], r) else { return err(UNSUPPORTED) };
             tool
         }
         _ => {
+            // Planar sides and center along one direction (a rib, drafted or not): every section the circle tangent to
+            // the three lines, a cylinder along the rib; the tool the section between the faces and the arc, extruded.
             let Some((cc, nc)) = plane_of(&cf) else { return err(UNSUPPORTED) };
-            if nc.dot(n1).abs() > 1e-6 {
+            let Some(e) = n1.cross(nc).try_normalize() else { return err(UNSUPPORTED) };
+            if n2.dot(e).abs() > 1e-9 {
                 return err(UNSUPPORTED);
             }
-            let e = nc.cross(n1).normalize();
-            // Axis: mid-plane between the sides, R below the center face.
-            let mid = p1 - n1 * (w * 0.5);
-            let c_mid = cc - n1 * (cc - mid).dot(n1);
-            let axis = c_mid - nc * r;
-            // Extent along the axis: the center faces.
+            // The section's plane: x along nc, y along e x nc, origin on the center face.
+            let (ax, ay) = (nc, e.cross(nc));
+            let to2 = |p: DVec3| glam::DVec2::new((p - cc).dot(ax), (p - cc).dot(ay));
+            let n2d = |n: DVec3| glam::DVec2::new(n.dot(ax), n.dot(ay));
+            // n_i . c + r = n_i . p_i for the three outward normals (the centre r inside each).
+            let rows = [(n2d(n1), n2d(n1).dot(to2(p1))), (n2d(n2), n2d(n2).dot(to2(p2))), (n2d(nc), 0.0)];
+            let m = glam::DMat3::from_cols(
+                DVec3::new(rows[0].0.x, rows[1].0.x, rows[2].0.x),
+                DVec3::new(rows[0].0.y, rows[1].0.y, rows[2].0.y),
+                DVec3::ONE,
+            );
+            if m.determinant().abs() < 1e-12 {
+                return err(UNSUPPORTED);
+            }
+            let sol = m.inverse() * DVec3::new(rows[0].1, rows[1].1, rows[2].1);
+            let (c2, r) = (glam::DVec2::new(sol.x, sol.y), sol.z);
+            if !(r > 1e-9) {
+                return err(UNSUPPORTED);
+            }
+            let to3 = |q: glam::DVec2| cc + ax * q.x + ay * q.y;
+            let c3 = to3(c2);
+            // Tangent points, and each side's line r past the center face (into the air: the section's top, so the
+            // region doesn't pinch where the arc touches the center face).
+            let (t1, t2, tc) = (c3 + n1 * r, c3 + n2 * r, c3 + nc * r);
+            let meet = |pi: DVec3, ni: DVec3| -> Option<DVec3> {
+                let n = n2d(ni);
+                (n.y.abs() > 1e-12).then(|| to3(glam::DVec2::new(r, (n.dot(to2(pi)) - n.x * r) / n.y)))
+            };
+            let (Some(q1), Some(q2)) = (meet(p1, n1), meet(p2, n2)) else { return err(UNSUPPORTED) };
+            // Extent along the rib: the center faces' vertices.
             let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
             for &(_, f) in &center {
                 for v in face(f)?.vertices() {
-                    let d = (v.vertex_point()? - axis).dot(e);
+                    let d = (v.vertex_point()? - c3).dot(e);
                     lo = lo.min(d);
                     hi = hi.max(d);
                 }
             }
-            let margin = w * 1e-3;
-            let ez = e.cross(n1);
-            let zr = if ez.dot(nc) > 0.0 { [0.0, 2.0 * r] } else { [-2.0 * r, 0.0] };
-            let block = oriented_box(axis, e, n1, [lo - margin, hi + margin], [-r - margin, r + margin], zr)?;
-            let cyl = k::make_cylinder(&k::Plane::new(axis + e * (lo - 2.0 * margin), e, n1), r, hi - lo + 4.0 * margin, std::f64::consts::TAU)?;
-            k::cut(&block, &cyl)?.shape
+            let margin = r * 1e-3;
+            let start = |p: DVec3| p + e * (lo - margin);
+            let wire = k::make_wire(&[
+                k::make_line(start(t1), start(q1))?,
+                k::make_line(start(q1), start(q2))?,
+                k::make_line(start(q2), start(t2))?,
+                k::make_arc_3pts(start(t2), start(tc), start(t1))?,
+            ])?;
+            let profile = k::make_face_from_wire(&wire, true)?;
+            k::extrude(&profile, e * (hi - lo + 2.0 * margin))?.shape
         }
     };
     let feature = ev.feature;
