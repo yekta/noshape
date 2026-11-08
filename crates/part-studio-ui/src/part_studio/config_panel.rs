@@ -2143,7 +2143,7 @@ impl PartStudioView {
         }
         for prop in &props {
             let prop = *prop;
-            let h = cell().id(SharedString::from(format!("cp-head-{prop}"))).justify_center().gap(px(3.)).bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(prop))
+            let h = cell().id(SharedString::from(format!("cp-head-{prop}"))).map(|d| crate::ui_script::mark(d, move || format!("cp_header:{prop}"))).justify_center().gap(px(3.)).bg(crate::theme::p().table_header).font_weight(FontWeight::BOLD).child(div().truncate().child(prop))
                 // Live 637: "Mass ƒ", the value is otherwise computed.
                 .when(prop == "Mass", |d| d.child(div().italic().font_weight(FontWeight::NORMAL).child("ƒ")));
             head = head.child(delete_column(h, prop));

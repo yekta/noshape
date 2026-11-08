@@ -262,6 +262,8 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 - A start's Variable Studio tab may hold variables: `{"kind": "variablestudio", "name": "Variable Studio 1",
   "variables": [{"name": "width", "value": "40 mm"}, {"name": "count", "kind": "NUMBER", "value": "4"}]}` (kind
   LENGTH by default; start `vs-vars`).
+- `{"cp_header": "Appearance"}`: a configured part property's column header in the Configuration panel's Configured
+  properties table (Appearance, Name, Part number, …: its title).
 - `{"var_cell": "width:Value"}`: a variable's cell by its name and column (`Name`, `Variable type`, `Value`,
   `Description`); `{"var_cell": "Name"}` the italic Name cell of the add row; `{"var_cell": "count:Variable type",
   "pick": "Any"}` picks a type.

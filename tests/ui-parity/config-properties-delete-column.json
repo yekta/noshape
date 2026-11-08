@@ -1,0 +1,45 @@
+{
+ "name": "config-properties-delete-column",
+ "about": "config-blocks: Appearance panel › Part 1 › Configure appearance (the Configured properties table with an Appearance column), right-click its header › Delete column",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last menus)",
+ "start": "config-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Appearance panel"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "panel_row": "Part 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Configure appearance"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "cp_header": "Appearance"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete column"
+   }
+  }
+ ]
+}
