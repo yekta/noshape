@@ -430,6 +430,16 @@ pub fn entities_along_ray(display: &StudioDisplay, origin: DVec3, dir: DVec3, ed
             if let Some(depth) = best {
                 // Edges win ties with the faces they bound.
                 hits.push(RayHit { reference: r.clone(), depth: depth - edge_tol * 0.5 });
+                // The ray in an edge's reach is in its faces' too: one it doesn't meet comes just behind the edge
+                // (live ui-parity face-menu-select-other: through the box's bottom back edge, the bottom face, the
+                // Top plane, then the back face).
+                if let Reference::Edge(crate::reference::TopoName::Edge { faces, .. }) = r {
+                    for f in faces.iter().map(|f| Reference::Face((**f).clone())) {
+                        if b.face_refs.contains(&f) && !hits.iter().any(|h| h.reference == f) {
+                            hits.push(RayHit { reference: f, depth: depth + edge_tol * 0.5 });
+                        }
+                    }
+                }
             }
         }
     }
@@ -1417,6 +1427,52 @@ mod tests {
         let refs: Vec<_> = hits.iter().map(|h| h.reference.clone()).collect();
         assert_eq!(refs, vec![edge, face(1), face(0)]);
         assert!(entities_along_ray(&d, DVec3::new(0.0, 0.01, 5.0), DVec3::NEG_Z, 0.05, &|_| true, 20).is_empty());
+    }
+
+    /// An edge in the ray's reach brings in its face the ray passes beside, just behind the edge (live ui-parity
+    /// face-menu-select-other: a box's bottom face, the Top plane, then its back face).
+    #[test]
+    fn an_edge_in_reach_brings_its_other_face() {
+        use crate::display::{BodyDisplay, MeshBuffers};
+        use crate::reference::{Role, TopoName};
+        // The bottom (z = 0) and the back (y = 1) of a box, sharing the edge y = 1, z = 0.
+        let mesh = MeshBuffers {
+            positions: vec![[-1.0, -1.0, 0.0], [1.0, -1.0, 0.0], [1.0, 1.0, 0.0], [-1.0, 1.0, 0.0], [-1.0, 1.0, 0.0], [1.0, 1.0, 0.0], [1.0, 1.0, 2.0], [-1.0, 1.0, 2.0]],
+            normals: vec![[0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0]],
+            indices: vec![0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7],
+            face_ranges: vec![(0, 6), (6, 6)],
+            edges: vec![vec![[-1.0, 1.0, 0.0], [1.0, 1.0, 0.0]]],
+            vertices: vec![],
+            mesh_lines: vec![],
+        };
+        let name = |s: u32| std::sync::Arc::new(TopoName::face(FeatureId(1), Role::New(s)));
+        let face = |s: u32| Reference::Face((*name(s)).clone());
+        let edge = Reference::Edge(TopoName::edge(name(0), name(1), 0));
+        let body = BodyDisplay {
+            id: crate::reference::BodyId { feature: FeatureId(1), index: 0 },
+            name: "Part 1".into(),
+            kind: crate::display::BodyKind::Solid,
+            color: [1.0; 4],
+            hidden: false,
+            mesh: std::sync::Arc::new(mesh),
+            coarser: Vec::new(),
+            levels_from: 0,
+            face_refs: vec![face(0), face(1)],
+            edge_refs: vec![edge.clone()],
+            vertex_refs: vec![],
+            bounds: None,
+            composite: None,
+            is_mesh: false,
+            face_colors: Vec::new(),
+        };
+        let d = StudioDisplay { bodies: vec![body], ..Default::default() };
+        // Straight down 0.02 in front of the edge: it meets the bottom, passes beside the back.
+        let hits = entities_along_ray(&d, DVec3::new(0.0, 0.98, 5.0), DVec3::NEG_Z, 0.05, &|_| false, 20);
+        let refs: Vec<_> = hits.iter().map(|h| h.reference.clone()).collect();
+        assert_eq!(refs, vec![edge, face(0), face(1)]);
+        // Out of the edge's reach, only the bottom.
+        let far = entities_along_ray(&d, DVec3::new(0.0, 0.5, 5.0), DVec3::NEG_Z, 0.05, &|_| false, 20);
+        assert_eq!(far.iter().map(|h| h.reference.clone()).collect::<Vec<_>>(), vec![face(0)]);
     }
 
     #[test]
