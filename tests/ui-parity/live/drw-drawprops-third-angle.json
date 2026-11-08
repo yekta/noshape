@@ -1,19 +1,19 @@
 {
  "scenario": "drw-drawprops-third-angle",
- "recorded": "2026-11-07T19:54:04.601Z",
+ "recorded": "2026-11-08T05:39:45.053Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "bc27c9838e0e8dacbd31a740",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "15847941bd062cd1087cb286",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "fec75b9b8f06f7e2fe8fa56f",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -89,14 +89,14 @@
     "on": {
      "sheet_point": [
       150,
-      40
+      110
      ]
     }
    },
    "ok": true,
    "at": [
     1019,
-    798
+    524
    ],
    "state": {
     "focus": {
@@ -164,7 +164,7 @@
      "selection": []
     }
    },
-   "t": 217980
+   "t": 263555
   },
   {
    "step": 2,
@@ -174,14 +174,52 @@
      "menu": "Drawing properties..."
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Drawing properties...\"}",
+   "ok": true,
+   "at": [
+    1060,
+    550
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Millimeters",
+      "Centimeters",
+      "Meters",
+      "Inches",
+      "Inches fractional",
+      "Feet and inches",
+      "Feet",
+      "Yards",
+      "Decimal separator",
+      "Period",
+      "Comma",
+      "Precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345",
+      "0.123456",
+      "Tolerance precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -242,7 +280,7 @@
      "selection": []
     }
    },
-   "t": 231799
+   "t": 281227
   },
   {
    "step": 3,
@@ -257,7 +295,42 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Drawing properties",
+     "text": [
+      "Drawing properties",
+      "Units and precision",
+      "Primary",
+      "Units",
+      "Millimeters",
+      "Centimeters",
+      "Meters",
+      "Inches",
+      "Inches fractional",
+      "Feet and inches",
+      "Feet",
+      "Yards",
+      "Decimal separator",
+      "Period",
+      "Comma",
+      "Precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345",
+      "0.123456",
+      "Tolerance precision",
+      "0",
+      "0.1",
+      "0.12",
+      "0.123",
+      "0.1234",
+      "0.12345"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -318,7 +391,7 @@
      "selection": []
     }
    },
-   "t": 246472
+   "t": 295853
   },
   {
    "step": 4,
@@ -328,14 +401,52 @@
      "tab": "Views"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"tab\":\"Views\"}",
+   "ok": true,
+   "at": [
+    1682,
+    138
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Views",
+     "text": [
+      "Views",
+      "All views",
+      "Projection angle",
+      "First angle",
+      "Third angle",
+      "Visible edges",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "View labels",
+      "APMONO",
+      "ARComp",
+      "ARIsoP1",
+      "ARItal"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -396,7 +507,7 @@
      "selection": []
     }
    },
-   "t": 261326
+   "t": 313422
   },
   {
    "step": 5,
@@ -406,14 +517,53 @@
      "dropdown": "Third angle"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"dropdown\":\"Third angle\"}",
+   "ok": true,
+   "at": [
+    1782,
+    241
+   ],
+   "via": "native select in the drawing: marked for the next menu step (its popup is not in the DOM)",
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Views",
+     "text": [
+      "Views",
+      "All views",
+      "Projection angle",
+      "First angle",
+      "Third angle",
+      "Visible edges",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "View labels",
+      "APMONO",
+      "ARComp",
+      "ARIsoP1",
+      "ARItal"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -474,7 +624,7 @@
      "selection": []
     }
    },
-   "t": 274628
+   "t": 330166
   },
   {
    "step": 6,
@@ -484,14 +634,50 @@
      "menu": "Third angle"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Third angle\"}",
+   "ok": true,
+   "at": null,
+   "via": "native select in the drawing: option picked by its label",
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Views",
+     "text": [
+      "Views",
+      "All views",
+      "Projection angle",
+      "First angle",
+      "Third angle",
+      "Visible edges",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "View labels",
+      "APMONO",
+      "ARComp",
+      "ARIsoP1",
+      "ARItal"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -552,7 +738,7 @@
      "selection": []
     }
    },
-   "t": 288653
+   "t": 346471
   },
   {
    "step": 7,
@@ -567,7 +753,42 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Views",
+     "text": [
+      "Views",
+      "All views",
+      "Projection angle",
+      "First angle",
+      "Third angle",
+      "Visible edges",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "View labels",
+      "APMONO",
+      "ARComp",
+      "ARIsoP1",
+      "ARItal"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -628,7 +849,7 @@
      "selection": []
     }
    },
-   "t": 303365
+   "t": 361271
   },
   {
    "step": 8,
@@ -637,12 +858,52 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": null,
+    "hover": [],
+    "element": null
+   },
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Views",
+     "text": [
+      "Views",
+      "All views",
+      "Projection angle",
+      "First angle",
+      "Third angle",
+      "Visible edges",
+      "0.13 mm",
+      "0.15 mm",
+      "0.18 mm",
+      "0.20 mm",
+      "0.25 mm",
+      "0.30 mm",
+      "0.35 mm",
+      "0.40 mm",
+      "0.50 mm",
+      "0.53 mm",
+      "0.60 mm",
+      "0.70 mm",
+      "0.80 mm",
+      "0.90 mm",
+      "1.00 mm",
+      "1.20 mm",
+      "1.40 mm",
+      "1.60 mm",
+      "2.00 mm",
+      "View labels",
+      "APMONO",
+      "ARComp",
+      "ARIsoP1",
+      "ARItal"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -703,7 +964,7 @@
      "selection": []
     }
    },
-   "t": 318423
+   "t": 377031
   }
  ]
 }

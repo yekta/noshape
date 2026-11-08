@@ -1,16 +1,16 @@
 {
  "scenario": "drw-detail-view",
- "recorded": "2026-11-07T18:34:17.923Z",
+ "recorded": "2026-11-08T04:58:31.128Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.9"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "2e417b82a1d292b6c2ac9c82",
+  "element": "0196b94f67a630eb3e492fc6",
   "start": "hole-plate-drawing",
   "startElement": "ac3109d7c4982f44b949727b",
   "runner": "live2 .nstate-uip-1.json"
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -136,7 +136,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -176,7 +176,7 @@
      "selection": []
     }
    },
-   "t": 220587
+   "t": 246118
   },
   {
    "step": 2,
@@ -239,7 +239,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -279,7 +279,7 @@
      "selection": []
     }
    },
-   "t": 236155
+   "t": 264953
   },
   {
    "step": 3,
@@ -289,17 +289,17 @@
      "view_point": {
       "view": "Front",
       "at": [
-       20,
+       8,
        -20,
-       20
+       12
       ]
      }
     }
    },
    "ok": true,
    "at": [
-    828,
-    599
+    781,
+    630
    ],
    "state": {
     "focus": {
@@ -342,7 +342,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -382,7 +382,7 @@
      "selection": []
     }
    },
-   "t": 251081
+   "t": 282442
   },
   {
    "step": 4,
@@ -426,7 +426,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -478,7 +478,7 @@
      "selection": []
     }
    },
-   "t": 266870
+   "t": 300558
   },
   {
    "step": 5,
@@ -487,6 +487,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     793,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -513,7 +521,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -565,7 +573,7 @@
      "selection": []
     }
    },
-   "t": 282014
+   "t": 316734
   }
  ],
  "_meta": {
@@ -574,14 +582,14 @@
     "format": "DXF",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.dxf",
-    "bytes": 115716,
+    "bytes": 115526,
     "error": null,
     "formatBefore": "PDF",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (1)"
      },
      {
       "label": "Format",
@@ -641,14 +649,14 @@
     "format": "DWG",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.dwg",
-    "bytes": 30016,
+    "bytes": 29915,
     "error": null,
     "formatBefore": "DXF",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (1)"
      },
      {
       "label": "Format",
@@ -708,14 +716,14 @@
     "format": "PDF",
     "via": "dialog (tab › Export…)",
     "file": "drw-detail-view.pdf",
-    "bytes": 84766,
+    "bytes": 85269,
     "error": null,
     "formatBefore": "DWG",
     "fields": [
      {
       "label": "File name View export rules",
       "id": "drawing-export-filename-input",
-      "value": "Part 1 Drawing 1"
+      "value": "Part 1 Drawing 1 (1)"
      },
      {
       "label": "Format",

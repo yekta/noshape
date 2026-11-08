@@ -1,19 +1,19 @@
 {
  "scenario": "drw-bom-switch-to-bom",
- "recorded": "2026-11-07T19:10:16.778Z",
+ "recorded": "2026-11-08T04:05:00.976Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
  },
  "live": {
-  "document": "5337f675c06cff98a9e89387",
-  "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "70592610bc55ae7e92c67030",
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "26e2b18da0fb33d26b7f23d8",
   "start": "pin-block-asm-drawing",
-  "startElement": "ed211f3bd9ad0f1f27da328a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "7425731ef03d2b9db73c3efb",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -290,7 +290,7 @@
      "selection": []
     }
    },
-   "t": 222341
+   "t": 253121
   },
   {
    "step": 2,
@@ -434,7 +434,7 @@
      "selection": []
     }
    },
-   "t": 238568
+   "t": 270387
   },
   {
    "step": 3,
@@ -443,6 +443,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -569,7 +577,7 @@
      "selection": []
     }
    },
-   "t": 253668
+   "t": 286500
   },
   {
    "step": 4,
@@ -578,6 +586,14 @@
     "key": "ctrl+s"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -717,7 +733,7 @@
      "selection": []
     }
    },
-   "t": 267096
+   "t": 302352
   },
   {
    "step": 5,
@@ -866,18 +882,21 @@
      "selection": []
     }
    },
-   "t": 281014
+   "t": 318032
   },
   {
    "step": 6,
    "do": {
     "do": "rclick",
     "on": {
-     "sheet_table": "Bill of materials"
+     "sheet_table": "start asm"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"sheet_table\":\"Bill of materials\"}",
+   "ok": true,
+   "at": [
+    137,
+    314
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -1014,10 +1033,15 @@
        "text": "Item Quantity Part number Description 1 1 2 1"
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
     }
    },
-   "t": 294581
+   "t": 333941
   },
   {
    "step": 7,
@@ -1027,27 +1051,16 @@
      "menu": "Switch to BOM"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Switch to BOM\"}",
+   "ok": true,
+   "at": [
+    178,
+    381
+   ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "iframe"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Sheet1 (1)",
-     "text": [
-      "Sheet1 (1)",
-      "In progress",
-      "start pin-block asm Copy 2",
-      "Front",
-      "Right",
-      "Top",
-      "Isometric",
-      "start pin-block asm Copy 2"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1056,7 +1069,62 @@
      "items": []
     },
     "features": {
-     "rows": [],
+     "rows": [
+      {
+       "name": "start pin-block asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Revolute 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
      "rollbackAfter": null
     },
     "parts": [],
@@ -1123,52 +1191,24 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": null,
-     "views": [
+     "error": "translation failed <a class=osx-import-filename href='6aeff575d34b4100389cebd7'>{1}</a> failed to translate."
+    },
+    "panel": {
+     "title": "Bill of materials",
+     "rows": [
       {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
+       "name": "1 | 1 |  | ",
+       "active": false
       },
       {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
+       "name": "2 | 1 |  | ",
+       "active": false
       }
      ],
-     "annotations": [
-      {
-       "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
-      }
-     ],
-     "selection": []
+     "banner": null
     }
    },
-   "t": 310332
+   "t": 355733
   },
   {
    "step": 8,
@@ -1180,23 +1220,9 @@
    "ok": true,
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "iframe"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Sheet1 (1)",
-     "text": [
-      "Sheet1 (1)",
-      "In progress",
-      "start pin-block asm Copy 2",
-      "Front",
-      "Right",
-      "Top",
-      "Isometric",
-      "start pin-block asm Copy 2"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1205,7 +1231,62 @@
      "items": []
     },
     "features": {
-     "rows": [],
+     "rows": [
+      {
+       "name": "start pin-block asm",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Origin",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": ""
+      },
+      {
+       "name": "Part 1 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Part 2 <1>",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-instance"
+      },
+      {
+       "name": "Mate features (1)",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": false,
+       "cls": "is-folder"
+      },
+      {
+       "name": "Revolute 1",
+       "state": "ok",
+       "selected": false,
+       "editing": false,
+       "related": false,
+       "hidden": true,
+       "cls": "ns-list-item-hidden is-mate-item"
+      }
+     ],
      "rollbackAfter": null
     },
     "parts": [],
@@ -1272,52 +1353,24 @@
      ]
     },
     "drawing": {
-     "tab": "start pin-block asm Copy 2 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": null,
-     "views": [
+     "error": "translation failed <a class=osx-import-filename href='6aeff57cd34b4100389cebdd'>{1}</a> failed to translate."
+    },
+    "panel": {
+     "title": "Bill of materials",
+     "rows": [
       {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
+       "name": "1 | 1 |  | ",
+       "active": false
       },
       {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
+       "name": "2 | 1 |  | ",
+       "active": false
       }
      ],
-     "annotations": [
-      {
-       "kind": "table",
-       "text": "Item Quantity Part number Description 1 1 2 1"
-      }
-     ],
-     "selection": []
+     "banner": null
     }
    },
-   "t": 325048
+   "t": 363324
   }
  ]
 }

@@ -1,16 +1,16 @@
 {
  "scenario": "drw-inspection-edit",
- "recorded": "2026-11-07T17:36:48.079Z",
+ "recorded": "2026-11-08T03:38:45.069Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.8"
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "9b68ee57594084e60ecce9ed",
+  "element": "96f3261d20e0ede60f871656",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 223656
+   "t": 236226
   },
   {
    "step": 2,
@@ -249,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 238219
+   "t": 252033
   },
   {
    "step": 3,
@@ -342,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 253060
+   "t": 268697
   },
   {
    "step": 4,
@@ -351,6 +351,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -422,7 +430,7 @@
      "selection": []
     }
    },
-   "t": 268342
+   "t": 285554
   },
   {
    "step": 5,
@@ -535,7 +543,7 @@
      "selection": []
     }
    },
-   "t": 282850
+   "t": 300951
   },
   {
    "step": 6,
@@ -643,7 +651,7 @@
      "selection": []
     }
    },
-   "t": 296881
+   "t": 317629
   },
   {
    "step": 7,
@@ -754,13 +762,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 312011
+   "t": 347643
   },
   {
    "step": 8,
@@ -769,6 +777,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -838,26 +854,27 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 327717
+   "t": 363722
   },
   {
    "step": 9,
    "do": {
     "do": "rclick",
     "on": {
-     "annotation": "1.575"
+     "annotation": "1",
+     "kind": "inspectionsymbol"
     }
    },
    "ok": true,
    "at": [
-    749,
-    587
+    743,
+    566
    ],
    "state": {
     "focus": {
@@ -928,30 +945,60 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 342335
+   "t": 392611
   },
   {
    "step": 10,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Edit"
+     "menu": "Edit..."
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Edit\"}",
+   "ok": true,
+   "at": [
+    784,
+    545
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Inspection item",
+     "text": [
+      "Inspection item",
+      "Manual",
+      "Automatic",
+      "Number:",
+      "1",
+      "Circle",
+      "Circle (Drawing)",
+      "Diamond",
+      "Double Circle",
+      "Flag",
+      "Hexagon",
+      "Octagon",
+      "Rectangle",
+      "Square Circle",
+      "Triangle",
+      "Tight Fit",
+      "1 Character",
+      "2 Characters",
+      "2 Characters (Drawing)",
+      "3 Characters",
+      "4 Characters",
+      "5 Characters"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1015,13 +1062,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 357264
+   "t": 407788
   },
   {
    "step": 11,
@@ -1036,7 +1083,34 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Inspection item",
+     "text": [
+      "Inspection item",
+      "Manual",
+      "Automatic",
+      "Number:",
+      "1",
+      "Circle",
+      "Circle (Drawing)",
+      "Diamond",
+      "Double Circle",
+      "Flag",
+      "Hexagon",
+      "Octagon",
+      "Rectangle",
+      "Square Circle",
+      "Triangle",
+      "Tight Fit",
+      "1 Character",
+      "2 Characters",
+      "2 Characters (Drawing)",
+      "3 Characters",
+      "4 Characters",
+      "5 Characters"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1100,13 +1174,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 372236
+   "t": 423723
   },
   {
    "step": 12,
@@ -1115,6 +1189,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -1184,13 +1266,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 388197
+   "t": 439417
   }
  ]
 }

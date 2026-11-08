@@ -1,16 +1,16 @@
 {
  "scenario": "drw-hide-inspection-items",
- "recorded": "2026-11-07T11:50:04.408Z",
+ "recorded": "2026-11-08T03:44:11.719Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "85a25aadadd24668eb6e800d",
+  "element": "ca9ff450600d7838784be776",
   "start": "block-drawing",
   "startElement": "392bca590892e6ffb484a34b",
   "runner": "live2 .nstate-uip-3.json"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 216284
+   "t": 238487
   },
   {
    "step": 2,
@@ -249,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 230528
+   "t": 256394
   },
   {
    "step": 3,
@@ -342,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 245765
+   "t": 273192
   },
   {
    "step": 4,
@@ -351,6 +351,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -422,7 +430,7 @@
      "selection": []
     }
    },
-   "t": 260679
+   "t": 291561
   },
   {
    "step": 5,
@@ -535,7 +543,7 @@
      "selection": []
     }
    },
-   "t": 274916
+   "t": 307419
   },
   {
    "step": 6,
@@ -643,7 +651,7 @@
      "selection": []
     }
    },
-   "t": 289395
+   "t": 323113
   },
   {
    "step": 7,
@@ -754,13 +762,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 304193
+   "t": 352765
   },
   {
    "step": 8,
@@ -769,6 +777,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -838,13 +854,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 319025
+   "t": 369215
   },
   {
    "step": 9,
@@ -928,13 +944,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 333222
+   "t": 384590
   }
  ]
 }

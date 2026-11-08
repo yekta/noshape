@@ -1,16 +1,16 @@
 {
  "scenario": "drw-callout-stacked-add",
- "recorded": "2026-11-07T19:09:56.320Z",
+ "recorded": "2026-11-08T03:31:12.815Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "91987d4dc883c92c08a596e0",
+  "element": "a9a10b6cd5e8fea9c6ffc40f",
   "start": "pin-block-asm-drawing",
   "startElement": "2e8be4ded96940b21ba2941d",
   "runner": "live2 .nstate-uip-2.json"
@@ -290,7 +290,7 @@
      "selection": []
     }
    },
-   "t": 227934
+   "t": 242650
   },
   {
    "step": 2,
@@ -434,7 +434,7 @@
      "selection": []
     }
    },
-   "t": 244060
+   "t": 260849
   },
   {
    "step": 3,
@@ -443,6 +443,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -569,7 +577,7 @@
      "selection": []
     }
    },
-   "t": 259985
+   "t": 276960
   },
   {
    "step": 4,
@@ -734,7 +742,7 @@
      "selection": []
     }
    },
-   "t": 273863
+   "t": 292654
   },
   {
    "step": 5,
@@ -906,7 +914,7 @@
      "selection": []
     }
    },
-   "t": 288208
+   "t": 309846
   },
   {
    "step": 6,
@@ -1082,7 +1090,7 @@
      "selection": []
     }
    },
-   "t": 302634
+   "t": 328352
   },
   {
    "step": 7,
@@ -1091,6 +1099,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -1221,20 +1237,21 @@
      "selection": []
     }
    },
-   "t": 317588
+   "t": 345889
   },
   {
    "step": 8,
    "do": {
     "do": "rclick",
     "on": {
-     "annotation": "1"
+     "annotation": "1",
+     "kind": "callout"
     }
    },
    "ok": true,
    "at": [
-    1253,
-    936
+    881,
+    598
    ],
    "state": {
     "focus": {
@@ -1366,7 +1383,7 @@
      "selection": []
     }
    },
-   "t": 332654
+   "t": 375482
   },
   {
    "step": 9,
@@ -1376,14 +1393,27 @@
      "menu": "Add stacked callouts..."
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Add stacked callouts...\"}",
+   "ok": true,
+   "at": [
+    922,
+    693
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Stacked callouts",
+     "text": [
+      "Stacked callouts",
+      "Anchor:",
+      "Part 1",
+      "Add instances from BOM",
+      "Stacked instances"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1505,10 +1535,15 @@
        "text": "Item Quantity Part number Description 1 1 2 1"
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 347443
+   "t": 393043
   },
   {
    "step": 10,
@@ -1523,7 +1558,17 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Stacked callouts",
+     "text": [
+      "Stacked callouts",
+      "Anchor:",
+      "Part 1",
+      "Add instances from BOM",
+      "Stacked instances"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1645,10 +1690,15 @@
        "text": "Item Quantity Part number Description 1 1 2 1"
       }
      ],
-     "selection": []
+     "selection": [
+      {
+       "kind": "VIEW",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 362118
+   "t": 411079
   },
   {
    "step": 11,
@@ -1657,6 +1707,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -1787,7 +1845,7 @@
      "selection": []
     }
    },
-   "t": 377827
+   "t": 427989
   }
  ]
 }

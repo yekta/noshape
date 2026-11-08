@@ -1,16 +1,16 @@
 {
  "scenario": "drw-inspection-remove",
- "recorded": "2026-11-07T17:49:52.019Z",
+ "recorded": "2026-11-08T03:53:54.197Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.8"
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "2277a33681577430ebd3cff5",
+  "element": "4e2ddc727b84568a48655eaa",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 213750
+   "t": 235021
   },
   {
    "step": 2,
@@ -249,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 228147
+   "t": 251010
   },
   {
    "step": 3,
@@ -342,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 243382
+   "t": 269358
   },
   {
    "step": 4,
@@ -351,6 +351,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -422,7 +430,7 @@
      "selection": []
     }
    },
-   "t": 258084
+   "t": 285288
   },
   {
    "step": 5,
@@ -535,7 +543,7 @@
      "selection": []
     }
    },
-   "t": 271658
+   "t": 299759
   },
   {
    "step": 6,
@@ -643,7 +651,7 @@
      "selection": []
     }
    },
-   "t": 286664
+   "t": 316485
   },
   {
    "step": 7,
@@ -754,13 +762,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 301749
+   "t": 344452
   },
   {
    "step": 8,
@@ -769,6 +777,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -838,26 +854,27 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 317933
+   "t": 361370
   },
   {
    "step": 9,
    "do": {
     "do": "rclick",
     "on": {
-     "annotation": "1.575"
+     "annotation": "1",
+     "kind": "inspectionsymbol"
     }
    },
    "ok": true,
    "at": [
-    749,
-    587
+    743,
+    566
    ],
    "state": {
     "focus": {
@@ -928,13 +945,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 334366
+   "t": 389098
   },
   {
    "step": 10,
@@ -944,8 +961,11 @@
      "menu": "Remove inspection item"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Remove inspection item\"}",
+   "ok": true,
+   "at": [
+    784,
+    592
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -1012,16 +1032,12 @@
       {
        "kind": "dimension",
        "text": "1.575"
-      },
-      {
-       "kind": "inspectionsymbol",
-       "text": null
       }
      ],
      "selection": []
     }
    },
-   "t": 348681
+   "t": 405537
   }
  ]
 }

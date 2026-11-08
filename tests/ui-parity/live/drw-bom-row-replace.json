@@ -1,0 +1,1559 @@
+{
+ "scenario": "drw-bom-row-replace",
+ "recorded": "2026-11-08T04:11:10.029Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+ },
+ "live": {
+  "document": "a1e7207bcd206771836609af",
+  "workspace": "6d6324b30f07aa9904363635",
+  "element": "ec05ddafb2ba6d1e83d37eca",
+  "start": "pin-block-asm-drawing",
+  "startElement": "7425731ef03d2b9db73c3efb",
+  "runner": "live2 .nstate-uip-1.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "other",
+   "tag": "iframe"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": null
+  },
+  "parts": [],
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "assembly": {
+   "instances": [
+    {
+     "name": "Part 2 <1>",
+     "fixed": false,
+     "transform": [
+      1,
+      0,
+      0,
+      -60,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      -5,
+      0,
+      0,
+      0,
+      1
+     ]
+    },
+    {
+     "name": "Part 1 <1>",
+     "fixed": true,
+     "transform": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      1
+     ]
+    }
+   ],
+   "mates": [
+    {
+     "name": "Revolute 1",
+     "type": "REVOLUTE",
+     "status": "OK"
+    }
+   ]
+  },
+  "drawing": {
+   "tab": "start pin-block asm Copy 2 Drawing 1",
+   "sheet": "Sheet1",
+   "sheets": [
+    "Sheet1"
+   ],
+   "tool": null,
+   "views": [
+    {
+     "name": "Front",
+     "kind": "base",
+     "parent": null,
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Isometric",
+     "kind": "isometric",
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Right",
+     "kind": "projected",
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    },
+    {
+     "name": "Top",
+     "kind": "projected",
+     "parent": "Front",
+     "scale": "1:1",
+     "brokenOut": 0
+    }
+   ],
+   "annotations": [],
+   "selection": []
+  }
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "tool": "BOM table"
+    }
+   },
+   "ok": true,
+   "at": [
+    890,
+    59
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "BOM table",
+     "text": [
+      "BOM table",
+      "Insert",
+      "start pin-block asm Copy 2",
+      "Template",
+      "Follow assembly",
+      "Onshape Default BOM",
+      "BOM type",
+      "Flattened",
+      "Structured - Top level",
+      "Structured - Multi level",
+      "Order",
+      "Top to bottom",
+      "Bottom to top",
+      "Select fixed corner"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "BOM table",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 243290
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "sheet_point": [
+      260,
+      200
+     ]
+    }
+   },
+   "ok": true,
+   "at": [
+    1450,
+    172
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 262956
+  },
+  {
+   "step": 3,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 279603
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "key",
+    "key": "ctrl+s"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 294625
+  },
+  {
+   "step": 5,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 500
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": []
+    }
+   },
+   "t": 310034
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "rclick",
+    "on": {
+     "sheet_table": "start asm"
+    }
+   },
+   "ok": true,
+   "at": [
+    137,
+    314
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
+    }
+   },
+   "t": 325224
+  },
+  {
+   "step": 7,
+   "do": {
+    "do": "click",
+    "on": {
+     "menu": "Replace..."
+    }
+   },
+   "ok": true,
+   "at": [
+    178,
+    354
+   ],
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSREPLACEBOMREFERENCE",
+      "title": "Select an assembly",
+      "text": "Select an assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Import…",
+      "inputs": [
+       {
+        "placeholder": "Search assemblies",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
+    }
+   },
+   "t": 341630
+  },
+  {
+   "step": 8,
+   "do": {
+    "do": "wait",
+    "until": "ms",
+    "ms": 800
+   },
+   "ok": true,
+   "state": {
+    "focus": {
+     "kind": "field",
+     "tag": "input",
+     "label": null,
+     "text": "",
+     "selection": [
+      0,
+      0
+     ],
+     "all": false
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": [
+     {
+      "id": "_OSREPLACEBOMREFERENCE",
+      "title": "Select an assembly",
+      "text": "Select an assembly / Current document / Other documents / noshape ui parity live2-1 / Main / Assembly 1 / audit 1943 / audit 1943 Copy 1 / audit 1943 sub / start config-blocks asm / start pin-block asm / start pin-block asm Copy 1 / start pin-block asm Copy 2 / start two-blocks asm / start two-blocks asm Copy 1 / Import…",
+      "inputs": [
+       {
+        "placeholder": "Search assemblies",
+        "value": ""
+       }
+      ]
+     }
+    ],
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
+    }
+   },
+   "t": 358087
+  },
+  {
+   "step": 9,
+   "do": {
+    "do": "key",
+    "key": "Escape"
+   },
+   "ok": true,
+   "pointer": {
+    "at": [
+     963,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Sheet1 (1)",
+     "text": [
+      "Sheet1 (1)",
+      "In progress",
+      "start pin-block asm Copy 2",
+      "Front",
+      "Right",
+      "Top",
+      "Isometric",
+      "start pin-block asm Copy 2"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "assembly": {
+     "instances": [
+      {
+       "name": "Part 2 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        -60,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -5,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
+      {
+       "name": "Part 1 <1>",
+       "fixed": true,
+       "transform": [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        0,
+        1
+       ]
+      }
+     ],
+     "mates": [
+      {
+       "name": "Revolute 1",
+       "type": "REVOLUTE",
+       "status": "OK"
+      }
+     ]
+    },
+    "drawing": {
+     "tab": "start pin-block asm Copy 2 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": null,
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [
+      {
+       "kind": "table",
+       "text": "Item Quantity Part number Description 1 1 2 1"
+      }
+     ],
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Isometric"
+      }
+     ]
+    }
+   },
+   "t": 375593
+  }
+ ]
+}

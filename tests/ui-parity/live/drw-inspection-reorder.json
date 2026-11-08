@@ -1,16 +1,16 @@
 {
  "scenario": "drw-inspection-reorder",
- "recorded": "2026-11-07T17:43:24.082Z",
+ "recorded": "2026-11-08T03:46:22.086Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.8"
+  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "987b7e56bd892a854a866913",
+  "element": "e92b0ab8948ab953c5eb391c",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 215331
+   "t": 235442
   },
   {
    "step": 2,
@@ -249,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 229826
+   "t": 252274
   },
   {
    "step": 3,
@@ -342,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 245370
+   "t": 268212
   },
   {
    "step": 4,
@@ -351,6 +351,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -422,7 +430,7 @@
      "selection": []
     }
    },
-   "t": 260259
+   "t": 284422
   },
   {
    "step": 5,
@@ -535,7 +543,7 @@
      "selection": []
     }
    },
-   "t": 274235
+   "t": 299617
   },
   {
    "step": 6,
@@ -643,7 +651,7 @@
      "selection": []
     }
    },
-   "t": 288685
+   "t": 315247
   },
   {
    "step": 7,
@@ -754,13 +762,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 303153
+   "t": 342938
   },
   {
    "step": 8,
@@ -769,6 +777,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -838,26 +854,27 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 318304
+   "t": 359092
   },
   {
    "step": 9,
    "do": {
     "do": "rclick",
     "on": {
-     "annotation": "1.575"
+     "annotation": "1",
+     "kind": "inspectionsymbol"
     }
    },
    "ok": true,
    "at": [
-    749,
-    587
+    743,
+    566
    ],
    "state": {
     "focus": {
@@ -928,30 +945,41 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 334368
+   "t": 387676
   },
   {
    "step": 10,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Reorder inspection items"
+     "menu": "Reorder inspection items..."
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Reorder inspection items\"}",
+   "ok": true,
+   "at": [
+    784,
+    568
+   ],
    "state": {
     "focus": {
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Reorder inspection items",
+     "text": [
+      "Reorder inspection items",
+      "Enter new inspection item identifier and then select the item to renumber",
+      "Number:"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1015,13 +1043,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 348885
+   "t": 404921
   },
   {
    "step": 11,
@@ -1036,7 +1064,15 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Reorder inspection items",
+     "text": [
+      "Reorder inspection items",
+      "Enter new inspection item identifier and then select the item to renumber",
+      "Number:"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1100,13 +1136,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 363404
+   "t": 420538
   },
   {
    "step": 12,
@@ -1115,6 +1151,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -1184,13 +1228,13 @@
       },
       {
        "kind": "inspectionsymbol",
-       "text": null
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 378947
+   "t": 436253
   }
  ]
 }
