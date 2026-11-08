@@ -227,7 +227,7 @@ fn change_edges_op(i: &mut Interp, cx: &super::FsContext, id: &[std::sync::Arc<s
         let q = super::query::QueryCx::new(&st);
         kept.into_iter()
             .filter(|(v, r, _)| !st.attributes_of(r).contains(&v))
-            .filter_map(|(v, _, snap)| q.tracked(&snap, false).first().map(|e| (q.to_ref(e), v)))
+            .filter_map(|(v, _, snap)| q.tracked(&snap, false, &[]).first().map(|e| (q.to_ref(e), v)))
             .filter(|(r, v)| !st.attributes_of(r).contains(&v))
             .collect()
     };

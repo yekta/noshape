@@ -242,6 +242,9 @@ pub struct CtxState {
     /// Edges `opEdgeChange` moved: their start, middle and end before and after, in order (a tracked edge is
     /// found where it went).
     pub edge_moves: Vec<(Vec<DVec3>, Vec<DVec3>)>,
+    /// The transforms `opPattern` copied bodies by, with the sequence number after it: a tracked entity is found on
+    /// its copies too (std sheet metal's part pattern puts the seed's joints on its copies' edges by tracking).
+    pub pattern_moves: Vec<(u32, DMat4)>,
     /// The same for the vertices an operation made where its new edges end (a localized opBoolean: the corner
     /// overcut's corner breaks go on `qCreatedBy(<its Boolean>, VERTEX)`), by their points.
     pub made_vertices: Vec<(FsId, Vec<BodyId>, Vec<DVec3>)>,
@@ -340,6 +343,7 @@ impl FsContext {
                 split_face_pieces: HashMap::new(),
                 split_face_edges: Vec::new(),
                 edge_moves: Vec::new(),
+                pattern_moves: Vec::new(),
                 made_vertices: Vec::new(),
                 attr_snapshots: HashMap::new(),
                 body_versions: HashMap::new(),

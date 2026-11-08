@@ -57,8 +57,13 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   c2-sm-louver 11 -> 24/36. Past 90° the relief keeps d × R (live's rule there not probed).
 - louver feature 6 "Louver" (live all-PLANE bends) is the UI-method fetch's artefact (live 2143: a bend of any angle
   is a cylinder in live); its live.jsonl is still the UI fetch (float32 boxes): a REST refetch is dx's / live's.
-- louver Linear pattern 2: live copies one body (RTDD, Part 3 as after Flange 4) 10 times (5 -> 15 parts); ours copies
-  3 parts (35), its copies 34/96/64 for live's 56/146/92. Next to look at.
+- louver Linear pattern 2 (std's sheet metal part pattern): its copies lost their bends (a plate and loose flange
+  walls) because our `startTracking` is geometric and never found the copies, so std's reapplyJointAttributes put no
+  joints on them. opPattern's body-copy transforms are now recorded (`pattern_moves`, with their op sequence) and a
+  TRACKING query also looks where those after its start moved the tracked points. louver 24 -> 27/36. T2
+  sheetmetal_std a_pattern_of_a_flanged_part_copies_it_whole. Left in louver: Sketch 9 NOT BUILT (its plane's face
+  S2E6G has no live geometry: the UI-fetch, dx / live), Fillet 1's info "For active sheet metal parts use Corner
+  break." (ours OK), Linear pattern 3's Part 16 83 faces for live's 94.
 - c2-valve-config Extrude 3 (11 circle / 48 other edges for 9 / 50): not the text. Open Sans Bold's "6" has a straight
   13-unit segment (356,780)-(369,780) in both; Extrude 3 runs it up to Revolve 1's REVOLVED face, which a plane
   square to its axis cuts in a circle (Parasolid says so; OCCT's splitter gives a B-spline). Bool's `op_prism_until`.

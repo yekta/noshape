@@ -1948,3 +1948,52 @@ fn a_bend_reliefs_round_is_centred_on_the_tangent_line() {
     let round = cylinders.iter().find(|c| c.1.z.abs() > 0.999 && (c.2 - mm(1.628 * 1.0625 / 2.0)).abs() < 1e-9).unwrap_or_else(|| panic!("the relief's round: {:#?}", face_report(&r)));
     assert!((round.0.y - bend.0.y).abs() < 1e-7, "the round at y {} mm, the tangent line at {} mm", round.0.y * 1e3, bend.0.y * 1e3);
 }
+
+/// A part pattern (New) of a sheet metal part with a flange copies it whole (c2-sm-louver's Linear pattern 2: live's
+/// ten copies 56 faces each as the seed; ours came out as a plate and loose flange walls).
+#[test]
+#[ignore = "T2: sheet metal / frames (P3), long std regenerations"]
+fn a_pattern_of_a_flanged_part_copies_it_whole() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let p: Vec<_> = [(0.0, 2.286), (12.7, 2.286), (12.7, 0.0), (60.0, 0.0), (60.0, 40.0), (12.7, 40.0), (12.7, 39.725), (0.0, 39.725)].iter().map(|&(x, y)| sk.add_point(glam::DVec2::new(mm(x), mm(y)))).collect();
+    for i in 0..p.len() {
+        sk.add_line_between(p[i], p[(i + 1) % p.len()]).unwrap();
+    }
+    let sketch = s.add("sketch", |pv| {
+        pv.set("sketchPlane", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        pv.set("sketch", ParamValue::Sketch(Box::new(SketchData { sketch: sk, ..Default::default() })));
+    });
+    let r = s.ok();
+    let key = r.display.sketches.iter().find(|g| g.feature == sketch).unwrap().regions[0].key.clone();
+    s.add("sheetMetalStart", |pv| {
+        pv.set("process", en("THICKEN"));
+        pv.set("regions", ParamValue::Query(vec![Reference::SketchRegion { sketch, key }]));
+        pv.set("thickness", expr("1.628 mm"));
+        pv.set("radius", expr("1.628 mm"));
+    });
+    let r = s.ok();
+    for at in [DVec3::new(36.0, 40.0, 1.628), DVec3::new(36.0, 0.0, 1.628)] {
+        let edge = edge_at(&r, at);
+        s.add("sheetMetalFlange", |pv| {
+            pv.set("edges", ParamValue::Query(vec![edge]));
+            pv.set("distance", expr("20 mm"));
+            pv.set("flangeAlignment", en("INNER"));
+        });
+    }
+    let r = s.ok();
+    let seed = &r.context.bodies[part(&r)];
+    let (faces, volume) = (seed.shape.faces().len(), volume_mm3(&r));
+    let body = seed.id.clone();
+    s.add("linearPattern", |p| {
+        p.set("patternType", en("PART"));
+        p.set("entities", ParamValue::Query(vec![Reference::Body(body.clone())]));
+        p.set("directionOne", ParamValue::Query(vec![Reference::Plane(DatumPlane::Top)]));
+        p.set("distance", expr("100 mm"));
+        p.set("instanceCount", expr("2"));
+        p.set("operationType", en("NEW"));
+    });
+    let r = s.ok();
+    let solids: Vec<_> = r.context.bodies.iter().filter(|b| b.kind == BodyKind::Solid).map(|b| (b.shape.faces().len(), b.shape.volume().unwrap_or(0.0) * 1e9)).collect();
+    assert!(solids.len() == 2 && solids.iter().all(|&(f, v)| f == faces && (v - volume).abs() < 1e-3), "the seed {faces} faces, {volume} mm³; the parts {solids:?}");
+}

@@ -10,7 +10,7 @@ use super::{CtxState, FsContext, FsId, context_arg, convert::*, is_marker, std_e
 use crate::display::{BodyKind, PlaneFrame};
 use crate::reference::{BodyId, DatumPlane, FeatureId, Reference, Role, TopoName};
 use crate::regen::eval::{decode_region_key, encode_region_key};
-use glam::DVec3;
+use glam::{DMat4, DVec3};
 use noshape_featurescript::interp::{Interp, NativeFn, R};
 use noshape_featurescript::value::{Map, Value};
 use noshape_kernel as k;
@@ -769,7 +769,7 @@ impl<'a> QueryCx<'a> {
         if !found.is_empty() && found.iter().all(|e| snap_matches(self, snap, e)) {
             return found;
         }
-        let tracked = self.tracked(snap, false);
+        let tracked = self.tracked(snap, false, &[]);
         if tracked.is_empty() {
             // Nothing lies where it was: it moved, if its name still means it. An edge's or vertex's name is an
             // ordinal among its neighbours' (`Boundary`, `Vertex`): after a topology change it may name another (a
@@ -796,7 +796,7 @@ impl<'a> QueryCx<'a> {
     /// What a `startTracking` id stands for now: the entity and what was
     /// made from it, e.g. the sheet edges std sheet metal CONVERT extracts
     /// from the part's bend edges (live dom/fs-smprobe3-4.txt).
-    pub fn tracking(&self, id: &str) -> Vec<Ent> {
+    pub fn tracking(&self, id: &str, since: u32) -> Vec<Ent> {
         let mut out = self.resolve_transient(id);
         // The faces named after it: a shell's or thicken's offset of it, a region enclosed from those, their pieces
         // (Parasolid's offsets keep their faces' lineage). A face a shell moved off its plane has nothing where it
@@ -807,7 +807,8 @@ impl<'a> QueryCx<'a> {
             }
         }
         if let Some(snap) = self.st.snapshots.get(id) {
-            out.extend(self.tracked(snap, true));
+            let copies: Vec<DMat4> = self.st.pattern_moves.iter().filter(|(seq, _)| *seq > since).map(|(_, m)| *m).collect();
+            out.extend(self.tracked(snap, true, &copies));
             // A face used to split faces: the edges it cut.
             if snap.etype == EType::Face && let Some(p) = snap.points.first() {
                 for (o, n, mids) in &self.st.split_tools {
@@ -838,8 +839,8 @@ impl<'a> QueryCx<'a> {
     /// Current entities a tracked entity became: those of its type lying on
     /// its old points (renamed or merged), or on the old edge between its
     /// ends (split pieces). With `to_sheets`, a solid's entity may also
-    /// become a sheet's (extracted surfaces).
-    pub(super) fn tracked(&self, snap: &Snapshot, to_sheets: bool) -> Vec<Ent> {
+    /// become a sheet's (extracted surfaces); also where each of `copies` (pattern transforms) put its points.
+    pub(super) fn tracked(&self, snap: &Snapshot, to_sheets: bool, copies: &[DMat4]) -> Vec<Ent> {
         const TOL: f64 = 1e-7;
         // An edge opEdgeChange moved is looked for where it went too (and on through later moves).
         let mut wheres: Vec<Vec<DVec3>> = vec![snap.points.clone()];
@@ -851,6 +852,8 @@ impl<'a> QueryCx<'a> {
                 }
             }
         }
+        let moved: Vec<Vec<DVec3>> = copies.iter().flat_map(|m| wheres.iter().map(move |w| w.iter().map(|p| m.transform_point3(*p)).collect())).collect();
+        wheres.extend(moved);
         // The old face's box and plane: a piece of it lies in its box (boxes are loose: a hundredth of its size to
         // spare) and on its plane, and its inner point is costly.
         let old_box = snap.face.as_ref().and_then(|f| f.bounding_box(false).ok());
@@ -1335,7 +1338,7 @@ pub fn relocated_pieces(q: &QueryCx, r: &Reference, snap: &Snapshot) -> Option<V
             _ => None,
         };
     }
-    let pieces = q.tracked(snap, false);
+    let pieces = q.tracked(snap, false, &[]);
     // Its name names another entity now and nothing lies where it was: it is gone, and its attributes with it
     // (Parasolid's; else they'd sit on whatever took the name: cf-sheet-metal-overcut-dogbone's corner breaks on
     // a tangent point the rebuild left out landed on other corners).
@@ -1949,6 +1952,13 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
         }
         "LAMINAR_DEPENDENCY" | "PATTERN" => sub(i, "subquery")?,
         "TRACKING" => {
+            // Only what operations after `lastOperationId` made or changed:
+            // "entities derived from subquery in features between
+            // startTracking and when query is evaluated" (std feature.fs).
+            // Std Bend tracks its bend edges after copying the bend face;
+            // the untouched copy lies on them too.
+            let last: Vec<Arc<str>> = query.get("lastOperationId").as_array().map(|a| a.iter().filter_map(|c| c.as_str()).collect()).unwrap_or_default();
+            let since = q.st.ops.values().find(|o| !last.is_empty() && o.id == last).map_or(0, |o| o.seq + 1);
             let mut out = Vec::new();
             for key in ["subquery1", "subquery2"] {
                 let items: Vec<Value> = match query.get(key) {
@@ -1958,18 +1968,11 @@ pub fn eval(i: &mut Interp, q: &QueryCx, query: &Value) -> R<Vec<Ent>> {
                 };
                 for item in items {
                     match item.get("queryType").as_str().as_deref() {
-                        Some("TRANSIENT") => out.extend(q.tracking(&item.get("transientId").as_str().unwrap_or_default())),
+                        Some("TRANSIENT") => out.extend(q.tracking(&item.get("transientId").as_str().unwrap_or_default(), since)),
                         _ => out.extend(eval(i, q, &item)?),
                     }
                 }
             }
-            // Only what operations after `lastOperationId` made or changed:
-            // "entities derived from subquery in features between
-            // startTracking and when query is evaluated" (std feature.fs).
-            // Std Bend tracks its bend edges after copying the bend face;
-            // the untouched copy lies on them too.
-            let last: Vec<Arc<str>> = query.get("lastOperationId").as_array().map(|a| a.iter().filter_map(|c| c.as_str()).collect()).unwrap_or_default();
-            let since = q.st.ops.values().find(|o| !last.is_empty() && o.id == last).map_or(0, |o| o.seq + 1);
             // A tracked body split since: its pieces too (std sheet metal's Fold tracks its definition sheet through
             // the split that makes the fold's two sides).
             let bodies: Vec<&BodyId> = out.iter().filter_map(|e| if let Ent::Body(b) = e { Some(&q.st.ctx.bodies[*b].id) } else { None }).collect();

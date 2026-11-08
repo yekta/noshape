@@ -1056,6 +1056,10 @@ fn op_pattern(i: &mut Interp, a: Vec<Value>) -> R<Value> {
     // Instance bodies as renamed after the operation.
     let mut st = cx.state.lock();
     let (marker, feature) = (super::marker_of(&id), st.feature);
+    if !made.is_empty() {
+        let seq = st.next_seq;
+        st.pattern_moves.extend(transforms.iter().filter(|m| !m.abs_diff_eq(DMat4::IDENTITY, 1e-12)).map(|m| (seq, *m)));
+    }
     own_sketches(&mut st, marker, &sketches);
     for (source, copy) in &sketches {
         let copied: Vec<Value> = st.attributes_of(&Reference::Sketch(*source)).into_iter().cloned().collect();
