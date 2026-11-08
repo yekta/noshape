@@ -94,6 +94,25 @@ fn loft_end_condition_normal() {
     assert!(l.shape.is_valid());
 }
 
+/// A surface loft between two lines along guides of two segments each (c2-hunting-knife's Loft 3 closes a hole with a
+/// guide of several curves): one face through the profiles and guides exactly, bounded by their own 6 edges (to share
+/// them with the faces round the hole); in their plane it is the hexagon they bound, 120 mm².
+#[test]
+fn a_loft_along_guides_of_several_curves_runs_through_them() {
+    let p = |x: f64, y: f64| DVec3::new(x, y, 0.0);
+    let chain = |pts: &[DVec3]| make_wire(&pts.windows(2).map(|w| make_line(w[0], w[1]).unwrap()).collect::<Vec<_>>()).unwrap();
+    let a = chain(&[p(0.0, 0.0), p(10.0, 0.0)]);
+    let b = chain(&[p(0.0, 10.0), p(10.0, 10.0)]);
+    let g1 = chain(&[p(0.0, 0.0), p(-2.0, 5.0), p(0.0, 10.0)]);
+    let g2 = chain(&[p(10.0, 0.0), p(12.0, 5.0), p(10.0, 10.0)]);
+    let r = loft_guided_open(&a, &b, &[g1, g2], true, false).unwrap();
+    let faces = r.faces();
+    assert_eq!(faces.len(), 1);
+    assert_eq!(faces[0].edges().len(), 6, "the profiles' 2 and the guides' 4 edges");
+    assert!(close(faces[0].area().unwrap(), 120.0, 1e-6), "area {}", faces[0].area().unwrap());
+    assert!(faces[0].is_valid());
+}
+
 /// c2-impeller-loft's Loft (live: its ends' rims the sketches' 4 circles and 3 lines): a loft's edges on its sections
 /// keep the sections' curves, not ThruSections' B-spline copies; a square to a circle with Normal to profile, its 4
 /// lines and the circle's 4 arcs, valid.

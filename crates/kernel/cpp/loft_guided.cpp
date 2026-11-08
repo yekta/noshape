@@ -12,8 +12,17 @@
 
 #include "internal.hpp"
 #include <BRepAdaptor_CompCurve.hxx>
+#include <TopExp.hxx>
+#include <Geom_TrimmedCurve.hxx>
+#include <GeomFill_BSplineCurves.hxx>
+#include <GeomConvert.hxx>
+#include <GeomConvert_CompCurveToBSplineCurve.hxx>
+#include <BRepCheck_Analyzer.hxx>
+#include <Bnd_Box.hxx>
+#include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepBuilderAPI_MakeSolid.hxx>
 #include <BRepBuilderAPI_Sewing.hxx>
 #include <BRepFill.hxx>
@@ -196,10 +205,31 @@ double meet(const Adaptor3d_Curve& g, const Adaptor3d_Curve& p, double& tg, gp_P
 
 // A guide as a curve from its start on profile A to its end on profile B,
 // by normalized arc length.
+// A guide as one curve: its edge, or its edges chained into a wire (a guide of several sketch curves, c2-hunting-knife's
+// Loft 3) run as one.
+std::unique_ptr<Adaptor3d_Curve> guide_curve(const TopoDS_Shape& gx)
+{
+  std::vector<TopoDS_Edge> edges;
+  for (TopExp_Explorer x(gx, TopAbs_EDGE); x.More(); x.Next())
+    edges.push_back(TopoDS::Edge(x.Current()));
+  if (edges.empty())
+    fail_invalid("a loft guide has no curve");
+  if (edges.size() == 1)
+    return std::make_unique<BRepAdaptor_Curve>(edges[0]);
+  BRepBuilderAPI_MakeWire mk;
+  ShapeList               list;
+  for (const TopoDS_Edge& e : edges)
+    list.Append(e);
+  mk.Add(list);
+  if (!mk.IsDone())
+    fail_op("A loft guide's curves are not connected.");
+  return std::make_unique<BRepAdaptor_CompCurve>(mk.Wire());
+}
+
 struct Guide
 {
-  std::unique_ptr<BRepAdaptor_Curve> c;
-  double                             t0, t1, len;
+  std::unique_ptr<Adaptor3d_Curve> c;
+  double                           t0, t1, len;
   bool                               reversed;
   double                             sa, sb; // arc lengths on A and B
   gp_Pnt at(double v) const
@@ -299,13 +329,8 @@ std::unique_ptr<OcShape> loft_guided_curved(const OcShape& profile_a, const OcSh
   std::vector<Guide> gs;
   for (const TopoDS_Shape& gx : guides.items)
   {
-    std::vector<TopoDS_Edge> edges;
-    for (TopExp_Explorer x(gx, TopAbs_EDGE); x.More(); x.Next())
-      edges.push_back(TopoDS::Edge(x.Current()));
-    if (edges.size() != 1)
-      fail_op("Loft guides of several curves are not supported yet");
     Guide g;
-    g.c.reset(new BRepAdaptor_Curve(edges[0]));
+    g.c = guide_curve(gx);
     // Trimmed to its stretch between the profiles.
     double ta, tb;
     gp_Pnt pa, pb;
@@ -609,6 +634,97 @@ TopoDS_Face simplest_face(const std::vector<std::vector<gp_Pnt>>& g, double tol)
   return std::abs(a.Mass() - b.Mass()) <= 1e-6 * a.Mass() ? out : f;
 }
 
+// A chain of edges as one B-spline, from `from` (an end of the chain): C0 at its joints.
+occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp_Pnt& from, double tol)
+{
+  ShapeList edges;
+  for (TopExp_Explorer x(chain, TopAbs_EDGE); x.More(); x.Next())
+    edges.Append(x.Current());
+  BRepBuilderAPI_MakeWire mw;
+  mw.Add(edges);
+  if (!mw.IsDone())
+    return nullptr;
+  GeomConvert_CompCurveToBSplineCurve join;
+  for (BRepTools_WireExplorer x(mw.Wire()); x.More(); x.Next())
+  {
+    double                        f, l;
+    const occ::handle<Geom_Curve> c = BRep_Tool::Curve(x.Current(), f, l);
+    if (c.IsNull())
+      return nullptr;
+    occ::handle<Geom_BSplineCurve> piece = GeomConvert::CurveToBSplineCurve(occ::handle<Geom_Curve>(new Geom_TrimmedCurve(c, f, l)));
+    if (x.Current().Orientation() == TopAbs_REVERSED)
+      piece->Reverse();
+    if (!join.Add(piece, tol))
+      return nullptr;
+  }
+  occ::handle<Geom_BSplineCurve> out = join.BSplineCurve();
+  if (out.IsNull())
+    return nullptr;
+  if (out->StartPoint().Distance(from) > out->EndPoint().Distance(from))
+    out->Reverse();
+  return out;
+}
+
+// A face filling the loop of `bounds` (four chains of edges in order round it: the profiles' and guides' own edges)
+// with a Coons patch, which runs through them exactly, bounded by those edges (Parasolid's face shares them with the
+// faces round a hole, c2-hunting-knife's Loft 3). Null where they don't close or the face isn't valid.
+TopoDS_Face face_on_edges(const std::vector<TopoDS_Shape>& bounds, double tol)
+{
+  ShapeList edges;
+  for (const TopoDS_Shape& b : bounds)
+    for (TopExp_Explorer x(b, TopAbs_EDGE); x.More(); x.Next())
+      edges.Append(x.Current());
+  BRepBuilderAPI_MakeWire mw;
+  mw.Add(edges);
+  if (bounds.size() != 4 || !mw.IsDone() || !mw.Wire().Closed())
+    return TopoDS_Face();
+  // Round the loop: each chain from where the one before ended.
+  std::vector<occ::handle<Geom_BSplineCurve>> sides;
+  TopoDS_Vertex first, last;
+  TopExp::Vertices(TopoDS::Wire(BRepBuilderAPI_MakeWire(TopoDS::Edge(TopExp_Explorer(bounds[0], TopAbs_EDGE).Current())).Wire()), first, last);
+  gp_Pnt at = BRep_Tool::Pnt(first);
+  for (const TopoDS_Shape& b : bounds)
+  {
+    occ::handle<Geom_BSplineCurve> c = chain_bspline(b, at, tol);
+    if (c.IsNull())
+      return TopoDS_Face();
+    sides.push_back(c);
+    at = c->EndPoint();
+  }
+  // Stretch style: through the four curves exactly, area within live's band (Coons style is 0.05 % over); the inside
+  // isn't live's yet (the blade's volume +2.9 %, asked live).
+  GeomFill_BSplineCurves fill(sides[0], sides[1], sides[2], sides[3], GeomFill_StretchStyle);
+  const occ::handle<Geom_BSplineSurface> surface = fill.Surface();
+  if (surface.IsNull())
+    return TopoDS_Face();
+  // The loop round the surface's normal (the other way it bounds the rest of the plane).
+  auto on = [&](const TopoDS_Wire& w) {
+    BRepBuilderAPI_MakeFace mf(occ::handle<Geom_Surface>(surface), w, true);
+    if (!mf.IsDone())
+      return TopoDS_Face();
+    ShapeFix_Face fix(mf.Face());
+    fix.Perform();
+    TopoDS_Face f = fix.Face();
+    BRepLib::SameParameter(f, tol, true);
+    return f;
+  };
+  TopoDS_Face out = on(mw.Wire());
+  if (out.IsNull())
+    return out;
+  GProp_GProps first_area;
+  BRepGProp::SurfaceProperties(out, first_area);
+  if (first_area.Mass() < 0)
+    out = on(TopoDS::Wire(mw.Wire().Reversed()));
+  if (out.IsNull())
+    return out;
+  double worst = 0;
+  for (TopExp_Explorer x(out, TopAbs_EDGE); x.More(); x.Next())
+    worst = std::max(worst, BRep_Tool::Tolerance(TopoDS::Edge(x.Current())));
+  if (worst > 1e3 * tol || !BRepCheck_Analyzer(out).IsValid())
+    return TopoDS_Face();
+  return out;
+}
+
 } // namespace
 
 std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShape& profile_b, const OcShapeList& guides,
@@ -626,21 +742,49 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
   // them and how far it runs on past each profile.
   struct G
   {
-    std::unique_ptr<BRepAdaptor_Curve> c;
-    double                             ta, tb, len, before, after, sa, sb;
+    std::unique_ptr<Adaptor3d_Curve> c;
+    double                           ta, tb, len, before, after, sa, sb;
     // Arc lengths from ta to the parameter range's ends.
     double up, down;
+    TopoDS_Shape shape; // the guide as selected
+    // Arc length along the curve at parameters `knot` (a dense table: GCPnts_AbscissaPoint fails across a composite
+    // guide's kink, c2-hunting-knife's Loft 3, and the point went off the guide).
+    std::vector<double> knot, arc;
+    void tabulate()
+    {
+      const double lo = c->FirstParameter(), hi = c->LastParameter();
+      const int    n  = 4000;
+      knot.resize(n + 1);
+      arc.resize(n + 1);
+      gp_Pnt prev = c->Value(lo);
+      for (int i = 0; i <= n; ++i)
+      {
+        knot[i]       = lo + (hi - lo) * i / n;
+        const gp_Pnt p = c->Value(knot[i]);
+        arc[i]        = i ? arc[i - 1] + p.Distance(prev) : 0.0;
+        prev          = p;
+      }
+    }
+    double arc_at(double t) const
+    {
+      const size_t i = std::min<size_t>(std::upper_bound(knot.begin(), knot.end(), t) - knot.begin(), knot.size() - 1);
+      if (i == 0)
+        return 0;
+      return arc[i - 1] + (arc[i] - arc[i - 1]) * (t - knot[i - 1]) / std::max(knot[i] - knot[i - 1], 1e-300);
+    }
+    double param_at_arc(double s) const
+    {
+      const size_t i = std::min<size_t>(std::max<size_t>(std::lower_bound(arc.begin(), arc.end(), s) - arc.begin(), 1), arc.size() - 1);
+      const double f = (s - arc[i - 1]) / std::max(arc[i] - arc[i - 1], 1e-300);
+      return knot[i - 1] + (knot[i] - knot[i - 1]) * std::clamp(f, 0.0, 1.0);
+    }
     gp_Pnt at(double v) const
     {
       // Signed arc length from ta along increasing parameter.
       const double a     = (tb > ta ? 1.0 : -1.0) * v * len;
       const double avail = a >= 0 ? up : down;
       if (std::abs(a) <= avail + 1e-15)
-      {
-        GCPnts_AbscissaPoint ap(*c, a, ta);
-        if (ap.IsDone())
-          return c->Value(ap.Parameter());
-      }
+        return c->Value(param_at_arc(arc_at(ta) + a));
       // Past the guide's end: on along its end tangent.
       gp_Pnt p;
       gp_Vec d;
@@ -651,13 +795,10 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
   std::vector<G> gs;
   for (const TopoDS_Shape& gx : guides.items)
   {
-    std::vector<TopoDS_Edge> edges;
-    for (TopExp_Explorer x(gx, TopAbs_EDGE); x.More(); x.Next())
-      edges.push_back(TopoDS::Edge(x.Current()));
-    if (edges.size() != 1)
-      fail_op("Loft guides of several curves are not supported yet");
     G g;
-    g.c.reset(new BRepAdaptor_Curve(edges[0]));
+    g.c     = guide_curve(gx);
+    g.shape = gx;
+    g.tabulate();
     gp_Pnt pa, pb;
     if (meet(*g.c, *A.c, g.ta, pa) > tol || meet(*g.c, *B.c, g.tb, pb) > tol || std::abs(g.ta - g.tb) < 1e-12)
       fail_op("All guides should intersect each profile boundary.");
@@ -669,6 +810,16 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
     g.down   = GCPnts_AbscissaPoint::Length(*g.c, lo, g.ta);
     g.sa     = A.abscissa(pa);
     g.sb     = flip_b ? B.len - B.abscissa(pb) : B.abscissa(pb);
+    // A guide through a profile's end runs along the face's side: its position exactly that end (a projection on a
+    // composite curve lands a hair inside).
+    if (pa.Distance(A.at(0)) < tol)
+      g.sa = 0;
+    else if (pa.Distance(A.at(A.len)) < tol)
+      g.sa = A.len;
+    if (pb.Distance(b_at(0)) < tol)
+      g.sb = 0;
+    else if (pb.Distance(b_at(B.len)) < tol)
+      g.sb = B.len;
     gs.push_back(std::move(g));
   }
   if (gs.empty())
@@ -763,7 +914,16 @@ std::unique_ptr<OcShape> loft_guided_open(const OcShape& profile_a, const OcShap
         grid[i][j] = gp_Pnt(s);
       }
     }
-    sew.Add(simplest_face(grid, 1e-6 * (1 + size)));
+    TopoDS_Face face = simplest_face(grid, 1e-6 * (1 + size));
+    // One patch between two guides along its sides (c2-hunting-knife's Loft 3, closing a hole): bounded by the
+    // profiles' and guides' own edges, as Parasolid's face (it shares them with the faces around the hole).
+    if (sa.size() == 2 && cols.front() >= 0 && cols.back() >= 0 && vlo == 0 && vhi == 1 && !trim_profiles)
+    {
+      const TopoDS_Face exact = face_on_edges({A.wire, gs[cols.back()].shape, B.wire, gs[cols.front()].shape}, tol);
+      if (!exact.IsNull())
+        face = exact;
+    }
+    sew.Add(face);
   }
   sew.Perform();
   return wrap(sew.SewedShape());

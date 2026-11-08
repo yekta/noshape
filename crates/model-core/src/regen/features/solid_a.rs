@@ -924,10 +924,13 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
             loft_guided(&shapes, &guides, solid)?
         };
         let names = name_new(ev, &shape);
-        let kind = if solid { BodyKind::Solid } else { BodyKind::Surface };
-        let op = ev.enum_(if solid { "operationType" } else { "surfaceOperationType" }).to_string();
-        let scope = if solid { super::extrude::scope(ev) } else { None };
-        return ev.apply_operation(vec![NamedShape::new(shape, names)], &op, scope, kind);
+        if !solid {
+            // std loft.fs: a surface Add joins the surfaces it meets, a solid where they close (makeSolid).
+            return super::bshared::surface_result(ev, NamedShape::new(shape, names));
+        }
+        let op = ev.enum_("operationType").to_string();
+        let scope = super::extrude::scope(ev);
+        return ev.apply_operation(vec![NamedShape::new(shape, names)], &op, scope, BodyKind::Solid);
     }
     let mut opts = k::LoftOptions { solid, closed: ev.bool("makePeriodic"), ..Default::default() };
     // loft.fs createProfileConditions ("End conditions" is only a group
@@ -1133,14 +1136,14 @@ pub fn loft(ev: &mut EvalCtx) -> FResult<()> {
         let scope = super::extrude::scope(ev);
         return ev.apply_operation(tools, &op, scope, BodyKind::Solid);
     }
-    let tools = vec![NamedShape::new(res.shape, names)];
+    let tool = NamedShape::new(res.shape, names);
     if solid {
         let op = ev.enum_("operationType").to_string();
         let scope = super::extrude::scope(ev);
-        ev.apply_operation(tools, &op, scope, BodyKind::Solid)
+        ev.apply_operation(vec![tool], &op, scope, BodyKind::Solid)
     } else {
-        let op = ev.enum_("surfaceOperationType").to_string();
-        ev.apply_operation(tools, &op, None, BodyKind::Surface)
+        // std loft.fs: a surface Add joins the surfaces it meets, a solid where they close (makeSolid).
+        super::bshared::surface_result(ev, tool)
     }
 }
 
