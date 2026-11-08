@@ -666,6 +666,12 @@ fn faces_tool(ev: &EvalCtx, body: &Body, faces: &[usize]) -> FResult<FaceTool> {
         1 => sewn.shape.solids().into_iter().next().ok_or_else(|| fe("Failed to create pattern, check input."))?,
         _ => Shape::compound(&sewn.shape.solids()),
     };
+    // Faces that close round no volume (two coincident faces): nothing to add or cut, and a cut by such tools spent
+    // seconds in OCCT for an empty part (FACE-PATTERN-30-CUT-SLOW).
+    let extent = solid.bounding_box(false).map(|b| b.diagonal()).unwrap_or(0.0);
+    if solid.volume().map_or(true, |v| v.abs() <= 1e-9 * extent.powi(3)) {
+        return err("Failed to create pattern, check input.");
+    }
     // Names: selected faces keep their names, caps are new.
     let mut names: Vec<Option<Name>> = vec![None; solid.count(ShapeType::Face)];
     for r in &sewn.history.records {

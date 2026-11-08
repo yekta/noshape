@@ -33,6 +33,18 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 10:45 UTC: P0 FACE-PATTERN-30-CUT-SLOW (lead): 520 s -> the document in 264 ms.**
+- Case: asm-suspension's Part Studio 805e29 as a one-document model corpus on vibe5 (~/core-cases/asm-susp-805e29:
+  features.json = studios/<eid>.json, live.jsonl = <eid>.live.jsonl). sudo gdb works on vibe5 (ptrace_scope 1).
+- Causes: (1) boolean.cpp: InsideChecked's rerun without glue lost the cut from the faces' classification
+  (CutByFaces): 141 s -> 1.5 s; (2) compound tools (an instance's pieces) never grouped, so that cut never applied:
+  the checked glued cut now goes by their solids, 117 s -> 1.9 s (only glue 4: flattening every cut broke
+  kernel_core::a_deadline_stops_a_long_operation's 900-hole compound path); (3) the tools were zero-volume (two
+  coincident faces each, from the Nut: the translation is wrong from Extrude 1 when the studio runs alone, asm's), the
+  cut came back empty and eval's three fuzzy retries reran it: faces_tool now fails such a tool ("Failed to create
+  pattern, check input."). T1 kernel blend::a_checked_glued_cut_of_tools_poking_out_is_the_plain_cut.
+- Probe scripts: /root/core-scratch/probe/ (pattern_cut_probe.rs: variants on dumped body/tools BREPs).
+
 **State 11-08 07:50 UTC: c2-hunting-knife's Loft 3 landed (eb200af6); the 60 s reopen ticketed.**
 - Loft 3: a guide of several curves is one composite curve (`guide_curve`); a guide's points by a dense arc-length
   table (`G::tabulate`: GCPnts_AbscissaPoint failed across the composite's joint and the code extrapolated off the

@@ -7387,6 +7387,27 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     for (const TopoDS_Shape& x : tools.items)
       t.push_back(facet_mesh(x, facets));
   }
+  // A face pattern's checked cut by tools that are compounds of solids (an instance's separate pieces) cuts by their
+  // solids: the grouping of tools apart and the cut from the faces' classification go by tools
+  // (FACE-PATTERN-30-CUT-SLOW: 29 compounds of 3 took 117 s, their 87 solids 1.9 s). The history still names the
+  // tools' own sub-shapes. (Other cuts keep their tools: a compound of 900 holes has its own paths.)
+  if (op == 1 && opts.glue == 4 && facets.source.empty())
+  {
+    std::vector<TopoDS_Shape> flat;
+    for (const TopoDS_Shape& x : t)
+    {
+      std::vector<TopoDS_Shape> solids;
+      int                       others = 0;
+      if (x.ShapeType() == TopAbs_COMPOUND)
+        for (TopoDS_Iterator it(x); it.More(); it.Next())
+          (it.Value().ShapeType() == TopAbs_SOLID ? solids.push_back(it.Value()) : (void)++others);
+      if (solids.size() >= 2 && others == 0)
+        flat.insert(flat.end(), solids.begin(), solids.end());
+      else
+        flat.push_back(x);
+    }
+    t = std::move(flat);
+  }
   // Many touching tools into one solid (patterns): in slabs.
   if (op == 0 && opts.glue == 3 && a.size() == 1 && facets.source.empty())
   {
@@ -7724,7 +7745,21 @@ static OpOut op_boolean_built(uint8_t op, const OcShapeList& args, const OcShape
     b->SetArguments(to_list(a));
     b->SetTools(to_list(t));
     apply_opts(*b, plain);
-    build_cancellable(*b);
+    // Again from the faces' classification when the first cut was (FACE-PATTERN-30-CUT-SLOW: without it OCCT's split
+    // solids of 87 pattern tools took 141 s, with it 1.1 s).
+    {
+      const CutByFaces scope(by_faces);
+      build_cancellable(*b);
+    }
+    if (by_faces && (b->HasErrors() || !b->IsDone()))
+    {
+      by_faces = false;
+      b        = make();
+      b->SetArguments(to_list(a));
+      b->SetTools(to_list(t));
+      apply_opts(*b, plain);
+      build_cancellable(*b);
+    }
   }
   fail_if_cancelled();
   if (!by_tree && (b->HasErrors() || !b->IsDone()))

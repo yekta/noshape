@@ -211,6 +211,33 @@ fn a_drafted_extrude_of_a_spline_has_steiners_volume() {
     }
 }
 
+/// A face pattern's checked glued cut (Glue::InsideChecked) by compound tools (an instance's pieces) reaching out of the
+/// part: the glued cut fails its check and runs again unglued, as the plain cut by the pieces does
+/// (FACE-PATTERN-30-CUT-SLOW: the compounds and that rerun both missed the cut from the faces' classification, 117 s and
+/// 141 s in OCCT's split solids, 1.9 s with it). The same solid either way.
+#[test]
+fn a_checked_glued_cut_of_tools_poking_out_is_the_plain_cut() {
+    setup();
+    let block = bx([0.0, 0.0, 0.0], [60.0, 40.0, 10.0]);
+    // Six overlapping pairs of Ø4 pins through the block and out of both faces.
+    let mut tools = Vec::new();
+    for i in 0..6 {
+        for dx in [0.0, 2.0] {
+            let at = DVec3::new(6.0 + 9.0 * f64::from(i) + dx, 20.0, -5.0) * MM;
+            tools.push(make_cylinder(&Plane::from_normal(at, DVec3::Z), 2.0 * MM, 20.0 * MM, std::f64::consts::TAU).unwrap());
+        }
+    }
+    let opts = |glue| BooleanOptions { glue, obb: true, parallel: true, ..Default::default() };
+    // As a face pattern passes them: each instance's pieces one compound tool (the cut goes by their solids).
+    let pairs: Vec<Shape> = tools.chunks(2).map(Shape::compound).collect();
+    let checked = boolean(BooleanOp::Cut, std::slice::from_ref(&block), &pairs, &opts(Glue::InsideChecked)).unwrap().shape;
+    let plain = boolean(BooleanOp::Cut, std::slice::from_ref(&block), &tools, &opts(Glue::Off)).unwrap().shape;
+    assert!(checked.is_valid());
+    assert_eq!(checked.faces().len(), plain.faces().len());
+    assert!((vol_mm3(&checked) - vol_mm3(&plain)).abs() < 1e-6 * vol_mm3(&plain), "{} vs {}", vol_mm3(&checked), vol_mm3(&plain));
+    assert!(vol_mm3(&checked) < 60.0 * 40.0 * 10.0 - 6.0 * 10.0 * std::f64::consts::PI * 4.0);
+}
+
 /// A checked blend that OCCT builds fine must be OCCT's own result, untouched
 /// (no scaled copy): exact HLR lost fillet end arcs on a scaled-back plate
 /// (drawing test `demo_plate_views_have_expected_lines`, 6 visible lines instead of 8).
