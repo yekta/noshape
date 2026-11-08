@@ -62,7 +62,7 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
-## Resume here (2026-11-08 08:40 UTC)
+## Resume here (2026-11-08 07:45 UTC)
 - **c2-sm-corner-break 6 -> 11/11** (dx's item 1): Corner break on a definition face's hole corners (the louver panel's
   40 slot and flange-tip corners): `sm_flat::broken_loop` rounds a corner of any loop, the face rebuilt with its holes,
   every corner of a sheet broken before one sew. A slot with rounded corners and a bend on a side keeps its arcs: the
@@ -74,6 +74,7 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   "surface PLANE when all facet normals agree", chord 0.1 mm / 0.1 rad), and live 2143 read /bodydetails at that
   rollback: REBu is a CYLINDER R 1.628 (55.935 mm²), 18 planes + 4 cylinders, as ours. The strips are each bend's one
   facet (0.08 / 0.16 mm wide = R θ and (R + t) θ). Needs the comparison to trust only REST surface types (dx).
+- Paused again after these (lead 11-08 07:10).
 
 ## Resume here (2026-11-08 05:50 UTC)
 - **Constraint refusals as live (2270), SKETCH-SPLINE-HANDLE-ARM closed**: `constraint_command` refuses a selection a
