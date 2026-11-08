@@ -2,7 +2,7 @@
 //! rebuilt feature by feature and compared with live after each feature.
 
 use noshape_ops::Ctx;
-use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, standard_spec_by_part_name};
+use noshape_ops::parity::{PartState, Translator, differences, live_parts, our_parts, parse_refs, parts_from_live_import, parts_from_query, rebuild_assembly, model_topology, refs_from_bodies, refs_from_sketches, standard_spec_by_part_name};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -1831,7 +1831,7 @@ fn parity_assemblies() {
         let mut studios = Vec::new();
         for e in std::fs::read_dir(dir.join("studios")).into_iter().flatten().filter_map(|e| e.ok()) {
             let file = e.file_name().to_string_lossy().to_string();
-            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass")) else { continue };
+            let Some(element) = file.strip_suffix(".json").filter(|s| !s.ends_with(".parts") && !s.ends_with(".mass") && !s.ends_with(".sketches")) else { continue };
             // Live's per-feature lines (<element>.live.jsonl, live's layout, 1842).
             let live: Vec<Value> = std::fs::read_to_string(dir.join("studios").join(format!("{element}.live.jsonl"))).map(|t| t.lines().filter_map(|l| serde_json::from_str::<Value>(l).ok()).filter(|l| l.get("index").is_some()).collect()).unwrap_or_default();
             // Its parts: <element>.parts.json, else the last state of live's lines (a suppressed feature's line lists
@@ -1862,6 +1862,10 @@ fn parity_assemblies() {
             let (Some(mut features), Some(parts)) = (read(&e.path()), read(&dir.join("studios").join(format!("{element}.parts.json"))).or_else(last_state).or_else(from_instances).or_else(|| profile_sources.contains(element).then(|| json!([])))) else { continue };
             if !live.is_empty() {
                 features["live"] = Value::Array(live.clone());
+            }
+            // Its sketches' bodies at the final state (live 2267).
+            if let Some(sk) = read(&dir.join("studios").join(format!("{element}.sketches.json"))) {
+                features["sketchBodies"] = sk;
             }
             // Imported files (live's studios/foreign/foreign.json: blob element → file) as the Part Studio corpus'
             // `foreignFiles`.
@@ -2566,4 +2570,21 @@ fn standard_content_is_found_by_its_part_name() {
         assert_eq!(spec.part_name(), name);
     }
     assert!(standard_spec_by_part_name("Hex socket head cap screw M3x0.50 x 7.3").is_none());
+}
+
+/// Live's sketch bodies at a studio's final state (`<element>.sketches.json`, live 2267) are references from their
+/// sketch feature on: a face is one of the sketch's regions, an edge and a point keep their positions.
+#[test]
+fn live_sketch_bodies_are_the_sketches_regions() {
+    let features = vec![json!({ "featureId": "FExtrude" }), json!({ "featureId": "FSketch" })];
+    let file = json!({ "sketches": [{ "featureId": "FSketch", "name": "Sketch 1", "bodies": [{ "id": "JFD", "type": "SKETCH",
+        "faces": [{ "id": "JGC", "area": 0.005, "box": { "min": [0.0, -0.04, -0.04], "max": [0.0, 0.04, 0.04] }, "surface": { "type": "PLANE", "origin": [0.0, 0.0, 0.0], "normal": [1.0, 0.0, 0.0] } }],
+        "edges": [{ "id": "JFN", "length": 0.055, "midPoint": [0.0, -0.0275, 0.0] }],
+        "vertices": [{ "id": "JFE", "point": [0.0, -0.055, 0.0] }] }] }, { "featureId": "FGone", "bodies": [] }] });
+    let refs = refs_from_sketches(&file, &features);
+    let face = &refs[&(2, "JGC".to_string())];
+    assert_eq!((face.kind.as_str(), face.sketch, face.normal), ("SKETCH_REGION", true, Some([1.0, 0.0, 0.0])));
+    assert_eq!(refs[&(2, "JFN".to_string())].measure, Some(0.055));
+    assert_eq!(refs[&(2, "JFE".to_string())].point, Some([0.0, -0.055, 0.0]));
+    assert!(refs.keys().all(|(k, _)| *k == 2), "{:?}", refs.keys());
 }

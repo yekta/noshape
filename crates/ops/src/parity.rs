@@ -4392,6 +4392,24 @@ pub fn refs_from_bodies(lines: &[Value]) -> HashMap<(usize, String), LiveRef> {
     out
 }
 
+/// Live's sketch bodies at a studio's final state (`<element>.sketches.json`: `sketches`, each a sketch feature's
+/// `featureId` and its SKETCH `bodies`, faces / edges / vertices as bodydetails') as references from each sketch's
+/// feature on: its faces the sketch's regions.
+pub fn refs_from_sketches(file: &Value, features: &[Value]) -> HashMap<(usize, String), LiveRef> {
+    let mut out = HashMap::new();
+    for s in file["sketches"].as_array().into_iter().flatten() {
+        let Some(k) = features.iter().position(|f| f["featureId"] == s["featureId"]) else { continue };
+        // (Its plane normals are evPlane's, the faces' own: as bodydetails' with `orientation`.)
+        let mut bodies = s["bodies"].clone();
+        for f in bodies.as_array_mut().into_iter().flatten().flat_map(|b| b["faces"].as_array_mut().into_iter().flatten()) {
+            f["orientation"] = json!(true);
+        }
+        let line = json!({ "index": k, "type": "newSketch", "bodies": bodies });
+        out.extend(refs_from_bodies(std::slice::from_ref(&line)));
+    }
+    out
+}
+
 /// A box in a sketch plane: (min, max).
 type Box2 = ([f64; 2], [f64; 2]);
 
@@ -5243,7 +5261,13 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
         }
         let studio = &studio;
         // Live's per-feature geometry (the studio's `live` lines, `<element>.live.jsonl`) for its id-only queries.
-        let refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
+        let mut refs = studio["live"].as_array().map(|lines| refs_from_bodies(lines)).unwrap_or_default();
+        // Its sketches' bodies at the final state (live 2267, `<element>.sketches.json`): their regions, edges and
+        // points, under live's own lines.
+        let features = studio["features"].as_array().map(Vec::as_slice).unwrap_or_default();
+        for (key, r) in refs_from_sketches(&studio["sketchBodies"], features) {
+            refs.entry(key).or_insert(r);
+        }
         let mut t = match Translator::open_in(ctx, &name, studio, refs) {
             Ok(t) => t,
             Err(e) => {
