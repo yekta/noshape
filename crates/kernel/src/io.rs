@@ -78,7 +78,7 @@ fn face_colors_of(r: &ffi::StepImport, i: usize) -> Vec<(usize, [f32; 3])> {
 /// available (STEPCAFControl / XCAF). Shapes are converted to `unit`.
 pub fn read_step(path: &Path, unit: LengthUnit) -> Result<Vec<ImportedShape>> {
     let r = ck(ffi::read_step(path_str(path)?))?;
-    step_shapes(&r, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, false)).collect()
+    step_shapes(&r, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect()
 }
 
 /// A STEP reader's shapes (OCCT millimetres) in `unit`, with names and colours.
@@ -147,7 +147,7 @@ pub fn read_step_assembly_nested(path: &Path, unit: LengthUnit) -> Result<Option
     };
     // OCCT reads STEP in millimetres.
     let t0 = std::time::Instant::now();
-    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, false)).collect::<Result<Vec<_>>>()?;
+    let parts = step_shapes(&t.parts, 1.0 / unit.mm_per_unit())?.into_iter().map(|p| merged_faces(p, true)).collect::<Result<Vec<_>>>()?;
     if std::env::var_os("NOSHAPE_IMPORT_TIMING").is_some() {
         eprintln!("  step tree scale: {:.1} ms", t0.elapsed().as_secs_f64() * 1000.0);
     }

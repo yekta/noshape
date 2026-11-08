@@ -8780,6 +8780,17 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     if (!BRepCheck_Analyzer(result).IsValid())
       return as_is();
   }
+  // A loop the merged faces' old seam left in two pieces of one curve: one edge again (c2-fan-blade-sweep's STEP: 120
+  // edges for live's 119).
+  HHist joined;
+  if (periodic && any)
+  {
+    const TopoDS_Shape j = join_loop_pieces(result, joined);
+    if (!j.IsSame(result) && BRepCheck_Analyzer(j).IsValid())
+      result = j;
+    else
+      joined.Nullify();
+  }
   MergedFaces out;
   out.shape = wrap(result);
   ShapeIMap nm;
@@ -8790,7 +8801,10 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     TopoDS_Shape f = converted_face(fm(i));
     if (!h.IsNull() && !h->Modified(f).IsEmpty())
       f = h->Modified(f).First();
-    const int k = nm.FindIndex(whole->Value(f));
+    f = whole->Value(f);
+    if (!joined.IsNull() && !joined->Modified(f).IsEmpty())
+      f = joined->Modified(f).First();
+    const int k = nm.FindIndex(f);
     out.face_map.push_back(k > 0 ? (uint32_t)(k - 1) : UINT32_MAX);
   }
   return out;
