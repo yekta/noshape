@@ -113,6 +113,27 @@ fn a_loft_along_guides_of_several_curves_runs_through_them() {
     assert!(faces[0].is_valid());
 }
 
+/// Live 2276 (loft Start condition Normal to profile, magnitude 1, End None): a Ø20 circle on Top lofted to a Ø20
+/// circle (D) 10 up and 5 aside, (I) 20 up and 5 aside (live's volumes), (G) on the plane x = 15 centred (15, 0, 15):
+/// a solid facing out (it came out inside out, -5300 mm³) with its start step per pole column (0.9 (c·n) + 0.1 |c| over 3
+/// for the column's chord c), near live's 5939.34 (its circles' pairing isn't ours yet: within 3 %).
+#[test]
+fn a_circle_loft_normal_to_its_start_as_live() {
+    let circle = |plane: Plane| -> Shape { make_face_from_wire(&make_wire_2d(&plane, &[Segment2d::Circle { center: DVec2::ZERO, radius: 10.0 }]).unwrap(), true).unwrap() };
+    let start = circle(Plane::xy());
+    for (case, end, want) in [
+        ("D", Plane::new(DVec3::new(5.0, 0.0, 10.0), DVec3::Z, DVec3::X), 3141.715161783061),
+        ("I", Plane::new(DVec3::new(5.0, 0.0, 20.0), DVec3::Z, DVec3::X), 6283.005657435383),
+        ("G", Plane::new(DVec3::new(15.0, 0.0, 15.0), DVec3::X, DVec3::Y), 5939.340041298628),
+    ] {
+        let l = loft(&[start.clone(), circle(end)], &LoftOptions { solid: true, start: LoftEnd::Normal(1.0), ..Default::default() }).unwrap();
+        let v = l.shape.volume().unwrap();
+        assert!(l.shape.is_valid(), "{case}");
+        let tol = if case == "G" { 0.03 } else { 1e-4 };
+        assert!(close(v, want, tol), "{case}: {v} vs live {want}");
+    }
+}
+
 /// c2-impeller-loft's Loft (live: its ends' rims the sketches' 4 circles and 3 lines): a loft's edges on its sections
 /// keep the sections' curves, not ThruSections' B-spline copies; a square to a circle with Normal to profile, its 4
 /// lines and the circle's 4 arcs, valid.

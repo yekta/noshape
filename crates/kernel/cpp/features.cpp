@@ -1763,6 +1763,24 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
       const double c2 = deg * (deg - 1) / 2.0, c3 = deg * (deg - 1) * (deg - 2) / 6.0;
       return 3 * e2 / c2 - 2 * e3 / c3;
     };
+    // Pole j's Greville parameter: the mean of its degree's knots.
+    auto greville = [&](int j) {
+      double g = 0;
+      for (int i = 1; i <= deg; ++i)
+        g += flat(flat.Lower() + j - 1 + i);
+      return g / deg;
+    };
+    // Rows that are straight lines (a square's sides): the corner rule above, as live's faces of degree 1 along them
+    // (10-24, 2276 (A)); curved rows: per pole column (2276 (G)).
+    auto straight = [&](const occ::handle<Geom_BSplineCurve>& c) {
+      const gp_Pnt a = c->Pole(1), b = c->Pole(c->NbPoles());
+      const gp_Lin line(a, gp_Vec(a, b).Magnitude() > 0 ? gp_Dir(gp_Vec(a, b)) : gp_Dir(0, 0, 1));
+      for (int i = 2; i < c->NbPoles(); ++i)
+        if (line.Distance(c->Pole(i)) > 1e-9 * (1 + a.Distance(b)))
+          return false;
+      return true;
+    };
+    const bool curved = !std::all_of(rows.begin(), rows.end(), straight);
     // Column by column: (x, y, z) or homogeneous (w x, w y, w z, w) with equal weights.
     const int  nu = rows[0]->NbPoles();
     const bool homogeneous = rows[0]->IsRational();
@@ -1791,7 +1809,15 @@ static bool natural_loft(const TopoDS_Shape& loft, std::vector<TopoDS_Wire> wire
         if (kind == 0)
           return d;
         gp_Vec v;
-        if (kind == 1)
+        if (kind == 1 && curved)
+        {
+          // Live's per pole column (2276 (G): a circle lofted to one on a perpendicular plane, the start step changing
+          // round it): 0.9 (c·n) + 0.1 |c| for the chord c between the sections' points at the pole's Greville
+          // parameter (a rational circle's poles sit off it).
+          const gp_Vec on(rows[a]->Value(greville(j)), rows[b]->Value(greville(j)));
+          v = nrm * (mag * (0.9 * std::abs(on.Dot(nrm)) + 0.1 * on.Magnitude()));
+        }
+        else if (kind == 1)
           v = nrm * (mag * (r0 + (r1 - r0) * step(j)));
         else
         {
@@ -3212,6 +3238,15 @@ static OpOut loft_impl(const OcShapeList& sections, bool solid, bool ruled, bool
   // Live 1784: through three or more sections, or between sections of different topology, faces meeting smoothly
   // are one side face (two matching sections: a face per segment).
   TopoDS_Shape out = ts.Shape();
+  // natural_loft's surfaces between sections on perpendicular planes with a start condition (live 2276's G: a circle
+  // on Top to one on x = 15) came out with every face facing in: the solid turned the right way out.
+  if (natural && solid)
+  {
+    GProp_GProps g;
+    BRepGProp::VolumeProperties(out, g);
+    if (g.Mass() < 0)
+      out.Reverse();
+  }
   {
     size_t real = 0;
     for (const auto& s : sections.items)
