@@ -58,6 +58,17 @@ items of `coverage_variable_studio.py --uncovered`: psui writes the vs-* scenari
 (universe/variable-studio.json), asks live2 for the batch, and fixes what the recordings show. Documents and versions
 stay yours.
 
+**2026-11-08 23:49 UTC (psui): Variable Studio coverage 100 % (98/98); the recorded vs-* mismatches.** 27 + 2 scenarios
+(vs-fs-monitor / vs-fs-profile on the new start `fs-vs`), batch with live2 (REQUESTS 22:59, follow-ups below). Of the
+72 recorded: vs-ps-table-create-studio (Create Variable Studio from a Part Studio's table: the tab one commit, not
+undoable; the Part Studio's reference its own undoable edit), vs-cfg-input-propagation (`ui_script::mark_note`: a
+panel's notice reads before a toast), vs-cfg-value-unconfigure (run.py: a toast live had timed out, ≥4.4 s on live's
+clock, isn't compared; Esc also drops a timed toast) now match. Left on live's side: vs-cfg-checkbox-dialog (live2's
+reader reads a checkbox input's `kind` as its lowercased name, `default` a string), vs-insert-other-documents (step 3
+reads no tabs and a "Standard" field: another panel's?), vs-tab-menu-copy-clipboard (Esc left the + menu open there,
+closed in doc-plus-menu: focus after the context menu), vs-undo-value (live's Ctrl+Z on a selected cell does nothing:
+a shortcoming, not a target), vs-type-* (focus only, as noted below).
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;
