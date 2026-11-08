@@ -42,6 +42,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## 11-08 06:02 UTC: drawing match 95/158, new starts, coverage 98/102 (lead 11-08)
+- **Drawing match 95/158 scenarios, 1031/1208 states** (vibe5, before 98422063: its fixes add a few more). Fixed: the
+  sheet's sketch geometry is recorded as live's export lists it (line, circle, arc, spline + its points, a lone
+  point, hatch); Esc ends a spline and keeps the Spline tool; Remove section keeps a closed spline (was lines); the
+  Sheets panel reference row's hover popup "<name> <version>" (live's; replaces our "Reference manager" tooltip); the
+  Inspection table panel (empty Characteristics message, "--" cells, recorded); no toolbar tool during a break's Edit...
+  or Add leader; Number in Inspection item's Automatic; exploded notes and the palette's unit recorded as live's.
+- Left, not ours: the hover popup after a sheet menu click (+2/-2 states: live's own row pitch is 25 or 26 px), the
+  inserted sheet's border as sketch lines + notes in live (asked live2), inspection numbers (re-records), revision
+  tables, Export's DWG version memory, live's centermark listed at the click in one run and not in another.
+- **New starts:** `block-drawing-files` (README `"files"`: tests/ui-parity/files, imported as file tabs; the file
+  picker has marks `list_row:` / `tab:` and a record) and `frame-drawing` (Frame along "Sketch 1 edges", Cut list,
+  drawing `"part": null` = the whole Part Studio). Scenarios drw-insert-image, drw-image-properties, drw-insert-dxf,
+  drw-cut-list-table-properties (REQUESTS 06:00). **Coverage: tools 58/58, menu 98/102, shortcuts 14/14, exports
+  10/10.** Left: Merge with cell below (revision table: no account), Show (model annotations: asked live2 which
+  feature makes one), Open Feature Studio in linked document and Unpin view reference (ours has no views or custom
+  tables from another document; asked live2 how live makes them, and whether Pin is offered on a same-document
+  reference, REQUESTS 01:20).
+
 ## 11-08 01:20 UTC: drawing match 87 -> 92/158, Foreshorten, coverage (lead's items 1-2)
 - **Drawing match (vibe5, 8 shards, /root/dx-scratch/drw-shards.sh): 92/158 scenarios, 1010/1208 states** (was 87/158,
   988). Fixed: the Sheets panel lists every sheet's references and views (was the active sheet's only) and stays the
