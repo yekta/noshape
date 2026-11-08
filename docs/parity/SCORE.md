@@ -101,6 +101,15 @@ field's right-click focus, the server round trip after Suppress, "Unknown of" ch
 three sketch scenarios, SKETCH-MIRROR-LINE-SELECTED. Coverage: toolbar 76/76, sketch tools 55/55, menus 92/117,
 shortcuts 78/89 (batches 10-14 with live).
 
+psui 11-08 10:05: the Part Studio scenarios (area psui, 530 with a live recording) on my tree at 09:28 (main 065c55f7's
+changes; vibe5, uip-psui.sh): **514/530 scenarios, 3040/3069 states** (11-08 01:08 on 11-07's binary: 493/530, 2994/3069).
+Since, config-depth-configure matches too (queued). Left, not ours: analysis-thickness ×3 (live's free account),
+external-thread / sm-form (account memory), fillet-chip ×2 (live's "Unknown" start), part-menu-release (Release
+paywall), feature-menu-suppress-unsuppress (live hides the sketch row after its server round trip),
+feature-menu-edit / remove-expression step 7 and appearance-face-row-remove step 2 (live's timing, its recordings
+disagree), sketch-row-copy-paste-onto-front (live's recorder's owner), dialog-number-rclick-menu (live runner),
+mirror-face-type (a live DOM detail).
+
 ## Parity index (qa, daily; docs/parity/INDEX.md, `tools/parity/index.py` over one suite run)
 
 | date | green | index | part studio geometry | part studio + sketch interaction | assembly results | assembly interaction | drawing interaction | drawing export | data exchange | speed against Onshape | feature studio | variable studio | versions / history / release | documents / tabs / start / preferences |
