@@ -6,6 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
+| 2026-11-08 | 8f6f6fd2 (qa 09:48: the 04:50 run, models on vibe2) | 72/87 | 740/951 | 741/1029 (5084/6039 states; 165 new scenarios) | cf-part-draft 13/13 is partly a corpus correction (live's high-accuracy gear volume, core 06:10), not only code; flags in SUITE-REGRESSIONS-1108 |
 | 2026-11-08 | 3950e447 (qa 04:55: the 00:34 run of qa-suites.sh, models on vibe2) | 70/86 | 724/934 (custom 97/107) | 729/864 (4874/5239 states) | the run's flags: SUITE-REGRESSIONS-1108; 51 of 85 documents regenerate slower than live (c2-rings-loft ×26.8, cf-snap-hook ×22.0, learning-center-michael ×21.6) |
 | 2026-11-03 | dx 21:29 (run 45; 3 dead-studio documents unscored; prize-wheel-tim refetched, its Hole as live) | 26/55 | 303/480 (custom 7/109) | – |
 | 2026-11-03 | dx 22:49 (run 47: valuesSortedById in feature order, cf-parameter-pattern 9/9; old studios' lowercase types, id-only faces by tessellated area: cf-o-ring-generator 10/11) | 27/55 | 308/480 (custom 12/109) | – |
@@ -106,6 +107,7 @@ shortcuts 78/89 (batches 10-14 with live).
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-11-07 | 843a9357 (20:34 run) | 57.5 | 71.2 | 93.2 | 25.5 | 87.5 | 73.8 | 79.2 | 75.0 | 62.0 | 0.0 | 0.0 | 0.0 | 0.0 |
 | 2026-11-08 | 3950e447 (00:34 run) | 61.6 | 77.5 | 93.6 | 53.4 | 87.8 | 75.1 | 83.3 | 75.0 | 61.3 | 0.0 | 0.0 | 0.0 | 0.0 |
+| 2026-11-08 | 8f6f6fd2 (04:50 run) | 64.7 | 77.8 | 93.7 | 54.6 | 87.3 | 80.9 | 100.0 | 75.0 | 62.7 | 0.2 | 0.0 | 33.1 | 0.0 |
 
 ## Own Boolean's share (bool, daily; `tools/bool-share.sh`)
 

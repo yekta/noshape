@@ -800,6 +800,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     drw-table-cells-resize also differed in the run but match alone (load, UIP-DRW-START-FLAKY).
   - From SUITE-REGRESSIONS-1107, now fixed in this run: learning-center-michael 7/7 again (2.4 s), cf-t-slot-joint 18/18.
   Totals: models 63/88 → 70/86, features 674/947 → 724/934, scenarios 732/861 → 729/864; parity index 57.5 → 61.6. (qa 2026-11-08 04:55)
+  **qa 09:48, the 04:50 run (green 8f6f6fd2) against the 00:34 one:** models 70/86 → 72/87, features 724/934 → 740/951, scenarios
+  729/864 → 741/1029 (165 new), parity index 61.6 → 64.7. Flags (single runs on vibe2, debug test profile):
+  - core: cf-part-draft 1.4 → 19.8 s, Part Draft 3 15.3 s: it builds now (8/13 → 13/13: core's direct drafted prism cba0a00bb /
+    ae5154213, and the corpus' high-accuracy gear volume, a correction); bool's 5a964e078 (the halves' union 3.1 → 0.13 s) is
+    after this green: check the next run.
+  - skasm / core: cf-sheet-metal-model-plus 2.0 → 3.1 s (14/14 both; Extrude 4 1.3 s, Flange 1 0.65 s).
+  - blend / core: cf-snap-hook 6.5 → 11.2 s with 11/18 → 14/18 (Snap Hook 1 / 2 3.4 / 4.0 s): more of it builds; Fillet 6 is fixed
+    after this green (4b3e0611f).
+  - Not regressions: c2-hunting-knife's 7 "now ERROR" features are past its unchanged first difference (Bridging curve 1, 10/52
+    matching both; 35 → 52 compared), fixed after this green by 2a99078ca / eb200af6f; the 11 scenarios that newly differed
+    (asm-empty-menu, asm-face-menu-*, asm-section-view-turn-off, drw-canvas-zoom-to-sheet, drw-centerline-2-point,
+    drw-dimension-*) all match alone on 0cb8ba5d at least once in three (load: UIP-ASM-FACE-MENU-FLAKY, UIP-DRW-START-FLAKY).
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
