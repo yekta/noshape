@@ -1519,8 +1519,18 @@ fn unique_knots(knots: &[f64]) -> (Vec<f64>, Vec<u32>) {
 /// A sketch region with its sketch.
 type RegionOf = (Arc<SketchResult>, noshape_sketch::regions::Region);
 
+/// A region whose loops enclose no area (asm-suspension's Knuckle: a translated sketch's loop out and back).
+fn encloses_no_area(region: &noshape_sketch::regions::Region) -> bool {
+    let bb = region.outer.bbox();
+    region.area().abs() <= 1e-9 * (bb.max - bb.min).length_squared()
+}
+
 /// Kernel face for a sketch region, with each edge's sketch source.
 pub fn region_profile(s: &SketchResult, region: &noshape_sketch::regions::Region, key: Source) -> FResult<Profile> {
+    // A tool of no volume gives an invalid part in a Boolean: the feature fails instead.
+    if encloses_no_area(region) {
+        return Err(FeatureError::new(format!("{KERNEL_FAILURE}a selected region encloses no area")));
+    }
     let plane = kernel_plane(&s.frame);
     // Merge consecutive arcs of the same circle entity (a full circle split at
     // a seam becomes one edge, so a hole is one cylindrical face).
@@ -1925,5 +1935,28 @@ mod sketch_x_tests {
             let ours = PlaneFrame::face_x(DVec3::from(n).normalize());
             assert!((ours - DVec3::from(x)).length() < 2e-3, "{name}: {ours} vs live {x:?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod region_area_tests {
+    use super::encloses_no_area;
+    use glam::DVec2;
+    use noshape_sketch::EntityId;
+    use noshape_sketch::regions::{ProfileLoop, ProfileSegment, Region, RegionId, SegmentSource};
+
+    fn region(points: &[DVec2]) -> Region {
+        let segments: Vec<ProfileSegment> = points.iter().zip(points.iter().cycle().skip(1)).map(|(&a, &b)| ProfileSegment::Line { a, b }).collect();
+        let sources = (0..segments.len()).map(|i| SegmentSource { entity: EntityId(i as u32), forward: true }).collect();
+        Region { id: RegionId { boundary: Vec::new(), ordinal: 0 }, outer: ProfileLoop { segments, sources }, holes: Vec::new(), joined: Vec::new() }
+    }
+
+    /// A loop out along a line and back (the Knuckle's Extrude 4 regions, tools of no volume) encloses no area; a
+    /// thin but real one does.
+    #[test]
+    fn a_loop_out_and_back_encloses_no_area() {
+        let (a, b) = (DVec2::ZERO, DVec2::new(0.02, 0.0));
+        assert!(encloses_no_area(&region(&[a, b, DVec2::new(0.01, 0.0)])));
+        assert!(!encloses_no_area(&region(&[a, b, DVec2::new(0.02, 1e-5), DVec2::new(0.0, 1e-5)])));
     }
 }
