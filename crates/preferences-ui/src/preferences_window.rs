@@ -295,6 +295,26 @@ impl PreferencesView {
             let section = f["label"].as_str().and_then(|l| l.split(" › ").next()).unwrap_or_default();
             PAGE_ORDER.iter().position(|s| *s == section).unwrap_or(PAGE_ORDER.len())
         });
+        // As the page shows them: in the display language (the controls keep their English names as targets); unit
+        // names stay English (live prefs-language-save: "Degree", "Millimeter").
+        for f in &mut fields {
+            let unit = f["label"].as_str().is_some_and(|l| l.starts_with("Units › ") && !l.ends_with("Time format"));
+            if let Some(v) = f["value"].as_str().filter(|_| !unit) {
+                f["value"] = serde_json::json!(crate::i18n::tr(v));
+            }
+            // The toolbar's tools by their names on the page.
+            if f["label"] == "Shortcut toolbars › Tools"
+                && let Some(items) = f["value"].as_array()
+            {
+                f["value"] = serde_json::json!(items.iter().map(|i| i.as_str().map(crate::i18n::tr).unwrap_or_default()).collect::<Vec<_>>());
+            }
+            // (Keyboard shortcuts' tab select is read as "Tab" in every language.)
+            if let Some(l) = f["label"].as_str().filter(|l| *l != "Keyboard shortcuts › Tab") {
+                f["label"] = serde_json::json!(l.split(" › ").map(crate::units_prefs::shown_label).collect::<Vec<_>>().join(" › "));
+            } else if f["label"] == "Keyboard shortcuts › Tab" {
+                f["label"] = serde_json::json!(format!("{} › Tab", crate::i18n::tr("Keyboard shortcuts")));
+            }
+        }
         serde_json::json!({
             "focus": focus,
             "dialog": crate::ui_script::open_dialog(),

@@ -162,6 +162,14 @@ impl UnitsPrefsView {
     }
 }
 
+/// A row's label in the UI language: "<quantity> default unit" by live's template ("Länge Standardeinheit").
+pub(crate) fn shown_label(english: &str) -> String {
+    match english.strip_suffix(" default unit") {
+        Some(quantity) => crate::i18n::template("__name__ default unit", &[("name", quantity)]),
+        None => crate::i18n::tr(english),
+    }
+}
+
 impl Render for UnitsPrefsView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
@@ -175,8 +183,8 @@ impl Render for UnitsPrefsView {
                     .id(("units-row", i))
                     .items_end()
                     .mb(px(12.))
-                    .child(v_flex().w(px(UNIT_W)).child(label(name)).child(div().mt(px(5.)).child(unit)))
-                    .child(v_flex().ml(px(22.)).w(px(DEC_W)).child(label("Display decimals".into())).child(div().mt(px(5.)).child(dec)))
+                    .child(v_flex().w(px(UNIT_W)).child(label(shown_label(&name))).child(div().mt(px(5.)).child(unit)))
+                    .child(v_flex().ml(px(22.)).w(px(DEC_W)).child(label(crate::i18n::tr("Display decimals"))).child(div().mt(px(5.)).child(dec)))
                     .child(div().ml(px(12.)).mb(px(7.)).size(px(20.)).child(crate::assets::icon("help-gray", 20., cx)))
                     .into_any_element(),
             );
@@ -218,7 +226,7 @@ impl Render for UnitsPrefsView {
                             ),
                     )
                     .child(v_flex().mt(px(20.)).children(rows))
-                    .child(v_flex().child(label("Time format".into())).child(div().mt(px(5.)).child(time)))
+                    .child(v_flex().child(label(crate::i18n::tr("Time format"))).child(div().mt(px(5.)).child(time)))
                     .child(
                         h_flex().mt(px(24.)).child(
                             div()

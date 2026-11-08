@@ -1360,7 +1360,7 @@ impl StartView {
     /// label is applied to `apply_to` when given.
     fn create_label(&mut self, apply_to: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
         let view = cx.entity();
-        let prompt = NamePrompt { title: "Create label", ok_label: "Create", label: "Label name", default: String::new(), hint: None, location: None, labels: None };
+        let prompt = NamePrompt { title: "Create new label", ok_label: "Create", label: "Label name", default: "Untitled label".into(), hint: None, location: None, labels: None };
         prompt_name(prompt, window, cx, move |name, window, cx| {
             let name = name.trim().to_string();
             view.update(cx, |this, cx| {
@@ -4161,9 +4161,7 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
             if let Some((l, st)) = labels.as_ref().zip(label_search.as_ref()) {
                 fields.push(serde_json::json!({ "label": "Document labels", "kind": "input", "value": l.chosen.borrow().join(", "), "search": st.read(cx).value().to_string() }));
             }
-            if let Some(loc) = &location {
-                fields.push(serde_json::json!({ "label": loc.0, "kind": "location", "value": loc.1.shown() }));
-            }
+            // (Live's recorder reads no field for the location browser.)
             serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok_label, "Cancel"] })
         });
         os::modal_doc_page(dialog, title, if location.is_some() { 598. } else { 460. })

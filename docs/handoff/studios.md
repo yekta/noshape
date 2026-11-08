@@ -61,6 +61,9 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   ("Delete tabs", every Part Studio and Assembly; `tab_users`); the Edit shortcut popup's checkbox is no page field.
   run.py: live's newer Properties reading (Description, the category row by its value, Undo / Redo named) and the
   Free plan's "Create public document" compared in ours' form.
+- Fourth land: Preferences' Units labels in the UI language ("__name__ default unit"), the recorded fields as the
+  page shows them (unit names English, as live's); "Create new label" prefilled "Untitled label"; the name prompts'
+  location browser isn't a field. Match after the third land (347 recorded): 105 scenarios, 1058/1539 states.
 - Coverage batch 4: 18 docs-* (+ Add column chooser, Advanced search fields, Reset / Search): documents 72.2 %.
 - Asked live (REQUESTS 2279): (a) Export… missing on tab menus: live's export quota is throttled again, they
   re-record doc-tab-menu-export / -assembly when it lifts; (b) live doesn't rename a tab on double-click (ours no
