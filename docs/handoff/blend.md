@@ -64,6 +64,20 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   instead of sectioning the two surfaces (which gives the 18 spurious curves). A day's work, not an hour's.
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
+## Speed survey (lead 11-08 19:40: audit11's blend features slower than live, by ms over live)
+Ours over live, from each document's slowest features and live.jsonl's per_feature_ms (only documents matching up to
+the feature count):
+- learning-center-michael Fillet 2 640 / 46: fillet_by_tools' need_ball cut, OCCT 314 face-face pairs: bool's (bool.md
+  "From blend 11-07 23:10"); blend_direct can't take its ball / concave-corner tools (their faces border other
+  tools, not the part: "a tool with no blend face or none on the part").
+- c2-rings-loft Fillet 1 392 / 23, Chamfer 1 345 / 30: the same kind (ring_blend's cut), bool's.
+- cf-part-draft Part Draft 2 368 / 39: op_defeature (OCCT defeaturing) 254 ms inside the custom feature, not a blend.
+- c2-hunting-knife Chamfer 1 182 / 19, Fillet 3: after its first difference (Loft 3): not comparable.
+- c2-tpd-fillet-variable Fillet 1 83 / 29: the Rust Boolean's one-by-one 35 ms + sections_ahead 46 ms, bool's.
+- cf-snap-hook Fillet 3 54 / 7 (66bf6d57: was 91), Fillet 6 121 / 8 (blend_direct sections, cone x torus pairs
+  tangent at the chain's joints), Fillet 5 118 / 6 (Rust Boolean, bool's).
+- motor-mount-jack Fillet 2 39 / 3: the full round's tool now one revolve (4d21d6419); the cut itself ~35-45 ms.
+
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
 - Corpus on vibe5, my tree rebased onto main: learning-center-michael 7 -> 5 (Fillet 2 now fails, "Failed to fillet
   selections.", after 22-52 s; live OK in 46 ms) and cf-lighten 5 -> 4 (Lighten 1's area 48549.85 mm², live
