@@ -56,6 +56,7 @@ pub fn prepare() -> Option<PathBuf> {
     if start.get("page").is_some() {
         let Some(docs) = std::env::var_os("NOSHAPE_DOCUMENTS_DIR").map(PathBuf::from) else { fail("a page start needs NOSHAPE_DOCUMENTS_DIR (the run's own documents folder)") };
         build_documents(&docs, &start["documents"], &starts);
+        noshape_start_ui::start_window::open_on_owned_by_me();
         return None;
     }
     let dir = std::env::temp_dir().join(format!("noshape-uip-{}", std::process::id()));
@@ -78,7 +79,10 @@ fn build_documents(dir: &Path, docs: &Value, starts: &Value) {
             Some(s) => starts.get(s).cloned().unwrap_or_else(|| fail(&format!("no start {s}"))),
             None => json!({ "units": "mm", "features": [], "tabs": [] }),
         };
-        noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &dir.join(format!("{name}.noshape")), &start).unwrap_or_else(|e| fail(&format!("start document {name}: {e}")));
+        let path = dir.join(format!("{name}.noshape"));
+        noshape_ops::ui_parity::build_start(&mut noshape_ops::Ctx::new(), &path, &start).unwrap_or_else(|e| fail(&format!("start document {name}: {e}")));
+        // Live's account opened each: they are in Recently opened.
+        noshape_app_core::doc_files::add_recent(&path);
     }
 }
 
@@ -669,15 +673,22 @@ pub fn start_page(cx: &mut App) {
             let mut found = Err(String::new());
             if matches!(what, "click" | "dblclick" | "rclick" | "hover") {
                 found = find(&target, cx);
-                // The wheel at the right edge, where no inner list (Keyboard shortcuts') takes it.
                 let (vw, vh) = w.update(cx, |_, window, _| (f32::from(window.viewport_size().width), f32::from(window.viewport_size().height))).unwrap_or((1919., 992.));
-                for _ in 0..12 {
+                let name = control_name(&target).unwrap_or_default();
+                for _ in 0..16 {
                     let Ok(at) = found else { break };
                     let y = f32::from(at.y);
-                    if (60.0..vh - 20.0).contains(&y) {
+                    let clip = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(30.));
+                    let inside = clip.is_none_or(|c| c.top() + px(10.) < at.y && at.y < c.bottom() - px(10.));
+                    if inside && (60.0..vh - 20.0).contains(&y) {
                         break;
                     }
-                    let wheel = ScrollWheelEvent { position: point(px(vw - 40.), px(vh / 2.)), delta: ScrollDelta::Pixels(point(px(0.), px((vh / 2. - y).clamp(-600., 600.)))), ..Default::default() };
+                    // At the clip's right edge: the page's clip wheels the page, an inner list's that list.
+                    let (wheel_at, mid) = match clip {
+                        Some(c) if !inside => (point(c.right() - px(40.), c.center().y), f32::from(c.center().y)),
+                        _ => (point(px(vw - 40.), px(vh / 2.)), vh / 2.),
+                    };
+                    let wheel = ScrollWheelEvent { position: wheel_at, delta: ScrollDelta::Pixels(point(px(0.), px((mid - y).clamp(-600., 600.)))), ..Default::default() };
                     let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
                     sleep(cx, 120).await;
                     redraw(w, cx).await;

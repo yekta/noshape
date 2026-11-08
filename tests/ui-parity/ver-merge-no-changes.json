@@ -1,0 +1,39 @@
+{
+ "name": "ver-merge-no-changes",
+ "about": "B1 › Merge into current workspace…: the tabs-with-no-changes group opened",
+ "area": "studios",
+ "source": "universe versions mg-unchanged-toggle (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "1 tab has no changes"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

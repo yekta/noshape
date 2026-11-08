@@ -1,0 +1,51 @@
+{
+ "name": "docs-trash-delete-forever",
+ "about": "Trash › uip Plate › Delete › Delete forever",
+ "area": "studios",
+ "source": "universe documents dialog-delete-forever-delete-forever-cancel (studios 11-08, coverage batch 3)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Delete"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Delete forever"
+   }
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "name": "fs-ps-show-code",
+ "about": "Part Studio 1 tab right-click › Show code (read-only FeatureScript), Esc",
+ "area": "studios",
+ "source": "universe feature-studio fs-ps-show-code (studios 11-08, coverage batch 3)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Show code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

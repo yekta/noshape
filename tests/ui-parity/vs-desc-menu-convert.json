@@ -1,0 +1,39 @@
+{
+ "name": "vs-desc-menu-convert",
+ "about": "Description cell right-click › Convert to expression, then again (Convert to text)",
+ "area": "studios",
+ "source": "universe variable-studio vs-row-convert-to-expression (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "height:Description"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Convert to expression"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "height:Description"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Convert to text"
+   }
+  }
+ ]
+}

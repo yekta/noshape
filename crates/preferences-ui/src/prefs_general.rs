@@ -75,9 +75,16 @@ fn help(id: &'static str, text: &'static str, cx: &App) -> AnyElement {
 /// A label over a control (14 px; the control's top 25 px under the
 /// label's, live prefs/00, 02).
 fn labelled(label: &str, control: impl IntoElement) -> Div {
+    labelled_with(label, control, None)
+}
+
+/// [`labelled`] with `beside` after the control (Environment profile's Create / Delete profile).
+fn labelled_with(label: &str, control: impl IntoElement, beside: Option<AnyElement>) -> Div {
     crate::ui_script::label_last_field(label);
     let name = crate::ui_script::in_section(label);
-    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(crate::ui_script::mark(div().child(control), || format!("field:{name}")))
+    // The mark on the control alone (a row's child is as wide as its content).
+    let row = h_flex().gap(px(5.)).child(crate::ui_script::mark(div().child(control), || format!("field:{name}"))).children(beside);
+    v_flex().gap(px(9.)).child(div().text_size(px(14.)).text_color(p().text).child(tr(label))).child(row)
 }
 
 /// A 250 × 34 browser select, or its greyed look when `enabled` is false.
@@ -128,8 +135,8 @@ impl Render for LanguagePrefsView {
         let view = cx.entity();
         // The languages are listed by their own names in every language
         // (live: "Deutsch", "日本語"), so never translated.
-        let lang = crate::ui_script::note_control("Display language", "select", serde_json::json!(crate::i18n::LANGUAGES.get(at).map(|(_, n)| *n)));
-        let pick = div().w(px(170.)).map(|d| crate::ui_script::mark(d, || format!("field:{lang}"))).child(os::user_select_field("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, move |i, _, cx| {
+        crate::ui_script::note_control("Display language", "select", serde_json::json!(crate::i18n::LANGUAGES.get(at).map(|(_, n)| *n)));
+        let pick = div().w(px(170.)).child(os::user_select_field("pref-language", crate::i18n::LANGUAGES.iter().map(|(_, n)| n.to_string()).collect(), at, move |i, _, cx| {
             view.update(cx, |this, cx| {
                 this.edited = crate::i18n::LANGUAGES[i].0;
                 cx.notify();
@@ -426,7 +433,7 @@ impl Render for EnvProfilePrefsView {
             Some(help("env-help", "An environment profile is defined by settings tied to a specific browser on a specific device. Creating or selecting a profile will tie these settings to your current environment.", cx)),
             v_flex()
                 .gap(px(25.))
-                .child(labelled("Environment profile", h_flex().gap(px(5.)).child(pick).child(buttons)))
+                .child(labelled_with("Environment profile", pick, Some(buttons.into_any_element())))
                 .child(labelled("Match pixel density on high resolution displays (can affect performance)", density_pick))
                 .child(h_flex().child(PreferencesView::save_button("env-save", tr("Save profile settings"), changed).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                     let Some(d) = this.density else { return };

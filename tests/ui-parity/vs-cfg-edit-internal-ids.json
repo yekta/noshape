@@ -1,0 +1,49 @@
+{
+ "name": "vs-cfg-edit-internal-ids",
+ "about": "Insert into all unticked, then: Input ⋯ › Edit internal IDs… (the dialog), Escape",
+ "area": "studios",
+ "source": "universe variable-studio vs-config-edit-internal-ids (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configure Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "config_more": "Configuration"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit internal IDs…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

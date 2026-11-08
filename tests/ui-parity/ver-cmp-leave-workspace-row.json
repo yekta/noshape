@@ -12,6 +12,12 @@
    }
   },
   {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
    "on": {
     "menu": "Compare"
    },

@@ -1,0 +1,45 @@
+{
+ "name": "docs-empty-trash-cancel",
+ "about": "Trash › Empty trash…: Empty trash?, Cancel",
+ "area": "studios",
+ "source": "universe documents documents-page-empty-trash (studios 11-08, coverage batch 3)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Empty trash…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

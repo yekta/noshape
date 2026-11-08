@@ -1,0 +1,33 @@
+{
+ "name": "ver-branch-edit-props",
+ "about": "V1 › Branch to create workspace… › Create workspace and edit properties",
+ "area": "studios",
+ "source": "universe versions dlg-br-create-edit-props (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Branch to create workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create workspace and edit properties"
+   }
+  }
+ ]
+}

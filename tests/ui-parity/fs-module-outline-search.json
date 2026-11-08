@@ -1,0 +1,29 @@
+{
+ "name": "fs-module-outline-search",
+ "about": "Module outline, typing filters it, Esc closes",
+ "area": "studios",
+ "source": "universe feature-studio fs-module-outline-search (studios 11-08, coverage batch 3)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Module outline"
+   }
+  },
+  {
+   "do": "type",
+   "text": "def"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

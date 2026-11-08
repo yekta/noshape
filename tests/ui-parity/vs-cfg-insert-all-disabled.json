@@ -1,0 +1,39 @@
+{
+ "name": "vs-cfg-insert-all-disabled",
+ "about": "Insert into all unticked, then: Configured: the footer's Insert into all Part Studios and Assemblies is disabled (a click does nothing)",
+ "area": "studios",
+ "source": "universe variable-studio vs-auto-insert-disabled-with-config (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configure Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Insert into all Part Studios and Assemblies"
+   }
+  }
+ ]
+}

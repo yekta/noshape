@@ -96,7 +96,30 @@ impl VariableStudioView {
         tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
         tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": self.ui_drawn }));
         let insert_into_all = self.studio(cx).is_some_and(|s| s.insert_into_all);
-        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "help": self.help_open })
+        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": self.ui_configuration(cx), "help": self.help_open })
+    }
+
+    /// The studio's configuration inputs: `{"name", "kind": list | checkbox | variable | text, "default", "shown",
+    /// "rows"}` (a list's options; `shown` the configuration the studio shows).
+    fn ui_configuration(&self, cx: &App) -> Vec<serde_json::Value> {
+        use noshape_model::configuration::ConfigInputKind as K;
+        let Some(cfg) = self.studio(cx).map(|s| &s.configuration) else { return Vec::new() };
+        cfg.inputs
+            .iter()
+            .map(|i| {
+                let shown = cfg.value_of(&cfg.active, &i.id);
+                let (kind, default, rows, shown) = match &i.kind {
+                    K::List { options, default } => {
+                        let name = |id: &str| options.iter().find(|o| o.id == id).map(|o| o.name.clone());
+                        ("list", serde_json::json!(name(default)), options.iter().map(|o| o.name.clone()).collect(), serde_json::json!(shown.as_deref().and_then(name)))
+                    }
+                    K::Checkbox { default } => ("checkbox", serde_json::json!(default), Vec::new(), serde_json::json!(shown.map(|v| v == "true"))),
+                    K::Variable { default, .. } => ("variable", serde_json::json!(default.text), Vec::new(), serde_json::json!(shown)),
+                    K::Text { default } => ("text", serde_json::json!(default), Vec::new(), serde_json::json!(shown)),
+                };
+                serde_json::json!({ "name": i.name, "kind": kind, "default": default, "shown": shown, "rows": rows })
+            })
+            .collect()
     }
 
     pub fn new(doc: Entity<DocModel>, tab: TabId, window: &mut Window, cx: &mut Context<Self>) -> Self {

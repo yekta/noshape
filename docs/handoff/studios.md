@@ -28,6 +28,31 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 05:30 UTC: driver below-the-fold fix, batch 3 (55 scenarios), coverage up in all four areas
+- Driver: a control in an inner scrolling list (Keyboard shortcuts, material libraries) is wheeled into view inside its
+  own clip (app-core `ui_script::clip_of`); all 61 prefs-* run clean. The docs-page start puts its documents in
+  Recently opened (live's account opened them) and pins the page to Owned by me (`start_window::open_on_owned_by_me`).
+- Ours now: Labels nav and each label row named (`nav:Labels`, `nav:<label>`); another workspace's row › Open in new
+  browser tab opens that workspace, editable, in a window of its own (history hook `open_workspace_window`); any
+  `os_ui::checkbox` is `checkbox:<label>`; merge cards / "N tabs have no changes" / "Compare with base:<side>" are
+  buttons; view-only bar's Return to <ws> and ⊞; Feature Studio's Commit ▾ (`caret:Commit Feature Studio`); Variable
+  Studio's Configuration panel (README) and `variables.configuration`.
+- Copy link (version / workspace / change rows, navbar link) marked cloud in the universe (it copies a cloud URL);
+  their 4 scenarios removed.
+- Batch 3: vs-* 26 (Configuration panel, tab and Description menus, inserted table menus), ver-* 17 (edit-properties
+  buttons, Open new workspace, merge cards, protection on/off, version view ☰ / Return / ⊞, compare Esc / other row /
+  Assembly), fs-* 5 (Commit ▾, outline search, mod+shift+f, Show code, Versions and history), docs-* 8 (Trash). All 46
+  run clean on ours (/root/studios-scratch/uip5); batch 2 too, except what ours lacks.
+- Still failing on ours (check against live's recordings first): Help menu has no Help / FeatureScript documentation /
+  System check (web pages: decide with lead); folder › Set library (live's meaning unknown); version row › Releases
+  (live shows only the Free plan's upsell); ver-version-restore (live's Restore to Main… dialog not captured).
+- Coverage: documents 207/313 (66.1 %), versions 99/169 (58.6 %), Variable Studio 64/98 (65.3 %), Feature Studio
+  74/119 (62.2 %). Match: no live recordings yet. Batches 2 + 3 (196 scenarios) filed with live and live2 (request
+  draft /root/studios-scratch/req-batch23.md).
+- Next: the universes' remaining items by area (documents page advanced search / column chooser / folders row,
+  imported-file tabs, Tab manager filters; versions' repair panel and reference manager; Feature Studio editor items
+  need editor targets: gutter, folds, Ctrl+click); then live's recordings as they come: fix mismatches P0/P1 first.
+
 ### 2026-11-07 23:44 UTC: batch 2 (147 scenarios), DOCS-SELECT-LEAVES-WAL fixed; batch 1 filed with live
 - Batch 1 (198 scenarios, 7a746fd8) filed in live/REQUESTS.md for live and live2 (23:40). Ours: 176 of 185 clean; the
   failures were the driver (controls below the fold: now wheeled into view; the toolbar's Undo not named) and
@@ -41,6 +66,11 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 - DOCS-SELECT-LEAVES-WAL (qa P2): a read-only handle's close removes the -wal / -shm it made (crates/store).
 - Coverage: documents 201/313 (64.2 %), versions 81/174 (46.6 %), Variable Studio 40/98 (40.8 %), Feature Studio
   58/119 (48.7 %).
+- Batch 2 on ours (325 recordings): every vs-* and fs-* clean. Gaps ours has against live's menus (check each
+  against live's recordings first): documents page — no Labels nav, Help menu lacks Help / FeatureScript
+  documentation / System check, folder rows lack Set library; Versions and history — no Copy link on any row, no
+  Releases on version rows, Open in new browser tab only on the current workspace's row; Restore to Main… restores
+  with no dialog (live's not captured). Compare mode is now in the state (`document.compare`).
 - Next: run batch 2 on ours and file it; versions' release (31 items, mostly premium on live's Free plan: check which
   are cloud), compare and merge items; Feature Studio's Import panel, Monitor ▾, notices panel; universes' `gaps`.
 

@@ -1,0 +1,45 @@
+{
+ "name": "docs-trash-details",
+ "about": "Trash › uip Plate › Details",
+ "area": "studios",
+ "source": "universe documents documents-page-trash-row-menu-details (studios 11-08, coverage batch 3)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Details"
+   }
+  }
+ ]
+}

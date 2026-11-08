@@ -1,6 +1,6 @@
 {
  "name": "prefs-env-density",
- "about": "Environment profile settings › Match pixel density › the second option, Save profile settings",
+ "about": "Environment profile settings › Match pixel density: greyed while the Onshape (default) profile is chosen; a click opens nothing",
  "area": "studios",
  "source": "everyday (studios 11-08, Preferences batch 3)",
  "start": "prefs-page",
@@ -8,14 +8,7 @@
   {
    "do": "click",
    "on": {
-    "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
-    "pick": "On"
-   }
-  },
-  {
-   "do": "click",
-   "on": {
-    "button": "Environment profile settings › Save profile settings"
+    "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)"
    }
   }
  ]

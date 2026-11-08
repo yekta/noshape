@@ -94,6 +94,15 @@ pub fn open_version_window(path: PathBuf, version: noshape_store::MicroversionId
     open_session_window(session, gpu, cx)
 }
 
+/// Another workspace of a document in a window of its own (Onshape's new
+/// browser tab on that workspace): another window on the same file, editing
+/// that workspace; the document stays registered to its first window.
+pub fn open_workspace_window(path: PathBuf, branch: noshape_store::BranchId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    let mut session = session::Session::open(&path)?;
+    session.switch_branch(branch)?;
+    open_session_window(session, gpu, cx).map(|_| ())
+}
+
 /// Tab › Open in new browser tab: another window on the same open document
 /// (Onshape's second browser tab on the workspace; both show every edit),
 /// with `tab` active. The document stays registered to its first window.

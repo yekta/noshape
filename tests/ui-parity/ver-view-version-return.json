@@ -1,0 +1,27 @@
+{
+ "name": "ver-view-version-return",
+ "about": "Open V1, then the view-only bar's Return to Main",
+ "area": "studios",
+ "source": "universe versions view-only-return (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Return to Main"
+   }
+  }
+ ]
+}

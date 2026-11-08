@@ -1,0 +1,43 @@
+{
+ "name": "docs-trash-row-menu",
+ "about": "uip Plate sent to trash, then Trash › its row's right-click menu",
+ "area": "studios",
+ "source": "universe documents trash (studios 11-08, coverage batch 3)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Send to trash"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

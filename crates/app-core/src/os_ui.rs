@@ -256,7 +256,8 @@ pub fn info_box(text: impl Into<SharedString>) -> Div {
 /// 3; checked `#1651b0` with a white check) and a 13.33 px `#666` label
 /// (`#333` on hover). Add `.on_click`.
 pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
-    checkbox_with(id, label.into().into_any_element(), on)
+    let label: SharedString = label.into();
+    crate::ui_script::mark(checkbox_with(id, label.clone().into_any_element(), on), || format!("checkbox:{label}"))
 }
 
 /// [`checkbox`] labelled with user-authored text (a label's name).

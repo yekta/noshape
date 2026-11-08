@@ -1,0 +1,33 @@
+{
+ "name": "ver-merge-compare-base",
+ "about": "B1 › Merge into current workspace…: Compare with base ↗ on the Replace card (B1 against the merge base)",
+ "area": "studios",
+ "source": "universe versions mg-compare-with-base (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Compare with base:B1"
+   }
+  }
+ ]
+}

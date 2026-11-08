@@ -3336,6 +3336,7 @@ impl PartStudioView {
         let doc = self.doc.clone();
         let custom_btn = div()
             .id("vb-custom-features")
+            .map(|d| crate::ui_script::mark(d, || "button:Add custom features in this version to your toolbar".into()))
             .h(px(26.))
             .px(px(8.))
             .flex()
@@ -3368,6 +3369,7 @@ impl PartStudioView {
         let custom_btn = crate::ui::with_tooltip("tt-vb-custom", "Add custom features in this version to your toolbar.", custom_btn);
         let back = div()
             .id("vb-return")
+            .map(|d| crate::ui_script::mark(d, || format!("button:Return to {branch}")))
             .h(px(24.))
             .px(px(8.))
             .flex()

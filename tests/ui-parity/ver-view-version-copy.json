@@ -1,0 +1,39 @@
+{
+ "name": "ver-view-version-copy",
+ "about": "Open V1, ☰ › Copy version… (the dialog), Cancel",
+ "area": "studios",
+ "source": "universe versions dlg-copy-version (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Document menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

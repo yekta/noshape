@@ -248,6 +248,12 @@ fn load_prefs() -> Prefs {
     std::fs::read(prefs_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
+/// The documents page opens on Owned by me next time (the ui-parity driver's page starts).
+pub fn open_on_owned_by_me() {
+    let prefs = Prefs { source: Some(Source::All), ..load_prefs() };
+    let _ = std::fs::write(prefs_path(), serde_json::to_vec_pretty(&prefs).unwrap_or_default());
+}
+
 pub struct StartView {
     focus: FocusHandle,
     /// Help ▸ Keyboard shortcuts: the studios' sheet, over the page (live psui/docs-help-3-shortcuts).
@@ -1433,11 +1439,13 @@ impl StartView {
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                     this.labels_open = !this.labels_open;
                     cx.notify();
-                })),
+                }))
+                .map(|d| crate::ui_script::mark(d, || "nav:Labels".into())),
         );
         if open {
             for (k, l) in self.labels.labels.clone().into_iter().enumerate() {
                 let source = Source::Label(l.clone());
+                let mark_name = format!("nav:{l}");
                 let active = self.source == source;
                 let color = if active { pal.accent } else { pal.text };
                 col = col.child(
@@ -1454,7 +1462,8 @@ impl StartView {
                         .when(!active, |d| d.hover(|d| d.bg(rgb(0xf5f5f5))))
                         .child(os::glyph(os::GLYPH_LABEL, 16., color))
                         .child(div().truncate().child(crate::ui::user_text(l)))
-                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx))),
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.set_source(source.clone(), cx)))
+                        .map(|d| crate::ui_script::mark(d, || mark_name)),
                 );
             }
         }

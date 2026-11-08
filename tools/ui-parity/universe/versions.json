@@ -508,7 +508,17 @@
    "where": "hover a version/workspace row",
    "freq": 3,
    "cloud": false,
-   "source": "dom/documents-versions-history-panel.txt"
+   "source": "dom/documents-versions-history-panel.txt",
+   "via": [
+    [
+     {
+      "do": "hover",
+      "on": {
+       "history_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vh-graph-branches",
@@ -631,25 +641,10 @@
    "id": "vrow-copy-link",
    "category": "row menu",
    "name": "Copy link",
-   "where": "right-click a version row",
+   "where": "right-click a version row (a web URL to the document: cloud)",
    "freq": 3,
-   "cloud": false,
-   "source": "behaviours.md:68",
-   "via": [
-    [
-     {
-      "on": {
-       "history_row": "re:V\\d+"
-      },
-      "do": "rclick"
-     },
-     {
-      "on": {
-       "menu": "Copy link"
-      }
-     }
-    ]
-   ]
+   "cloud": true,
+   "source": "behaviours.md:68"
   },
   {
    "id": "vrow-compare",
@@ -823,25 +818,10 @@
    "id": "wrow-cur-copy-link",
    "category": "row menu",
    "name": "Copy link",
-   "where": "right-click the current workspace row",
+   "where": "right-click the current workspace row (a web URL to the document: cloud)",
    "freq": 3,
-   "cloud": false,
-   "source": "behaviours.md:5571",
-   "via": [
-    [
-     {
-      "on": {
-       "history_row": "Main"
-      },
-      "do": "rclick"
-     },
-     {
-      "on": {
-       "menu": "Copy link"
-      }
-     }
-    ]
-   ]
+   "cloud": true,
+   "source": "behaviours.md:5571"
   },
   {
    "id": "wrow-cur-protection",
@@ -967,25 +947,10 @@
    "id": "wrow-copy-link",
    "category": "row menu",
    "name": "Copy link",
-   "where": "right-click another workspace row",
+   "where": "right-click another workspace row (a web URL to the document: cloud)",
    "freq": 3,
-   "cloud": false,
-   "source": "behaviours.md:5015",
-   "via": [
-    [
-     {
-      "on": {
-       "history_row": "re:B\\d+"
-      },
-      "do": "rclick"
-     },
-     {
-      "on": {
-       "menu": "Copy link"
-      }
-     }
-    ]
-   ]
+   "cloud": true,
+   "source": "behaviours.md:5015"
   },
   {
    "id": "wrow-compare",
@@ -1159,25 +1124,10 @@
    "id": "crow-copy-link",
    "category": "row menu",
    "name": "Copy link",
-   "where": "right-click a history (change) row",
+   "where": "right-click a history (change) row (a web URL to the document: cloud)",
    "freq": 3,
-   "cloud": false,
-   "source": "behaviours.md:3317",
-   "via": [
-    [
-     {
-      "on": {
-       "history_row": "re:(?!Main$|V\\d+$|B\\d+$|Start$).*"
-      },
-      "do": "rclick"
-     },
-     {
-      "on": {
-       "menu": "Copy link"
-      }
-     }
-    ]
-   ]
+   "cloud": true,
+   "source": "behaviours.md:3317"
   },
   {
    "id": "crow-compare",
@@ -1316,7 +1266,16 @@
    "where": "Create version dialog: creates, then opens the new version's Properties",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:71"
+   "source": "behaviours.md:71",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create version and edit properties"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-cv-cancel",
@@ -1417,7 +1376,16 @@
    "where": "Branch dialog: creates, switches to it, opens workspace Properties",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:72"
+   "source": "behaviours.md:72",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Create workspace and edit properties"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-br-open-new-ws",
@@ -1426,7 +1394,16 @@
    "where": "Branch dialog checkbox (on by default)",
    "freq": 2,
    "cloud": false,
-   "source": "dom/dialog-branch.txt"
+   "source": "dom/dialog-branch.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Open new workspace"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-br-cancel",
@@ -1559,7 +1536,21 @@
    "where": "Workspace protection dialog checkbox (disabled while drawings need updating)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5565"
+   "source": "behaviours.md:5565",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-wp-apply-cancel",
@@ -1609,7 +1600,21 @@
    "where": "after enabling: Part Studio shows \"This document is view only.\", drawing shows \"Workspace protection enabled. …\", tab + greyed",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5573"
+   "source": "behaviours.md:5573",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "wp-blocked-actions",
@@ -1627,7 +1632,31 @@
    "where": "Workspace protection dialog › untick › Apply",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5590"
+   "source": "behaviours.md:5590",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Enable workspace protection"
+      }
+     },
+     {
+      "on": {
+       "button": "Apply"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-delete-workspace",
@@ -1724,7 +1753,21 @@
    "where": "☰ while viewing a version › \"Copy the active version to a new document\"",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29695"
+   "source": "behaviours.md:29695",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy version…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-update-workspace",
@@ -1772,9 +1815,9 @@
    "id": "nav-copy-link",
    "category": "navbar",
    "name": "Copy document URL at this tab and workspace or version",
-   "where": "navbar link icon after the name",
+   "where": "navbar link icon after the name (a web URL to the document: cloud)",
    "freq": 3,
-   "cloud": false,
+   "cloud": true,
    "source": "dom/navbar-version-v1.txt"
   },
   {
@@ -1784,7 +1827,21 @@
    "where": "☰ reduced to Rename document · Move to… · Restore deleted workspaces… · Copy version… · Version properties… · Print… · Close document",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:29697"
+   "source": "behaviours.md:29697",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      }
+     },
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "nav-version-properties",
@@ -1793,7 +1850,21 @@
    "where": "☰ while viewing a version",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29697"
+   "source": "behaviours.md:29697",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "Version properties…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "nav-workspace-properties",
@@ -1857,7 +1928,16 @@
    "where": "view-only bar button",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:60"
+   "source": "behaviours.md:60",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Return to .+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "view-only-custom-features",
@@ -1866,7 +1946,16 @@
    "where": "view-only bar ⊞ button",
    "freq": 3,
    "cloud": false,
-   "source": "dom/version-view-only-bar.txt"
+   "source": "dom/version-view-only-bar.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add custom features in this version to your toolbar"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "view-only-help",
@@ -1967,7 +2056,21 @@
    "where": "open an Assembly (or tab only on one side) in compare",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3515"
+   "source": "behaviours.md:3515",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "doc_tab": "re:Assembly.*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-features-list",
@@ -2155,7 +2258,22 @@
    "where": "click another version row: leaves compare, opens it",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:2638"
+   "source": "behaviours.md:2638",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "mg-dialog",
@@ -2182,7 +2300,16 @@
    "where": "merge dialog overall strategy card",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5031"
+   "source": "behaviours.md:5031",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Keep .+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-overall-merge",
@@ -2214,7 +2341,16 @@
    "where": "merge dialog overall strategy card",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5033"
+   "source": "behaviours.md:5033",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Replace with .+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-compare-with-base",
@@ -2223,7 +2359,16 @@
    "where": "strategy card link: opens compare against the merge base in a new browser tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5075"
+   "source": "behaviours.md:5075",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Compare with base:.+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-tab-strategy",
@@ -2250,7 +2395,16 @@
    "where": "merge dialog group header, click to collapse/expand",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5066"
+   "source": "behaviours.md:5066",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:\\d+ tabs? ha(s|ve) no changes"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "mg-merge",
@@ -2718,7 +2872,20 @@
    "where": "Esc does nothing in compare mode (URL stays /and/)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3517"
+   "source": "behaviours.md:3517",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      }
+     },
+     {
+      "do": "key",
+      "key": "Escape"
+     }
+    ]
+   ]
   },
   {
    "id": "sc-esc-create-version",

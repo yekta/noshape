@@ -1,0 +1,25 @@
+{
+ "name": "ver-row-tooltip",
+ "about": "Hover the V1 row: its tooltip",
+ "area": "studios",
+ "source": "universe versions vh-row-tooltip-description (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "wait",
+   "ms": 1500
+  }
+ ]
+}

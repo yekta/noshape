@@ -881,7 +881,21 @@
    "where": "table ⋯ (only with more than one table)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:37264"
+   "source": "behaviours.md:37264",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Collapse all tables"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-insert-vs-button",
@@ -962,7 +976,21 @@
    "where": "Variable Studio footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17670"
+   "source": "behaviours.md:17670",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Configure Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "checkbox": "Insert into all Part Studios and Assemblies"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-learn-more-link",
@@ -1012,7 +1040,21 @@
    "where": "inserted table ⋯",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1570"
+   "source": "behaviours.md:1570",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Edit reference…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-remove-reference",
@@ -1062,7 +1104,21 @@
    "where": "inserted table ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1570"
+   "source": "behaviours.md:1570",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Rename"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-copy-table",
@@ -1071,7 +1127,21 @@
    "where": "inserted table ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1570"
+   "source": "behaviours.md:1570",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Table menu:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Copy table"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-inserted-create-task",
@@ -1382,7 +1452,21 @@
    "where": "Configuration panel while auto-inserted",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17661"
+   "source": "behaviours.md:17661",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Variable Studio.*"
+      }
+     },
+     {
+      "on": {
+       "button": "Configuration panel"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-configure-studio",
@@ -1391,7 +1475,23 @@
    "where": "Configuration panel empty state",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5458"
+   "source": "behaviours.md:5458",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Configure Variable Studio"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Configure Variable Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-add-input",
@@ -1400,7 +1500,23 @@
    "where": "Configuration panel footer",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5477"
+   "source": "behaviours.md:5477",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Add configuration input"
+      }
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Add configuration input"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-list-names",
@@ -1409,7 +1525,21 @@
    "where": "Add configuration input › List",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17677"
+   "source": "behaviours.md:17677",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Configure Variable Studio"
+      }
+     },
+     {
+      "on": {
+       "button": "Add configuration input"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-checkbox-dialog",
@@ -1418,7 +1548,16 @@
    "where": "Add configuration input › Checkbox",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5481"
+   "source": "behaviours.md:5481",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Checkbox"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-variable-dialog",
@@ -1427,7 +1566,16 @@
    "where": "Add configuration input › Configuration variable",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5482"
+   "source": "behaviours.md:5482",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Configuration variable"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-row-menu",
@@ -1445,7 +1593,22 @@
    "where": "Value cell right-click (inputs present)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5470"
+   "source": "behaviours.md:5470",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Configure( with .+)?"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-unconfigure",
@@ -1454,7 +1617,22 @@
    "where": "configured Value cell right-click",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5470"
+   "source": "behaviours.md:5470",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "var_cell": "re:.+:Value"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Unconfigure from .+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-value-set-to-cv",
@@ -1481,7 +1659,16 @@
    "where": "configuration input ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5910"
+   "source": "behaviours.md:5910",
+   "via": [
+    [
+     {
+      "on": {
+       "config_more": "re:.+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-edit-internal-ids",
@@ -1490,7 +1677,21 @@
    "where": "input ⋯ › Edit internal IDs…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5914"
+   "source": "behaviours.md:5914",
+   "via": [
+    [
+     {
+      "on": {
+       "config_more": "re:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "re:Edit internal IDs?…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-input-propagation",
@@ -1499,7 +1700,21 @@
    "where": "input ⋯",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5929"
+   "source": "behaviours.md:5929",
+   "via": [
+    [
+     {
+      "on": {
+       "config_more": "re:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Input propagation…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-table-cell-menu",
@@ -1508,7 +1723,17 @@
    "where": "configuration table cell right-click",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5478"
+   "source": "behaviours.md:5478",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "config_row": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-left-panel",
@@ -1517,7 +1742,16 @@
    "where": "Variable Studio left side once configured",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5468"
+   "source": "behaviours.md:5468",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Configure Variable Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "vs-config-filter-inputs",
@@ -1535,7 +1769,21 @@
    "where": "Configuration panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17671"
+   "source": "behaviours.md:17671",
+   "via": [
+    [
+     {
+      "on": {
+       "config_more": "re:.+"
+      }
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
   }
  ],
  "gaps": [

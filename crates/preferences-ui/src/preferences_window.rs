@@ -639,7 +639,7 @@ impl PreferencesView {
         let right = v_flex()
             .ml(px(20.))
             .flex_none()
-            .child(h_flex().map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Reset all")))).child(os::primary_button("kb-reset-all", "Reset all").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_reset_all(window, cx)))))
+            .child(h_flex().child(div().map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Reset all")))).child(os::primary_button("kb-reset-all", "Reset all").on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_reset_all(window, cx))))))
             .child(Self::legend(cx));
         let help = div().id("kb-help").child(crate::assets::icon("help-gray", 18., cx)).into_any_element();
         let popup = self.render_popup(window, cx);

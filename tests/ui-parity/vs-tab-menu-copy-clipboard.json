@@ -1,0 +1,31 @@
+{
+ "name": "vs-tab-menu-copy-clipboard",
+ "about": "Variable Studio tab right-click › Copy to clipboard, then + › Paste",
+ "area": "studios",
+ "source": "universe variable-studio vs-tab-copy-to-clipboard (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy to clipboard"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

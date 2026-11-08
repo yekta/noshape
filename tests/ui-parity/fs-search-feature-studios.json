@@ -1,0 +1,23 @@
+{
+ "name": "fs-search-feature-studios",
+ "about": "Feature Studio › mod+shift+f: Search Feature Studios",
+ "area": "studios",
+ "source": "universe feature-studio fs-search-navbar-button (studios 11-08, coverage batch 3)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+shift+f"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

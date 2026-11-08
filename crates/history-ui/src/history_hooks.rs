@@ -21,6 +21,8 @@ pub struct Hooks {
     /// version or change (read-only), or on the current workspace (None),
     /// showing `tab` (else the active one).
     pub open_new_window: OpenNewWindow,
+    /// Another workspace's row › Open in new browser tab: a window on that workspace, editable.
+    pub open_workspace_window: fn(Entity<DocModel>, BranchId, &mut App) -> anyhow::Result<()>,
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -44,4 +46,8 @@ pub fn workspace_protection(doc: Entity<DocModel>, branch: BranchId, window: &mu
 
 pub fn open_new_window(doc: Entity<DocModel>, at: Option<noshape_store::MicroversionId>, tab: Option<noshape_model::document::TabId>, cx: &mut App) -> anyhow::Result<()> {
     (hooks().open_new_window)(doc, at, tab, cx)
+}
+
+pub fn open_workspace_window(doc: Entity<DocModel>, branch: BranchId, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_workspace_window)(doc, branch, cx)
 }

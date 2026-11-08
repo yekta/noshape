@@ -94,7 +94,7 @@ impl Render for ExportRulesPrefsView {
                     .pl(px(15.))
                     .pt(px(14.))
                     .child(body)
-                    .child(h_flex().mt(px(add_gap)).map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Add export rule…")))).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx)))),
+                    .child(h_flex().mt(px(add_gap)).child(div().map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Add export rule…")))).child(os::primary_button("er-add", tr("Add export rule…")).on_click(move |_, window, cx| open_dialog(view_add.clone(), None, window, cx))))),
             )
     }
 }

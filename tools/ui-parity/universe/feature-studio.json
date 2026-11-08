@@ -219,7 +219,21 @@
    "where": "Feature Studio toolbar, first button",
    "freq": 3,
    "cloud": false,
-   "source": "dom/fs-nav-shortcuts.txt"
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-undo",
@@ -506,7 +520,16 @@
    "where": "Feature Studio toolbar",
    "freq": 3,
    "cloud": false,
-   "source": "dom/feature-studio-toolbar-menus.txt"
+   "source": "dom/feature-studio-toolbar-menus.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Commit Feature Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-tb-search-tools",
@@ -1535,7 +1558,19 @@
    "where": "Module outline ▾",
    "freq": 2,
    "cloud": false,
-   "source": "dom/fs-nav-shortcuts.txt"
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Module outline"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-key-commit",
@@ -1768,7 +1803,15 @@
    "where": "document navbar",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:34755"
+   "source": "behaviours.md:34755",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "mod+shift+f"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-compare",
@@ -2004,7 +2047,22 @@
    "where": "Part Studio tab right-click",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1870"
+   "source": "behaviours.md:1870",
+   "via": [
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "doc_tab": "re:Part Studio.*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Show code"
+      }
+     }
+    ]
+   ]
   }
  ],
  "gaps": [

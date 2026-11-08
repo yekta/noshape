@@ -1327,10 +1327,15 @@ impl Render for HistoryPanel {
                         // Live wp-901: Open · Open in new browser tab · Compare · Merge
                         // into current workspace… · Workspace protection… · Properties…
                         // | Delete. A new browser tab is another window here (as the tab
-                        // menu's); only on the current workspace, whose window shares
-                        // its edits. Copy link is web-only.
+                        // menu's): the current workspace's shares its edits, another's
+                        // edits that workspace. Copy link is web-only.
                         let dn = d5.clone();
-                        let m = if b == current_branch { m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| open_new_window(&dn, None, None, cx))) } else { m };
+                        let m = m.item(crate::os_menu::OsMenuItem::new("Open in new browser tab").on_click(move |_, _, cx| {
+                            let opened = if b == current_branch { crate::history_hooks::open_new_window(dn.clone(), None, None, cx) } else { crate::history_hooks::open_workspace_window(dn.clone(), b, cx) };
+                            if let Err(e) = opened {
+                                dn.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("{e:#}"))));
+                            }
+                        }));
                         let m = if b != current_branch {
                             m.item(crate::os_menu::OsMenuItem::new("Compare").on_click(move |_, _, cx| v3.update(cx, |t, cx| t.compare_with_current(crate::compare_mode::Side::Workspace(b), name2.clone(), cx))))
                                 .item(crate::os_menu::OsMenuItem::new("Merge into current workspace…").on_click({

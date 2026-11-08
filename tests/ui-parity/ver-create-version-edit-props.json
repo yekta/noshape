@@ -1,0 +1,21 @@
+{
+ "name": "ver-create-version-edit-props",
+ "about": "Create version… › Create version and edit properties: the version made, its Properties open",
+ "area": "studios",
+ "source": "universe versions dlg-cv-create-edit-props (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version and edit properties"
+   }
+  }
+ ]
+}

@@ -53,6 +53,9 @@ pub fn mark<E: ParentElement>(el: E, name: impl FnOnce() -> String) -> E {
                 if let Ok(mut m) = bounds().lock() {
                     m.insert(name.clone(), (window.window_handle().window_id(), b));
                 }
+                if let Ok(mut c) = clips().lock() {
+                    c.insert(name.clone(), window.content_mask().bounds);
+                }
             },
             |_, _, _, _| {},
         )
@@ -260,6 +263,20 @@ pub fn clear() {
     if let Ok(mut m) = bounds().lock() {
         m.clear();
     }
+    if let Ok(mut c) = clips().lock() {
+        c.clear();
+    }
+}
+
+/// Each named control's clip when last painted: the part of the window its scrolling containers let show.
+fn clips() -> &'static Mutex<HashMap<String, Bounds<Pixels>>> {
+    static C: OnceLock<Mutex<HashMap<String, Bounds<Pixels>>>> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Where `name` can show: the clip of the scrolling containers around it (the driver scrolls a control into it).
+pub fn clip_of(name: &str) -> Option<Bounds<Pixels>> {
+    clips().lock().ok()?.get(name).copied()
 }
 
 /// The bounds `name` had when last painted.

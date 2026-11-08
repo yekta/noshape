@@ -1,0 +1,39 @@
+{
+ "name": "ver-branch-no-open",
+ "about": "V1 › Branch to create workspace…, Open new workspace unticked, Create: the run stays on Main",
+ "area": "studios",
+ "source": "universe versions dlg-br-open-new-ws (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Branch to create workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Open new workspace"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  }
+ ]
+}

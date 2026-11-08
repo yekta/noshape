@@ -1,0 +1,39 @@
+{
+ "name": "ver-merge-replace",
+ "about": "B1 › Merge into current workspace…: the Replace with B1 card, then Merge",
+ "area": "studios",
+ "source": "universe versions mg-overall-replace (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Replace with B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Merge"
+   }
+  }
+ ]
+}

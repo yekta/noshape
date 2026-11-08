@@ -1,0 +1,21 @@
+{
+ "name": "vs-cfg-blocked-notice",
+ "about": "The Configuration panel while Insert into all is on (the start's default): the notice that configurations need it off",
+ "area": "studios",
+ "source": "universe variable-studio vs-config-blocked-notice (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Configuration panel"
+   }
+  }
+ ]
+}

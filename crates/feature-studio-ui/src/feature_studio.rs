@@ -693,6 +693,7 @@ impl FeatureStudioView {
         let doc = self.doc.clone();
         let back = div()
             .id("fs-vb-return")
+            .map(|d| crate::ui_script::mark(d, || format!("button:Return to {branch}")))
             .h(px(24.))
             .px(px(8.))
             .flex()
@@ -1175,6 +1176,7 @@ impl FeatureStudioView {
                     .rounded_l(px(0.))
                     .child(os::glyph(os::GLYPH_CHEVRON_DOWN, 14., gpui_kit::rgb_static(0xffffff)))
                     .when(clean, |b| b.opacity(0.5))
+                    .map(|d| crate::ui_script::mark(d, || "caret:Commit Feature Studio".into()))
                     .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let b = anchor.get();
                         this.open_commit_menu(point(b.left(), b.bottom() + px(2.)), window, cx);

@@ -1,0 +1,15 @@
+{
+ "name": "docs-trash-empty-state",
+ "about": "An empty Trash: its empty state",
+ "area": "studios",
+ "source": "universe documents documents-page-empty-states-no-documents-owned-by-you-nothing-in-trash-get-start (studios 11-08, coverage batch 3)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "nav": "Trash"
+   }
+  }
+ ]
+}

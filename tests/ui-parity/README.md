@@ -252,6 +252,14 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
 - On a Variable Studio tab the state has `"variables": {"tables": [{"title": "Variable Studio 1", "rows": [{"name",
   "type", "value", "description"}]}]}`: the inserted studios' tables first, then its own; `value` as the cell shows it
   (an expression's result while the cell isn't being edited).
+- A Variable Studio's Configuration panel (studios, 11-08) takes the Part Studio's targets: `{"button": "Configure
+  Variable Studio"}` (the empty panel's button; it adds a List input) and `{"caret": "Configure Variable Studio"}` its
+  ▾, `{"button": "Add configuration input"}` / `{"caret": "Add configuration input"}` once configured,
+  `{"config_more": "<input name>"}`, `{"config_more": ""}` (by Filter inputs), `{"config_row": "Default"}`; the
+  Checkbox / Variable input dialog is `dialog` (title "Checkbox input" / "Variable input", `tabs` Length…Text, fields
+  Name, Default, Minimum, Maximum), its ✓ / ✕ `{"button": "ok"}` / `"cancel"`, a type `{"tab": "Angle"}`. State
+  `variables.configuration`: `[{"name": "Configuration", "kind": "list", "default": "Default", "shown": "Default",
+  "rows": ["Default"]}]` (kind list | checkbox | variable | text; `rows` a list's options).
 - A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
   `features` in Main (start `doc-versions`). While comparing, `document.compare` is `{"base": "Main", "target": "V1",
   "only_differences": true, "features": [{"name": "Extrude 2", "change": "added"}], "selected": null}` (`features` the

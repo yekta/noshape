@@ -1,0 +1,21 @@
+{
+ "name": "vs-tab-menu-open-new-tab",
+ "about": "Variable Studio tab right-click › Open in new browser tab",
+ "area": "studios",
+ "source": "universe variable-studio vs-tab-open-new-browser-tab (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Open in new browser tab"
+   }
+  }
+ ]
+}

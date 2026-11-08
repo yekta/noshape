@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-open-version",
+ "about": "V1 › Compare, then a click on the V1 row: leaves compare and opens V1",
+ "area": "studios",
+ "source": "universe versions cmp-leave-other-row (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  }
+ ]
+}

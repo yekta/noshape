@@ -110,10 +110,10 @@ impl Render for MaterialLibrariesView {
                     // opens the "Add material library" modal.
                     // Live 1902, 1919: a primary (blue) button 50 px under the last
                     // row, the next section's rule 50 px under it.
-                    .child(h_flex().mt(px(50.)).mb(px(18.)).map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Add material library…")))).child(crate::os_ui::primary_button("matlib-add-library", "Add material library…").on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
+                    .child(h_flex().mt(px(50.)).mb(px(18.)).child(div().map(|d| crate::ui_script::mark(d, || format!("button:{}", crate::ui_script::in_section("Add material library…")))).child(crate::os_ui::primary_button("matlib-add-library", "Add material library…").on_click(cx.listener(|_, _: &ClickEvent, window, cx| {
                         let view = cx.entity();
                         crate::material_libraries::open(move |_, _, cx| view.update(cx, |_, cx| cx.notify()), window, cx);
-                    })))),
+                    }))))),
             )
     }
 }

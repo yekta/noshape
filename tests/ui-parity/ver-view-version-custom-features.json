@@ -1,0 +1,31 @@
+{
+ "name": "ver-view-version-custom-features",
+ "about": "Open V1, then the view-only bar's ⊞ (Add custom features in this version to your toolbar)",
+ "area": "studios",
+ "source": "universe versions view-only-custom-features (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Add custom features in this version to your toolbar"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

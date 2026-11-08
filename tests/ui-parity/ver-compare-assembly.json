@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-assembly",
+ "about": "V1 › Compare, then the Assembly 1 tab (not comparable)",
+ "area": "studios",
+ "source": "universe versions cmp-not-comparable (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  }
+ ]
+}

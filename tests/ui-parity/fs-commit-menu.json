@@ -1,0 +1,25 @@
+{
+ "name": "fs-commit-menu",
+ "about": "Feature Studio toolbar › Commit ▾ (Commit, Commit all)",
+ "area": "studios",
+ "source": "universe feature-studio fs-tb-commit-menu (studios 11-08, coverage batch 3)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "caret": "Commit Feature Studio"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

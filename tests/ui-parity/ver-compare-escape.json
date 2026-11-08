@@ -1,0 +1,31 @@
+{
+ "name": "ver-compare-escape",
+ "about": "V1 › Compare, then Esc: still comparing",
+ "area": "studios",
+ "source": "universe versions sc-compare-esc (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

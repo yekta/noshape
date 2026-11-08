@@ -344,6 +344,7 @@ impl VariableStudioView {
             .child(
                 div()
                     .id(SharedString::from(format!("vcfg-more-{iid}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("config_more:{}", input.name)))
                     .size(px(25.))
                     .flex()
                     .items_center()
@@ -471,6 +472,7 @@ impl VariableStudioView {
             let mut row = h_flex().child(
                 cell(NAME_W)
                     .id(SharedString::from(format!("vcfg-row-{iid}-{key}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("config_row:{}", if label.is_empty() { key } else { label })))
                     .relative()
                     .cursor_pointer()
                     .when(on, |d| d.child(div().absolute().left_0().top_0().bottom_0().w(px(3.)).bg(blue)))
@@ -600,6 +602,7 @@ impl VariableStudioView {
         } else if studio.configuration.is_empty() {
             let main = div()
                 .id("vcfg-configure")
+                .map(|d| crate::ui_script::mark(d, || "button:Configure Variable Studio".into()))
                 .h(px(33.))
                 .px(px(10.5))
                 .flex()
@@ -613,6 +616,7 @@ impl VariableStudioView {
             let v = view.clone();
             let caret = div()
                 .id("vcfg-configure-more")
+                .map(|d| crate::ui_script::mark(d, || "caret:Configure Variable Studio".into()))
                 .w(px(26.))
                 .h(px(33.))
                 .flex()
@@ -666,6 +670,7 @@ impl VariableStudioView {
                 .child(
                     div()
                         .id("vcfg-more")
+                        .map(|d| crate::ui_script::mark(d, || "config_more:".into()))
                         .size(px(25.))
                         .flex()
                         .items_center()
@@ -716,6 +721,7 @@ impl VariableStudioView {
         let add = (!studio.configuration.is_empty()).then(|| {
             let main = div()
                 .id("vcfg-add-input")
+                .map(|d| crate::ui_script::mark(d, || "button:Add configuration input".into()))
                 .h(px(28.))
                 .px(px(10.))
                 .flex()
@@ -729,6 +735,7 @@ impl VariableStudioView {
             let v = view.clone();
             let caret = div()
                 .id("vcfg-add-input-more")
+                .map(|d| crate::ui_script::mark(d, || "caret:Add configuration input".into()))
                 .w(px(22.))
                 .h(px(28.))
                 .flex()
@@ -834,6 +841,22 @@ impl VariableStudioView {
         let blue = rgb(0x1651b0);
         let ok = !d.name.read(cx).value().trim().is_empty();
         let title = if d.variable { "Variable input" } else { "Checkbox input" };
+        crate::ui_script::note_dialog(|| {
+            let text = |st: &Entity<InputState>| st.read(cx).value().to_string();
+            let mut fields = vec![serde_json::json!({ "label": "Name", "kind": "string", "text": text(&d.name) })];
+            if d.variable {
+                let text_kind = VAR_KINDS[d.kind].1 == VariableKind::Text;
+                fields.push(serde_json::json!({ "label": "Default", "kind": "string", "text": text(&d.values[0]) }));
+                if !text_kind {
+                    fields.push(serde_json::json!({ "label": "Minimum", "kind": "string", "text": text(&d.values[1]) }));
+                    fields.push(serde_json::json!({ "label": "Maximum", "kind": "string", "text": text(&d.values[2]) }));
+                }
+            } else {
+                fields.push(serde_json::json!({ "label": "Default", "kind": "boolean", "checked": d.default_on }));
+            }
+            let tabs: Vec<serde_json::Value> = if d.variable { VAR_KINDS.iter().enumerate().map(|(i, (l, _))| serde_json::json!({ "label": l, "selected": i == d.kind })).collect() } else { Vec::new() };
+            serde_json::json!({ "title": title, "kind": "feature", "tabs": tabs, "fields": fields, "error": null, "ok": if ok { "enabled" } else { "disabled" } })
+        });
         let row = |id: &'static str, label: &'static str, st: &Entity<InputState>| {
             h_flex()
                 .id(id)
@@ -850,6 +873,7 @@ impl VariableStudioView {
                 tabs = tabs.child(
                     div()
                         .id(SharedString::from(format!("vci-kind-{i}")))
+                        .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
                         .flex_1()
                         .h(px(26.))
                         .flex()
@@ -908,8 +932,8 @@ impl VariableStudioView {
                         .border_color(rgb(0xd7d7d7))
                         // Red until it has a name (live vs-913).
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(rgb(0xaa252d))).child(title))
-                        .child(div().id("vci-ok").size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
-                        .child(div().id("vci-cancel").size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("vci-ok").map(|d| crate::ui_script::mark(d, || "button:ok".into())).size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
+                        .child(div().id("vci-cancel").map(|d| crate::ui_script::mark(d, || "button:cancel".into())).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                             this.cfg_dialog = None;
                             cx.notify();
                         }))),

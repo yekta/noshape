@@ -1,0 +1,21 @@
+{
+ "name": "fs-tb-versions-history",
+ "about": "Feature Studio › Versions and history",
+ "area": "studios",
+ "source": "universe feature-studio fs-tb-versions-history (studios 11-08, coverage batch 3)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

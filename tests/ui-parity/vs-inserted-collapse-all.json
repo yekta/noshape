@@ -1,0 +1,45 @@
+{
+ "name": "vs-inserted-collapse-all",
+ "about": "Variable Studio 1 inserted into Variable Studio 2, its table ⋯ › Collapse all tables",
+ "area": "studios",
+ "source": "universe variable-studio vs-table-collapse-all (studios 11-08, coverage batch 3)",
+ "start": "vs-two",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert Variable Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "panel_row": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Table menu:Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Collapse all tables"
+   }
+  }
+ ]
+}

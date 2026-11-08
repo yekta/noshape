@@ -1,0 +1,63 @@
+{
+ "name": "ver-protection-enable",
+ "about": "Main › Workspace protection…: tick Enable workspace protection, Apply; then untick it, Apply",
+ "area": "studios",
+ "source": "universe versions dlg-wp-enable (studios 11-08, coverage batch 3)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace protection…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Enable workspace protection"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Apply"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Workspace protection…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Enable workspace protection"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Apply"
+   }
+  }
+ ]
+}

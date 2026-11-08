@@ -1,0 +1,25 @@
+{
+ "name": "vs-tab-menu-move-to-document",
+ "about": "Variable Studio tab right-click › Move to document… (the dialog), Escape",
+ "area": "studios",
+ "source": "universe variable-studio vs-tab-move-to-document (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Move to document…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

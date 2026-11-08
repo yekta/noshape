@@ -1,0 +1,27 @@
+{
+ "name": "vs-desc-menu-copy",
+ "about": "Description cell right-click › Copy",
+ "area": "studios",
+ "source": "universe variable-studio vs-row-copy (studios 11-08, coverage batch 3)",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "var_cell": "height:Description"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Copy"
+   }
+  }
+ ]
+}

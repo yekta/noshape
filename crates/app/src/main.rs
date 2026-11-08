@@ -385,6 +385,11 @@ fn register_history_hooks() {
                 }
             }
         },
+        open_workspace_window: |doc, branch, cx| {
+            let gpu = cx.global::<gpu::GpuGlobal>().0.clone();
+            let path = doc.read(cx).session.path.clone();
+            files::open_workspace_window(path, branch, gpu, cx)
+        },
     });
 }
 

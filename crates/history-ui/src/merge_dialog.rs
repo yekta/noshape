@@ -325,6 +325,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
                 let side = if s == Strategy::Keep { (plan.target_side, plan.target.clone()) } else { (plan.source_side, plan.source.clone()) };
                 div()
                     .id(SharedString::from(format!("merge-compare-{s:?}")))
+                    .map(|d| crate::ui_script::mark(d, || format!("button:Compare with base:{}", side.1)))
                     .cursor_pointer()
                     .text_color(rgb(BLUE))
                     .hover(|d| d.underline())
@@ -341,6 +342,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
             let state = state.clone();
             h_flex()
                 .id(SharedString::from(format!("merge-card-{s:?}")))
+                .map(|d| crate::ui_script::mark(d, || if s == Strategy::Merge { "button:Merge changes".into() } else { format!("button:{}", strategy_label(s, &plan)) }))
                 .w(px(card_w))
                 .h_full()
                 .items_start()
@@ -520,6 +522,7 @@ pub fn open(doc: Entity<DocModel>, source: Side, source_name: String, window: &m
         let toggle = state.clone();
         let same_header = h_flex()
             .id("merge-no-changes")
+            .map(|d| crate::ui_script::mark(d, || format!("button:{}", if n_same == 1 { "1 tab has no changes".to_string() } else { format!("{n_same} tabs have no changes") })))
             .h(px(32.))
             .pl(px(if n_same > 0 { 4. } else { 18. }))
             .gap(px(4.))

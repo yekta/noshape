@@ -852,7 +852,16 @@
    "where": "documents page, empty views",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:41"
+   "source": "behaviours.md:41",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dp-doc-menu-open",
@@ -1389,7 +1398,27 @@
    "where": "documents page › Trash › right-click a row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:40"
+   "source": "behaviours.md:40",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     },
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Details"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-trash-row-menu-restore",
@@ -1398,7 +1427,27 @@
    "where": "documents page › Trash › right-click a row (toast \"… has been restored.\")",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:40"
+   "source": "behaviours.md:40",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     },
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Restore"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-trash-row-menu-delete",
@@ -1407,7 +1456,27 @@
    "where": "documents page › Trash › right-click a row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:35"
+   "source": "behaviours.md:35",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     },
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-delete-forever-delete-forever-cancel",
@@ -1416,7 +1485,26 @@
    "where": "documents page › Trash › row › Delete",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:35"
+   "source": "behaviours.md:35",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     },
+     {
+      "on": {
+       "menu": "Delete"
+      }
+     },
+     {
+      "on": {
+       "button": "Delete forever"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-empty-trash",
@@ -1425,7 +1513,21 @@
    "where": "documents page › Trash (button by the 30-day note)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:39"
+   "source": "behaviours.md:39",
+   "via": [
+    [
+     {
+      "on": {
+       "nav": "Trash"
+      }
+     },
+     {
+      "on": {
+       "button": "Empty trash…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-empty-trash-empty-trash-cancel",
@@ -1434,7 +1536,21 @@
    "where": "documents page › Trash › Empty trash…",
    "freq": 3,
    "cloud": false,
-   "source": "dom/documents-empty-trash-modal.txt"
+   "source": "dom/documents-empty-trash-modal.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Empty trash…"
+      }
+     },
+     {
+      "on": {
+       "button": "Empty trash"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-details-panel-name-owner-description-labels-create-new-label-crea",
