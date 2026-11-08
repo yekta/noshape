@@ -182,6 +182,11 @@ def normalize_live(state):
         # A clicked checkbox (an <input> with no selection): no text field (README "Focus").
         if focus.get("tag") == "input":
             focus["tag"] = "checkbox"
+    # The Tabs panel's Sort menu hangs inside the panel's header: live's recorder reads its rows into the panel's name.
+    doc, lst = (state or {}).get("document"), (state or {}).get("list")
+    if isinstance(doc, dict) and isinstance(lst, dict) and isinstance(doc.get("panel"), str) and lst.get("rows"):
+        if doc["panel"] == "Tabs " + " ".join(lst["rows"]):
+            doc["panel"] = "Tabs"
     # The Feature Studio's code editor: Ace's hidden textarea holds a piece of the text around the caret, not a field's
     # text; the editor's own `featurestudio.caret` is compared instead.
     if isinstance(focus, dict) and focus.get("tag") == "textarea" and (state or {}).get("featurestudio"):
@@ -472,6 +477,11 @@ def compare(live, ours, whole_document=True):
         # its `titleState` and `ok` are defaults).
         if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and a["dialog"].get("kind") == "feature" and a["dialog"].get("title") is None:
             b["dialog"] = dict(b["dialog"], title=None, **{k: a["dialog"][k] for k in ("titleState", "ok") if k in a["dialog"]})
+        # A Feature Studio's notices while the autocomplete list is open (typing): live's count changes from run to run
+        # at the same step (its compile runs on its own time), as ours.
+        for side in (a, b):
+            if isinstance(side.get("list"), dict) and side["list"].get("kind") == "autocomplete" and isinstance(side.get("featurestudio"), dict):
+                side["featurestudio"].pop("notices", None)
         # Live lists a studio's child rows (Insert Variable Studio's variables) in a different order on each run.
         for side in (a, b):
             if isinstance(side.get("dialog"), dict) and isinstance(side["dialog"].get("fields"), list):

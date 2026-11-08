@@ -897,7 +897,12 @@ fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
     let all = a == 0 && b == text.chars().count() && b > 0;
     // In a feature-style dialog (Insert Variable Studio's search) live reads it as that dialog's field.
     if s["dialog"]["kind"] == "feature" {
-        s["focus"] = json!({ "kind": "field", "label": null, "text": text, "selection": [a, b], "all": all, "dialog": s["dialog"]["title"] });
+        // Its label when exactly one of the dialog's labelled text fields holds that text (live vs-cfg-checkbox-dialog:
+        // "Name"); a search box has none (its "label" in our notes is its placeholder).
+        let holds = |f: &&Value| matches!(f["kind"].as_str(), Some("string" | "input")) && !f["label"].as_str().is_some_and(|l| l.starts_with("Search ")) && (f["text"] == json!(text) || f["value"] == json!(text));
+        let fields: Vec<&Value> = s["dialog"]["fields"].as_array().map(|f| f.iter().filter(holds).collect()).unwrap_or_default();
+        let label = if let [one] = fields.as_slice() { one["label"].clone() } else { Value::Null };
+        s["focus"] = json!({ "kind": "field", "label": label, "text": text, "selection": [a, b], "all": all, "dialog": s["dialog"]["title"] });
         return;
     }
     s["focus"] = json!({ "kind": "other", "text": text, "selection": [a, b], "all": all });
@@ -910,6 +915,8 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
         Some(f) => f,
         // A text field (a table cell, the code editor) has the keyboard; a view itself holding it is live's body.
         None if window.focused(cx).is_some() && window.context_stack().iter().any(|c| c.contains("Input")) => json!({ "kind": "other" }),
+        // A Feature Studio's Import panel holding the keyboard (live fs-import-pick: a field of the panel).
+        None if window.context_stack().iter().any(|c| c.contains("FsImportPanel")) => json!({ "kind": "field", "label": null }),
         None => json!({ "kind": "none" }),
     };
     let list = noshape_app_core::os_menu::ui_state(cx).or_else(noshape_app_core::ui_script::open_list);

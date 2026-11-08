@@ -511,7 +511,7 @@ impl Workspace {
         match self.active.and_then(|t| self.views.get(&t)) {
             Some(TabView::FeatureStudio(v)) => {
                 let st = v.read(cx).ui_state(cx);
-                let list = st.completion.map(|rows| serde_json::json!({ "kind": "autocomplete", "rows": rows, "highlighted": null, "disabled": [] }));
+                let list = st.completion.map(|rows| serde_json::json!({ "kind": "autocomplete", "rows": rows, "meta": st.completion_kinds.clone().unwrap_or_default(), "highlighted": gpui_kit::component::input::COMPLETION_SELECTED_ROW.load(std::sync::atomic::Ordering::Relaxed), "disabled": [] }));
                 Some(serde_json::json!({
                     "featurestudio": { "caret": [st.caret.0, st.caret.1], "line": st.line, "lines": st.lines, "committed": st.committed, "notices": st.notices },
                     "unsaved": st.unsaved,
@@ -2893,7 +2893,8 @@ impl Workspace {
             }
         } else {
             let (doc, active) = (self.doc.clone(), self.active);
-            let tm = cx.new(|cx| Panel::new(doc, active, window, cx));
+            let me = cx.entity().downgrade();
+            let tm = cx.new(|cx| Panel::new(doc, active, me, window, cx));
             let sub = cx.subscribe_in(&tm, window, |this: &mut Self, _, ev: &TabManagerEvent, window, cx| match ev {
                 TabManagerEvent::Open(t) => this.activate(*t, window, cx),
                 TabManagerEvent::Close => this.toggle_tab_manager(window, cx),
@@ -3054,6 +3055,66 @@ trait TabContextMenuExt: InteractiveElement + Sized {
 }
 
 impl<E: InteractiveElement + Sized> TabContextMenuExt for E {}
+
+/// The Tabs panel's Create… submenu (live 2331): Folder, Import…, Part Studio, Assembly, Variable Studio, Drawing…,
+/// Feature Studio, Material Library, as the + menu makes them.
+pub(crate) fn panel_create_menu(view: Entity<Workspace>, m: crate::os_menu::OsMenu) -> crate::os_menu::OsMenu {
+    use crate::os_menu::OsMenuItem as I;
+    let tab = |m: crate::os_menu::OsMenu, label: &'static str, icon: &'static str, kind: &'static str| {
+        let v = view.clone();
+        m.item(I::new(label).icon_name(icon).on_click(move |_, w, cx| v.update(cx, |t, cx| t.add_tab(kind, w, cx))))
+    };
+    let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+    let m = m
+        .item(I::new("Folder").icon_name("folder").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.create_folder(w, cx))))
+        .item(I::new("Import…").icon_name("import-file").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.import(w, cx))));
+    let m = tab(m, "Part Studio", "part-studio", "partstudio");
+    let m = tab(m, "Assembly", "assembly", "assembly");
+    let m = tab(m, "Variable Studio", "variable-studio", "variables");
+    let m = m.item(I::new("Drawing…").icon_name("drawing").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.open_create_drawing(crate::drawing_create::CreateRequest { source: None, name: None }, w, cx))));
+    let m = tab(m, "Feature Studio", "feature-studio", "featurestudio");
+    tab(m, "Material Library", "material-library", "materiallibrary")
+}
+
+/// A tab's rows in the Tabs panel's menu (live doc-tab-manager-row-menu, 2331): the tab bar's menu without
+/// Properties…, Export…, Release… and the drawing / assembly extras, the panel's Add selection to folder before
+/// Duplicate. `delete`, `add_to_folder` and `move_to` are the panel's (they act on its selection).
+pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_menu::OsMenu, delete: crate::os_menu::OsMenuItem, add_to_folder: crate::os_menu::OsMenuItem, move_to: crate::os_menu::OsMenuItem, cx: &App) -> crate::os_menu::OsMenu {
+    use crate::os_menu::OsMenuItem as I;
+    let kind = view.read(cx).doc.read(cx).session.doc.tab(id).map(|t| kind_of(&t.content)).unwrap_or("");
+    let (v1, v2, v3, v4, v5, v6) = (view.clone(), view.clone(), view.clone(), view.clone(), view.clone(), view);
+    let m = m
+        .item(delete)
+        .item(I::new("Open in new browser tab").on_click(move |_, _, cx| {
+            let (doc, gpu) = (v1.read(cx).doc.clone(), v1.read(cx).gpu.clone());
+            if let Err(e) = crate::files::open_tab_window(doc, id, gpu, cx) {
+                log::warn!("Could not open a window: {e}");
+            }
+        }))
+        .item(I::new("Rename").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.start_tab_rename(id, w, cx))));
+    let m = if kind == "partstudio" {
+        m.item(I::new("Show code").on_click(move |_, w, cx| {
+            let doc = v3.read(cx).doc.clone();
+            crate::doc_dialogs::show_code(doc, id, w, cx)
+        }))
+    } else {
+        m
+    };
+    let m = m
+        .item(add_to_folder)
+        .item(I::new("Duplicate").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.duplicate_tab(id, cx))))
+        .item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
+            let t = v5.read(cx).doc.read(cx).session.doc.tab(id).cloned();
+            cx.set_global(crate::doc_dialogs::CopiedTab(t));
+        }));
+    let m = if matches!(kind, "partstudio" | "assembly" | "drawing") {
+        m.item(I::new("Select as document thumbnail").on_click(move |_, _, cx| v6.update(cx, |t, cx| t.select_thumbnail(id, cx))))
+    } else {
+        m
+    };
+    m.item(move_to)
+}
+
 
 #[cfg(test)]
 mod switcher_tests {

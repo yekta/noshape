@@ -570,7 +570,9 @@ impl VariableStudioView {
                     // A configured studio can't be inserted everywhere (live vs-905: greyed).
                     .when(configured, |b| gpui_kit::component::Disableable::disabled(b, true).opacity(0.5))
                     // Not an undo step (live vs-cfg-*: Undo stays off after ticking it).
-                    .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        // The checkbox takes the keyboard from any field (live vs-cfg-insert-all-disabled: focus none).
+                        window.focus(&this.focus, cx);
                         if configured {
                             return;
                         }

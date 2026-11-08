@@ -75,6 +75,8 @@ struct Thumbs {
 
 pub struct TabManager {
     doc: Entity<DocModel>,
+    /// The window's workspace: the tab menu's actions (create, duplicate, thumbnail…) are its.
+    workspace: WeakEntity<crate::workspace::Workspace>,
     thumbs: Thumbs,
     evaluator: std::sync::Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
     search: Entity<InputState>,
@@ -92,6 +94,7 @@ pub struct TabManager {
     sort: TabSort,
     /// The sort menu is open; the sort button's bounds (the menu hangs under it).
     sort_open: bool,
+    sort_focus: FocusHandle,
     sort_anchor: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     show_search: bool,
     show_filters: bool,
@@ -122,7 +125,7 @@ impl TabSort {
 }
 
 impl TabManager {
-    pub fn new(doc: Entity<DocModel>, active: Option<TabId>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(doc: Entity<DocModel>, active: Option<TabId>, workspace: WeakEntity<crate::workspace::Workspace>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tabs"));
         let subs = vec![
             cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
@@ -145,7 +148,7 @@ impl TabManager {
         ];
         // Live 10-27 (TABS-PANEL-FOCUS): opening the panel leaves the focus
         // on the page; typing goes into Search tabs only once it is clicked.
-        Self { doc, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
+        Self { doc, workspace, thumbs: Thumbs::default(), evaluator: Default::default(), search, query: String::new(), kinds: HashSet::new(), selected: active, multi: Vec::new(), collapsed: HashSet::new(), renaming: None, sort: TabSort::TabOrder, sort_open: false, sort_focus: cx.focus_handle(), sort_anchor: Default::default(), show_search: true, show_filters: true, compact: false, show_preview: true, _subs: subs }
     }
 
     /// The workspace's active tab changed (keep it selected, like Onshape).
@@ -227,6 +230,23 @@ impl TabManager {
         cx.notify();
     }
 
+    /// Folder › Add selected to folder: the panel's selection goes into `folder` (not the folder itself).
+    fn add_selected_to(&mut self, folder: TabId, cx: &mut Context<Self>) {
+        let ids: Vec<TabId> = self.multi.iter().chain(self.selected.iter()).copied().filter(|t| *t != folder).collect();
+        if ids.is_empty() {
+            return;
+        }
+        self.doc.update(cx, |doc, cx| {
+            doc.edit_document("Move to folder", cx, |d| {
+                for t in &ids {
+                    d.set_parent(*t, Some(folder));
+                }
+            })
+        });
+        self.multi.clear();
+        cx.notify();
+    }
+
     fn start_rename(&mut self, folder: TabId, window: &mut Window, cx: &mut Context<Self>) {
         let name = self.doc.read(cx).session.doc.folder(folder).map(|f| f.name.clone()).unwrap_or_default();
         let st = cx.new(|cx| InputState::new(window, cx).default_value(name));
@@ -288,13 +308,17 @@ impl TabManager {
                 }
                 cx.notify();
             }))
-            .os_context_menu(move |menu, _, _| {
+            .os_context_menu(move |menu, window, cx| {
                 use crate::os_menu::OsMenuItem as I;
-                // Live (behaviours "Folders"): the tab bar's three items.
-                let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
+                // Live (doc-tab-manager-folder-menu): Create… ▸, Rename, Add selected to folder, Unpack, Move to document….
+                let (v1, v2, v3, v4) = (view.clone(), view.clone(), view.clone(), view.clone());
+                let menu = match view.read(cx).workspace.upgrade() {
+                    Some(ws) => menu.submenu("Create…", window, cx, move |m, _, _| crate::workspace::panel_create_menu(ws, m)),
+                    None => menu,
+                };
                 menu.item(I::new("Rename").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.start_rename(id, w, cx))))
+                    .item(I::new("Add selected to folder").on_click(move |_, _, cx| v4.update(cx, |t, cx| t.add_selected_to(id, cx))))
                     .item(I::new("Unpack").on_click(move |_, _, cx| v2.update(cx, |t, cx| t.unpack(id, cx))))
-                    .separator()
                     .item(I::new("Move to document…").on_click(move |_, w, cx| {
                         let doc = v3.read(cx).doc.clone();
                         crate::doc_dialogs::move_to_document(doc, vec![id], w, cx)
@@ -454,21 +478,25 @@ impl Render for TabManager {
                         }
                         cx.notify();
                     }))
-                    .os_context_menu(move |menu, _, cx| {
+                    .os_context_menu(move |menu, window, cx| {
                         use crate::os_menu::OsMenuItem as I;
                         let ids = view.read(cx).targets(id);
                         let (v1, v2, v3) = (view.clone(), view.clone(), view.clone());
                         let (i1, i2, i3) = (ids.clone(), ids.clone(), ids);
-                        menu.item(I::new("Add selection to folder").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_to_new_folder(i1.clone(), w, cx))))
-                            .separator()
-                            .item(I::new("Move to document…").on_click(move |_, w, cx| {
-                                let doc = v2.read(cx).doc.clone();
-                                crate::doc_dialogs::move_to_document(doc, i2.clone(), w, cx)
-                            }))
-                            .item(I::new("Delete").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
-                                t.multi.clear();
-                                cx.emit(TabManagerEvent::Delete(i3.clone()))
-                            })))
+                        let add = I::new("Add selection to folder").on_click(move |_, w, cx| v1.update(cx, |t, cx| t.add_to_new_folder(i1.clone(), w, cx)));
+                        let move_to = I::new("Move to document…").on_click(move |_, w, cx| {
+                            let doc = v2.read(cx).doc.clone();
+                            crate::doc_dialogs::move_to_document(doc, i2.clone(), w, cx)
+                        });
+                        let delete = I::new("Delete").on_click(move |_, _, cx| v3.update(cx, |t, cx| {
+                            t.multi.clear();
+                            cx.emit(TabManagerEvent::Delete(i3.clone()))
+                        }));
+                        // Live (doc-tab-manager-row-menu, 2331): Create… ▸ then the tab's own menu.
+                        let Some(ws) = view.read(cx).workspace.upgrade() else { return menu.item(add).item(move_to).item(delete) };
+                        let ws2 = ws.clone();
+                        let menu = menu.submenu("Create…", window, cx, move |m, _, _| crate::workspace::panel_create_menu(ws2, m));
+                        crate::workspace::panel_tab_menu(ws, id, menu, delete, add, move_to, cx)
                     })
                     .into_any_element())
             })
@@ -534,9 +562,11 @@ impl Render for TabManager {
                         div()
                             .relative()
                             .mr(px(6.))
-                            .child(tm_toggle("tm-sort", "tm-sort", false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip(crate::ui::tooltip("Sort tabs")).map(|d| noshape_app_core::ui_script::mark(d, || "button:Sort tabs".into())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                this.sort_open = !this.sort_open;
-                                cx.notify();
+                            .child(tm_toggle("tm-sort", "tm-sort", false, cx).when(self.sort_open, |b| b.bg(rgb(0xb2ddf6))).tooltip(crate::ui::tooltip("Sort tabs")).map(|d| noshape_app_core::ui_script::mark(d, || "button:Sort tabs".into())).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                                this.set_sort_open(!this.sort_open, cx);
+                                if this.sort_open {
+                                    window.focus(&this.sort_focus, cx);
+                                }
                             })))
                             .child(canvas(move |b, _, _| probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     })
@@ -621,6 +651,14 @@ impl Render for TabManager {
 }
 
 impl TabManager {
+    fn set_sort_open(&mut self, open: bool, cx: &mut Context<Self>) {
+        self.sort_open = open;
+        if !open {
+            noshape_app_core::ui_script::note_list(None);
+        }
+        cx.notify();
+    }
+
     /// The sort menu (live document/42, behaviours "Tab manager header icons"):
     /// 120 px under the sort button, 22 px rows of 12 px `#555` text, the
     /// current order bold on `#b2ddf6`.
@@ -637,10 +675,18 @@ impl TabManager {
             .border_color(rgb(0xd7d7d7))
             .rounded(px(3.))
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(6.)), blur_radius: px(12.), spread_radius: px(0.), inset: false }])
-            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
-                this.sort_open = false;
-                cx.notify();
-            }));
+            .track_focus(&self.sort_focus)
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
+                if ev.keystroke.key == "escape" {
+                    this.set_sort_open(false, cx);
+                }
+            }))
+            .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| this.set_sort_open(false, cx)));
+        if noshape_app_core::ui_script::active() {
+            let rows: Vec<&str> = TabSort::ALL.iter().map(|s| s.label()).collect();
+            let current = TabSort::ALL.iter().position(|s| *s == self.sort);
+            noshape_app_core::ui_script::note_list(Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": current, "disabled": [] })));
+        }
         for s in TabSort::ALL {
             let cur = s == self.sort;
             list = list.child(
@@ -658,8 +704,7 @@ impl TabManager {
                     .child(s.label())
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.sort = s;
-                        this.sort_open = false;
-                        cx.notify();
+                        this.set_sort_open(false, cx);
                     })),
             );
         }

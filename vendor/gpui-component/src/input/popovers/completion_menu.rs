@@ -22,6 +22,10 @@ use crate::{
     list::{List, ListDelegate, ListEvent, ListState},
 };
 
+/// NOSHAPE PATCH: the open completion list's highlighted row, for the ui-parity driver (an editor's state doesn't
+/// hold its popover).
+pub static SELECTED_ROW: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
 struct ContextMenuDelegate {
     query: SharedString,
     ace: bool,
@@ -34,6 +38,7 @@ impl ContextMenuDelegate {
     fn set_items(&mut self, items: Vec<CompletionItem>) {
         self.items = items.into_iter().map(Rc::new).collect();
         self.selected_ix = 0;
+        SELECTED_ROW.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn selected_item(&self) -> Option<&Rc<CompletionItem>> {
@@ -253,6 +258,7 @@ impl ListDelegate for ContextMenuDelegate {
         cx: &mut Context<ListState<Self>>,
     ) {
         self.selected_ix = ix.map(|i| i.row).unwrap_or(0);
+        SELECTED_ROW.store(self.selected_ix, std::sync::atomic::Ordering::Relaxed);
         cx.notify();
     }
 
@@ -352,7 +358,8 @@ impl CompletionMenu {
             return false;
         }
 
-        cx.propagate();
+        // NOSHAPE PATCH: only an action the menu doesn't take goes on (Enter accepting a row also inserted a newline
+        // under it: live fs-autocomplete-arrows, one line).
         if input::Enter::is_primary(&*action) {
             self.on_action_enter(window, cx);
         } else if action.partial_eq(&input::Escape) {
@@ -362,6 +369,7 @@ impl CompletionMenu {
         } else if action.partial_eq(&input::MoveDown) {
             self.on_action_down(window, cx);
         } else {
+            cx.propagate();
             return false;
         }
 

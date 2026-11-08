@@ -104,6 +104,8 @@ pub struct ImportPanel {
     thumbs: std::collections::HashMap<TabId, std::sync::Arc<RenderImage>>,
     thumbs_for: Option<String>,
     evaluator: std::sync::Arc<parking_lot::Mutex<noshape_model::assembly::eval::AssemblyEvaluator>>,
+    /// The panel holding the keyboard after a click in it (live fs-import-pick: focus on the panel, not the code).
+    pub(crate) focus: FocusHandle,
     _subs: Vec<Subscription>,
 }
 
@@ -117,7 +119,7 @@ impl ImportPanel {
                 cx.notify();
             }
         })];
-        Self { doc, studio, other: false, kind: Kind::PartStudios, search, graph: false, current_version: None, current_snapshot: None, docs: None, other_doc: None, thumbs: Default::default(), thumbs_for: None, evaluator: Default::default(), _subs: subs }
+        Self { focus: cx.focus_handle(), doc, studio, other: false, kind: Kind::PartStudios, search, graph: false, current_version: None, current_snapshot: None, docs: None, other_doc: None, thumbs: Default::default(), thumbs_for: None, evaluator: Default::default(), _subs: subs }
     }
 
     fn set_kind(&mut self, kind: Kind, window: &mut Window, cx: &mut Context<Self>) {

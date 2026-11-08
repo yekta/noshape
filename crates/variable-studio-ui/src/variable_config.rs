@@ -39,19 +39,30 @@ pub(super) fn configured_outline() -> Div {
     div().absolute().top(px(2.)).left(px(2.)).right(px(2.)).bottom(px(2.)).border_1().border_dashed().border_color(rgb(CONFIGURED))
 }
 
+/// Where a configuration table row stands (its menu offers only what would change something).
+#[derive(Clone, Copy)]
+struct RowSpot {
+    /// A list's row (a checkbox's rows have only Switch to).
+    list: bool,
+    current: bool,
+    default: bool,
+    first: bool,
+    last: bool,
+}
+
 /// A Value / Description cell's configuration items (live vs-906, 915–921):
 /// "Configure" while the studio has one input, else "Configure with <input>"
 /// per list / checkbox input and "Set to #<variable>" per configuration
-/// variable of the value's type; a configured cell offers "Unconfigure
-/// from <input>". Configuring shows "#L1 = 10 mm Value added to
+/// variable of the value's type; a configured cell offers "Unconfigure".
+/// Configuring shows "#L1 = 10 mm Value added to
 /// Configuration".
 pub(super) fn cell_menu(m: crate::os_menu::OsMenu, view: Entity<VariableStudioView>, cfg: &VsConfiguration, cell: (String, VsField, String, Option<VarKind>)) -> crate::os_menu::OsMenu {
     use crate::os_menu::OsMenuItem;
     // The cell: its variable, Value or Description, current text and type.
     let (variable, field, current, var_kind) = cell;
-    if let Some(c) = cfg.configured_cell(&variable, field) {
-        let name = cfg.inputs.iter().find(|i| i.id == c.input).map(|i| i.name.clone()).unwrap_or_default();
-        return m.item(OsMenuItem::new(format!("Unconfigure from {name}")).on_click(move |_, _, cx| {
+    if cfg.configured_cell(&variable, field).is_some() {
+        // Live (vs-cfg-value-unconfigure, live2 08:37): the row reads "Unconfigure".
+        return m.item(OsMenuItem::new("Unconfigure").on_click(move |_, _, cx| {
             view.update(cx, |t, cx| t.edit(vsc::UNCONFIGURE, cx, |s| s.configuration.unconfigure(&variable, field)))
         }));
     }
@@ -152,9 +163,18 @@ impl VariableStudioView {
             self.open_input_dialog(kind == "Variable", window, cx);
             return;
         }
+        let mut made = None;
         self.cfg_edit(vsc::ADD_INPUT, cx, |c| {
-            vsc::add_list_input(c);
+            made = Some(vsc::add_list_input(c));
         });
+        // Live 2331: the new list's empty "Name" row takes the keyboard, ready for the next configuration's name.
+        if let Some(id) = made {
+            let iid = id.clone();
+            let add: Commit = std::rc::Rc::new(move |c: &mut VsConfiguration, v: String| {
+                vsc::add_row(c, &iid, &v);
+            });
+            self.start_cfg_text(format!("add-{id}"), String::new(), add, window, cx);
+        }
         cx.notify();
     }
 
@@ -252,7 +272,9 @@ impl VariableStudioView {
     /// A configuration table row's menu (live vs-918): Switch to "<row>",
     /// Set as default, Duplicate row, Move up / down, Delete row, and on a
     /// configured column's cell Delete column.
-    fn table_menu(m: crate::os_menu::OsMenu, view: Entity<Self>, input: String, key: String, label: String, column: Option<(String, VsField)>, list: bool) -> crate::os_menu::OsMenu {
+    /// Only the rows that would do something (live vs-cfg-row-menu: the one, default, shown row has Duplicate row
+    /// only): Switch to another row, Set another as default, Move up / down where it can, Delete one of several.
+    fn table_menu(m: crate::os_menu::OsMenu, view: Entity<Self>, input: String, key: String, label: String, column: Option<(String, VsField)>, spot: RowSpot) -> crate::os_menu::OsMenu {
         use crate::os_menu::OsMenuItem;
         let act = |label: &'static str, f: Box<dyn Fn(&mut VsConfiguration)>| {
             let view = view.clone();
@@ -263,26 +285,33 @@ impl VariableStudioView {
             })
         };
         let (i1, k1) = (input.clone(), key.clone());
-        let mut m = m.item({
+        let mut m = m.when(!spot.current, |m| {
             let view = view.clone();
-            OsMenuItem::new(format!("Switch to \"{label}\"")).on_click(move |_, _, cx| {
+            m.item(OsMenuItem::new(format!("Switch to \"{label}\"")).on_click(move |_, _, cx| {
                 let (i, k) = (i1.clone(), k1.clone());
                 view.update(cx, |t, cx| t.cfg_edit(vsc::SWITCH, cx, move |c| vsc::switch(c, &i, &k)))
-            })
+            }))
         });
-        if list {
-            let (i2, k2) = (input.clone(), key.clone());
-            m = m.item(act(vsc::SET_DEFAULT, Box::new(move |c| vsc::set_default_row(c, &i2, &k2))));
+        if spot.list {
+            if !spot.default {
+                let (i2, k2) = (input.clone(), key.clone());
+                m = m.item(act(vsc::SET_DEFAULT, Box::new(move |c| vsc::set_default_row(c, &i2, &k2))));
+            }
             let (i3, k3) = (input.clone(), key.clone());
             m = m.item(act(vsc::DUPLICATE_ROW, Box::new(move |c| {
                 vsc::duplicate_row(c, &i3, &k3);
             })));
             for up in [true, false] {
+                if (up && spot.first) || (!up && spot.last) {
+                    continue;
+                }
                 let (i4, k4) = (input.clone(), key.clone());
                 m = m.item(act(vsc::move_description(up), Box::new(move |c| vsc::move_row(c, &i4, &k4, up))));
             }
-            let (i5, k5) = (input.clone(), key.clone());
-            m = m.item(act(vsc::DELETE_ROW, Box::new(move |c| vsc::delete_row(c, &i5, &k5))));
+            if !(spot.first && spot.last) {
+                let (i5, k5) = (input.clone(), key.clone());
+                m = m.item(act(vsc::DELETE_ROW, Box::new(move |c| vsc::delete_row(c, &i5, &k5))));
+            }
         }
         if let Some((var, field)) = column {
             m = m.item(act(vsc::DELETE_COLUMN, Box::new(move |c| c.unconfigure(&var, field))));
@@ -422,7 +451,6 @@ impl VariableStudioView {
             _ => Vec::new(),
         };
         let columns: Vec<noshape_model::variables::VsConfigured> = cfg.configured.iter().filter(|c| c.input == iid).cloned().collect();
-        let input_kind = input.kind.clone();
         let checkbox = matches!(input.kind, ConfigInputKind::Checkbox { .. });
         let notice = |second: bool| {
             v_flex()
@@ -454,8 +482,15 @@ impl VariableStudioView {
             v_flex().child(head_cell(COL_W, ROW_H).child(format!("#{}", c.variable))).child(head_cell(COL_W, ROW_H).child(if c.field == VsField::Value { "Value" } else { "Description" }))
         }));
         let mut table = v_flex().child(head);
-        for (key, label) in &rows {
+        let default_key = match &input.kind {
+            ConfigInputKind::List { default, .. } => default.clone(),
+            ConfigInputKind::Checkbox { default } => default.to_string(),
+            _ => String::new(),
+        };
+        let count = rows.len();
+        for (ix, (key, label)) in rows.iter().enumerate() {
             let on = *key == shown;
+            let spot = RowSpot { list: matches!(input.kind, ConfigInputKind::List { .. }), current: on, default: *key == default_key, first: ix == 0, last: ix + 1 == count };
             let (k1, id1) = (key.clone(), iid.clone());
             let rename: Commit = {
                 let (id, key) = (iid.clone(), key.clone());
@@ -488,8 +523,7 @@ impl VariableStudioView {
                     }))
                     .os_context_menu({
                         let (view, input, key, label) = (cx.entity(), iid.clone(), key.clone(), if label.is_empty() { key.clone() } else { label.clone() });
-                        let list = matches!(input_kind, ConfigInputKind::List { .. });
-                        move |m, _, _| Self::table_menu(m, view.clone(), input.clone(), key.clone(), label.clone(), None, list)
+                        move |m, _, _| Self::table_menu(m, view.clone(), input.clone(), key.clone(), label.clone(), None, spot)
                     }),
             );
             for c in &columns {
@@ -501,8 +535,7 @@ impl VariableStudioView {
                 let t = self.cfg_text(format!("val-{iid}-{key}-{}-{:?}", c.variable, c.field), text, (13.33, if on { FontWeight::BOLD } else { FontWeight::NORMAL }, pal.text.into()), commit, cx);
                 let cell_menu = {
                     let (view, input, key, label, col) = (cx.entity(), iid.clone(), key.clone(), if label.is_empty() { key.clone() } else { label.clone() }, (c.variable.clone(), c.field));
-                    let list = matches!(input_kind, ConfigInputKind::List { .. });
-                    move |m, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| Self::table_menu(m, view.clone(), input.clone(), key.clone(), label.clone(), Some(col.clone()), list)
+                    move |m, _: &mut Window, _: &mut Context<crate::os_menu::OsMenu>| Self::table_menu(m, view.clone(), input.clone(), key.clone(), label.clone(), Some(col.clone()), spot)
                 };
                 row = row.child(cell(COL_W).id(SharedString::from(format!("vcfg-cell-{iid}-{key}-{}", c.variable))).child(t).os_context_menu(cell_menu));
             }
@@ -537,7 +570,8 @@ impl VariableStudioView {
         section = section.child(div().id(SharedString::from(format!("vcfg-table-{iid}"))).overflow_x_scroll().child(table));
         if columns.is_empty() {
             // Live vs-914: a checkbox's notice is the title only.
-            section = section.child(notice(!checkbox));
+            // Its second line only while the studio has one input (live vs-cfg-list-names: two lists, the title only).
+            section = section.child(notice(!checkbox && cfg.inputs.len() == 1));
         }
         section.into_any_element()
     }
@@ -852,10 +886,11 @@ impl VariableStudioView {
             let mut fields = vec![serde_json::json!({ "label": "Name", "kind": "string", "text": text(&d.name) })];
             if d.variable {
                 let text_kind = VAR_KINDS[d.kind].1 == VariableKind::Text;
-                fields.push(serde_json::json!({ "label": "Default", "kind": "string", "text": text(&d.values[0]) }));
+                let kind = if text_kind { "string" } else { "number" };
+                fields.push(serde_json::json!({ "label": "Default", "kind": kind, "text": text(&d.values[0]) }));
                 if !text_kind {
-                    fields.push(serde_json::json!({ "label": "Minimum", "kind": "string", "text": text(&d.values[1]) }));
-                    fields.push(serde_json::json!({ "label": "Maximum", "kind": "string", "text": text(&d.values[2]) }));
+                    fields.push(serde_json::json!({ "label": "Minimum", "kind": kind, "text": text(&d.values[1]) }));
+                    fields.push(serde_json::json!({ "label": "Maximum", "kind": kind, "text": text(&d.values[2]) }));
                 }
             } else {
                 fields.push(serde_json::json!({ "label": "Default", "kind": "boolean", "checked": d.default_on }));
@@ -891,6 +926,8 @@ impl VariableStudioView {
                         .when(!on, |d| d.text_color(pal.text).border_b_1().border_color(rgb(0xd7d7d7)))
                         .child(*label)
                         .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                            // Live: the kind tab takes the click, the field loses the keyboard.
+                            window.blur(cx);
                             let units = this.doc.read(cx).session.doc.settings.units;
                             let Some(d) = &mut this.cfg_dialog else { return };
                             if d.kind != i {
@@ -938,9 +975,14 @@ impl VariableStudioView {
                         .border_color(rgb(0xd7d7d7))
                         // Red until it has a name (live vs-913).
                         .child(div().flex_1().pl(px(6.)).text_size(px(13.)).font_weight(FontWeight::MEDIUM).when(!ok, |d| d.text_color(rgb(0xaa252d))).child(title))
-                        .child(div().id("vci-ok").map(|d| crate::ui_script::mark(d, || "button:ok".into())).size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.commit_input_dialog(cx))))
-                        .child(div().id("vci-cancel").map(|d| crate::ui_script::mark(d, || "button:cancel".into())).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        .child(div().id("vci-ok").map(|d| crate::ui_script::mark(d, || "button:ok".into())).size(px(28.)).flex().items_center().justify_center().bg(pal.accept).when(!ok, crate::ui::disabled_accept).cursor_pointer().child(crate::ui::glyph("check", 16., gpui_kit::white())).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                            // Closed, the keyboard goes back to the page (live vs-cfg-checkbox-dialog: focus none).
+                            window.focus(&this.focus, cx);
+                            this.commit_input_dialog(cx)
+                        })))
+                        .child(div().id("vci-cancel").map(|d| crate::ui_script::mark(d, || "button:cancel".into())).size(px(28.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., rgb(0xd52b1e))).on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
                             this.cfg_dialog = None;
+                            window.focus(&this.focus, cx);
                             cx.notify();
                         }))),
                 )
@@ -1111,6 +1153,17 @@ impl Render for IdsDialog {
         let errors = vsc::id_error(&new_id).is_some() || self.rows.iter().any(|(_, _, st)| vsc::id_error(&st.read(cx).value()).is_some());
         let duplicate = self.duplicate(cx);
         let can_confirm = duplicate.is_none() && (id_change || row_change) && !errors;
+        crate::ui_script::note_dialog(|| {
+            let field = |v: &str| serde_json::json!({ "label": null, "kind": "input", "value": v });
+            let mut fields = vec![field(&self.input_name), field(&new_id)];
+            for (_, name, st) in &self.rows {
+                fields.push(field(name));
+                fields.push(field(&st.read(cx).value()));
+            }
+            let title = if multiple { "Edit internal IDs" } else { "Edit internal ID" };
+            let ok = if multiple { "Break references and change IDs" } else { "Break references and change ID" };
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"] })
+        });
         let cell = |w: f32| h_flex().w(px(w)).h(px(34.)).flex_none().px(px(4.)).border_r_1().border_b_1().border_color(grid).text_size(px(14.)).text_color(pal.text);
         let head = |w: f32, t: &str| cell(w).bg(rgb(0xeaeaea)).justify_center().font_weight(FontWeight::BOLD).child(t.to_string());
         // Invalid: pink (the Input ID's cell also says why on hover).

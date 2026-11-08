@@ -370,6 +370,7 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("document:Rename", Op("config_edit_input")),
     ("document:Reset to default", Op("variable_insert_studio")),
     ("document:Set to last viewed", Op("variable_insert_studio")),
+    ("document:Unconfigure", Op("config_configure")),
     ("document:Update linked document", Op("variable_insert_studio")),
     ("document:View in repair", Op("history_repair_view")),
     ("document:Visibility conditions…", Op("config_visibility")),

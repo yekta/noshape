@@ -510,6 +510,75 @@ pub fn complete_at(text: &str, offset: usize) -> Option<(usize, Vec<Match<'stati
     (!rows.is_empty()).then_some((start, rows))
 }
 
+/// A top-level snippet: what typing starts it, its caption in the list, its text and as an Ace snippet.
+struct TopSnippet {
+    trigger: &'static str,
+    entry: Entry,
+}
+
+/// What the list offers outside every function (live 2331: on a new Feature Studio's empty line "defineF" lists
+/// only "Define feature" (snippet), "const" lists "Constant declaration" (snippet) then const (keyword)): the
+/// snippets, then FeatureScript's top-level keywords. Inside a function std's names are offered ([`complete_at`]).
+fn top_level() -> &'static [TopSnippet] {
+    static TOP: LazyLock<Vec<TopSnippet>> = LazyLock::new(|| {
+        let snippet = |trigger: &'static str, caption: &str, text: String, template: String| TopSnippet { trigger, entry: Entry { name: caption.into(), kind: "snippet".into(), snippet: text, template, doc: String::new(), rank: 0 } };
+        let feature = crate::feature_studio::NEW_FEATURE;
+        let mut out = vec![
+            // Enter inserts the New feature template, "My Feature" selected; Tab goes on to myFeature (live fs-snippet-placeholders).
+            snippet("defineFeature", "Define feature", feature.to_string(), feature.replacen("\"My Feature\"", "\"${1:My Feature}\"", 1).replacen("myFeature", "${2:myFeature}", 1)),
+            snippet("const", "Constant declaration", "const constName = 0;".into(), "const ${1:constName} = ${2:0};".into()),
+        ];
+        for kw in ["annotation", "const", "enum", "export", "function", "import", "predicate", "type"] {
+            out.push(TopSnippet { trigger: kw, entry: Entry { name: kw.into(), kind: "keyword".into(), snippet: kw.into(), template: kw.into(), doc: String::new(), rank: 0 } });
+        }
+        out
+    });
+    &TOP
+}
+
+/// The caret after `before` (the text up to it) is outside every `{ }` block: comments and strings aside.
+pub fn at_top_level(before: &str) -> bool {
+    let mut depth = 0i32;
+    let (mut in_str, mut line_comment, mut block_comment) = (false, false, false);
+    let mut chars = before.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            _ if line_comment => line_comment = c != '\n',
+            '*' if block_comment && chars.peek() == Some(&'/') => {
+                chars.next();
+                block_comment = false;
+            }
+            _ if block_comment => {}
+            '\\' if in_str => {
+                chars.next();
+            }
+            '"' => in_str = !in_str,
+            _ if in_str => {}
+            '/' if chars.peek() == Some(&'/') => line_comment = true,
+            '/' if chars.peek() == Some(&'*') => {
+                chars.next();
+                block_comment = true;
+            }
+            '{' => depth += 1,
+            '}' => depth -= 1,
+            _ => {}
+        }
+    }
+    depth <= 0
+}
+
+/// [`complete_at`] at the top level: the snippets whose trigger starts with the word, then the keywords.
+pub fn complete_top_level(line: &str) -> Option<(usize, Vec<Match<'static>>)> {
+    let word_len: usize = line.chars().rev().take_while(|c| c.is_alphanumeric() || *c == '_').map(char::len_utf8).sum();
+    let start = line.len() - word_len;
+    let word = line[start..].to_lowercase();
+    if word.is_empty() || line[..start].ends_with('.') || line[..start].contains("//") {
+        return None;
+    }
+    let rows: Vec<Match> = top_level().iter().filter(|t| t.trigger.to_lowercase().starts_with(&word)).map(|t| Match { entry: &t.entry, hits: Vec::new() }).collect();
+    (!rows.is_empty()).then_some((start, rows))
+}
+
 /// `snippet` as inserted on a line indented by `indent`: each new line starts with it (Ace's snippet insertion).
 pub fn indented(snippet: &str, indent: &str) -> String {
     snippet.replace('\n', &format!("\n{indent}"))
@@ -533,7 +602,9 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
         let line_start = text.line_start_offset(row);
         let line = text.slice(line_start..offset).to_string();
         let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
-        let items = complete_at(&line, line.len())
+        // Outside every function the snippets and keywords (live 2331), inside std's names.
+        let top = at_top_level(&text.slice(0..offset).to_string());
+        let items = if top { complete_top_level(&line) } else { complete_at(&line, line.len()) }
             .map(|(start, rows)| {
                 let range = Range { start: text.offset_to_position(line_start + start), end: text.offset_to_position(offset) };
                 rows.into_iter()
@@ -564,6 +635,20 @@ impl gpui_kit::component::input::CompletionProvider for Completions {
 mod tests {
     use super::*;
 
+    /// Live 2331: at the top level of a new Feature Studio the list is snippets then keywords.
+    #[test]
+    fn top_level_lists_snippets_and_keywords() {
+        let head = "FeatureScript 3112;\nimport(path : \"onshape/std/common.fs\", version : \"3112.0\");\n\n";
+        assert!(at_top_level(head));
+        assert!(!at_top_level(&format!("{head}export function f()\n{{\n    ")));
+        assert!(at_top_level(&format!("{head}export function f()\n{{\n}}\n// {{\n\"{{\"")));
+        let rows = |w: &str| complete_top_level(w).map(|(_, r)| r.iter().map(|m| (m.entry.name.clone(), m.entry.kind.clone())).collect::<Vec<_>>()).unwrap_or_default();
+        assert_eq!(rows("defineF"), [("Define feature".to_string(), "snippet".to_string())]);
+        assert_eq!(rows("const"), [("Constant declaration".to_string(), "snippet".to_string()), ("const".to_string(), "keyword".to_string())]);
+        let feature = &top_level()[0].entry;
+        assert!(feature.template.starts_with("annotation { \"Feature Type Name\" : \"${1:My Feature}\"") && feature.template.contains("export const ${2:myFeature} = defineFeature("), "{}", feature.template);
+    }
+
     fn names(rows: &[Match]) -> Vec<String> {
         rows.iter().map(|m| m.entry.name.clone()).collect()
     }
@@ -571,7 +656,7 @@ mod tests {
     /// Live (A): after "opE" the prefix matches in std's order, then the fuzzy ones: the functions, the predicate,
     /// the enums.
     #[test]
-    fn ope_lists_like_live() {
+    fn ope_lists_like_live_inside_a_function() {
         let (_, rows) = complete_at("opE", 3).unwrap();
         let got = names(&rows);
         let want = ["opEnclose", "opExtractWires", "opExtrude", "opSplineThroughEdges", "opSplitEdges", "lastModifyingOperationId", "surfaceOperationTypePredicate", "SplitOperationKeepType", "NewBodyOperationType"];

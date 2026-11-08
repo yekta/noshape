@@ -12,6 +12,8 @@ mod number_input;
 mod otp_input;
 mod overlay;
 pub(crate) mod popovers;
+/// NOSHAPE PATCH: the open completion list's highlighted row (the ui-parity driver).
+pub use popovers::completion_menu::SELECTED_ROW as COMPLETION_SELECTED_ROW;
 mod search;
 mod syntax_context;
 

@@ -185,14 +185,100 @@ impl FsNoticesPanel {
     }
 }
 
+/// The filter icon's rows (live fs-notices-filter-icon): each inserts its token in the filter box.
+const FILTER_TOKENS: [(&str, &str); 5] = [
+    (":text", "Filter by notice text"),
+    (":elementid", "Filter by element id"),
+    (":tabname", "Filter by tab name"),
+    (":currenttab", "Filter by current tab"),
+    (":minlevel", "Filter by minimum severity level. Available levels are: info, warn, error."),
+];
+
+/// The filter box's query: plain words in the message, `:text <words>`, `:elementid <id>`, `:tabname <name>`,
+/// `:currenttab`, `:minlevel info|warn|error` (all must hold).
+#[derive(Default, Debug, PartialEq)]
+struct NoticeFilter {
+    text: Vec<String>,
+    element: Option<String>,
+    tab_name: Option<String>,
+    current_tab: bool,
+    min_level: u8,
+}
+
+impl NoticeFilter {
+    fn parse(q: &str) -> Self {
+        let mut f = NoticeFilter::default();
+        let mut words = q.split_whitespace().peekable();
+        while let Some(w) = words.next() {
+            let mut arg = || words.next_if(|n| !n.starts_with(':')).map(str::to_lowercase);
+            match w.to_lowercase().as_str() {
+                ":text" => f.text.extend(arg()),
+                ":elementid" => f.element = arg(),
+                ":tabname" => f.tab_name = arg(),
+                ":currenttab" => f.current_tab = true,
+                ":minlevel" => f.min_level = match arg().as_deref() {
+                    Some("warn") => 1,
+                    Some("error") => 2,
+                    _ => 0,
+                },
+                other => f.text.push(other.to_string()),
+            }
+        }
+        f
+    }
+
+    fn keeps(&self, tab: TabId, tab_name: &str, current: Option<TabId>, n: &Notice) -> bool {
+        let level = if n.error { 2 } else if n.info { 0 } else { 1 };
+        let message = n.message.to_lowercase();
+        self.text.iter().all(|t| message.contains(t.as_str()))
+            && self.element.as_ref().is_none_or(|e| tab.to_string().to_lowercase().contains(e.as_str()))
+            && self.tab_name.as_ref().is_none_or(|t| tab_name.to_lowercase().contains(t.as_str()))
+            && (!self.current_tab || current == Some(tab))
+            && level >= self.min_level
+    }
+}
+
+impl FsNoticesPanel {
+    /// The filter icon's menu: a row per token; picking one puts it in the filter box, ready for its value.
+    fn open_filter_menu(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
+        let filter = self.filter.clone();
+        let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
+            m = m.dropdown();
+            for (token, what) in FILTER_TOKENS {
+                let f = filter.clone();
+                m = m.item(crate::os_menu::OsMenuItem::new(format!("{token} – {what}")).on_click(move |_, window, cx| {
+                    f.update(cx, |st, cx| {
+                        let now = st.value().trim_end().to_string();
+                        let text = if now.is_empty() { format!("{token} ") } else { format!("{now} {token} ") };
+                        let n = text.len();
+                        st.set_value(text, window, cx);
+                        st.focus(window, cx);
+                        st.set_selected_range(n..n, cx);
+                    })
+                }));
+            }
+            m
+        });
+        // A page's dropdown (Escape leaves it open), as the panel's other menus.
+        crate::os_menu::mark_page_dropdown(&menu, cx);
+        crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
+    }
+}
+
 impl Render for FsNoticesPanel {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
-        let q = self.filter.read(cx).value().trim().to_lowercase();
+        let filter = NoticeFilter::parse(self.filter.read(cx).value().trim());
+        // Monitor output: the filter's words.
+        let text_ok = |m: &str| {
+            let m = m.to_lowercase();
+            filter.text.iter().all(|t| m.contains(t.as_str()))
+        };
+        let current = self.doc.read(cx).session.active_tab;
         let watched = monitored(&self.doc, cx);
         let mut sections: Vec<AnyElement> = Vec::new();
         for (tab, name, notices) in self.notices.clone() {
-            let shown: Vec<Notice> = notices.into_iter().filter(|n| q.is_empty() || n.message.to_lowercase().contains(&q)).collect();
+            let shown: Vec<Notice> = notices.into_iter().filter(|n| filter.keeps(tab, &name, current, n)).collect();
             if shown.is_empty() {
                 continue;
             }
@@ -233,7 +319,7 @@ impl Render for FsNoticesPanel {
             let head = self.header(key, "featurescript-table", g.title.clone(), false, false, cx);
             let mut body = v_flex();
             if !self.collapsed.contains(&key) {
-                for (i, e) in g.entries.into_iter().filter(|e| q.is_empty() || e.message.to_lowercase().contains(&q)).enumerate() {
+                for (i, e) in g.entries.into_iter().filter(|e| text_ok(&e.message)).enumerate() {
                     body = body.child(self.monitor_item(format!("fst-{studio}-{i}"), e, cx));
                 }
                 if !g.output.is_empty() {
@@ -255,7 +341,7 @@ impl Render for FsNoticesPanel {
             // notices with their stacks, their printed output, then the
             // "Result:" line.
             let (entries, printed) = if open && part_studio { noshape_model::custom::run::monitor(&self.doc.read(cx).session.doc, tab) } else { Default::default() };
-            let entries: Vec<_> = entries.into_iter().filter(|e| q.is_empty() || e.message.to_lowercase().contains(&q)).collect();
+            let entries: Vec<_> = entries.into_iter().filter(|e| text_ok(&e.message)).collect();
             let mut body = v_flex();
             for (i, e) in entries.into_iter().enumerate() {
                 body = body.child(self.monitor_item(format!("fsm-{tab}-{i}"), e, cx));
@@ -292,11 +378,32 @@ impl Render for FsNoticesPanel {
                     .border_b_1()
                     .border_color(rgb(0xeaeaea))
                     .child(div().text_size(px(18.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child("FeatureScript notices"))
-                    .child(div().id("fsn-filter").map(|d| crate::ui_script::mark(d, || "button:Filter FeatureScript notices".into())).size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).tooltip(crate::ui::tooltip("Filter FeatureScript notices")).child(crate::ui::glyph("filter", 20., pal.text)))
+                    .child(div().id("fsn-filter").map(|d| crate::ui_script::mark(d, || "button:Filter FeatureScript notices".into())).size(px(30.)).flex().items_center().justify_center().rounded(px(3.)).tooltip(crate::ui::tooltip("Filter FeatureScript notices")).cursor_pointer().child(crate::ui::glyph("filter", 20., pal.text)).on_click(cx.listener(|this, e: &ClickEvent, window, cx| this.open_filter_menu(e.position(), window, cx))))
                     .child(div().w(px(902.)).map(|d| crate::ui_script::mark(d, || "field:Filter notices".into())).child(crate::os_ui::input_h(Input::new(&self.filter), 30.).text_size(px(14.)).pl(px(5.))))
                     .child(div().flex_1())
                     .child(div().id("fsn-close").cursor_pointer().child(os::glyph(os::GLYPH_CLOSE, 16., pal.text_muted)).on_click(cx.listener(|_, _: &ClickEvent, _, cx| cx.emit(FsNoticesEvent::Close)))),
             )
             .child(v_flex().id("fsn-list").flex_1().min_h_0().overflow_y_scroll().children(sections))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NoticeFilter, Notice};
+    use noshape_model::document::TabId;
+
+    /// The filter box's tokens (live's filter menu): text, tab name, current tab, minimum level.
+    #[::core::prelude::v1::test]
+    fn filter_tokens() {
+        let n = |message: &str, error: bool, info: bool| Notice { line: 1, column: 1, message: message.into(), error, info };
+        let (a, b) = (TabId(1), TabId(2));
+        let f = NoticeFilter::parse(":tabname studio :minlevel warn");
+        assert!(f.keeps(a, "Feature Studio 1", None, &n("Missing semicolon", true, false)));
+        assert!(!f.keeps(a, "Feature Studio 1", None, &n("Variable m set but not used", false, true)));
+        assert!(!f.keeps(a, "Other", None, &n("Missing semicolon", true, false)));
+        let f = NoticeFilter::parse("semicolon :currenttab");
+        assert!(f.keeps(b, "x", Some(b), &n("Missing semicolon", true, false)));
+        assert!(!f.keeps(a, "x", Some(b), &n("Missing semicolon", true, false)));
+        assert_eq!(NoticeFilter::parse(":text not used").text, ["not", "used"]);
     }
 }

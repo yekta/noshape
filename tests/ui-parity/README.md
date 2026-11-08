@@ -521,6 +521,9 @@ clicked button holding the keyboard (Enter or Space re-activating it) is the exc
 The Feature Studio's code editor holding the keyboard is live's Ace textarea, whose text is a piece around the
 caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
 
+The Tabs panel's Sort menu hangs inside the panel's header, so live's recorder reads its rows into
+`document.panel` ("Tabs Tab order Name: A → Z …"): read as "Tabs" while that menu is the open list.
+
 Child rows: a dialog's `fields` with `"child": true` (Insert Variable Studio's variables under their studio row,
 `"child": false`) are compared as a set within each studio: live lists them in a different order on each run.
 

@@ -1,6 +1,6 @@
 mod caret_anchored;
 mod code_action_menu;
-mod completion_menu;
+pub(crate) mod completion_menu;
 mod diagnostic_popover;
 mod hover_popover;
 

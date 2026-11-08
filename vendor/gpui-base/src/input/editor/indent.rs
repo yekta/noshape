@@ -402,6 +402,12 @@ impl<M: InputModeKind> InputBaseState<M> {
             }
             last_end = Some(range.end);
             let text = match direction {
+                // NOSHAPE PATCH: soft tabs pad to the next tab stop, as Ace (live fs-autocomplete-tab: column 7 → 8).
+                IndentDirection::Indent if !tab_indent.is_empty() && tab_indent.chars().all(|c| c == ' ') => {
+                    let row = self.text.offset_to_point(range.start).row;
+                    let column = self.text.slice(self.text.line_start_offset(row)..range.start).chars().count();
+                    " ".repeat(tab_len - column % tab_len)
+                }
                 IndentDirection::Indent => tab_indent.to_string(),
                 IndentDirection::Outdent => String::new(),
             };
@@ -415,11 +421,12 @@ impl<M: InputModeKind> InputBaseState<M> {
             let cursor = sel.cursor_offset();
             let new_offset = match direction {
                 IndentDirection::Indent => {
-                    let inserted_before = edits
+                    let inserted_before: usize = edits
                         .iter()
                         .filter(|(range, _)| range.start <= cursor)
-                        .count();
-                    cursor + inserted_before * tab_len
+                        .map(|(_, text)| text.len())
+                        .sum();
+                    cursor + inserted_before
                 }
                 IndentDirection::Outdent => {
                     let removed_before: usize = edits

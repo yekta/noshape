@@ -188,7 +188,7 @@ const SNIPPET_MENUS: [(&str, &str, Snippets); 6] = [
         "Feature parameters",
         "fs-snip-p",
         &[
-            ("Length parameter", "annotation { \"Name\" : \"My length\" }\nisLength(definition.myLength, LENGTH_BOUNDS);"),
+            ("Length parameter", "annotation { \"Name\" : \"My Length\" }\nisLength(definition.myLength, LENGTH_BOUNDS);"),
             ("Angle parameter", "annotation { \"Name\" : \"My angle\" }\nisAngle(definition.myAngle, ANGLE_360_BOUNDS);"),
             ("Count parameter", "annotation { \"Name\" : \"My count\" }\nisInteger(definition.myCount, POSITIVE_COUNT_BOUNDS);"),
             ("Query parameter", "annotation { \"Name\" : \"My query\", \"Filter\" : EntityType.FACE, \"MaxNumberOfPicks\" : 1 }\ndefinition.myQuery is Query;"),
@@ -309,7 +309,7 @@ fn changed_end(old: &str, new: &str) -> usize {
 pub const FS_TEMPLATE: &str = noshape_ops::docedit::FS_TEMPLATE;
 
 /// "New feature" (live document/72, dom/feature-studio-template-and-error.txt).
-const NEW_FEATURE: &str = "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\nexport const myFeature = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n        // Define the parameters of the feature type\n    }\n    {\n        // Define the function's action\n    });\n";
+pub(crate) const NEW_FEATURE: &str = "annotation { \"Feature Type Name\" : \"My Feature\", \"Feature Type Description\" : \"\" }\nexport const myFeature = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n        // Define the parameters of the feature type\n    }\n    {\n        // Define the function's action\n    });\n";
 
 /// A notice of a Feature Studio (FeatureScript notices panel, editor squiggles).
 #[derive(Clone, Debug)]
@@ -485,6 +485,8 @@ pub struct FsUiState {
     pub unsaved: bool,
     pub notices: usize,
     pub completion: Option<Vec<String>>,
+    /// Each row's kind at its right ("snippet", "keyword", "function"…).
+    pub completion_kinds: Option<Vec<String>>,
 }
 
 pub struct FeatureStudioView {
@@ -553,6 +555,7 @@ impl FeatureStudioView {
             unsaved: text != self.synced,
             notices: self.notices.len(),
             completion: menu.open.then(|| menu.items.iter().map(|i| i.label.clone()).collect()),
+            completion_kinds: menu.open.then(|| menu.items.iter().map(|i| i.detail.clone().unwrap_or_default()).collect()),
         }
     }
 
@@ -572,6 +575,8 @@ impl FeatureStudioView {
                 .line_number(true)
                 .soft_wrap(false)
                 .tab_size(TabSize { tab_size: 4, hard_tabs: false })
+                // Live's editor doesn't close brackets as you type (fs-auto-close-paren: "f(", fs-enter-indent).
+                .auto_close(false)
                 .default_value(source.clone());
             // Our Onshape menu replaces the kit's (see `symbol_menu`).
             st.set_context_menu_enabled(false);
@@ -1087,13 +1092,19 @@ impl FeatureStudioView {
     }
 
     /// Insert a snippet at the cursor.
-    fn insert_snippet(&mut self, text: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    fn insert_snippet(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.read_only(cx) {
             return;
         }
+        // A parameter's name is selected, ready to type over (live fs-snippets-params: "My Length").
+        let name = text.find("\"Name\" : \"").map(|i| i + "\"Name\" : \"".len()).and_then(|from| text[from..].find('"').map(|len| from..from + len));
         self.editor.update(cx, |e, cx| {
             e.focus(window, cx);
+            let at = e.selected_range().start;
             e.insert(text, window, cx);
+            if let Some(r) = name.clone() {
+                e.set_selected_range(at + r.start..at + r.end, cx);
+            }
         });
     }
 
@@ -1127,10 +1138,13 @@ impl FeatureStudioView {
             m = m.snippet_list();
             for (label, text) in SNIPPET_MENUS[menu_ix].2.iter() {
                 let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(*label).on_click(move |_, w, cx| v.update(cx, |this, cx| this.insert_snippet(text, w, cx))));
+                // A whole line: live's snippet ends with a newline (fs-snippets-params).
+                m = m.item(crate::os_menu::OsMenuItem::new(*label).on_click(move |_, w, cx| v.update(cx, |this, cx| this.insert_snippet(&format!("{text}\n"), w, cx))));
             }
             m
         });
+        // A toolbar dropdown: Escape leaves it open (live fs-snippets-*).
+        crate::os_menu::mark_page_dropdown(&menu, cx);
         crate::os_menu::open_anchored(at, Anchor::TopLeft, menu, window, cx);
     }
 
@@ -1145,7 +1159,7 @@ impl FeatureStudioView {
                 let v = view.clone();
                 m = m.item(crate::os_menu::OsMenuItem::new(*label).on_click(move |_, w, cx| {
                     set_snippet_face(label);
-                    v.update(cx, |this, cx| this.insert_snippet(text, w, cx));
+                    v.update(cx, |this, cx| this.insert_snippet(&format!("{text}\n"), w, cx));
                 }));
             }
             m
@@ -1184,6 +1198,7 @@ impl FeatureStudioView {
     fn open_monitor(&mut self, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let studios: Vec<(TabId, String)> = self.doc.read(cx).session.doc.ordered_tabs().iter().filter(|t| matches!(t.content, TabContent::PartStudio(_) | TabContent::VariableStudio(_))).map(|t| (t.id, t.name.clone())).collect();
         let view = cx.entity();
+        let profiling = crate::fs_profile::profiling(&self.doc, cx);
         let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
             m = m.dropdown();
             for (id, name) in studios {
@@ -1194,9 +1209,15 @@ impl FeatureStudioView {
                     crate::fs_notices::set_monitored(&doc, id, cx);
                 }));
                 let v = view.clone();
-                m = m.item(crate::os_menu::OsMenuItem::new(format!("Profile {name}")).icon_name("regen-timer").on_click(move |_, _, cx| {
+                // While it is profiled the row reads "Profiling <name>" and stops it (live fs-profile-part-studio).
+                let on = profiling == Some(id);
+                m = m.item(crate::os_menu::OsMenuItem::new(if on { format!("Profiling {name}") } else { format!("Profile {name}") }).icon_name("regen-timer").on_click(move |_, _, cx| {
                     let doc = v.read(cx).doc.clone();
-                    crate::fs_profile::start(&doc, id, cx);
+                    if on {
+                        crate::fs_profile::stop(&doc, cx);
+                    } else {
+                        crate::fs_profile::start(&doc, id, cx);
+                    }
                 }));
             }
             m
@@ -1351,6 +1372,15 @@ impl FeatureStudioView {
                 v_flex()
                     .id("fs-outline")
                     .occlude()
+                    // Esc closes it, the keyboard back on the page (live fs-module-outline: focus none).
+                    .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                        if e.keystroke.key == "escape" {
+                            cx.stop_propagation();
+                            this.outline = None;
+                            window.focus(&this.focus, cx);
+                            cx.notify();
+                        }
+                    }))
                     // Live 71 (empty): 218 px, #ccc, the 202 px search field 8 px in,
                     // 11 px "0 symbols" / "No top-level symbols found".
                     .min_w(px(218.))
@@ -1587,7 +1617,7 @@ impl FeatureStudioView {
                         cell("fs-snip-face".into())
                             .tooltip(crate::ui::tooltip(face.clone()))
                             .child(div().text_size(px(14.)).text_color(pal.text).child(face))
-                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.insert_snippet(face_text, window, cx))),
+                            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.insert_snippet(&format!("{face_text}\n"), window, cx))),
                         crate::ui::tool_caret("fs-snip-caret", cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                             let b = sa.get();
                             this.open_all_snippets(point(b.left(), b.bottom() + px(2.)), window, cx);
@@ -1703,13 +1733,9 @@ impl FeatureStudioView {
                     .child(div().min_w_0().pr(px(4.)).truncate().text_size(px(14.)).text_color(pal.text).child(monitor_name))
                     .child(div().w(px(14.)).flex_none().h_full().flex().items_center().justify_center().border_l_1().border_color(rgb(0xaaaaaa)).child(os::glyph(os::GLYPH_CARET, 8., pal.text)))
                     .child(probe(&mon_anchor))
-                    .on_click(cx.listener(move |this, e: &ClickEvent, window, cx| {
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                         let b = ma.get();
-                        // The caret cell opens the menu; the button stops profiling.
-                        if crate::fs_profile::profiling(&this.doc, cx).is_some() && e.position().x < b.right() - px(16.) {
-                            crate::fs_profile::stop(&this.doc, cx);
-                            return;
-                        }
+                        // The menu, profiling or not (live fs-profile-part-studio: its row reads "Profiling …").
                         this.open_monitor(point(b.left(), b.bottom() + px(2.)), window, cx);
                     })),
             )
@@ -1846,7 +1872,21 @@ impl Render for FeatureStudioView {
             .children(self.render_diagnostic_tooltip(cx))
             .children(self.import_panel.as_ref().map(|(panel, _)| {
                 let b = self.import_anchor.get();
-                deferred(anchored().position(point(b.left(), b.bottom() + px(2.))).child(panel.clone())).with_priority(1).into_any_element()
+                // (Occluding: a click on the panel never reaches the code under it; it takes the keyboard, live
+                // fs-import-pick, unless one of its fields did.)
+                let fh = panel.read(cx).focus.clone();
+                let fh2 = fh.clone();
+                let host = div()
+                    .occlude()
+                    .key_context("FsImportPanel")
+                    .track_focus(&fh)
+                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                        if !fh2.contains_focused(window, cx) {
+                            window.focus(&fh2, cx);
+                        }
+                    })
+                    .child(panel.clone());
+                deferred(anchored().position(point(b.left(), b.bottom() + px(2.))).child(host)).with_priority(1).into_any_element()
             }))
     }
 }

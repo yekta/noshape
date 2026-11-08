@@ -2369,7 +2369,7 @@ Examples:
 | `field` | one of `value`, `description` |  | Variable Studio: the Value (default) or Description cell. |
 | `param` | string |  | Parameter id, or "suppressed" (Part Studio, Assembly; required there). |
 | `input` | string |  | List or Checkbox input id or name (required, except to unconfigure). |
-| `unconfigure` | boolean |  | Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (Unconfigure from <input>). |
+| `unconfigure` | boolean |  | Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (its Unconfigure). |
 
 #### config_set_value
 

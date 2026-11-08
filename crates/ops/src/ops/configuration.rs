@@ -123,7 +123,7 @@ pub fn ops() -> Vec<Op> {
                 opt("field", json!({ "type": "string", "enum": ["value", "description"] }), "Variable Studio: the Value (default) or Description cell."),
                 opt("param", s(), "Parameter id, or \"suppressed\" (Part Studio, Assembly; required there)."),
                 opt("input", s(), "List or Checkbox input id or name (required, except to unconfigure)."),
-                opt("unconfigure", json!({ "type": "boolean" }), "Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (Unconfigure from <input>)."),
+                opt("unconfigure", json!({ "type": "boolean" }), "Unconfigure: a Part Studio feature's `param` (the dialog's configure mode, clicking the configured field again; the feature keeps its own value) or a Variable Studio cell (its Unconfigure)."),
             ],
             mutates: true,
             destructive: false,

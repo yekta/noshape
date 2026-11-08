@@ -28,6 +28,36 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 17:36 UTC: full suite 266/394 scenarios, 1625/1814 states (89.6%, from 85.1%), no regressions
+- Edit internal IDs records its fields (name / id pairs, as live's inputs); the Variable input dialog's Default,
+  Minimum and Maximum are "number" fields for the numeric kinds; clicking a kind tab takes the keyboard from Name (live
+  vs-cfg-variable-dialog: the typed text goes nowhere). The Tabs panel's Sort menu is a recorded list and Esc closes it
+  (run.py: live reads its rows into the panel's name).
+- Open: vs-cfg-insert-all-disabled step 5 (a click on the greyed checkbox doesn't reach a footer mouse-down listener:
+  something above it takes the press; not found yet). Define table / Define computed property re-asked of live
+  (REQUESTS 17:08). Batch 6 (REQUESTS 15:27) not recorded yet.
+
+### 2026-11-08 17:04 UTC: live's 2331 answers applied; Feature Studio and Variable Studio configuration fixes
+- Autocomplete as live: outside every function the list is snippets then keywords (`fs_complete::at_top_level`,
+  `complete_top_level`: "Define feature" inserts the New feature template, "My Feature" then myFeature by Tab;
+  "Constant declaration" `const constName = 0;`), inside a function std's names as before; rows record their kind
+  (`list.meta`) and the highlighted row (vendored NOSHAPE PATCH `COMPLETION_SELECTED_ROW`). Enter accepting a row no
+  longer also inserts a newline (vendored NOSHAPE PATCH: the menu propagated every action). Tab pads to the next tab
+  stop (NOSHAPE PATCH, Ace's soft tabs). No bracket auto-close in the Feature Studio. Open: Define table / Define
+  computed property (asked of live2 with the full top-level snippet list).
+- Feature Studio: the Import panel takes the keyboard after a click in it and doesn't pass clicks to the code; the
+  module outline's Esc closes it and drops the focus; parameter snippets select their name ("My Length") and end with
+  a newline; the snippet menus, Monitor ▾ (its row "Profiling <studio>" stops profiling) and the notices filter
+  (new: `:text`, `:elementid`, `:tabname`, `:currenttab`, `:minlevel` tokens, its icon's menu) are page dropdowns.
+- Tabs panel menus as live's: a tab's Create… ▸ (Folder, Import…, Part Studio, Assembly, Variable Studio, Drawing…,
+  Feature Studio, Material Library) then its own menu with Add selection to folder; a folder's Create…, Rename, Add
+  selected to folder, Unpack, Move to document… (`workspace::panel_create_menu`, `panel_tab_menu`).
+- Variable Studio configuration: Configure leaves the new list's Name row editing (live 2331); the row menu offers
+  only what changes something; a configured cell's "Unconfigure"; the notice's second line only with one input;
+  dialog fields' focus labelled ("Name"); closing the input dialogs or ticking Insert into all drops the keyboard.
+- Not done: live drops a text field's focus on any click (a browser's); GPUI only on focusable elements, so a few
+  focus states differ (vs-cfg-insert-all-disabled). Edit internal IDs records no fields yet.
+
 ### 2026-11-08 16:12 UTC: release management covered (lead 11-08: spec from Onshape docs, not recordable)
 - 22 scenarios rel-* (`"recordable": false`, README): Release… on a part, the Create Release candidate dialog (Generate
   missing part numbers with a seeded numbering scheme, needs-attention filter, search and type filter, Add to Release…,
