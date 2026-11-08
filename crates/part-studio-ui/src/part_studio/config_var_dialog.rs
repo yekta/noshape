@@ -246,12 +246,24 @@ impl PartStudioView {
                 .shadow_md()
                 .text_color(pal.text)
                 // Enter commits; Esc leaves the dialog open (live).
-                .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| match e.keystroke.key.as_str() {
+                // Esc closes it, also from its fields (live ui-parity config-variable-edit-definition).
+                .capture_action(cx.listener(|this, _: &gpui_kit::component::input::Escape, window, cx| {
+                    cx.stop_propagation();
+                    this.ui.var_input = None;
+                    window.focus(&this.focus, cx);
+                    cx.notify();
+                }))
+                .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| match e.keystroke.key.as_str() {
                     "enter" => {
                         cx.stop_propagation();
                         this.commit_variable_input(cx);
                     }
-                    "escape" => cx.stop_propagation(),
+                    "escape" => {
+                        cx.stop_propagation();
+                        this.ui.var_input = None;
+                        window.focus(&this.focus, cx);
+                        cx.notify();
+                    }
                     _ => {}
                 }))
                 .child(
