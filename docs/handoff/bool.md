@@ -183,6 +183,10 @@ The gate today (scripts in /root/bool-scratch, outside the repo; copy what you n
   parity56's 5 cuts by patterns of cutters, declined on main too; shorter stubs, b7cb4b90's 0.6 um, ours merges as
   OCCT). OCCT's builder takes the stub into the vertex: to do, then those 5 are ours. Gate: corpora + parity56 0
   differences (parity56 351 as main), knurl / gear as main and level, shfall its known 2 (58 taken, main 55).
+- **c2-housing-draft's Rotieren 1 (branch bool-rot2):** the revolved cavity touching the top face along the r 15.2
+  circle (live 2342: a zero-thickness edge) is ours: a piece along a tangent face goes by its points' signed distances, an edge tangent to a face at one end is off it, a flat revolution without a seam is a
+  plane (`as_plane`; with a seam it stays: a revolved base's top disc). Rotieren 1 215 -> 118 ms (vibe5), document
+  265 -> 168 ms (live 105); of the 118, 208 / 274 ms on vibe4 is the C++ build of the 41-face result: next.
 - **The tyre after the seam fix:** declines "an ellipse on another face": a section ellipse assigned to a third face
   (a plane) it only passes near; to look into next.
 

@@ -218,9 +218,9 @@ struct RustLenient
   RustLenient& operator=(const RustLenient&) = delete;
 };
 std::string rust_last_decline();
-// A B-spline, Bezier or extruded surface that is a plane (within 1e-7) as that plane, its normal the same way
-// (an imported box's faces), else `s`.
-occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s);
+// A B-spline, Bezier, extruded or revolved surface of face `f` that is a plane (within 1e-7) as that plane, its
+// normal the same way (an imported box's faces; a revolution only where `f` has no seam), else `s`.
+occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f);
 bool rust_boolean(uint8_t op, const std::vector<TopoDS_Shape>& args, std::vector<const OcShape*>& srcs,
                   std::vector<std::unique_ptr<OcShape>>& own, TopoDS_Shape& out, occ::handle<BRepTools_History>& hist,
                   double fuzzy = 0, bool touching_only = false, bool scaled_inputs = false);

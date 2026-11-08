@@ -110,13 +110,20 @@ RustLenient::RustLenient() { ++t_lenient; }
 RustLenient::~RustLenient() { --t_lenient; }
 std::string rust_last_decline() { return std::string(brep_last_decline()); }
 
-occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s)
+occ::handle<Geom_Surface> as_plane(const occ::handle<Geom_Surface>& s, const TopoDS_Face& f)
 {
   occ::handle<Geom_Surface> base = s;
   while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(base))
     base = tr->BasisSurface();
-  if (occ::down_cast<Geom_BSplineSurface>(base).IsNull() && occ::down_cast<Geom_BezierSurface>(base).IsNull() && occ::down_cast<Geom_SurfaceOfLinearExtrusion>(base).IsNull())
+  // (Also a revolution: a line square to its axis turned, a flat ring OCCT keeps as one (c2-housing-draft's
+  // Rotieren 1); not one closing on a seam, an edge twice in it (a revolved base's top disc).)
+  const bool revolution = !occ::down_cast<Geom_SurfaceOfRevolution>(base).IsNull();
+  if (occ::down_cast<Geom_BSplineSurface>(base).IsNull() && occ::down_cast<Geom_BezierSurface>(base).IsNull() && occ::down_cast<Geom_SurfaceOfLinearExtrusion>(base).IsNull() && !revolution)
     return s;
+  if (revolution)
+    for (TopExp_Explorer x(f, TopAbs_EDGE); x.More(); x.Next())
+      if (BRep_Tool::IsClosed(TopoDS::Edge(x.Current()), f))
+        return s;
   const GeomLib_IsPlanarSurface planar(base, Precision::Confusion());
   if (!planar.IsPlanar())
     return s;
@@ -528,7 +535,7 @@ const char* to_body(const OcShape& s, BrepBody& b, double& max_tol)
     // (A trimmed surface's own: the same parameters.)
     while (const occ::handle<Geom_RectangularTrimmedSurface> tr = occ::down_cast<Geom_RectangularTrimmedSurface>(surf))
       surf = tr->BasisSurface();
-    surf = as_plane(surf);
+    surf = as_plane(surf, f);
     // (An offset surface (Shell's slabs): the plane, cylinder, cone, ... OCCT keeps as its equivalent; else a
     // B-spline within 1e-7 of it over the face's parameters (the same parameters, so its curves on it stay).)
     if (const occ::handle<Geom_OffsetSurface> off = occ::down_cast<Geom_OffsetSurface>(surf))
@@ -1638,7 +1645,7 @@ const char* build(const BrepResult& r, const std::vector<const OcShape*>& srcs, 
     const occ::handle<Geom_Surface>& s = s0;
     // (A B-spline that is a plane, read as one (to_body): new edges' curves on it projected, as OCCT keeps its
     // surface.)
-    const bool as_flat = as_plane(s0) != s0;
+    const bool as_flat = as_plane(s0, src) != s0;
     const occ::handle<Geom_CylindricalSurface> cs = occ::down_cast<Geom_CylindricalSurface>(s);
     const occ::handle<Geom_ConicalSurface>     cn = occ::down_cast<Geom_ConicalSurface>(s);
     const bool                                 round = !cs.IsNull() || !cn.IsNull();

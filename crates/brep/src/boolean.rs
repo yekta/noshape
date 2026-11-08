@@ -1929,7 +1929,7 @@ impl Ctx<'_> {
                     (d[0], d[1])
                 }
             };
-            let Some(c) = free::projected(&self.faces[f], &at, t0, t1, self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
+            let Some(c) = free::projected(&self.faces[f], &at, t0, t1, GREY * self.tol) else { return Err(Decline("an edge on another argument's free-form face")) };
             self.faces[f].pcurves.insert((e, false), (c.clone(), t0, t1));
             on_free = Some((f, c));
         }
@@ -2140,7 +2140,14 @@ impl Ctx<'_> {
         if near > 0 && on + near == 7 && matches!(self.faces[f].s, Surf::Plane { .. } | Surf::Cyl { .. }) {
             return Ok(false);
         }
+        // (Touching it at one end and leaving it: from on it there to past the tolerance at the other end, steadily
+        // (a straight edge tangent to a revolved face at its end, c2-housing-draft's Rotieren 1): off it.)
         if near > 0 && on + near == 7 {
+            let ds: Vec<f64> = (0..=6).map(|k| free::surface_distance(&self.faces[f], self.seg_at(&s, k as f64 / 6.0))).collect();
+            let rising = ds.windows(2).all(|w| w[1] >= w[0]) || ds.windows(2).all(|w| w[1] <= w[0]);
+            if rising && ds[0].min(ds[6]) <= 0.01 * on_tol && ds[0].max(ds[6]) > on_tol {
+                return Ok(true);
+            }
             return Err(Decline("an edge nearly on another argument's face"));
         }
         Ok(false)
@@ -2332,12 +2339,12 @@ impl Ctx<'_> {
         if ends.iter().any(|&[p0, p1]| stub((p1 - p0).length()) && ((at_corner(p0) && branch(p1)) || (at_corner(p1) && branch(p0)))) {
             return Err(Decline("a short section from a corner"));
         }
+        let (Some(fa), Some(fb)) = (face(a), face(b)) else { return Ok(secs) };
         // (The edges' meeting points for every pair cost a small Boolean a sixth more.)
         let copied = |arg: u32| self.copies.get(arg as usize).copied().flatten().is_some();
         if !secs.is_empty() && !(copied(a.0) && copied(b.0)) {
             return Ok(secs);
         }
-        let (Some(fa), Some(fb)) = (face(a), face(b)) else { return Ok(secs) };
         let ends: Vec<DVec3> = self.boundaries_meet(fa, fb).into_iter().filter(|q| secs.iter().all(|c| (c.curve.at(c.t0) - *q).length() > 10.0 * tol && (c.curve.at(c.t1) - *q).length() > 10.0 * tol)).collect();
         if ends.len() < 2 || ends.len() > 4 {
             return Ok(secs);
@@ -5545,7 +5552,65 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         v.sort_by_key(|&g| cx.faces[g].solid);
     }
     // (Each piece's states against the solids, on all threads; taken in order below.)
-    let state_of = |pi: usize| -> R<Vec<(usize, State)>> {
+    // (Points of piece `pi` other than its own: on the way from it to points of its sides, a band clear of them.)
+    let other_points = |pi: usize| -> Vec<DVec3> {
+        let f = pieces[pi].face;
+        let Ok(outline) = pieces[pi].loops.iter().flatten().map(|&(sg, _)| cx.c2_of(f, &sedges[sg].seg, 0, None)).collect::<R<Vec<C2>>>() else { return Vec::new() };
+        let q0 = cx.faces[f].to2(pieces[pi].inside);
+        let mut out = Vec::new();
+        for c in &outline {
+            for t in [0.5, 0.25, 0.75] {
+                let b = c.at(c.at_fraction(t));
+                for k in [0.5, 0.25, 0.75] {
+                    let q = q0 + (b - q0) * k;
+                    if out.len() < 16 && distance2(q, &outline) > 2.0 * GREY * tol && inside2(q, &outline) {
+                        out.push(cx.faces[f].to3(q));
+                    }
+                }
+            }
+        }
+        out
+    };
+    // (Piece `pi` against solid `t` where its point is on a face of `t` and moving it can't clear that (a sliver
+    // between straight edges and the circle a revolved face touches a plane along, c2-housing-draft's Rotieren 1): by
+    // the side of the faces of `t` it lies along, tangent to its own there (their normals parallel), where its points'
+    // signed distances agree (and some of them are past noise); else None (coincident: the signs mixed).)
+    let tangent_side = |pi: usize, t: usize| -> Option<State> {
+        let f = pieces[pi].face;
+        // (A plane's piece only: a round's torus along a boss's wall it touches splits as OCCT's at its seam.)
+        if !matches!(cx.faces[f].s, Surf::Plane { .. }) {
+            return None;
+        }
+        let mut pts = vec![pieces[pi].inside];
+        pts.extend(other_points(pi));
+        let (mut pos, mut neg, mut tangent) = (0, 0, false);
+        for &q in &pts {
+            for &g in &cx.solids[t].faces {
+                let gf = &cx.faces[g];
+                if !boxes_meet(q, q, gf.lo, gf.hi, GREY * tol) || free::surface_distance(gf, q) > GREY * tol {
+                    continue;
+                }
+                let (ng, nf) = (cx.normal_at(g, q), cx.normal_at(f, q));
+                if ng.dot(nf).abs() < 1.0 - 1e-4 {
+                    return None;
+                }
+                tangent = true;
+                let d = (q - gf.to3(gf.to2(q))).dot(ng);
+                if d > 1e-3 * tol {
+                    pos += 1;
+                } else if d < -1e-3 * tol {
+                    neg += 1;
+                }
+            }
+        }
+        match (tangent, pos, neg) {
+            (true, p, 0) if p >= 2 => Some(State::Out),
+            (true, 0, n) if n >= 2 => Some(State::In),
+            _ => None,
+        }
+    };
+    // (Each solid's state at a point of piece `pi`, its own or (below) another.)
+    let state_at = |pi: usize, at: DVec3| -> R<Vec<(usize, State)>> {
         let f = pieces[pi].face;
         let s = cx.faces[f].solid;
         let arg = cx.faces[f].arg;
@@ -5554,7 +5619,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             if cx.solids[t].arg == arg {
                 continue;
             }
-            if !meets[s * ns + t] || pieces[pi].inside.is_nan() {
+            if !meets[s * ns + t] || at.is_nan() {
                 states.push((t, State::Out));
                 continue;
             }
@@ -5564,12 +5629,12 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
             for &g in on[from..].iter().take_while(|&&g| cx.faces[g].solid == t) {
                 // (A free-form face: past its patch the point's parameters are clamped to its edge; off it there,
                 // not on that face (a knurl's grooves: their faces on one surface, each groove's its own part of it).)
-                if matches!(cx.faces[g].s, Surf::Nurbs { .. }) && free::surface_distance(&cx.faces[g], pieces[pi].inside) > tol {
+                if matches!(cx.faces[g].s, Surf::Nurbs { .. }) && free::surface_distance(&cx.faces[g], at) > tol {
                     continue;
                 }
-                let q = cx.faces[g].to2(pieces[pi].inside);
+                let q = cx.faces[g].to2(at);
                 let d = cx.bound_distance(g, q)?;
-                let p = pieces[pi].inside;
+                let p = at;
                 let same = cx.normal_at(g, p).dot(cx.normal_at(f, p)) > 0.0;
                 let inside = if d <= GREY * tol {
                     // (A sliver along that face's boundary (two knurl caps' edges a micrometre apart for 330 um): on
@@ -5625,7 +5690,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                 // (In a cut, a tool's piece outside every object isn't kept whatever it is against another tool: on
                 // that tool's face by the rays (a 3 um strip of a knurl groove's flank outside the cylinder, between
                 // its corner edge and the cylinder's section, 0.6 um from another groove's flank) it is as outside.)
-                None => match cx.ray_state(pieces[pi].inside, t) {
+                None => match cx.ray_state(at, t) {
                     Err(Decline(w))
                         if w == "a piece's point on another solid's face"
                             && op == Op::Cut
@@ -5635,6 +5700,7 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
                     {
                         State::Out
                     }
+                    Err(Decline(w)) if w == "a piece's point on another solid's face" && let Some(st) = tangent_side(pi, t) => st,
                     r => r?,
                 },
             };
@@ -5669,10 +5735,19 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         if doomed.load(std::sync::atomic::Ordering::Relaxed) {
             return Err(Decline(ON_ANOTHER));
         }
-        let r = state_of(pi);
-        if matches!(&r, Err(Decline(w)) if *w == ON_ANOTHER) && !settles(pi) {
-            doomed.store(true, std::sync::atomic::Ordering::Relaxed);
+        let r = state_at(pi, pieces[pi].inside);
+        if !matches!(&r, Err(Decline(w)) if *w == ON_ANOTHER) || settles(pi) {
+            return r;
         }
+        // (Its point on another solid's face where no section settles it: a face touching it, tangent there (a
+        // straight edge's plane against a revolved face, c2-housing-draft's Rotieren 1). Other points of a plane's
+        // piece, clear of its sides, from its point towards them.)
+        for q in other_points(pi).into_iter().filter(|_| matches!(cx.faces[pieces[pi].face].s, Surf::Plane { .. })) {
+            if let Ok(st) = state_at(pi, q) {
+                return Ok(st);
+            }
+        }
+        doomed.store(true, std::sync::atomic::Ordering::Relaxed);
         r
     };
     let first = par_map(pieces.len(), &|pi| if later(pi).is_some() { None } else { Some(state_of(pi)) })?;

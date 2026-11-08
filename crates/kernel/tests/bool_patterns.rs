@@ -644,6 +644,27 @@ fn lumps_touching_along_a_line_are_two_solids() {
     assert!((v - c.summary.volume).abs() <= 1e-7 * r.shape.area().unwrap(), "volume {v} against OCCT's {}", c.summary.volume);
 }
 
+/// A revolved cavity touching a plate's top face along a circle (c2-housing-draft's Rotieren 1, recorded; live 2342: the
+/// circle is a zero-thickness edge between the top face and the torus-like walls, ribs cutting it into four arcs):
+/// noshape's Boolean takes the cut, valid, with live's volume (to its accuracy); the document's merges after it give
+/// live's Part 1, 36/79/44 (the parity suite).
+#[test]
+fn a_cavity_touching_a_face_along_a_circle_cut_as_live() {
+    let _ = k::set_working_scale(1000.0);
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/booleans");
+    let c = k::bool_corpus::load(&dir, "39bba82f912dcab3").expect("the recorded cut");
+    k::set_rust_boolean_only(true);
+    let r = k::boolean(c.op, &c.objects, &c.tools, &c.opts);
+    let why = k::last_rust_decline();
+    k::set_rust_boolean_only(false);
+    let r = r.unwrap_or_else(|e| panic!("noshape's Boolean declined: {why} ({e})"));
+    assert!(r.shape.is_valid());
+    let v = r.shape.volume().unwrap() * 1e9;
+    assert!((v - 1294.124).abs() < 0.01, "volume {v} mm3, live 1294.124");
+    let counts = (r.shape.count(k::ShapeType::Face), r.shape.count(k::ShapeType::Edge), r.shape.count(k::ShapeType::Vertex));
+    assert_eq!(counts, (c.summary.faces, c.summary.edges, c.summary.vertices));
+}
+
 /// A document's cuts by a pattern of 8 cutters (recorded, parity): noshape's Boolean declines the first late (a short
 /// section from a cutter's corner, found after OCCT's sections), so in its feature type's scope the next cut goes
 /// straight to OCCT's; OCCT's results both.
