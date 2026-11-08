@@ -6518,20 +6518,24 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
           NCollection_Array1<gp_Pnt2d>             uv(1, n + 1);
           NCollection_Array1<double>               pp(1, n + 1);
           const occ::handle<ShapeAnalysis_Surface> sas2 = new ShapeAnalysis_Surface(BRep_Tool::Surface(Ff));
-          for (int k = 0; k <= n; ++k)
-          {
+          // (Along the curve from its middle, each foot from the last, both ways: the nearest foot by the face's edge
+          // can lie on the surface's extension past it, and the end on the seam is the jump itself, its side a sign
+          // at 1e-17: c2-rings-loft's ring built directly, in memory, against the same ring read back.)
+          auto foot = [&](int k, const gp_Pnt2d& from) {
             const double w = c0 + (c1 - c0) * k / n;
-            // (Along the curve from its own start, each foot from the last: the nearest foot by the face's edge can
-            // lie on the surface's extension past it.)
-            gp_Pnt2d q = k == 0 ? ce->Value(e0) : sas2->NextValueOfUV(uv(k), c3->Value(w), 1e3 * tol);
-            const gp_Pnt2d ref = k == 0 ? ce->Value(e0) : uv(k);
+            gp_Pnt2d     q = sas2->NextValueOfUV(from, c3->Value(w), 1e3 * tol);
             if (span_u > 0)
-              q.SetX(q.X() + std::round((ref.X() - q.X()) / span_u) * span_u);
+              q.SetX(q.X() + std::round((from.X() - q.X()) / span_u) * span_u);
             if (span_v > 0)
-              q.SetY(q.Y() + std::round((ref.Y() - q.Y()) / span_v) * span_v);
+              q.SetY(q.Y() + std::round((from.Y() - q.Y()) / span_v) * span_v);
             uv(k + 1) = q;
             pp(k + 1) = w;
-          }
+          };
+          foot(n / 2, ce->Value(e0 + (e1 - e0) * 0.5));
+          for (int k = n / 2 + 1; k <= n; ++k)
+            foot(k, uv(k));
+          for (int k = n / 2 - 1; k >= 0; --k)
+            foot(k, uv(k + 2));
           occ::handle<TColgp_HArray1OfPnt2d> huv = new TColgp_HArray1OfPnt2d(uv);
           occ::handle<TColStd_HArray1OfReal> hpp = new TColStd_HArray1OfReal(pp);
           Geom2dAPI_Interpolate              fit2(huv, hpp, false, 1e-12);
