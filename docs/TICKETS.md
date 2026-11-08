@@ -1004,6 +1004,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   polygon's first corner) and 26d817465 (a section with fewer vertices gets the others' corners spread evenly); neither
   under legacy_topology or a ScopeRule. If the new loft is live's, documents made from now on are right, but ones saved
   before change on open. qa's CLI sweeps don't have this document (only the GUI rows): added to qa's watch list. (qa 2026-11-07 08:51, v0.4.34)
+- [ ] P1 WIN-SHOW-IN-EXPLORER (studios) **a document row's "Show in Explorer" does nothing on Windows, in v0.4.36** (new in this
+  release; macOS's Show in Finder and the footer link on all three work). qa-os.yml on v0.4.36 (run 42459360425, windows-latest):
+  a real right-click on "uip Bracket" opens the row menu, Show in Explorer is clicked, no Explorer window opens, and the app logs
+  `Revealing path \\?\C:\Users\runneradmin\Documents\noshape\uip Bracket.noshape in explorer: The parameter is incorrect.
+  (0x80070057)`: the documents page's paths are canonicalized (start_window.rs: `canonicalize()`, a `\\?\` verbatim path on
+  Windows) and `cx.reveal_path` (start_window.rs 3816) can't take one. The click also gives no visible feedback (AGENTS.md: a
+  click always does). Strip the verbatim prefix before revealing (and showing: check Details › Location too). Check:
+  `gh workflow run qa-os.yml -R yekta/noshape -f ref=<branch>` (or `-f tag=`). (qa 2026-11-08 07:40)
+- [ ] P3 UIS-RCLICK-WINDOWS (studios / psui: the UI script) **the UI script's `rclick` on a documents page row opens no menu on
+  Windows** (macOS and Linux open it; a real right-click on Windows does): qa-os.yml's show-in / details steps fail with "menu:…
+  is not shown", so .github/qa/footer.py right-clicks with mouse_event on Windows instead. (qa 2026-11-08 07:40)
 - [ ] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
   document's two sketches lose their planes**: qa's ticket document cli-fillet2-segv (vibe3 ~/qa/tickets) on 24829a72 → 4fee814c:
   its Fillet 1 (after Extrude 1, Chamfer 1, Linear pattern 1, Shell 1) changes by a hair (Part 1 45580.502 → 45580.636 mm³,

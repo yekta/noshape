@@ -47,8 +47,8 @@ jobs:
       - name: Documents page folder links
         shell: bash
         run: |
-          python -m pip install -q pillow || python3 -m pip install -q --break-system-packages pillow
           py=python; command -v python3 > /dev/null && [ "$RUNNER_OS" != Windows ] && py=python3
+          $py -m pip install -q pillow || $py -m pip install -q --break-system-packages pillow
           $py .github/qa/footer.py --bin "$BIN" --out "$RUNNER_TEMP/qa"
 
       - uses: actions/upload-artifact@v7
