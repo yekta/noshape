@@ -66,6 +66,34 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   ffc3c2, fc0b0b, a4fe5d of asm-xdev-subs) place all 19 of their instances as live (corpus12, 10:00 main); xdev-subs
   90 → 200/286.
 
+## 11-08 15:45 UTC: resumed (lead): P1 other-document views, the four documents, exchange, 2313 / 2299
+- **P1 drawing views of another document's version (live 2303), queued f7073f5b.** Insert view › Other documents
+  already pinned views to `ext:` keys; now the Sheets panel row reads In progress · ⧫ V1 (the ⧫ a blue update icon
+  while a newer version exists, read off the UI thread: drawing_refs.rs `check_ext_refs`, again on window
+  activation), its menu is live's (Switch to reference opens that document | Replace... | Pin reference / Unpin
+  reference | Update linked document...: the Reference manager), PinnedVersion.locked keeps a pinned one out of the
+  notices and Update all. The tab bar's notice (workspace_update::version_refs) skips pinned ones; a drawing tab's
+  icon does nothing on a click (live). Ops: drawing_insert_view `document` + `version`, drawing_pin_reference,
+  drawing_update_references (document / version), document_update_references lists drawings; e2e
+  drawing_view_of_another_documents_version. Not recorded yet in live (live2's recorder has no such start); "Unpin
+  reference" is inferred (live showed the unpinned menu only).
+- **The four documents (2313):** the new Derived (`partStudio` + `partQuery`; an empty one is live's ERROR "Select
+  entities from another Part Studio.") and Import `flatten` (ours: one Part Studio, every instance placed).
+  c2-hex-bookcase-derived 0 → 4/17 (first: "text indent", the sketch text's glyph outlines, skasm's);
+  c2-gamma-imported / c2-wire-clip-imported place all 88 parts, 73 match (PEM FH4-M3-18 ×15: our STEP import keeps one
+  face more, +0.02 mm³); c2-fan-blade-sweep: rerun pending after the empty-Derived fix.
+- **Exchange:** the Parasolid writer only makes a closed B-spline face or edge periodic when its seam knot comes down
+  (else split): cf-hose-routing's four hoses were degree-12 single-span sections, written periodic with a full seam
+  knot; live dropped them ("imported with errors"). Unverified in live yet: ours.* regenerated for its re-import.
+  The suite's ours.stl is now at REST's default density (custom 0.012 mm / 30°) and held to the model within live's
+  own STL error. **Finding for the lead (not changed):** our STL presets are far coarser than Onshape's (clamp-hms:
+  live Coarse/Medium/Fine 24,608 / 34,732 / 49,056 triangles within 0.3 mm³; ours 3,720 / 7,396 / 19,338, −223 /
+  −48 / −11 mm³; even 0.003 mm gives 11,506, −3.4): Parasolid's facetting isn't OCCT's at the same numbers.
+- **2313 / 2299 / note:** First angle moves the views (drawing views.rs `change_projection`, also ops
+  drawing_properties `projection`); Alt+drag moves a dimension, copies a note; the Cut list's composite is
+  "Composite part 1", its panel shows the picked Part Studio with a ▾, properties "Cut list : Composite part 1";
+  Create Drawing records its name field. Drawings 121/175, 1246/1397 states.
+
 ## 11-08 13:04 UTC: paused by the lead (quota) until live delivers. What each answer unblocks
 Resume on REQUESTS 2300 or the exchange re-import (lead). Rebuild the app (rb.sh --get noshape) and rerun the drawing
 suite with /root/dx-scratch/drw-shards.sh (copied into tools/ui-parity/.drw-shards.sh for the run; last: out-w on
