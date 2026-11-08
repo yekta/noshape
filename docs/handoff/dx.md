@@ -50,6 +50,22 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   instances in xdev-subs, robot-relations, pinslot, corexy). Part Studio suite after all three: no document worse
   (70/86, 724/934).
 
+## 11-08 10:04 UTC: std 3112, XT-B3, louver, drawings 114/173
+- std 3112 (live's export, /root/onshape-research/live/std-3112) is the embedded std and new Feature Studios' pin
+  (custom.rs TEMPLATE, ops FS_TEMPLATE). 3095 joined the packs; all 99 packs were repacked against the new base
+  (tools/std-pack.py, only the shipped list: `--all` would ship 223). 3112 calls no native 3095 lacked. Existing pins
+  still get their own release. Queued c2b29de2.
+- XT-B3 (landed): Parasolid bare binary (`B`, little-endian) and v9 (SCH_900000_9008) read; `write_parasolid_bare`;
+  the writer never writes below 12000 unless asked. asm told (handoff/asm.md).
+- Parity: UI-method fetches (`settle_ms`) give no surface types; evPlane faces map to ours on that plane.
+  c2-sm-louver 31/36; Sketch 9 sits on a sheet-metal definition face (skasm). c2-sm-corner-break's 40 vertices
+  translate; Corner break itself fails in our sheet metal (skasm).
+- Drawings 114/173 scenarios, 1200/1372 states (out-p). Not in live's export, so out of the record: custom tables,
+  datum targets, foreshortened dimensions, exploded notes. Live's recorder reports hovered edges as EDGE selection:
+  recording hover cost 32 scenarios, reverted. Exports 24/24.
+- Waiting: live2's re-records (crop spline point, existing-profile crop/detail), other-document views (2278; P1, mine
+  once captured), qa's agent sessions (v0.4.36's one failed call, Symmetric about origin, answered).
+
 ## 11-08 06:51 UTC: live2's 20 recordings (2f97542b): drawings 106/167, exports 24/24
 - **Drawing match 106/167 scenarios, 1142/1311 states** (vibe5, before this land's last two fixes: Views tab's
   projection options and the crop ▾ / custom-table focus). **Exports 24/24** (compare.py with `--drawn-by NGYEKTA`
