@@ -36,6 +36,10 @@ lib sync before main can go green. When a green has it: re-run tickets/crash3151
 replay) on it and verify. Open P0s: CRASH-3151, CRASH-3388, BLEND-RUST-STRAIGHT-WRONG (4570b4e5, not in v0.4.25). The watch
 now exits IDLE after 100 min (re-arm it); it stops on GREEN / RELEASE / fuzz deaths as before.
 
+**11-08 06:10 (lead):** core added live's high-accuracy volume for cf-part-draft's spur gear to the corpus (`volume_high`
+404,878.0748 mm³; the REST figure was 0.36 % high), here and on vibe2–5. The next suite run (~04:49 + 4 h) should read
+cf-part-draft 13/13: a corpus correction, not a code change; say so in that run's SCORE row and don't count it as a fix.
+
 **11-08 04:24: the 05:00 (v0.4.36) list is in TICKETS: no blocker** (green a25df4cd: sweeps = cba0a00b; CRASH-6297 and
 SECTIONS-AHEAD-HANG verified there, the hang's repro tickets/hang5786/rep.py also on vibe3). New, the lead's call:
 P1 SAVED-SKETCH-PLANE-LOST (blend 4fee814c; per-feature tools bin/featstat.py, bin/rollstat.py). Fuzz: v3cf18.sh (v0.4.35,
