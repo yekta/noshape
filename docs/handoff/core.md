@@ -33,13 +33,21 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
-**State 11-08 04:15 UTC: lead's next: Extrude with draft through the direct build, then (3) after 06:05.**
-- Extrude with draft (worktree): `op_prism` (features.cpp) builds the drafted prism directly (`draft_prism_directly`,
-  shell.cpp: tapered_prism + its history) where OCCT's DraftAngle fails (a spline or involute profile: "Failed to
-  extrude selections, check input." before); OCCT's draft stays first, so drafted extrudes that worked are unchanged.
-  tapered_prism's right-prism test is now caps alike + sides square to the pull (OCCT's volume of a spline prism is
-  1e-4 out). T1 kernel blend::a_drafted_extrude_of_a_spline_has_steiners_volume, model features_c::
-  a_drafted_extrude_of_a_spline_narrows_as_steiner. Suite run: /root/core-scratch/suite-ext.log.
+**State 11-08 05:00 UTC: Extrude with draft landed (19027e11); (3) after 06:05; loft Normal-to-profile asked.**
+- Extrude with draft: `op_prism` (features.cpp) builds the drafted prism directly (`draft_prism_directly`, shell.cpp:
+  tapered_prism + its history) where OCCT's DraftAngle fails (a spline or involute profile: "Failed to extrude
+  selections, check input." before); OCCT's draft stays first. tapered_prism's right-prism test is caps alike + sides
+  square to the pull (OCCT's volume of a spline prism is 1e-4 out). T1 kernel blend::
+  a_drafted_extrude_of_a_spline_has_steiners_volume, model features_c::a_drafted_extrude_of_a_spline_narrows_as_steiner.
+- c2-impeller-loft's Loft Gehäuse (-2.3 % volume): live's rows (2228) fit 3k = 0.9 (c·n)²/|c| + 0.1 |c| per pole
+  column (k the first control-point step, c the row's chord, n the start normal) within 0.36 %; ours is
+  0.9 |c·n| + 0.1 |c| at the faces' ends, smoothstepped. Live's rule per column (chord between the sections' points at
+  the pole's Greville parameter: a rational circle's poles sit off it) gives 257,272.8 mm³ (live 257,078, -2.3 % ->
+  +0.076 %), live's topology and rails (16.5937), but the 10-24 square loft (kernel features::loft_end_condition_normal,
+  live 5476.391) drops to 5442.58 (-0.6 %); the old rule fits it to 1.5e-5. The two live cases conflict (parallel vs
+  perpendicular end section?): not landed, patch /root/core-scratch/features.cpp.loftrule; asked live for 4 controlled
+  lofts (REQUESTS, 04:58). Also: live pairs the section points neither by arc length nor symmetrically on the side face
+  (-0.032 % area left).
 - The lead passed snap-hook's Fillet 6 to blend and Part Draft 3's 1.87 s union to bool. ae515421 landed 04:10.
 
 **State 11-08 03:55 UTC (restarted 01:05): (2) landed, (4) Part Draft 3 landed (cba0a00b, speed ae515421).**
