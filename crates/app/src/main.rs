@@ -459,6 +459,10 @@ fn main() {
     let path = args.iter().find(|a| !a.starts_with("--")).map(PathBuf::from);
     // A ui-parity scenario opens its own start document.
     let path = if ui_script::enabled() { ui_script::prepare() } else { path };
+    // Its store read on a thread while the app and its window start (files::prefetch_session).
+    if let Some(p) = path.as_ref().filter(|_| reopen.is_none() && !demo) {
+        files::prefetch_session(p);
+    }
 
     let app = gpui_kit::application().with_assets(assets::AppAssets);
     noshape_render::perf::milestone("GPUI application created");

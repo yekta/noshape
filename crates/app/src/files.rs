@@ -50,13 +50,38 @@ pub fn show_start_window(cx: &mut App) {
 
 /// Open (or create) a document in a new window. If it is already open, its
 /// window is brought to the front instead.
+/// The document named on the command line, opened on a thread from process start so its store's reading overlaps the
+/// app's and the window's setup (28–115 ms of a macOS launch); [`open_document_window`] takes it.
+type Prefetched = (PathBuf, std::thread::JoinHandle<anyhow::Result<session::Session>>);
+static PREFETCHED: std::sync::Mutex<Option<Prefetched>> = std::sync::Mutex::new(None);
+
+pub fn prefetch_session(path: &std::path::Path) {
+    if !path.exists() {
+        return;
+    }
+    let p = path.to_path_buf();
+    if let Ok(h) = std::thread::Builder::new().name("open-document".into()).spawn(move || session::Session::open(&p))
+        && let Ok(mut slot) = PREFETCHED.lock()
+    {
+        *slot = Some((path.to_path_buf(), h));
+    }
+}
+
+/// The prefetched session of `path`, waiting for it if it isn't open yet.
+fn take_prefetched(path: &std::path::Path) -> Option<anyhow::Result<session::Session>> {
+    let (_, h) = PREFETCHED.lock().ok()?.take_if(|(p, _)| p == path)?;
+    h.join().ok()
+}
+
 pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Document>, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied())
         && h.update(cx, |_, window, _| window.activate_window()).is_ok() {
             return Ok(());
         }
     noshape_render::perf::milestone("opening document");
-    let session = if path.exists() {
+    let session = if let Some(s) = take_prefetched(&path) {
+        s?
+    } else if path.exists() {
         session::Session::open(&path)?
     } else {
         session::Session::create(&path, create_with.unwrap_or_else(crate::units_prefs::new_document))?
