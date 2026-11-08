@@ -45,6 +45,21 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   (a studio's `live` lines → `refs_from_bodies`), and a suppressed last feature's empty parts line no longer empties
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
+## Resume here (2026-11-08 01:00 UTC)
+- Landed / queued by the previous agent: louver's part pattern (6a180588) and Fillet 1 corner break (d4b69fba).
+- **Planar face frames, live 2256** (ScopeRule 15, `legacy_tilted_face_frames`): x = the reference axis of the normal's
+  largest component projected into the plane (+X facing mostly ±Z, else Z × the signed axis; ties go to X, then Z).
+  `PlaneFrame::face_x`; the old rule is `face_x_1897`, `Context::planar_face_x` picks by the studio's rules; sketches
+  on construction planes take the same rule (their old Y-facing Z × n kept for studios saved before).
+  c2-duct-multipart 17 -> 19/19; suite 730 -> 732/934, 70 -> 71/86, nothing lower.
+- **c2-sm-louver Extrude 3 is an OCCT Boolean failure (bool's, told in handoff/bool.md)**: std's sheet metal boolean
+  intersects the thickened definition face (83 faces, the plate with its teeth) with the extrude (9 faces): OCCT's
+  Common is empty and its Cut removes nothing though Fuse loses the right 102 mm³ (live cuts 101.46: the tooth, region
+  RVHC); crates/brep declines ("a non-manifold result"); fuzzy / glue / scaled don't help. Case:
+  /root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt} (bool_corpus format). The regions themselves are
+  right now (646 + 159.77 + 341.49 mm², the split at y -46.537 as live's).
+- Louver otherwise: feature 6 and Sketch 9 are the UI fetch's (dx / live).
+
 ## Resume here (2026-11-07 23:40 UTC, restarted on a pinned account)
 - c2-sm-louver: Flange 4's "Cannot create flange with selected alignment" was fixed before the restart (b933b1d3).
   Flange 9's same error was std's edge change refusing a wall with holes (edge_change.rs `outer_and_holes`: the

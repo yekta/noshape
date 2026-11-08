@@ -241,9 +241,25 @@ impl PlaneFrame {
         let t = (self.origin - origin).dot(self.normal) / denom;
         Some(origin + dir * t)
     }
-    /// Onshape's x for a planar face of normal `n` (evPlane, live 1897): +X on a face facing ±Z, else the world's +Z
-    /// projected into the plane is y and x = y × n.
+    /// Onshape's x for a planar face of normal `n` (evPlane, live 2256): by n's largest component (X on a tie, Z on a
+    /// tie of Y and Z), a reference axis projected into the plane: +X facing mostly ±Z, else Z × that signed axis (+Y facing
+    /// +X, -Y facing -X, -X facing +Y, +X facing -Y).
     pub fn face_x(n: DVec3) -> DVec3 {
+        let a = n.abs();
+        let axis = if a.x >= a.y && a.x >= a.z {
+            DVec3::X * n.x.signum()
+        } else if a.z >= a.y {
+            DVec3::Z
+        } else {
+            DVec3::Y * n.y.signum()
+        };
+        let reference = if axis == DVec3::Z { DVec3::X } else { DVec3::Z.cross(axis) };
+        let x = reference - n * reference.dot(n);
+        if x.length() < 1e-9 { Self::face_x_1897(n) } else { x.normalize() }
+    }
+    /// The face x of studios saved before ScopeRule 15 (live 1897): +X on a face facing ±Z, else the world's +Z
+    /// projected into the plane is y and x = y × n.
+    pub fn face_x_1897(n: DVec3) -> DVec3 {
         let y = DVec3::Z - n * DVec3::Z.dot(n);
         if y.length() < 1e-9 { DVec3::X } else { y.normalize().cross(n) }
     }

@@ -563,6 +563,8 @@ impl From<Vec<Arc<Body>>> for Bodies {
 pub struct Context {
     /// The studio's planar faces keep OCCT's plane x ([`crate::partstudio::PartStudio::legacy_face_frames`]).
     pub legacy_face_frames: bool,
+    /// The studio's tilted planar faces keep x = Z × n ([`crate::partstudio::PartStudio::legacy_tilted_face_frames`]).
+    pub legacy_tilted_face_frames: bool,
     /// The studio's sketches on construction planes keep the planes' own frames
     /// ([`crate::partstudio::PartStudio::legacy_plane_sketch_frames`]).
     pub legacy_plane_sketch_frames: bool,
@@ -735,12 +737,25 @@ impl HoleRecord {
 }
 
 impl Context {
+    /// The x of a sketch or evPlane on a planar face of plane `pl`, by the rules the studio was saved under.
+    pub fn planar_face_x(&self, pl: &noshape_kernel::Plane) -> DVec3 {
+        let n = pl.unit_normal();
+        if self.legacy_face_frames {
+            pl.unit_x()
+        } else if self.legacy_tilted_face_frames {
+            PlaneFrame::face_x_1897(n)
+        } else {
+            PlaneFrame::face_x(n)
+        }
+    }
+
     /// Everything but the bodies the same as `o` (an evaluation's other inputs, for reusing it): shared parts by
     /// identity, values by equality; FeatureScript attributes only when both have none. Every field is named here, so
     /// a new one has to say how it compares.
     pub fn same_but_bodies(&self, o: &Context) -> bool {
         let Context {
             legacy_face_frames,
+            legacy_tilted_face_frames,
             legacy_plane_sketch_frames,
             legacy_edge_directions,
             bodies: _,
@@ -781,6 +796,7 @@ impl Context {
             a.len() == b.len() && a.iter().zip(b).all(|((k, v), (l, w))| k == l && Arc::ptr_eq(v, w))
         }
         *legacy_face_frames == o.legacy_face_frames
+            && *legacy_tilted_face_frames == o.legacy_tilted_face_frames
             && *legacy_plane_sketch_frames == o.legacy_plane_sketch_frames
             && *legacy_edge_directions == o.legacy_edge_directions
             && same_arcs(sketches, &o.sketches)

@@ -642,7 +642,7 @@ impl<'a> EvalCtx<'a> {
         }
         let f = self.raw_plane(&base)?;
         let n = f.normal;
-        let x = construction_sketch_x(n);
+        let x = if self.ctx.legacy_tilted_face_frames { construction_sketch_x(n) } else { PlaneFrame::face_x(n) };
         let canonical = PlaneFrame { origin: n * f.origin.dot(n), x, y: n.cross(x), normal: n };
         Some(match &self.xform {
             Some(m) => transform_frame(&canonical, m),
@@ -663,7 +663,7 @@ impl<'a> EvalCtx<'a> {
                 let pl = face.face_plane().ok()??;
                 // Sketch origin on a face: world origin projected onto the face plane.
                 let n = pl.unit_normal();
-                let x = if self.ctx.legacy_face_frames { pl.unit_x() } else { PlaneFrame::face_x(n) };
+                let x = self.ctx.planar_face_x(&pl);
                 let origin = n * pl.origin.dot(n);
                 Some(PlaneFrame { origin, x, y: n.cross(x), normal: n })
             }
@@ -1868,11 +1868,8 @@ fn non_manifold(shape: &Shape) -> bool {
     })
 }
 
-/// A sketch's x on a construction plane of normal `n`, by n's largest component (live's sketch frames): facing mostly
-/// x, world Y projected onto it, signed as n's x (cf-3d-spline's Sketch 2 on a Curve point plane, c2-hunting-knife's
-/// Sketch 14, Right; cf-surface-pattern's Sketch 11 on a -x plane: -Y); facing mostly z, world X projected
-/// (c2-fan-blade-sweep's threadprofile, c2-duct-multipart's Sketch 2 on a -z plane: +X); facing mostly y, Z x n (Front,
-/// cf-fill-pattern's).
+/// A sketch's x on a construction plane of normal `n` in a studio saved before ScopeRule 15 (live's sketch frames
+/// then, the same as [`PlaneFrame::face_x`] but for a plane facing mostly y: Z x n).
 fn construction_sketch_x(n: DVec3) -> DVec3 {
     let a = n.abs();
     let x = if a.x >= a.y && a.x >= a.z {
@@ -1882,18 +1879,20 @@ fn construction_sketch_x(n: DVec3) -> DVec3 {
     } else {
         DVec3::Z.cross(n)
     };
-    if x.length() < 1e-9 { PlaneFrame::face_x(n) } else { x.normalize() }
+    if x.length() < 1e-9 { PlaneFrame::face_x_1897(n) } else { x.normalize() }
 }
 
 #[cfg(test)]
 mod sketch_x_tests {
     use super::construction_sketch_x;
+    use crate::display::PlaneFrame;
     use glam::DVec3;
 
-    /// Live's frames of sketches on construction planes (the parity corpus' sketches' transform matrices: normal, x).
+    /// Live's frames of sketches on construction planes (the parity corpus' sketches' transform matrices: normal, x)
+    /// and of evPlane on planar faces (live 2256: the probe's faces, c2-duct-multipart's Sketch 6 / 7 faces).
     #[test]
-    fn a_sketch_on_a_construction_plane_takes_lives_x() {
-        let live: [(&str, [f64; 3], [f64; 3]); 6] = [
+    fn a_sketch_on_a_plane_or_a_face_takes_lives_x() {
+        let planes: [(&str, [f64; 3], [f64; 3]); 6] = [
             ("cf-3d-spline Sketch 2", [0.7189781793680351, -0.19971616093556532, -0.6657205364518847], [0.14654386486040158, 0.9798537926962163, -0.13568876375963115]),
             ("c2-duct-multipart Sketch 2", [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]),
             ("cf-surface-pattern Sketch 11", [-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]),
@@ -1901,9 +1900,30 @@ mod sketch_x_tests {
             ("cf-fill-pattern Sketch 1", [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]),
             ("c2-hunting-knife Sketch 14", [0.8974203707289625, 6.123233995736766e-17, -0.4411764705882348], [-5.495114922514275e-17, 1.0000000000000002, 2.7014267628250408e-17]),
         ];
-        for (name, n, x) in live {
-            let ours = construction_sketch_x(DVec3::from(n).normalize());
-            assert!((ours - DVec3::from(x)).length() < 1e-9, "{name}: {ours} vs live {x:?}");
+        for (name, n, x) in planes {
+            let n = DVec3::from(n).normalize();
+            assert!((construction_sketch_x(n) - DVec3::from(x)).length() < 1e-9, "{name}: before ScopeRule 15 vs live {x:?}");
+            assert!((PlaneFrame::face_x(n) - DVec3::from(x)).length() < 1e-9, "{name}: {} vs live {x:?}", PlaneFrame::face_x(n));
+        }
+        let faces: [(&str, [f64; 3], [f64; 3]); 14] = [
+            ("a slanted", [-0.5547, 0.0, 0.83205], [0.83205, 0.0, 0.5547]),
+            ("a cap", [0.0, 1.0, 0.0], [-1.0, 0.0, 0.0]),
+            ("a side", [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]),
+            ("a bottom", [0.0, 0.0, -1.0], [1.0, 0.0, 0.0]),
+            ("c surface", [0.5547, 0.0, -0.83205], [0.83205, 0.0, 0.5547]),
+            ("f chamfer", [0.0, -0.894427, 0.447214], [1.0, 0.0, 0.0]),
+            ("g slanted", [0.0, -0.5547, 0.83205], [1.0, 0.0, 0.0]),
+            ("h slanted", [-0.480384, 0.27735, 0.83205], [0.877058, 0.151911, 0.455733]),
+            ("h side", [0.866025, -0.5, 0.0], [0.5, 0.866025, 0.0]),
+            ("j", [-0.724138, 0.0, 0.689655], [0.0, -1.0, 0.0]),
+            ("k 45 degrees", [-1.0, 0.0, 1.0], [0.0, -1.0, 0.0]),
+            ("n", [0.0, 0.724138, 0.689655], [-1.0, 0.0, 0.0]),
+            ("c2-duct-multipart Sketch 7", [0.552, 0.0, -0.834], [0.834, 0.0, 0.552]),
+            ("c2-duct-multipart Sketch 6", [0.853758, -0.414683, -0.314858], [0.389068, 0.909966, -0.143484]),
+        ];
+        for (name, n, x) in faces {
+            let ours = PlaneFrame::face_x(DVec3::from(n).normalize());
+            assert!((ours - DVec3::from(x)).length() < 2e-3, "{name}: {ours} vs live {x:?}");
         }
     }
 }

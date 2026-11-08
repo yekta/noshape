@@ -377,7 +377,7 @@ impl Regenerator {
                 (bodies, display)
             });
         }
-        let mut ctx: Arc<Context> = Arc::new(Context { legacy_face_frames: studio.legacy_face_frames, legacy_plane_sketch_frames: studio.legacy_plane_sketch_frames, legacy_edge_directions: studio.legacy_edge_directions, ..Default::default() });
+        let mut ctx: Arc<Context> = Arc::new(Context { legacy_face_frames: studio.legacy_face_frames, legacy_tilted_face_frames: studio.legacy_tilted_face_frames, legacy_plane_sketch_frames: studio.legacy_plane_sketch_frames, legacy_edge_directions: studio.legacy_edge_directions, ..Default::default() });
         let declines = self.declines.clone();
         let mut states = Vec::with_capacity(studio.features.len());
         let mut live: Vec<FeatureId> = Vec::new();

@@ -151,13 +151,14 @@ impl Feature {
 /// ([`PartStudio::legacy_edge_directions`]); 11, blends finished as live ([`PartStudio::legacy_blend_finish`]);
 /// 12, a rounded hole's seams off the rims it trims ([`PartStudio::legacy_rim_seams`]); 13, noshape's full rounds,
 /// ridges and rounds rolling over a narrow face ([`PartStudio::legacy_blend_pairs`]); 14, collinear sketch lines one
-/// edge though a stub bounding no region ends at their joint ([`PartStudio::legacy_stub_joints`]); 0, older studios.
+/// edge though a stub bounding no region ends at their joint ([`PartStudio::legacy_stub_joints`]); 15, a tilted planar
+/// face's frame from its normal's largest component ([`PartStudio::legacy_tilted_face_frames`]); 0, older studios.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScopeRule(pub u8);
 
 impl Default for ScopeRule {
     fn default() -> Self {
-        ScopeRule(14)
+        ScopeRule(15)
     }
 }
 
@@ -385,6 +386,11 @@ pub struct PartStudio {
     /// so later features find the faces they found.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub legacy_stub_joints: bool,
+    /// Saved with features before a planar face's frame took its x from the normal's largest component (ScopeRule <
+    /// 15, live 2256: a tilted face facing mostly ±Z had x = Z × n, horizontal): sketches on such faces and planes
+    /// from them stay where they were.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub legacy_tilted_face_frames: bool,
     /// Rollback bar position: number of features evaluated (None = all).
     #[serde(default)]
     pub rollback: Option<usize>,
@@ -618,6 +624,10 @@ impl PartStudio {
         // And with a stub at a joint of collinear lines keeping them apart.
         if self.scope_rule.0 < 14 && !self.features.is_empty() {
             self.legacy_stub_joints = true;
+        }
+        // And with x = Z × n on tilted planar faces.
+        if self.scope_rule.0 < 15 && !self.features.is_empty() {
+            self.legacy_tilted_face_frames = true;
         }
         self.scope_rule = ScopeRule::default();
     }
