@@ -157,6 +157,11 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   Next: print the plane's pieces near the circle with their states; check the tool's v = 0 circle edge is found on
   the plane (edge_on_surface, analytic). sp-cut still declines "a piece's point on another solid's face" (spheres
   44 / 45 touching): tangent_side gives None there (find why: normals or signs). Gate not run on the WIP.
+- **Rotieren 1 needs live's answer (11-08 17:22 UTC; REQUESTS "c2-housing-draft's Rotieren 1"):** with the WIP all of
+  the z = 0 face's pieces are classified (kept, outside the tool), consistently; the decline is the geometry: the
+  revolve's cavity (below z = 0) touches the top face tangentially along r = 15.2 mm, so the result has the top face
+  meeting the cavity along that circle at zero thickness, a non-manifold edge ours refuses. What live builds there
+  (a shared edge, split faces, or a slight gap) decides the design; live's Part 1 after it: 36/79/44, 1294.125 mm3.
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
