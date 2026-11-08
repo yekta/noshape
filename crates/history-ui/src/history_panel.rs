@@ -1131,6 +1131,7 @@ impl Render for HistoryPanel {
         let comparing = crate::compare_mode::rows(&self.doc, cx);
         // "Compare history entries": the first entry picked is blue.
         let first_pick = crate::compare_mode::first_pick(&self.doc, cx);
+        let picking = crate::compare_mode::picking(&self.doc, cx);
         let repair_picking = crate::repair_mode::picking(&self.doc, cx);
         // Repair is offered from a Part Studio (live rp-900).
         let repair_here = {
@@ -1152,7 +1153,9 @@ impl Render for HistoryPanel {
             let compare_side = comparing.map(|(base, target)| (is_row(base), is_row(target))).filter(|(b, t)| *b || *t);
             // Compare history entries: the first pick is selected (live cmp2-902).
             let picked = first_pick.is_some_and(is_row);
+            // While picking entries to compare only the picks are selected (live ver-compare-entries).
             let selected = comparing.is_none()
+                && !picking
                 && match r.kind {
                     RowKind::Workspace(b) => b == current_branch && viewing.is_none(),
                     _ => viewing == Some(r.mv),

@@ -863,7 +863,19 @@
    "where": "editor while profiling",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3192"
+   "source": "behaviours.md:3192",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "fs-ac-open-first-letter",
@@ -1540,7 +1552,21 @@
    "where": "while profiling",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3193"
+   "source": "behaviours.md:3193",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "re:Profile .*"
+      }
+     },
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-commit-regenerates",
@@ -1829,7 +1855,21 @@
    "where": "Versions and history / std tab",
    "freq": 3,
    "cloud": false,
-   "source": "dom/fs-nav-shortcuts.txt"
+   "source": "dom/fs-nav-shortcuts.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "re:Feature Studio.*"
+      }
+     },
+     {
+      "on": {
+       "history_row": "re:V\\d+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "fs-publish-featurescript",

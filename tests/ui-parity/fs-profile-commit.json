@@ -1,0 +1,47 @@
+{
+ "name": "fs-profile-commit",
+ "about": "Profile Part Studio 1, an edit, then Commit (the profile refreshes)",
+ "area": "studios",
+ "source": "universe feature-studio fs-profile-refresh-on-commit (studios 11-08, coverage batch 5)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Profile Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "type",
+   "text": "// edit"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Commit Feature Studio"
+   }
+  }
+ ]
+}

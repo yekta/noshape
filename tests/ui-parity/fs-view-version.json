@@ -1,0 +1,39 @@
+{
+ "name": "fs-view-version",
+ "about": "Feature Studio 1, Create version… › Create, then Versions and history › V1: the read-only editor with its banner",
+ "area": "studios",
+ "source": "universe feature-studio fs-view-version-readonly (studios 11-08, coverage batch 5)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  }
+ ]
+}

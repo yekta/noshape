@@ -194,6 +194,13 @@ impl UndoStack {
         self.redo.len()
     }
 
+    /// Forgets the edits after the first `len` (a dialog's preview edits on
+    /// Cancel: neither undoable nor redoable, as if never made).
+    pub fn forget_since(&mut self, len: usize) {
+        self.undo.truncate(len);
+        self.redo.clear();
+    }
+
     pub fn clear(&mut self) {
         self.undo.clear();
         self.redo.clear();

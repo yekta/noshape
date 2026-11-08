@@ -28,6 +28,23 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 13:00 UTC: compare, Insert Variable Studio and inserted tables to live's recordings
+- The 24 ver-compare / vs-insert / vs-inserted scenarios: 6 → 16 matched, 125/135 states. Compare: change marks as
+  live's (">" added = only in the base, "<" removed), the panel stands in for the feature list (`features`/`parts`
+  empty, `document.workspace` null), a row clicked in it is the selection; "Compare history entries" clears the row
+  selection. Insert Variable Studio: variable rows recorded (`child`), only the picked rows highlighted (a whole
+  studio: its row), a search keeps the matching variables, no notice when nothing matches, the red title as
+  `titleState`, a previewed table untitled until ✓ (`variable_insert::previewing`), Cancel leaves no undo or redo
+  (`Session::forget_undo_since`), its search field focus a dialog field. Variable Studio: the ? popover closes on a
+  second click and records its text, Copy table's toast, a collapsed table records no rows, Esc ends Rename.
+- Runner: child rows compared as a set (live's order changes per run), "Create task…" cloud (assigns work to users),
+  an unread feature-dialog header (`title` null) leaves `titleState`/`ok` unread.
+- Not followed: live's ⋯ table menus stay open on Escape (vs-table-menu, vs-inserted-table-menu): a shortcoming.
+- Asked of live/live2 (REQUESTS): compare step-3 states sampled before the panel loaded (`features` [],
+  `only_differences` null in ver-compare-leave/-only-differences/-reverse/-entries); ver-compare-assembly lists the
+  Part Studio's rows on the Assembly tab (is that what live shows?); vs-insert-other-documents reads tabs [] and a
+  "Standard" field (another panel?); vs-inserted-edit-reference: undo off while Edit reference… is open.
+
 ### 2026-11-08 09:48 UTC: lead's decisions applied (Help menu, Update workspace…, focus rule)
 - Help menu (both): Help · FeatureScript documentation · Keyboard shortcuts | System check · About | Install command
   line tool… · Connect to coding agents… (live's rows, its cloud ones left out; ours after a divider, not compared).

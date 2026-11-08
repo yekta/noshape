@@ -504,14 +504,16 @@ pub fn ui_state(doc: &Entity<DocModel>, tab: Option<TabId>, cx: &App) -> Option<
         out
     };
     let rows = panel_rows(s, &configured(&a, &s.base_config), &configured(&b, &s.target_config));
+    // As live's recorder names the panel's marks: only in the base (">") is "added" (the base has it over the
+    // target), only in the target ("<") "removed", "≠" modified.
     let change = |r: &FeatureCompare| match r.status {
-        _ if r.moved.is_some() => Some("moved"),
-        Some(ChangeKind::Modified) => Some("modified"),
-        Some(ChangeKind::Removed) => Some("removed"),
-        Some(ChangeKind::Added) => Some("added"),
-        None => None,
+        _ if r.moved.is_some() => (Some("moved"), None),
+        Some(ChangeKind::Modified) => (Some("modified"), Some("≠")),
+        Some(ChangeKind::Removed) => (Some("added"), Some(">")),
+        Some(ChangeKind::Added) => (Some("removed"), Some("<")),
+        None => (None, None),
     };
-    out["features"] = rows.iter().map(|r| serde_json::json!({ "name": r.name, "change": change(r) })).collect();
+    out["features"] = rows.iter().map(|r| serde_json::json!({ "name": r.name, "change": change(r).0, "indicator": change(r).1 })).collect();
     out["selected"] = serde_json::json!(s.selected.and_then(|id| rows.iter().find(|r| r.id == id)).map(|r| r.name.clone()));
     Some(out)
 }

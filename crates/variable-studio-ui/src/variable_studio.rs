@@ -34,6 +34,8 @@ pub struct VariableStudioView {
     /// The footer's `?` popover is open, and the footer group's bounds.
     help_open: bool,
     footer_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
+    /// The footer `?`: a press on it is its own toggle, not a press outside the popover.
+    help_bounds: std::rc::Rc<std::cell::Cell<Bounds<Pixels>>>,
     /// Same-document studios inserted into this one: editable tables
     /// (Onshape edits the inserted studio itself, live document/50–51).
     inserted_views: HashMap<TabId, Entity<VariableStudioView>>,
@@ -91,12 +93,17 @@ impl VariableStudioView {
     /// The variables as last drawn (the ui-parity state's `variables`): `{"name", "type", "value", "description"}`,
     /// the inserted studios' tables first, then this one's (`"title"`: its tab's name).
     pub fn ui_state(&self, cx: &App) -> serde_json::Value {
-        let title = |t: TabId| self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default();
-        let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "collapsed": v.read(cx).collapsed, "rows": v.read(cx).ui_drawn })).collect();
+        let title = |t: TabId| match crate::variable_insert::previewing(self.tab, t) {
+            true => String::new(),
+            false => self.doc.read(cx).session.doc.tab(t).map(|t| t.name.clone()).unwrap_or_default(),
+        };
+        // A collapsed table's rows aren't shown (live: none).
+        let rows = |collapsed: bool, drawn: &[serde_json::Value]| if collapsed { serde_json::json!([]) } else { serde_json::json!(drawn) };
+        let mut tables: Vec<serde_json::Value> = self.inserted_views.iter().map(|(t, v)| serde_json::json!({ "title": title(*t), "collapsed": v.read(cx).collapsed, "rows": rows(v.read(cx).collapsed, &v.read(cx).ui_drawn) })).collect();
         tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
-        tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": self.ui_drawn }));
+        tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": rows(self.collapsed, &self.ui_drawn) }));
         let insert_into_all = self.studio(cx).is_some_and(|s| s.insert_into_all);
-        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": Some(self.ui_configuration(cx)).filter(|c| !c.is_empty()), "help": self.help_open })
+        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": self.config_open.then(|| self.ui_configuration(cx)), "help": self.help_open })
     }
 
     /// The studio's configuration inputs: `{"name", "kind": list | checkbox | variable | text, "default", "shown",
@@ -135,6 +142,7 @@ impl VariableStudioView {
             host: None,
             help_open: false,
             footer_bounds: Default::default(),
+            help_bounds: Default::default(),
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
             focus_add_row: false,
@@ -463,6 +471,7 @@ impl VariableStudioView {
             div().size(px(20.)).flex().items_center().justify_center().child(div().size(px(13.)).rounded(px(2.)).border_1().border_color(rgb(0x888888))).into_any_element()
         };
         let probe = self.footer_bounds.clone();
+        let help_probe = self.help_bounds.clone();
         h_flex()
             .h(px(40.))
             .flex_none()
@@ -504,6 +513,7 @@ impl VariableStudioView {
             .child(
                 Button::new("vs-insert-all-help")
                     .map(|d| crate::ui_script::mark(d, || "button:Insert into all help".into()))
+                    .child(canvas(move |b, _, _| help_probe.set(b), |_, _, _, _| {}).absolute().top_0().left_0().size_full())
                     .custom(variant)
                     .h(px(35.))
                     .w(px(49.))
@@ -549,7 +559,10 @@ impl VariableStudioView {
                     .border_1()
                     .border_color(rgb(0xd7d7d7))
                     .rounded(px(5.25))
-                    .on_mouse_down_out(cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                    .on_mouse_down_out(cx.listener(|this, ev: &MouseDownEvent, _, cx| {
+                        if this.help_bounds.get().contains(&ev.position) {
+                            return;
+                        }
                         this.help_open = false;
                         cx.notify();
                     }))
@@ -565,6 +578,7 @@ impl VariableStudioView {
                             .text_color(pal.info_text)
                             .child(div().font_weight(FontWeight::BOLD).child(title))
                             .child(div().child(body))
+                            .map(|d| crate::ui_script::mark_message(d, || format!("{title} {body} Learn more about Variable Studios")))
                             .child(
                                 div()
                                     .id("vs-help-learn")
@@ -585,6 +599,8 @@ impl VariableStudioView {
     fn copy_table(&self, cx: &mut Context<Self>) {
         let Some(studio) = self.studio(cx) else { return };
         cx.write_to_clipboard(ClipboardItem::new_string(noshape_ops::variable_studio::studio_table_text(studio)));
+        let name = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
+        self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(format!("{name} table copied to clipboard."))));
     }
 }
 
@@ -602,7 +618,9 @@ impl Render for VariableStudioView {
         let studio = studio.configured(&studio.configuration.active).into_owned();
         let (units, title) = {
             let d = &self.doc.read(cx).session.doc;
-            (d.settings.units, d.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default())
+            // A table only previewed by the Insert dialog has no title yet (live).
+            let previewed = self.host.is_some_and(|h| crate::variable_insert::previewing(h, self.tab));
+            (d.settings.units, if previewed { String::new() } else { d.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default() })
         };
         // Results with the tables inserted into this studio in scope.
         let eval = noshape_model::variables::studio_evaluation(&self.doc.read(cx).session.doc, self.tab);
@@ -885,7 +903,21 @@ impl Render for VariableStudioView {
                             .when(in_panel && !auto_ref, |r| r.child(crate::assets::icon("variable-studio", 20., cx)))
                             .when(auto_ref, |r| r.child(div().id("vs-auto-ref").pl(px(4.)).tooltip(crate::ui::tooltip("Automatically referenced Variable Studio")).child(crate::assets::icon("auto-variable-reference", 20., cx))))
                             .child(match &self.renaming {
-                                Some(st) => div().w(px(260.)).text_size(px(16.)).border_b_1().border_color(pal.accent).child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
+                                Some(st) => div()
+                                    .w(px(260.))
+                                    .text_size(px(16.))
+                                    .border_b_1()
+                                    .border_color(pal.accent)
+                                    // Esc keeps the name: the field goes before its blur would rename.
+                                    .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                                        if ev.keystroke.key == "escape" {
+                                            cx.stop_propagation();
+                                            this.renaming = None;
+                                            window.focus(&this.focus, cx);
+                                            cx.notify();
+                                        }
+                                    }))
+                                    .child(Input::new(st).h(px(26.)).appearance(false).text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).pl(px(3.))).into_any_element(),
                                 None => div().text_size(px(16.)).font_weight(FontWeight::MEDIUM).text_color(pal.text).child(crate::ui::user_text(title)).into_any_element(),
                             })
                             .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

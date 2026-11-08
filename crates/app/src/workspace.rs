@@ -481,10 +481,13 @@ impl Workspace {
             (None, false) => session.store.branch(session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()),
         };
         let history = self.history.as_ref().map(|h| h.read(cx).ui_rows(cx));
+        let compare = noshape_history_ui::compare_mode::ui_state(&self.doc, self.active, cx);
+        // While comparing the navbar shows the compare bar, not the workspace (live ver-compare-*).
+        let workspace = compare.is_none().then_some(workspace);
         serde_json::json!({
             "workspace": workspace,
             "history": history,
-            "compare": noshape_history_ui::compare_mode::ui_state(&self.doc, self.active, cx),
+            "compare": compare,
             "tabs": tabs,
             "folder": open.and_then(|f| d.folder(f).map(|x| x.name.clone())),
             "renaming": renaming,

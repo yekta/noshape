@@ -855,6 +855,16 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         if let Some(f) = w.ui_rename_focus(window, cx) {
             s["focus"] = f;
         }
+        // Comparing: the compare panel stands in for the feature list, and no part is listed (live ver-compare-*).
+        if !s["document"]["compare"].is_null() && s["features"].is_object() {
+            s["features"] = json!({ "rows": [], "rollbackAfter": null });
+            s["parts"] = json!([]);
+            // The feature picked in the compare panel is the selection, as live's.
+            let picked = s["document"]["compare"]["selected"].take();
+            if let Some(name) = picked.as_str() {
+                s["selection"] = json!({ "count": 1, "items": [{ "kind": "FEATURE", "owner": name }] });
+            }
+        }
         // The window's alerts and toasts when the studio has no message of its own (live reads every alert).
         if s["message"].is_null() {
             s["message"] = json!(noshape_app_core::ui_script::window_message(window.window_handle().window_id()));
@@ -885,6 +895,11 @@ fn with_input_focus_in(s: &mut Value, window: &mut Window, cx: &mut App) {
     let chars = |b: usize| text.get(..b.min(text.len())).map_or(0, |t| t.chars().count());
     let (a, b) = (chars(sel.start), chars(sel.end));
     let all = a == 0 && b == text.chars().count() && b > 0;
+    // In a feature-style dialog (Insert Variable Studio's search) live reads it as that dialog's field.
+    if s["dialog"]["kind"] == "feature" {
+        s["focus"] = json!({ "kind": "field", "label": null, "text": text, "selection": [a, b], "all": all, "dialog": s["dialog"]["title"] });
+        return;
+    }
     s["focus"] = json!({ "kind": "other", "text": text, "selection": [a, b], "all": all });
 }
 

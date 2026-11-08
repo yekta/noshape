@@ -1,0 +1,41 @@
+{
+ "name": "fs-profile-stale",
+ "about": "Profile Part Studio 1, then an edit in the code (the profile bars grey out)",
+ "area": "studios",
+ "source": "universe feature-studio fs-ed-profile-stale (studios 11-08, coverage batch 5)",
+ "start": "fs-studio",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Feature Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Monitor"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Profile Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "editor": "code"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+End"
+  },
+  {
+   "do": "type",
+   "text": "// edit"
+  }
+ ]
+}

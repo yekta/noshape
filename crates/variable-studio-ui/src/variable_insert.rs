@@ -103,8 +103,19 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
             TabContent::VariableStudio(v) => Some((t.id, t.name.clone(), v.variables.iter().map(|x| x.name.clone()).filter(|n| !n.is_empty()).collect::<Vec<_>>(), v.configuration.clone())),
             _ => None,
         })
-        .filter(|(_, name, vars, _)| query.is_empty() || name.to_lowercase().contains(query) || vars.iter().any(|v| v.to_lowercase().contains(query)))
+        .filter_map(|(id, name, vars, cfg)| {
+            // Live: a search matching variables lists the studio with only those (ui-parity vs-insert-search-variable).
+            if query.is_empty() || name.to_lowercase().contains(query) {
+                return Some((id, name, vars, cfg));
+            }
+            let vars: Vec<String> = vars.into_iter().filter(|v| v.to_lowercase().contains(query)).collect();
+            (!vars.is_empty()).then_some((id, name, vars, cfg))
+        })
         .collect();
+    // Live: a search that matches nothing leaves the list empty, no notice.
+    if studios.is_empty() && !query.is_empty() {
+        return;
+    }
     if studios.is_empty() {
         let msg = if external.is_some() { "This version has no Variable Studios." } else { "There are no other Variable Studios in this document." };
         rows.push(os::info_box(msg).m(px(10.)).into_any_element());
@@ -136,7 +147,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                 .group(SharedString::from(format!("ivs-row-{id}")))
                 .map(|d| {
                     let row = (name.clone(), whole);
-                    crate::ui_script::note_field(|| serde_json::json!({ "label": row.0, "kind": "boolean", "checked": row.1 }));
+                    crate::ui_script::note_field(|| serde_json::json!({ "label": row.0, "kind": "boolean", "checked": row.1, "child": false }));
                     crate::ui_script::mark(d, || format!("panel_row:{}", row.0))
                 })
                 .tooltip(crate::ui::user_tooltip(name.clone()))
@@ -231,8 +242,11 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         }
         if open {
             for n in &names {
-                let picked = cur.as_ref().is_some_and(|r| r.variables.as_ref().is_none_or(|v| v.contains(n)));
-                let (doc2, cur2, n2, all, ext2) = (doc.clone(), cur.clone(), n.clone(), names.clone(), external.clone());
+                // Live: with the whole studio picked only its row is highlighted.
+                let picked = cur.as_ref().and_then(|r| r.variables.as_ref()).is_some_and(|v| v.contains(n));
+                let (doc2, cur2, n2, ext2) = (doc.clone(), cur.clone(), n.clone(), external.clone());
+                let row = (n.clone(), picked);
+                crate::ui_script::note_field(|| serde_json::json!({ "label": row.0, "kind": "boolean", "checked": row.1, "child": true }));
                 rows.push(
                     h_flex()
                         .id(SharedString::from(format!("ivs-{id}-{n}")))
@@ -263,10 +277,9 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                         .child(div().flex_none().mr(px(14.)).child(crate::assets::icon("variable", 20., cx)))
                         .child(div().flex_1().truncate().child(n.clone()))
                         .on_click(move |_, window, cx| {
-                            // Toggle one variable; a whole-table reference
-                            // becomes the list of the others.
+                            // Toggle one variable; over a whole-table pick it
+                            // picks just this one.
                             let list = match &cur2 {
-                                Some(StudioRef { variables: None, .. }) => all.iter().filter(|x| **x != n2).cloned().collect(),
                                 Some(StudioRef { variables: Some(v), .. }) => {
                                     let mut v = v.clone();
                                     match v.iter().position(|x| *x == n2) {
@@ -277,7 +290,7 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                                     }
                                     v
                                 }
-                                None => vec![n2.clone()],
+                                _ => vec![n2.clone()],
                             };
                             let next = (!list.is_empty()).then(|| StudioRef { studio: id, variables: Some(list), external: ext2.clone(), config: Default::default() });
                             set_ref(&doc2, target, id, next, cx);
@@ -385,6 +398,33 @@ fn config_box(ctx: &Rows, id: TabId, key: &(Option<std::path::PathBuf>, TabId), 
     .into_any_element()
 }
 
+thread_local! {
+    /// The open dialog's host and the studios it had before: any other it
+    /// shows is a preview until ✓.
+    static PREVIEW: RefCell<Option<(TabId, Vec<TabId>)>> = const { RefCell::new(None) };
+}
+
+/// `studio` is only previewed in `host` (the dialog open, not yet ✓): live
+/// draws its table without a title.
+pub fn previewing(host: TabId, studio: TabId) -> bool {
+    PREVIEW.with(|p| p.borrow().as_ref().is_some_and(|(h, before)| *h == host && studio != host && !before.contains(&studio)))
+}
+
+fn host_studios(doc: &noshape_model::Document, target: InsertTarget) -> (TabId, Vec<TabId>) {
+    let (host, refs) = match target {
+        InsertTarget::Studio(t) => (t, doc.tab(t).and_then(|t| match &t.content {
+            TabContent::VariableStudio(v) => Some(v.inserted.clone()),
+            _ => None,
+        }).unwrap_or_default()),
+        InsertTarget::Element(e) => (e, vars::element_studios(doc, e)),
+    };
+    (host, refs.iter().filter(|r| r.external.is_none()).map(|r| r.studio).collect())
+}
+
+fn end_preview() {
+    PREVIEW.with(|p| p.borrow_mut().take());
+}
+
 /// Open the dialog for `target`.
 pub fn open(doc: Entity<DocModel>, target: InsertTarget, window: &mut Window, cx: &mut App) {
     open_with(doc, target, DialogState::default(), window, cx);
@@ -394,6 +434,9 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
     let state: Rc<RefCell<DialogState>> = Rc::new(RefCell::new(state));
     // ✕ (or Esc) puts the target's references back as they were.
     let before = snapshot(&doc.read(cx).session.doc, target);
+    let preview = host_studios(&doc.read(cx).session.doc, target);
+    let undo_mark = doc.read(cx).session.undo_len();
+    PREVIEW.with(|p| *p.borrow_mut() = Some(preview));
     let search = cx.new(|cx| gpui_kit::component::input::InputState::new(window, cx).select_on_focus(false).placeholder("Search Variable Studios"));
     window
         .subscribe(&search, cx, |_, ev: &gpui_kit::component::input::InputEvent, window, _| {
@@ -634,7 +677,9 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .on_click(move |_, window, cx| {
                         let _ = (&doc_ok, &st_ok);
                         if changed {
+                            end_preview();
                             window.close_dialog(cx);
+                            window.refresh();
                         }
                     }),
             )
@@ -648,8 +693,9 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                     .justify_center()
                     .child(crate::assets::icon("dialog-cancel", 24., cx))
                     .on_click(move |_, window, cx| {
+                        end_preview();
                         if let Some(b) = before_x.clone() {
-                            restore(&doc_x, target, b, cx);
+                            restore(&doc_x, target, b, undo_mark, cx);
                         }
                         window.close_dialog(cx);
                     }),
@@ -670,8 +716,8 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             let mut fields = vec![serde_json::json!({ "label": "Search Variable Studios", "kind": "string", "text": search.read(cx).value().to_string() })];
             fields.extend(crate::ui_script::take_fields());
             let tabs = serde_json::json!([{ "label": "Current document", "selected": !other }, { "label": "Other documents", "selected": other }]);
-            let error = (!changed).then_some("Insert Variable Studio did not regenerate properly: Error regenerating.");
-            serde_json::json!({ "title": "Insert Variable Studio", "kind": "feature", "tabs": tabs, "fields": fields, "error": error })
+            let title_state = if changed { "ok" } else { "error" };
+            serde_json::json!({ "title": "Insert Variable Studio", "titleState": title_state, "ok": "enabled", "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
         });
         dialog
             .w(px(300.))
@@ -686,8 +732,9 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             .bg(gpui_kit::rgba(0xfffffff2))
             .shadow(vec![BoxShadow { color: hsla(0., 0., 0., 0.2), offset: point(px(0.), px(5.)), blur_radius: px(10.), spread_radius: px(0.), inset: false }])
             .on_cancel(move |_, _, cx| {
+                end_preview();
                 if let Some(b) = before_e.clone() {
-                    restore(&doc_e, target, b, cx);
+                    restore(&doc_e, target, b, undo_mark, cx);
                 }
                 true
             })
@@ -731,7 +778,8 @@ fn snapshot(doc: &noshape_model::Document, target: InsertTarget) -> Option<RefsS
 }
 
 /// Cancel: the target's references as they were when the dialog opened.
-fn restore(doc: &Entity<DocModel>, target: InsertTarget, snap: RefsSnapshot, cx: &mut App) {
+/// The preview's edits leave no undo or redo (live vs-insert-pick-cancel).
+fn restore(doc: &Entity<DocModel>, target: InsertTarget, snap: RefsSnapshot, undo_mark: usize, cx: &mut App) {
     if snapshot(&doc.read(cx).session.doc, target).as_ref() == Some(&snap) {
         return;
     }
@@ -739,12 +787,13 @@ fn restore(doc: &Entity<DocModel>, target: InsertTarget, snap: RefsSnapshot, cx:
         InsertTarget::Studio(t) | InsertTarget::Element(t) => t,
     };
     doc.update(cx, |d, cx| {
-        d.edit_tab(tab, "Remove reference", cx, |c| match (c, &snap) {
+        d.edit_tab_not_undoable(tab, "Remove reference", cx, |c| match (c, &snap) {
             (TabContent::VariableStudio(v), RefsSnapshot::Studio(r)) => v.inserted = r.clone(),
             (TabContent::PartStudio(ps), RefsSnapshot::Element(r)) => ps.variable_studios = r.clone(),
             (TabContent::Assembly(a), RefsSnapshot::Element(r)) => a.variable_studios = r.clone(),
             _ => {}
         });
+        d.session.forget_undo_since(undo_mark);
     });
 }
 

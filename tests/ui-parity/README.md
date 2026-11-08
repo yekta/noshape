@@ -277,11 +277,15 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   Checkbox / Variable input dialog is `dialog` (title "Checkbox input" / "Variable input", `tabs` Length…Text, fields
   Name, Default, Minimum, Maximum), its ✓ / ✕ `{"button": "ok"}` / `"cancel"`, a type `{"tab": "Angle"}`. State
   `variables.configuration`: `[{"name": "Configuration", "kind": "list", "default": "Default", "shown": "Default",
-  "rows": ["Default"]}]` (kind list | checkbox | variable | text; `rows` a list's options; null when not configured).
+  "rows": ["Default"]}]` (kind list | checkbox | variable | text; `rows` a list's options; `[]` with the panel open and nothing configured, null with it closed, as live's).
 - A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
   `features` in Main (start `doc-versions`). While comparing, `document.compare` is `{"base": "Main", "target": "V1",
-  "only_differences": true, "features": [{"name": "Extrude 2", "change": "added"}], "selected": null}` (`features` the
-  compare panel's rows on a Part Studio, `change` modified | removed | added | moved | null; `null` elsewhere); targets
+  "only_differences": true, "features": [{"name": "Extrude 2", "change": "added"}], "selected": null}` (`selected` stays
+  null: a row clicked in the panel is the `selection`, `{"kind": "FEATURE", "owner": "<feature>"}`, as live records it) (`features` the
+  compare panel's rows on a Part Studio, `change` modified | removed | added | moved | null, as live's recorder
+  names the marks: ">" (only in the base) added, "<" (only in the target) removed, `indicator` the mark; `null`
+  elsewhere; `features` and `parts` are empty and `document.workspace` null while comparing, the panel standing in
+  for the list and the compare bar for the navbar's workspace); targets
   `{"button": "Reverse compare"}`, `{"checkbox": "Only show differences"}`, `{"panel_row": "<feature>"}`;
   `"branches": [{"name": "B1", "features": [...]}]`: workspace B1 branched
   from Main's head after the versions, its own `features` in it, the run back on Main (start `doc-branches`). Targets: `{"history_row": "V1"}` a Versions and history row by its name
@@ -496,13 +500,16 @@ line's or circle's length in the sketch value box, or its dimension before a val
 10 mm circle is 9.53 mm in live). An assembly instance's transform (the `assembly` key) is equal within 0.5 mm and
 0.002 per rotation entry, for the same reason after a drag; the instances are compared by name (live's REST order
 isn't the list's). Live's root row reading "<name> Copy 1" (its runner opens a copy) is read as "<name>". Live's
-menus lose the rows of cloud features noshape leaves out ("Add comment"); a menu that lost one is a row shorter, so it
+menus lose the rows of cloud features noshape leaves out ("Add comment", "Create task…"); a menu that lost one is a row shorter, so it
 may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
 Focus (lead 11-08): a `focus` with no text field ("none", or "other" on a button, a row, a menu: live's Chrome
 focuses a clicked button, ours' buttons take no focus) equals another such; a text field's focus (an input, a
 textarea, a select, or ours' "other" with `text`) is compared as recorded. A scenario whose later steps depend on the
 clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it.
+
+Child rows: a dialog's `fields` with `"child": true` (Insert Variable Studio's variables under their studio row,
+`"child": false`) are compared as a set within each studio: live lists them in a different order on each run.
 
 ## noshape side
 

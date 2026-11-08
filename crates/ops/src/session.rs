@@ -536,6 +536,17 @@ impl Session {
         self.undo.undo_description()
     }
 
+    /// The undo list's length, a mark for [`Self::forget_undo_since`].
+    pub fn undo_len(&self) -> usize {
+        self.undo.undo_len()
+    }
+
+    /// Forgets the undo entries after `mark` and the redo list (a dialog's
+    /// preview edits once it is cancelled).
+    pub fn forget_undo_since(&mut self, mark: usize) {
+        self.undo.forget_since(mark);
+    }
+
     pub fn can_undo(&self) -> bool {
         match self.tab_scope() {
             Some(scope) => self.undo.can_undo_in(&self.store, &scope),

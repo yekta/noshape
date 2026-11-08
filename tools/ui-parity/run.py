@@ -166,7 +166,7 @@ def all_differences(a, b, path=""):
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
 CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
-              "Import from"}
+              "Import from", "Create task…"}
 
 
 def normalize_live(state):
@@ -395,6 +395,19 @@ def same_fieldless_focus(a, b):
     return b
 
 
+def sorted_child_rows(fields):
+    out, run = [], []
+    for f in fields + [None]:
+        if isinstance(f, dict) and f.get("child") is True:
+            run.append(f)
+            continue
+        out += sorted(run, key=lambda x: str(x.get("label")))
+        run = []
+        if f is not None:
+            out.append(f)
+    return out
+
+
 def drop_rows(state, drop):
     lst = (state or {}).get("list")
     if not isinstance(lst, dict) or lst.get("kind") != "context-menu":
@@ -437,6 +450,14 @@ def compare(live, ours, whole_document=True):
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
         b = same_fieldless_focus(a, b)
+        # A feature-style panel whose header live's recorder doesn't read (Insert Variable Studio: `title` null, so
+        # its `titleState` and `ok` are defaults).
+        if isinstance(a.get("dialog"), dict) and isinstance(b.get("dialog"), dict) and a["dialog"].get("kind") == "feature" and a["dialog"].get("title") is None:
+            b["dialog"] = dict(b["dialog"], title=None, **{k: a["dialog"][k] for k in ("titleState", "ok") if k in a["dialog"]})
+        # Live lists a studio's child rows (Insert Variable Studio's variables) in a different order on each run.
+        for side in (a, b):
+            if isinstance(side.get("dialog"), dict) and isinstance(side["dialog"].get("fields"), list):
+                side["dialog"]["fields"] = sorted_child_rows(side["dialog"]["fields"])
         # A new subassembly is "Assembly <n>" with the document's next free number, which differs between live's lane
         # documents and ours ("Assembly 2 <1>" / "Assembly 1 <1>"): compared as one name.
         for side in (a, b):
