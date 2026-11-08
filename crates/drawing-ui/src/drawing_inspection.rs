@@ -357,7 +357,8 @@ impl DrawingEditor {
         } else {
             body = body.child(h_flex().child(tab("insp-manual", "Manual", !automatic, false, cx)).child(tab("insp-auto", "Automatic", automatic, true, cx)));
             text.extend(["Manual".into(), "Automatic".into()]);
-            if let Some(st) = number.as_ref().filter(|_| !automatic) {
+            // Number in both modes (live behaviours D6: Automatic adds Scope and Preview).
+            if let Some(st) = number.as_ref() {
                 body = body.child(row("Number:", Input::new(st).small().into_any_element()));
                 text.extend(["Number:".into(), st.read(cx).value().to_string()]);
             }
@@ -382,10 +383,10 @@ impl DrawingEditor {
                     }
                     m
                 });
-                body = body.child(row("Scope", scope_btn.into_any_element())).child(
+                body = body.child(row("Scope:", scope_btn.into_any_element())).child(
                     div().px(px(6.)).py(px(4.)).child(Button::new("insp-preview").label("Preview").outline().small().on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.inspection_preview(cx)))),
                 );
-                text.push("Scope".into());
+                text.push("Scope:".into());
                 text.extend(labels.map(String::from));
                 text.push("Preview".into());
             }

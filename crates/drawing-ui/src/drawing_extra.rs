@@ -722,10 +722,22 @@ impl DrawingEditor {
             };
             let menu = src.map(|(tab, part)| this.reference_menu(tab, part, version.is_some(), cx));
             let mark = name.clone();
+            // Live (live2 drw-sheet-ref-switch): hovered, a popup of its name and version ("Part 1 In progress").
+            let tip = format!("{name}  {}", version.as_deref().unwrap_or("In progress"));
+            let hover_key = key.clone();
             crate::ui::tree_row(SharedString::from(key), false)
                 .map(|d| crate::ui_script::mark(d, || format!("sheet_ref:{mark}")))
                 .cursor_pointer()
-                .tooltip(crate::ui::tooltip("Reference manager"))
+                .tooltip(crate::ui::tooltip(tip))
+                .on_hover(cx.listener(move |this, on: &bool, _, cx| {
+                    let k = Some(hover_key.clone());
+                    if *on {
+                        this.sheets_ref_hover = k;
+                    } else if this.sheets_ref_hover == k {
+                        this.sheets_ref_hover = None;
+                    }
+                    cx.notify();
+                }))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.open_ref_manager(cx)))
                 .when_some(menu, |row, entries| {
                     row.on_mouse_down(
@@ -812,9 +824,13 @@ impl DrawingEditor {
                 // Every sheet lists its references and views (live2 drw-sheet-insert / -duplicate).
                 for (k, (r, vs)) in groups(self, s, cx).iter().enumerate() {
                     let src = vs.first().and_then(|v| self.reference_source(s, v.id));
-                    list = list.child(ref_row(self, format!("dr-sheet-ref-{i}-{k}"), r, src, 34., cx));
+                    let key = format!("dr-sheet-ref-{i}-{k}");
                     let (name, version) = r.split_once('\u{1}').unwrap_or((r.as_str(), "In progress"));
                     text.extend([version.to_string(), name.to_string()]);
+                    if self.sheets_ref_hover.as_deref() == Some(key.as_str()) {
+                        text.push(format!("{name} {version}"));
+                    }
+                    list = list.child(ref_row(self, key, r, src, 34., cx));
                     for v in vs {
                         list = list.child(self.sheet_view_row(s, v, 75., cx));
                         text.push(self.view_row_label(s, v).0);

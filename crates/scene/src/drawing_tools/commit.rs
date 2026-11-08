@@ -676,7 +676,13 @@ pub fn keep_boundary(sheet: &mut Sheet, pl: &ViewPlacement, b: Boundary) {
             }
         }
         Boundary::Spline(pts) if pts.len() >= 3 => {
-            let q: Vec<DVec2> = pts.iter().map(|p| at(*p)).collect();
+            // A closed spline's points end on the first (a profile stores each point once): live2
+            // drw-broken-out-remove keeps a spline and its 4 points.
+            let mut q: Vec<DVec2> = pts.iter().map(|p| at(*p)).collect();
+            q.dedup_by(|a, b| a.distance(*b) < 1e-9);
+            if q.len() > 1 && q[0].distance(q[q.len() - 1]) > 1e-9 {
+                q.push(q[0]);
+            }
             if sk.add_closed_fit_spline(&q).is_err() {
                 for (i, a) in q.iter().enumerate() {
                     sk.add_line(*a, q[(i + 1) % q.len()]);

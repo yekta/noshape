@@ -150,9 +150,10 @@ impl DrawingEditor {
             let parts: Vec<&str> = b.geometry.texts.iter().filter(|t| matches!(b.picks.get(t.pick as usize), Some(PickTarget::Annotation(x)) if *x == id)).map(|t| t.text.as_str()).collect();
             parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")
         };
-        // The ordinate group being placed is listed once the tool ends (live drw-ordinate-dimension).
+        // The ordinate group being placed is listed once the tool ends (live drw-ordinate-dimension); one being added
+        // to stays listed (live2 drw-ordinate-add-to-group).
         let placing = match self.tool {
-            Tool::Ordinate { group, .. } => group,
+            Tool::Ordinate { group, .. } if group != self.ordinate_extending => group,
             _ => None,
         };
         sheet
@@ -161,6 +162,9 @@ impl DrawingEditor {
             .filter(|a| Some(a.id) != placing)
             // Not in live's drawing export, which its recorder reads (live2 2181): weld and edge condition symbols.
             .filter(|a| !matches!(a.kind, AnnotationKind::Weld { .. } | AnnotationKind::EdgeCondition { .. }))
+            // An exploded note is polylines in the export (help: "explode the note into polylines upon export"; live2
+            // drw-note-explode lists none).
+            .filter(|a| !matches!(&a.kind, AnnotationKind::Note { style, .. } if style.explode))
             .map(|a| {
                 let kind = format!("{:?}", a.kind);
                 let variant = kind.split([' ', '(', '{']).next().unwrap_or("");
@@ -242,6 +246,7 @@ impl DrawingEditor {
         }
         // An inspection item is an annotation of its own in live, read as its number (live2 2226), hidden or not.
         annotations.extend(sheet.annotations.iter().filter_map(|a| a.inspection).map(|n| ("inspectionsymbol", n.to_string())));
+        annotations.extend(sheet_sketch_items(&sheet.sketch).into_iter().map(|k| (k, String::new())));
         annotations.sort();
         // What is drawn in selection colours (README "### Drawings"; live 2068): selected views; the Projected
         // tool's parent drawn picked after Insert view placed it.
@@ -299,10 +304,10 @@ impl DrawingEditor {
             "sheet": sheet.name,
             "sheets": sheets,
             // (The Insert view panel before a part is chosen is the Insert view tool's, as live's toolbar shows it.)
-            "tool": ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name()),
+            "tool": self.ui_tool(),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
-            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp")).then_some(t) })).collect::<Vec<_>>(),
+            "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "line" | "circle" | "arc" | "spline" | "splinepoint" | "sketchpoint" | "hatch")).then_some(t) })).collect::<Vec<_>>(),
             "selection": selection,
         })
     }
@@ -356,6 +361,15 @@ impl DrawingEditor {
 impl DrawingEditor {
     /// The tool a dialog stands for while the tool itself is Select, as live's toolbar shows it active (the Insert
     /// view panel before a part is chosen, a placed weld symbol's dialog, Hatch region, Format painter…).
+    /// The toolbar's active tool as live shows it: none while a menu's edit of an existing item runs (a break line's
+    /// Edit..., a note's Add leader: live2 drw-break-edit, drw-note-add-leader).
+    fn ui_tool(&self) -> Option<&'static str> {
+        if matches!(self.tool, Tool::GdtLeader { .. }) || self.break_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
+            return None;
+        }
+        ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name())
+    }
+
     fn dialog_tool_name(&self) -> Option<&'static str> {
         if !matches!(self.tool, Tool::Select) {
             return None;
@@ -425,6 +439,34 @@ fn ui_tool_name(t: &Tool) -> Option<&'static str> {
 
 /// A dimension as live's recorder reads it: its value without the Ø / R prefix, with its leading zero ("Ø.394" →
 /// "0.394").
+/// The sheet's sketch geometry as live's recorder lists it with the annotations (live2 drw-sketch-spline,
+/// drw-sketch-point, drw-hatch-edit): each line, circle, arc and spline, a spline's through points, a point no curve
+/// uses, each hatch region.
+fn sheet_sketch_items(sk: &noshape_model::drawing::sheet_sketch::SheetSketch) -> Vec<&'static str> {
+    use noshape_sketch::entities::Geometry;
+    let used: std::collections::HashSet<_> = sk.sketch.entities().flat_map(|e| e.point_refs()).collect();
+    let mut out = Vec::new();
+    for e in sk.sketch.entities().filter(|e| !e.external) {
+        match &e.geometry {
+            Geometry::Point { .. } if !used.contains(&e.id) => out.push("sketchpoint"),
+            Geometry::Point { .. } => {}
+            Geometry::Line { .. } => out.push("line"),
+            Geometry::Circle { .. } => out.push("circle"),
+            Geometry::Arc { .. } => out.push("arc"),
+            Geometry::FitSpline { points, .. } => {
+                out.push("spline");
+                // (A closed one lists its first point again at the end.)
+                let n = if points.len() > 1 && points.first() == points.last() { points.len() - 1 } else { points.len() };
+                out.extend(std::iter::repeat_n("splinepoint", n));
+            }
+            Geometry::BSpline { .. } | Geometry::Conic { .. } => out.push("spline"),
+            Geometry::Ellipse { .. } | Geometry::EllipticalArc { .. } => out.push("ellipse"),
+        }
+    }
+    out.extend(sk.hatches.iter().map(|_| "hatch"));
+    out
+}
+
 fn dimension_value(shown: &str) -> String {
     let v = shown.trim_start_matches(['Ø', '⌀', 'R', 'S']);
     if v.starts_with('.') { format!("0{v}") } else { v.to_string() }

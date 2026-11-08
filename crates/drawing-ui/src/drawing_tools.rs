@@ -228,9 +228,13 @@ impl DrawingEditor {
         if self.detail_escape(cx) {
             return;
         }
+        // Esc ends a spline being drawn (keeping it) and stays in the Spline tool; the next Esc ends the tool (live2
+        // drw-sketch-spline).
+        if self.finish_sketch(cx) {
+            self.redraw(cx);
+            return;
+        }
         if !matches!(self.tool, Tool::Select) {
-            // Esc ends a spline (keeping it) and exits the sketch tool.
-            self.finish_sketch(cx);
             self.tool = Tool::Select;
             self.overlay = Overlay::default();
             self.note_leader = None;

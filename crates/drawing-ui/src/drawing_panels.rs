@@ -135,6 +135,9 @@ impl DrawingEditor {
     /// Tolerance, Upper limit, Lower limit, Nominal & Tolerance (the item bold, "--" when unnumbered, the
     /// other cells read-only grey), scrolling sideways.
     fn render_inspection_table(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        // Live's empty sections (live2 drw-inspection-table-export-csv).
+        const DATUMS_EMPTY: (&str, &str) = ("Add datums or datum targets to build an inspection table", "An inspection table reveals all the datums and datum targets within the drawing. Add datums or datum targets to see the table by the datums name.");
+        const CHARS_EMPTY: (&str, &str) = ("Add drawing annotations and dimensions to build an inspection table", "An inspection table reveals all the dimensions and annotations within the drawing. Add inspection items to see the table by the inspection item number.");
         let pal = p();
         let only = self.insp_table.current_sheet_only;
         let sheet = self.sheet + 1;
@@ -218,7 +221,7 @@ impl DrawingEditor {
                             .when(empty, |d| {
                                 d.on_mouse_down(
                                     MouseButton::Right,
-                                    cx.listener(move |_, e: &MouseDownEvent, window, cx| {
+                                    cx.listener(move |this, e: &MouseDownEvent, window, cx| {
                                         cx.stop_propagation();
                                         let entries = vec![MenuEntry::item("Assign number", move |t, _, cx| {
                                             let n = t.drawing.next_inspection_number();
@@ -226,6 +229,8 @@ impl DrawingEditor {
                                         })];
                                         let ed = cx.entity();
                                         let menu = crate::os_menu::OsMenu::build(window, cx, move |m, window, cx| fill_os_menu(m, &entries, &ed, window, cx));
+                                        // The drawing's own menu (live's is in its iframe).
+                                        this.frame_menu = Some(menu.downgrade());
                                         crate::os_menu::open(e.position, menu, window, cx);
                                     }),
                                 )
@@ -234,6 +239,8 @@ impl DrawingEditor {
                     }
                 };
                 let both = if r.tolerance.is_empty() { r.nominal.clone() } else { format!("{} {}", r.nominal, r.tolerance) };
+                // Live (live2 drw-inspection-table-assign-number): an empty value shows "--".
+                let dash = |v: &str| if v.is_empty() { "--".to_string() } else { v.to_string() };
                 list = list.child(
                     h_flex()
                         .id((if key == "it-d" { "it-drow" } else { "it-crow" }, i))
@@ -253,9 +260,9 @@ impl DrawingEditor {
                         .child(cell(r.kind.clone().into(), COLS[2].1, true))
                         .child(cell(r.unit.clone().into(), COLS[3].1, true))
                         .child(cell(r.nominal.clone().into(), COLS[4].1, true))
-                        .child(cell(r.tolerance.clone().into(), COLS[5].1, true))
-                        .child(cell(r.upper.clone().into(), COLS[6].1, true))
-                        .child(cell(r.lower.clone().into(), COLS[7].1, true))
+                        .child(cell(dash(&r.tolerance).into(), COLS[5].1, true))
+                        .child(cell(dash(&r.upper).into(), COLS[6].1, true))
+                        .child(cell(dash(&r.lower).into(), COLS[7].1, true))
                         .child(cell(both.into(), COLS[8].1, true)),
                 );
             }
@@ -273,11 +280,52 @@ impl DrawingEditor {
             .text_size(px(14.))
             .line_height(px(20.))
             .text_color(gpui_kit::rgb(0x31708f))
-            .child(div().font_weight(FontWeight::BOLD).child("Add datums or datum targets to build an inspection table"))
-            .child(div().child("An inspection table reveals all the datums and datum targets within the drawing. Add datums or datum targets to see the table by the datums name."));
+            .child(div().font_weight(FontWeight::BOLD).child(DATUMS_EMPTY.0))
+            .child(div().child(DATUMS_EMPTY.1));
+        let chars_info = v_flex()
+            .m(px(5.))
+            .p(px(15.))
+            .gap(px(4.))
+            .rounded(px(4.))
+            .bg(gpui_kit::rgb(0xd9edf7))
+            .border_1()
+            .border_color(gpui_kit::rgb(0xbce8f1))
+            .text_size(px(14.))
+            .line_height(px(20.))
+            .text_color(gpui_kit::rgb(0x31708f))
+            .child(div().font_weight(FontWeight::BOLD).child(CHARS_EMPTY.0))
+            .child(div().child(CHARS_EMPTY.1));
         let (dc, cc) = (self.insp_table.datums_closed, self.insp_table.chars_closed);
+        // The panel's texts in reading order for the ui-parity runner (live2 drw-inspection-table-*).
+        crate::ui_script::note_dialog(|| {
+            let mut text: Vec<String> = ["Inspection table", "View:", "All sheets", "Current sheet", "Datums"].map(String::from).to_vec();
+            let rows = |text: &mut Vec<String>, rows: &[noshape_model::drawing::inspection::InspectionRow]| {
+                text.extend(COLS.iter().map(|c| c.0.to_string()));
+                for r in rows {
+                    let both = if r.tolerance.is_empty() { r.nominal.clone() } else { format!("{} {}", r.nominal, r.tolerance) };
+                    let dash = |v: &str| if v.is_empty() { "--".to_string() } else { v.to_string() };
+                    text.extend([dash(&r.number), sheet_name(r.sheet), r.kind.clone(), r.unit.clone(), r.nominal.clone(), dash(&r.tolerance), dash(&r.upper), dash(&r.lower), both]);
+                }
+            };
+            if !dc {
+                if datums.is_empty() {
+                    text.extend([DATUMS_EMPTY.0, DATUMS_EMPTY.1].map(String::from));
+                } else {
+                    rows(&mut text, &datums);
+                }
+            }
+            text.push("Characteristics".into());
+            if !cc {
+                if chars.is_empty() {
+                    text.extend([CHARS_EMPTY.0, CHARS_EMPTY.1].map(String::from));
+                } else {
+                    rows(&mut text, &chars);
+                }
+            }
+            serde_json::json!({ "kind": "drawing-panel", "title": "Inspection table", "text": text })
+        });
         let datums_body = if datums.is_empty() { info.into_any_element() } else { table(&datums, "it-d", cx) };
-        let chars_body = table(&chars, "it-c", cx);
+        let chars_body = if chars.is_empty() { chars_info.into_any_element() } else { table(&chars, "it-c", cx) };
         v_flex()
             .size_full()
             .child(h_flex().h(px(36.)).mt(px(5.)).px(px(7.)).gap(px(5.)).child(div().text_size(px(12.)).text_color(gpui_kit::rgb(0x666666)).child("View:")).child(view).child(div().flex_1()).child(div().map(|d| crate::ui_script::mark(d, || "panel_more:Inspection table".into())).child(more)))

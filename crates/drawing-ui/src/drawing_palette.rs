@@ -374,6 +374,10 @@ impl DrawingEditor {
             Some(u) if u.symbol().is_empty() => "(ft-in)".to_string(),
             Some(u) => format!("({})", u.symbol()),
         };
+        // Live's recorder reads the dimension palette's one text, its unit (live2 drw-dimension-edit: "(in)").
+        if !hole {
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": unit_label, "text": [unit_label] }));
+        }
         // A focused box: live's 1 px rgba(82,168,236,.8) border with an 8 px
         // rgba(82,168,236,.6) glow (dom/drawing-dimension-edit-dialog.txt).
         let focus_id = [&d.above, &d.prefix, &d.value, &d.suffix, &d.below, &d.tol_a, &d.tol_b].into_iter().find(|st| st.read(cx).focus_handle(cx).is_focused(window)).map(|st| st.entity_id());

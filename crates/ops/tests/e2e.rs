@@ -2884,7 +2884,8 @@ fn drawing_broken_out_sections_and_profile_crops() {
     call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": a["id"], "action": "remove_broken_out", "index": 0 }));
     assert!(last(&mut ctx).ends_with(":: Remove section"));
     assert!(views_of(&mut ctx).into_iter().find(|v| v["id"] == a["id"]).unwrap()["broken_out"].as_array().is_none_or(|x| x.is_empty()));
-    assert!(sketch_n(&mut ctx) > n1, "the spline stays");
+    // A closed spline through the profile's 3 points (live2 drw-broken-out-remove), not lines.
+    assert_eq!(sketch_n(&mut ctx) - n1, 4, "the spline and its 3 points stay");
     let e = try_call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": b["id"], "action": "remove_crop" })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("view"), "{e:?}");
 }
