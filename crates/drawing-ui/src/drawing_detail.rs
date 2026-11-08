@@ -35,8 +35,9 @@ pub struct DetailDlg {
     /// Esc pressed before the profile: the next click picks an existing
     /// closed sketch region as the profile.
     pub pick_region: bool,
-    /// The profile was an existing closed curve ("Profile selected", live 1404).
-    pub selected: bool,
+    /// The profile was an existing closed curve ("Profile selected", live 1404): its sketch curves, which the placed
+    /// view takes off the sheet (live2 drw-detail-existing-profile).
+    pub picked: Vec<noshape_sketch::EntityId>,
     /// Edit detail... (live asb 10-23 views (1)): the detail view being
     /// edited; ✓ applies the dialog to it, ✕ discards.
     pub edit: Option<ViewId>,
@@ -54,7 +55,7 @@ impl DrawingEditor {
             (false, true) => {
                 let next = self.current_sheet().next_label();
                 let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(next));
-                self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false, selected: false, edit: None });
+                self.detail_dlg = Some(DetailDlg { shape: 0, pts: Vec::new(), view: None, profile: None, scale: None, label, style: self.drawing.props.view_tab.detail_style, show_profile: self.drawing.props.view_tab.detail_show_profile, clip_border: self.drawing.props.view_tab.detail_clip_border, pick_region: false, picked: Vec::new(), edit: None });
             }
             (true, false) if self.detail_dlg.as_ref().is_some_and(|d| d.edit.is_none()) => self.detail_dlg = None,
             _ => {}
@@ -80,7 +81,12 @@ impl DrawingEditor {
     /// The closed sheet sketch loop whose curve is under the pointer (live 1404: hovering the curve turns the whole
     /// closed curve tan; a click inside it does nothing): its outline (sheet mm).
     pub fn closed_loop_at(&self) -> Option<Vec<[f64; 2]>> {
-        noshape_scene::drawing_tools::closed_loop_through(&self.sketch().sketch, self.cursor, self.tol_mm(5.0))
+        self.closed_loop_curves_at().map(|(outline, _)| outline)
+    }
+
+    /// [`Self::closed_loop_at`] with the sketch curves bounding it.
+    pub fn closed_loop_curves_at(&self) -> Option<(Vec<[f64; 2]>, Vec<noshape_sketch::EntityId>)> {
+        noshape_scene::drawing_tools::closed_loop_curves_through(&self.sketch().sketch, self.cursor, self.tol_mm(5.0))
     }
 
     /// The view a picked closed loop lies on (its middle in the view, else the nearest within 20 mm).
@@ -94,7 +100,7 @@ impl DrawingEditor {
     /// Region-pick click: the closed sketch curve under the pointer becomes the profile of the view it lies on
     /// ("Profile selected").
     fn detail_region_click(&mut self, cx: &mut Context<Self>) {
-        let Some(outer) = self.closed_loop_at() else { return };
+        let Some((outer, curves)) = self.closed_loop_curves_at() else { return };
         let Some((view, pl)) = self.view_of_loop(&outer).and_then(|v| Some((v, self.placement(v)?))) else {
             self.status = Some("The profile is not on a view".into());
             cx.notify();
@@ -105,7 +111,7 @@ impl DrawingEditor {
             d.shape = 3;
             d.pts = outer.iter().map(|q| pl.to_view(*q)).collect();
             d.pick_region = false;
-            d.selected = true;
+            d.picked = curves;
         }
         self.status = None;
         self.finish_detail_profile(cx);
@@ -170,7 +176,7 @@ impl DrawingEditor {
         let profile = v.detail_profile.clone().filter(|p| p.len() >= 3);
         self.cancel(cx);
         self.tool = Tool::Select;
-        self.detail_dlg = Some(DetailDlg { shape: if profile.is_some() { 3 } else { 0 }, pts: Vec::new(), view: Some(*parent), profile, scale: v.scale, label, style: v.detail_style, show_profile: !v.detail_hide_profile, clip_border: v.detail_clip_border, pick_region: false, selected: false, edit: Some(id) });
+        self.detail_dlg = Some(DetailDlg { shape: if profile.is_some() { 3 } else { 0 }, pts: Vec::new(), view: Some(*parent), profile, scale: v.scale, label, style: v.detail_style, show_profile: !v.detail_hide_profile, clip_border: v.detail_clip_border, pick_region: false, picked: Vec::new(), edit: Some(id) });
         self.selection = vec![Sel::View(id)];
         self.update_preview(cx);
         cx.notify();
@@ -398,7 +404,7 @@ impl DrawingEditor {
                     d.view = None;
                     // A shape pressed again leaves picking an existing profile.
                     d.pick_region = false;
-                    d.selected = false;
+                    d.picked.clear();
                 }
                 this.tool = Tool::Detail { parent: None, center: None, radius: None };
                 this.update_preview(cx);
@@ -419,7 +425,7 @@ impl DrawingEditor {
             })))
         };
         // The profile field's text (live 127, 600–604: per shape until the profile exists; editing: its chip).
-        let picked = self.detail_dlg.as_ref().is_some_and(|d| d.selected);
+        let picked = self.detail_dlg.as_ref().is_some_and(|d| !d.picked.is_empty());
         let field_text = if editing && !matches!(self.tool, Tool::Detail { .. }) {
             "Profile"
         } else if placed && picked {

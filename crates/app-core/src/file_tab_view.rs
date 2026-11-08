@@ -557,19 +557,42 @@ struct PickState {
 /// tab) and inserts it. "Other documents" lists the library's documents;
 /// open one to pick from its files (live: Insert image / Select a DWT
 /// have Current document | Other documents, drawing.md EX17, S13).
-/// The open file picker's search box (the parity runner's focus: a field while it has the keyboard).
-struct PickerSearch(Option<WeakEntity<InputState>>);
+/// The open file picker's search box (the parity runner's focus: a field while it has the keyboard) and its title.
+struct PickerSearch(Option<(WeakEntity<InputState>, &'static str)>);
 impl Global for PickerSearch {}
 
 /// Whether the file picker's search box has the keyboard.
 pub fn picker_search_focused(window: &Window, cx: &App) -> bool {
-    cx.try_global::<PickerSearch>().and_then(|p| p.0.as_ref()).and_then(|w| w.upgrade()).is_some_and(|s| s.read(cx).focus_handle(cx).is_focused(window))
+    cx.try_global::<PickerSearch>().and_then(|p| p.0.as_ref()).and_then(|(w, _)| w.upgrade()).is_some_and(|s| s.read(cx).focus_handle(cx).is_focused(window))
+}
+
+/// The title of the file picker while it is open.
+pub fn open_picker(cx: &App) -> Option<&'static str> {
+    cx.try_global::<PickerSearch>().and_then(|p| p.0.as_ref()).filter(|(w, _)| w.upgrade().is_some()).map(|(_, title)| *title)
+}
+
+/// A drawing's file picker: the same dialog, which live's recorder reads as one of the page's panels, not a dialog
+/// (live2 drw-insert-image).
+pub fn pick_file_flyout(doc: Entity<DocModel>, title: &'static str, kinds: &'static [FileKind], exts: &'static [&'static str], window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
+    pick(doc, PickSpec { title, kinds, exts, flyout: true }, window, cx, on_pick)
 }
 
 pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [FileKind], exts: &'static [&'static str], window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
+    pick(doc, PickSpec { title, kinds, exts, flyout: false }, window, cx, on_pick)
+}
+
+struct PickSpec {
+    title: &'static str,
+    kinds: &'static [FileKind],
+    exts: &'static [&'static str],
+    flyout: bool,
+}
+
+fn pick(doc: Entity<DocModel>, spec: PickSpec, window: &mut Window, cx: &mut App, on_pick: impl Fn(FileTab, &mut Window, &mut App) + 'static) {
+    let PickSpec { title, kinds, exts, flyout } = spec;
     let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search files"));
     // Live (live2 drw-insert-image): the search box has the keyboard as the picker opens.
-    cx.set_global(PickerSearch(Some(search.downgrade())));
+    cx.set_global(PickerSearch(Some((search.downgrade(), title))));
     let focus = search.clone();
     window.defer(cx, move |window, cx| focus.update(cx, |s, cx| s.focus(window, cx)));
     let state = cx.new(|_| PickState::default());
@@ -743,7 +766,9 @@ pub fn pick_file(doc: Entity<DocModel>, title: &'static str, kinds: &'static [Fi
         texts.extend(names);
         texts.push("Import…".into());
         // The panel's texts for the ui-parity runner (README "### Drawings": live's is a flyout of the drawing).
-        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": title, "text": texts }));
+        if !flyout {
+            crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": title, "text": texts }));
+        }
         let document_row = h_flex().h(px(40.)).flex_none().px(px(6.)).child(
             v_flex()
                 .flex_1()

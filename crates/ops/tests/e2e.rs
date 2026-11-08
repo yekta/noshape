@@ -2932,18 +2932,24 @@ fn drawing_broken_out_sections_and_profile_crops() {
     assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "polygon");
     // An existing closed sketch curve (no shape pressed / Esc, live 1404): picked on its curve, not inside it.
     let (bx, by) = ((num(&b["bounds"]["min"][0]) + num(&b["bounds"]["max"][0])) / 2.0, (num(&b["bounds"]["min"][1]) + num(&b["bounds"]["max"][1])) / 2.0);
+    // The picked curve leaves the sheet with the view made from it (live2 drw-crop-existing-profile,
+    // drw-detail-existing-profile).
+    let sketch_n = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["sketch_entities"].as_u64().unwrap_or(0);
+    let n_before = sketch_n(&mut ctx);
     call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "circle", "picks": [[bx, by], [bx + 4.0, by]] }));
     let e = try_call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "existing", "at": [bx, by] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("at"), "{e:?}");
     call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "existing", "at": [bx + 4.0, by] }));
     assert_eq!(views_of(&mut ctx).into_iter().find(|v| v["id"] == b["id"]).unwrap()["crop"], "polygon");
+    assert_eq!(sketch_n(&mut ctx), n_before, "the crop's circle is off the sheet");
+    call(&mut ctx, "drawing_sketch", json!({ "drawing": tab, "tool": "circle", "picks": [[bx, by], [bx + 4.0, by]] }));
     let r = call(&mut ctx, "drawing_detail_view", json!({ "drawing": tab, "parent": b["id"], "profile": "existing", "at": [bx, by - 4.0], "position": [380, 250] }));
     assert!(r["view"].is_u64() || r["views"].is_array(), "{r}");
+    assert_eq!(sketch_n(&mut ctx), n_before, "the detail's circle is off the sheet");
     let e = try_call(&mut ctx, "drawing_crop_view", json!({ "drawing": tab, "view": b["id"], "shape": "polygon", "points": [[1, 1], [2, 2]] })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("points"), "{e:?}");
     // Remove crop / Remove section keep their boundary as a sketch entity
     // (live asb 10-23 views (3)).
-    let sketch_n = |ctx: &mut Ctx| call(ctx, "drawing_get", json!({ "drawing": tab, "edges": false }))["sketch_entities"].as_u64().unwrap_or(0);
     let n0 = sketch_n(&mut ctx);
     call(&mut ctx, "drawing_view_edit", json!({ "drawing": tab, "view": b["id"], "action": "remove_crop" }));
     assert!(last(&mut ctx).ends_with(":: Remove crop"));

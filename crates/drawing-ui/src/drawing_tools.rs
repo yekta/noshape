@@ -923,7 +923,14 @@ impl DrawingEditor {
                         *label = l;
                     }
                     let name = if matches!(self.tool, Tool::Section { .. }) { "Section view" } else { "Detail view" };
-                    self.edit_sheet(name, cx, |s| s.views.push(v));
+                    let picked = if matches!(self.tool, Tool::Detail { .. }) { self.detail_dlg.as_ref().map(|d| d.picked.clone()).unwrap_or_default() } else { Vec::new() };
+                    self.edit_sheet(name, cx, |s| {
+                        s.views.push(v);
+                        if !picked.is_empty() {
+                            s.sketch.sketch.remove_entities(&picked);
+                            let _ = s.sketch.sketch.solve();
+                        }
+                    });
                     self.tool = Tool::Select;
                     // A newly placed view is not selected (live 2068).
                     self.selection.clear();

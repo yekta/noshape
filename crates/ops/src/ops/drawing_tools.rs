@@ -995,10 +995,12 @@ fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let parent = view_arg(&t, a, "parent")?;
     let shape = enum_arg(a, "profile", &[("circle", 0u8), ("rectangle", 1), ("spline", 2), ("polygon", 3), ("existing", 4)], 0)?;
     let tool0 = Tool::Detail { parent: None, center: None, radius: None };
+    let mut picked = Vec::new();
     let (center, r, profile) = if shape == 4 {
         // Esc, then an existing closed sketch curve picked at `at` ("Profile selected").
         let at = pt_arg(a, "at")?;
-        let outline = existing_profile(&t, at)?;
+        let outline;
+        (outline, picked) = existing_profile(&t, at)?;
         let pl = t.m.pick(&tool0, &[], at).placement(parent).ok_or_else(|| OpError::param("parent", "the view isn't drawn"))?;
         let local: Vec<[f64; 2]> = outline.iter().map(|p| pl.to_view(*p)).collect();
         let (poly, center, r) = dt::detail_profile(3, &local).ok_or_else(|| OpError::param("at", "the closed curve is too small"))?;
@@ -1035,7 +1037,9 @@ fn detail_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let v = t.m.pick(&tool, &[], position).pending_view(&opts).ok_or_else(|| OpError::param("position", "the detail view can't be placed there"))?;
     let id = v.id;
     let mut t = t;
-    t.d.sheets[t.sheet].views.push(v);
+    let sheet = &mut t.d.sheets[t.sheet];
+    sheet.views.push(v);
+    take_off_sheet(sheet, &picked);
     done(od, t, "Detail view", "view", id.0)
 }
 
@@ -1091,10 +1095,12 @@ fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let view = view_arg(&t, a, "view")?;
     refused(&t, "crop", view, "view")?;
     let shape = enum_arg(a, "shape", &[("rectangle", 0), ("circle", 1), ("polygon", 2), ("spline", 3), ("existing", 4)], 0)?;
+    let mut picked = Vec::new();
     let crop = if shape == 4 {
         // No shape pressed: an existing closed sketch curve, picked at `at`.
         let at = pt_arg(a, "at")?;
-        let outline = existing_profile(&t, at)?;
+        let outline;
+        (outline, picked) = existing_profile(&t, at)?;
         let pl = t.m.pick(&Tool::Select, &[], at).placement(view).ok_or_else(|| OpError::param("view", "the view isn't drawn"))?;
         Crop::Polygon(outline.iter().map(|q| pl.to_view(*q)).collect())
     } else if shape >= 2 {
@@ -1110,13 +1116,24 @@ fn crop_view(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         dt::view_crop(&pl, circle, f, pt_arg(a, "to")?).ok_or_else(|| OpError::param("to", "the crop shape is empty"))?
     };
     edit_view(&mut t, view, |v| v.crop = Some(crop));
+    take_off_sheet(&mut t.d.sheets[t.sheet], &picked);
     done(od, t, "Crop view", "view", view.0)
 }
 
-/// The closed sheet sketch curve through `at` (sheet mm, within 1 mm): its outline (live 1404: the Detail / Crop view
-/// dialogs pick an existing closed profile by its curve).
-fn existing_profile(t: &Target, at: [f64; 2]) -> Result<Vec<[f64; 2]>, OpError> {
-    dt::closed_loop_through(&t.d.sheets[t.sheet].sketch.sketch, at, 1.0).ok_or_else(|| OpError::param("at", "not on a closed sketch curve of the sheet"))
+/// The closed sheet sketch curve through `at` (sheet mm, within 1 mm): its outline and its curves (live 1404: the
+/// Detail / Crop view dialogs pick an existing closed profile by its curve).
+fn existing_profile(t: &Target, at: [f64; 2]) -> Result<(Vec<[f64; 2]>, Vec<noshape_sketch::EntityId>), OpError> {
+    dt::closed_loop_curves_through(&t.d.sheets[t.sheet].sketch.sketch, at, 1.0).ok_or_else(|| OpError::param("at", "not on a closed sketch curve of the sheet"))
+}
+
+/// A picked profile's curves leave the sheet with the view made from them (live2 drw-crop-existing-profile,
+/// drw-detail-existing-profile).
+fn take_off_sheet(sheet: &mut noshape_model::drawing::Sheet, curves: &[noshape_sketch::EntityId]) {
+    if curves.is_empty() {
+        return;
+    }
+    sheet.sketch.sketch.remove_entities(curves);
+    let _ = sheet.sketch.sketch.solve();
 }
 
 /// Profile clicks `points` (sheet mm) as the profile tools take them: the

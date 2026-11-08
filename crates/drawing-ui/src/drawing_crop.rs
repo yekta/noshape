@@ -23,6 +23,11 @@ pub struct CropDlg {
     pub edit: Option<ViewId>,
     /// Spline ▾ › Add spline point: the next click on the profile inserts one.
     pub add_point: bool,
+    /// A picked existing profile and its sketch curves: ✓ with that profile takes them off the sheet (live2
+    /// drw-crop-existing-profile).
+    pub picked: Option<(Crop, Vec<noshape_sketch::EntityId>)>,
+    /// The Spline ▾ menu (its rows are the panel's text while it is open: live2 drw-crop-add-spline-point).
+    pub menu: Option<WeakEntity<crate::os_menu::OsMenu>>,
 }
 
 const SHAPES: [(&str, &str); 3] = [("Circle", "circle"), ("Spline", "spline"), ("Polygon", "polyline")];
@@ -63,7 +68,7 @@ impl DrawingEditor {
                     Tool::CropPoly { spline: false, .. } => 2,
                     _ => 1,
                 };
-                self.crop_dlg = Some(CropDlg { shape, pending: None, edit: None, add_point: false });
+                self.crop_dlg = Some(CropDlg { shape, pending: None, edit: None, add_point: false, picked: None, menu: None });
             }
             (true, false) => self.crop_dlg = None,
             _ => {}
@@ -81,7 +86,7 @@ impl DrawingEditor {
         let Some(crop) = self.current_sheet().view(id).and_then(|v| v.crop.clone()) else { return };
         let shape = shape_of(&crop);
         self.set_tool(shape_tool(shape, None), cx);
-        self.crop_dlg = Some(CropDlg { shape, pending: Some((id, crop)), edit: Some(id), add_point: false });
+        self.crop_dlg = Some(CropDlg { shape, pending: Some((id, crop)), edit: Some(id), add_point: false, picked: None, menu: None });
         self.update_preview(cx);
     }
 
@@ -105,9 +110,19 @@ impl DrawingEditor {
     fn accept_crop(&mut self, cx: &mut Context<Self>) {
         let Some((view, crop)) = self.crop_dlg.as_mut().and_then(|d| d.pending.take()) else { return };
         let edit = self.crop_dlg.as_ref().is_some_and(|d| d.edit.is_some());
-        self.crop_dlg = None;
+        let picked = self.crop_dlg.take().and_then(|d| d.picked).filter(|(p, _)| *p == crop).map(|(_, curves)| curves);
         self.tool = Tool::Select;
-        self.edit_view(if edit { "Edit crop" } else { "Crop view" }, view, cx, |v| v.crop = Some(crop));
+        let description = if edit { "Edit crop" } else { "Crop view" };
+        match picked {
+            Some(curves) => self.edit_sheet(description, cx, |s| {
+                if let Some(v) = s.view_mut(view) {
+                    v.crop = Some(crop);
+                }
+                s.sketch.sketch.remove_entities(&curves);
+                let _ = s.sketch.sketch.solve();
+            }),
+            None => self.edit_view(description, view, cx, |v| v.crop = Some(crop)),
+        }
         self.update_preview(cx);
     }
 
@@ -149,11 +164,12 @@ impl DrawingEditor {
     /// No shape pressed (live2 drw-crop-add-spline-point): the closed sketch curve clicked becomes the pending
     /// profile; a click elsewhere does nothing (live 1404, as the Detail view's).
     pub fn crop_pick_profile(&mut self, cx: &mut Context<Self>) {
-        let Some(outline) = self.closed_loop_at() else { return };
+        let Some((outline, curves)) = self.closed_loop_curves_at() else { return };
         let Some((view, pl)) = self.view_of_loop(&outline).and_then(|v| Some((v, self.placement(v)?))) else { return };
-        let pts: Vec<[f64; 2]> = outline.iter().map(|q| pl.to_view(*q)).collect();
+        let crop = Crop::Polygon(outline.iter().map(|q| pl.to_view(*q)).collect());
         if let Some(d) = &mut self.crop_dlg {
-            d.pending = Some((view, Crop::Polygon(pts)));
+            d.picked = Some((crop.clone(), curves));
+            d.pending = Some((view, crop));
         }
         self.update_preview(cx);
         cx.notify();
@@ -273,7 +289,12 @@ impl DrawingEditor {
                             });
                             // The drawing's own menu (live's is in its iframe).
                             let weak = menu.downgrade();
-                            frame.update(cx, |t, _| t.frame_menu = Some(weak));
+                            frame.update(cx, |t, _| {
+                                if let Some(d) = &mut t.crop_dlg {
+                                    d.menu = Some(weak.clone());
+                                }
+                                t.frame_menu = Some(weak);
+                            });
                             crate::os_menu::open(e.position(), menu, window, cx);
                         }),
                 );
@@ -297,12 +318,15 @@ impl DrawingEditor {
         } else {
             field.h(px(26.)).flex().items_center().child(if shape == NO_SHAPE { "Select closed profile" } else { "Create closed profile" })
         };
+        let menu_open = self.crop_dlg.as_ref().and_then(|d| d.menu.as_ref()).is_some_and(|m| crate::os_menu::is_open_menu(m, cx));
         crate::ui_script::note_dialog(|| {
             let text: &[&str] = match (pending, shape == NO_SHAPE) {
                 (true, _) => &["Crop view", "Edit closed profile", "Profile", "×"],
                 (false, true) => &["Crop view", "Select closed profile"],
                 (false, false) => &["Crop view", "Create closed profile"],
             };
+            let menu: &[&str] = if menu_open { &["Spline", "Spline point"] } else { &[] };
+            let text = [text, menu].concat();
             serde_json::json!({ "kind": "drawing-panel", "title": "Crop view", "text": text })
         });
         Some(

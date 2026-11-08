@@ -1293,15 +1293,21 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
 /// The closed loop of sheet sketch `sk` whose curve passes within `tol` of `p` (sheet mm): its outline, the smallest
 /// such loop (Crop / Detail view picking an existing closed profile: live 1404, the curve is picked, not its inside).
 pub fn closed_loop_through(sk: &noshape_sketch::Sketch, p: [f64; 2], tol: f64) -> Option<Vec<[f64; 2]>> {
+    closed_loop_curves_through(sk, p, tol).map(|(outline, _)| outline)
+}
+
+/// [`closed_loop_through`] with the sketch curves bounding the loop (a view made from it takes them off the sheet:
+/// live2 drw-crop-existing-profile, drw-detail-existing-profile).
+pub fn closed_loop_curves_through(sk: &noshape_sketch::Sketch, p: [f64; 2], tol: f64) -> Option<(Vec<[f64; 2]>, Vec<noshape_sketch::EntityId>)> {
     let near = |pts: &[noshape_sketch::DVec2]| pts.windows(2).any(|w| super::jog::seg_dist(p, [w[0].x, w[0].y], [w[1].x, w[1].y]) <= tol);
     let regions = sk.regions();
     regions
         .iter()
         .flat_map(|r| std::iter::once(&r.outer).chain(r.holes.iter()))
-        .map(|l| (l.signed_area().abs(), l.tessellate(0.05)))
-        .filter(|(_, pts)| near(pts))
+        .map(|l| (l.signed_area().abs(), l.tessellate(0.05), l))
+        .filter(|(_, pts, _)| near(pts))
         .min_by(|a, b| a.0.total_cmp(&b.0))
-        .map(|(_, pts)| pts.into_iter().map(|q| [q.x, q.y]).collect())
+        .map(|(_, pts, l)| (pts.into_iter().map(|q| [q.x, q.y]).collect(), l.sources.iter().map(|s| s.entity).collect()))
 }
 
 #[cfg(test)]

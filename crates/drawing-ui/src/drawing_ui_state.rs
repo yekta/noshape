@@ -316,7 +316,12 @@ impl DrawingEditor {
             "sheet": sheet.name,
             "sheets": sheets,
             // (The Insert view panel before a part is chosen is the Insert view tool's, as live's toolbar shows it.)
-            "tool": self.ui_tool(),
+            "tool": self.ui_tool().or_else(|| match noshape_app_core::file_tab_view::open_picker(cx) {
+                // (Live keeps the tool while its file picker is open: live2 drw-insert-image, drw-insert-dxf.)
+                Some("Select an image") => Some("Insert image"),
+                Some("Select a DXF or DWG file") => Some("Insert DXF or DWG"),
+                _ => None,
+            }),
             "views": views,
             // (Live's recorder reads no text for a centermark, a centerline or a surface finish symbol: null, live 2146.)
             "annotations": annotations.into_iter().map(|(k, t)| json!({ "kind": k, "text": (!matches!(k, "centermark" | "centerline" | "surfacefinishsymbol" | "virtualsharp" | "line" | "circle" | "arc" | "spline" | "splinepoint" | "sketchpoint" | "hatch")).then_some(t) })).collect::<Vec<_>>(),

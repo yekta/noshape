@@ -231,7 +231,7 @@ fn register_drawing_hooks() {
     noshape_drawing_ui::drawing_hooks::register(noshape_drawing_ui::drawing_hooks::Hooks {
         import: workspace::request_import,
         open_document_window: |path, gpu, cx| files::open_document_window(path, None, gpu, cx),
-        pick_file: |doc, title, kinds, exts, window, cx, on_pick| file_tab_view::pick_file(doc, title, kinds, exts, window, cx, on_pick),
+        pick_file: |doc, title, kinds, exts, window, cx, on_pick| file_tab_view::pick_file_flyout(doc, title, kinds, exts, window, cx, on_pick),
         release_log: release_dialog::release_log,
         watermark_text: release_dialog::drawing_watermark_text,
         library_docs: || start_library::Library::default().scan(&start_library::ScanInput::current()).docs,
