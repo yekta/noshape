@@ -175,10 +175,10 @@ pub fn tessellate_export(shape: &Shape, linear_deflection: f64, angular_deflecti
     crate::mesh_repair::drop_pinched_triangles(&mut t);
     crate::mesh_repair::repair_folded_faces(&big, &mut t);
     crate::mesh_repair::orient_by_neighbours(&mut t);
-    let down = (1.0 / UP) as f32;
+    // (Divided in f64: the f32 a mesh at size would have, 20.0 → 0.02 exactly as written.)
     for p in t.positions.iter_mut().chain(t.edge_points.iter_mut()).chain(t.vertices.iter_mut()) {
         for c in p.iter_mut() {
-            *c *= down;
+            *c = (*c as f64 / UP) as f32;
         }
     }
     Ok(t)
