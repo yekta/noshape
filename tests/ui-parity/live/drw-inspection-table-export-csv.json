@@ -1,16 +1,16 @@
 {
  "scenario": "drw-inspection-table-export-csv",
- "recorded": "2026-11-07T19:43:47.935Z",
+ "recorded": "2026-11-07T23:39:41.355Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
+  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.11"
  },
  "live": {
   "document": "b53c968665192de2f2abd604",
   "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "b1d0953a3394ebc0dcaf82f7",
+  "element": "0044f40160af7e25582f853d",
   "start": "block-drawing",
   "startElement": "7fc07371758a5353920f612d",
   "runner": "live2 .nstate-uip-2.json"
@@ -176,7 +176,7 @@
      "selection": []
     }
    },
-   "t": 215035
+   "t": 222599
   },
   {
    "step": 2,
@@ -267,7 +267,7 @@
      "selection": []
     }
    },
-   "t": 228800
+   "t": 236724
   },
   {
    "step": 3,
@@ -277,8 +277,11 @@
      "panel_more": "Inspection table"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"panel_more\":\"Inspection table\"}",
+   "ok": true,
+   "at": [
+    1898,
+    139
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -360,7 +363,7 @@
      "selection": []
     }
    },
-   "t": 243522
+   "t": 250965
   },
   {
    "step": 4,
@@ -370,8 +373,11 @@
      "menu": "Export to CSV"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Export to CSV\"}",
+   "ok": true,
+   "at": [
+    1845,
+    167
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -453,7 +459,7 @@
      "selection": []
     }
    },
-   "t": 259074
+   "t": 265064
   },
   {
    "step": 5,
@@ -544,7 +550,7 @@
      "selection": []
     }
    },
-   "t": 273732
+   "t": 280370
   },
   {
    "step": 6,
@@ -634,7 +640,7 @@
      "selection": []
     }
    },
-   "t": 289078
+   "t": 295071
   }
  ]
 }

@@ -1,16 +1,16 @@
 {
  "scenario": "drw-canvas-drawing-properties",
- "recorded": "2026-11-07T11:19:24.554Z",
+ "recorded": "2026-11-07T23:02:37.213Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-07.8 50b19f57 + live2 2026-11-07.10"
  },
  "live": {
   "document": "a1e7207bcd206771836609af",
   "workspace": "6d6324b30f07aa9904363635",
-  "element": "60b40d867820cc787b544cc5",
+  "element": "2397c7e47caf6e0882db7ea7",
   "start": "block-drawing",
   "startElement": "fec75b9b8f06f7e2fe8fa56f",
   "runner": "live2 .nstate-uip-1.json"
@@ -164,7 +164,7 @@
      "selection": []
     }
    },
-   "t": 223146
+   "t": 224359
   },
   {
    "step": 2,
@@ -280,7 +280,7 @@
      "selection": []
     }
    },
-   "t": 238388
+   "t": 238630
   },
   {
    "step": 3,
@@ -391,7 +391,7 @@
      "selection": []
     }
    },
-   "t": 256189
+   "t": 255004
   },
   {
    "step": 4,
@@ -501,7 +501,7 @@
      "selection": []
     }
    },
-   "t": 272282
+   "t": 270274
   }
  ]
 }
