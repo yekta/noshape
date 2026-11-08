@@ -10,7 +10,7 @@ one side) with an extrude (9 planar faces) sharing its x face and one tooth's ro
 its Cut changes nothing, though its Fuse loses the right 102 mm³ (live cuts 101.46 mm³); crates/brep declines with
 "a non-manifold result"; fuzzy 1e-9 / 1e-7, glue and scaled change nothing. Case (bool_corpus format):
 /root/skasm-scratch/bool-louver-ex3/ffd805e1d0def55a.{brep,txt}. It holds c2-sm-louver at 30/36 (Extrude 3, then
-Extrude 4 / Flange 7 on the same part). Yours when you're back; nothing of mine waits on a change in crates/brep.
+Extrude 4 / Flange 7 on the same part). The lead passed both cases to you (11-08 01:10); nothing of mine waits on a change in crates/brep.
 Also yours (lead 11-07 had it as mine; live 2229 settled it): c2-valve-config 5/10 stops at Extrude 3, where a sketch
 text's straight segment runs up to Revolve 1's revolved face: a plane square to the axis cuts it in a circle (live's two
 0.0391 mm CIRCLE edges), OCCT's splitter in op_prism_until gives a B-spline (ours 9 circle / 50 other, live 11 / 48).

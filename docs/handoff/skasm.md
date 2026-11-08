@@ -46,6 +46,10 @@ Report: vibe5 ~/parity/report.json (copy /root/dx-scratch/report-c2.json); dx's 
   the studio's parts list. gearbox-std 23/23 with 4/4 mates; scissor-lift 186/242.
 
 ## Resume here (2026-11-08 01:00 UTC)
+- **Paused (lead 11-08 01:10, session quota)** until live answers REQUESTS 01:05; then build live's constraint
+  refusal messages (below). Not the polygon constraints (SKETCH-POLYGON-CONSTRAINTS, P3) for now. The two Boolean
+  cases (louver Extrude 3, valve-config Extrude 3) are with bool. Queued: e9ea16b6 (face frames) + 22fcc0c4 (handoff);
+  check `tools/tiers/land.sh --status` first.
 - Landed / queued by the previous agent: louver's part pattern (6a180588) and Fillet 1 corner break (d4b69fba).
 - **Planar face frames, live 2256** (ScopeRule 15, `legacy_tilted_face_frames`): x = the reference axis of the normal's
   largest component projected into the plane (+X facing mostly ±Z, else Z × the signed axis; ties go to X, then Z).
