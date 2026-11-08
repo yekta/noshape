@@ -29,6 +29,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "Could not create valid swept body, check input.", live OK (Part 5 15/32/20, 664406.43 mm³).
 - [x] (skasm 11-07: a round of a boss rim whose wall is shorter than the radius, Allow edge overflow off, rolls on the cap and over the wall's far edge as live's (blend_section::cliff_rim_blend: the torus tangent to the cap at R - sqrt(h(2r - h)), through the far circle; live's face data: cap r 2, round down to the base circle; 76.35 mm³ a boss, live 76.32); Fillets 4 and 3 as live, cf-snap-hook 7 -> 9/18, next: Fillet 5 (85 faces, live 30); suite 631 -> 640, nothing lower; T1 kernel_robustness::a_round_past_its_wall_rolls_over_the_far_edge) P1 SNAP-HOOK-FILLET-4 (skasm, lead 11-06 23:15; parity suite) cf-snap-hook's Fillet 4 (feature 7): ours "Failed
   to fillet selections.", live OK (Case 402571.66 mm³).
+- [ ] P1 SHFALL-A7AB-EXTRA-VERTEX (bool, lead 11-08: fix within a day, after c2-housing-draft's Rotieren 1) **a Shell
+  slab fuse ours now takes keeps an extra vertex on a straight edge after the merge: ours is wrong there, not OCCT.**
+  shfall a7ab967d0e6d4517 (Fuse, 23 tools), taken since revolutions of arcs are noshape's free-form faces (cf-snap-hook
+  6.76 -> 2.18 s): same volume and counts as OCCT, 4 vertices Deleted where OCCT says Modified ((-60, 0, 7), (-59, 0,
+  7), (-60, 1, 6), (-59, 1, 6) mm; the deleted_v rule, boolean.rs), and after unify_same_domain 52 edges against
+  OCCT's 51 (along y 0, z 6: 57 + 2 mm where OCCT has one 59 mm edge; the vertex at (-2, 0, 6) and its four edges
+  alike before the merge). Recorded as shfall's known 3rd difference until fixed (temporary). If the fix slips past
+  a day: tell the lead (narrow the revolution handling instead).
 - [ ] P1 DISPLACEMENT-MAP (dx, lead 11-04 13:08, the user's case) the public Displacement map FeatureScript
   (Evan Reese's, FeatureScript 3044; repro /root/lead-scratch/disp/displacementMap.fs and leather.csv, 512×512 pixel
   values) fails in noshape: a cylinder (Sketch circle + Extrude), the CSV imported as a tab, the custom feature on the

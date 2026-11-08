@@ -78,6 +78,15 @@ scratch /root/bool-scratch.
   a 170 ms cut); c2-valve-config Extrude 2's cut is ours with the valve land. Reproduce with NOSHAPE_PARITY_ONLY. Core
   adds a change-scope from OCCT's history for the unify after them (noted here when it lands). Review core's
   FACE-PATTERN-30-CUT-SLOW (boolean.cpp's pattern-cut path) against the gate when it lands.
+- **cf-snap-hook's revolutions (11-08, landing):** a revolution of a circle or ellipse arc is noshape's free-form
+  face (its profile a B-spline at the arc's own parameters, as an extrusion's): 8 of the document's 10 recorded
+  Booleans ours, the Snap Hook fuses ~11 ms against OCCT's 0.8-1.2 s; the document 6.76 -> 2.18 s (Snap Hook 1 / 2
+  1.87 / 2.54 -> 0.24 / 0.28 s; live 274 ms the document). Gate: corpora + parity56 0 differences, knurl/gear level,
+  model suite unchanged (74/87, 755/951); **shfall's known differences are 3 until P1 SHFALL-A7AB-EXTRA-VERTEX is fixed
+  (a7ab967d: ours wrong, an extra vertex after the merge; due within a day of 11-08 14:00, after Rotieren 1)**. Its
+  two other declines ("an edge on another argument's free-form face", 091580a4 and c22ea361) and c2-housing-draft's
+  Rotieren 1 (526 ms cut: past "a face of revolution" now; a straight edge tangent to the revolved face at its end,
+  then "a piece's point on another solid's face"; WIP /root/bool-scratch/wip/housing-rotieren-1108.patch) next.
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
