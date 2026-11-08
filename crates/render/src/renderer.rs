@@ -2976,6 +2976,18 @@ impl Renderer {
         self.overlay_gpu.get_or_insert(overlay);
     }
 
+    /// One small empty frame through the first frame's passes, off screen, then forgotten: the GPU's first-use costs
+    /// (a runner's paravirtual Metal took ~200 ms over the first frame's ~130 ms of passes, warm or not) paid while
+    /// the window is still being created (`NOSHAPE_PREWARM=early`, a startup experiment).
+    pub fn warm_up(&mut self, msaa: u32) {
+        let _t = perf::scope("r.warm_up");
+        let t = std::time::Instant::now();
+        let style = Style { msaa, ..Style::default() };
+        let frame = self.render(RenderParams { scene: &Scene::default(), camera: &Camera::default(), width: 64, height: 64, device_pixel_ratio: 1.0, style: &style, pick: false });
+        self.drop_target(SYNC_TARGET);
+        log::info!(target: "perf", "renderer: warm-up frame {} in {:.0} ms", if frame.is_ok() { "rendered" } else { "failed" }, t.elapsed().as_secs_f64() * 1e3);
+    }
+
     /// Forget a target (its textures are released once in-flight reads finish).
     pub fn drop_target(&mut self, target: u64) {
         self.targets.remove(&target);

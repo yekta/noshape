@@ -246,18 +246,24 @@ def cold_start_split(out_dir):
     """The job's first launch (everything cold) beside launches with only our caches cleared (bench.sh STARTUP) and
     warm ones (medians): the first minus `ours` is the runner's first-launch cost; `ours` is noshape's own cold start."""
     first, ours, warm = milestones(os.path.join(out_dir, "texture-orbit.log")), median_milestones(out_dir, "ours"), median_milestones(out_dir, "warm")
+    early = median_milestones(out_dir, "early")
     if not first or not ours:
         return []
     ms = lambda d, k: f"{d[k]:.0f} ms" if d and k in d else "n/a"
     lines = ["", "Cold start split (ms from process start): the job's first launch, then launches with only noshape's caches "
-             "cleared (config, display cache, Metal shader caches) and warm ones (medians of three):", "",
-             "| milestone | first launch | our caches cleared | warm |", "|---|---|---|---|"]
+             "cleared (config, display cache, Metal shader caches)" + (", the same with NOSHAPE_PREWARM=early" if early else "")
+             + " and warm ones (medians of three):", "",
+             "| milestone | first launch | our caches cleared |" + (" early |" if early else "") + " warm |",
+             "|---|---|---|" + ("---|" if early else "") + "---|"]
     for name, _ in SPLIT:
-        lines.append(f"| {name} | {ms(first, name)} | {ms(ours, name)} | {ms(warm, name)} |")
+        lines.append(f"| {name} | {ms(first, name)} | {ms(ours, name)} |" + (f" {ms(early, name)} |" if early else "") + f" {ms(warm, name)} |")
     f, o = first.get("first viewport frame"), ours.get("first viewport frame")
     if f is not None and o is not None:
         lines += ["", f"- noshape's own cold start (our caches cleared, the OS warm): {o:.0f} ms, target {TARGET_FIRST_FRAME_MS:.0f}: "
                   f"{'met' if o <= TARGET_FIRST_FRAME_MS else 'not met'}; the runner's first-launch cost {f - o:.0f} ms"]
+    e = early.get("first viewport frame") if early else None
+    if e is not None and o is not None:
+        lines.append(f"- with NOSHAPE_PREWARM=early: {e:.0f} ms ({e - o:+.0f} ms)")
     return lines
 
 

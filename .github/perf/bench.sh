@@ -170,8 +170,9 @@ fi
 # document at the end, each quitting once its model is on screen (`NOSHAPE_PERF_SCRIPT=open`), three of each (one
 # sample per runner swung 1.2-1.7 s): `start_ours-<n>.log` with our caches cleared again (fresh config and cache dirs,
 # the Metal shader caches removed) on the now warm OS, then `start_warm-<n>.log` with nothing cleared. First launch
-# minus the ours median is the runner's first-launch cost.
-startup() { # name config-dir cache-dir clear-shader-caches
+# minus the ours median is the runner's first-launch cost. `start_early-<n>.log`, each after an `ours` one: the same
+# with NOSHAPE_PREWARM=early (the GPU's first use paid while the window is created), the experiment beside it.
+startup() { # name config-dir cache-dir clear-shader-caches [extra env]
   local name=$1 cfg=$2 cache=$3 log="$OUT/start_$1.log"
   local work; work=$(mktemp -d)
   cp "$DOC" "$work/start.noshape"
@@ -180,7 +181,7 @@ startup() { # name config-dir cache-dir clear-shader-caches
   fi
   echo "== startup $name ($BIN)"
   env NOSHAPE_PERF=1 NOSHAPE_PERF_SCRIPT=open NOSHAPE_PRESENT="${MODES[0]}" NOSHAPE_CONFIG_DIR="$cfg" NOSHAPE_CACHE_DIR="$cache" \
-    RUST_LOG=info ${BENCH_ENV//,/ } "$BIN" "$work/start.noshape" > "$log" 2>&1 &
+    RUST_LOG=info ${BENCH_ENV//,/ } ${5:-} "$BIN" "$work/start.noshape" > "$log" 2>&1 &
   local pid=$!
   for _ in $(seq 120); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
   kill "$pid" 2>/dev/null; sleep 1; kill -9 "$pid" 2>/dev/null
@@ -191,6 +192,9 @@ if [[ ${STARTUP:-1} == 1 && -z ${ONLY:-} ]]; then
   for n in 1 2 3; do
     dirs=$(mktemp -d)
     startup "ours-$n" "$dirs/config" "$dirs/cache" 1
+    rm -rf "$dirs"
+    dirs=$(mktemp -d)
+    startup "early-$n" "$dirs/config" "$dirs/cache" 1 NOSHAPE_PREWARM=early
     rm -rf "$dirs"
   done
   dirs=$(mktemp -d)
