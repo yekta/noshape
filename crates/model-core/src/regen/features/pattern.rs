@@ -857,12 +857,22 @@ fn overhang_growth(body: &Shape, tool: &NamedShape) -> Option<NamedShape> {
         let n = f.normal_at_point(f.centroid().ok()?).ok()?.normalize();
         Some((p, n))
     };
-    let supports: Vec<(Shape, k::Plane, DVec3)> = body.faces().into_iter().filter_map(|f| outward(&f).map(|(p, n)| (f, p, n))).collect();
+    // The part's planar faces; each one's outward normal only once a tool face lies in its plane (a centroid and a
+    // projection per face of the part were most of a feature mirror's time, clamp-hms).
+    let supports: Vec<(Shape, k::Plane, std::cell::OnceCell<Option<DVec3>>)> = body.faces().into_iter().filter_map(|f| Some((f.clone(), f.face_plane().ok().flatten()?, std::cell::OnceCell::new()))).collect();
     let mut grown: Vec<Shape> = Vec::new();
     for f in tool.shape.faces() {
         let Some((tp, d)) = outward(&f) else { continue };
         // A footprint: lying on a planar face of the part, facing it.
-        let on: Vec<&Shape> = supports.iter().filter(|(_, bp, bn)| bn.dot(d) < -1.0 + 1e-9 && (tp.origin - bp.origin).dot(d).abs() <= tol).map(|(s, _, _)| s).collect();
+        let on: Vec<&Shape> = supports
+            .iter()
+            .filter(|(s, bp, bn)| {
+                bp.normal.normalize_or_zero().dot(d).abs() > 1.0 - 1e-9
+                    && (tp.origin - bp.origin).dot(d).abs() <= tol
+                    && bn.get_or_init(|| outward(s).map(|x| x.1)).is_some_and(|n| n.dot(d) < -1.0 + 1e-9)
+            })
+            .map(|(s, _, _)| s)
+            .collect();
         if on.is_empty() {
             continue;
         }
@@ -1143,7 +1153,12 @@ fn merged_faces(tool: &Shape, body: &Body, fs: &[usize]) -> Vec<usize> {
         .filter(|i| !fs.contains(i))
         .filter(|&i| {
             let Ok(face) = body.shape.sub_shape(ShapeType::Face, i) else { return false };
-            let Ok(k::Surface::Plane(_)) = face.face_surface() else { return false };
+            let Ok(k::Surface::Plane(pl)) = face.face_surface() else { return false };
+            // In a tool face's plane at all (its centroid and area only then: most faces aren't).
+            let pn = pl.normal.normalize_or_zero();
+            if !tool_planes.iter().any(|(o, tn, ..)| tn.dot(pn).abs() > 1.0 - 1e-9 && (*o - pl.origin).dot(pn).abs() < tol) {
+                return false;
+            }
             let (Ok(c), Ok(area)) = (face.centroid(), face.area()) else { return false };
             let Ok(n) = face.normal_at_point(c) else { return false };
             let n = n.normalize_or_zero();
