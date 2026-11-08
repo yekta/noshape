@@ -1464,10 +1464,10 @@ impl Render for HistoryPanel {
             )
             // Live cmp2-901: "Select two history entries to compare."
             .when(crate::compare_mode::picking(&self.doc, cx), |d| {
-                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select two history entries to compare."))
+                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select two history entries to compare.").map(|d| crate::ui_script::mark_message(d, || "Select two history entries to compare.".into())))
             })
             .when(repair_picking, |d| {
-                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio"))
+                d.child(div().mx(px(10.)).mt(px(6.)).px(px(15.)).py(px(7.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child("Select a history entry to repair this Part Studio").map(|d| crate::ui_script::mark_message(d, || "Select a history entry to repair this Part Studio".into())))
             })
             .child(
                 // Live document/22: the box with its ▾ (filter panel) and the

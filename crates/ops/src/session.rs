@@ -300,13 +300,22 @@ impl Session {
     /// "<tab name> :: <description>", the way every UI edit is recorded.
     /// `None` when the tab doesn't exist.
     pub fn edit_tab<R>(&mut self, tab: TabId, description: &str, f: impl FnOnce(&mut noshape_model::document::TabContent) -> R) -> Result<Option<R>> {
+        self.edit_tab_as(tab, description, Undo::Yes, f)
+    }
+
+    /// [`Self::edit_tab`] that Undo doesn't take back (live: a Variable Studio's Insert into all).
+    pub fn edit_tab_not_undoable<R>(&mut self, tab: TabId, description: &str, f: impl FnOnce(&mut noshape_model::document::TabContent) -> R) -> Result<Option<R>> {
+        self.edit_tab_as(tab, description, Undo::No, f)
+    }
+
+    fn edit_tab_as<R>(&mut self, tab: TabId, description: &str, undo: Undo, f: impl FnOnce(&mut noshape_model::document::TabContent) -> R) -> Result<Option<R>> {
         anyhow::ensure!(!self.read_only(), "{READ_ONLY_MESSAGE}");
         // Refused before the edit touches the in-memory document.
         self.ensure_unprotected()?;
         let tab_name = self.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
         let Some(t) = self.doc.tab_mut(tab) else { return Ok(None) };
         let r = f(&mut t.content);
-        self.commit(&[tab], false, &format!("{tab_name} :: {description}"))?;
+        self.commit_tabs(&[tab], false, &format!("{tab_name} :: {description}"), undo)?;
         Ok(Some(r))
     }
 

@@ -853,6 +853,10 @@ pub(crate) fn window_state(w: &mut Workspace, window: &mut Window, cx: &mut Cont
         if let Some(f) = w.ui_rename_focus(window, cx) {
             s["focus"] = f;
         }
+        // The window's alerts and toasts when the studio has no message of its own (live reads every alert).
+        if s["message"].is_null() {
+            s["message"] = json!(noshape_app_core::ui_script::window_message(window.window_handle().window_id()));
+        }
     }
     s
 }

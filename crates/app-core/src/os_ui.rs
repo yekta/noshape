@@ -253,7 +253,10 @@ pub fn field_label(text: impl Into<SharedString>) -> Div {
 /// text `#094174`.
 pub fn info_box(text: impl Into<SharedString>) -> Div {
     let pal = p();
-    div().px(px(14.)).py(px(15.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child(text.into())
+    let text: SharedString = text.into();
+    let said = text.to_string();
+    // Live's recorder reads every alert as the page's `message`.
+    crate::ui_script::mark_message(div().px(px(14.)).py(px(15.)).rounded(px(3.)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.info_text).child(text), || said)
 }
 
 /// Onshape's dialog checkbox row: 27 px, a 12 px box (1 px `#888`, radius

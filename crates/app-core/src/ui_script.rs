@@ -276,6 +276,44 @@ pub fn noted_message() -> Option<String> {
     message_slot().lock().ok()?.clone()
 }
 
+/// Alert boxes and message bubbles by where they were painted (a window, the top-left corner in whole pixels): live's
+/// recorder reads every alert of the page as `message`, several joined by " / " top to bottom.
+type PaintedMessages = Mutex<std::collections::BTreeMap<(u64, i32, i32), String>>;
+
+fn painted_messages() -> &'static PaintedMessages {
+    static M: OnceLock<PaintedMessages> = OnceLock::new();
+    M.get_or_init(Default::default)
+}
+
+/// `el` (an alert box, a message bubble) recording `text` as a `message` each time it is painted.
+pub fn mark_message<E: ParentElement>(el: E, text: impl FnOnce() -> String) -> E {
+    if !active() {
+        return el;
+    }
+    let text = text();
+    el.child(
+        canvas(
+            move |b, window, _| {
+                let id = window.window_handle().window_id().as_u64();
+                if let Ok(mut m) = painted_messages().lock() {
+                    m.insert((id, f32::from(b.origin.y).round() as i32, f32::from(b.origin.x).round() as i32), text.clone());
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0(),
+    )
+}
+
+/// The alerts `window` painted since the last [`clear_dialog`], top to bottom, and the one [`note_message`] noted.
+pub fn window_message(window: WindowId) -> Option<String> {
+    let id = window.as_u64();
+    let mut all: Vec<String> = painted_messages().lock().ok()?.iter().filter(|((w, ..), _)| *w == id).map(|(_, t)| t.clone()).collect();
+    all.extend(noted_message());
+    (!all.is_empty()).then(|| all.join(" / "))
+}
+
 fn focus_slot() -> &'static Mutex<Option<serde_json::Value>> {
     static F: OnceLock<Mutex<Option<serde_json::Value>>> = OnceLock::new();
     F.get_or_init(Default::default)
@@ -339,6 +377,9 @@ pub fn clear_dialog() {
     TITLE_ONLY_MODAL.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Ok(mut m) = message_slot().lock() {
         *m = None;
+    }
+    if let Ok(mut m) = painted_messages().lock() {
+        m.clear();
     }
     if let Ok(mut f) = focus_slot().lock() {
         *f = None;

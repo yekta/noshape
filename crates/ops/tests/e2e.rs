@@ -728,7 +728,7 @@ fn workspace_units_are_not_an_undo_step() {
 #[test]
 fn help_and_the_featurescript_library_read_offline() {
     let mut ctx = Ctx::new();
-    let h = call(&mut ctx, "app_help", json!({}));
+    let h = call(&mut ctx, "app_user_guide", json!({}));
     assert!(h["guide"].as_str().is_some_and(|g| g.starts_with("# noshape help")), "{h}");
     let l = call(&mut ctx, "featurestudio_std", json!({}));
     assert!(l["modules"].as_array().is_some_and(|m| m.iter().any(|m| m == "geometry.fs")), "{l}");

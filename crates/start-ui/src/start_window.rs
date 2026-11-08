@@ -2263,7 +2263,7 @@ impl StartView {
     /// Versions and history | Move to… | Remove from recently opened, Send
     /// to trash. Cloud items (Share, Transfer ownership, new browser tab)
     /// are not part of noshape. Trashed documents: Details, Restore, Delete.
-    fn doc_menu(view: Entity<StartView>, d: DocEntry, menu: OsMenu) -> OsMenu {
+    fn doc_menu(view: Entity<StartView>, d: DocEntry, in_recent: bool, menu: OsMenu) -> OsMenu {
         let item = |label: &'static str, view: &Entity<StartView>, d: &DocEntry, f: fn(&mut StartView, DocEntry, &mut Window, &mut Context<StartView>)| {
             let (view, d) = (view.clone(), d.clone());
             OsMenuItem::new(label).on_click(move |_, window, cx| {
@@ -2308,7 +2308,8 @@ impl StartView {
             .item(item("Move to…", &view, &d, |t, d, w, cx| t.move_to(d, w, cx)))
             .item(item(crate::file_dialogs::show_in_folder_label(), &view, &d, |_, d, _, cx| open_in_file_manager(&d.path, true, cx)))
             .separator();
-        let menu = if d.recent_rank.is_some() { menu.item(item("Remove from recently opened", &view, &d, |t, d, _, cx| t.forget(d, cx))) } else { menu };
+        // Only in Recently opened (live docs-row-menu: Owned by me's rows have none).
+        let menu = if in_recent && d.recent_rank.is_some() { menu.item(item("Remove from recently opened", &view, &d, |t, d, _, cx| t.forget(d, cx))) } else { menu };
         menu.item(item("Send to trash", &view, &d, |t, d, w, cx| t.trash(d, w, cx)))
     }
 
@@ -2544,7 +2545,7 @@ impl StartView {
             "selection": null,
             "features": null,
             "parts": [],
-            "message": null,
+            "message": crate::ui_script::window_message(window.window_handle().window_id()),
             "tooltip": null,
             "undo": null,
             "sketch": null,
@@ -3000,7 +3001,8 @@ impl StartView {
                     .os_context_menu(move |menu, _, cx| {
                         let path = d2.path.clone();
                         v.update(cx, |this, cx| this.select(&path, cx));
-                        Self::doc_menu(v.clone(), d2.clone(), menu)
+                        let in_recent = v.read(cx).source == Source::Recent;
+                        Self::doc_menu(v.clone(), d2.clone(), in_recent, menu)
                     }),
             );
         }
@@ -3467,7 +3469,8 @@ impl StartView {
                     // menu's own handler stops propagation, so select here.
                     .os_context_menu(move |menu, _, cx| {
                         v2.update(cx, |this, cx| this.select(&p1, cx));
-                        Self::doc_menu(v2.clone(), d2.clone(), menu)
+                        let in_recent = v2.read(cx).source == Source::Recent;
+                        Self::doc_menu(v2.clone(), d2.clone(), in_recent, menu)
                     })
                     .into_any_element()
             })
@@ -3717,6 +3720,7 @@ impl Render for StartView {
                     cx.default_global::<StartToast>().0 = None;
                     window.refresh();
                 };
+                let said = format!("{}{}{}", t.bold.clone().unwrap_or_default(), t.text, if t.restore.is_some() { " Restore" } else { "" });
                 let bubble = match t.restore.clone() {
                     Some(id) => {
                         let view = cx.entity();
@@ -3724,7 +3728,7 @@ impl Render for StartView {
                     }
                     None => os::message_bubble("start-toast", t.kind, text, close, cx),
                 };
-                div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(bubble)
+                crate::ui_script::mark_message(div().absolute().top(px(8.)).left_0().right_0().flex().justify_center().child(bubble), || said)
             }))
     }
 }

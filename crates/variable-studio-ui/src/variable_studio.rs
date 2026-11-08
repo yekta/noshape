@@ -96,7 +96,7 @@ impl VariableStudioView {
         tables.sort_by(|a, b| a["title"].as_str().cmp(&b["title"].as_str()));
         tables.push(serde_json::json!({ "title": title(self.tab), "collapsed": self.collapsed, "rows": self.ui_drawn }));
         let insert_into_all = self.studio(cx).is_some_and(|s| s.insert_into_all);
-        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": self.ui_configuration(cx), "help": self.help_open })
+        serde_json::json!({ "tables": tables, "insert_into_all": insert_into_all, "configuration_panel": self.config_open, "configuration": Some(self.ui_configuration(cx)).filter(|c| !c.is_empty()), "help": self.help_open })
     }
 
     /// The studio's configuration inputs: `{"name", "kind": list | checkbox | variable | text, "default", "shown",
@@ -485,10 +485,20 @@ impl VariableStudioView {
                     .child(h_flex().gap(px(4.)).child(check).child(div().text_size(px(14.)).child("Insert into all Part Studios and Assemblies")))
                     // A configured studio can't be inserted everywhere (live vs-905: greyed).
                     .when(configured, |b| gpui_kit::component::Disableable::disabled(b, true).opacity(0.5))
+                    // Not an undo step (live vs-cfg-*: Undo stays off after ticking it).
                     .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                        if !configured {
-                            this.edit(noshape_ops::variable_studio::insert_into_all_description(!on), cx, |s| s.insert_into_all = !on)
+                        if configured {
+                            return;
                         }
+                        let tab = this.tab;
+                        this.doc.update(cx, |d, cx| {
+                            d.edit_tab_not_undoable(tab, noshape_ops::variable_studio::insert_into_all_description(!on), cx, |c| {
+                                if let TabContent::VariableStudio(v) = c {
+                                    v.insert_into_all = !on;
+                                }
+                            })
+                        });
+                        cx.notify();
                     })),
             )
             .child(

@@ -343,7 +343,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **featurestudio**: [`featurestudio_std`](#featurestudio_std), [`featurestudio_get`](#featurestudio_get), [`featurestudio_edit`](#featurestudio_edit), [`featurestudio_commit`](#featurestudio_commit), [`featurestudio_monitor`](#featurestudio_monitor)
 - **agents**: [`agents_status`](#agents_status), [`agents_connect`](#agents_connect), [`agents_disconnect`](#agents_disconnect)
 - **cli**: [`cli_status`](#cli_status), [`cli_install`](#cli_install)
-- **app**: [`app_help`](#app_help), [`app_system_check`](#app_system_check), [`app_about`](#app_about)
+- **app**: [`app_user_guide`](#app_user_guide), [`app_system_check`](#app_system_check), [`app_about`](#app_about)
 
 ### ops
 
@@ -6841,7 +6841,7 @@ Examples:
 
 ### app
 
-#### app_help
+#### app_user_guide
 
 noshape's user guide, as Help › Help shows it (Markdown).
 

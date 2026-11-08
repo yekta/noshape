@@ -83,7 +83,7 @@ fn system_check(ctx: &mut Ctx, _: &Args) -> Result<OpOutput, OpError> {
 fn help_op() -> Op {
     Op {
         group: "app",
-        verb: "help",
+        verb: "user_guide",
         summary: "noshape's user guide, as Help › Help shows it (Markdown)",
         description: "`guide`: the guide's Markdown. The FeatureScript standard library is featurestudio_std's, the keyboard shortcuts ui_shortcuts'.",
         fields: vec![],

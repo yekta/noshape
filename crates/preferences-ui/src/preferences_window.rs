@@ -322,7 +322,7 @@ impl PreferencesView {
             "selection": null,
             "features": null,
             "parts": [],
-            "message": crate::prefs_general::shown_toast(cx).or_else(crate::ui_script::noted_message),
+            "message": crate::ui_script::window_message(window.window_handle().window_id()).or_else(|| crate::prefs_general::shown_toast(cx)),
             "tooltip": null,
             "undo": null,
             "sketch": null,

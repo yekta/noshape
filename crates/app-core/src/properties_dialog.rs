@@ -442,7 +442,13 @@ impl MetaForm {
             if item {
                 fields.push(check("Exclude from all BOMs", self.exclude_from_bom));
                 fields.push(serde_json::json!({ "label": "Unit of measure", "kind": "select", "value": self.unit.clone().unwrap_or_else(|| DEFAULT_UNIT.to_string()) }));
-                if self.material.is_some() || self.computed_mass.is_some() {
+                if let Some(options) = &self.bom_options {
+                    // An assembly (live doc-dialog-properties-assembly…, 11-08 recorder): Override, Mass, then
+                    // Subassembly BOM behavior.
+                    fields.push(check("Override", self.mass_on));
+                    fields.push(input("Mass", if self.mass_on { text(&self.mass) } else { String::new() }));
+                    fields.push(serde_json::json!({ "label": "Subassembly BOM behavior *", "kind": "select", "value": options.get(self.bom).cloned().unwrap_or_default() }));
+                } else if self.material.is_some() || self.computed_mass.is_some() {
                     fields.push(check("Mass Override", self.mass_on));
                 }
             }
@@ -602,8 +608,8 @@ impl Render for MetaForm {
                 .into_any_element(),
             ));
         // Parts (with their material) and assemblies (a computed mass, no
-        // material; live assembly/726) have the Mass row.
-        if self.material.is_some() || self.computed_mass.is_some() {
+        // material; live assembly/726; from the tab's menu too) have the Mass row.
+        if self.material.is_some() || self.computed_mass.is_some() || self.bom_options.is_some() {
             let mass_on = self.mass_on;
             let computed = self.computed_mass.clone();
             form = form.child(

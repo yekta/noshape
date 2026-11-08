@@ -277,7 +277,7 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   Checkbox / Variable input dialog is `dialog` (title "Checkbox input" / "Variable input", `tabs` Length…Text, fields
   Name, Default, Minimum, Maximum), its ✓ / ✕ `{"button": "ok"}` / `"cancel"`, a type `{"tab": "Angle"}`. State
   `variables.configuration`: `[{"name": "Configuration", "kind": "list", "default": "Default", "shown": "Default",
-  "rows": ["Default"]}]` (kind list | checkbox | variable | text; `rows` a list's options).
+  "rows": ["Default"]}]` (kind list | checkbox | variable | text; `rows` a list's options; null when not configured).
 - A start's `"versions": [{"name": "V1", "features": [...]}]`: version V1 made after what comes before it, then its
   `features` in Main (start `doc-versions`). While comparing, `document.compare` is `{"base": "Main", "target": "V1",
   "only_differences": true, "features": [{"name": "Extrude 2", "change": "added"}], "selected": null}` (`features` the
@@ -384,6 +384,9 @@ Two keys added 11-03 (skasm, for the sketch scenarios; the runner compares each 
              "constraints": ["COINCIDENT", "COINCIDENT", "HORIZONTAL"],
              "dimensions": [{"kind": "LINEAR", "value": 30}, {"kind": "DIAMETER", "value": 12}] }
 ```
+- `message`: the page's alerts and message bubbles, by their whole text (a bold title and its body, list items, a
+  link's text), several joined by " / " top to bottom (ours: every alert box and toast records its text where it is
+  painted; a studio's own bubble first).
 - `undo`: whether the toolbar's Undo and Redo are enabled (live: `[command-id=UNDO_A_CHANGE / REDO_A_CHANGE]` not
   disabled); in a sketch or dialog, its own history's.
 - `sketch`: `null` unless a sketch is being edited. `tool`: the active sketch tool's tooltip name without its shortcut

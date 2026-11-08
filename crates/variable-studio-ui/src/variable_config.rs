@@ -434,6 +434,7 @@ impl VariableStudioView {
                 .text_color(pal.info_text)
                 .child(div().font_weight(FontWeight::BOLD).child("No variables are configured"))
                 .when(second, |d| d.child("Right click a variable value or description to configure them."))
+                .map(|d| crate::ui_script::mark_message(d, || if second { "No variables are configured Right click a variable value or description to configure them.".into() } else { "No variables are configured".into() }))
         };
         if rows.is_empty() {
             // A configuration variable: no table (live vs-914); the notice
@@ -595,7 +596,8 @@ impl VariableStudioView {
                         .text_size(px(14.))
                         .text_color(pal.info_text)
                         .child(div().font_weight(FontWeight::BOLD).child("This Variable Studio is automatically referenced in this workspace"))
-                        .child("To add configurations, first disable the \"Insert into all Part Studios and Assemblies\" option. This may affect regeneration."),
+                        .child("To add configurations, first disable the \"Insert into all Part Studios and Assemblies\" option. This may affect regeneration.")
+                        .map(|d| crate::ui_script::mark_message(d, || "This Variable Studio is automatically referenced in this workspace To add configurations, first disable the \"Insert into all Part Studios and Assemblies\" option. This may affect regeneration.".into())),
                 )
                 .child(empty_art)
                 .into_any_element()

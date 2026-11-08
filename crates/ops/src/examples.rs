@@ -338,7 +338,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("cli_install", &[r##"{}"##, r##"{"dir": "~/.local/bin"}"##]),
     ("app_about", &[r##"{}"##, r##"{"notices": true}"##]),
     ("app_system_check", &[r##"{}"##]),
-    ("app_help", &[r##"{}"##]),
+    ("app_user_guide", &[r##"{}"##]),
 ];
 
 /// The groups whose every operation must have examples (the coverage test).

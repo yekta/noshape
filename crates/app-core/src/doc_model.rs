@@ -151,6 +151,24 @@ impl DocModel {
         self.edit_tab_as(tab, description, true, cx, f)
     }
 
+    /// [`Self::edit_tab`] that Undo doesn't take back (live: a Variable Studio's Insert into all).
+    pub fn edit_tab_not_undoable<R>(&mut self, tab: TabId, description: &str, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
+        if self.session.read_only() {
+            return None;
+        }
+        self.flush_pending(cx);
+        let r = match self.session.edit_tab_not_undoable(tab, description, f) {
+            Ok(r) => r,
+            Err(e) => {
+                cx.emit(DocEvent::Error(format!("Could not save change: {e:#}")));
+                None
+            }
+        };
+        cx.emit(DocEvent::TabChanged(tab));
+        cx.notify();
+        r
+    }
+
     fn edit_tab_as<R>(&mut self, tab: TabId, description: &str, step: bool, cx: &mut Context<Self>, f: impl FnOnce(&mut TabContent) -> R) -> Option<R> {
         if self.session.read_only() {
             return None;

@@ -226,7 +226,7 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
 pub const MENUS: &[(&str, Cover)] = &[
     ("app:About", Op("app_about")),
     ("app:FeatureScript documentation", Op("featurestudio_std")),
-    ("app:Help", Op("app_help")),
+    ("app:Help", Op("app_user_guide")),
     ("app:Keyboard shortcuts", Op("ui_shortcuts")),
     ("app:System check", Op("app_system_check")),
     ("app:Connect to coding agents…", Op("agents_connect")),

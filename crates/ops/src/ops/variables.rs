@@ -451,8 +451,13 @@ fn studio_settings(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     if on && !s.configuration.is_empty() {
         return Err(OpError::invalid("a configured Variable Studio can't be inserted into all Part Studios and Assemblies (insert it with variable_insert_studio in one configuration)").with_param("insert_into_all"));
     }
+    // Not an undo step (live vs-cfg-*: Undo stays off after ticking it).
     if s.insert_into_all != on {
-        vs_edit(od, tab, vs::insert_into_all_description(on), |s| s.insert_into_all = on)?;
+        od.session.edit_tab_not_undoable(tab, vs::insert_into_all_description(on), |c| {
+            if let TabContent::VariableStudio(v) = c {
+                v.insert_into_all = on;
+            }
+        })?;
     }
     Ok(json!({ "studio": od.doc().tab(tab).map(|t| t.name.clone()), "insert_into_all": on }).into())
 }

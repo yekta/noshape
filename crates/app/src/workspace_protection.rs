@@ -116,7 +116,8 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                                     .cursor_pointer()
                                     .child("Learn more about workspace protection")
                                     .on_click(|_, _, cx| cx.open_url("https://github.com/yekta/noshape#readme")),
-                            ),
+                            )
+                            .map(|d| noshape_app_core::ui_script::mark_message(d, || "Workspace protection restrictions Workspace protection applies restrictions to how a workspace can be edited. This option currently restricts the following actions in a workspace: Restrict geometry changes to merges only Restrict drawings changes to merges only Restrict metadata changes to merges only Restrict adding new tabs to merges only Actions that are allowed in this workspace: Release management Refresh drawing updates Version creation, branching and merging Learn more about workspace protection".into())),
                     ),
             )
             // Live: Apply stays pale until the box changes; Enter does the same.

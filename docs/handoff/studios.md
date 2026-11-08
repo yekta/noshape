@@ -31,7 +31,7 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 ### 2026-11-08 09:48 UTC: lead's decisions applied (Help menu, Update workspace…, focus rule)
 - Help menu (both): Help · FeatureScript documentation · Keyboard shortcuts | System check · About | Install command
   line tool… · Connect to coding agents… (live's rows, its cloud ones left out; ours after a divider, not compared).
-  Help opens the offline guide (crates/app/assets/help/user-guide.md; op `app_help`); FeatureScript documentation the
+  Help opens the offline guide (crates/app/assets/help/user-guide.md; op `app_user_guide`); FeatureScript documentation the
   bundled std document read-only (op `featurestudio_std`); System check a dialog: system, threads, graphics adapter
   (software renderer flagged), memory, the documents folder's disk (`noshape_scene::system_info`, read off the UI
   thread with a 5 s timeout; op `app_system_check`). One list for both menus: crates/app/src/help_menu.rs.
@@ -41,7 +41,16 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
   Info toasts hide after 4.4 s as live's.
 - Focus rule (run.py `no_field_focus`, README "Comparison"): two focuses with no text field compare equal.
   Studios after it (uip10, before these app changes): 121/347 scenarios, 1095/1540 states.
-- Open: live2's batch 2+3 recordings (ver/vs/fs) to measure; Assembly Properties lacks Mass / Override / Subassembly
+- Then: every alert box and toast records its whole text as `message` (os_ui::info_box, the workspace's, the
+  documents page's and Preferences' toasts, the custom notices: `ui_script::mark_message`, joined " / " top to bottom
+  as live's recorder); `variables.configuration` null when unconfigured; an Assembly's Properties has Override, Mass
+  and Subassembly BOM behavior from the tab's menu too; Insert into all isn't an undo step (`edit_tab_not_undoable`);
+  "Remove from recently opened" only in Recently opened. The CLI reserves `help`: the guide's op is `app_user_guide`
+  (68ce53f1 failed the land on that).
+- Measured with live2's ver/vs/fs batch (394 recorded, before the batch above): 128 scenarios, 1221/1814 states
+  (67.3 %): documents 76.1 %, versions 74.9 %, Variable Studio 48.6 % (mostly `variables.configuration` and messages,
+  fixed above), Feature Studio 59.6 % (the std 3112 line: dx).
+- Open: Assembly Properties' Calculate from the tab menu has no computed mass ("No material assigned."); Assembly Properties lacks Mass / Override / Subassembly
   BOM behavior; ours' modal fields aren't recorded (an Input hook in vendored gpui-component); dx has std 3112.
 
 ### 2026-11-08 06:44 UTC: first match numbers; fixes from live's batch 1

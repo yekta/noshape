@@ -52,8 +52,9 @@ pub fn shown_toast(cx: &App) -> Option<String> {
 /// The bubble, top centre (live: 8 px down), if one is showing.
 pub fn toast_overlay(cx: &App) -> Option<AnyElement> {
     let text = cx.try_global::<PrefsToast>()?.0.clone()?;
+    let said = text.clone();
     Some(
-        div()
+        crate::ui_script::mark_message(div(), || said)
             .absolute()
             .top(px(8.))
             .left_0()

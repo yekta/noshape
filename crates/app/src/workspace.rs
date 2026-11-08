@@ -2406,6 +2406,7 @@ impl Workspace {
             return None;
         }
         let ws = cx.entity();
+        let said = msg.clone();
         Some(
             div()
                 .absolute()
@@ -2414,6 +2415,7 @@ impl Workspace {
                 .right_0()
                 .flex()
                 .justify_center()
+                .map(|d| noshape_app_core::ui_script::mark_message(d, || said))
                 .child(crate::os_ui::message_bubble("ws-toast", kind, msg, move |_, _, cx| {
                     ws.update(cx, |this, cx| {
                         this.toast = None;
