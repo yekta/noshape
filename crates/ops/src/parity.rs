@@ -5454,6 +5454,7 @@ pub fn rebuild_assembly(ctx: &mut Ctx, path: &Path, asm: &Value, studios: &[(Str
                     }
                 };
                 taken.push(ours.clone());
+                trace(&format!("{element}: live part {pid} \"{pname}\" -> ours {ours} (volume fits {fits:?})"));
                 chosen[ix] = Some(ours);
             }
         }
