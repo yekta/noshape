@@ -455,25 +455,22 @@ feature tool counts for a scenario that clicks it, presses its shortcut or doubl
 shortcut that starts a tool counts for the tool too. Menu items labelled at run time ("Suppress Extrude 1") aren't in
 the universe. Reported with the score (docs/parity/SCORE.md).
 
-11-06, 399 scenarios (main had 311 in the morning; batch 1 adds Mate connector, Curve pattern, Boolean subtract /
-intersect, Mid plane, Chamfer and 15 sketch tools and constraints; batch 2 the face, part, feature and empty-space
-context menus; batch 3 selection, the feature list's filter, Fillet, Revolve, Shell and Three point plane; batch 4 14
-more sketch tools: the dropdowns' members, sketch fillet / chamfer, mirror, patterns, split, text; batch 5 Hole's tabs
-and sizes, the patterns' types and axes, Mirror's types, Point normal and Line angle planes, Extrude's Through all and
-flip, the feature menu's Suppress / Unsuppress and Delete):
+11-08, 538 Part Studio scenarios. Uncovered: Delete annotation (the Inspection panel's Datum: live's plan), Open linked
+document (a Derived of another document: no start has one), Feedback/Report a bug (a cloud feature), Ctrl+click /
+Shift+click Open in new tab / window (the browser's).
 
 | kind | covered | scenarios per item (median) |
 |---|---|---|
 | toolbar | 76/76 | 1 |
-| sketch tool | 55/55 | 1 |
-| menu | 92/117 | 1 |
-| shortcut | 78/89 | 1 |
+| sketch tool | 55/55 | 2 |
+| menu | 119/121 | 1 |
+| shortcut | 86/89 | 1 |
 
 | most-used tool (lead 11-06) | scenarios |
 |---|---|
 | Extrude | 58 |
-| Sketch | 146 |
-| Fillet | 16 |
+| Sketch | 153 |
+| Fillet | 20 |
 | Chamfer | 6 |
 | Revolve | 5 |
 | Shell | 5 |
@@ -484,8 +481,8 @@ flip, the feature menu's Suppress / Unsuppress and Delete):
 | Mirror | 5 |
 | Boolean | 6 |
 | Plane | 7 |
-| Mate connector | 4 |
-| sketch tools (all 55) | 137 scenarios, 55 tools covered |
+| Mate connector | 8 |
+| sketch tools (all 55) | 142 scenarios, 55 tools covered |
 
 ### Drawings
 `tools/ui-parity/coverage_drawing.py` counts the drw-* scenarios exercising each drawing tool and drawing menu item

@@ -122,7 +122,7 @@ def main():
         start = starts.get(sc.get("start"), {}) if isinstance(sc.get("start"), str) else {}
         feature_type = {f.get("name"): ("sketch" if f.get("type") == "newSketch" else f.get("type")) for f in start.get("features", [])}
         # Whether the step is in a sketch (its toolbar and keys are the sketch's).
-        sketching = False
+        sketching = bar = connector = False
         for step in sc.get("steps", []):
             on = step.get("on") or {}
             if "tool" in on:
@@ -137,6 +137,10 @@ def main():
                     sketching = True
                 elif not sketching or on["tool"].lower() in tool_of and on["tool"].lower() not in sketch_tool_of:
                     sketching = False
+            if "tool" in on:
+                connector = on["tool"] == "Mate connector"
+            if on.get("button") == "ok" or (step.get("do") == "key" and step.get("key") in ("Enter", "Escape")):
+                connector = False
             if on.get("button") == "ok":
                 sketching = False
             if "menu" in on and "tool" not in on:
@@ -156,14 +160,18 @@ def main():
             # inferencing); not Shift / Ctrl clicks elsewhere (they add to the selection, not open windows).
             mods = step.get("mods")
             if step.get("do") in ("click", "dblclick") and mods:
-                keys = [norm_key(mods + " click")] if mods == "alt" else [norm_key(mods)] if sketching else []
+                # (Shift in a Mate connector dialog: Lock mate inference.)
+                keys = [norm_key(mods + " click")] if mods == "alt" else [norm_key(mods)] if sketching or (connector and mods == "shift") else []
                 for key in keys:
                     for item, sketch_key in key_of.get(key, []):
                         if item in items and sketch_key == sketching:
                             items[item].add(name)
+            # The rollback bar clicked, then ↑ / ↓: Move rollback bar ("select rollback bar ↑ ↓").
+            if step.get("do") == "click":
+                bar = bool(on.get("rollback_bar"))
             if step.get("do") == "key":
                 key = norm_key(step.get("key", ""))
-                for item, sketch_key in key_of.get(key, []):
+                for item, sketch_key in key_of.get(key, []) + (key_of.get(norm_key("select rollback bar " + step.get("key", "")), []) if bar else []):
                     if item in items and sketch_key == sketching:
                         items[item].add(name)
                 if key == "shift+s" and not sketching:
