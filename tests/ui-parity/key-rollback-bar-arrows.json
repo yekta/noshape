@@ -1,0 +1,43 @@
+{
+ "name": "key-rollback-bar-arrows",
+ "about": "block: select the rollback bar, ↑ twice (above Extrude 1, then Sketch 1), ↓ once, Escape",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last shortcuts)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "rollback_bar": true
+   }
+  },
+  {
+   "do": "key",
+   "key": "ArrowUp"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "ArrowUp"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,34 @@
+{
+ "name": "mate-connector-shift-lock-inference",
+ "about": "block: Mate connector, a Shift+click on the top face near its corner (Lock mate inference), Enter",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last shortcuts)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     37,
+     27,
+     10
+    ]
+   },
+   "mods": "shift"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "name": "alt-click-through-transparent",
+ "about": "overlap: right-click Part 2's top face › Make transparent…, Alt+click on it (Select through transparent: what lies behind), Escape twice",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last shortcuts)",
+ "start": "overlap",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "face": [
+     40,
+     15,
+     15
+    ]
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Make transparent…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     40,
+     15,
+     15
+    ]
+   },
+   "mods": "alt"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

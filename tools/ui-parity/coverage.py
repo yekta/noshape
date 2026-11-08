@@ -49,7 +49,7 @@ def coverage_rs(prefixes, table):
 
 def norm_key(k):
     """A key as the scenarios write it: lower case, `mod` for Ctrl/Cmd, `+` between parts."""
-    k = k.strip().lower().replace("ctrl/cmd", "mod").replace("cmd", "mod").replace("ctrl", "mod")
+    k = k.strip().lower().replace("ctrl/cmd", "mod").replace("cmd", "mod").replace("ctrl", "mod").replace("alt/⌥", "alt")
     parts = [p for p in re.split(r"[ +]|(?<=[a-z])-(?=.)", k) if p]
     return "+".join(parts)
 
@@ -152,6 +152,15 @@ def main():
                     items[menu_of[on["menu"].lower()]].add(name)
                 else:
                     unmatched[f"menu {on['menu']}"] += 1
+            # A click with a modifier held: Alt+click (Select through transparent), Shift in a sketch (Suppress
+            # inferencing); not Shift / Ctrl clicks elsewhere (they add to the selection, not open windows).
+            mods = step.get("mods")
+            if step.get("do") in ("click", "dblclick") and mods:
+                keys = [norm_key(mods + " click")] if mods == "alt" else [norm_key(mods)] if sketching else []
+                for key in keys:
+                    for item, sketch_key in key_of.get(key, []):
+                        if item in items and sketch_key == sketching:
+                            items[item].add(name)
             if step.get("do") == "key":
                 key = norm_key(step.get("key", ""))
                 for item, sketch_key in key_of.get(key, []):

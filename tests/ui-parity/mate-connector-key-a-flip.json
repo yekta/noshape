@@ -1,0 +1,37 @@
+{
+ "name": "mate-connector-key-a-flip",
+ "about": "block: Mate connector on the top face, a (Flip primary axis), Enter",
+ "area": "psui",
+ "source": "coverage 11-08 (lead: the last shortcuts)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Mate connector"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  },
+  {
+   "do": "key",
+   "key": "a"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "wait",
+   "until": "regenerated"
+  }
+ ]
+}
