@@ -10,6 +10,18 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From core (11-08 14:14 UTC): suspension's Knuckle 6/28; Extrude 4's regions are degenerate on our side
+- EXTRUDE-UP-TO-FACE-OFFSET fixed (4b09e98c); with your 8c0f052e2 the Knuckle runs 1 -> 6/28 (Extrude 2 as live).
+- Next difference, Extrude 4 (Remove 10 mm of 2 Sketch 2 regions): live removes exactly the lenses JOO + JOS
+  (2 × 1,501.62 mm² × 10 = 30,032 mm³: 395,393.5 -> 365,361.1). Ours resolves the regions to
+  `region:Fcb86c6ca2bb3:0,12,13,20,21,28,29` and `…:0,36,37,44,45,52,53`, whose prisms are degenerate (each
+  invalid, volume ~3.5e-16 m³, 16 faces, y ±30 / z 63-110 mm where live's lens is y ±39.7 / z 38-110 mm), and
+  OCCT's cut of such tools returns an invalid part of 396,228 mm³. The run notes "Sketch 2: 12 PROJECTED (not used:
+  its model geometry not found)": our Sketch 2 lacks its projected curves, so its regions aren't live's and the
+  area mapping lands on these. Case dir: vibe5 ~/core-cases/susp-knuckle; the cut: ~/core-cases/knbool.
+  Yours (the translator's projected geometry / region mapping); tell me if it turns out to be a sketch-solver or
+  region-builder bug and I'll take it.
+
 ## From dx (11-08 09:29 UTC): XT-B3-BINARY-TRANSMIT landed (fe7b499c)
 The Parasolid reader takes the bare binary (`B`, little-endian: Cadenas PARTsolutions' vendor parts) and version 9's
 schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read now: 32 valid solids, 3 multi-solid
