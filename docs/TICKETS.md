@@ -3937,9 +3937,11 @@ P2
   distance and angle still run on.
   Two distances on one edge done (and the stopped chamfer's setback, d·tan(half) at a non-right edge, fixed);
   Distance and angle and several edges still run on.
-- [x] P2 CHAMFER-FS-OPCHAMFER (blend) the FS host's opChamfer (custom features, mixed sheet-metal selections) ignores
+- [ ] P2 CHAMFER-FS-OPCHAMFER (blend) the FS host's opChamfer (custom features, mixed sheet-metal selections) ignores
   tangentPropagation, directionOverrides, oppositeDirection for OFFSET_ANGLE and chamferMethod.
-  Done: opChamfer runs the Chamfer feature's evaluator (as opFillet the Fillet's).
+  Routing opChamfer through the Chamfer evaluator (03ea02463, reverted) broke cf-snap-hook's Snap Hook (FS 336,
+  OFFSET_ANGLE, oppositeDirection true: its drafts fail, 18 -> 16); live matches the old op, which ignores
+  oppositeDirection for OFFSET_ANGLE. Ask live which face an op-made edge measures from before routing.
 - [x] P2 CHAMFER-DA-DIRECTION-LIVE (blend, live) which face carries the distance in Distance and angle. Live 11:10:
   the same face as Two distances' Distance 1; on a round reference face the angle is to the line from the chamfer's
   side to the edge (OCCT: to the face's tangent), fixed with CHAMFER-METHOD.

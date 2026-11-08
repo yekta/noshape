@@ -29,9 +29,6 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opSplineThroughEdges", |i, a| BuiltinOp { enums: &[("fitType", "EDGES")], ..BuiltinOp::new("fitSpline", "REGEN_ERROR") }.run(i, a, crate::regen::features::curves::fit_spline)),
     ("opRuledSurface", op_ruled_surface),
     ("opCreateCurvesOnFace", op_create_curves_on_face),
-    // Every opChamfer option (tangent propagation, direction overrides, Tangent measurement) as the Chamfer
-    // feature builds it.
-    ("opChamfer", |i, a| BuiltinOp { defaults: &[("tangentPropagation", ParamValue::Bool(false))], ..BuiltinOp::new("chamfer", "CHAMFER_FAILED") }.run(i, a, crate::regen::features::detail::chamfer)),
     ("opFullRoundFillet", |i, a| BuiltinOp { enums: &[("filletType", "FULL_ROUND")], ..BuiltinOp::new("fillet", "FILLET_FAILED") }.run(i, a, crate::regen::features::detail::fillet)),
     // Every opFillet option (cross sections, width, asymmetric, partial,
     // variable) as the Fillet feature builds it.

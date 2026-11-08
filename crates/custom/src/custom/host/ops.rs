@@ -29,6 +29,7 @@ pub const NATIVES: &[(&str, NativeFn)] = &[
     ("opExtrude", op_extrude),
     ("opRevolve", op_revolve),
     ("opBoolean", op_boolean),
+    ("opChamfer", op_chamfer),
     ("opTransform", op_transform),
     ("opPattern", op_pattern),
     ("opDeleteBodies", op_delete_bodies),
@@ -843,6 +844,50 @@ fn by_body(items: Vec<(usize, usize)>) -> BTreeMap<usize, Vec<usize>> {
         m.entry(b).or_default().push(e);
     }
     m
+}
+
+fn blend(i: &mut Interp, a: &[Value], chamfer: bool) -> R<Value> {
+    let (cx, id, def) = args(i, a)?;
+    let refs = evaluate_refs(i, &cx, def.get("entities"))?;
+    let spec = if chamfer {
+        let t = def_enum(&def, "chamferType").unwrap_or_else(|| "EQUAL_OFFSETS".into());
+        match &*t {
+            "TWO_OFFSETS" => {
+                let (w1, w2) = (def_length(i, &def, "width1")?, def_length(i, &def, "width2")?);
+                if def_bool(&def, "oppositeDirection", false) { k::ChamferSpec::TwoDistances(w2, w1) } else { k::ChamferSpec::TwoDistances(w1, w2) }
+            }
+            "OFFSET_ANGLE" => k::ChamferSpec::DistanceAngle(def_length(i, &def, "width")?, def_angle(i, &def, "angle")?),
+            _ => k::ChamferSpec::Equal(def_length(i, &def, "width")?),
+        }
+    } else {
+        k::ChamferSpec::Equal(def_length(i, &def, "radius")?)
+    };
+    run_op(i, &cx, &id, if chamfer { "CHAMFER_FAILED" } else { "FILLET_FAILED" }, |ev| {
+        let groups = by_body(ev.resolve_edges(&refs));
+        if groups.is_empty() {
+            return Err(super::code_error(if chamfer { "CHAMFER_SELECT_EDGES" } else { "FILLET_SELECT_EDGES" }));
+        }
+        let blend_role = |n: &Name| Role::Blend(n.clone());
+        for (bi, edges) in groups.into_iter().rev() {
+            let body = ev.ctx.bodies[bi].clone();
+            let shapes: Vec<Shape> = edges.iter().filter_map(|e| body.shape.sub_shape(ShapeType::Edge, *e).ok()).collect();
+            let res = match (chamfer, spec) {
+                // The same blends as the Fillet and Chamfer features (with their fallbacks).
+                (false, k::ChamferSpec::Equal(r)) => k::fillet_checked(&body.shape, &shapes, &[r]),
+                (_, s) => k::chamfer_checked(&body.shape, &shapes, s, &[]),
+            }
+            .map_err(|e| fe(e.to_string()))?;
+            let names = body.shape_names();
+            let faces = ev.name_result(&[&names], &res.history, &res.shape, &BTreeMap::new(), Some(&blend_role));
+            ev.replace_body(bi, res.shape, faces);
+        }
+        Ok(())
+    })?;
+    Ok(Value::Undefined)
+}
+
+fn op_chamfer(i: &mut Interp, a: Vec<Value>) -> R<Value> {
+    blend(i, &a, true)
 }
 
 // ---------------------------------------------------------------- transforms and copies
