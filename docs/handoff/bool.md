@@ -162,6 +162,11 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   revolve's cavity (below z = 0) touches the top face tangentially along r = 15.2 mm, so the result has the top face
   meeting the cavity along that circle at zero thickness, a non-manifold edge ours refuses. What live builds there
   (a shared edge, split faces, or a slight gap) decides the design; live's Part 1 after it: 36/79/44, 1294.125 mm3.
+- **cf-surface-pattern after the refined sections (11-08 17:35 UTC):** not tangency. The pieces it declines on
+  ("a piece's point on another solid's face") have their points 1-23 um from a sphere that crosses the part's face
+  transversally (normals' dot 0.03-0.88: faces 0:0 / 0:2 / 0:3 against spheres 4-83), so tangent_side rightly gives
+  None. They are slivers lying along a section (points near it within the band): the next step is a point in such a
+  sliver farther from its sections (other_points' band test is against the piece's own outline, which these pass).
 - **Found 11-08 (not yet worked):** cf-surface-pattern's sphere cut (vibe4 ~/agents/bool-corpora/sp-cut, 990256f0)
   declines "a section touching a face's boundary": the part's faces carry 0.25-0.54 mm tolerances (a sphere 0.07 mm), so
   the grey band about a boundary is 1-2 mm and sections near the boundary count as touching it (debug print:
