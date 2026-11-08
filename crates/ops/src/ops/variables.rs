@@ -141,7 +141,7 @@ pub fn ops() -> Vec<Op> {
             group: "variable",
             verb: "create",
             summary: "Create a variable (#name) in a Part Studio or a Variable Studio",
-            description: "Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row (\"Add variable\", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.",
+            description: "Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row (\"Add variable\", a Length variable), then its type, value and description cells, one edit each, as typed in the table; a name the studio has becomes `<name>_0` (`renamed`, with Onshape's `message`). Use it in any expression as #name.",
             fields: vec![
                 doc_field(),
                 var_tab(),
@@ -563,7 +563,12 @@ fn list(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let (od, tab) = match table(ctx, a)? {
         (od, Table::Vs(tab)) => {
-            let name = vs_name(vs_studio(od, tab)?, a.str("name")?, None)?;
+            let given = a.str("name")?.trim().trim_start_matches('#');
+            if !vt::is_identifier(given) {
+                return Err(name_error(NameError::Invalid, given));
+            }
+            // A taken name becomes `<name>_0` (live's Variable Studio).
+            let name = vs::free_name(vs_studio(od, tab)?, given);
             if let Some(k) = a.opt_str("kind")? {
                 kind_of(k)?;
             }
@@ -572,7 +577,12 @@ fn create(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             vs_edit(od, tab, "Add variable", |s| vs::add_variable(s, &name, &units))?;
             let i = vs_studio(od, tab)?.variables.len() - 1;
             vs_set_fields(od, tab, i, a)?;
-            return Ok(vs_list(od, tab)?.into());
+            let mut out = vs_list(od, tab)?;
+            if name != given {
+                out["message"] = json!(vs::RENAMED_MESSAGE);
+                out["renamed"] = json!(name);
+            }
+            return Ok(out.into());
         }
         (od, Table::Studio(tab)) => (od, tab),
     };

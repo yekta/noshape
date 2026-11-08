@@ -2657,8 +2657,10 @@ fn variable_studio_table() {
     // Errors name the parameter.
     let e = try_call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "2x", "value": 1 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
-    let e = try_call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "half", "value": 1 })).unwrap_err();
-    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    // A taken name becomes `<name>_0`, with live's toast.
+    let r = call(&mut ctx, "variable_create", json!({ "tab": "vs all", "name": "half", "value": 1 }));
+    assert_eq!((r["renamed"].as_str(), r["message"].as_str()), (Some("half_0"), Some("Renamed some new variables to avoid name conflicts.")), "{r}");
+    call(&mut ctx, "variable_delete", json!({ "tab": "vs all", "variable": "half_0" }));
     let e = try_call(&mut ctx, "variable_set", json!({ "tab": "vs all", "variable": "nope", "value": 1 })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("variable"), "{e:?}");
 }
@@ -4060,6 +4062,38 @@ fn tab_folders() {
     assert_eq!(tab_folder(&mut ctx, "Assembly 1"), "Folder 1");
     let d = call(&mut ctx, "document_info", json!({}));
     assert_eq!(d["folders"].as_array().unwrap().len(), 1, "{d}");
+}
+
+/// Tab › Move to document…: into a new document (named, next to this one), then into an existing one; the tabs
+/// leave this document; the last tab can't go.
+#[test]
+fn tab_move_to_document() {
+    let mut ctx = Ctx::new();
+    let path = scratch("move-src.noshape");
+    let other = scratch("move-other.noshape");
+    call(&mut ctx, "document_create", json!({ "path": other.to_str().unwrap() }));
+    call(&mut ctx, "document_close", json!({}));
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "variable_create_studio", json!({}));
+    let names = |v: &Value| v["tabs"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let r = call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Variable Studio 1"], "name": "move-new" }));
+    assert!(!names(&r).contains(&"Variable Studio 1".to_string()), "{r}");
+    let new = std::path::PathBuf::from(r["document"].as_str().unwrap());
+    assert_eq!(new.file_name().unwrap(), "move-new.noshape", "{r}");
+    assert_eq!(new.parent(), path.parent());
+    // Into the existing document: Assembly 1 there becomes "Assembly 2".
+    let r = call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Assembly 1"], "document": other.to_str().unwrap() }));
+    assert_eq!(names(&r), ["Part Studio 1"], "{r}");
+    let e = try_call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Part Studio 1"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tabs"));
+    let e = try_call(&mut ctx, "tab_move_to_document", json!({ "tabs": ["Nope"] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tabs"));
+    let o = call(&mut ctx, "document_open", json!({ "path": other.to_str().unwrap() }));
+    assert_eq!(names(&o), ["Part Studio 1", "Assembly 1", "Assembly 2"], "{o}");
+    let n = call(&mut ctx, "document_open", json!({ "path": new.to_str().unwrap() }));
+    assert_eq!(names(&n), ["Variable Studio 1"], "{n}");
+    assert_eq!(n["name"], "move-new", "{n}");
+    let _ = std::fs::remove_file(&new);
 }
 
 /// feature_add makes the dialog's own choices for fields not given: an

@@ -7,7 +7,7 @@ use crate::doc_model::{DocEvent, DocModel};
 use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
+use gpui_kit::component::input::{InputState, Textarea, TextareaState};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -51,10 +51,13 @@ pub fn document_details(doc: Entity<DocModel>, window: &mut Window, cx: &mut App
             .child(
                 os::modal_body()
                     .child(h_flex().gap(px(6.)).child(div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child("Enter a document description:")).child(div().text_size(px(12.)).text_color(pal.text_muted).child("Maximum of 10000 characters")))
-                    .child(Textarea::new(&desc_st).h(px(96.)).text_size(px(14.)))
+                    .child({
+                        os::note_modal_input(Some("Enter a document description"), &desc_st.read(cx).value());
+                        Textarea::new(&desc_st).h(px(96.)).text_size(px(14.))
+                    })
                     .child({
                         let nrm = nrm.clone();
-                        os::checkbox("doc-nrm", "Not revision managed", nrm.get()).on_click(move |_, window, _| {
+                        os::modal_checkbox("doc-nrm", "Not revision managed", nrm.get()).on_click(move |_, window, _| {
                             nrm.set(!nrm.get());
                             window.refresh();
                         })
@@ -158,7 +161,7 @@ fn copy_dialog(doc: Entity<DocModel>, mv: Option<noshape_store::MicroversionId>,
             .child(
                 os::modal_body()
                     .child(os::field_label("Document name"))
-                    .child(os::input_h(Input::new(&name_st), 32.).text_size(px(14.)))
+                    .child(os::input_h(os::modal_input(Some("Document name"), &name_st, cx), 32.).text_size(px(14.)))
                     .child(os::field_label("Copy document to"))
                     .child(location.render()),
             )
@@ -730,13 +733,45 @@ fn element_code(name: &str, content: &TabContent) -> String {
     out
 }
 
-/// Tab › Move to document…: another document receives the element (as a new
-/// tab) and it is deleted here.
+/// Tab › Move to document… (live doc-tab-menu-move-to-document): New document (its name, "Untitled document",
+/// selected) | Other documents (pick one), the tabs being moved, [Move] [Cancel]. The tabs go to the other document
+/// and are deleted here (op `tab_move_to_document`).
 pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document::TabId>, window: &mut Window, cx: &mut App) {
+    #[derive(Default)]
+    struct State {
+        other: bool,
+        picked: Option<std::path::PathBuf>,
+    }
     let path = doc.read(cx).session.path.clone();
     let docs = crate::doc_files::other_documents(&path);
+    let state = Rc::new(std::cell::RefCell::new(State::default()));
+    let name_st = cx.new(|cx| InputState::new(window, cx).default_value("Untitled document"));
+    let focus = name_st.clone();
+    let names: Vec<String> = {
+        let d = &doc.read(cx).session.doc;
+        tabs.iter().filter_map(|t| d.tab(*t).map(|x| x.name.clone()).or_else(|| d.folder(*t).map(|f| f.name.clone()))).collect()
+    };
     window.open_dialog(cx, move |dialog, _, cx| {
         let pal = p();
+        let other = state.borrow().other;
+        let tab = |id: &'static str, label: &'static str, on: bool, to_other: bool| {
+            let st = state.clone();
+            div()
+                .id(id)
+                .px(px(12.))
+                .py(px(8.))
+                .text_size(px(14.))
+                .cursor_pointer()
+                .text_color(if on { pal.accent } else { pal.text })
+                .when(on, |d| d.border_b_2().border_color(pal.accent))
+                .map(|d| noshape_app_core::ui_script::mark(d, || format!("button:{label}")))
+                .child(label)
+                .on_click(move |_, window, _| {
+                    st.borrow_mut().other = to_other;
+                    window.refresh();
+                })
+        };
+        let picked = state.borrow().picked.clone();
         let rows: Vec<AnyElement> = if docs.is_empty() {
             vec![os::info_box("No other documents.").into_any_element()]
         } else {
@@ -744,7 +779,8 @@ pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document
                 .enumerate()
                 .map(|(k, target)| {
                     let name = crate::derived::external_doc_info(target).map(|i| i.name).unwrap_or_default();
-                    let (doc, target, tabs) = (doc.clone(), target.clone(), tabs.clone());
+                    let (st, target) = (state.clone(), target.clone());
+                    let on = picked.as_ref() == Some(&target);
                     h_flex()
                         .id(("mtd", k))
                         .h(px(32.))
@@ -752,69 +788,65 @@ pub fn move_to_document(doc: Entity<DocModel>, tabs: Vec<noshape_model::document
                         .gap(px(6.))
                         .text_size(px(14.))
                         .cursor_pointer()
-                        .hover(|d| d.bg(rgb(0xdef1fb)))
+                        .when(on, |d| d.bg(pal.accent_soft))
+                        .when(!on, |d| d.hover(|d| d.bg(rgb(0xdef1fb))))
                         .child(os::glyph(os::GLYPH_DOCUMENT, 18., pal.text_muted))
-                        .child(div().flex_1().truncate().child(crate::ui::user_text(name)))
-                        .on_click(move |_, window, cx| {
-                            let r = tabs.iter().try_for_each(|t| move_tab_into(&doc, *t, &target, cx));
-                            if report(&doc, r, cx) {
-                                window.close_dialog(cx);
-                            }
+                        .child(div().flex_1().truncate().child(crate::ui::user_text(name.clone())))
+                        .map(|d| noshape_app_core::ui_script::mark(d, move || format!("list_row:{name}")))
+                        .on_click(move |_, window, _| {
+                            st.borrow_mut().picked = Some(target.clone());
+                            window.refresh();
                         })
                         .into_any_element()
                 })
                 .collect()
         };
+        let count = match names.len() {
+            1 => "1 tab selected".to_string(),
+            n => format!("{n} tabs selected"),
+        };
+        let moved = v_flex().pt(px(8.)).gap(px(2.)).child(div().text_size(px(13.)).text_color(pal.text_muted).child(count)).children(names.iter().map(|n| div().pl(px(8.)).text_size(px(14.)).child(crate::ui::user_text(n.clone()))));
+        let (doc, tabs, n, st) = (doc.clone(), tabs.clone(), name_st.clone(), state.clone());
         os::modal(dialog, "Move to document", 460.)
-            .child(os::modal_body().child(os::field_label("Document")).child(v_flex().id("mtd-rows").max_h(px(360.)).overflow_y_scroll().children(rows)))
-            .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .child(
+                os::modal_body()
+                    .child(h_flex().border_b_1().border_color(rgb(0xeeeeee)).child(tab("mtd-new", "New document", !other, false)).child(tab("mtd-other", "Other documents", other, true)))
+                    .when(!other, |d| d.child(os::field_label("Document name")).child(os::input_h(os::modal_input(Some("Document name"), &name_st, cx), 32.).text_size(px(14.))))
+                    .when(other, |d| d.child(v_flex().id("mtd-rows").max_h(px(300.)).overflow_y_scroll().children(rows)))
+                    .child(moved),
+            )
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, _, cx| {
+                let (to_other, picked) = {
+                    let s = st.borrow();
+                    (s.other, s.picked.clone())
+                };
+                let name = n.read(cx).value().trim().to_string();
+                let r = match (to_other, picked) {
+                    (true, None) => return false,
+                    (true, Some(target)) if crate::files::is_document_open(&target, cx) => Err(anyhow::anyhow!("Close the other document's window first")),
+                    (true, Some(target)) => move_out(&doc, &tabs, noshape_ops::tab_move::Destination::Existing(&target), cx),
+                    (false, _) if name.is_empty() => return false,
+                    (false, _) => move_out(&doc, &tabs, noshape_ops::tab_move::Destination::New(&name), cx),
+                };
+                report(&doc, r, cx)
+            })
+    });
+    window.defer(cx, move |window, cx| {
+        focus.update(cx, |s, cx| {
+            s.focus(window, cx);
+            s.select_all(window, cx);
+        })
     });
 }
 
-/// Move a tab, or a folder with its contents (Onshape: "tabs and folders
-/// within the folder remain within it"), into the other document's main
-/// workspace.
-fn move_tab_into(doc: &Entity<DocModel>, tab: noshape_model::document::TabId, target: &std::path::Path, cx: &mut App) -> anyhow::Result<()> {
-    use noshape_model::document::TabId;
-    anyhow::ensure!(!crate::files::is_document_open(target, cx), "Close the other document's window first");
-    let src = doc.read(cx).session.doc.clone();
-    let label = match (src.tab(tab), src.folder(tab)) {
-        (Some(t), _) => t.name.clone(),
-        (None, Some(f)) => f.name.clone(),
-        _ => return Ok(()),
+fn move_out(doc: &Entity<DocModel>, tabs: &[noshape_model::document::TabId], dest: noshape_ops::tab_move::Destination, cx: &mut App) -> anyhow::Result<()> {
+    let (src, path) = {
+        let s = &doc.read(cx).session;
+        (s.doc.clone(), s.path.clone())
     };
-    let mut store = noshape_store::Document::open(target)?;
-    let branch = store.default_branch()?;
-    let head = store.head(branch)?;
-    let mut other = noshape_model::Document::from_blobs(&store.read_all(head)?)?;
-    let mut added = Vec::new();
-    // Copy `id` (tab or folder) into `parent` of the other document.
-    fn copy(src: &noshape_model::Document, other: &mut noshape_model::Document, id: TabId, parent: Option<TabId>, added: &mut Vec<TabId>) {
-        if let Some(t) = src.tab(id) {
-            let name = if other.tabs.iter().any(|x| x.name == t.name) { other.next_tab_name(&t.name) } else { t.name.clone() };
-            let new = other.add_tab(&name, t.content.clone());
-            other.set_parent(new, parent);
-            added.push(new);
-        } else if let Some(f) = src.folder(id) {
-            let new = other.add_folder(&f.name, parent);
-            for c in src.children(Some(id)) {
-                copy(src, other, c, Some(new), added);
-            }
-        }
-    }
-    copy(&src, &mut other, tab, None, &mut added);
-    let mut changes: Vec<(String, Option<Vec<u8>>)> = added.iter().map(|id| (noshape_model::Document::blob_name(*id), other.tab_blob(*id))).collect();
-    changes.push((noshape_model::document::META_BLOB.to_string(), Some(other.settings_blob())));
-    store.commit(branch, &changes, &format!("Insert tab : {label}"))?;
-    let _ = store.checkpoint();
-    doc.update(cx, |d, cx| {
-        d.edit_document_not_undoable(&format!("Move tab to document : {label}"), cx, |document| {
-            if document.is_folder(tab) {
-                document.delete_folder_tree(tab);
-            } else {
-                document.remove_tab(tab);
-            }
-        })
-    });
+    noshape_ops::tab_move::copy_out(&src, &path, tabs, dest)?;
+    let what = noshape_ops::tab_move::description(&src, tabs);
+    doc.update(cx, |d, cx| d.edit_document_not_undoable(&what, cx, |document| noshape_ops::tab_move::remove(document, tabs)));
     Ok(())
 }

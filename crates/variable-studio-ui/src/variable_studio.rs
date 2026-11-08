@@ -274,6 +274,11 @@ impl VariableStudioView {
                     }
                     cx.notify();
                 }
+                // Enter in a name or description leaves the field (live vs-rename-variable: the cell keeps the
+                // selection, not the keyboard).
+                if !add_row && value_row.is_none() && matches!(ev, InputEvent::PressEnter { .. }) {
+                    window.focus(&this.focus, cx);
+                }
                 // Unchanged text commits nothing (no empty undo step; Esc's
                 // revert then blur stays a no-op).
                 if !add_row && this.inputs.get(&k).is_some_and(|(_, last)| *last == v) {
@@ -281,11 +286,15 @@ impl VariableStudioView {
                 }
                 // The add row empties once used: Enter then the blur that
                 // follows added the variable twice ("cd", "cd").
-                if add_row && !v.trim().is_empty() {
+                if add_row && noshape_model::variable_table::is_identifier(v.trim().trim_start_matches('#')) {
                     st.update(cx, |s, cx| s.set_value("", window, cx));
                     if matches!(ev, InputEvent::PressEnter { .. }) {
                         this.focus_add_row = true;
                     }
+                }
+                // The blur after an Enter sees this text as saved.
+                if !add_row && let Some(e) = this.inputs.get_mut(&k) {
+                    e.1 = v.clone();
                 }
                 commit(this, v, cx);
             }
@@ -686,7 +695,8 @@ impl Render for VariableStudioView {
             if crate::ui_script::active() {
                 // A cell being typed in shows what's typed (live vs-edit-value: "50" before Enter).
                 let value = if editing { expr.read(cx).value().to_string() } else { shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text)) };
-                drawn.push(serde_json::json!({ "name": v.name, "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": value, "description": desc_text }));
+                let typed = |st: &Entity<InputState>, saved: &str| if st.read(cx).focus_handle(cx).is_focused(window) { st.read(cx).value().to_string() } else { saved.to_string() };
+                drawn.push(serde_json::json!({ "name": typed(&name, &v.name), "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": value, "description": typed(&desc, &desc_text) }));
             }
             let from_import = v.kind == Some(VarKind::FromImport);
             let cfg_value = studio.configuration.configured_cell(&v.name, VsField::Value).is_some();
@@ -838,7 +848,8 @@ impl Render for VariableStudioView {
                                 let (text, v) = (desc_text.clone(), desc_view.clone());
                                 let m = row_menu(m, desc_view.clone(), i, n);
                                 variable_config::cell_menu(m, desc_view.clone(), &cfg, (var.clone(), VsField::Description, text.clone(), None))
-                                    .item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone()))))
+                                    // Live vs-desc-menu-convert: Copy only on a text description.
+                                    .when(!desc_is_expr, |m| m.item(crate::os_menu::OsMenuItem::new("Copy").on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(text.clone())))))
                                     .item(crate::os_menu::OsMenuItem::new(if desc_is_expr { "Convert to text" } else { "Convert to expression" }).on_click(move |_, _, cx| {
                                         v.update(cx, |t, cx| {
                                             t.edit("Edit variable description", cx, |s| {
@@ -858,11 +869,17 @@ impl Render for VariableStudioView {
         let add_units = units;
         let new_name = self.cell("new".into(), String::new(), window, cx, move |this, val, cx| {
             let name = val.trim().trim_start_matches('#').to_string();
-            if name.is_empty() {
+            // Live: an invalid name isn't added and stays in the cell (vs-add-variable-invalid).
+            if !noshape_model::variable_table::is_identifier(&name) {
                 return;
             }
             this.inputs.remove("new");
-            this.edit("Add variable", cx, |s| noshape_ops::variable_studio::add_variable(s, &name, &add_units));
+            let Some(studio) = this.studio(cx) else { return };
+            let free = noshape_ops::variable_studio::free_name(studio, &name);
+            this.edit("Add variable", cx, |s| noshape_ops::variable_studio::add_variable(s, &free, &add_units));
+            if free != name {
+                this.doc.update(cx, |_, cx| cx.emit(DocEvent::Info(noshape_ops::variable_studio::RENAMED_MESSAGE.into())));
+            }
         });
         if std::mem::take(&mut self.focus_add_row) {
             // After this frame, once the new row's input is laid out.

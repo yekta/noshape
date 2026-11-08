@@ -50,6 +50,7 @@ pub mod shortcuts;
 pub mod sketch_export;
 pub mod sketch_use;
 pub mod studio;
+pub mod tab_move;
 pub mod tool_search;
 pub mod ui_parity;
 pub mod values;

@@ -164,6 +164,7 @@ def all_differences(a, b, path=""):
 
 
 # Cloud features noshape leaves out (AGENTS.md: comments, sharing…): not compared in live's menus.
+INPUT_BUTTONS = {"Apply", "Cancel", "Save", "OK"}
 CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
               "Import from", "Create task…"}
@@ -175,6 +176,10 @@ def normalize_live(state):
     focus = (state or {}).get("focus")
     if isinstance(focus, dict) and focus.get("text") == "on" and focus.get("selection") == [None, None]:
         focus["text"], focus["selection"] = None, None
+    # The Feature Studio's code editor: Ace's hidden textarea holds a piece of the text around the caret, not a field's
+    # text; the editor's own `featurestudio.caret` is compared instead.
+    if isinstance(focus, dict) and focus.get("tag") == "textarea" and (state or {}).get("featurestudio"):
+        state["focus"] = {"kind": "other"}
     # Live's recorder leaves an instance's owner empty when a command selected it (Select instances with same
     # configuration, Dynamic suppression's panel), not a click: compared by kind.
     sel = (state or {}).get("selection")
@@ -220,6 +225,13 @@ def normalize_live(state):
         focus["text"] = re.sub(r"^start \S+ Copy \d+ - ", "Part Studio 1 - ", focus["text"])
         if focus.get("selection") == [0, n]:
             focus["selection"] = [0, len(focus["text"])]
+    if isinstance(d, dict) and d.get("kind") == "modal" and isinstance(d.get("fields"), list):
+        # Live's recorder reads an <input type="button"> (Workspace protection's Apply / Cancel) as a field: a button.
+        is_button = lambda f: isinstance(f, dict) and f.get("label") is None and f.get("kind") == "input" and f.get("value") in INPUT_BUTTONS
+        buttons = [f["value"] for f in d["fields"] if is_button(f)]
+        if buttons:
+            d["fields"] = [f for f in d["fields"] if not is_button(f)]
+            d["buttons"] = (d.get("buttons") or []) + [b for b in buttons if b not in (d.get("buttons") or [])]
     if isinstance(d, dict) and d.get("kind") == "modal":
         # A modal titled after the copy ("Input propagation for start two-blocks asm Copy 2").
         if isinstance(d.get("title"), str):
@@ -343,7 +355,7 @@ LOCAL_ROWS = {"Show in folder", "Show in Explorer", "Show in Finder", "Install c
 
 # Rows that depend on what the clipboard held before the scenario (live's runner keeps one browser session, so a copy
 # from an earlier scenario shows Paste into sketch in a later one): compared only in scenarios that copy something.
-CLIPBOARD_ROWS = {"Paste into sketch", "Paste sketch", "Paste sketch entities"}
+CLIPBOARD_ROWS = {"Paste into sketch", "Paste sketch", "Paste sketch entities", "Paste tab", "Paste inputs"}
 
 
 def copies(live):
@@ -573,6 +585,9 @@ def main():
     score, steps_ok, steps_all = 0, 0, 0
     for name in names:
         out = out_dir / f"{name}.json"
+        if not (scen_dir / f"{name}.json").exists():
+            print(f"{name}: no scenario (a live recording of a dropped one)")
+            continue
         if not args.compare_only:
             problem = run_one(args.app, scen_dir / f"{name}.json", out, args.display, args.timeout)
             # The display refusing a new client now and then (Xvfb): once more.

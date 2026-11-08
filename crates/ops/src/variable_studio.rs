@@ -13,6 +13,19 @@ pub fn add_variable(s: &mut VariableStudio, name: &str, units: &UnitPrefs) {
     s.variables.push(VariableDef { name, expr: ExprValue::new(format!("0 {unit}")), kind: Some(VarKind::Length), description: String::new(), description_expr: false, import: None });
 }
 
+/// Live's toast when an added variable's name was taken (vs-add-variable-duplicate).
+pub const RENAMED_MESSAGE: &str = "Renamed some new variables to avoid name conflicts.";
+
+/// A name no variable of `s` has: `name`, else `<name>_0`, `<name>_1`… (live: "width" → "width_0").
+pub fn free_name(s: &VariableStudio, name: &str) -> String {
+    let name = name.trim().trim_start_matches('#');
+    let taken = |n: &str| s.variables.iter().any(|v| v.name == n);
+    if !taken(name) {
+        return name.to_string();
+    }
+    (0..).map(|i| format!("{name}_{i}")).find(|n| !taken(n)).expect("a free name")
+}
+
 /// The Name cell ("Rename variable"): configured cells follow the name.
 pub fn rename_variable(s: &mut VariableStudio, i: usize, name: &str) {
     if let Some(v) = s.variables.get_mut(i) {

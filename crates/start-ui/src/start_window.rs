@@ -1103,7 +1103,7 @@ impl StartView {
                     }
                 }
                 self.selected = None;
-                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(item.id), brief: false });
+                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(item.id), brief: true });
                 self.force_rescan(cx);
             }
             Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not move to trash: {e:#}")),
@@ -1204,7 +1204,7 @@ impl StartView {
     /// Onshape's folder menu (live documents/46, minus cloud items): Open,
     /// Rename, Details, Move to…, Send to trash; in the Trash: Details,
     /// Restore, Delete.
-    fn folder_menu(view: Entity<StartView>, f: PathBuf, name: String, trash_id: Option<String>, menu: OsMenu) -> OsMenu {
+    fn folder_menu(view: Entity<StartView>, f: PathBuf, name: String, trash_id: Option<String>, menu: OsMenu, window: &mut Window, cx: &mut Context<OsMenu>) -> OsMenu {
         let item = |label: &'static str, f: &PathBuf, act: fn(&mut StartView, PathBuf, &mut Window, &mut Context<StartView>)| {
             let (view, f) = (view.clone(), f.clone());
             OsMenuItem::new(label).on_click(move |_, window, cx| {
@@ -1232,6 +1232,20 @@ impl StartView {
                 let (f, name) = (f2.clone(), name.clone());
                 v.update(cx, |t, cx| t.confirm_trash(f, name, true, window, cx));
             }))
+            .submenu("Set library", window, cx, |m, _, _| Self::library_menu(f, m))
+    }
+
+    /// Set library ▸: the folder becomes one of the user's libraries (op `documents_set_library`), ✓ the ones it is.
+    fn library_menu(folder: PathBuf, menu: OsMenu) -> OsMenu {
+        let set = noshape_ops::prefs::LibraryFolders::load();
+        noshape_ops::prefs::LIBRARIES.iter().fold(menu, |m, (key, label)| {
+            let folder = folder.clone();
+            m.item(OsMenuItem::new(*label).checked(set.0.get(*key) == Some(&folder)).on_click(move |_, _, _| {
+                let mut libs = noshape_ops::prefs::LibraryFolders::load();
+                libs.0.insert(key.to_string(), folder.clone());
+                let _ = libs.save();
+            }))
+        })
     }
 
     /// The selected folder tile: (name, created, modified) in unix ms.
@@ -2677,7 +2691,7 @@ impl StartView {
                         .text_size(px(14.))
                         .text_color(pal.text)
                         .child("Documents in the trash will be automatically deleted after 30 days.")
-                        .child(os::secondary_button("empty-trash", "Empty trash…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_empty_trash(window, cx)))),
+                        .child(os::page_secondary_button("empty-trash", "Empty trash…", cx).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.confirm_empty_trash(window, cx)))),
                 )
             })
             .into_any_element()
@@ -2762,12 +2776,12 @@ impl StartView {
                         cx.notify();
                     }))
                     // Right-click selects too (the menu's handler stops propagation).
-                    .os_context_menu(move |menu, _, cx| {
+                    .os_context_menu(move |menu, window, cx| {
                         view.update(cx, |this, cx| {
                             this.selected = Some(f2.clone());
                             cx.notify();
                         });
-                        Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu)
+                        Self::folder_menu(view.clone(), f.clone(), name.clone(), trash_id.clone(), menu, window, cx)
                     }),
             );
         }
@@ -2951,12 +2965,12 @@ impl StartView {
                         cx.notify();
                     }))
                     // Right-click selects too (the menu's handler stops propagation).
-                    .os_context_menu(move |menu, _, cx| {
+                    .os_context_menu(move |menu, window, cx| {
                         v.update(cx, |this, cx| {
                             this.selected = Some(f2.clone());
                             cx.notify();
                         });
-                        Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu)
+                        Self::folder_menu(v.clone(), f3.clone(), menu_name.clone(), tid.clone(), menu, window, cx)
                     }),
             );
         }

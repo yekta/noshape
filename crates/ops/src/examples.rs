@@ -42,6 +42,8 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_folder_create", &[r##"{}"##, r##"{"name": "Fixtures", "folder": "Folder 1"}"##]),
     ("tab_move", &[r##"{"tab": "Part Studio 1", "folder": "Folder 1"}"##, r##"{"tab": "Part Studio 1", "to_parent": true}"##, r##"{"tab": "Assembly 1", "before": "Part Studio 1"}"##]),
     ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
+    ("documents_set_library", &[r##"{"library": "frame_profiles", "folder": "/home/ann/noshape/Profiles"}"##, r##"{"library": "images", "clear": true}"##]),
+    ("tab_move_to_document", &[r##"{"tabs": ["Variable Studio 1"], "name": "Shared variables"}"##, r##"{"tabs": ["Part Studio 2"], "document": "/home/ann/noshape/bracket.noshape"}"##]),
     // features
     ("feature_frame_profiles", &[r##"{}"##, r##"{"standard": "ISO", "profile": "Rectangular tube", "size": "30mm x 30mm x 2mm", "rounded": true}"##]),
     ("feature_types", &[r##"{"search": "move face"}"##, r##"{"category": "Detail"}"##, r##"{"document": "/home/me/Documents/noshape/Gears.noshape", "version": "V2"}"##]),

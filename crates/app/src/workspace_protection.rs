@@ -75,6 +75,8 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                     .child({
                         let on = on.clone();
                         let blocked = !stale.is_empty();
+                        let value = on.get();
+                        noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": "Enable workspace protection", "kind": "checkbox", "value": value }));
                         h_flex()
                             .id("ws-protect")
                             .map(|d| noshape_app_core::ui_script::mark(d, || "checkbox:Enable workspace protection".into()))

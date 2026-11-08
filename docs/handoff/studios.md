@@ -28,6 +28,35 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 13:42 UTC: whole-suite measure 82.1 %; Move to document…, Set library, modal fields, Feature Studio editor
+- Measured (uip12, every studios scenario on b66c324a + the batch below in progress): 181/390 scenarios, 1475/1796
+  states (82.1 %): documents (doc/docs/prefs) 80.5 %, versions 84.6 %, Variable Studio 83.5 %, Feature Studio 81.6 %.
+- Move to document… is live's dialog: New document (Document name "Untitled document", selected) | Other documents,
+  "1 tab selected" and the tabs, Move / Cancel; op `tab_move_to_document` (new or existing document, e2e
+  tab_move_to_document; `crates/ops/src/tab_move.rs`). Open: the referenced-tabs notice and "Move all referenced tabs"
+  (asked live), what happens after the move.
+- Documents › folder › Set library ▸ (My frame profiles library, My sheet metal forms, My default tolerances, My images,
+  My standard content): kept per user in libraries.json, op `documents_set_library`. Nothing reads it yet: the frame
+  profile picker, sheet metal forms, tolerances, images and standard content need to list a library folder's documents
+  (owners: core / sheet metal / drawings / assemblies).
+- Modals record their fields as live's recorder reads them (`ui_script::note_modal_field`, `os::modal_input`,
+  `os::modal_checkbox`, `os::note_modal_input`): Copy workspace / version, Document details, Create version / workspace
+  (the name unlabelled, the description "Description cannot contain HTML."), Workspace protection, New environment
+  profile, Move to document. The runner reads live's `<input type=button>` fields (Apply / Cancel) as buttons. Create
+  Drawing (drawing-ui) still notes `fields: []`: dx's.
+- Feature Studio: the Import panel recorded as live's picker (kind tabs, "Search <kind>", a row per element); New feature
+  selects "My Feature"; a plain click is a Back reference step; the code editor's focus compared as "other" (Ace's
+  textarea holds a piece of text).
+- Variable Studio: a name or description being typed is the row's; Enter leaves the field; an added name that's taken
+  becomes `<name>_0` with "Renamed some new variables to avoid name conflicts." (the op too); an invalid one stays in the
+  add row; Copy only on a text description; Paste inputs only with inputs copied.
+- Documents page: the trash toast fades as the restore one (3 s); the page's Empty trash… isn't one of the modal's
+  buttons (`os::page_secondary_button`). Runner: "Paste tab", "Paste inputs" are clipboard rows; dropped scenarios'
+  live recordings (Copy link) are skipped and deleted.
+- Next (not started): the FS editor's undo as live's (the toolbar's Undo / Redo act on Ace's history, by word groups,
+  the caret at the change; Ctrl+Z makes Redo available); the Variable Studio's name / description cells select on a
+  click and edit on a key, as its value cells; documents-page ops (trash, folders, labels, moves: none exist).
+
 ### 2026-11-08 13:00 UTC: compare, Insert Variable Studio and inserted tables to live's recordings
 - The 24 ver-compare / vs-insert / vs-inserted scenarios: 6 → 16 matched, 125/135 states. Compare: change marks as
   live's (">" added = only in the base, "<" removed), the panel stands in for the feature list (`features`/`parts`

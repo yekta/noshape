@@ -508,6 +508,9 @@ focuses a clicked button, ours' buttons take no focus) equals another such; a te
 textarea, a select, or ours' "other" with `text`) is compared as recorded. A scenario whose later steps depend on the
 clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it.
 
+The Feature Studio's code editor holding the keyboard is live's Ace textarea, whose text is a piece around the
+caret: compared as `{"kind": "other"}` (the caret is `featurestudio.caret`).
+
 Child rows: a dialog's `fields` with `"child": true` (Insert Variable Studio's variables under their studio row,
 `"child": false`) are compared as a set within each studio: live lists them in a different order on each run.
 

@@ -65,7 +65,24 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
 
     custom_properties(&mut ctx, &dir);
     export_defaults(&mut ctx, &dir);
+    libraries(&mut ctx, &dir);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A folder's Set library ▸: kept per user, one folder per library, unset with `clear`.
+fn libraries(ctx: &mut Ctx, dir: &std::path::Path) {
+    let profiles = dir.join("Profiles");
+    std::fs::create_dir_all(&profiles).unwrap();
+    let l = call(ctx, "documents_set_library", json!({ "library": "My frame profiles library", "folder": profiles.to_str().unwrap() })).unwrap();
+    assert_eq!(l["libraries"]["frame_profiles"], profiles.to_str().unwrap(), "{l}");
+    let l = call(&mut Ctx::new(), "documents_set_library", json!({ "library": "images", "folder": profiles.to_str().unwrap() })).unwrap();
+    assert_eq!(l["libraries"].as_object().unwrap().len(), 2, "{l}");
+    let l = call(ctx, "documents_set_library", json!({ "library": "images", "clear": true })).unwrap();
+    assert!(l["libraries"]["images"].is_null(), "{l}");
+    let e = call(ctx, "documents_set_library", json!({ "library": "nope", "folder": profiles.to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("library"), "{e:?}");
+    let e = call(ctx, "documents_set_library", json!({ "library": "images", "folder": dir.join("none").to_str().unwrap() })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("folder"), "{e:?}");
 }
 
 /// The Export dialog's remembered options are export_parts' defaults (live exportSolidOptions): STL as text in

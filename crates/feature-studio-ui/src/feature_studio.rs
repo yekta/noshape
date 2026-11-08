@@ -921,6 +921,19 @@ impl FeatureStudioView {
         self.jump(from, NavEntry { pos: to, label: format!("Symbol - {name}") }, window, cx);
     }
 
+    /// A plain click that moved the caret: Back reference returns to where it was (live fs-key-back-reference).
+    fn note_click_move(&mut self, cx: &mut Context<Self>) {
+        let here = self.editor.read(cx).cursor_position();
+        let Some(before) = self.caret_before_click.take().filter(|b| *b != here) else { return };
+        self.nav.truncate((self.nav_at + 1).min(self.nav.len()));
+        if self.nav.last().is_none_or(|l| l.pos != before) {
+            self.nav.push(NavEntry::caret(before));
+        }
+        self.nav.push(NavEntry::caret(here));
+        self.nav_at = self.nav.len() - 1;
+        cx.notify();
+    }
+
     /// Back ▾ / Forward ▾: the history entries on that side, nearest first.
     fn open_history(&mut self, back: bool, at: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.doc.read(cx).session.doc.tab(self.tab).map(|t| t.name.clone()).unwrap_or_default();
@@ -1052,6 +1065,21 @@ impl FeatureStudioView {
         self.editor.update(cx, |e, cx| {
             e.focus(window, cx);
             e.insert(text, window, cx);
+        });
+    }
+
+    /// New feature: the template, its name "My Feature" selected (live fs-new-feature, Ace's first tab stop).
+    fn insert_new_feature(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.read_only(cx) {
+            return;
+        }
+        let name = "My Feature";
+        let Some(offset) = NEW_FEATURE.find(name) else { return };
+        self.editor.update(cx, |e, cx| {
+            e.focus(window, cx);
+            let at = e.selected_range().start;
+            e.insert(NEW_FEATURE, window, cx);
+            e.set_selected_range(at + offset..at + offset + name.len(), cx);
         });
     }
 
@@ -1578,7 +1606,7 @@ impl FeatureStudioView {
                     .tooltip(crate::ui::tooltip("New feature")).map(|d| crate::ui_script::mark(d, || "button:New feature".into()))
                     .child(os::glyph(os::GLYPH_NEW_FEATURE, 20., pal.text))
                     .when(stage >= 2, |d| d.child(div().relative().text_size(px(14.)).text_color(pal.text).child("New feature").child(probe(&self.tb.new_label))))
-                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_snippet(NEW_FEATURE, window, cx))),
+                    .on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.insert_new_feature(window, cx))),
             )
             .child(crate::ui::tool_separator())
             .child(snip_area);
@@ -1765,6 +1793,8 @@ impl Render for FeatureStudioView {
                     .on_mouse_down(MouseButton::Left, cx.listener(|_, e: &MouseDownEvent, window, cx| {
                         if e.modifiers.secondary() && !e.modifiers.alt && !e.modifiers.shift {
                             cx.defer_in(window, |this, window, cx| this.goto_definition(window, cx));
+                        } else if !e.modifiers.modified() {
+                            cx.defer_in(window, |this, _, cx| this.note_click_move(cx));
                         }
                     }))
                     .on_mouse_down(MouseButton::Right, cx.listener(|_, e: &MouseDownEvent, window, cx| {

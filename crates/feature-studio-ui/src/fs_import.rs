@@ -433,11 +433,14 @@ impl Render for ImportPanel {
         if rows.is_empty() {
             list = list.child(div().px(px(10.)).py(px(8.)).text_size(px(12.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(format!("No {} available.", self.kind.label().to_lowercase())));
         }
+        // As live's recorder reads the panel (the Insert Variable Studio picker's): the document tabs, then the kinds;
+        // the search box by its placeholder, a row per element.
         crate::ui_script::note_dialog(|| {
-            let tabs = serde_json::json!([{ "label": "Current document", "selected": !self.other }, { "label": "Other documents", "selected": self.other }]);
-            let items: Vec<&String> = rows.iter().map(|r| &r.1).collect();
-            let fields = serde_json::json!([{ "label": "Kind", "kind": "enum", "text": self.kind.label() }, { "label": "Search", "kind": "string", "text": self.search.read(cx).value().to_string() }, { "label": "Rows", "kind": "list", "items": items }]);
-            serde_json::json!({ "title": "Import", "kind": "other", "tabs": tabs, "fields": fields, "error": null })
+            let mut tabs = vec![serde_json::json!({ "label": "Current document", "selected": !self.other }), serde_json::json!({ "label": "Other documents", "selected": self.other })];
+            tabs.extend(Kind::ALL.iter().map(|k| serde_json::json!({ "label": k.label(), "selected": self.kind == *k })));
+            let mut fields = vec![serde_json::json!({ "label": self.kind.placeholder(), "kind": "string", "text": self.search.read(cx).value().to_string() })];
+            fields.extend(rows.iter().map(|r| serde_json::json!({ "label": r.1, "kind": "boolean", "checked": false, "child": false })));
+            serde_json::json!({ "title": "Import", "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
         });
         for (i, (tab_id, name, icon)) in rows.into_iter().enumerate() {
             let row_mark = format!("panel_row:{name}");

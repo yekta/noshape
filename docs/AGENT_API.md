@@ -319,7 +319,8 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
+- **documents**: [`documents_set_library`](#documents_set_library)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
@@ -668,6 +669,26 @@ Examples:
 | `to_parent` | boolean |  | Move to parent folder: out of its folder into the one around it. |
 | `before` | string |  | Tab or folder (name or id) to put it in front of. |
 
+#### tab_move_to_document
+
+Move tabs to a new or another document (Tab › Move to document…) (edits the document (one undoable history entry); deletes or overwrites).
+
+The tabs (or tab folders, with what they hold) go to a new document named `name` ("Untitled document" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.
+
+Examples:
+
+```json
+{"tabs": ["Variable Studio 1"], "name": "Shared variables"}
+{"tabs": ["Part Studio 2"], "document": "/home/ann/noshape/bracket.noshape"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tabs` | array of string | required | Tabs or folders (names or ids) to move. |
+| `name` | string |  | The new document's name (default "Untitled document"). |
+| `document` | string |  | An existing document's path to move them into instead (Other documents). |
+
 #### tab_folder_unpack
 
 Unpack a tab folder (edits the document (one undoable history entry)).
@@ -724,6 +745,27 @@ Examples:
 | `sort` | one of `tab_order`, `name_asc`, `name_desc`, `type` |  | Sort order (default tab_order). |
 | `open` | boolean |  | Open (true) or close the panel. |
 | `activate` | string |  | Show this tab (name or id). |
+
+### documents
+
+#### documents_set_library
+
+Set a folder as one of your libraries (Documents › a folder's Set library ▸) (edits the document (one undoable history entry)).
+
+The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind. The reply lists every library set.
+
+Examples:
+
+```json
+{"library": "frame_profiles", "folder": "/home/ann/noshape/Profiles"}
+{"library": "images", "clear": true}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `library` | one of `frame_profiles`, `sheet_metal_forms`, `tolerances`, `images`, `standard_content` | required | Which library (its key; the menu's row also works). |
+| `folder` | string |  | The folder's path (required unless `clear`). |
+| `clear` | boolean |  | Unset that library. |
 
 ### feature
 
@@ -1798,7 +1840,7 @@ Examples:
 
 Create a variable (#name) in a Part Studio or a Variable Studio (edits the document (one undoable history entry)).
 
-Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row ("Add variable", a Length variable), then its type, value and description cells, one edit each, as typed in the table. Use it in any expression as #name.
+Part Studio: the Variable table's add row, a Variable feature at the rollback bar; a name an earlier Variable feature assigns is redefined from there on (a second `#name = …`, as the Variable dialog allows). Variable Studio: the table's last row ("Add variable", a Length variable), then its type, value and description cells, one edit each, as typed in the table; a name the studio has becomes `<name>_0` (`renamed`, with Onshape's `message`). Use it in any expression as #name.
 
 Examples:
 

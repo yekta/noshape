@@ -365,6 +365,23 @@ pub fn note_button(label: &str) {
     }
 }
 
+/// A modal's field drawn now ([`crate::os_ui::modal_input`], [`crate::os_ui::modal_checkbox`]): listed in the
+/// [`note_modal`] modal being drawn as live's recorder reads it, `{label, kind: input | checkbox | select, value}`.
+pub fn note_modal_field(field: impl FnOnce() -> serde_json::Value) {
+    if !active() || !TITLE_ONLY_MODAL.load(std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    if let Ok(mut d) = dialog_slot().lock()
+        && let Some(d) = d.as_mut()
+    {
+        let f = field();
+        match d["fields"].as_array_mut() {
+            Some(all) => all.push(f),
+            None => d["fields"] = serde_json::json!([f]),
+        }
+    }
+}
+
 /// The modal drawn since the last [`clear_dialog`], if any.
 pub fn open_dialog() -> Option<serde_json::Value> {
     dialog_slot().lock().ok()?.clone()

@@ -166,7 +166,8 @@ impl VariableStudioView {
             }
             // Live vs-903 / 909: Paste inputs (copied with Copy input).
             let v = view.clone();
-            m.item(crate::os_menu::OsMenuItem::new("Paste inputs").icon_name("paste").disabled(crate::config_visibility::copied_inputs().is_empty()).on_click(move |_, _, cx| v.update(cx, |this, cx| this.paste_inputs(cx))))
+            // Live: only with inputs copied (vs-cfg-configure-menu).
+            m.when(!crate::config_visibility::copied_inputs().is_empty(), |m| m.item(crate::os_menu::OsMenuItem::new("Paste inputs").icon_name("paste").on_click(move |_, _, cx| v.update(cx, |this, cx| this.paste_inputs(cx)))))
         });
         crate::os_menu::open_anchored(at, anchor, menu, window, cx);
     }

@@ -602,7 +602,7 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, text, 950.)
             .title(title)
-            .child(version_dialog_body(&name, &desc, None))
+            .child(version_dialog_body(&name, &desc, None, cx))
             .when(has_fs, |d| d.child(publish_row(publish.clone(), cx)))
             .children(stale_drawings_warning(&doc, &stale, cx))
             .footer(
@@ -686,7 +686,7 @@ fn open_branch_dialog(doc: Entity<DocModel>, from: MicroversionId, from_name: St
         let (create2, edit_after) = (create.clone(), edit_after.clone());
         os::modal(dialog, format!("Create workspace from {from_name}"), 950.)
             .title(version_dialog_title("Create workspace from", &from_name))
-            .child(version_dialog_body(&name, &desc, Some(open)))
+            .child(version_dialog_body(&name, &desc, Some(open), cx))
             .footer(
                 os::modal_footer()
                     .child(os::modal_ok(os::primary_button("ok", "Create")))
@@ -756,6 +756,7 @@ fn version_dialog_title_in(doc_name: &str, workspace: &str) -> AnyElement {
 fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
     let pal = p();
     let checked = on.get();
+    crate::ui_script::note_modal_field(|| serde_json::json!({ "label": "Publish custom features and tables", "kind": "checkbox", "value": checked }));
     h_flex()
         .id("publish-fs")
         .w_full()
@@ -915,16 +916,19 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
     )
 }
 
-fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>) -> AnyElement {
+/// The fields as live's recorder reads them: the name unlabelled, the description by its hint.
+fn version_dialog_body(name: &Entity<InputState>, desc: &Entity<TextareaState>, open: Option<Rc<std::cell::Cell<bool>>>, cx: &App) -> AnyElement {
     let pal = p();
     let label = |t: &str| div().text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(t.to_string());
+    let name_input = os::modal_input(None, name, cx);
+    os::note_modal_input(Some("Description cannot contain HTML."), &desc.read(cx).value());
     os::modal_body()
         .gap(px(10.))
-        .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(Input::new(name), 34.).text_size(px(14.)))))
+        .child(h_flex().gap(px(4.)).child(label("Name:")).child(div().w(px(300.)).child(os::input_h(name_input, 34.).text_size(px(14.)))))
         .child(v_flex().gap(px(2.)).child(h_flex().gap(px(8.)).child(label("Description:")).child(div().text_size(px(14.)).child("(Maximum of 10000 characters)"))).child(Textarea::new(desc).h(px(96.)).text_size(px(14.))))
         .when_some(open, |d, open| {
             d.child(
-                os::checkbox("open-ws", "Open new workspace", open.get()).on_click(move |_, window, _| {
+                os::modal_checkbox("open-ws", "Open new workspace", open.get()).on_click(move |_, window, _| {
                     open.set(!open.get());
                     window.refresh();
                 }),

@@ -309,3 +309,36 @@ impl AsmToolbarPrefs {
         self.set_order().into_iter().map(|i| (i, ASM_TOOLSETS[i].iter().copied().filter(|t| !self.removed.iter().any(|r| r == t)).collect::<Vec<_>>())).filter(|(_, t)| !t.is_empty()).collect()
     }
 }
+
+/// Documents › a folder's Set library ▸ (live docs-folder-menu-set-library): the folder each of the user's libraries
+/// reads, by key, with its menu row.
+pub const LIBRARIES: [(&str, &str); 5] = [
+    ("frame_profiles", "My frame profiles library"),
+    ("sheet_metal_forms", "My sheet metal forms"),
+    ("tolerances", "My default tolerances"),
+    ("images", "My images"),
+    ("standard_content", "My standard content"),
+];
+
+/// The folders set as the user's libraries (libraries.json), library key → folder.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct LibraryFolders(pub std::collections::BTreeMap<String, std::path::PathBuf>);
+
+impl LibraryFolders {
+    fn path() -> std::path::PathBuf {
+        noshape_scene::config_dir().join("libraries.json")
+    }
+
+    pub fn load() -> Self {
+        std::fs::read(Self::path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+    }
+
+    pub fn save(&self) -> std::io::Result<()> {
+        std::fs::write(Self::path(), serde_json::to_vec_pretty(self).unwrap_or_default())
+    }
+
+    /// The library key of `key_or_label` ("frame_profiles" or "My frame profiles library").
+    pub fn key(key_or_label: &str) -> Option<&'static str> {
+        LIBRARIES.iter().find(|(k, l)| *k == key_or_label || *l == key_or_label).map(|(k, _)| *k)
+    }
+}

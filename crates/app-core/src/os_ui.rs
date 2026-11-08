@@ -137,6 +137,14 @@ pub fn cancel_button(id: impl Into<ElementId>, label: impl Into<SharedString>, c
 /// Onshape's secondary button: white with a 1 px `#aaaaaa` outline, hover
 /// `#eaeaea`.
 pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
+    let label: SharedString = label.into();
+    crate::ui_script::note_button(&label);
+    page_secondary_button(id, label, cx)
+}
+
+/// [`secondary_button`] on a page, never one of a modal's buttons (a page drawn after the modal in a frame, the
+/// Trash's "Empty trash…").
+pub fn page_secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Button {
     let pal = p();
     let label: SharedString = label.into();
     let name = label.clone();
@@ -156,7 +164,6 @@ pub fn secondary_button(id: impl Into<ElementId>, label: impl Into<SharedString>
         .h(px(34.))
         .px(px(11.))
         .rounded(px(3.));
-    crate::ui_script::note_button(&name);
     crate::ui_script::mark(button, || format!("button:{name}"))
 }
 
@@ -265,6 +272,31 @@ pub fn info_box(text: impl Into<SharedString>) -> Div {
 pub fn checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
     let label: SharedString = label.into();
     crate::ui_script::mark(checkbox_with(id, label.clone().into_any_element(), on), || format!("checkbox:{label}"))
+}
+
+/// [`checkbox`] in a modal: recorded as one of its fields (`label` as live's recorder reads it).
+pub fn modal_checkbox(id: impl Into<ElementId>, label: impl Into<SharedString>, on: bool) -> Stateful<Div> {
+    let label: SharedString = label.into();
+    crate::ui_script::note_modal_field(|| serde_json::json!({ "label": label.to_string(), "kind": "checkbox", "value": on }));
+    checkbox(id, label, on)
+}
+
+/// A modal's text field, recorded as one of its fields (`label` as live's recorder reads it: its label, its
+/// placeholder or aria text, `None` for none).
+pub fn modal_input(label: Option<&str>, state: &Entity<gpui_kit::component::input::InputState>, cx: &App) -> gpui_kit::component::input::Input {
+    let value = state.read(cx).value().to_string();
+    crate::ui_script::note_modal_field(|| serde_json::json!({ "label": label, "kind": "input", "value": value }));
+    gpui_kit::component::input::Input::new(state)
+}
+
+/// A modal's text field drawn some other way (a textarea), recorded as one of its fields.
+pub fn note_modal_input(label: Option<&str>, value: &str) {
+    crate::ui_script::note_modal_field(|| serde_json::json!({ "label": label, "kind": "input", "value": value }));
+}
+
+/// A modal's select (its value as shown), recorded as one of its fields.
+pub fn note_modal_select(label: &str, value: &str) {
+    crate::ui_script::note_modal_field(|| serde_json::json!({ "label": label, "kind": "select", "value": value }));
 }
 
 /// [`checkbox`] labelled with user-authored text (a label's name).

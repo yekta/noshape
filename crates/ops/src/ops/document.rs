@@ -185,6 +185,35 @@ pub fn ops() -> Vec<Op> {
             run: tab_move,
         },
         Op {
+            group: "documents",
+            verb: "set_library",
+            summary: "Set a folder as one of your libraries (Documents › a folder's Set library ▸)",
+            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind. The reply lists every library set.",
+            fields: vec![
+                req("library", json!({ "type": "string", "enum": crate::prefs::LIBRARIES.iter().map(|(k, _)| *k).collect::<Vec<_>>() }), "Which library (its key; the menu's row also works)."),
+                opt("folder", s(), "The folder's path (required unless `clear`)."),
+                opt("clear", json!({ "type": "boolean" }), "Unset that library."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: documents_set_library,
+        },
+        Op {
+            group: "tab",
+            verb: "move_to_document",
+            summary: "Move tabs to a new or another document (Tab › Move to document…)",
+            description: "The tabs (or tab folders, with what they hold) go to a new document named `name` (\"Untitled document\" by default, its file next to this document's) or, with `document`, into that existing document; they are deleted here. Not undoable, as Onshape's. The other document must not be open in another window. A document keeps at least one tab.",
+            fields: vec![
+                doc_field(),
+                req("tabs", json!({ "type": "array", "items": { "type": "string" } }), "Tabs or folders (names or ids) to move."),
+                opt("name", s(), "The new document's name (default \"Untitled document\")."),
+                opt("document", s(), "An existing document's path to move them into instead (Other documents)."),
+            ],
+            mutates: true,
+            destructive: true,
+            run: tab_move_to_document,
+        },
+        Op {
             group: "tab",
             verb: "folder_unpack",
             summary: "Unpack a tab folder",
@@ -253,6 +282,58 @@ fn tab_move(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let folder = target.and_then(|t| od.doc().folder(t)).map(|f| f.name.clone());
     Ok(json!({ "moved": id.to_string(), "folder": folder }).into())
+}
+
+fn documents_set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let Some(key) = crate::prefs::LibraryFolders::key(a.str("library")?) else {
+        return Err(OpError::param("library", "not a library: frame_profiles, sheet_metal_forms, tolerances, images or standard_content"));
+    };
+    let mut libs = crate::prefs::LibraryFolders::load();
+    if a.bool_or("clear", false)? {
+        libs.0.remove(key);
+    } else {
+        let Some(folder) = a.opt_str("folder")? else { return Err(OpError::param("folder", "the folder to use is required")) };
+        let folder = std::path::PathBuf::from(folder);
+        if !folder.is_dir() {
+            return Err(OpError::invalid(format!("{} isn't a folder", folder.display())).with_param("folder"));
+        }
+        libs.0.insert(key.to_string(), folder);
+    }
+    libs.save().map_err(|e| OpError::new("io", format!("saving the libraries: {e}")))?;
+    Ok(json!({ "libraries": libs.0 }).into())
+}
+
+fn tab_move_to_document(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let target = a.opt_str("document")?.map(std::path::PathBuf::from);
+    if let Some(t) = &target {
+        if !t.exists() {
+            return Err(OpError::invalid(format!("{} doesn't exist", t.display())).with_param("document"));
+        }
+        let canon = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        if ctx.open_paths().iter().any(|p| canon(p) == canon(t)) || ctx.live_server(t).is_some() {
+            return Err(OpError::invalid("the document is open: close it first").with_param("document"));
+        }
+    }
+    let name = a.opt_str("name")?.unwrap_or("Untitled document").to_string();
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    if target.as_deref().is_some_and(|t| t.canonicalize().ok() == od.session.path.canonicalize().ok()) {
+        return Err(OpError::invalid("the tabs are already in this document").with_param("document"));
+    }
+    let keys = a.array("tabs")?;
+    if keys.is_empty() {
+        return Err(OpError::param("tabs", "select a tab to move"));
+    }
+    let mut ids = Vec::new();
+    for k in keys {
+        let Some(k) = k.as_str() else { return Err(OpError::param("tabs", "tab names or ids (strings)")) };
+        ids.push(find_tab_or_folder(od.doc(), k, "tabs")?);
+    }
+    let dest = match &target {
+        Some(t) => crate::tab_move::Destination::Existing(t),
+        None => crate::tab_move::Destination::New(&name),
+    };
+    let path = crate::tab_move::move_tabs(&mut od.session, &ids, dest).map_err(|e| OpError::invalid(format!("{e:#}")).with_param(if target.is_some() { "document" } else { "tabs" }))?;
+    Ok(json!({ "moved": keys, "document": path.display().to_string(), "tabs": describe(od)["tabs"] }).into())
 }
 
 fn tab_folder_unpack(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

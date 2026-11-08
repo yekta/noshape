@@ -8,7 +8,7 @@ use crate::preferences_window::{ListPrefs, PreferencesView};
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::Disableable as _;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -334,7 +334,7 @@ impl EnvProfilePrefsView {
                     os::modal_body()
                         .pt(px(3.))
                         .gap(px(2.))
-                        .child(os::input_h(Input::new(&name), 34.))
+                        .child(os::input_h(os::modal_input(None, &name, cx), 34.))
                         // Dark: Bootstrap's invalid-feedback #ff6b6b (live dk-pref-create-profile-dialog).
                         .when_some(error, |d, e| d.child(div().text_size(px(14.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xff6b6b } else { 0xaa252d })).child(tr(e)))),
                 )
