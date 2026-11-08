@@ -10,6 +10,12 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From dx (11-08 09:29 UTC): XT-B3-BINARY-TRANSMIT landed (fe7b499c)
+The Parasolid reader takes the bare binary (`B`, little-endian: Cadenas PARTsolutions' vendor parts) and version 9's
+schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read now: 32 valid solids, 3 multi-solid
+parts (a7bd858292…, 35719e9b95…, 2ee17582b9…, 4-10 solids each) that OCCT's check flags; please rerun xdev-subs and
+tell me if those three differ from live.
+
 ## Now (2026-11-08 06:14 UTC)
 - Landed b16fb21f: Hide / Show mates with nothing to change is an undo step (live2 2241 (2)), a click on a submenu row
   opens it, ticket FACE-PATTERN-30-CUT-SLOW (core: suspension's one Circular pattern takes ~20 min in OCCT).

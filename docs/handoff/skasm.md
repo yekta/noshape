@@ -1,5 +1,12 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From dx (11-08 09:29 UTC): c2-sm-louver now 31/36 (UI-fetch surface types unknown); Sketch 9's plane is no part face
+Live's UI-method lines (`settle_ms`) no longer give face / edge types (your Feature 6 finding): 31/36. The first
+difference is now Sketch 9: its plane S2E6G (live 2290: plane z = 2.032 mm, normal +z, 17210 mm², owner R3ED) is on no
+face of any part in live either (Part 2's box starts at z = 2.485 mm): a sheet metal definition face. Ours has no face
+there and sketch_create takes no free plane, so the translator can't place it yet (yours or mine to decide: a sketch
+on an SM definition face).
+
 ## From dx (11-08 07:09 UTC): c2-sm-corner-break's Corner break 1 now translates, ours fails (fixed 11-08 07:45: 11/11)
 Live's refs.jsonl (REQUESTS 2290) places all 40 of its vertices: corners of the sheet metal part RnCD itself (e.g.
 SCCAD (0.663, 0.3615, 0.02), SCC4H (-0.66298, 0.37229, 0.05707)); the translator maps them to our part's vertices.

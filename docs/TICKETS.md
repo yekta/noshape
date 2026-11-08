@@ -4321,7 +4321,7 @@ were checked in code by asm; "(verify)" ones need a live check first.
   an external, reference-only entity standing for the Origin (live: external id IB), never drawn, picked or listed.
 
 ## Drawings / API / data exchange (dx)
-- [ ] P1 XT-B3-BINARY-TRANSMIT (dx; asm 2026-11-08 06:18 UTC, the assembly corpus' xdev-subs): **a Parasolid file with a text
+- [x] (dx 11-08 09:29: fe7b499c, bare binary and v9 schema read; xdev-subs' 34 files + 1 text read, 32 valid) P1 XT-B3-BINARY-TRANSMIT (dx; asm 2026-11-08 06:18 UTC, the assembly corpus' xdev-subs): **a Parasolid file with a text
   header (`FORMAT=binary`) whose body starts `B3   : TRANSMIT FILE created by modeller version 2900122
   SCH_900000_9008` is refused**: "parasolid: not a transmit file" (crates/kernel/cpp/xt_read.cpp takes `PS\0\0` binary
   or `T` text after the header). Written by Cadenas PARTsolutions (vendor parts: SCHUNK, Misumi); Onshape imports them.

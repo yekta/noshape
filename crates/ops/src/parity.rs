@@ -50,6 +50,8 @@ pub struct LiveRef {
     /// The feature parameter live evaluated it for (refs.jsonl `parameter`): a query live's fetch gave no ids for
     /// (Flange 6's edges in c2-sm-louver) is these.
     pub parameter: Option<String>,
+    /// Its point is its plane's origin (live's evPlane, refs.jsonl `origin`), not a point on the face.
+    pub plane_origin: bool,
 }
 
 /// What became of one Onshape feature.
@@ -212,7 +214,7 @@ pub fn parse_refs(text: &str) -> HashMap<(usize, String), LiveRef> {
         let Ok(v) = serde_json::from_str::<Value>(line) else { continue };
         let (Some(k), Some(id)) = (v["index"].as_u64(), v["id"].as_str()) else { continue };
         // A face may come as its plane's `origin` and its `area` (live 2290).
-        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string) };
+        let r = LiveRef { kind: v["kind"].as_str().unwrap_or("").to_string(), point: f3(&v["point"]).or_else(|| f3(&v["origin"])), normal: f3(&v["normal"]), direction: f3(&v["direction"]), measure: v["measure"].as_f64().or(v["area"].as_f64()), geometry: our_type(v["surfaceType"].as_str().or(v["curveType"].as_str())), bbox: None, sketch: false, body: None, parameter: v["parameter"].as_str().map(str::to_string), plane_origin: v["point"].is_null() && !v["origin"].is_null() };
         out.insert((k as usize, id.to_string()), r);
     }
     out
@@ -2821,6 +2823,8 @@ impl<'a> Translator<'a> {
                 let axis = (0..3).max_by(|a, b| n[*a].abs().total_cmp(&n[*b].abs())).unwrap_or(2);
                 Ok(["plane:right", "plane:front", "plane:top"][axis].to_string())
             }
+            // A face given as its plane (live's evPlane): ours on that plane, the nearest in area.
+            "FACE" if r.plane_origin && let Some(f) = self.face_on_plane(&r) => Ok(f),
             "FACE" | "PLANE" => {
                 let part = self.part_of(k, &r);
                 self.nearest("faces", &r, part.as_deref()).ok_or_else(|| format!("{id}: no face of ours at {:?} mm", mm(p)))
@@ -2927,6 +2931,22 @@ impl<'a> Translator<'a> {
 
     /// `part`: the part of ours live's is on, which decides between equally good ones (two parts with a hole in
     /// one place: cf-fill-pattern's sheet metal part and its solid).
+    /// The planar face of ours on live's plane (`r.point` its origin, `r.normal`), the nearest to live's area: a plane's
+    /// origin can lie anywhere on it, far from the face (c2-sm-louver's Sketch 9 plane S2E6G, live 2290).
+    fn face_on_plane(&mut self, r: &LiveRef) -> Option<String> {
+        let (o, n) = (r.point?, r.normal?);
+        let reply = self.call("query_entities", json!({ "kind": "faces", "surface": "plane", "limit": 100000 })).ok()?;
+        let k = per_unit(&reply["units"]);
+        let dot = |a: [f64; 3], b: [f64; 3]| a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        let on = |e: &&Value| {
+            let (Some(c), Some(fn_)) = (f3(&e["centroid"]), f3(&e["normal"])) else { return false };
+            let c = c.map(|x| x * k);
+            dot(fn_, n).abs() > 1.0 - 1e-6 && dot([c[0] - o[0], c[1] - o[1], c[2] - o[2]], n).abs() < 1e-7
+        };
+        let area = |e: &&Value| e["area"].as_f64().map_or(f64::INFINITY, |a| r.measure.map_or(0.0, |m| (a * k * k - m).abs()));
+        reply["faces"].as_array()?.iter().filter(on).min_by(|a, b| area(a).total_cmp(&area(b))).and_then(|e| e["id"].as_str().map(str::to_string))
+    }
+
     fn nearest(&mut self, kind: &str, r: &LiveRef, part: Option<&str>) -> Option<String> {
         let p = r.point?;
         let mut a = json!({ "kind": kind, "near": mm(p), "limit": 8 });
@@ -4595,8 +4615,14 @@ fn curves_meet(a: &Value, b: &Value, tol: f64) -> bool {
 /// Live's parts of one live.jsonl line.
 pub fn live_parts(line: &Value) -> Vec<PartState> {
     let band = |v: &Value| v.as_array().and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]));
-    // Its bodydetails body (by part id): faces and edges by geometry.
+    // Its bodydetails body (by part id): faces and edges by geometry. Not from the UI-method fetch (its lines carry
+    // `settle_ms`): it calls a face PLANE when its display triangles all face one way (c2-sm-louver's bends, skasm
+    // 11-08: cylinders R 1.628 in live's exact read): not known there, not compared.
+    let ui_fetch = line.get("settle_ms").is_some();
     let types = |p: &Value, list: &str, field: &str| {
+        if ui_fetch {
+            return None;
+        }
         let body = line["bodies"].as_array()?.iter().find(|b| b["id"] == p["partId"])?;
         let mut m = std::collections::BTreeMap::new();
         for x in body[list].as_array()? {

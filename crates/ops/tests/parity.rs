@@ -990,6 +990,19 @@ fn an_inch_documents_bare_numbers_are_inches() {
     assert_eq!((r.matching, r.compared), (3, 3), "first difference: {:?}; untranslated: {:?}", r.first, r.untranslated);
 }
 
+/// Face and edge types from the UI-method fetch (its lines carry `settle_ms`) aren't known: it calls a face PLANE when
+/// its display triangles all face one way (c2-sm-louver's bends are cylinders in live's exact read, skasm 11-08).
+#[test]
+fn ui_fetch_surface_types_are_unknown() {
+    let line = json!({ "index": 6, "parts": [{ "name": "Part 2", "partId": "RJBD", "faces": 2, "edges": 0 }],
+        "bodies": [{ "id": "RJBD", "type": "SOLID", "faces": [{ "id": "A", "surface": "PLANE" }, { "id": "B", "surface": "PLANE" }], "edges": [] }] });
+    assert_eq!(live_parts(&line)[0].face_types.as_ref().and_then(|m| m.get("plane").copied()), Some(2));
+    let mut ui = line.clone();
+    ui["settle_ms"] = json!(800);
+    assert_eq!(live_parts(&ui)[0].face_types, None);
+    assert_eq!(live_parts(&ui)[0].edge_types, None);
+}
+
 /// massproperties' [0, 0, 0] centroid of a part without a material isn't
 /// live's centroid, even when the part's box is about the origin
 /// (exercise-chino's Extrude 1, fetched through live's UI).
