@@ -1,19 +1,19 @@
 {
  "scenario": "fs-snippets-operation",
- "recorded": "2026-11-08T01:07:09.061Z",
+ "recorded": "2026-11-08T14:06:33.745Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "0d508a6fdcc10cab3defa5dc",
-  "workspace": "0ef57981392cfbd12c9961c6",
-  "element": "651ad7fa492d4a1fab9978bb",
+  "document": "66f2e23eeb68f3de7d27d1ca",
+  "workspace": "f8662862003694d336d84a9e",
+  "element": "6eccfe83811f4a086fc164e3",
   "start": "fs-studio",
-  "startElement": "651ad7fa492d4a1fab9978bb",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "6eccfe83811f4a086fc164e3",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 28481
+   "t": 24125
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 30734
+   "t": 26403
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 32554
+   "t": 28289
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 34424
+   "t": 30169
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 36336
+   "t": 32079
   },
   {
    "step": 6,
@@ -507,7 +507,23 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "fCuboid",
+      "fCylinder",
+      "fSphere",
+      "opExtrude",
+      "opRevolve",
+      "opThicken",
+      "opTransform",
+      "opPattern",
+      "opPlane",
+      "opDeleteBodies"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -560,7 +576,7 @@
      "notices": 0
     }
    },
-   "t": 38512
+   "t": 34310
   },
   {
    "step": 7,
@@ -584,7 +600,23 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "fCuboid",
+      "fCylinder",
+      "fSphere",
+      "opExtrude",
+      "opRevolve",
+      "opThicken",
+      "opTransform",
+      "opPattern",
+      "opPlane",
+      "opDeleteBodies"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -637,7 +669,7 @@
      "notices": 0
     }
    },
-   "t": 41884
+   "t": 37698
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "fs-snippets-params",
- "recorded": "2026-11-08T03:15:14.871Z",
+ "recorded": "2026-11-08T13:59:11.552Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "dbdd0fff11cc33a5ef75bb13",
-  "workspace": "a656269a52aacc1488a19206",
-  "element": "3a48271229fb82f2335fc286",
+  "document": "449e3cbe73aacf4ac41c2b49",
+  "workspace": "ee341a06542eb849ea3567cf",
+  "element": "b82432e6aefde12a3d19bf70",
   "start": "fs-studio",
-  "startElement": "3a48271229fb82f2335fc286",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "b82432e6aefde12a3d19bf70",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 41211
+   "t": 21489
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 46211
+   "t": 23639
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 48119
+   "t": 25440
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 50073
+   "t": 27288
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 52051
+   "t": 29112
   },
   {
    "step": 6,
@@ -507,7 +507,28 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Length parameter",
+      "Angle parameter",
+      "Count parameter",
+      "Query parameter",
+      "Enum parameter",
+      "Boolean parameter",
+      "String parameter",
+      "Array parameter",
+      "Selection-driven array parameter",
+      "Part Studio reference parameter",
+      "Variable Studio reference parameter",
+      "Image reference parameter",
+      "CSV reference parameter",
+      "JSON reference parameter",
+      "Parameter group"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -560,7 +581,7 @@
      "notices": 0
     }
    },
-   "t": 55630
+   "t": 31325
   },
   {
    "step": 7,
@@ -642,7 +663,7 @@
      "notices": 1
     }
    },
-   "t": 59936
+   "t": 33959
   }
  ]
 }

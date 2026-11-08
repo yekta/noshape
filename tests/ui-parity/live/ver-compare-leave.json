@@ -1,19 +1,19 @@
 {
  "scenario": "ver-compare-leave",
- "recorded": "2026-11-08T01:12:49.830Z",
+ "recorded": "2026-11-08T13:51:43.270Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "cd1cf50e5e36bc06fed84538",
-  "workspace": "2139f941ad2309bbe0012e51",
-  "element": "71464b86dab0269369b2694c",
+  "document": "2557e7eb841bc5743f66bee4",
+  "workspace": "66116a53e47f8bd3615d0248",
+  "element": "0d6dbf79b80ac7d0633dabff",
   "start": "doc-versions",
-  "startElement": "71464b86dab0269369b2694c",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "0d6dbf79b80ac7d0633dabff",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 34285
+   "t": 35450
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 36776
+   "t": 37987
   },
   {
    "step": 3,
@@ -424,8 +424,19 @@
      "compare": {
       "base": "Main",
       "target": "V1",
-      "only_differences": null,
-      "features": [],
+      "only_differences": true,
+      "features": [
+       {
+        "name": "Sketch 2",
+        "change": "added",
+        "indicator": ">"
+       },
+       {
+        "name": "Extrude 2",
+        "change": "added",
+        "indicator": ">"
+       }
+      ],
       "selected": null
      },
      "tabs": [
@@ -448,7 +459,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 52199
+   "t": 53379
   },
   {
    "step": 4,
@@ -569,7 +580,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 64532
+   "t": 60838
   }
  ]
 }

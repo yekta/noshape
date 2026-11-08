@@ -1,19 +1,19 @@
 {
  "scenario": "ver-compare-reverse",
- "recorded": "2026-11-08T01:14:44.698Z",
+ "recorded": "2026-11-08T13:54:38.219Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "4240bb21d1cb795075538f19",
-  "workspace": "498f2209843f50189b943975",
-  "element": "577417455b8bb1a1b2c152f2",
+  "document": "9b306ba7901980034ac6fb24",
+  "workspace": "32093bf74212493c8807d615",
+  "element": "5a76bfb069944a5b8d1cdaa9",
   "start": "doc-versions",
-  "startElement": "577417455b8bb1a1b2c152f2",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "5a76bfb069944a5b8d1cdaa9",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40459
+   "t": 26174
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43125
+   "t": 28571
   },
   {
    "step": 3,
@@ -424,8 +424,19 @@
      "compare": {
       "base": "Main",
       "target": "V1",
-      "only_differences": null,
-      "features": [],
+      "only_differences": true,
+      "features": [
+       {
+        "name": "Sketch 2",
+        "change": "added",
+        "indicator": ">"
+       },
+       {
+        "name": "Extrude 2",
+        "change": "added",
+        "indicator": ">"
+       }
+      ],
       "selected": null
      },
      "tabs": [
@@ -448,7 +459,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 61391
+   "t": 42979
   },
   {
    "step": 4,
@@ -510,8 +521,19 @@
      "compare": {
       "base": "V1",
       "target": "Main",
-      "only_differences": null,
-      "features": [],
+      "only_differences": true,
+      "features": [
+       {
+        "name": "Sketch 2",
+        "change": "removed",
+        "indicator": "<"
+       },
+       {
+        "name": "Extrude 2",
+        "change": "removed",
+        "indicator": "<"
+       }
+      ],
       "selected": null
      },
      "tabs": [
@@ -534,7 +556,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 77028
+   "t": 53062
   }
  ]
 }

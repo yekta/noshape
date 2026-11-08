@@ -1,19 +1,19 @@
 {
  "scenario": "ver-compare-entries",
- "recorded": "2026-11-08T01:12:33.377Z",
+ "recorded": "2026-11-08T13:56:09.203Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "424213944a78e7eb1bf5f7f3",
-  "workspace": "063c14194bb855b7dcb3c64d",
-  "element": "833e46c9465c8234ff745428",
+  "document": "f82759a2da49abd47415f4ff",
+  "workspace": "ac53f2613590f3e09be8cd2b",
+  "element": "1a894a3e8104e883259ea0d1",
   "start": "doc-branches",
-  "startElement": "833e46c9465c8234ff745428",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "1a894a3e8104e883259ea0d1",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -230,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 46515
+   "t": 25759
   },
   {
    "step": 2,
@@ -357,7 +357,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 51829
+   "t": 28159
   },
   {
    "step": 3,
@@ -483,7 +483,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55857
+   "t": 30320
   },
   {
    "step": 4,
@@ -550,8 +550,19 @@
      "compare": {
       "base": "V1",
       "target": "Main",
-      "only_differences": null,
-      "features": [],
+      "only_differences": true,
+      "features": [
+       {
+        "name": "Sketch 2",
+        "change": "removed",
+        "indicator": "<"
+       },
+       {
+        "name": "Extrude 2",
+        "change": "removed",
+        "indicator": "<"
+       }
+      ],
       "selected": null
      },
      "tabs": [
@@ -574,7 +585,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 75598
+   "t": 41618
   }
  ]
 }

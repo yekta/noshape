@@ -1,19 +1,19 @@
 {
  "scenario": "fs-snippets-evaluate",
- "recorded": "2026-11-08T03:13:18.925Z",
+ "recorded": "2026-11-08T14:04:12.657Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "5e50f1a1c47b00978c2c3e32",
-  "workspace": "671fdf7a82e35dea62de575a",
-  "element": "9a53c23ec82920ddefbe82f7",
+  "document": "6c256b494ecbbfc838a20134",
+  "workspace": "c2c6d8702083bdbf0ea1f14c",
+  "element": "f2d0c065b0aad89d8fdf6159",
   "start": "fs-studio",
-  "startElement": "9a53c23ec82920ddefbe82f7",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "f2d0c065b0aad89d8fdf6159",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 37595
+   "t": 24382
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 41926
+   "t": 26552
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 43806
+   "t": 28411
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 45647
+   "t": 30289
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 47535
+   "t": 32195
   },
   {
    "step": 6,
@@ -507,7 +507,27 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "evVertexPoint",
+      "evLine",
+      "evAxis",
+      "evPlane",
+      "evOwnerSketchPlane",
+      "evEdgeTangentLine",
+      "evFaceTangentPlane",
+      "evDistance",
+      "evLength",
+      "evArea",
+      "evVolume",
+      "evApproximateCentroid",
+      "evApproximateMassProperties",
+      "evBox3d"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -560,7 +580,7 @@
      "notices": 0
     }
    },
-   "t": 50466
+   "t": 34377
   },
   {
    "step": 7,
@@ -584,7 +604,27 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "evVertexPoint",
+      "evLine",
+      "evAxis",
+      "evPlane",
+      "evOwnerSketchPlane",
+      "evEdgeTangentLine",
+      "evFaceTangentPlane",
+      "evDistance",
+      "evLength",
+      "evArea",
+      "evVolume",
+      "evApproximateCentroid",
+      "evApproximateMassProperties",
+      "evBox3d"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -637,7 +677,7 @@
      "notices": 0
     }
    },
-   "t": 53911
+   "t": 37792
   }
  ]
 }

@@ -1,19 +1,19 @@
 {
  "scenario": "fs-snippets-math",
- "recorded": "2026-11-08T03:13:39.511Z",
+ "recorded": "2026-11-08T14:05:23.011Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "9825728620c1bc64801342a3",
-  "workspace": "0baf853eb93ef42860cb064f",
-  "element": "7be5dff8d6dbd8171d6e3f68",
+  "document": "bd6826c60b3c43dad8c23670",
+  "workspace": "c6f537f6593ae621963e078f",
+  "element": "5486339a4c59684e87ad1dd3",
   "start": "fs-studio",
-  "startElement": "7be5dff8d6dbd8171d6e3f68",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "5486339a4c59684e87ad1dd3",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 39012
+   "t": 24271
   },
   {
    "step": 2,
@@ -233,7 +233,7 @@
      "notices": 0
     }
    },
-   "t": 43645
+   "t": 26522
   },
   {
    "step": 3,
@@ -317,7 +317,7 @@
      "notices": 0
     }
    },
-   "t": 45645
+   "t": 28354
   },
   {
    "step": 4,
@@ -401,7 +401,7 @@
      "notices": 0
     }
    },
-   "t": 47493
+   "t": 30184
   },
   {
    "step": 5,
@@ -485,7 +485,7 @@
      "notices": 0
     }
    },
-   "t": 49363
+   "t": 32006
   },
   {
    "step": 6,
@@ -507,7 +507,22 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "vector",
+      "line",
+      "plane",
+      "coordSystem",
+      "transform",
+      "rotationAround",
+      "scaleUniformly",
+      "fromWorld",
+      "toWorld"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -560,7 +575,7 @@
      "notices": 0
     }
    },
-   "t": 53819
+   "t": 34172
   },
   {
    "step": 7,
@@ -584,7 +599,22 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "vector",
+      "line",
+      "plane",
+      "coordSystem",
+      "transform",
+      "rotationAround",
+      "scaleUniformly",
+      "fromWorld",
+      "toWorld"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -637,7 +667,7 @@
      "notices": 0
     }
    },
-   "t": 57325
+   "t": 37532
   }
  ]
 }

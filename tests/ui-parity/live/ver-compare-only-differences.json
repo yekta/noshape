@@ -1,19 +1,19 @@
 {
  "scenario": "ver-compare-only-differences",
- "recorded": "2026-11-08T01:14:17.875Z",
+ "recorded": "2026-11-08T13:53:16.239Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "4618314a83030d490c56f545",
-  "workspace": "4e8e4e66e631e931485b161e",
-  "element": "7240311aa19244c9efd17c5a",
+  "document": "26a8eab5f8ada9bf94378287",
+  "workspace": "f972ef47ecc8c4ec467e4c00",
+  "element": "1b5aab4107a200e5556052e5",
   "start": "doc-versions",
-  "startElement": "7240311aa19244c9efd17c5a",
-  "runner": "live2 .nstate-uip-3.json"
+  "startElement": "1b5aab4107a200e5556052e5",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -225,7 +225,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 49381
+   "t": 28456
   },
   {
    "step": 2,
@@ -362,7 +362,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 54287
+   "t": 30838
   },
   {
    "step": 3,
@@ -424,8 +424,19 @@
      "compare": {
       "base": "Main",
       "target": "V1",
-      "only_differences": null,
-      "features": [],
+      "only_differences": true,
+      "features": [
+       {
+        "name": "Sketch 2",
+        "change": "added",
+        "indicator": ">"
+       },
+       {
+        "name": "Extrude 2",
+        "change": "added",
+        "indicator": ">"
+       }
+      ],
       "selected": null
      },
      "tabs": [
@@ -448,7 +459,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 73863
+   "t": 45231
   },
   {
    "step": 4,
@@ -562,7 +573,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 80081
+   "t": 48015
   }
  ]
 }

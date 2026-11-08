@@ -1,19 +1,19 @@
 {
  "scenario": "fs-monitor-menu",
- "recorded": "2026-11-08T03:29:36.363Z",
+ "recorded": "2026-11-08T13:58:15.020Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "2508c56e01984ac6bc5d9e2e",
-  "workspace": "b3b9e5a3282a51325cc80cd1",
-  "element": "372b88c63383c81afb73fa0c",
+  "document": "d450cfa2338b36203d7ff9a5",
+  "workspace": "b31bbd272ea6c91a1d8a51d1",
+  "element": "3753a66c696996ea21fe7704",
   "start": "fs-studio",
-  "startElement": "372b88c63383c81afb73fa0c",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "3753a66c696996ea21fe7704",
+  "runner": "live2 "
  },
  "start": {
   "focus": {
@@ -151,7 +151,7 @@
      "notices": 0
     }
    },
-   "t": 38137
+   "t": 21737
   },
   {
    "step": 2,
@@ -173,7 +173,15 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Monitor Part Studio 1",
+      "Profile Part Studio 1"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -226,7 +234,7 @@
      "notices": 0
     }
    },
-   "t": 41107
+   "t": 23876
   },
   {
    "step": 3,
@@ -250,7 +258,15 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Monitor Part Studio 1",
+      "Profile Part Studio 1"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -303,7 +319,7 @@
      "notices": 0
     }
    },
-   "t": 44583
+   "t": 27197
   }
  ]
 }
