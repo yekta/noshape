@@ -33,6 +33,19 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 23:01 UTC: the "keep" mark for intentional splits (lead: build it; conditions: model + assembly suites
+no document worse, cf-fix-pcb stays 12/12 (140 faces), no speed regression, bool.md note; brep untouched so no gate).**
+- Patch /root/core-scratch/keep-mark.patch (not committed; applied/removed for the baseline runs): common.cpp
+  KeepEdgeMark (a BRep_CurveRepresentation subclass appended to the edge's curve list: kept_edge() is a flag lookup),
+  mark_kept_edges (ffi; Rust k::mark_kept_edges / k::imprint_kept), carry_kept_marks (through copies, the wire
+  rotation and USD's history), keep_marked_edges (USD KeepShape). boolean.cpp: every unify step skips marked edges
+  (merge_planar, cylinder groups / bands / patches, apex cones, tori/spheres pairs, the USD calls). imprint_kept in
+  hole.rs (thread split), split.rs (Split / opSplitFace), curves.rs (offset curve split), surfacing_c.rs (wrap,
+  isocline), custom ops.rs op_wrap. T1 features_a::a_threads_split_face_stays_split_through_a_later_boolean.
+- Results so far: fan source studio 15 -> 18/22 (next Chamfer 2: blend's, to note in blend.md), cf-fix-pcb 12/12.
+  Running: assembly suite baseline (asm-base.log, /root/core-scratch/asm-suite.sh), then with the patch: model suite
+  (vs suite-ownspline.log), assembly suite, kernel / model tests, speed A/B, g++-13, land; bool.md heads-up.
+
 **State 11-08 22:13 UTC: fan blade source studio: the thread's split face; impeller side faces don't pay.**
 - Live 2389: the 0.15 mm band on Poti2's boss comes from External thread 1's Split face (edge JaB, circle at x -13.8,
   r 3.4), and Extrude 7 (only touching the cap) leaves it. Ours splits it too, then Extrude 7's Rust Boolean result
