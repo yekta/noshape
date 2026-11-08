@@ -1,19 +1,19 @@
 {
  "scenario": "drw-dimension-foreshorten",
- "recorded": "2026-11-08T06:24:30.248Z",
+ "recorded": "2026-11-08T18:17:19.014Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "484b3e78d3f6dd67b389426b",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "8f52dc00d999191133bc41e9",
   "start": "hole-plate-drawing",
-  "startElement": "ac3109d7c4982f44b949727b",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "e14cce55628fbf2ae4425d70",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -162,7 +162,7 @@
      "selection": []
     }
    },
-   "t": 252898
+   "t": 229698
   },
   {
    "step": 2,
@@ -255,7 +255,7 @@
      ]
     }
    },
-   "t": 270301
+   "t": 246373
   },
   {
    "step": 3,
@@ -348,7 +348,7 @@
      "selection": []
     }
    },
-   "t": 289053
+   "t": 263799
   },
   {
    "step": 4,
@@ -433,7 +433,7 @@
      "selection": []
     }
    },
-   "t": 307218
+   "t": 280510
   },
   {
    "step": 5,
@@ -524,7 +524,7 @@
      ]
     }
    },
-   "t": 338392
+   "t": 309608
   },
   {
    "step": 6,
@@ -610,7 +610,7 @@
      "selection": []
     }
    },
-   "t": 355418
+   "t": 324802
   },
   {
    "step": 7,
@@ -704,7 +704,7 @@
      "selection": []
     }
    },
-   "t": 373209
+   "t": 340439
   },
   {
    "step": 8,
@@ -792,18 +792,28 @@
      "selection": []
     }
    },
-   "t": 389977
+   "t": 356851
   },
   {
    "step": 9,
    "do": {
     "do": "rclick",
     "on": {
-     "annotation": "0.197"
+     "view_point": {
+      "view": "Top",
+      "at": [
+       -1,
+       1,
+       20
+      ]
+     }
     }
    },
-   "ok": false,
-   "error": "target not found: {\"annotation\":\"0.197\"}",
+   "ok": true,
+   "at": [
+    745,
+    322
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -870,7 +880,7 @@
      "selection": []
     }
    },
-   "t": 418801
+   "t": 374338
   },
   {
    "step": 10,
@@ -880,8 +890,11 @@
      "menu": "Remove foreshorten"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Remove foreshorten\"}",
+   "ok": true,
+   "at": [
+    786,
+    323
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -944,11 +957,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "dimension",
+       "text": "0.197"
+      }
+     ],
      "selection": []
     }
    },
-   "t": 435161
+   "t": 390065
   },
   {
    "step": 11,
@@ -1020,11 +1038,16 @@
        "brokenOut": 0
       }
      ],
-     "annotations": [],
+     "annotations": [
+      {
+       "kind": "dimension",
+       "text": "0.197"
+      }
+     ],
      "selection": []
     }
    },
-   "t": 450610
+   "t": 405181
   }
  ]
 }
