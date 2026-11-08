@@ -1979,7 +1979,9 @@ pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: Cha
         let Some(sec) = constant_section(&f.face_surface()?, &info.curve, p) else { return Ok(None) };
         secs.push(sec);
     }
+    // (OCCT's distance and angle stops below 90°: an acute edge's chamfer can lean further.)
     let curved = match chamfer {
+        ChamferSides::OffsetAngle(_, angle) | ChamferSides::TangentAngle(_, angle) if angle >= std::f64::consts::FRAC_PI_2 => true,
         ChamferSides::OffsetAngle(..) => matches!(secs[0], Sec::Circle(..)),
         _ => secs.iter().any(|s| matches!(s, Sec::Circle(..))),
     };
@@ -2029,7 +2031,8 @@ pub fn chamfer_offsets(shape: &Shape, e: usize, faces: [&Shape; 2], chamfer: Cha
     };
     let (d0, d1) = match chamfer {
         ChamferSides::Tangent(a, b) => (a, b),
-        ChamferSides::TangentAngle(d, angle) | ChamferSides::OffsetAngle(d, angle) => (d, d * angle.tan()),
+        ChamferSides::TangentAngle(d, angle) | ChamferSides::OffsetAngle(d, angle) if angle < std::f64::consts::FRAC_PI_4 => (d, d * angle.tan()),
+        ChamferSides::TangentAngle(d, _) | ChamferSides::OffsetAngle(d, _) => (d, 2.0 * d),
     };
     let mut x = [start(&secs[0], d0), start(&secs[1], d1)];
     let tol = 1e-12 * scale;

@@ -3928,7 +3928,8 @@ P2
 - [ ] P2 FILLET-FULLROUND-PROP (blend) Full round ignores Tangent propagation; "Cannot select separate center face sets."
 - [ ] P2 FILLET-PARTFAIL (blend, live) one part failing fails the whole fillet; live: "Could not fillet selections on
   some parts." and keeps the others?
-- [ ] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
+- [x] P2 CHAMFER-ANGLE-OVER-90 (blend) Distance and angle refuses 90-179.9° in the kernel (features.cpp:8048).
+  Done: 90° and over go to OCCT as two distances (an acute edge's chamfer; one edge, or edges coming to the same).
 - [x] P2 CHAMFER-ASYM-NO-PROPAGATION (blend) Tangent propagation off stops only equal-distance chamfers; two distances /
   distance and angle still run on.
   Two distances on one edge done (and the stopped chamfer's setback, d·tan(half) at a non-right edge, fixed);

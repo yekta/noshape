@@ -3852,6 +3852,38 @@ fn a_chamfer_stopped_at_its_selection_sets_back_its_distance_on_a_drafted_wall()
     }
 }
 
+/// Distance and angle past 90° at an acute edge (std allows 0.1-179.9°; OCCT stops below 90°): a 60° wedge, 2 mm at
+/// 100° to the reference face takes the triangle with sides 2 and 2 sin 100° / sin 20° along the faces.
+#[test]
+fn a_distance_and_angle_chamfer_leans_past_90_degrees_at_an_acute_edge() {
+    let mut s = Studio::new();
+    let mut sk = noshape_sketch::Sketch::new();
+    let h = 30.0 * 60f64.to_radians().tan();
+    polyline(&mut sk, &[(0.0, 0.0), (30.0, 0.0), (0.0, h)], true);
+    let sid = s.sketch(Reference::Plane(DatumPlane::Front), sk);
+    let region = s.region(sid);
+    s.add("extrude", move |p| {
+        p.set("entities", q(region));
+        p.set("depth", expr("20 mm"));
+    });
+    let r = s.ok();
+    let v0 = volume(&r, 0);
+    let b = &r.context.bodies[0];
+    let e = b.shape.edges().iter().position(|e| e.edge_info().is_ok_and(|i| matches!(i.curve, noshape_kernel::Curve::Line { .. }) && (i.start.x - mm(30.0)).abs() < 1e-9 && (i.end.x - mm(30.0)).abs() < 1e-9 && i.start.z.abs() < 1e-9 && i.end.z.abs() < 1e-9)).unwrap();
+    let edge = Reference::Edge((*b.edges[e]).clone());
+    s.add("chamfer", move |p| {
+        p.set("entities", q(edge));
+        p.set("chamferType", en("OFFSET_ANGLE"));
+        p.set("width", expr("2 mm"));
+        p.set("angle", expr("100 deg"));
+    });
+    let r = s.ok();
+    let other = 2.0 * 100f64.to_radians().sin() / 20f64.to_radians().sin();
+    let removed = 0.5 * 2.0 * other * 60f64.to_radians().sin() * 20.0;
+    let got = (v0 - volume(&r, 0)) * 1e9;
+    assert!((got - removed).abs() < 1e-6, "{got} mm³, want {removed}");
+}
+
 /// Live (11-08): a chamfer on the edge between a shaft's flat (x = 6) and its round (r = 10), 20 long, in every type
 /// and both measurements. Tangent measures along the faces' tangent lines from where they meet; Offset's angle is to
 /// the line from the chamfer's side to the edge. Volumes in mm³.
