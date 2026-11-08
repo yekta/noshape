@@ -198,10 +198,14 @@ fn helical_sweep_clear(profile: &[DVec3], path: &[(DVec3, DVec3, f64)], tool: &S
 /// The part of the sweep path a profile in its middle sweeps along (live
 /// L12): the piece from the profile toward the path's start, or toward its
 /// end with the path's Opposite direction. Unchanged when the profile's
-/// plane doesn't cut the path.
-fn half_path(path: &Shape, origin: DVec3, normal: DVec3, opposite: bool) -> Shape {
+/// plane doesn't cut the path. A closed path is swept whole from the profile
+/// (`profile_at`, its centre), as live (cf-snap-hook's Sweep 1 round a rim).
+fn half_path(path: &Shape, origin: DVec3, normal: DVec3, opposite: bool, profile_at: DVec3) -> Shape {
     let x = if normal.cross(DVec3::X).length() > 0.1 { DVec3::X } else { DVec3::Y };
     let plane = k::Plane::new(origin, normal, x);
+    if path.is_closed().unwrap_or(false) {
+        return closed_path_from(path, &plane, normal, profile_at).unwrap_or_else(|| path.clone());
+    }
     let Some(start) = path.edges().first().and_then(|e| e.endpoints().ok()).map(|e| e.0) else { return path.clone() };
     let Ok(cut) = k::split_by_plane(path, &plane) else { return path.clone() };
     let edges = cut.shape.edges();
@@ -219,6 +223,32 @@ fn half_path(path: &Shape, origin: DVec3, normal: DVec3, opposite: bool) -> Shap
         return path.clone();
     }
     k::make_wire(&kept).unwrap_or_else(|_| path.clone())
+}
+
+/// A closed path as one loop starting where the profile's plane crosses it nearest the profile. `None`: it starts
+/// there already, or the loop can't be rebuilt.
+fn closed_path_from(path: &Shape, plane: &k::Plane, normal: DVec3, profile_at: DVec3) -> Option<Shape> {
+    let tol = 1e-7 * (path.bounding_box(false).ok()?.diagonal() + 1.0);
+    let on_plane = |p: DVec3| (p - plane.origin).dot(normal).abs() < tol;
+    let start = path.edges().first()?.endpoints().ok()?.0;
+    let pieces: Vec<(Shape, DVec3, DVec3)> = k::split_by_plane(path, plane).ok()?.shape.edges().into_iter().filter_map(|e| {
+        let (a, b) = e.endpoints().ok()?;
+        Some((e, a, b))
+    }).collect();
+    let q = pieces.iter().flat_map(|(_, a, b)| [*a, *b]).filter(|p| on_plane(*p)).min_by(|p, r| p.distance(profile_at).total_cmp(&r.distance(profile_at)))?;
+    if q.distance(start) < tol {
+        return None;
+    }
+    let mut left = pieces;
+    let mut ordered = Vec::with_capacity(left.len());
+    let mut at = q;
+    while !left.is_empty() {
+        let i = left.iter().position(|(_, a, b)| a.distance(at) < tol || b.distance(at) < tol)?;
+        let (e, a, b) = left.remove(i);
+        at = if a.distance(at) < tol { b } else { a };
+        ordered.push(e);
+    }
+    (at.distance(q) < tol).then(|| k::make_wire(&ordered).ok()).flatten()
 }
 
 /// A loft end condition as loft.fs createProfileConditions builds it, from
@@ -429,7 +459,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
     let (extend, path_opposite) = (ev.bool("extendToFullPath"), ev.bool("pathOppositeDirection"));
     let sweep = |profile: &Shape, frame: Option<&crate::display::PlaneFrame>, opts: &k::SweepOptions| {
         let path = match frame {
-            Some(f) if !extend => half_path(&path, f.origin, f.normal, path_opposite),
+            Some(f) if !extend => half_path(&path, f.origin, f.normal, path_opposite, profile.bounding_box(false).map_or(f.origin, |b| b.center())),
             _ => path.clone(),
         };
         match &lock_faces {
@@ -488,7 +518,7 @@ pub fn sweep(ev: &mut EvalCtx) -> FResult<()> {
             } else if let Some(d) = lock_dir {
                 o.mode = k::SweepMode::Binormal(d);
             }
-            let eff = if extend { path.clone() } else { half_path(&path, frame.origin, frame.normal, path_opposite) };
+            let eff = if extend { path.clone() } else { half_path(&path, frame.origin, frame.normal, path_opposite, w.bounding_box(false).map_or(frame.origin, |b| b.center())) };
             let shape = thin_sheet_sweep(&w, &frame, &eff, &o, t1, t2, path_open && ev.bool("trimEnds"), thin_fail)?;
             let names = name_new(ev, &shape);
             tools.push(NamedShape::new(shape, names));

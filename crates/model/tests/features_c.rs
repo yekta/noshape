@@ -2053,6 +2053,32 @@ fn sweep_from_the_middle_of_the_path_as_live() {
     assert!((v - 7853.9816).abs() < 1e-3, "{v}");
 }
 
+/// A profile on a closed path sweeps the whole loop whichever way the path runs (cf-snap-hook's Sweep 1: a lip round
+/// a case's rim, its profile's plane crossing the rim twice): a 2 mm square on Right round a 40 × 20 mm rectangle
+/// that starts at a corner, 4 mm² × 120 mm, not half of it.
+#[test]
+fn a_profile_on_a_closed_path_sweeps_the_whole_loop() {
+    for opposite in [false, true] {
+        let mut s = Studio::new();
+        let mut sk = noshape_sketch::Sketch::new();
+        let path = polyline(&mut sk, &[(-20.0, -10.0), (20.0, -10.0), (20.0, 10.0), (-20.0, 10.0)], true);
+        let path_sketch = s.sketch(Reference::Plane(DatumPlane::Top), sk);
+        let mut sk = noshape_sketch::Sketch::new();
+        polyline(&mut sk, &[(-11.0, -1.0), (-9.0, -1.0), (-9.0, 1.0), (-11.0, 1.0)], true);
+        let profile_sketch = s.sketch(Reference::Plane(DatumPlane::Right), sk);
+        let region = s.region(profile_sketch);
+        s.add("sweep", move |p| {
+            p.set("profiles", q(region));
+            p.set("path", entities(path_sketch, &path));
+            p.set("pathOppositeDirection", ParamValue::Bool(opposite));
+        });
+        let r = s.ok();
+        assert!(r.context.bodies[0].shape.is_valid());
+        let v = volume(&r, 0) * 1e9;
+        assert!((v - 480.0).abs() < 1e-6, "opposite {opposite}: {v} mm³");
+    }
+}
+
 /// Live "psb (10-24 c) thin sweep": a Ø20 circle (or a 20 mm line) on Top
 /// swept Thin 50 up, Thickness 1 = 2: outward / on −y; Flip wall inward;
 /// Mid plane both sides; Scale 2 keeps the wall 2 thick normal to the cone;
