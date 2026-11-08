@@ -195,13 +195,11 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
   std::iota(parent.begin(), parent.end(), 0);
   std::function<int(int)> find = [&](int x) { return parent[x] == x ? x : parent[x] = find(parent[x]); };
   std::map<std::pair<int, int>, std::vector<int>> by_edge; // undirected edge -> triangles
-  std::map<std::pair<int, int>, int>              half;    // directed edge -> count
   for (size_t k = 0; k < tris.size(); ++k)
     for (int j = 0; j < 3; ++j)
     {
       const int a = tris[k][j], c = tris[k][(j + 1) % 3];
       by_edge[{std::min(a, c), std::max(a, c)}].push_back((int)k);
-      ++half[{a, c}];
     }
   for (const auto& [e, ts] : by_edge)
     for (size_t i = 1; i < ts.size(); ++i)
@@ -212,15 +210,15 @@ std::vector<MeshPiece> mesh_bodies(const std::vector<gp_Pnt>& nodes, std::vector
   std::vector<MeshPiece> out;
   for (const auto& [root, ts] : pieces)
   {
-    // Closed: every edge used as often one way as the other (Onshape's cone
-    // import has edges at the apex shared by four slivers, two each way).
+    // Closed: every edge used an even number of times (Onshape's cone import has edges at the apex shared by four
+    // slivers, two each way; a mesher's fold covers a few edges twice the same way, and live still reads a solid:
+    // exchange suite, cf-sheet-metal-model-plus' STL).
     bool closed = true;
     for (const auto& t : ts)
       for (int j = 0; j < 3 && closed; ++j)
       {
-        const int  a = t[j], c = t[(j + 1) % 3];
-        const auto f = half.find({a, c}), r = half.find({c, a});
-        closed = f != half.end() && r != half.end() && f->second == r->second;
+        const int a = t[j], c = t[(j + 1) % 3];
+        closed      = by_edge.at({std::min(a, c), std::max(a, c)}).size() % 2 == 0;
       }
     out.push_back({mesh_face(pts, ts), closed});
   }

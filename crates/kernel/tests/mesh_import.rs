@@ -220,3 +220,33 @@ fn b64(data: &[u8]) -> String {
     }
     s
 }
+
+/// A mesh whose edges are each used an even number of times is closed, as live reads it, though some are used
+/// twice the same way (a mesher's fold: the exchange suite's cf-sheet-metal-model-plus STL; here a bottom triangle
+/// written three times, in the plane through the origin so the volume stays the cube's).
+#[test]
+fn stl_with_a_fold_is_a_solid() {
+    let p = |x: f64, y: f64, z: f64| [x * 0.01, y * 0.01, z * 0.01];
+    let [a, b, c, d] = [p(0., 0., 0.), p(1., 0., 0.), p(1., 1., 0.), p(0., 1., 0.)];
+    let [e, f, g, h] = [p(0., 0., 1.), p(1., 0., 1.), p(1., 1., 1.), p(0., 1., 1.)];
+    let mut tris = vec![[a, c, b], [a, d, c], [e, f, g], [e, g, h], [a, b, f], [a, f, e], [b, c, g], [b, g, f], [c, d, h], [c, h, g], [d, a, e], [d, e, h]];
+    tris.extend([[a, c, b], [a, c, b]]);
+    let mut text = String::from("solid fold\n");
+    for t in &tris {
+        text += "facet normal 0 0 0\nouter loop\n";
+        for v in t {
+            text += &format!("vertex {} {} {}\n", v[0], v[1], v[2]);
+        }
+        text += "endloop\nendfacet\n";
+    }
+    text += "endsolid fold\n";
+    let dir = std::env::temp_dir().join(format!("noshape-meshfold-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("fold.stl");
+    std::fs::write(&path, text).unwrap();
+    let s = read_mesh_bodies(&path, LengthUnit::Meter).unwrap();
+    let _ = std::fs::remove_dir_all(&dir);
+    assert_eq!(s.count(ShapeType::Solid), 1, "closed: a solid");
+    let v = volume_properties(&s).unwrap().mass;
+    assert!((v - 1e-6).abs() < 1e-10, "volume {v}");
+}
