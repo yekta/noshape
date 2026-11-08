@@ -28,6 +28,32 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-08 14:37 UTC: documents-page ops; ⋯ table menus stay open on Escape
+- The documents page's file logic moved down into ops (`noshape_ops::doc_library`: naming, rename, move, copy,
+  details, labels, the recent and watched-folder lists, and shared actions `rename_doc`, `move_doc`, `create_folder`,
+  `rename_folder`, `move_folder`, `send_to_trash`, `restore`; `noshape_ops::doc_trash`: the Trash). app-core
+  re-exports them; the page calls the shared actions, so the page and the ops do the same. Ops (group `documents`):
+  list (folder, recent, trash, label; folder sort), create_folder, rename, move, copy, details (+ description), trash,
+  restore, delete, empty_trash, label, forget_recent, set_library; e2e documents_page. coverage.rs scans the page
+  (area `documents`, 18 rows). docs-* unchanged (146/165).
+- The Variable Studio's table ⋯ and the Configuration panel's ⋯ menus are page dropdowns: Escape leaves them open
+  (live vs-table-menu, vs-inserted-table-menu, vs-cfg-input-menu; as psui's configuration panel). The + menu stayed
+  open in one recording (vs-tab-menu-copy-clipboard) but the ☰ menu closes: not changed on one recording.
+
+### Set library: who reads the library folders (for the lead to route)
+`noshape_ops::prefs::LibraryFolders::load().0` maps a library key to its folder (op `documents_set_library`); each
+consumer lists that folder's `.noshape` documents (and their elements) next to Onshape's own library, as live's "My …"
+entries. Nothing reads them yet:
+- `frame_profiles` "My frame profiles library": the Frame feature's profile picker (part-studio-ui `select_item.rs`,
+  model-core `regen/features/frame_library.rs`: today only "Onshape frame profiles"): core / psui.
+- `sheet_metal_forms` "My sheet metal forms": the sheet metal Form feature's form picker (custom
+  `host/sheetmetal.rs`, model-core `regen`): core (sheet metal).
+- `tolerances` "My default tolerances": the default tolerance tables (model-data `fits/tables.rs`, the hole and
+  dimension tolerance pickers in Part Studios and drawings): core + dx.
+- `images` "My images": Insert image in drawings (drawing-ui `drawing_images.rs`) and sketches: dx + skasm.
+- `standard_content` "My standard content": the assembly's Insert › Standard content (assembly-ui
+  `assembly_standard.rs`): asm.
+
 ### 2026-11-08 13:42 UTC: whole-suite measure 82.1 %; Move to document…, Set library, modal fields, Feature Studio editor
 - Measured (uip12, every studios scenario on b66c324a + the batch below in progress): 181/390 scenarios, 1475/1796
   states (82.1 %): documents (doc/docs/prefs) 80.5 %, versions 84.6 %, Variable Studio 83.5 %, Feature Studio 81.6 %.

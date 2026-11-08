@@ -224,6 +224,25 @@ pub const SHORTCUTS: &[(&str, Cover)] = &[
 /// `OsMenuItem::new("…")` label in those sources (`tests/coverage.rs`
 /// collects them). Labels built at run time ("Delete Part 1") aren't listed.
 pub const MENUS: &[(&str, Cover)] = &[
+    // The documents page (start-ui start_window.rs).
+    ("documents:Any", Op("documents_details")),
+    ("documents:Company settings", Op("company_custom_properties")),
+    ("documents:Copy workspace…", Op("documents_copy")),
+    ("documents:Delete", Op("documents_delete")),
+    ("documents:Details", Op("documents_details")),
+    ("documents:Labels…", Op("documents_label")),
+    ("documents:Last modified", Op("documents_list")),
+    ("documents:Move to…", Op("documents_move")),
+    ("documents:Name: A → Z", Op("documents_list")),
+    ("documents:Name: Z → A", Op("documents_list")),
+    ("documents:Open", Op("document_open")),
+    ("documents:Open in new browser tab", Op("document_open")),
+    ("documents:Preferences…", Op("ui_preferences")),
+    ("documents:Remove from recently opened", Op("documents_forget_recent")),
+    ("documents:Rename", Op("documents_rename")),
+    ("documents:Restore", Op("documents_restore")),
+    ("documents:Send to trash", Op("documents_trash")),
+    ("documents:Versions and history", Op("documents_details")),
     ("app:About", Op("app_about")),
     ("app:FeatureScript documentation", Op("featurestudio_std")),
     ("app:Help", Op("app_user_guide")),

@@ -4106,6 +4106,67 @@ fn tab_move_to_document() {
     let _ = std::fs::remove_file(&new);
 }
 
+/// The documents page through its ops: folders, labels, rename, move, copy, details and the trash, each as the page
+/// does it (labels and the recent list follow a document).
+#[test]
+fn documents_page() {
+    let dir = scratch("docs-page");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    call(&mut ctx, "document_create", json!({ "path": dir.join("Bracket.noshape").to_str().unwrap() }));
+    call(&mut ctx, "document_close", json!({}));
+    let f = call(&mut ctx, "documents_create_folder", json!({}));
+    assert!(f["created"].as_str().unwrap().ends_with("Untitled folder"), "{f}");
+    call(&mut ctx, "documents_create_folder", json!({ "name": "Fixtures" }));
+    let e = try_call(&mut ctx, "documents_create_folder", json!({ "name": "Fixtures" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("name"), "{e:?}");
+    let l = call(&mut ctx, "documents_list", json!({}));
+    assert_eq!((l["folders"].as_array().unwrap().len(), l["documents"][0]["name"].as_str()), (2, Some("Bracket")), "{l}");
+    let z = call(&mut ctx, "documents_list", json!({ "sort": "name_desc" }));
+    assert_eq!(z["folders"][0]["name"], "Untitled folder", "{z}");
+    // A label, then the document renamed and moved: the label follows.
+    call(&mut ctx, "documents_label", json!({ "label": "Brackets", "create": true, "path": "Bracket" }));
+    let r = call(&mut ctx, "documents_rename", json!({ "path": "Bracket", "name": "Bracket v2" }));
+    let renamed = r["path"].as_str().unwrap().to_string();
+    assert!(renamed.ends_with("Bracket v2.noshape"), "{r}");
+    let m = call(&mut ctx, "documents_move", json!({ "path": renamed, "to": "Fixtures" }));
+    let moved = m["path"].as_str().unwrap().to_string();
+    assert!(moved.contains("Fixtures"), "{m}");
+    let l = call(&mut ctx, "documents_list", json!({ "label": "Brackets" }));
+    assert_eq!(l["documents"][0]["path"], moved.as_str(), "{l}");
+    // Copy workspace…, Details.
+    let c = call(&mut ctx, "documents_copy", json!({ "path": moved }));
+    assert_eq!(c["name"], "Bracket v2 - Copy", "{c}");
+    let d = call(&mut ctx, "documents_details", json!({ "path": moved, "description": "Wall bracket" }));
+    assert_eq!(d["description"], "Wall bracket", "{d}");
+    // The trash: send, restore, send again and delete, a folder and Empty trash.
+    let copy = c["copy"].as_str().unwrap().to_string();
+    let t = call(&mut ctx, "documents_trash", json!({ "path": copy }));
+    assert!(t["message"].as_str().unwrap().ends_with("has been sent to the trash and will be automatically deleted after 30 days."), "{t}");
+    assert!(!std::path::Path::new(&copy).exists());
+    let r = call(&mut ctx, "documents_restore", json!({ "item": "Bracket v2 - Copy" }));
+    assert_eq!(r["message"], "Bracket v2 - Copy has been restored.", "{r}");
+    assert!(std::path::Path::new(&copy).exists());
+    call(&mut ctx, "documents_trash", json!({ "path": copy }));
+    call(&mut ctx, "documents_delete", json!({ "item": "Bracket v2 - Copy" }));
+    let e = try_call(&mut ctx, "documents_restore", json!({ "item": "Bracket v2 - Copy" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("item"), "{e:?}");
+    call(&mut ctx, "documents_trash", json!({ "path": "Untitled folder" }));
+    let l = call(&mut ctx, "documents_list", json!({ "place": "trash" }));
+    assert!(l["items"].as_array().unwrap().iter().any(|i| i["name"] == "Untitled folder" && i["folder"] == true), "{l}");
+    call(&mut ctx, "documents_empty_trash", json!({}));
+    assert!(call(&mut ctx, "documents_list", json!({ "place": "trash" }))["items"].as_array().unwrap().is_empty());
+    // An open document can't be trashed.
+    call(&mut ctx, "document_open", json!({ "path": moved }));
+    let e = try_call(&mut ctx, "documents_trash", json!({ "path": moved })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("path"), "{e:?}");
+    call(&mut ctx, "document_close", json!({}));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// feature_add makes the dialog's own choices for fields not given: an
 /// Extrude from a sketch on a part's face adds to that part (merge scope
 /// the part); Remove there cuts into it.

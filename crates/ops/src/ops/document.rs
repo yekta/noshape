@@ -185,20 +185,6 @@ pub fn ops() -> Vec<Op> {
             run: tab_move,
         },
         Op {
-            group: "documents",
-            verb: "set_library",
-            summary: "Set a folder as one of your libraries (Documents › a folder's Set library ▸)",
-            description: "The folder becomes the user's library of that kind: My frame profiles library, My sheet metal forms, My default tolerances, My images or My standard content (one folder each; setting another replaces it). `clear` unsets the kind. The reply lists every library set.",
-            fields: vec![
-                req("library", json!({ "type": "string", "enum": crate::prefs::LIBRARIES.iter().map(|(k, _)| *k).collect::<Vec<_>>() }), "Which library (its key; the menu's row also works)."),
-                opt("folder", s(), "The folder's path (required unless `clear`)."),
-                opt("clear", json!({ "type": "boolean" }), "Unset that library."),
-            ],
-            mutates: true,
-            destructive: false,
-            run: documents_set_library,
-        },
-        Op {
             group: "tab",
             verb: "move_to_document",
             summary: "Move tabs to a new or another document (Tab › Move to document…)",
@@ -282,25 +268,6 @@ fn tab_move(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     }
     let folder = target.and_then(|t| od.doc().folder(t)).map(|f| f.name.clone());
     Ok(json!({ "moved": id.to_string(), "folder": folder }).into())
-}
-
-fn documents_set_library(_ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
-    let Some(key) = crate::prefs::LibraryFolders::key(a.str("library")?) else {
-        return Err(OpError::param("library", "not a library: frame_profiles, sheet_metal_forms, tolerances, images or standard_content"));
-    };
-    let mut libs = crate::prefs::LibraryFolders::load();
-    if a.bool_or("clear", false)? {
-        libs.0.remove(key);
-    } else {
-        let Some(folder) = a.opt_str("folder")? else { return Err(OpError::param("folder", "the folder to use is required")) };
-        let folder = std::path::PathBuf::from(folder);
-        if !folder.is_dir() {
-            return Err(OpError::invalid(format!("{} isn't a folder", folder.display())).with_param("folder"));
-        }
-        libs.0.insert(key.to_string(), folder);
-    }
-    libs.save().map_err(|e| OpError::new("io", format!("saving the libraries: {e}")))?;
-    Ok(json!({ "libraries": libs.0 }).into())
 }
 
 fn tab_move_to_document(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

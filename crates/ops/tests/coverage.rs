@@ -93,6 +93,8 @@ fn menu_labels() -> BTreeSet<String> {
     for e in std::fs::read_dir(part_studio.join("part_studio")).expect("part studio sources").flatten() {
         files.push(("partStudio".into(), e.path()));
     }
+    // The documents page.
+    files.push(("documents".into(), std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../start-ui/src/start_window.rs")));
     let mut out = BTreeSet::new();
     for (area, path) in files {
         let text = std::fs::read_to_string(&path).expect("read source");

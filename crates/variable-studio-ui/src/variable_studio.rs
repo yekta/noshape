@@ -1049,6 +1049,8 @@ impl Render for VariableStudioView {
                                     None => m,
                                 }
                             });
+                                // A page's dropdown: Escape leaves it open (live vs-table-menu, as the configuration panel's ⋯).
+                                crate::os_menu::mark_page_dropdown(&menu, cx);
                                 crate::os_menu::open_anchored(point(e.position().x + px(12.), e.position().y + px(12.)), Anchor::TopRight, menu, window, cx);
                             }),
                     ),

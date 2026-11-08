@@ -21,6 +21,8 @@ pub mod config;
 pub mod coverage;
 pub mod derived;
 pub mod doc;
+pub mod doc_library;
+pub mod doc_trash;
 pub mod drawing;
 pub mod drawing_export;
 pub mod examples;

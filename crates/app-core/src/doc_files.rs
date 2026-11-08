@@ -12,62 +12,9 @@ pub fn new_document_path() -> PathBuf {
     (1..).map(|n| dir.join(format!("Untitled {n}.noshape"))).find(|p| !p.exists()).expect("free name")
 }
 
-pub fn recent() -> Vec<PathBuf> {
-    let f = config_dir().join("recent.json");
-    std::fs::read(&f)
-        .ok()
-        .and_then(|b| serde_json::from_slice::<Vec<PathBuf>>(&b).ok())
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|p| p.exists())
-        .collect()
-}
+pub use noshape_ops::doc_library::{add_recent, canonical, recent, remove_recent, replace_recent};
 
-pub fn add_recent(p: &Path) {
-    let mut list = recent();
-    let p = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
-    list.retain(|x| *x != p);
-    list.insert(0, p);
-    list.truncate(15);
-    write_recent(&list);
-}
-
-fn write_recent(list: &[PathBuf]) {
-    let _ = std::fs::write(config_dir().join("recent.json"), serde_json::to_vec_pretty(list).unwrap_or_default());
-}
-
-pub fn canonical(p: &Path) -> PathBuf {
-    p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
-}
-
-/// Remove a document from the recent list (start window "Remove from recent").
-pub fn remove_recent(p: &Path) {
-    let p = canonical(p);
-    let mut list = recent();
-    list.retain(|x| *x != p);
-    write_recent(&list);
-}
-
-/// Point a recent entry at a document's new location (after a rename).
-pub fn replace_recent(old: &Path, new: &Path) {
-    let new = canonical(new);
-    let list: Vec<PathBuf> = recent_raw().into_iter().map(|x| if x == old { new.clone() } else { x }).collect();
-    write_recent(&list);
-}
-
-fn recent_raw() -> Vec<PathBuf> {
-    std::fs::read(config_dir().join("recent.json")).ok().and_then(|b| serde_json::from_slice::<Vec<PathBuf>>(&b).ok()).unwrap_or_default()
-}
-
-/// Extra folders the start window lists `.noshape` files from (besides
-/// [`documents_dir`]). Persisted in the config dir.
-pub fn watched_folders() -> Vec<PathBuf> {
-    std::fs::read(config_dir().join("folders.json")).ok().and_then(|b| serde_json::from_slice::<Vec<PathBuf>>(&b).ok()).unwrap_or_default()
-}
-
-pub fn set_watched_folders(list: &[PathBuf]) {
-    let _ = std::fs::write(config_dir().join("folders.json"), serde_json::to_vec_pretty(list).unwrap_or_default());
-}
+pub use noshape_ops::doc_library::{set_watched_folders, watched_folders};
 
 /// The user's name for version history (Preferences); None = the OS name.
 pub fn user_name_pref() -> Option<String> {

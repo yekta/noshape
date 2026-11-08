@@ -894,28 +894,15 @@ impl StartView {
     /// Create ▾ › Folder…: a new folder in the current place.
     fn new_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let start = self.current_place();
-        let default = (0..)
-            .map(|i| if i == 0 { "Untitled folder".to_string() } else { format!("Untitled folder ({i})") })
-            .find(|n| !start.join(n).exists())
-            .unwrap_or_default();
+        let default = lib::next_untitled_folder(&start);
         let location = Location::new(start);
         let chosen = location.chosen.clone();
         let view = cx.entity();
         let prompt = NamePrompt { title: "New folder", ok_label: "Create", label: "Folder name", default, hint: None, location: Some(("Folder location", location)), labels: None };
         prompt_name(prompt, window, cx, move |name, window, cx| {
             let place = chosen.borrow().clone();
-            let clean = lib::sanitize_name(&name);
-            if clean.is_empty() {
-                Self::notify(window, cx, AlertKind::Warning, "Enter a name for the folder");
-                return false;
-            }
-            let path = place.join(&clean);
-            if path.exists() {
-                Self::notify(window, cx, AlertKind::Warning, format!("\"{clean}\" already exists in this folder"));
-                return false;
-            }
-            if let Err(e) = std::fs::create_dir_all(&path) {
-                Self::notify(window, cx, AlertKind::Error, format!("Could not create the folder: {e}"));
+            if let Err(e) = lib::create_folder(&place, &name) {
+                Self::notify(window, cx, AlertKind::Warning, format!("{e:#}"));
                 return false;
             }
             view.update(cx, |this, cx| {
@@ -937,11 +924,9 @@ impl StartView {
             if name == old {
                 return;
             }
-            match lib::rename_document(&d.path, &name) {
+            match lib::rename_doc(&d.path, &name) {
                 Ok(dest) => {
-                    crate::doc_files::replace_recent(&d.path, &dest);
-                    this.labels.moved(&d.path, &dest);
-                    this.labels.save();
+                    this.labels = lib::Labels::load();
                     this.selected = Some(dest.canonicalize().unwrap_or(dest));
                     this.force_rescan(cx);
                 }
@@ -1088,19 +1073,12 @@ impl StartView {
     }
 
     fn send_to_trash(&mut self, path: PathBuf, name: String, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
-        match self.trash.send(&path, &name, folder) {
+        match lib::send_to_trash(&path, &name, folder) {
             Ok(item) => {
-                for d in self.docs.iter().filter(|d| d.path == item.original || (folder && d.path.starts_with(&item.original))) {
-                    crate::doc_files::remove_recent(&d.path);
-                }
-                if folder {
-                    let mut list = crate::doc_files::watched_folders();
-                    list.retain(|f| canon(f) != item.original);
-                    crate::doc_files::set_watched_folders(&list);
-                    if matches!(&self.source, Source::Folder(f) if canon(f).starts_with(&item.original)) {
-                        self.source = Source::All;
-                        self.save_prefs();
-                    }
+                self.trash = crate::start_trash::Trash::load();
+                if folder && matches!(&self.source, Source::Folder(f) if canon(f).starts_with(&item.original)) {
+                    self.source = Source::All;
+                    self.save_prefs();
                 }
                 self.selected = None;
                 Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(name), text: " has been sent to the trash and will be automatically deleted after 30 days.".into(), restore: Some(item.id), brief: true });
@@ -1112,30 +1090,12 @@ impl StartView {
 
     /// Trash row menu › Restore and the toast's Restore link.
     fn restore_trashed(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        let item = self.trash.get(&id).cloned();
-        match self.trash.restore(&id) {
-            Ok(dest) => {
-                // Live documents/86: "<name> has been restored." (brief); a
-                // restored document's Modified time becomes the restore time.
-                if let Some(item) = &item {
-                    if !item.folder
-                        && let Ok(mut store) = noshape_store::Document::open(&dest)
-                    {
-                        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0);
-                        let _ = store.set_meta("modified", Some(now.to_string().as_bytes()));
-                        let _ = store.checkpoint();
-                    }
-                    Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: None, brief: true });
-                }
-                // A folder from outside the documents folder is listed again.
-                if let Some(item) = item.filter(|i| i.folder && !i.original.starts_with(canon(&crate::file_dialogs::documents_dir())))
-                    && item.original.parent().is_some_and(|p| !self.dirs.iter().any(|d| d == p))
-                {
-                    let mut list = crate::doc_files::watched_folders();
-                    list.push(dest.clone());
-                    crate::doc_files::set_watched_folders(&list);
-                    self.folders = ScanInput::current().folders;
-                }
+        match lib::restore(&id, &crate::file_dialogs::documents_dir()) {
+            Ok((_, item)) => {
+                self.trash = crate::start_trash::Trash::load();
+                // Live documents/86: "<name> has been restored." (brief).
+                Self::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: Some(item.name.clone()), text: " has been restored.".into(), restore: None, brief: true });
+                self.folders = ScanInput::current().folders;
                 self.selected = None;
                 self.force_rescan(cx);
             }
@@ -1272,22 +1232,10 @@ impl StartView {
 
     /// Paths under `old` now live under `new` (recent list, labels, the
     /// place shown).
+    /// After a folder's rename or move (`lib::rename_folder` / `lib::move_folder` moved its recent entries, labels
+    /// and watched folder): the page's place follows.
     fn folder_moved(&mut self, old: &Path, new: &Path) {
-        for d in self.docs.iter().filter(|d| d.path.starts_with(old)) {
-            if let Ok(rest) = d.path.strip_prefix(old) {
-                let dest = new.join(rest);
-                crate::doc_files::replace_recent(&d.path, &dest);
-                self.labels.moved(&d.path, &dest);
-            }
-        }
-        self.labels.save();
-        let mut list = crate::doc_files::watched_folders();
-        for w in list.iter_mut() {
-            if canon(w) == old {
-                *w = new.to_path_buf();
-            }
-        }
-        crate::doc_files::set_watched_folders(&list);
+        self.labels = lib::Labels::load();
         if let Source::Folder(f) = &self.source
             && let Ok(rest) = canon(f).strip_prefix(old)
         {
@@ -1301,25 +1249,16 @@ impl StartView {
     fn rename_folder(&mut self, f: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let name = folder_label(&f);
         self.start_inline_rename(f.clone(), name, move |this, name, window, cx| {
-            let clean = lib::sanitize_name(&name);
-            let Some(parent) = f.parent() else { return };
-            if clean.is_empty() {
-                Self::notify(window, cx, AlertKind::Warning, "Enter a name for the folder");
-                return;
-            }
-            let dest = parent.join(&clean);
-            if dest == f {
-                return;
-            }
-            if dest.exists() {
-                Self::notify(window, cx, AlertKind::Warning, format!("\"{clean}\" already exists in this folder"));
-                return;
-            }
-            if let Err(e) = std::fs::rename(&f, &dest) {
-                Self::notify(window, cx, AlertKind::Error, format!("{}: {e}", "Rename failed"));
-                return;
-            }
-            this.folder_moved(&f, &dest);
+            let old = canon(&f);
+            let dest = match lib::rename_folder(&f, &name) {
+                Ok(dest) if dest == f => return,
+                Ok(dest) => dest,
+                Err(e) => {
+                    Self::notify(window, cx, AlertKind::Warning, format!("{e:#}"));
+                    return;
+                }
+            };
+            this.folder_moved(&old, &canon(&dest));
             this.selected = Some(canon(&dest));
             this.force_rescan(cx);
         }, window, cx);
@@ -1338,21 +1277,17 @@ impl StartView {
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
-                    let Some(file_name) = f.file_name() else { return false };
-                    let dest = dir.join(file_name);
-                    if dest == f {
-                        return true;
-                    }
-                    if dir.starts_with(&f) || dest.exists() {
-                        Self::notify(window, cx, AlertKind::Warning, format!("\"{}\" can't be moved there", folder_label(&f)));
-                        return false;
-                    }
-                    if let Err(e) = std::fs::rename(&f, &dest) {
-                        Self::notify(window, cx, AlertKind::Error, format!("{}: {e}", "Move failed"));
-                        return false;
-                    }
+                    let old = canon(&f);
+                    let dest = match lib::move_folder(&f, &dir) {
+                        Ok(dest) if dest == f => return true,
+                        Ok(dest) => dest,
+                        Err(e) => {
+                            Self::notify(window, cx, AlertKind::Warning, format!("{e:#}"));
+                            return false;
+                        }
+                    };
                     view.update(cx, |this, cx| {
-                        this.folder_moved(&f, &dest);
+                        this.folder_moved(&old, &canon(&dest));
                         this.selected = Some(canon(&dest));
                         this.force_rescan(cx);
                     });
@@ -2079,15 +2014,15 @@ impl StartView {
                 })))
                 // The legend (live documents/116, as the document's panel).
                 .child({
-                    let item = |icon: &'static str, label: &'static str, faint: bool, cx: &mut Context<Self>| h_flex().gap(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(if faint { pal.text_faint } else { pal.text }).child(crate::assets::icon(icon, 20., cx)).child(label);
+                    let legend = |icon: &'static str, label: &'static str, faint: bool, cx: &mut Context<Self>| h_flex().gap(px(4.)).text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(if faint { pal.text_faint } else { pal.text }).child(crate::assets::icon(icon, 20., cx)).child(label);
                     v_flex()
                         .flex_none()
                         .items_center()
                         .gap(px(10.))
                         .py(px(14.))
-                        .child(h_flex().gap(px(30.)).child(item("legend-workspace", "Workspace", false, cx)).child(item("legend-version", "Version", false, cx)).child(item("legend-change", "Change", true, cx)))
-                        .child(h_flex().gap(px(30.)).child(item("legend-release-candidate", "Release candidate", false, cx)).child(item("legend-release", "Release", false, cx)))
-                        .child(h_flex().gap(px(30.)).child(item("legend-obsoletion", "Contains obsoletion", false, cx)))
+                        .child(h_flex().gap(px(30.)).child(legend("legend-workspace", "Workspace", false, cx)).child(legend("legend-version", "Version", false, cx)).child(legend("legend-change", "Change", true, cx)))
+                        .child(h_flex().gap(px(30.)).child(legend("legend-release-candidate", "Release candidate", false, cx)).child(legend("legend-release", "Release", false, cx)))
+                        .child(h_flex().gap(px(30.)).child(legend("legend-obsoletion", "Contains obsoletion", false, cx)))
                 })
                 .into_any_element()
             }
@@ -2251,12 +2186,10 @@ impl StartView {
                 .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Move here"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
                 .on_ok(move |_, window, cx| {
                     let dir = loc.chosen.borrow().clone();
-                    match lib::move_document(&d.path, &dir) {
+                    match lib::move_doc(&d.path, &dir) {
                         Ok(dest) => {
-                            crate::doc_files::replace_recent(&d.path, &dest);
                             view.update(cx, |this, cx| {
-                                this.labels.moved(&d.path, &dest);
-                                this.labels.save();
+                                this.labels = lib::Labels::load();
                                 this.selected = Some(dest.canonicalize().unwrap_or(dest));
                                 this.force_rescan(cx);
                             });

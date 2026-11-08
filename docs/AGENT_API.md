@@ -320,7 +320,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
-- **documents**: [`documents_set_library`](#documents_set_library)
+- **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
@@ -747,6 +747,210 @@ Examples:
 | `activate` | string |  | Show this tab (name or id). |
 
 ### documents
+
+#### documents_list
+
+The documents page's list: a folder's documents and folders, Recently opened, a label's, or the Trash.
+
+Without arguments the documents folder (Owned by me): its folders and documents (name, path, modified, labels). `folder` lists another folder; `place` "recent" the Recently opened list, "trash" the Trash (its items' `id`s for documents_restore / documents_delete); `label` the documents with that label. `labels` lists every label.
+
+Examples:
+
+```json
+{}
+{"place": "trash"}
+{"label": "Brackets"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `folder` | string |  | A folder to list (a path; a bare name is in the documents folder). |
+| `place` | one of `owned`, `recent`, `trash` |  | Owned by me (default), Recently opened or the Trash. |
+| `label` | string |  | Only the documents with this label. |
+| `sort` | one of `name`, `name_desc`, `modified` |  | The folders' order, as the Folders row's sort menu: Name: A → Z (default), Name: Z → A, Last modified (newest first). |
+
+#### documents_create_folder
+
+Create a folder (Create ▾ › Folder…) (edits the document (one undoable history entry)).
+
+A folder named `name` (default "Untitled folder", then "Untitled folder (1)"…) in `folder` (default the documents folder). Refused when one of that name is there.
+
+Examples:
+
+```json
+{"name": "Fixtures"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `name` | string |  | Folder name. |
+| `folder` | string |  | Where (default the documents folder). |
+
+#### documents_rename
+
+Rename a document or folder (its menu's Rename) (edits the document (one undoable history entry)).
+
+A document: its file and its name (the recent list and its labels follow); a folder: in place. The document must not be open.
+
+Examples:
+
+```json
+{"path": "/home/ann/noshape/Bracket.noshape", "name": "Bracket v2"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
+| `name` | string | required | The new name. |
+
+#### documents_move
+
+Move a document or folder into another folder (its menu's Move to…) (edits the document (one undoable history entry)).
+
+Into `to` (a folder; a folder can't go into itself). The document must not be open; its recent entry and labels follow.
+
+Examples:
+
+```json
+{"path": "/home/ann/noshape/Bracket.noshape", "to": "/home/ann/noshape/Fixtures"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
+| `to` | string | required | The folder to move it into. |
+
+#### documents_copy
+
+Copy a document's workspace to a new document (the row menu's Copy workspace…) (edits the document (one undoable history entry)).
+
+A new document named `name` (default "<name> - Copy") in `to` (default the same folder) with the workspace's state.
+
+Examples:
+
+```json
+{"path": "/home/ann/noshape/Bracket.noshape"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
+| `name` | string |  | The copy's name. |
+| `to` | string |  | The folder for the copy. |
+
+#### documents_details
+
+A document's details (the Details panel), and its description (edits the document (one undoable history entry)).
+
+Name, description, owner, created and modified (with by whom), its workspaces and versions, its tabs. `description` sets it.
+
+Examples:
+
+```json
+{"path": "Bracket"}
+{"path": "Bracket", "description": "Wall bracket, 3 mm steel"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
+| `description` | string |  | A new description. |
+
+#### documents_trash
+
+Send a document or folder to the trash (Send to trash) (edits the document (one undoable history entry); deletes or overwrites).
+
+It goes to the Trash (deleted after 30 days, Onshape's message in `message`) and leaves Recently opened. Restore it with documents_restore. The document must not be open.
+
+Examples:
+
+```json
+{"path": "/home/ann/noshape/Old plate.noshape"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
+
+#### documents_restore
+
+Restore an item of the trash (Trash › Restore) (edits the document (one undoable history entry)).
+
+Back where it was, by its trash `id` or name (documents_list place "trash").
+
+Examples:
+
+```json
+{"item": "Old plate"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `item` | string | required | The trash item's id or name. |
+
+#### documents_delete
+
+Delete an item of the trash forever (Trash › Delete) (edits the document (one undoable history entry); deletes or overwrites).
+
+By its trash `id` or name; it can't be undone.
+
+Examples:
+
+```json
+{"item": "Old plate"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `item` | string | required | The trash item's id or name. |
+
+#### documents_empty_trash
+
+Empty the trash (Trash › Empty trash…) (edits the document (one undoable history entry); deletes or overwrites).
+
+Every item of the trash is deleted forever.
+
+Examples:
+
+```json
+{}
+```
+
+#### documents_label
+
+Create a label, or put a label on a document or take it off (Labels…, Create ▾ › Label…) (edits the document (one undoable history entry)).
+
+`create` makes a label (names are unique, case aside). With `path` the label goes on that document (`on` false takes it off).
+
+Examples:
+
+```json
+{"label": "Brackets", "create": true, "path": "Bracket"}
+{"label": "Brackets", "path": "Bracket", "on": false}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `label` | string | required | The label's name. |
+| `create` | boolean |  | Create the label first. |
+| `path` | string |  | A document to label. |
+| `on` | boolean |  | On (default) or off the document. |
+
+#### documents_forget_recent
+
+Remove a document from Recently opened (its menu there) (edits the document (one undoable history entry)).
+
+Only the list entry goes; the document stays.
+
+Examples:
+
+```json
+{"path": "/home/ann/noshape/Bracket.noshape"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `path` | string | required | The document's (or folder's) path; a bare name is in the documents folder. |
 
 #### documents_set_library
 

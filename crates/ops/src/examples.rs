@@ -42,6 +42,18 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_folder_create", &[r##"{}"##, r##"{"name": "Fixtures", "folder": "Folder 1"}"##]),
     ("tab_move", &[r##"{"tab": "Part Studio 1", "folder": "Folder 1"}"##, r##"{"tab": "Part Studio 1", "to_parent": true}"##, r##"{"tab": "Assembly 1", "before": "Part Studio 1"}"##]),
     ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
+    ("documents_list", &[r##"{}"##, r##"{"place": "trash"}"##, r##"{"label": "Brackets"}"##]),
+    ("documents_create_folder", &[r##"{"name": "Fixtures"}"##]),
+    ("documents_rename", &[r##"{"path": "/home/ann/noshape/Bracket.noshape", "name": "Bracket v2"}"##]),
+    ("documents_move", &[r##"{"path": "/home/ann/noshape/Bracket.noshape", "to": "/home/ann/noshape/Fixtures"}"##]),
+    ("documents_copy", &[r##"{"path": "/home/ann/noshape/Bracket.noshape"}"##]),
+    ("documents_details", &[r##"{"path": "Bracket"}"##, r##"{"path": "Bracket", "description": "Wall bracket, 3 mm steel"}"##]),
+    ("documents_trash", &[r##"{"path": "/home/ann/noshape/Old plate.noshape"}"##]),
+    ("documents_restore", &[r##"{"item": "Old plate"}"##]),
+    ("documents_delete", &[r##"{"item": "Old plate"}"##]),
+    ("documents_empty_trash", &[r##"{}"##]),
+    ("documents_label", &[r##"{"label": "Brackets", "create": true, "path": "Bracket"}"##, r##"{"label": "Brackets", "path": "Bracket", "on": false}"##]),
+    ("documents_forget_recent", &[r##"{"path": "/home/ann/noshape/Bracket.noshape"}"##]),
     ("documents_set_library", &[r##"{"library": "frame_profiles", "folder": "/home/ann/noshape/Profiles"}"##, r##"{"library": "images", "clear": true}"##]),
     ("tab_move_to_document", &[r##"{"tabs": ["Variable Studio 1"], "name": "Shared variables"}"##, r##"{"tabs": ["Part Studio 2"], "document": "/home/ann/noshape/bracket.noshape"}"##]),
     // features
@@ -344,7 +356,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
 ];
 
 /// The groups whose every operation must have examples (the coverage test).
-pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing", "ui"];
+pub const REQUIRED_GROUPS: &[&str] = &["ops", "document", "documents", "tab", "feature", "sketch", "variable", "config", "part", "material", "query", "analysis", "render", "export", "import", "featurestudio", "history", "assembly", "context", "drawing", "ui"];
 
 /// Examples of an operation (MCP tool name).
 pub fn of(tool: &str) -> &'static [&'static str] {

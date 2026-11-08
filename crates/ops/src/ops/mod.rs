@@ -6,6 +6,7 @@ mod appearance;
 mod assembly;
 mod configuration;
 mod document;
+mod documents;
 mod context;
 mod drawing;
 mod drawing_annotation;
@@ -47,6 +48,7 @@ pub fn all() -> Vec<Op> {
     let mut v = Vec::new();
     v.extend(meta::ops());
     v.extend(document::ops());
+    v.extend(documents::ops());
     v.extend(feature::ops());
     v.extend(sketch::ops());
     v.extend(sketch_edit::ops());

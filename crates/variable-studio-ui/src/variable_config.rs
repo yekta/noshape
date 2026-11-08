@@ -405,6 +405,8 @@ impl VariableStudioView {
                                 })
                             }))
                         });
+                        // A page's dropdown: Escape leaves it open (live vs-cfg-input-menu).
+                        crate::os_menu::mark_page_dropdown(&menu, cx);
                         crate::os_menu::open(e.position(), menu, window, cx);
                     }),
             );
@@ -698,6 +700,7 @@ impl VariableStudioView {
                                     })
                                 }))
                             });
+                            crate::os_menu::mark_page_dropdown(&menu, cx);
                             crate::os_menu::open(e.position(), menu, window, cx);
                         })),
                 );

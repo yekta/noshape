@@ -5,7 +5,7 @@ use gpui_kit::RenderImage;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-pub const EXT: &str = "noshape";
+pub use noshape_ops::doc_library::EXT;
 
 #[derive(Clone)]
 pub struct DocEntry {
