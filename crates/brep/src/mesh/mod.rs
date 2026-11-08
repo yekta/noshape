@@ -997,11 +997,11 @@ fn mesh_plane(vertices: &[DVec3], edges: &[MeshEdge], face: &MeshFace, origin: D
 }
 
 /// A B-spline face: its boundary nodes (its edges', shared with its neighbours) put on the surface's parameter
-/// plane, a grid of nodes inside it fine enough for the deflections (each knot span cut into as many steps as its
-/// second derivative over its first asks: chord `|S''| h² / 8` within the linear deflection, turn `|S''| h / |S'|`
-/// within the angular), then all triangulated by [`cdt::triangulate_with`] on the plane scaled by the surface's
-/// mean first derivatives (near isotropic). Declined: a seam (an edge twice in the face), a boundary node off the
-/// surface, a degenerate parameterisation.
+/// plane, nodes inside it at the corners of cells cut as fine as the surface's bending there asks (chord `|S''·N| h²
+/// / 8` within the linear deflection, turn within the angular: by the region, not the face's tightest spot), then all
+/// triangulated by [`cdt::triangulate_with`] on the plane scaled by the surface's mean first derivatives and stretched
+/// so a typical cell is square. Declined: a seam (an edge twice in the face), a boundary node off the surface, a
+/// degenerate parameterisation.
 /// A face's edges' curves on it (per loop, per use) and the curves they index.
 type FaceCurves<'a> = (&'a [Vec<Option<u32>>], &'a [NurbsCurve]);
 
@@ -1412,68 +1412,9 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     if !(hi.x > lo.x && hi.y > lo.y) {
         return Err("a flat parameter box");
     }
-    // The steps along u (v): the knots inside the box, each span cut for its largest second derivative.
-    let samples = 5;
-    let steps = |along_u: bool| -> Result<Vec<f64>, &'static str> {
-        let (a, b, knots) = if along_u { (lo.x, hi.x, s.breaks(true)) } else { (lo.y, hi.y, s.breaks(false)) };
-        let (c0, c1) = if along_u { (lo.y, hi.y) } else { (lo.x, hi.x) };
-        let mut br = vec![a];
-        br.extend(knots.iter().copied().filter(|&k| k > a && k < b));
-        br.push(b);
-        br.dedup_by(|x, y| (*x - *y).abs() <= 1e-12 * (b - a));
-        // Each span's largest step; the nodes then spread by the steps' density over the whole range (not
-        // one at every knot: a thread's flank, flat across but for its knots, took a row of nodes there).
-        let mut hs: Vec<f64> = Vec::with_capacity(br.len());
-        for w in br.windows(2) {
-            let (mut d2, mut d1) = (0.0f64, f64::MAX);
-            for i in 0..samples {
-                for j in 0..samples {
-                    let t = w[0] + (w[1] - w[0]) * i as f64 / (samples - 1) as f64;
-                    let c = c0 + (c1 - c0) * j as f64 / (samples - 1) as f64;
-                    let d = if along_u { s.derivs(t, c) } else { s.derivs(c, t) };
-                    let (first, second) = if along_u { (d[1], d[3]) } else { (d[2], d[5]) };
-                    d2 = d2.max(second.length());
-                    // (Not at an apex or pole, where the rows meet whatever the step.)
-                    if first.length() > 1e-9 * (1.0 + d[0].abs().max_element()) {
-                        d1 = d1.min(first.length());
-                    }
-                }
-            }
-            let span = w[1] - w[0];
-            let mut h = span;
-            if d2 > 0.0 {
-                h = h.min((8.0 * defl.linear / d2).sqrt());
-                if d1 > 0.0 && d1 < f64::MAX {
-                    h = h.min(defl.angular * d1 / d2);
-                }
-            }
-            hs.push(h.max(span * 1e-4));
-        }
-        // How many steps up to each break, and in all.
-        let mut at = vec![0.0];
-        for (w, h) in br.windows(2).zip(&hs) {
-            at.push(at[at.len() - 1] + (w[1] - w[0]) / h);
-        }
-        let total = at[at.len() - 1];
-        let n = total.ceil().clamp(1.0, 1e5) as usize;
-        let mut out = vec![a];
-        let mut k = 0;
-        for i in 1..n {
-            let c = total * i as f64 / n as f64;
-            while k + 2 < at.len() && at[k + 1] < c {
-                k += 1;
-            }
-            let f = ((c - at[k]) / (at[k + 1] - at[k]).max(1e-300)).clamp(0.0, 1.0);
-            out.push(br[k] + (br[k + 1] - br[k]) * f);
-        }
-        out.push(b);
-        Ok(out)
-    };
-    let (mut us, mut vs) = (steps(true)?, steps(false)?);
-    if dbg {
-        eprintln!("mesh grid: {} boundary nodes ({}) {:?}", points.len(), if from_curves_used { "their curves on the face" } else { "projected" }, dbg_t.elapsed());
-    }
+    let nb_points = points.len();
     // Scale: the mean first derivatives over the box.
+    let samples = 5;
     let (mut su, mut sv, mut n) = (0.0, 0.0, 0.0);
     for i in 0..samples {
         for j in 0..samples {
@@ -1487,43 +1428,200 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     if su.is_nan() || sv.is_nan() || su <= 0.0 || sv <= 0.0 {
         return Err("no derivatives");
     }
-    // No step more than ten times the other way's smallest (on the surface): no long slivers across a flat way
-    // (three times put a row of nodes along a thread's flank, its 0.5 mm across flat, twice BRepMesh's
-    // triangles).
-    let smallest = |t: &[f64], scale: f64| t.windows(2).map(|w| (w[1] - w[0]) * scale).fold(f64::MAX, f64::min);
-    let refine = |t: &mut Vec<f64>, scale: f64, cap: f64| {
-        let mut out = vec![t[0]];
-        for w in t.windows(2) {
-            let n = ((w[1] - w[0]) * scale / cap).ceil().clamp(1.0, 4096.0) as usize;
-            out.extend((1..=n).map(|k| w[0] + (w[1] - w[0]) * k as f64 / n as f64));
-        }
-        *t = out;
+    // The steps the surface allows (scaled) along u and v, on a raster over the box (four cells a knot span, up to
+    // 512 a way and 262144 in all): each cell's from the bending at its and its neighbours' corners, then graded, each
+    // growing at most half the distance from a tighter one. Steps by the region, not the face's tightest spot for all
+    // of it (a blade's edge set a tensor grid's step across the whole face: cf-setback-fillet 454k triangles against
+    // BRepMesh's 549).
+    let (w, h) = ((hi.x - lo.x) * su, (hi.y - lo.y) * sv);
+    let cells_along = |along_u: bool| {
+        let (a, b) = if along_u { (lo.x, hi.x) } else { (lo.y, hi.y) };
+        let knots = s.breaks(along_u).iter().filter(|&&k| k > a && k < b).count();
+        (4 * (knots + 1)).clamp(8, 512)
     };
-    let (mu, mv) = (smallest(&us, su), smallest(&vs, sv));
-    refine(&mut us, su, 10.0 * mv);
-    refine(&mut vs, sv, 10.0 * mu);
-    // Past the limit, thinned evenly both ways to it: a display mesh coarser than the deflections ask rather than
-    // BRepMesh's (half an hour on a 512 × 512 pole displacement map).
-    const MAX_NODES: usize = 400_000;
-    if us.len() * vs.len() > MAX_NODES {
-        let f = ((us.len() * vs.len()) as f64 / MAX_NODES as f64).sqrt();
-        let thin = |t: &mut Vec<f64>| {
-            let last = t.len() - 1;
-            let n = ((last as f64 / f).floor() as usize).max(1);
-            *t = (0..=n).map(|k| t[k * last / n]).collect();
-        };
-        thin(&mut us);
-        thin(&mut vs);
+    let (mut nu, mut nv) = (cells_along(true), cells_along(false));
+    const MAX_RASTER: usize = 1 << 18;
+    if nu * nv > MAX_RASTER {
+        let f = ((nu * nv) as f64 / MAX_RASTER as f64).sqrt();
+        (nu, nv) = (((nu as f64 / f) as usize).max(8), ((nv as f64 / f) as usize).max(8));
     }
-    let scaled = |q: DVec2| DVec2::new(q.x * su, q.y * sv);
-    // Interior grid nodes: inside the boundary (even-odd), at least a third of the local step from it. Each
-    // row's crossings of the boundary once, and the boundary's segments in cells (as wide as the largest such
-    // distance) to look for one close by: not every segment for every node.
-    let segs: Vec<(DVec2, DVec2)> = rings.iter().flat_map(|r| (0..r.len()).map(|k| (scaled(uv[r[k]]), scaled(uv[r[(k + 1) % r.len()]])))).collect();
-    let gap = |t: &[f64], i: usize, scale: f64| (t[i + 1] - t[i - 1]) * 0.5 * scale;
-    let du: Vec<f64> = (1..us.len().saturating_sub(1)).map(|i| gap(&us, i, su)).collect();
-    let dv: Vec<f64> = (1..vs.len().saturating_sub(1)).map(|j| gap(&vs, j, sv)).collect();
-    let cell = du.iter().chain(&dv).fold(0.0f64, |m, d| m.max(*d)) / 3.0;
+    let corner = |k: usize| DVec2::new(lo.x + (hi.x - lo.x) * (k % (nu + 1)) as f64 / nu as f64, lo.y + (hi.y - lo.y) * (k / (nu + 1)) as f64 / nv as f64);
+    let mut allowed = vec![(f64::MAX, f64::MAX); (nu + 1) * (nv + 1)];
+    let mut normal = vec![DVec3::ZERO; (nu + 1) * (nv + 1)];
+    for (k, d) in in_parallel((nu + 1) * (nv + 1), 1024, |k| s.derivs(corner(k).x, corner(k).y)) {
+        let step = |first: f64, second: f64| {
+            if second.is_nan() || second <= 0.0 {
+                return f64::MAX;
+            }
+            let mut h = (8.0 * defl.linear / second).sqrt();
+            // (Not at an apex or pole, where the rows meet whatever the step.)
+            if first > 1e-9 * (1.0 + d[0].abs().max_element()) {
+                h = h.min(defl.angular * first / second);
+            }
+            h
+        };
+        // The surface's bending: the second derivatives across it (along it they only speed the parameters up: a
+        // draft's B-spline wall, flat, took 3,792 triangles against BRepMesh's 32); at a pole, all of them.
+        // (None where the parameters all but collapse, a tip or pole: its direction there is noise.)
+        let cross = d[1].cross(d[2]);
+        let n = if cross.length() > 1e-6 * d[1].length() * d[2].length() { cross.normalize() } else { DVec3::ZERO };
+        normal[k] = n;
+        let across = |x: DVec3| if n == DVec3::ZERO { x.length() } else { x.dot(n).abs() };
+        let (mut hu, mut hv) = (step(d[1].length(), across(d[3])), step(d[2].length(), across(d[5])));
+        // A twist (a saddle, flat both ways): cells square on the surface, their sides' product within it.
+        let twist = across(d[4]);
+        if twist > 0.0 && d[1].length() > 0.0 && d[2].length() > 0.0 {
+            let c = 4.0 * defl.linear / twist;
+            hu = hu.min((c * d[2].length() / d[1].length()).sqrt());
+            hv = hv.min((c * d[1].length() / d[2].length()).sqrt());
+        }
+        allowed[k] = (hu * su, hv * sv);
+    }
+    let least = (w.max(h) * 1e-4).max(1e-12);
+    let (cw, ch) = (w / nu as f64, h / nv as f64);
+    // How far the normal turns across each raster cell, each way (a twist turns it too, where the second derivatives
+    // along the rows don't see it): the steps that turn it by the angular deflection.
+    let turned: Vec<(f64, f64)> = (0..nu * nv)
+        .map(|c| {
+            let (i, j) = (c % nu, c / nu);
+            let at = |di: usize, dj: usize| normal[(j + dj) * (nu + 1) + i + di];
+            let angle = |a: DVec3, b: DVec3| if a == DVec3::ZERO || b == DVec3::ZERO { 0.0 } else { a.angle_between(b) };
+            let (tu, tv) = (angle(at(0, 0), at(1, 0)).max(angle(at(0, 1), at(1, 1))), angle(at(0, 0), at(0, 1)).max(angle(at(1, 0), at(1, 1))));
+            let step = |size: f64, turn: f64| if turn > 0.0 { size * defl.angular / turn } else { f64::MAX };
+            (step(cw, tu), step(ch, tv))
+        })
+        .collect();
+    let mut field: Vec<(f64, f64)> = (0..nu * nv)
+        .map(|c| {
+            // (Its own corners and cells and its neighbours': a peak between samples.)
+            let (i, j) = (c % nu, c / nu);
+            let mut x_y = (w, h);
+            for jj in j.saturating_sub(1)..=(j + 2).min(nv) {
+                for ii in i.saturating_sub(1)..=(i + 2).min(nu) {
+                    let a = allowed[jj * (nu + 1) + ii];
+                    x_y = (x_y.0.min(a.0), x_y.1.min(a.1));
+                    if ii < nu && jj < nv {
+                        let t = turned[jj * nu + ii];
+                        x_y = (x_y.0.min(t.0), x_y.1.min(t.1));
+                    }
+                }
+            }
+            (x_y.0.max(least), x_y.1.max(least))
+        })
+        .collect();
+    // The face's typical cell shape (a long bend's: a sliver along its flat length, as BRepMesh's), the plane it is
+    // triangulated on stretched so that one is square; a cell no more than ten times longer either way than that (a
+    // boundary node amid cells far longer fanned triangles across several: a wavy tube's seam, 11° of turn).
+    let mut shapes: Vec<f64> = field.iter().map(|f| f.1 / f.0).collect();
+    let mid = shapes.len() / 2;
+    let typical = *shapes.select_nth_unstable_by(mid, f64::total_cmp).1;
+    for f in &mut field {
+        *f = (f.0.min(10.0 * f.1 / typical), f.1.min(10.0 * typical * f.0));
+    }
+    let flat = |q: DVec2| DVec2::new(q.x * su, q.y * sv / typical);
+    for _ in 0..4 {
+        let mut changed = false;
+        for pass in 0..4 {
+            for jj in 0..nv {
+                for ii in 0..nu {
+                    let (i, j) = (if pass % 2 == 0 { ii } else { nu - 1 - ii }, if pass < 2 { jj } else { nv - 1 - jj });
+                    let mut f = field[j * nu + i];
+                    for (di, dj, d) in [(-1i64, 0i64, cw), (1, 0, cw), (0, -1, ch), (0, 1, ch)] {
+                        let (a, b) = (i as i64 + di, j as i64 + dj);
+                        if a < 0 || b < 0 || a >= nu as i64 || b >= nv as i64 {
+                            continue;
+                        }
+                        let g = field[b as usize * nu + a as usize];
+                        f = (f.0.min(g.0 + 0.5 * d), f.1.min(g.1 + 0.5 * d));
+                    }
+                    if f != field[j * nu + i] {
+                        field[j * nu + i] = f;
+                        changed = true;
+                    }
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    // The cells: the box cut into as many as each part's steps ask (its raster cells' least), until none asks more.
+    // Past the limit, no more cuts: a mesh coarser than the deflections ask rather than BRepMesh's (half an hour on a
+    // 512 × 512 pole displacement map).
+    const MAX_CELLS: usize = 400_000;
+    // (Over the limit, every step longer by the same factor: coarser evenly, not cut short somewhere.)
+    let need: f64 = field.iter().map(|f| (cw / f.0) * (ch / f.1)).sum();
+    if need > 0.4 * MAX_CELLS as f64 {
+        let k = (need / (0.4 * MAX_CELLS as f64)).sqrt();
+        for f in &mut field {
+            *f = (f.0 * k, f.1 * k);
+        }
+    }
+    let raster = |a: f64, b: f64, lo: f64, hi: f64, n: usize| {
+        let t = |x: f64| (x - lo) / (hi - lo) * n as f64;
+        let first = (t(a).floor().max(0.0) as usize).min(n - 1);
+        let last = ((t(b).ceil() as usize).saturating_sub(1)).clamp(first, n - 1);
+        first..=last
+    };
+    let asks = |c: &[f64; 4]| {
+        let mut f = (f64::MAX, f64::MAX);
+        for j in raster(c[2], c[3], lo.y, hi.y, nv) {
+            for i in raster(c[0], c[1], lo.x, hi.x, nu) {
+                let g = field[j * nu + i];
+                f = (f.0.min(g.0), f.1.min(g.1));
+            }
+        }
+        f
+    };
+    let mut leaves: Vec<[f64; 4]> = Vec::new();
+    let mut queue = std::collections::VecDeque::from([[lo.x, hi.x, lo.y, hi.y]]);
+    while let Some(c) = queue.pop_front() {
+        if leaves.len() % 4096 == 4095 && crate::cancelled() {
+            return Err("cancelled");
+        }
+        let (fx, fy) = asks(&c);
+        let cuts = |size: f64, step: f64| if size > step * 1.0001 { (size / step).ceil().min(16.0) as usize } else { 1 };
+        let (cu, cv) = (cuts((c[1] - c[0]) * su, fx), cuts((c[3] - c[2]) * sv, fy));
+        if (cu == 1 && cv == 1) || leaves.len() + queue.len() + cu * cv > MAX_CELLS {
+            leaves.push(c);
+            continue;
+        }
+        let at = |a: f64, b: f64, n: usize, k: usize| if k == n { b } else { a + (b - a) * k as f64 / n as f64 };
+        for j in 0..cv {
+            for i in 0..cu {
+                queue.push_back([at(c[0], c[1], cu, i), at(c[0], c[1], cu, i + 1), at(c[2], c[3], cv, j), at(c[2], c[3], cv, j + 1)]);
+            }
+        }
+    }
+    // The cells' corners inside the box, each with its least cell's smaller side (on that plane). One corner reached by two
+    // cells' cuts differs in its last digits: snapped to a grid four times the triangulation's (2^22 across), so it
+    // is one node (two that close fail the triangulation).
+    let snap = w.max(h / typical) / f64::from(1u32 << 20);
+    let mut corners: std::collections::HashMap<(i64, i64), f64> = std::collections::HashMap::new();
+    for c in &leaves {
+        let side = ((c[1] - c[0]) * su).min((c[3] - c[2]) * sv / typical);
+        for (u, v) in [(c[0], c[2]), (c[1], c[2]), (c[0], c[3]), (c[1], c[3])] {
+            if u <= lo.x || u >= hi.x || v <= lo.y || v >= hi.y || u <= u0 || u >= u1 || v <= v0 || v >= v1 {
+                continue;
+            }
+            let q = flat(DVec2::new(u, v));
+            let e = corners.entry(((q.x / snap).round() as i64, (q.y / snap).round() as i64)).or_insert(side);
+            *e = e.min(side);
+        }
+    }
+    let mut candidates: Vec<(DVec2, f64)> = corners.into_iter().map(|((x, y), side)| (DVec2::new(x as f64 * snap / su, y as f64 * snap * typical / sv), side)).collect();
+    // By rows (each row's boundary crossings once), in a fixed order whatever the hashing.
+    candidates.sort_by(|a, b| a.0.y.total_cmp(&b.0.y).then(a.0.x.total_cmp(&b.0.x)));
+    // Interior nodes: inside the boundary (even-odd), at least a third of their cells' side from it. The boundary's
+    // segments in cells (a typical node's side) to look for one close by: not every segment for every node.
+    let segs: Vec<(DVec2, DVec2)> = rings.iter().flat_map(|r| (0..r.len()).map(|k| (flat(uv[r[k]]), flat(uv[r[(k + 1) % r.len()]])))).collect();
+    let mut sides: Vec<f64> = candidates.iter().map(|c| c.1).collect();
+    let cell = if sides.is_empty() {
+        0.0
+    } else {
+        let mid = sides.len() / 2;
+        *sides.select_nth_unstable_by(mid, f64::total_cmp).1 / 3.0
+    };
     let mut cells: std::collections::HashMap<(i64, i64), Vec<u32>> = std::collections::HashMap::new();
     if cell > 0.0 {
         let key = |q: DVec2| ((q.x / cell).floor() as i64, (q.y / cell).floor() as i64);
@@ -1545,8 +1643,9 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
     }
     let close = |q: DVec2, r: f64| -> bool {
         let (cx, cy) = ((q.x / cell).floor() as i64, (q.y / cell).floor() as i64);
-        (cx - 2..=cx + 2).any(|x| {
-            (cy - 2..=cy + 2).any(|y| {
+        let reach = 2 + (r / cell).ceil().min(64.0) as i64;
+        (cx - reach..=cx + reach).any(|x| {
+            (cy - reach..=cy + reach).any(|y| {
                 cells.get(&(x, y)).is_some_and(|l| {
                     l.iter().any(|&k| {
                         let (a, b) = segs[k as usize];
@@ -1558,39 +1657,34 @@ fn mesh_grid_why(edges: &[MeshEdge], face: &MeshFace, s: &impl GridSurface, node
             })
         })
     };
-    let mut interior = Vec::new();
     if dbg {
-        eprintln!("mesh grid: grid {} x {}, {} boundary segments {:?}", us.len(), vs.len(), segs.len(), dbg_t.elapsed());
+        eprintln!("mesh grid: {} boundary nodes ({}), {} cells ({} x {} raster), {} corners, {} boundary segments {:?}", nb_points, if from_curves_used { "their curves on the face" } else { "projected" }, leaves.len(), nu, nv, candidates.len(), segs.len(), dbg_t.elapsed());
     }
+    let mut interior = Vec::new();
     let mut crossings: Vec<f64> = Vec::new();
-    for (j, &v) in vs.iter().enumerate().skip(1).take(vs.len().saturating_sub(2)) {
-        if j % 64 == 0 && crate::cancelled() {
+    let mut row = f64::NAN;
+    for (k, &(q, side)) in candidates.iter().enumerate() {
+        if k % 65536 == 65535 && crate::cancelled() {
             return Err("cancelled");
         }
-        if v <= v0 || v >= v1 {
-            continue;
+        let sq = flat(q);
+        if sq.y != row {
+            row = sq.y;
+            crossings.clear();
+            crossings.extend(segs.iter().filter(|(a, b)| (a.y > row) != (b.y > row)).map(|(a, b)| a.x + (row - a.y) * (b.x - a.x) / (b.y - a.y)));
+            crossings.sort_by(f64::total_cmp);
         }
-        let y = v * sv;
-        crossings.clear();
-        crossings.extend(segs.iter().filter(|(a, b)| (a.y > y) != (b.y > y)).map(|(a, b)| a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y)));
-        crossings.sort_by(f64::total_cmp);
-        for (i, &u) in us.iter().enumerate().skip(1).take(us.len().saturating_sub(2)) {
-            if u <= u0 || u >= u1 {
-                continue;
-            }
-            let sq = DVec2::new(u * su, y);
-            // Inside: an odd number of crossings past it.
-            let past = crossings.len() - crossings.partition_point(|&x| x <= sq.x);
-            if past % 2 == 1 && !close(sq, du[i - 1].min(dv[j - 1]) / 3.0) {
-                interior.push(DVec2::new(u, v));
-            }
+        // Inside: an odd number of crossings past it.
+        let past = crossings.len() - crossings.partition_point(|&x| x <= sq.x);
+        if past % 2 == 1 && !close(sq, side / 3.0) {
+            interior.push(q);
         }
     }
     let nb = uv.len();
     if dbg {
         eprintln!("mesh grid: {} interior nodes {:?}", interior.len(), dbg_t.elapsed());
     }
-    let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| scaled(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
+    let all: Vec<cdt::Pt> = uv.iter().chain(&interior).map(|q| flat(*q)).map(|q| cdt::Pt { x: q.x, y: q.y }).collect();
     let inner: Vec<usize> = (nb..nb + interior.len()).collect();
     let mut triangles = cdt::triangulate_with(&all, &rings, &inner).ok_or("the triangulation failed")?;
     // (A triangle with two of a pole's nodes is a point and a segment: none.)

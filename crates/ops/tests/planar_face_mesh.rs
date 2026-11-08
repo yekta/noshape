@@ -380,6 +380,68 @@ fn corpus_export_meshes_are_closed_and_oriented() {
     assert!(problems.is_empty(), "{} export meshes:\n{}", problems.len(), problems.join("\n"));
 }
 
+/// Our mesher's triangles per face against BRepMesh's on every corpus solid, at the display's Auto and the Export's
+/// Medium: no face many times BRepMesh's (lead 11-08: one tight spot set a tensor grid's step for the whole face,
+/// cf-setback-fillet 454k triangles on one face against BRepMesh's 549). NOSHAPE_PLANAR_ONLY=<document stem> runs one.
+#[test]
+#[ignore = "T2: the parity corpus lives outside the repo (other people's work)"]
+fn corpus_triangle_counts_against_brepmesh() {
+    let dir = std::env::var("NOSHAPE_PLANAR_CORPUS").unwrap_or_else(|_| format!("{}/agents/psui/corpus", std::env::var("HOME").unwrap_or_default()));
+    let only = std::env::var("NOSHAPE_PLANAR_ONLY").ok();
+    let mut docs: Vec<_> = std::fs::read_dir(&dir).expect("the corpus directory").flatten().map(|e| e.path()).filter(|p| p.extension().is_some_and(|x| x == "noshape")).filter(|p| only.as_ref().is_none_or(|o| p.file_stem().is_some_and(|s| s == o.as_str()))).collect();
+    docs.sort();
+    assert!(!docs.is_empty(), "no documents in {dir}");
+    // (setting, ours, BRepMesh's, ours' time, BRepMesh's time) over all; the faces most over BRepMesh's.
+    let mut totals = [(0usize, 0usize, 0.0f64, 0.0f64); 2];
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    for path in &docs {
+        let stem = path.file_stem().unwrap().to_string_lossy().to_string();
+        let mut ctx = noshape_ops::Ctx::new();
+        let Ok(od) = ctx.open(path) else { continue };
+        let tabs: Vec<noshape_model::TabId> = od.doc().ordered_tabs().into_iter().filter(|t| matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
+        for tab in tabs {
+            let Ok(r) = od.regenerate(tab, None) else { continue };
+            for b in r.context.bodies.iter().filter(|b| b.kind == noshape_model::display::BodyKind::Solid) {
+                let display = noshape_model::regen::display_deflection(&b.shape, 1.0, false);
+                let medium = (noshape_ops::export::PRESETS[1].0 / 1000.0, noshape_ops::export::PRESETS[1].1.to_radians());
+                for (setting, (lin, ang)) in [display, medium].into_iter().enumerate() {
+                    // (Each on a fresh copy: BRepMesh keeps a triangulation already on the shape when it is fine enough.)
+                    let run = |rust: bool| {
+                        k::set_rust_mesh_everywhere(rust);
+                        let copy = k::transform(&b.shape, &k::Transform::Translate(DVec3::ZERO), true).ok()?.shape;
+                        let t0 = std::time::Instant::now();
+                        let t = k::tessellate(&copy, lin, ang, true).ok();
+                        Some((t?, t0.elapsed().as_secs_f64() * 1e3))
+                    };
+                    let (Some((ours, ours_ms)), Some((occt, occt_ms))) = (run(true), run(false)) else { continue };
+                    k::set_rust_mesh_everywhere(true);
+                    totals[setting].0 += ours.indices.len() / 3;
+                    totals[setting].1 += occt.indices.len() / 3;
+                    totals[setting].2 += ours_ms;
+                    totals[setting].3 += occt_ms;
+                    for (fi, (a, o)) in ours.faces.iter().zip(&occt.faces).enumerate() {
+                        let (a, o) = ((a.index_count / 3) as f64, (o.index_count / 3) as f64);
+                        if a > 2000.0 && a > 2.0 * o {
+                            let surface = b.shape.sub_shape(ShapeType::Face, fi).and_then(|f| f.face_surface()).map(|s| format!("{s:?}").split([' ', '(', '{']).next().unwrap_or("").to_string()).unwrap_or_default();
+                            worst.push((a / o.max(1.0), format!("{stem} / {} face {fi} {surface} ({}): ours {a} BRepMesh {o}", b.name, ["display", "Medium"][setting])));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (setting, (a, o, ams, oms)) in totals.iter().enumerate() {
+        eprintln!("{}: triangles ours {a} BRepMesh {o} ({:.2}x), time ours {ams:.0} ms BRepMesh {oms:.0} ms", ["display", "Medium"][setting], *a as f64 / (*o).max(1) as f64);
+    }
+    worst.sort_by(|a, b| b.0.total_cmp(&a.0));
+    eprintln!("{} faces over 2x BRepMesh's (and 2000 triangles); the most:", worst.len());
+    for (r, w) in worst.iter().take(40) {
+        eprintln!("{r:.1}x {w}");
+    }
+    // (11-08: the most 4.3x, a knife's blade at the display's angle BRepMesh doesn't keep to; 1,353x before.)
+    assert!(worst.iter().all(|(r, _)| *r < 5.0), "{} faces over 5x BRepMesh's triangles", worst.iter().filter(|(r, _)| *r >= 5.0).count());
+}
+
 /// The checks see the two faults the user's dock showed on a Mac (v0.4.33): a flat face's triangle turned over (the
 /// solid's inside shown black, a hatched wedge in a section) and one stretched across the face over a hole or channel
 /// (the section's caps hatched over empty space and red over the walls).
