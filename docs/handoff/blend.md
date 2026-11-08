@@ -32,6 +32,14 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   box is ±230 mm. Next: that piece's sections (twist / a jump in r at the chain's vertex at (50, 25)).
   Tried 15:10: sections all started on side 1 (the frame swapped where the edge lists the wall first): the lofts
   come out invalid (7 faces each), still 3 solids (patch hold-rim-wip2.patch). Stopped there (time box).
+  17:10 (branch hold-rim-wip3, patch hold-rim-wip3.patch): piece 3's sections are smooth (r 14.8 -> 2.5 -> 14.8,
+  frame consistent; the ±230 mm box was the loose B-spline box). New cause: the tool's sides lie on the walls, and a
+  loft's side only approximates the curved, filleted end walls. Lifting both sides off the part (`lifted_section_face`,
+  into air for a cut) gives one valid part with the closed loft (2233's T1 still passes), but 32 faces (live 20) and
+  only 4,858 mm³ cut (live 5,899): the rim top (2,859 mm²) stays though it lies inside the tool. With one loft per hold
+  line the pieces' end sections touch: 2 invalid solids. No live capture needed: our radii and the tool's volume match.
+  Next: look at the closed lifted loft's result in the app (which side of the top survives; is the tool inside out
+  where the chain turns at its vertices), or build the held blend face directly (blend_direct) instead of a cut.
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
 ## From core (11-07 19:56 UTC): 2e49088a9 regresses learning-center-michael and cf-lighten
