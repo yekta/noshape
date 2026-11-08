@@ -506,6 +506,9 @@ pub enum ExternalSnap {
 pub struct SketchEditor {
     pub feature: FeatureId,
     pub frame: PlaneFrame,
+    /// The handle arms the scene draws (from the shown display, set when one is applied); `None`: every arm the
+    /// sketch has. The overlay draws the others, so an arm the display doesn't have yet still shows.
+    pub scene_arms: Option<std::collections::HashSet<EntityId>>,
     pub tool: Tool,
     clicks: Vec<Click>,
     /// End point of the previous line (chaining).
@@ -1152,6 +1155,7 @@ impl SketchEditor {
         Self {
             feature,
             frame,
+            scene_arms: None,
             tool: Tool::Select,
             clicks: Vec::new(),
             chain_end: None,
@@ -5679,9 +5683,11 @@ impl SketchEditor {
             let Some((s, en)) = e.endpoints() else { continue };
             for (end, h) in [(s, h0), (en, h1)] {
                 if let (Some(a), Some(b)) = (data.sketch.point(end), data.sketch.point(h)) {
-                    // (An arm missing, a spline from before arms: its line drawn here.)
+                    // (An arm the scene doesn't draw, a spline from before arms or one the shown display doesn't have
+                    // yet: its line drawn here.)
                     // (The tip itself is the sketch's point, drawn with its hover and selection states.)
-                    if !data.sketch.handle_arms(e.id).iter().flatten().any(|arm| data.sketch.endpoints(*arm).is_some_and(|(p, q)| (p, q) == (end, h))) {
+                    let drawn = |arm: &EntityId| self.scene_arms.as_ref().is_none_or(|shown| shown.contains(arm));
+                    if !data.sketch.handle_arms(e.id).iter().flatten().filter(|arm| drawn(arm)).any(|arm| data.sketch.endpoints(*arm).is_some_and(|(p, q)| (p, q) == (end, h))) {
                         lines.push_polyline(&[w(a), w(b)], crate::palette::rgb8(crate::palette::viewport::SKETCH_HANDLE_LINE), 0, 1.0, on_top);
                     }
                 }

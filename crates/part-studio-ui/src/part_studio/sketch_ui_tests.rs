@@ -3240,3 +3240,61 @@ fn the_swap_from_the_cached_display_to_the_real_one_changes_no_frame(cx: &mut Te
     assert!(frames.len() >= at_swap + 3, "frames after the real display landed");
 }
 
+
+/// User P0 11-08: a spline saved before handle arms (the 11-06 entities) is given them on entering its sketch, in the
+/// dialog's copy only; the shown display, regenerated without them, drew none and the overlay left them to the scene:
+/// no arm lines until another regeneration. The overlay draws the arms the shown display doesn't, the entry
+/// regenerates so the scene has them, and giving them isn't an undo step.
+#[gpui::test]
+fn a_spline_from_before_handle_arms_shows_its_arms_on_entering_its_sketch(cx: &mut TestAppContext) {
+    let block = serde_json::json!({ "units": "mm", "features": [
+        { "type": "newSketch", "name": "Sketch 1", "plane": "Top", "shapes": [{ "corner_rectangle": [[0, 0], [40, 30]] }] }
+    ] });
+    let (window, view) = part_studio_from(cx, "spline-arms", Some(block));
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    // Its spline as saved before arms: the tips, no arm lines.
+    let id = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            let id = v.studio(cx).unwrap().features.iter().find(|f| f.name == "Sketch 1").unwrap().id;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Spline", cx, |ps| {
+                    let f = ps.features.iter_mut().find(|f| f.id == id).unwrap();
+                    let Some(noshape_model::params::ParamValue::Sketch(mut d)) = f.params.get("sketch").cloned() else { panic!("a sketch") };
+                    let s = d.sketch.add_fit_spline_with_handles(&[glam::DVec2::new(0.0, 0.05), glam::DVec2::new(0.02, 0.07), glam::DVec2::new(0.04, 0.05)]).unwrap();
+                    // (Arms go only with their spline: the saved form without them.)
+                    let mut json = serde_json::to_value(&d.sketch).unwrap();
+                    if let Some(serde_json::Value::Object(es)) = json.get_mut("entities") {
+                        es.retain(|_, e| e.get("handle_of").is_none_or(serde_json::Value::is_null));
+                    }
+                    d.sketch = serde_json::from_value(json).unwrap();
+                    assert!(d.sketch.handle_arms(s).iter().all(Option::is_none));
+                    f.params.set("sketch", noshape_model::params::ParamValue::Sketch(d));
+                })
+            });
+            id
+        })
+    });
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_feature(id, w, cx))).unwrap();
+    draw(cx, window);
+    // Every arm the dialog's sketch has is drawn: by the scene (the shown display has it) or by the overlay.
+    let drawn = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let ed = v.sketch.as_ref().expect("the sketch editor");
+            let data = v.sketch_data(cx).expect("its data");
+            let arms: Vec<_> = data.sketch.entities().filter(|e| e.handle_of.is_some()).map(|e| e.id).collect();
+            let in_display: Vec<_> = v.display.sketches.iter().filter(|s| s.feature == id).flat_map(|s| s.curves.iter().filter(|c| c.handle).map(|c| noshape_sketch::EntityId(c.entity))).collect();
+            let scene = ed.scene_arms.clone().expect("the scene's arms");
+            assert!(scene.iter().all(|a| in_display.contains(a)), "the scene draws only the display's arms");
+            (arms.len(), arms.iter().filter(|a| in_display.contains(a)).count())
+        })
+    };
+    let (arms, _) = drawn(cx);
+    assert_eq!(arms, 2, "given on entry");
+    wait_until(cx, window, |cx| !view.read(cx).ui_busy());
+    assert_eq!(drawn(cx), (2, 2), "regenerated: the scene draws both");
+    assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "not an undo step");
+}

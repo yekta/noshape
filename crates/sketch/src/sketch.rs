@@ -316,14 +316,13 @@ impl Sketch {
         self.touch();
     }
 
-    /// Every curve's missing handle lines ([`Self::add_handle_arms`]).
-    pub fn add_all_handle_arms(&mut self) {
-        let curves: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. } | Geometry::BSpline { .. })).map(|e| e.id).collect();
-        for c in curves {
-            if self.handle_arms(c).iter().any(Option::is_none) {
-                self.add_handle_arms(c);
-            }
+    /// Every curve's missing handle lines ([`Self::add_handle_arms`]); whether any was missing.
+    pub fn add_all_handle_arms(&mut self) -> bool {
+        let curves: Vec<EntityId> = self.entities.values().filter(|e| matches!(e.geometry, Geometry::FitSpline { handles: Some(_), .. } | Geometry::BSpline { .. })).filter(|e| self.handle_arms(e.id).iter().any(Option::is_none)).map(|e| e.id).collect();
+        for &c in &curves {
+            self.add_handle_arms(c);
         }
+        !curves.is_empty()
     }
 
     /// Inserts an entity with a caller-chosen id at or above the allocator

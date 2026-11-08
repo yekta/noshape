@@ -278,6 +278,13 @@ impl DraftHistory {
         Self { undo: Vec::new(), redo: Vec::new(), last: f.clone(), dragging: false, absorb: false }
     }
 
+    /// `f` as the state the history starts from (not a step: a spline from before handle arms given them on entry).
+    pub fn rebase(&mut self, f: &Feature) {
+        if self.undo.is_empty() {
+            self.last = f.clone();
+        }
+    }
+
     /// Record `current` if it differs from the last checkpoint.
     pub fn checkpoint(&mut self, current: &Feature) -> bool {
         if *current == self.last {
@@ -1075,6 +1082,17 @@ impl PartStudioView {
         // colors only once `opts.editing_sketch` is set (otherwise an
         // existing sketch opened for editing showed gray until the next edit).
         self.sync_sketch_editor(cx);
+        // The edited sketch's handle arms this display draws: the overlay draws the others (a spline from before
+        // arms is given them on entry, before a regeneration has them: drawn nowhere, user P0 11-08).
+        let id = self.sketch.as_ref().map(|ed| ed.feature);
+        let arms = id.map(|id| self.display.sketches.iter().filter(|sk| sk.feature == id).flat_map(|sk| sk.curves.iter().filter(|c| c.handle).map(|c| noshape_sketch::EntityId(c.entity))).collect());
+        if let Some(ed) = &mut self.sketch {
+            ed.scene_arms = arms;
+        }
+        // Arms given on entry: regenerated, so the scene draws and picks them.
+        if std::mem::take(&mut self.ui.regen_for_arms) {
+            self.schedule_regen(window, cx);
+        }
         self.ui.measure_lines = None;
         self.opts.vertex_colors = self.vertex_colors(cx);
         self.ui.transform_ghost = self.transform_ghost(cx);

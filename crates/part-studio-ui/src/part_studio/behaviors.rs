@@ -217,6 +217,8 @@ pub struct UiState {
     /// The rollback bar took the keyboard (↑/↓ or a click on it) while these
     /// features were selected; it reads light blue until the selection changes.
     pub rollback_keyboard: Option<Vec<noshape_model::reference::FeatureId>>,
+    /// The edited sketch's splines were given handle arms on entry: regenerate once the display is applied.
+    pub regen_for_arms: bool,
     /// "Show dependencies" panel for a feature.
     pub dependencies: Option<FeatureId>,
     pub cube_hover: Option<super::view_cube::CubeCell>,
@@ -665,6 +667,7 @@ impl UiState {
             list_autoscroll: 0.0,
             list_autoscrolling: false,
             rollback_keyboard: None,
+            regen_for_arms: false,
             dependencies: None,
             cube_hover: None,
             cube_origin: None,
