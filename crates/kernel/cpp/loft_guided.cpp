@@ -18,6 +18,8 @@
 #include <GeomConvert.hxx>
 #include <GeomConvert_CompCurveToBSplineCurve.hxx>
 #include <Approx_CurvilinearParameter.hxx>
+#include <Geom_Conic.hxx>
+#include <BSplCLib.hxx>
 #include <GeomAdaptor_Curve.hxx>
 #include <BRepCheck_Analyzer.hxx>
 #include <Bnd_Box.hxx>
@@ -667,7 +669,18 @@ occ::handle<Geom_BSplineCurve> chain_bspline(const TopoDS_Shape& chain, const gp
       return nullptr;
     const occ::handle<Geom_Curve> trimmed(new Geom_TrimmedCurve(c, f, l));
     occ::handle<Geom_BSplineCurve> piece = GeomConvert::CurveToBSplineCurve(trimmed);
-    if (by_arc && !c->IsKind(STANDARD_TYPE(Geom_Line)))
+    // A polynomial spline keeps its own parameter, stretched over its length (live 2380 (14): a fit spline profile
+    // stays one cubic, paired with the line by its parameter); arcs and other rational curves by arc length (live
+    // 2319 (3): an arc profile paired by angle).
+    const bool polynomial = !piece->IsRational() && !c->IsKind(STANDARD_TYPE(Geom_Line)) && !c->IsKind(STANDARD_TYPE(Geom_Conic))
+                            && !(c->IsKind(STANDARD_TYPE(Geom_TrimmedCurve)) && occ::down_cast<Geom_TrimmedCurve>(c)->BasisCurve()->IsKind(STANDARD_TYPE(Geom_Conic)));
+    if (by_arc && polynomial)
+    {
+      NCollection_Array1<double> knots = piece->Knots();
+      BSplCLib::Reparametrize(0.0, GCPnts_AbscissaPoint::Length(GeomAdaptor_Curve(trimmed)), knots);
+      piece->SetKnots(knots);
+    }
+    else if (by_arc && !c->IsKind(STANDARD_TYPE(Geom_Line)))
     {
       const occ::handle<Adaptor3d_Curve> ad(new GeomAdaptor_Curve(trimmed));
       Approx_CurvilinearParameter        arc(ad, tol, GeomAbs_C2, 14, 100);

@@ -784,6 +784,8 @@ fn a_guided_surface_loft_as_live() {
     let aa = arc(v(0., 0., 0.), v(20., 10., 0.), v(40., 0., 0.));
     let b7 = line(v(5., 0., 50.), v(35., 0., 50.));
     let (t0, t1) = (arc(v(0., 0., 0.), v(0., -10., 25.), v(5., 0., 50.)), arc(v(40., 0., 0.), v(40., -10., 25.), v(35., 0., 50.)));
+    let sp = make_wire(&[make_bspline(&[v(0., 0., 0.), v(20.0 / 3.0, 5., 0.), v(20., 15., 0.), v(40.0 - 20.0 / 3.0, 5., 0.), v(40., 0., 0.)], None, &[0.0, 0.5, 1.0], &[4, 1, 4], 3, false).unwrap()]).unwrap();
+    let (g0s, g1s) = (g0.clone(), g1.clone());
     let cases = [
         ("one straight guide", &la, &lb, vec![g0.clone()], 2000.0, "plane"),
         ("two straight guides", &la, &lb, vec![g0.clone(), g1.clone()], 2000.0, "plane"),
@@ -791,6 +793,8 @@ fn a_guided_surface_loft_as_live() {
         ("one arc guide", &la, &lb, vec![c0.clone()], 2118.1613, ""),
         ("two arc guides", &la, &lb, vec![c0, c1], 2206.937, "cylinder"),
         ("profiles of different length", &la, &b7, vec![t0, t1], 2113.639, ""),
+        // Live 2380 (14): a spline profile (live's poles) between straight guides, paired by its own parameter.
+        ("a spline profile", &sp, &lb, vec![g0s, g1s], 2113.2909, ""),
     ];
     for (case, a, b, g, live, kind) in cases {
         let r = loft_guided_open(a, b, &g, true, false).unwrap();
