@@ -705,7 +705,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - [ ] P0 CRASH-6297 (bool) **opening a saved document kills the CLI / app with a stack overflow in `bez_apart`, since
   v0.4.33** (CLI fuzz seed 6297 on v0.4.35, step 97: a Shell, 2 faces, 1 mm). The fuzz document was saved with the Shell in
   it, so every open regenerates it and dies: `thread '<unknown>' has overflowed its stack` on v0.4.33, v0.4.34, v0.4.35 and
-  greens 24829a72 / 4fee814c; **v0.4.32 opens it** (57 features, Shell 8 Error). gdb on 24829a72
+  greens 24829a72 / 4fee814c / 42ae0d85; **v0.4.32 opens it** (57 features, Shell 8 Error). gdb on 24829a72
   (qa-scratch/tickets/crash6297/gdb-24829a72-open.txt): a rayon worker under `boolean::par_map` (boolean.rs 3428) →
   `free::apart` (free.rs 682) → `bez_apart` calling itself at free.rs 665 (now 689) about 2,770 frames deep: the recursion
   is bounded only by the 20,000 hull-pair budget, not by depth, so a pair whose halves never fall apart (nor below `gap`)
@@ -958,6 +958,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   polygon's first corner) and 26d817465 (a section with fewer vertices gets the others' corners spread evenly); neither
   under legacy_topology or a ScopeRule. If the new loft is live's, documents made from now on are right, but ones saved
   before change on open. qa's CLI sweeps don't have this document (only the GUI rows): added to qa's watch list. (qa 2026-11-07 08:51, v0.4.34)
+- [ ] P1 SAVED-SKETCH-PLANE-LOST (blend; core's 6941806b7 / a38465541 are in the same green) **since green 4fee814c a saved
+  document's two sketches lose their planes**: qa's ticket document cli-fillet2-segv (vibe3 ~/qa/tickets) on 24829a72 → 4fee814c:
+  its Fillet 1 (after Extrude 1, Chamfer 1, Linear pattern 1, Shell 1) changes by a hair (Part 1 45580.502 → 45580.636 mm³,
+  Part 2 44489.854 → 44489.774, 11 / 16 faces both), then **Sketch 3 and Sketch 5 "Select a sketch plane."** (Ok before),
+  Chamfer 3 Ok → "Distance of chamfer on face too large.", Extrude 3 → "Select face or sketch region to extrude.", Part 2
+  43411.10 → 17143.11 mm³ (62 faces). Better in the same green: Shell 3 now Ok, Mirror 1's copy = its part exactly (45580.441
+  before, against 45580.502). The fillet's change fits 4fee814c (a fillet built at the working scale); the sketch's lost face
+  is the regression: a sketch on a face of a fillet that is rebuilt must keep finding that face. Also changed, no status lost:
+  cli-suppress-stall (Shell 7 and Fillet 11 now Ok: Part 1 91042.77 → 7871.36, Part 6 91238.11 → 7896.46) and cli-draft-hang
+  (Part 1 and its copies 20705.7244 → 20705.755); 42ae0d85 the same. Repro: `python3 bin/featstat.py <cli> tickets/cli-fillet2-segv.noshape`
+  (features and parts), bin/rollstat.py <cli> <doc> <feature>... (parts after each feature). (qa 2026-11-08 03:02)
 - [ ] P3 SAVED-BRIDGE-FACE-CHANGE (core) **b113528b (a blend that consumes a face a hair smaller: the zero-width bridge cut
   out and the faces sewn) changes a saved document's faces**: qa-scratch/tickets/cli-fillet-segv.noshape Part 4 33 → 34 faces,
   volume the same (43710.5082 mm³). Likely right (live has no zero-width bridge), but saved documents change on open with
