@@ -331,8 +331,10 @@ struct Mesh
 } // namespace detail
 
 // `rings[0]` the outer boundary, the rest holes: indices into `pts`, each
-// ring once round. Triangles counter-clockwise into `tris`.
-inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vector<int>>& rings, std::vector<int>& tris)
+// ring once round. Triangles counter-clockwise into `tris`. `inner`: the
+// points from that index on are vertices inside the polygon too (an export's
+// grid nodes; each strictly inside, else false).
+inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vector<int>>& rings, std::vector<int>& tris, size_t inner = SIZE_MAX)
 {
   tris.clear();
   if (rings.empty())
@@ -377,6 +379,13 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
   }
   if (!(want > 0))
     return false;
+  inner = std::min(inner, pts.size());
+  for (size_t i = inner; i < pts.size(); ++i)
+  {
+    if (used[i] || !(pts[i].x > minX && pts[i].x < maxX && pts[i].y > minY && pts[i].y < maxY))
+      return false;
+  }
+  const size_t ni = pts.size() - inner;
   // Worked on a grid of 2^22 steps across the points, the enclosing
   // triangle within a few widths of them: every coordinate an integer under
   // 2^24, so `orient`'s products stay under 2^52 and it is exact in doubles
@@ -394,21 +403,24 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
   m.p.push_back({cx + 2 * big, cy - big});
   m.p.push_back({cx, cy + 2 * big});
   m.vedge.assign(np + 3, -1);
-  m.v.reserve(6 * nv + 12);
-  m.tw.reserve(6 * nv + 12);
-  m.fixed.reserve(6 * nv + 12);
+  m.v.reserve(6 * (nv + ni) + 12);
+  m.tw.reserve(6 * (nv + ni) + 12);
+  m.fixed.reserve(6 * (nv + ni) + 12);
   m.add_tri((int)np, (int)np + 1, (int)np + 2);
   // Insertion order: BRIO (a fixed pseudo-random shuffle cut into rounds of
   // doubling size, each round in z-order): few flips per point (points in
   // sequence round a circle would each flip the fan inside it) and short walks.
   std::vector<std::pair<uint32_t, int>> order;
-  order.reserve(nv);
+  order.reserve(nv + ni);
   const double s = 65535 / size;
+  auto key = [&](size_t i) {
+    return detail::spread((uint32_t)std::clamp((pts[i].x - minX) * s, 0.0, 65535.0)) | (detail::spread((uint32_t)std::clamp((pts[i].y - minY) * s, 0.0, 65535.0)) << 1);
+  };
   for (const auto& r : rr)
     for (int i : r)
-      order.emplace_back(detail::spread((uint32_t)std::clamp((pts[(size_t)i].x - minX) * s, 0.0, 65535.0)) |
-                           (detail::spread((uint32_t)std::clamp((pts[(size_t)i].y - minY) * s, 0.0, 65535.0)) << 1),
-                         i);
+      order.emplace_back(key((size_t)i), i);
+  for (size_t i = inner; i < pts.size(); ++i)
+    order.emplace_back(key(i), (int)i);
   uint64_t seed = 0x9E3779B97F4A7C15ull;
   for (size_t k = order.size(); k > 1; --k)
   {
@@ -496,8 +508,8 @@ inline bool triangulate(const std::vector<Pt>& pts, const std::vector<std::vecto
       sum += ar / 2;
       tris.insert(tris.end(), {a, b, c});
     }
-  // Every point used: V + 2 H - 2 triangles, covering the polygon.
-  if (tris.size() / 3 != nv + 2 * (rr.size() - 1) - 2 || std::abs(sum - want) > 1e-9 * size * size)
+  // Every point used: V + 2 I + 2 H - 2 triangles (I inner points), covering the polygon.
+  if (tris.size() / 3 != nv + 2 * ni + 2 * (rr.size() - 1) - 2 || std::abs(sum - want) > 1e-9 * size * size)
     return false;
   return true;
 }

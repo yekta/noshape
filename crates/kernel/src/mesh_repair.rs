@@ -9,18 +9,60 @@ use crate::shape::{Shape, ShapeType};
 use glam::{DVec2, DVec3};
 use noshape_brep::mesh::cdt::{self, Pt};
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// Integer keys hashed by a multiply (an export's millions of welded points and edges: SipHash took most of an STL
+/// export's repairs, pulley02-maxwell at Fine 21 of 25 s).
+#[derive(Default)]
+struct Mix(u64);
+
+impl Hasher for Mix {
+    fn finish(&self) -> u64 {
+        self.0 ^ (self.0 >> 31)
+    }
+    fn write(&mut self, bytes: &[u8]) {
+        for &b in bytes {
+            self.write_u64(b as u64);
+        }
+    }
+    fn write_u32(&mut self, x: u32) {
+        self.write_u64(x as u64);
+    }
+    fn write_u64(&mut self, x: u64) {
+        self.0 = (self.0.rotate_left(26) ^ x).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+    }
+}
+
+type Fast = BuildHasherDefault<Mix>;
+
+/// The directed welded edges of triangles `indices`, three per triangle.
+fn edge_keys<'a>(indices: &'a [u32], weld: &'a [u32]) -> impl Iterator<Item = u64> + 'a {
+    indices.as_chunks::<3>().0.iter().flat_map(move |tri| {
+        let w = tri.map(|i| weld[i as usize]);
+        (0..3).map(move |k| edge(w[k], w[(k + 1) % 3]))
+    })
+}
+
+/// A directed welded edge as one key.
+fn edge(a: u32, b: u32) -> u64 {
+    (a as u64) << 32 | b as u64
+}
 
 /// Each triangle wound against its neighbours (an edge it uses the way another triangle does) turned when that makes
 /// fewer such edges: a mesher's triangle wound the other way, without turning one the corners' normals mislead
 /// about. Returns how many.
 pub fn orient_by_neighbours(t: &mut Tessellation) -> usize {
     let weld = weld(t);
-    let mut used: HashMap<(u32, u32), u32> = HashMap::new();
-    for tri in t.indices.as_chunks::<3>().0 {
-        let w = tri.map(|i| weld[i as usize]);
-        for k in 0..3 {
-            *used.entry((w[k], w[(k + 1) % 3])).or_default() += 1;
-        }
+    // No edge used twice the same way: nothing to turn (the usual case, told by sorting).
+    let mut sorted: Vec<u64> = edge_keys(&t.indices, &weld).collect();
+    sorted.sort_unstable();
+    if !sorted.windows(2).any(|p| p[0] == p[1]) {
+        return 0;
+    }
+    drop(sorted);
+    let mut used: HashMap<u64, u32, Fast> = HashMap::with_capacity_and_hasher(t.indices.len(), Fast::default());
+    for k in edge_keys(&t.indices, &weld) {
+        *used.entry(k).or_default() += 1;
     }
     let mut turned = 0;
     // A few passes: a turned triangle may settle its neighbour's count.
@@ -29,17 +71,17 @@ pub fn orient_by_neighbours(t: &mut Tessellation) -> usize {
         for tri in t.indices.as_chunks_mut::<3>().0 {
             let w = tri.map(|i| weld[i as usize]);
             let sides = [(w[0], w[1]), (w[1], w[2]), (w[2], w[0])];
-            let against = sides.iter().filter(|e| used.get(e).copied().unwrap_or(0) > 1).count();
+            let against = sides.iter().filter(|(a, b)| used.get(&edge(*a, *b)).copied().unwrap_or(0) > 1).count();
             if against == 0 {
                 continue;
             }
-            let turned_against = sides.iter().filter(|(a, b)| used.get(&(*b, *a)).copied().unwrap_or(0) > 0).count();
+            let turned_against = sides.iter().filter(|(a, b)| used.get(&edge(*b, *a)).copied().unwrap_or(0) > 0).count();
             if turned_against >= against {
                 continue;
             }
             for (a, b) in sides {
-                *used.get_mut(&(a, b)).expect("counted") -= 1;
-                *used.entry((b, a)).or_default() += 1;
+                *used.get_mut(&edge(a, b)).expect("counted") -= 1;
+                *used.entry(edge(b, a)).or_default() += 1;
             }
             tri.swap(1, 2);
             turned += 1;
@@ -74,7 +116,7 @@ pub fn drop_pinched_triangles(t: &mut Tessellation) -> usize {
 
 /// Each vertex's first vertex at the same position (the faces' meshes share their edges' points, not indices).
 fn weld(t: &Tessellation) -> Vec<u32> {
-    let mut id = HashMap::new();
+    let mut id: HashMap<[u32; 3], u32, Fast> = HashMap::with_capacity_and_hasher(t.positions.len(), Fast::default());
     t.positions
         .iter()
         .map(|p| {
@@ -87,13 +129,27 @@ fn weld(t: &Tessellation) -> Vec<u32> {
 /// Folded faces of `t` (the tessellation of `shape`, its faces in order) re-triangulated; returns how many.
 pub fn repair_folded_faces(shape: &Shape, t: &mut Tessellation) -> usize {
     let weld = weld(t);
+    let tris_of = |r: &crate::mesh::FaceRange| &t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize];
+    // The folded faces: an edge used twice the same way within the face.
+    let mut keys: Vec<u64> = Vec::new();
+    let folded: Vec<usize> = (0..t.faces.len())
+        .filter(|&fi| {
+            keys.clear();
+            keys.extend(edge_keys(tris_of(&t.faces[fi]), &weld));
+            keys.sort_unstable();
+            keys.windows(2).any(|p| p[0] == p[1])
+        })
+        .collect();
+    if folded.is_empty() {
+        return 0;
+    }
     // Each directed welded edge: the faces using it.
-    let mut faces_of: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
+    let mut faces_of: HashMap<u64, Vec<usize>, Fast> = HashMap::default();
     for (fi, r) in t.faces.iter().enumerate() {
-        for tri in t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize].as_chunks::<3>().0 {
+        for tri in tris_of(r).as_chunks::<3>().0 {
             let w = tri.map(|i| weld[i as usize]);
             for k in 0..3 {
-                let f = faces_of.entry((w[k], w[(k + 1) % 3])).or_default();
+                let f = faces_of.entry(edge(w[k], w[(k + 1) % 3])).or_default();
                 if !f.contains(&fi) {
                     f.push(fi);
                 }
@@ -101,20 +157,10 @@ pub fn repair_folded_faces(shape: &Shape, t: &mut Tessellation) -> usize {
         }
     }
     let mut fixed: Vec<(usize, Vec<u32>)> = Vec::new();
-    for (fi, r) in t.faces.iter().enumerate() {
-        let tris = &t.indices[r.first_index as usize..(r.first_index + r.index_count) as usize];
-        let mut used: HashMap<(u32, u32), u32> = HashMap::new();
-        for tri in tris.as_chunks::<3>().0 {
-            let w = tri.map(|i| weld[i as usize]);
-            for k in 0..3 {
-                *used.entry((w[k], w[(k + 1) % 3])).or_default() += 1;
-            }
-        }
-        if used.values().all(|&n| n == 1) {
-            continue;
-        }
+    for fi in folded {
+        let tris = tris_of(&t.faces[fi]);
         let Ok(face) = shape.sub_shape(ShapeType::Face, fi) else { continue };
-        let others = |a: u32, b: u32| faces_of.get(&(a, b)).is_some_and(|f| f.iter().any(|&g| g != fi));
+        let others = |a: u32, b: u32| faces_of.get(&edge(a, b)).is_some_and(|f| f.iter().any(|&g| g != fi));
         if let Some(new) = retriangulate(&face, t, tris, &weld, &others) {
             fixed.push((fi, new));
         }

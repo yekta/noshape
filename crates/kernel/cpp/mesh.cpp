@@ -14,6 +14,9 @@
 #include <BRepTools.hxx>
 #include <TopExp_Explorer.hxx>
 #include <BRepMesh_MeshAlgoFactory.hxx>
+#include <BRepMesh_DefaultRangeSplitter.hxx>
+#include <BRepMesh_DelaunayBaseMeshAlgo.hxx>
+#include <BRepMesh_DelaunayNodeInsertionMeshAlgo.hxx>
 #include <BRepMesh_ShapeTool.hxx>
 #include <IMeshData_Curve.hxx>
 #include <IMeshData_Edge.hxx>
@@ -53,29 +56,11 @@
 namespace noshape {
 
 namespace {
-// The boundary nodes of `f` triangulated in its parameter plane (constrained
-// Delaunay, no other nodes) into the face's triangulation; false (nothing
-// written) when the face has fewer than `min_nodes` of them or isn't clean
-// (self-intersecting or seam wires, a ring the triangulation refuses).
-// `curved`: a curved surface, triangulated in its parameters scaled to
-// lengths and kept only when every triangle's centre and edge midpoints lie
-// within the face's deflection of the surface.
-bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
+// The boundary of `f` in its parameter plane: each wire's nodes once round as a ring of indices into `uv` / `xyz`,
+// the edges' pcurves told their nodes' indices (1-based, in the face's triangulation to come). False when a wire
+// self-intersects or has a degenerated edge, or (unless `seams`) an edge on the face twice.
+bool face_rings(const IMeshData::IFaceHandle& f, bool seams, std::vector<cdt::Pt>& uv, std::vector<gp_Pnt>& xyz, std::vector<std::vector<int>>& rings)
 {
-  size_t total = 0;
-  for (int w = 0; w < f->WiresNb(); ++w)
-  {
-    const IMeshData::IWireHandle& W = f->GetWire(w);
-    for (int e = 0; e < W->EdgesNb(); ++e)
-      total += (size_t)W->GetEdge(e)->GetPCurve(f.get(), W->GetEdgeOrientation(e))->ParametersNb();
-  }
-  if (total < min_nodes)
-    return false;
-  std::vector<cdt::Pt>          uv;
-  std::vector<gp_Pnt>           xyz;
-  std::vector<std::vector<int>> rings;
-  uv.reserve(total);
-  xyz.reserve(total);
   auto same = [&](int node, const gp_Pnt2d& q) { return std::abs(uv[(size_t)node].x - q.X()) + std::abs(uv[(size_t)node].y - q.Y()) < 1e-12; };
   for (int w = 0; w < f->WiresNb(); ++w)
   {
@@ -88,8 +73,9 @@ bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
     {
       const IMeshData::IEdgeHandle E = W->GetEdge(e);
       const TopAbs_Orientation     o = W->GetEdgeOrientation(e);
-      // One pcurve on this face (no seams), run one way.
-      if ((o != TopAbs_FORWARD && o != TopAbs_REVERSED) || E->GetDegenerated() || E->GetPCurves(f.get()).Extent() != 1)
+      // One pcurve on this face (a seam's two, each with its own nodes), run one way.
+      const int pcurves = E->GetPCurves(f.get()).Extent();
+      if ((o != TopAbs_FORWARD && o != TopAbs_REVERSED) || E->GetDegenerated() || (pcurves != 1 && !(seams && pcurves == 2)))
         return false;
       const IMeshData::IPCurveHandle& P = E->GetPCurve(f.get(), o);
       const IMeshData::ICurveHandle&  C = E->GetCurve();
@@ -121,7 +107,169 @@ bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
     }
     rings.push_back(std::move(ring));
   }
-  if (rings.empty())
+  return !rings.empty();
+}
+
+// The face's triangulation from nodes and counter-clockwise triangles (indices from 0).
+void write_face(const IMeshData::IFaceHandle& f, const std::vector<cdt::Pt>& uv, const std::vector<gp_Pnt>& xyz, const std::vector<int>& tris)
+{
+  occ::handle<Poly_Triangulation> T = new Poly_Triangulation((int)uv.size(), (int)(tris.size() / 3), true);
+  for (size_t i = 0; i < uv.size(); ++i)
+  {
+    T->SetNode((int)i + 1, xyz[i]);
+    T->SetUVNode((int)i + 1, gp_Pnt2d(uv[i].x, uv[i].y));
+  }
+  for (size_t t = 0; t < tris.size(); t += 3)
+    T->SetTriangle((int)(t / 3) + 1, Poly_Triangle(tris[t] + 1, tris[t + 1] + 1, tris[t + 2] + 1));
+  BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
+}
+
+// The cells of an export's grid on a sphere or torus over the parameter box [u0, u1] × [v0, v1] (live 2335,
+// Parasolid's facetter on knob-jason's fillets: 81 × 688 and 41 × 565 cells on its R 11.5 and R 7.76 tori at
+// Coarse): along each direction the fewest equal steps whose chord sags by at most half the chord tolerance `tol`
+// on the direction's largest circle (u: the face's widest parallel, v: the tube or the sphere), and turns by at most
+// `ang`.
+void export_grid(const BRepAdaptor_Surface& s, double u0, double u1, double v0, double v1, double tol, double ang, int& nu, int& nv)
+{
+  const bool   torus = s.GetType() == GeomAbs_Torus;
+  const double r     = torus ? s.Torus().MinorRadius() : s.Sphere().Radius();
+  const double R     = torus ? s.Torus().MajorRadius() : 0.0;
+  double       ru    = 0;
+  for (int k = 0; k <= 512; ++k)
+  {
+    const double v = v0 + (v1 - v0) * k / 512;
+    ru             = std::max(ru, torus ? R + r * std::cos(v) : r * std::cos(v));
+  }
+  // The angle a chord of a circle of radius `radius` may span: sagging tol / 2, turning ang.
+  auto step = [&](double radius) { return std::min(ang, radius > tol / 2 ? 2 * std::acos(1 - tol / 2 / radius) : 3.14159265358979323846); };
+  auto cells = [](double range, double st) { return (int)std::clamp(std::ceil(range / st - 1e-9), 1.0, 65536.0); };
+  nu = cells(u1 - u0, step(ru));
+  nv = cells(v1 - v0, step(r));
+  // More than 1024 steps along either direction: the powers of two above them, both ways (knob-jason's tori at
+  // Fine: R 11.5 161 × 1376 → 256 × 2048, R 7.76 81 × 1130 → 128 × 2048; pulley02's groove at Coarse 181 × 1617 →
+  // 256 × 2048; knob-jason's R 11.5 at Medium, 114 × 973, stays).
+  if (nu > 1024 || nv > 1024)
+  {
+    auto pow2 = [](int n) { int p = 1; while (p < n) p *= 2; return p; };
+    nu = pow2(nu), nv = pow2(nv);
+  }
+}
+
+// An export's sphere or torus as live's facetter makes it: the boundary nodes and the nodes of `export_grid`'s grid
+// that lie inside the face (a quarter cell clear of its boundary along both directions), triangulated in the
+// parameters scaled to lengths (planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh
+// deflection and angle are twice Parasolid's (mesh.rs). False (nothing written) when the face isn't clean.
+bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm)
+{
+  std::vector<cdt::Pt>          uv;
+  std::vector<gp_Pnt>           xyz;
+  std::vector<std::vector<int>> rings;
+  if (!face_rings(f, true, uv, xyz, rings))
+    return false;
+  const BRepAdaptor_Surface& S = *f->GetSurface();
+  double u0 = uv[0].x, u1 = u0, v0 = uv[0].y, v1 = v0;
+  for (const cdt::Pt& q : uv)
+  {
+    u0 = std::min(u0, q.x), u1 = std::max(u1, q.x);
+    v0 = std::min(v0, q.y), v1 = std::max(v1, q.y);
+  }
+  int nu = 1, nv = 1;
+  export_grid(S, u0, u1, v0, v1, prm.Deflection / 2, prm.Angle / 2, nu, nv);
+  if ((double)nu * nv > 3e7)
+    return false;
+  const double du = (u1 - u0) / nu, dv = (v1 - v0) / nv;
+  // Grid nodes inside: on each row between the boundary's crossings (even-odd), likewise on each column.
+  std::vector<std::pair<cdt::Pt, cdt::Pt>> seg;
+  for (const auto& r : rings)
+    for (size_t k = 0; k < r.size(); ++k)
+      seg.emplace_back(uv[(size_t)r[k]], uv[(size_t)r[(k + 1) % r.size()]]);
+  const size_t      w = (size_t)nu - 1;
+  std::vector<char> in((size_t)(nu - 1) * (size_t)(nv - 1), 0);
+  std::vector<double> xs;
+  auto spans = [&](bool rows, int line, double at) {
+    xs.clear();
+    for (const auto& [a, b] : seg)
+    {
+      const double ay = rows ? a.y : a.x, by = rows ? b.y : b.x, ax = rows ? a.x : a.y, bx = rows ? b.x : b.y;
+      if ((ay <= at) != (by <= at))
+        xs.push_back(ax + (at - ay) * (bx - ax) / (by - ay));
+    }
+    std::sort(xs.begin(), xs.end());
+    const double lo0 = rows ? u0 : v0, step = rows ? du : dv;
+    const int    n   = rows ? nu : nv;
+    for (size_t k = 0; k + 1 < xs.size(); k += 2)
+    {
+      const int first = std::max(1, (int)std::ceil((xs[k] + step / 4 - lo0) / step));
+      const int last  = std::min(n - 1, (int)std::floor((xs[k + 1] - step / 4 - lo0) / step));
+      for (int i = first; i <= last; ++i)
+        in[rows ? (size_t)(line - 1) * w + (size_t)(i - 1) : (size_t)(i - 1) * w + (size_t)(line - 1)] |= rows ? 1 : 2;
+    }
+  };
+  for (int j = 1; j < nv; ++j)
+    spans(true, j, v0 + dv * j);
+  for (int i = 1; i < nu; ++i)
+    spans(false, i, u0 + du * i);
+  const size_t ring_nodes = uv.size();
+  for (int j = 1; j < nv; ++j)
+    for (int i = 1; i < nu; ++i)
+      if (in[(size_t)(j - 1) * w + (size_t)(i - 1)] == 3)
+      {
+        const double u = u0 + du * i, v = v0 + dv * j;
+        uv.push_back({u, v});
+        xyz.push_back(S.Value(u, v));
+      }
+  // The outer ring first: the largest.
+  auto area = [&](const std::vector<int>& r) {
+    double a = 0;
+    for (size_t k = 0, j = r.size() - 1; k < r.size(); j = k++)
+      a += uv[(size_t)r[j]].x * uv[(size_t)r[k]].y - uv[(size_t)r[k]].x * uv[(size_t)r[j]].y;
+    return std::abs(a);
+  };
+  size_t outer = 0;
+  for (size_t k = 1; k < rings.size(); ++k)
+    if (area(rings[k]) > area(rings[outer]))
+      outer = k;
+  std::swap(rings[0], rings[outer]);
+  gp_Pnt p;
+  gp_Vec su, sv;
+  S.D1((u0 + u1) / 2, (v0 + v1) / 2, p, su, sv);
+  const double lu = su.Magnitude(), lv = sv.Magnitude();
+  if (!(lu > 0) || !(lv > 0))
+    return false;
+  std::vector<cdt::Pt> plane = uv;
+  for (cdt::Pt& q : plane)
+    q = {q.x * lu, q.y * lv};
+  std::vector<int> tris;
+  if (!cdt::triangulate(plane, rings, tris, ring_nodes))
+    return false;
+  write_face(f, uv, xyz, tris);
+  return true;
+}
+
+// The boundary nodes of `f` triangulated in its parameter plane (constrained
+// Delaunay, no other nodes) into the face's triangulation; false (nothing
+// written) when the face has fewer than `min_nodes` of them or isn't clean
+// (self-intersecting or seam wires, a ring the triangulation refuses).
+// `curved`: a curved surface, triangulated in its parameters scaled to
+// lengths and kept only when every triangle's centre and edge midpoints lie
+// within the face's deflection of the surface.
+bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
+{
+  size_t total = 0;
+  for (int w = 0; w < f->WiresNb(); ++w)
+  {
+    const IMeshData::IWireHandle& W = f->GetWire(w);
+    for (int e = 0; e < W->EdgesNb(); ++e)
+      total += (size_t)W->GetEdge(e)->GetPCurve(f.get(), W->GetEdgeOrientation(e))->ParametersNb();
+  }
+  if (total < min_nodes)
+    return false;
+  std::vector<cdt::Pt>          uv;
+  std::vector<gp_Pnt>           xyz;
+  std::vector<std::vector<int>> rings;
+  uv.reserve(total);
+  xyz.reserve(total);
+  if (!face_rings(f, false, uv, xyz, rings))
     return false;
   // The outer ring first: the largest.
   auto area = [&](const std::vector<int>& r) {
@@ -180,15 +328,7 @@ bool cdt_face(const IMeshData::IFaceHandle& f, size_t min_nodes, bool curved)
         return false;
     }
   }
-  occ::handle<Poly_Triangulation> T = new Poly_Triangulation((int)uv.size(), (int)(tris.size() / 3), true);
-  for (size_t i = 0; i < uv.size(); ++i)
-  {
-    T->SetNode((int)i + 1, xyz[i]);
-    T->SetUVNode((int)i + 1, gp_Pnt2d(uv[i].x, uv[i].y));
-  }
-  for (size_t t = 0; t < tris.size(); t += 3)
-    T->SetTriangle((int)(t / 3) + 1, Poly_Triangle(tris[t] + 1, tris[t + 1] + 1, tris[t + 2] + 1));
-  BRepMesh_ShapeTool::AddInFace(f->GetFace(), T);
+  write_face(f, uv, xyz, tris);
   return true;
 }
 
@@ -568,6 +708,67 @@ private:
   occ::handle<IMeshTools_MeshAlgoFactory> myDefault = new BRepMesh_MeshAlgoFactory();
 };
 
+// An export's sphere or torus GridAlgo can't take: `export_grid`'s nodes, through BRepMesh's Delaunay.
+class ExportGridSplitter : public BRepMesh_DefaultRangeSplitter
+{
+public:
+  Handle(IMeshData::ListOfPnt2d) GenerateSurfaceNodes(const IMeshTools_Parameters& prm) const override
+  {
+    const auto [u0, u1] = GetRangeU();
+    const auto [v0, v1] = GetRangeV();
+    int nu = 1, nv = 1;
+    export_grid(*GetSurface(), u0, u1, v0, v1, prm.Deflection / 2, prm.Angle / 2, nu, nv);
+    const occ::handle<NCollection_IncAllocator> alloc = new NCollection_IncAllocator(IMeshData::MEMORY_BLOCK_SIZE_HUGE);
+    Handle(IMeshData::ListOfPnt2d) nodes = new IMeshData::ListOfPnt2d(alloc);
+    for (int j = 1; j < nv; ++j)
+      for (int i = 1; i < nu; ++i)
+        nodes->Append(gp_Pnt2d(u0 + (u1 - u0) * i / nu, v0 + (v1 - v0) * j / nv));
+    return nodes;
+  }
+};
+
+// An export's sphere or torus: `grid_face`, else `fallback`.
+class GridAlgo : public IMeshTools_MeshAlgo
+{
+public:
+  explicit GridAlgo(const occ::handle<IMeshTools_MeshAlgo>& fallback) : myFallback(fallback) {}
+
+  void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
+  {
+    bool done = false;
+    try
+    {
+      done = grid_face(f, prm);
+    }
+    catch (const Standard_Failure&)
+    {
+    }
+    if (done)
+      return;
+    if (std::getenv("NOSHAPE_MESH_DEBUG"))
+      std::fprintf(stderr, "mesh: an export grid face went to BRepMesh\n");
+    myFallback->Perform(f, prm, range);
+  }
+
+private:
+  occ::handle<IMeshTools_MeshAlgo> myFallback;
+};
+
+// The export path (`exact`): spheres and tori on `export_grid`'s grid; every other face as the display meshes it.
+class ExportAlgoFactory : public IMeshTools_MeshAlgoFactory
+{
+public:
+  occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
+  {
+    if (type == GeomAbs_Torus || type == GeomAbs_Sphere)
+      return new GridAlgo(new BRepMesh_DelaunayNodeInsertionMeshAlgo<ExportGridSplitter, BRepMesh_DelaunayBaseMeshAlgo>());
+    return myOwn->GetAlgo(type, prm);
+  }
+
+private:
+  occ::handle<IMeshTools_MeshAlgoFactory> myOwn = new PlanarCdtAlgoFactory();
+};
+
 // BRepMesh's model post-processing without its deflection estimate
 // (BRepLib::UpdateDeflection per face, ~5 % of the 400-hole plate's display
 // meshing): the edges' polygons on the new triangulations (or 3D polygons of
@@ -818,7 +1019,7 @@ std::unique_ptr<OcMesh> mesh_prepare(const OcShape& s, double lin, double ang, b
     // on macOS arm64 (features_a pattern_instance_references_survive_upstream_edit,
     // v0.4.6 CI run 39827462890).
     occ::handle<BRepMesh_Context> ctx = new BRepMesh_Context();
-    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(new PlanarCdtAlgoFactory()));
+    ctx->SetFaceDiscret(new BRepMesh_FaceDiscret(exact ? occ::handle<IMeshTools_MeshAlgoFactory>(new ExportAlgoFactory()) : occ::handle<IMeshTools_MeshAlgoFactory>(new PlanarCdtAlgoFactory())));
     if (std::getenv("NOSHAPE_MESH_BREPMESH_POST") == nullptr)
       ctx->SetPostProcessor(new DisplayPostProcessor());
     lap = std::make_unique<KernelTimer>("mesh.cache");

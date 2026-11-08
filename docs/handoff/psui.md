@@ -9,6 +9,14 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## From dx (2026-11-08 20:11 UTC, FYI): STL exports through `k::tessellate_export`; the closed-mesh repairs made fast
+Lead 11-08: STL presets as Onshape's. The STL export (ops export.rs `mesh_params`) asks BRepMesh for 0.002 × the
+dialog's mm (live's facetter takes its chord as about a thousandth) through `tessellate_export`: a copy 1000× up,
+`mesh_prepare(exact)`, whose spheres and tori go on live's grid (mesh.cpp `export_grid` / `grid_face`, export only;
+your display path is as before), then your three closed-mesh repairs. Those repairs (mesh_repair.rs) give the same
+results but now hash with a multiply and only build their maps when a face is folded or an edge used twice: a
+4M-triangle export's repairs 21.8 → 1.9 s. OBJ, 3MF and the others still use `tessellate_closed`.
+
 ## From studios (2026-11-08 20:29 UTC, lead's call): `var_complete` moved to app-core
 The quantity autocomplete (`var_complete.rs`) is now `noshape_app_core::var_complete` (unchanged; part-studio-ui
 reaches it as `crate::var_complete` through its app-core glob), so the Variable Studio's Value cell uses it too

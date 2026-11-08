@@ -7351,3 +7351,48 @@ fn stl_presets_facet_as_onshapes() {
     let r = |a: usize, b: usize| a as f64 / b as f64;
     assert!((r(fine, medium) - 2f64.sqrt()).abs() < 0.15 && (r(medium, coarse) - 2f64.sqrt()).abs() < 0.15, "coarse {coarse}, medium {medium}, fine {fine}");
 }
+
+/// An STL's fillet torus on live's grid (live 2335, knob-jason's fillets): across the profile and round the axis the
+/// fewest equal steps whose chords sag by at most half the chord tolerance. The hole's R 2 rim fillet (tube centre
+/// R 7 at z 18) at Coarse: 72 steps over its 90°, 537 round (live's rule; BRepMesh alone gave about half).
+#[test]
+fn stl_fillet_torus_on_onshapes_grid() {
+    let mut ctx = Ctx::new();
+    block_with_hole(&mut ctx, "stl_torus.noshape");
+    let circles = call(&mut ctx, "query_entities", json!({ "kind": "edges", "curve": "circle" }))["edges"].as_array().unwrap().clone();
+    let rim = circles.iter().find(|e| (num(&e["midpoint"][2]) - 20.0).abs() < 1e-6).unwrap()["id"].as_str().unwrap().to_string();
+    let fi = call(&mut ctx, "feature_add", json!({ "type": "fillet", "params": { "entities": [rim], "radius": "2 mm" } }));
+    assert_eq!(fi["feature_status"]["status"], "Ok", "{fi}");
+    let file = scratch("stl_torus_coarse.stl");
+    call(&mut ctx, "export_parts", json!({ "format": "STL", "file": file.to_str().unwrap(), "units": "Millimeter", "resolution": "coarse" }));
+    let b = std::fs::read(&file).unwrap();
+    let n = u32::from_le_bytes(b[80..84].try_into().unwrap()) as usize;
+    // The torus's inner nodes by their angle round the tube (degrees, 90 at the top, 180 at the bore), in rings
+    // (gaps over 0.1°; the seam's own nodes alone between them).
+    let mut nodes: std::collections::HashSet<(u32, u32, u32)> = Default::default();
+    let mut phis: Vec<f64> = Vec::new();
+    for i in 0..n {
+        for k in 0..3 {
+            let o = 84 + i * 50 + 12 + k * 12;
+            let f = |j: usize| f32::from_le_bytes(b[o + 4 * j..o + 4 * j + 4].try_into().unwrap());
+            let (x, y, z) = (f(0) as f64, f(1) as f64, f(2) as f64);
+            let rho = x.hypot(y);
+            let phi = (z - 18.0).atan2(rho - 7.0).to_degrees();
+            if ((rho - 7.0).hypot(z - 18.0) - 2.0).abs() < 1e-3 && phi > 90.2 && phi < 179.8 && nodes.insert((f(0).to_bits(), f(1).to_bits(), f(2).to_bits())) {
+                phis.push(phi);
+            }
+        }
+    }
+    phis.sort_by(f64::total_cmp);
+    let mut rings: Vec<usize> = Vec::new();
+    for (k, phi) in phis.iter().enumerate() {
+        if k == 0 || phi - phis[k - 1] > 0.1 {
+            rings.push(0);
+        }
+        *rings.last_mut().unwrap() += 1;
+    }
+    rings.retain(|&r| r > 10);
+    assert_eq!(rings.len(), 71, "rings inside the profile (live's rule: 72 steps): {rings:?}");
+    let mid = rings[rings.len() / 2];
+    assert!((536..=537).contains(&mid), "{mid} nodes round a middle ring, live's rule 537 steps: {rings:?}");
+}

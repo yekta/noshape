@@ -11,6 +11,26 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-08 20:11 UTC: STL presets as live's facetter (lead: do the meshing work)
+
+- live2's knob-jason / pulley02-maxwell files (2335) read: live meshes a sphere's or torus's face on a grid of its
+  parameter box. Each direction gets the fewest equal steps whose chord sags at most half the chord tolerance on the
+  direction's largest circle (u: the face's widest parallel, v: the tube), and powers of two above them, both ways,
+  once either direction needs more than 1024 (knob-jason's R 11.5 fillet: Coarse 81 × 688, Fine 256 × 2048; pulley02's
+  groove at Coarse 256 × 2048). Edges keep their own chord steps; live also adds the grid's crossings onto a face's
+  edges (not done: about 1 % of the planes' triangles).
+- kernel mesh.cpp, export path only (`exact`): `export_grid` + `grid_face` (the grid's inner nodes and the face's
+  boundary, seams taken, through planar_cdt.hpp's CDT, now with inner points), GridAlgo / ExportAlgoFactory, BRepMesh's
+  Delaunay with ExportGridSplitter as the fallback (knob-jason's 24 small spheres: degenerated edges). mesh_repair.rs
+  as before but fast (a multiply hasher, folded faces found by sorting, maps only when needed): pulley02 Fine's
+  repairs 21.8 → 1.9 s. e2e `stl_fillet_torus_on_onshapes_grid`.
+- Triangles (ours / live): clamp-hms 24,596 / 24,608, 34,712 / 34,732, 49,044 / 49,056 (−0.049, −0.058, −0.024 %,
+  unchanged: some arcs one point off live's, their points offset, not their rule); knob-jason 824,846 / 832,344,
+  1,637,832 / 1,645,816, 4,198,382 / 4,155,356 (−0.9, −0.5, +1.0 %); pulley02-maxwell 1,056,076 / 1,064,472,
+  2,105,636 / 2,121,968, 4,209,460 / 4,226,096 (−0.8, −0.8, −0.4 %). The CLI's open + export: 0.2 s (clamp),
+  0.9-5.5 s (knob), 1.5-6.4 s (pulley) on vibe4; live's times asked (REQUESTS).
+- Next (lead): c2-fan-blade-sweep's single STEP import, face counts off live's (core's ticket).
+
 ## 11-08 21:27 UTC: c2-fan-blade-sweep's STEP import (core's SUITE-FAN-BLADE-IMPORT, lead)
 
 - STEP now merges a part's faces on one cylinder, cone, sphere or torus as IGES did (the file split them; live's
