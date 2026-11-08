@@ -64,6 +64,18 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   instead of sectioning the two surfaces (which gives the 18 spurious curves). A day's work, not an hour's.
 - Asked live 12:50: surface walls' side directions (2306 D's apart case contradicts the touching rule).
 
+## Cascades (lead 11-08 ~20:30)
+- c2-fan-blade-sweep: Derived 1's source (derived/fb207f797…) failed at Chamfer 1 (two distances 0.4 / 0.2 on four
+  0.7 mm pins' tops): our Distance 1 face was the top on three pins (the feature-wide first side). Fixed (b3f3df84e,
+  `face_order_in`: each profile loop's first side): the source 8 -> 14/22; Fan-Connector as live. The document still
+  stops at Derived 1 on part "Poti2" (82 vs 83 faces), from the source's Extrude 7 (feature 15): core's.
+  Run the source alone: models dir with a link to it (vibe5 /home/ngyekta/blend-scratch/models/fan-source).
+- c2-rings-loft: the 0.06 % area at Circular pattern 1 starts at Chamfer 1: ours 705.288 mm³ / 914.52 mm² against live
+  705.853 / 914.99 (inside its band; Shell / Extrude 3 / the pattern carry it, the pattern's narrower band fails).
+  Faces: our chamfer faces 10.044 mm² (live 9.8228), y to 1.81 (live 1.89); the side strips 8.854 (live 9.17, ours
+  cut to y ±2.49, live ±2.53): the run-on past the arc's ends goes further than live's. Asked live (REQUESTS 21:06)
+  for the chamfer face's surface and edges.
+
 ## Speed survey (lead 11-08 19:40: audit11's blend features slower than live, by ms over live)
 Ours over live, from each document's slowest features and live.jsonl's per_feature_ms (only documents matching up to
 the feature count):
