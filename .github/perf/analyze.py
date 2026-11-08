@@ -210,6 +210,44 @@ def speed_targets(rows, started):
     return out
 
 
+# The cold start's milestones (ms from process start) the split compares.
+SPLIT = [("app created", "GPUI application created"), ("gpui-kit", "gpui-kit initialized"), ("window opening", "window: opening"),
+         ("window created", "window: created"), ("workspace drawn", "first workspace render"), ("first viewport frame", "first viewport frame presented")]
+
+
+def milestones(log):
+    """{milestone: ms} of a launch's log, None without the log."""
+    if not os.path.exists(log):
+        return None
+    with open(log, errors="replace") as f:
+        text = f.read()
+    out = {}
+    for name, key in SPLIT:
+        m = re.search(re.escape(key) + r": ([\d.]+) ms since start", text)
+        if m:
+            out[name] = float(m.group(1))
+    return out
+
+
+def cold_start_split(out_dir):
+    """The job's first launch (everything cold) beside a launch with only our caches cleared (bench.sh STARTUP) and a
+    warm one: the first minus `ours` is the runner's first-launch cost; `ours` is noshape's own cold start."""
+    first, ours, warm = (milestones(os.path.join(out_dir, n)) for n in ("texture-orbit.log", "start_ours.log", "start_warm.log"))
+    if not first or not ours:
+        return []
+    ms = lambda d, k: f"{d[k]:.0f} ms" if d and k in d else "n/a"
+    lines = ["", "Cold start split (ms from process start): the job's first launch, then one with only noshape's caches cleared "
+             "(config, display cache, Metal shader caches) and a warm one:", "",
+             "| milestone | first launch | our caches cleared | warm |", "|---|---|---|---|"]
+    for name, _ in SPLIT:
+        lines.append(f"| {name} | {ms(first, name)} | {ms(ours, name)} | {ms(warm, name)} |")
+    f, o = first.get("first viewport frame"), ours.get("first viewport frame")
+    if f is not None and o is not None:
+        lines += ["", f"- noshape's own cold start (our caches cleared, the OS warm): {o:.0f} ms, target {TARGET_FIRST_FRAME_MS:.0f}: "
+                  f"{'met' if o <= TARGET_FIRST_FRAME_MS else 'not met'}; the runner's first-launch cost {f - o:.0f} ms"]
+    return lines
+
+
 def compare_stills(out):
     """(ok, message) for texture-still.png vs readback-still.png."""
     try:
@@ -288,6 +326,7 @@ def main():
                   "| launch | window drawn | first viewport frame | shader compile |", "|---|---|---|---|"]
         for i, r in enumerate(started):
             lines.append(f"| {'first' if i == 0 and r['log'] == 'texture-orbit.log' else 'later'}: {r['log'][:-4]} | {ms(r.get('window_ms'))} | {ms(r.get('frame_ms'))} | {ms(r.get('pipelines_ms'))} |")
+    lines += cold_start_split(args.out)
     lines += [""] + speed_targets(rows, started)
     for log in sorted(glob.glob(os.path.join(args.out, "*-pick.log"))):
         with open(log, errors="replace") as f:

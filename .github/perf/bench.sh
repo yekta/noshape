@@ -165,3 +165,30 @@ if [[ -n ${LATENCY_DOC:-} && ( -z ${ONLY:-} || " $ONLY " == *" latency:"* ) ]]; 
     [[ -n ${AB_BIN:-} ]] && latency "$AB_BIN" "$AB_OUT"
   fi
 fi
+# STARTUP (default on; not on a re-measure, ONLY): what the cold start costs noshape apart from the runner. The job's
+# first launch (the texture orbit) is the true cold start: the OS's caches and ours cold. Two more launches of the
+# document at the end, each quitting once its model is on screen (`NOSHAPE_PERF_SCRIPT=open`): `start_ours.log` with
+# our caches cleared again (fresh config and cache dirs, the Metal shader caches removed) on the now warm OS, then
+# `start_warm.log` with nothing cleared. First launch minus start_ours is the runner's first-launch cost.
+startup() { # name config-dir cache-dir clear-shader-caches
+  local name=$1 cfg=$2 cache=$3 log="$OUT/start_$1.log"
+  local work; work=$(mktemp -d)
+  cp "$DOC" "$work/start.noshape"
+  if [[ $4 == 1 && "$(uname)" == Darwin ]]; then
+    find "$(getconf DARWIN_USER_CACHE_DIR)" -maxdepth 3 -type d -name com.apple.metal -prune -exec rm -rf {} +
+  fi
+  echo "== startup $name ($BIN)"
+  env NOSHAPE_PERF=1 NOSHAPE_PERF_SCRIPT=open NOSHAPE_PRESENT="${MODES[0]}" NOSHAPE_CONFIG_DIR="$cfg" NOSHAPE_CACHE_DIR="$cache" \
+    RUST_LOG=info ${BENCH_ENV//,/ } "$BIN" "$work/start.noshape" > "$log" 2>&1 &
+  local pid=$!
+  for _ in $(seq 120); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+  kill "$pid" 2>/dev/null; sleep 1; kill -9 "$pid" 2>/dev/null
+  grep -a "first viewport frame presented\|window: created\|panicked" "$log" | cut -c1-200
+  rm -rf "$work"
+}
+if [[ ${STARTUP:-1} == 1 && -z ${ONLY:-} ]]; then
+  dirs=$(mktemp -d)
+  startup ours "$dirs/config" "$dirs/cache" 1
+  startup warm "$dirs/config" "$dirs/cache" 0
+  rm -rf "$dirs"
+fi
