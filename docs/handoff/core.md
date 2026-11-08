@@ -33,6 +33,22 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-08 06:20 UTC: (3) done: cf-part-draft 13/13 to the end, custom 4/4.**
+- Landed 05:44 (2a99078c): opCreateBSplineCurve of one straight span is a line (Parasolid; std's bridging curve with
+  Position at both ends); translator: a vertex a split imprinted where two sketch curves meet (IMPRINT_ON_FACE).
+  c2-hunting-knife 10 -> 11, suite 737/934.
+- Spur Gear: live's HIGH evVolume (core/q2253/fs-volume-rb9.json) of the gear JQD is 404,878.0748 mm³ (REST's
+  406,339.35 is 0.36 % high; ours 404,878.0819). Added as `volume_high` to JQD on cf-part-draft's live.jsonl lines
+  index 8-11 (gear unchanged since Spur Gear) on this machine and vibe2-5, in place (script
+  /root/core-scratch/bin/gear-vh.py, idempotent; backups live.jsonl.bak-core-0608 on the hosts,
+  /root/core-scratch/cf-part-draft-live.jsonl.bak here). cf-part-draft: 9/13 -> 13/13 to the end, custom 4/4.
+- c2-hunting-knife's Loft 3 (in the worktree: loft_guided.cpp `guide_curve`, a guide of several curves as one composite
+  curve: it builds now instead of "Loft guides of several curves are not supported yet"). Not landed: std's loft
+  surface Add joins with makeSolid (loft, fill, bsurf; extrude / sweep / revolve don't); routing the loft's surface
+  exits through bshared::surface_result (patch /root/core-scratch/loft-guides-join.patch) joins it (14 faces, live
+  14) but leaves a sheet with 40 edges (live 38, a solid) and +146 mm² area: our guided loft face isn't live's (live's
+  adds no edge: its boundary is the blade's free edges). Also that run reopened in 60 s: check before landing.
+
 **State 11-08 05:00 UTC: Extrude with draft landed (19027e11); (3) after 06:05; loft Normal-to-profile asked.**
 - Extrude with draft: `op_prism` (features.cpp) builds the drafted prism directly (`draft_prism_directly`, shell.cpp:
   tapered_prism + its history) where OCCT's DraftAngle fails (a spline or involute profile: "Failed to extrude
