@@ -381,8 +381,7 @@ impl DerivedProvider for DocStudios {
                     f.source.hash(&mut h);
                 }
             }
-            for f in ps.features.iter().filter(|f| noshape_model::features::importing::is_derived(&f.type_id)) {
-                let src = f.params.text("partStudio").to_string();
+            for src in ps.features.iter().filter_map(noshape_model::features::importing::source_studio) {
                 if src != tab && self.active.lock().insert(src.clone()) {
                     self.version(&src).hash(&mut h);
                     self.active.lock().remove(&src);

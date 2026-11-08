@@ -541,6 +541,11 @@ REQUESTS 20:20). Where the slowest go (preview regeneration):
 
 ## In progress
 
+**11-08 08:13 UTC, FRAME-PROFILE-OTHER-STUDIO (lead):** done, see TICKETS (value `<tab>#<sketch>.4294967295`); the
+variable table's Filter feature list leaves the parts list alone and its row's hover ends under its menu
+(variable-table-row-filter matches). Live asked (REQUESTS 07:57) for the field text / configuration / placement.
+
+
 **11-08 06:34 UTC.** Part Studio ui-parity: 493/530 on 11-07 19:54's binary (all 530, vibe5, /root/psui-scratch/uip-psui.sh),
 498 on main 05:31 (key-backtick-select-other, face-menu-select-other, frame-tool, plane-line-angle,
 sketch-circumscribed-polygon now match); this commit +6 (camera-menu ×9 counted once fixed: Previous view never

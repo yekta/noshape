@@ -769,9 +769,16 @@ impl PartStudioView {
                         let target = format!("panel_row:{}", r.name);
                         crate::ui_script::mark(h_flex().child(name_el).child(kind_select).child(value_cell), move || target)
                             .os_context_menu_over_inputs(move |menu, window, cx| {
-                                // The pressed row takes the keyboard before its menu opens (live variable-table-row-filter: "other").
+                                // The pressed row takes the keyboard before its menu opens (live variable-table-row-filter: "other"),
+                                // and the menu under the pointer ends the row's hover (its users no longer lit).
                                 let row_focus = view.read(cx).panel_row_focus.clone();
                                 window.focus(&row_focus, cx);
+                                view.update(cx, |this, cx| {
+                                    if this.ui.var_hover.take().is_some() {
+                                        this.refresh_scene(false, cx);
+                                        cx.notify();
+                                    }
+                                });
                                 let menu = menu.focus_after_action(view.read(cx).focus.clone());
                                 var_row_menu(menu, view.clone(), fid, &n2, k, count, configurable)
                             })

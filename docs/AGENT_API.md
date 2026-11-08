@@ -715,7 +715,7 @@ Examples:
 
 Frame's profile library (Sketch profile › Libraries): standards, profiles and sizes.
 
-Onshape frame profiles as the Frame dialog's Select sketch › Libraries tab lists them. Without arguments: the standards and their profiles; with `standard` and `profile`: that profile's sizes, its default, whether it has Rounded, and the `profileSketch` value for feature_add (`frame-library:<standard>/<profile>` then a tab and `Size=<size>`, `;Rounded=true`).
+Onshape frame profiles as the Frame dialog's Select sketch › Libraries tab lists them. Without arguments: the standards and their profiles; with `standard` and `profile`: that profile's sizes, its default, whether it has Rounded, and the `profileSketch` value for feature_add (`frame-library:<standard>/<profile>` then a tab and `Size=<size>`, `;Rounded=true`). A sketch of another Part Studio of the document (Select sketch › Current document) is `<tab id>#<sketch feature id>.4294967295`, that studio's configuration after a tab (`input=value` pairs joined by `;`).
 
 Examples:
 

@@ -14,6 +14,23 @@ pub fn register(out: &mut Vec<FeatureType>) {
     out.push(tag());
 }
 
+/// A Frame's `profileSketch` naming a sketch of another Part Studio of the document (Select sketch › Current
+/// document, live D134): `<tab>#<sketch feature>.<index>` as the select panel writes a studio's sketch, the studio's
+/// configuration after a tab (`input=value` pairs joined by `;`). The tab and the sketch's feature.
+pub fn studio_sketch(value: &str) -> Option<(&str, crate::FeatureId, crate::configuration::ConfigValues)> {
+    let (base, config) = value.split_once('\t').unwrap_or((value, ""));
+    let (tab, body) = base.trim().split_once('#')?;
+    let feature = body.split('.').next()?.strip_prefix('F')?;
+    let feature = crate::FeatureId(u64::from_str_radix(feature, 16).ok()?);
+    let mut values = crate::configuration::ConfigValues::default();
+    for kv in config.split(';').filter(|s| !s.is_empty()) {
+        if let Some((k, v)) = kv.split_once('=') {
+            values.0.insert(k.to_string(), v.to_string());
+        }
+    }
+    (!tab.is_empty()).then_some((tab, feature, values))
+}
+
 pub const FRAME_CORNER: &[(&str, &str)] = &[("MITER", "Miter"), ("BUTT", "Butt"), ("COPED_BUTT", "Coped butt"), ("NONE", "None")];
 
 fn butt(v: &ParamValues, id: &str) -> bool {

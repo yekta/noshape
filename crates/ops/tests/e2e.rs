@@ -1922,6 +1922,32 @@ fn a_frame_with_a_library_profile() {
     assert!((v - (900.0 - 676.0) * 200.0).abs() < 1e-3, "volume {v}");
 }
 
+/// Frame › Select sketch › Current document (FRAME-PROFILE-OTHER-STUDIO, live D134): the profile is a sketch of
+/// another Part Studio, `<tab>#<sketch>.<index>` as the panel writes it; it follows that sketch when it changes.
+#[test]
+fn a_frame_with_another_part_studios_sketch() {
+    let mut ctx = Ctx::new();
+    let profile = new_sketch(&mut ctx, "frame-other-studio.noshape", "plane:top");
+    let r = call(&mut ctx, "sketch_draw", json!({ "sketch": profile, "tool": "center_rectangle", "points": [[0, 0], [10, 5]] }));
+    assert_eq!(r["regions"].as_array().map(Vec::len), Some(1), "{r}");
+    let info = call(&mut ctx, "document_info", json!({}));
+    let source = info["tabs"].as_array().unwrap().iter().find(|t| t["name"] == "Part Studio 1").unwrap()["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "tab_create", json!({ "kind": "Part Studio", "name": "Path" }));
+    let path = call(&mut ctx, "sketch_create", json!({ "tab": "Path", "plane": "plane:top" }))["sketch"].as_str().unwrap().to_string();
+    let r = call(&mut ctx, "sketch_draw", json!({ "tab": "Path", "sketch": path, "tool": "line", "points": [[0, 0], [200, 0]] }));
+    let line = r["created"].as_array().unwrap().iter().find(|e| e["type"] == "line").unwrap_or_else(|| panic!("{r}"))["id"].clone();
+    let value = format!("{source}#{profile}.{}", u32::MAX);
+    let f = call(&mut ctx, "feature_add", json!({ "tab": "Path", "type": "frame", "params": { "profileSketch": value, "selections": [line] } }));
+    assert_eq!(f["feature_status"]["status"], "Ok", "{f}");
+    let volume = |ctx: &mut Ctx| num(&call(ctx, "query_parts", json!({ "tab": "Path" }))["parts"][0]["volume"]);
+    let v = volume(&mut ctx);
+    assert!((v - 20.0 * 10.0 * 200.0).abs() < 1e-3, "volume {v}");
+    // A sketch that is gone: "Select profile." on the field.
+    let gone = format!("{source}#F1234.{}", u32::MAX);
+    let e = call(&mut ctx, "feature_edit", json!({ "tab": "Path", "feature": f["feature"], "params": { "profileSketch": gone } }));
+    assert_eq!(e["feature_status"]["status"], "Error", "{e}");
+}
+
 /// A new Frame's profile is 8020 › 10 Series › 1001 (live 2216: a fresh account's default), a profile with no Size;
 /// feature_frame_profiles lists 8020's series as Types.
 #[test]

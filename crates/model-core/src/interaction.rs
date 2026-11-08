@@ -234,6 +234,10 @@ fn parse_filter(query: &str) -> Option<(String, String, bool)> {
 /// parts); the other commands keep only features.
 pub fn filter_row(query: &str, name: &str, hidden: bool) -> Option<bool> {
     let (cmd, arg, exact) = parse_filter(query)?;
+    // The Variable table's Filter feature list leaves the parts list as it is (live ui-parity variable-table-row-filter).
+    if cmd == "variable" {
+        return None;
+    }
     let (name, arg) = (name.to_lowercase(), arg.to_lowercase());
     let name_match = arg.is_empty() || if exact { name == arg } else { name.contains(&arg) };
     Some(match cmd.as_str() {
@@ -1315,6 +1319,7 @@ mod tests {
         assert_eq!(filter_row("extru", "Part 1", false), Some(false));
         assert_eq!(filter_row(":hidden", "Top", true), Some(true));
         assert_eq!(filter_row(":hidden", "Origin", false), Some(false));
+        assert_eq!(filter_row(":variable width", "Part 1", false), None, "the parts list stays");
         assert_eq!(filter_row(":shown", "Part 1", false), Some(true));
         assert_eq!(filter_row(":errors", "Part 1", false), Some(false));
         assert_eq!(filter_row(":", "Origin", false), Some(false));

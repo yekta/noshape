@@ -300,10 +300,8 @@ fn result_key(studio: &PartStudio, config: &ConfigValues, units: &UnitPrefs, opt
         key = hash_bytes(hash_bytes(key, name.as_bytes()), &v.value.to_le_bytes());
     }
     for f in effective {
-        if crate::features::importing::is_derived(&f.type_id)
-            && let Some(p) = &opts.derived
-        {
-            key = hash_bytes(key, &p.version(f.params.text("partStudio")).to_le_bytes());
+        if let (Some(tab), Some(p)) = (crate::features::importing::source_studio_of(&f.type_id, &f.params), &opts.derived) {
+            key = hash_bytes(key, &p.version(&tab).to_le_bytes());
         }
         if let Some((tab, _)) = crate::custom::parse_type_id(&f.type_id) {
             let v = opts.custom_features.clone().unwrap_or_else(custom_features::fallback_provider).version(tab);
@@ -433,11 +431,9 @@ impl Regenerator {
             }
             key = hash_bytes(key, &blob);
             let local = hash_bytes(key0, &blob);
-            // Derived features depend on another Part Studio's state.
-            if crate::features::importing::is_derived(&f.type_id)
-                && let Some(p) = &opts.derived
-            {
-                key = hash_bytes(key, &p.version(params.text("partStudio")).to_le_bytes());
+            // Derived features (and a Frame with another studio's profile) depend on another Part Studio's state.
+            if let (Some(tab), Some(p)) = (crate::features::importing::source_studio_of(&f.type_id, params), &opts.derived) {
+                key = hash_bytes(key, &p.version(&tab).to_le_bytes());
             }
             // Custom features depend on their Feature Studio's source.
             if let Some((tab, _)) = crate::custom::parse_type_id(&f.type_id) {

@@ -510,6 +510,8 @@ impl SelectItemPanel {
                 continue;
             }
             let parts = match &s.what {
+                // Frame's Select sketch lists a studio's sketches only (live D134).
+                RefSourceKind::PartStudio(parts) if self.frame_profiles => Some(parts.iter().filter(|(b, _)| b.index == u32::MAX).cloned().collect()),
                 RefSourceKind::PartStudio(parts) if expandable => Some(parts.clone()),
                 _ => None,
             };
@@ -587,6 +589,14 @@ impl SelectItemPanel {
                 );
             }
             out.push(r.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                // Frame takes a sketch, not a studio: the row folds or unfolds its sketches.
+                if this.frame_profiles {
+                    if !this.expanded.remove(&key) {
+                        this.expanded.insert(key.clone());
+                    }
+                    cx.notify();
+                    return;
+                }
                 // Picking a configured studio keeps the configuration shown.
                 let cfg = this.cfg_edit.get(&key).cloned().unwrap_or_default();
                 this.pick(join_value(&key, &cfg), cx);

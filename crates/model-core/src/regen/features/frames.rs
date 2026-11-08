@@ -307,50 +307,22 @@ fn path_edges(ev: &EvalCtx) -> FResult<Vec<(Shape, Name)>> {
     Ok(uniq)
 }
 
-/// Profile from the `profileSketch` text: a sketch of this Part Studio with
-/// that name, else the built-in library.
+/// Profile from the `profileSketch` text: a sketch of another Part Studio (Select sketch › Current document), a
+/// sketch of this Part Studio with that name, else the built-in library.
 fn resolve_profile(ev: &EvalCtx, text: &str) -> FResult<(FrameProfile, Shape)> {
     let text = text.trim();
     if text.is_empty() {
         return crate::regen::eval::err_at(&["profileSketch"], "Select profile.");
     }
+    if let Some((tab, sketch, values)) = crate::features::frames::studio_sketch(text) {
+        let source = ev.derived.as_ref().and_then(|p| if values.0.is_empty() { p.context(tab) } else { p.context_configured(tab, &values) });
+        let Some(s) = source.and_then(|c| c.sketches.iter().find(|s| s.feature == sketch).cloned()) else {
+            return crate::regen::eval::err_at(&["profileSketch"], "Select profile.");
+        };
+        return sketch_profile(&s);
+    }
     if let Some(s) = ev.ctx.sketches.iter().find(|s| s.name == text).cloned() {
-        // Regions that are not holes of other regions; use the largest.
-        let mut faces: Vec<Shape> = Vec::new();
-        for reg in &s.regions {
-            let key = crate::regen::eval::encode_region_key(&reg.id);
-            if let Ok(p) = region_profile(&s, reg, Source::Region { sketch: s.feature, key }) {
-                faces.push(p.shape);
-            }
-        }
-        let outers: Vec<Option<Shape>> = faces.iter().map(|f| outer_wire(f).and_then(|w| k::make_face_from_wire(&w, true).ok())).collect();
-        let on = |s: &Shape, p: DVec3| k::make_vertex(p).ok().and_then(|v| k::distance(s, &v).ok()).is_some_and(|d| d.distance < 1e-9);
-        let mut keep: Vec<Shape> = Vec::new();
-        for (j, f) in faces.iter().enumerate() {
-            let Ok(c) = f.centroid() else { continue };
-            // A region filling a hole of another region is not material.
-            let fills_hole = faces.iter().enumerate().any(|(i, g)| i != j && outers[i].as_ref().is_some_and(|o| on(o, c)) && !on(g, c));
-            if !fills_hole {
-                keep.push(f.clone());
-            }
-        }
-        let face = keep.into_iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0))).ok_or_else(|| fe("Profile should have at least one region."))?;
-        let plane = crate::regen::eval::kernel_plane(&s.frame);
-        let to_xy = k::Transform::frame_to_frame(&plane, &k::Plane::xy());
-        let face = face.transformed(&to_xy)?;
-        let mut lo = DVec2::splat(f64::INFINITY);
-        let mut hi = DVec2::splat(f64::NEG_INFINITY);
-        for v in face.vertices() {
-            let p = v.vertex_point()?;
-            lo = lo.min(p.truncate());
-            hi = hi.max(p.truncate());
-        }
-        if let Ok(bb) = face.bounding_box(true) {
-            lo = lo.min(bb.min.truncate());
-            hi = hi.max(bb.max.truncate());
-        }
-        let prof = FrameProfile { standard: String::new(), description: s.name.clone(), outer: Vec::new(), holes: Vec::new(), min: lo, max: hi };
-        return Ok((prof, face));
+        return sketch_profile(&s);
     }
     // A Libraries pick (Onshape frame profiles), else a profile named by its kind and dimensions.
     let p = match super::frame_library::profile_of(text) {
@@ -359,6 +331,46 @@ fn resolve_profile(ev: &EvalCtx, text: &str) -> FResult<(FrameProfile, Shape)> {
     };
     let f = p.face()?;
     Ok((p, f))
+}
+
+/// A sketch's profile: its largest region that doesn't fill a hole of another, moved from the sketch plane to XY.
+fn sketch_profile(s: &crate::regen::context::SketchResult) -> FResult<(FrameProfile, Shape)> {
+    // Regions that are not holes of other regions; use the largest.
+    let mut faces: Vec<Shape> = Vec::new();
+    for reg in &s.regions {
+        let key = crate::regen::eval::encode_region_key(&reg.id);
+        if let Ok(p) = region_profile(s, reg, Source::Region { sketch: s.feature, key }) {
+            faces.push(p.shape);
+        }
+    }
+    let outers: Vec<Option<Shape>> = faces.iter().map(|f| outer_wire(f).and_then(|w| k::make_face_from_wire(&w, true).ok())).collect();
+    let on = |s: &Shape, p: DVec3| k::make_vertex(p).ok().and_then(|v| k::distance(s, &v).ok()).is_some_and(|d| d.distance < 1e-9);
+    let mut keep: Vec<Shape> = Vec::new();
+    for (j, f) in faces.iter().enumerate() {
+        let Ok(c) = f.centroid() else { continue };
+        // A region filling a hole of another region is not material.
+        let fills_hole = faces.iter().enumerate().any(|(i, g)| i != j && outers[i].as_ref().is_some_and(|o| on(o, c)) && !on(g, c));
+        if !fills_hole {
+            keep.push(f.clone());
+        }
+    }
+    let face = keep.into_iter().max_by(|a, b| a.area().unwrap_or(0.0).total_cmp(&b.area().unwrap_or(0.0))).ok_or_else(|| fe("Profile should have at least one region."))?;
+    let plane = crate::regen::eval::kernel_plane(&s.frame);
+    let to_xy = k::Transform::frame_to_frame(&plane, &k::Plane::xy());
+    let face = face.transformed(&to_xy)?;
+    let mut lo = DVec2::splat(f64::INFINITY);
+    let mut hi = DVec2::splat(f64::NEG_INFINITY);
+    for v in face.vertices() {
+        let p = v.vertex_point()?;
+        lo = lo.min(p.truncate());
+        hi = hi.max(p.truncate());
+    }
+    if let Ok(bb) = face.bounding_box(true) {
+        lo = lo.min(bb.min.truncate());
+        hi = hi.max(bb.max.truncate());
+    }
+    let prof = FrameProfile { standard: String::new(), description: s.name.clone(), outer: Vec::new(), holes: Vec::new(), min: lo, max: hi };
+    Ok((prof, face))
 }
 
 fn outer_wire(f: &Shape) -> Option<Shape> {

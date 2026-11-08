@@ -2402,7 +2402,7 @@ impl PartStudioView {
         };
         let sources = crate::fs_reference::sources(&doc, &self.tab.to_string(), |id| provider.context(id).map(|c| renamed(id, crate::fs_reference::parts_and_sketches(&c))).unwrap_or_default());
         let studios: Vec<TabId> = doc.tabs.iter().filter(|t| t.id != self.tab && matches!(t.content, noshape_model::document::TabContent::PartStudio(_))).map(|t| t.id).collect();
-        let wants_pictures = dialog.read(cx).ty.id == "importDerived" || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { kind: noshape_model::params::ReferenceKind::PartStudio }));
+        let wants_pictures = matches!(dialog.read(cx).ty.id, "importDerived" | "frame") || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { kind: noshape_model::params::ReferenceKind::PartStudio }));
         let (path, except, gpu_for_dialog) = (self.doc.read(cx).session.path.clone(), self.tab.to_string(), self.gpu.clone());
         dialog.update(cx, |d, cx| {
             d.ref_sources = sources;
@@ -2488,8 +2488,9 @@ impl PartStudioView {
         }
         // Derived's Part Studio field names its studio from these too (qa5
         // DOC3: a pasted part opened with the empty "Select Part Studio…").
-        // The Form's Form Part Studio too (its library's pictures).
-        if is_derived || dialog.read(cx).ty.id == "sheetMetalFormed" || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { .. })) {
+        // The Form's Form Part Studio too (its library's pictures), and Frame's Select sketch (the other studios'
+        // sketches, FRAME-PROFILE-OTHER-STUDIO).
+        if is_derived || matches!(dialog.read(cx).ty.id, "sheetMetalFormed" | "frame") || dialog.read(cx).ty.params.iter().any(|s| matches!(s.kind, noshape_model::params::ParamKind::Reference { .. })) {
             self.set_reference_sources(&dialog, cx);
         }
         let sub = cx.subscribe_in(&dialog, window, |this: &mut Self, emitter, ev: &DialogEvent, window, cx| match ev {

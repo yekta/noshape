@@ -8,7 +8,7 @@
 use super::common::*;
 use super::curve::LENGTH_UNIT_NAMES;
 use super::{Category, FeatureType};
-use crate::params::{Hints, NumSpec, ParamSpec, QueryFilter};
+use crate::params::{Hints, NumSpec, ParamSpec, ParamValues, QueryFilter};
 
 pub fn register(out: &mut Vec<FeatureType>) {
     out.push(derived());
@@ -43,6 +43,23 @@ pub fn derived() -> FeatureType {
 /// Derived and the assembly Mirror's "Derived mirror".
 pub fn is_derived(type_id: &str) -> bool {
     type_id == "importDerived" || type_id == "derivedMirror"
+}
+
+/// The other Part Studio a feature takes from (its result depends on that studio's): a Derived's source, a Frame's
+/// profile sketch of another studio.
+pub fn source_studio(f: &crate::partstudio::Feature) -> Option<String> {
+    source_studio_of(&f.type_id, &f.params)
+}
+
+/// [`source_studio`] of a feature type with these (possibly configured) parameters.
+pub fn source_studio_of(type_id: &str, params: &ParamValues) -> Option<String> {
+    if is_derived(type_id) {
+        return Some(params.text("partStudio").trim().to_string()).filter(|t| !t.is_empty());
+    }
+    if type_id == "frame" {
+        return super::frames::studio_sketch(params.text("profileSketch")).map(|(tab, _, _)| tab.to_string());
+    }
+    None
 }
 
 /// Internal feature used by Assembly mirror.

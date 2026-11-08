@@ -17,7 +17,7 @@ pub fn ops() -> Vec<Op> {
             group: "feature",
             verb: "frame_profiles",
             summary: "Frame's profile library (Sketch profile › Libraries): standards, profiles and sizes",
-            description: "Onshape frame profiles as the Frame dialog's Select sketch › Libraries tab lists them. Without arguments: the standards and their profiles; with `standard` and `profile`: that profile's sizes, its default, whether it has Rounded, and the `profileSketch` value for feature_add (`frame-library:<standard>/<profile>` then a tab and `Size=<size>`, `;Rounded=true`).",
+            description: "Onshape frame profiles as the Frame dialog's Select sketch › Libraries tab lists them. Without arguments: the standards and their profiles; with `standard` and `profile`: that profile's sizes, its default, whether it has Rounded, and the `profileSketch` value for feature_add (`frame-library:<standard>/<profile>` then a tab and `Size=<size>`, `;Rounded=true`). A sketch of another Part Studio of the document (Select sketch › Current document) is `<tab id>#<sketch feature id>.4294967295`, that studio's configuration after a tab (`input=value` pairs joined by `;`).",
             fields: vec![opt("standard", s(), "A standard (Type), e.g. ISO."), opt("profile", s(), "A profile of it, e.g. Rectangular tube."), opt("size", s(), "A size of it (default: the profile's default)."), opt("rounded", json!({ "type": "boolean" }), "Rounded corners (profiles that have them).")],
             mutates: false,
             destructive: false,
