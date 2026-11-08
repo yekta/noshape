@@ -1072,6 +1072,9 @@ that touches the model: ~12 min.
 
 ## Next, in order
 
+- (11-08 13:55, lead from studios) S-TOOLBAR-OVER-TABS: the S shortcut toolbar opens when S is typed with the pointer
+  over the tab bar; live opens it only over the graphics (ui-parity doc-tab-rename-escape). After EXPORT-MESH-FOLD.
+
 N000000000000000. (11-06 21:49) **Display cache (lead 11-06: open like Onshape, instantly).** part_studio/display_cache.rs
     (key: blake3 of the whole document's JSON, the tab, configuration values, View in high quality, the build: version,
     the executable's size and time, `noshape_kernel::OCCT_PATCHES` from kernel's build.rs; files

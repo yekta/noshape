@@ -6844,7 +6844,8 @@ impl Render for PartStudioView {
             .on_action(cx.listener(|this, _: &HideConstruction, window, cx| this.hide_construction(window, cx)))
             .on_action(cx.listener(|this, _: &ZoomWindow, _, cx| this.toggle_zoom_window(cx)))
             .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| {
-                if this.edit.is_none() || this.sketch.is_some() {
+                // Live opens it at the pointer over the graphics only (not over the tab bar or a panel).
+                if (this.edit.is_none() || this.sketch.is_some()) && this.viewport.read(cx).pointer_inside() {
                     this.toggle_mini_toolbar(cx);
                 }
             }))

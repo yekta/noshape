@@ -6480,7 +6480,11 @@ impl AssemblyView {
             .on_action(cx.listener(|this, _: &Copy, _, cx| this.copy_selection(cx)))
             .on_action(cx.listener(|this, _: &Paste, _, cx| this.paste_instances(cx)))
             .on_action(cx.listener(|this, _: &RenameSelected, window, cx| this.rename_selected(window, cx)))
-            .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| this.toggle_mini_toolbar(cx)))
+            .on_action(cx.listener(|this, _: &ShortcutToolbar, _, cx| {
+                if this.viewport.read(cx).pointer_inside() {
+                    this.toggle_mini_toolbar(cx);
+                }
+            }))
             .on_action(cx.listener(|this, _: &ToggleShortcutHelp, window, cx| this.toggle_shortcut_sheet(window, cx)))
             .on_action(cx.listener(|this, _: &MateConnectorTool, window, cx| this.open_mc(None, window, cx)))
             .on_action(cx.listener(|this, _: &SelectOther, _, cx| this.select_other(false, cx)))
