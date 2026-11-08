@@ -12,6 +12,7 @@ use crate::os_ui as os;
 use crate::theme::p;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use noshape_model::FeatureId;
 use noshape_model::configuration::{ConfigInput, ConfigInputKind, ConfiguredParam};
@@ -315,6 +316,9 @@ impl PropagationDialog {
     }
 }
 
+/// The dialog's line when no instance or feature has an input to follow (live).
+const NO_MATCH: &str = "No input in the current tab matches any references.";
+
 impl Render for PropagationDialog {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
@@ -339,6 +343,12 @@ impl Render for PropagationDialog {
                     .child(div().absolute().left(px(8.)).child(crate::ui::os_checkbox(("prop-col", k), "", self.all(&*column)).on_click(Self::toggler(column.clone(), cx))))
                     .child(crate::ui::user_text(name.clone())),
             );
+        }
+        // Nothing to propagate: live's info line in place of the table (live asm-config-input-menu-input-propagation).
+        if self.rows.is_empty() {
+            crate::ui_script::note_dialog(|| {
+                serde_json::json!({ "kind": "modal", "title": format!("Input propagation for {}", self.studio_name), "fields": [], "buttons": ["Confirm"], "text": NO_MATCH, "info": NO_MATCH })
+            });
         }
         let mut table = v_flex().mx(px(10.)).border_l_1().border_t_1().border_color(grid).child(head);
         for (r, row) in self.rows.iter().enumerate() {
@@ -374,7 +384,15 @@ impl Render for PropagationDialog {
                     .child(div().id("prop-close").cursor_pointer().opacity(0.5).child(crate::ui::glyph("close", 14., gpui_kit::rgb(0x000000))).on_click(|_, window, cx| window.close_dialog(cx))),
             )
             .child(div().h(px(1.)).bg(gpui_kit::rgb(os::MODAL_DIVIDER)))
-            .child(div().pt(px(10.)).pb(px(18.)).child(table))
+            .child(div().pt(px(10.)).pb(px(18.)).map(|d| {
+                if self.rows.is_empty() {
+                    d.child(
+                        div().mx(px(10.)).p(px(14.)).rounded(px(5.25)).bg(pal.info_fill).border_1().border_color(pal.info_outline).text_size(px(14.)).text_color(pal.text).child(NO_MATCH),
+                    )
+                } else {
+                    d.child(table)
+                }
+            }))
             .child(self.render_footer(cx))
     }
 }
@@ -395,7 +413,7 @@ impl PropagationDialog {
             .border_color(gpui_kit::rgb(os::MODAL_DIVIDER))
             .child(crate::assets::icon("help", 20., cx))
             .child(div().flex_1())
-            .child(div().text_size(px(14.)).text_color(pal.text).child(format!("{n} new input{} to propagate", if n == 1 { "" } else { "s" })))
+            .when(!self.rows.is_empty(), |d| d.child(div().text_size(px(14.)).text_color(pal.text).child(format!("{n} new input{} to propagate", if n == 1 { "" } else { "s" }))))
             .child(os::primary_button("prop-confirm", "Confirm").disabled(n == 0).on_click(move |_, window, cx| {
                 on_confirm(picked.clone(), window, cx);
                 window.close_dialog(cx);

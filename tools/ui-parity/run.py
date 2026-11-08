@@ -216,6 +216,9 @@ def normalize_live(state):
         if focus.get("selection") == [0, n]:
             focus["selection"] = [0, len(focus["text"])]
     if isinstance(d, dict) and d.get("kind") == "modal":
+        # A modal titled after the copy ("Input propagation for start two-blocks asm Copy 2").
+        if isinstance(d.get("title"), str):
+            d["title"] = re.sub(r" Copy \d+$", "", d["title"])
         for f in d.get("fields") or []:
             if isinstance(f, dict) and str(f.get("label", "")).startswith("File name") and isinstance(f.get("value"), str):
                 f["value"] = re.sub(r"^start \S+( Copy \d+)? - ", "Part Studio 1 - ", f["value"])

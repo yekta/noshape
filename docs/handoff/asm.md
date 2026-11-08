@@ -16,6 +16,18 @@ schema (SCH_900000_9008). asm-xdev-subs' 34 bare files and its v9 text file read
 parts (a7bd858292…, 35719e9b95…, 2ee17582b9…, 4-10 solids each) that OCCT's check flags; please rerun xdev-subs and
 tell me if those three differ from live.
 
+## Latest (2026-11-08 09:3x UTC)
+- ui-parity asm 131/141. The graphics right-click menu opens where live's does (probed in live: top-left 2 px under
+  the pointer's pixel; above it with its bottom 4 px under; the row under the pointer hovered only when the pointer is
+  between pixels, as Chrome hit-tests while reporting whole pixels; the driver notes a target's exact point, the
+  triad's at the last face pick's, an empty spot's at a whole pixel). Input propagation with nothing to propagate shows
+  live's info line (no table) and is recorded; psui recorded Visibility conditions. Left: mate flip (2241 (1)),
+  Align with Z's rotation (REQUESTS 2296), dynamic-suppression toast (2269), Reference manager / Change configuration
+  (live's lane document's names), Switch to Part Studio (start naming), Release… (live's upsell), Create empty
+  subassembly (live's shortcoming).
+- Frames with another studio's profile (psui e1d80331): the translator writes `<tab>#<sketch>.4294967295`, the source
+  studio built first (profile-only studios too): pattern-std 116 → 137/162.
+
 ## Now (2026-11-08 06:14 UTC)
 - Landed b16fb21f: Hide / Show mates with nothing to change is an undo step (live2 2241 (2)), a click on a submenu row
   opens it, ticket FACE-PATTERN-30-CUT-SLOW (core: suspension's one Circular pattern takes ~20 min in OCCT).
