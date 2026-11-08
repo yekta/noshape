@@ -1,16 +1,16 @@
 {
  "scenario": "drw-crop-add-spline-point",
- "recorded": "2026-11-08T04:24:44.768Z",
+ "recorded": "2026-11-08T08:40:06.789Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.2"
  },
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "9b9ccbb98a171a22c4e55a13",
+  "element": "cd4bbae485d7477f222efade",
   "start": "block-drawing",
   "startElement": "392bca590892e6ffb484a34b",
   "runner": "live2 .nstate-uip-3.json"
@@ -168,7 +168,7 @@
      "selection": []
     }
    },
-   "t": 244031
+   "t": 232118
   },
   {
    "step": 2,
@@ -251,98 +251,10 @@
      "selection": []
     }
    },
-   "t": 259061
+   "t": 247452
   },
   {
    "step": 3,
-   "do": {
-    "do": "click",
-    "on": {
-     "button": "Spline"
-    }
-   },
-   "ok": true,
-   "at": [
-    93,
-    123
-   ],
-   "state": {
-    "focus": {
-     "kind": "other",
-     "tag": "iframe"
-    },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Crop view",
-     "text": [
-      "Crop view",
-      "Select closed profile"
-     ]
-    },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [],
-     "rollbackAfter": null
-    },
-    "parts": [],
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": "Crop view",
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
-    }
-   },
-   "t": 274577
-  },
-  {
-   "step": 4,
    "do": {
     "do": "click",
     "on": {
@@ -371,7 +283,7 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile"
+      "Create closed profile"
      ]
     },
     "dialogs": [],
@@ -434,7 +346,102 @@
      "selection": []
     }
    },
-   "t": 292124
+   "t": 264896
+  },
+  {
+   "step": 4,
+   "do": {
+    "do": "click",
+    "on": {
+     "view_point": {
+      "view": "Front",
+      "at": [
+       25,
+       0,
+       2
+      ]
+     }
+    }
+   },
+   "ok": true,
+   "at": [
+    769,
+    650
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Crop view",
+     "text": [
+      "Crop view",
+      "Create closed profile"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Crop view",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 283053
   },
   {
    "step": 5,
@@ -446,101 +453,6 @@
       "at": [
        25,
        0,
-       2
-      ]
-     }
-    }
-   },
-   "ok": true,
-   "at": [
-    769,
-    650
-   ],
-   "state": {
-    "focus": {
-     "kind": "other",
-     "tag": "iframe"
-    },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Crop view",
-     "text": [
-      "Crop view",
-      "Select closed profile"
-     ]
-    },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [],
-     "rollbackAfter": null
-    },
-    "parts": [],
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": "Crop view",
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
-    }
-   },
-   "t": 308420
-  },
-  {
-   "step": 6,
-   "do": {
-    "do": "click",
-    "on": {
-     "view_point": {
-      "view": "Front",
-      "at": [
-       25,
-       0,
        8
       ]
      }
@@ -561,7 +473,7 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile"
+      "Create closed profile"
      ]
     },
     "dialogs": [],
@@ -624,7 +536,102 @@
      "selection": []
     }
    },
-   "t": 325424
+   "t": 298895
+  },
+  {
+   "step": 6,
+   "do": {
+    "do": "click",
+    "on": {
+     "view_point": {
+      "view": "Front",
+      "at": [
+       5,
+       0,
+       8
+      ]
+     }
+    }
+   },
+   "ok": true,
+   "at": [
+    691,
+    626
+   ],
+   "state": {
+    "focus": {
+     "kind": "other",
+     "tag": "iframe"
+    },
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Crop view",
+     "text": [
+      "Crop view",
+      "Create closed profile"
+     ]
+    },
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": null
+    },
+    "parts": [],
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": {
+     "tab": "Part 1 Drawing 1",
+     "sheet": "Sheet1",
+     "sheets": [
+      "Sheet1"
+     ],
+     "tool": "Crop view",
+     "views": [
+      {
+       "name": "Front",
+       "kind": "base",
+       "parent": null,
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Isometric",
+       "kind": "isometric",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Right",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      },
+      {
+       "name": "Top",
+       "kind": "projected",
+       "parent": "Front",
+       "scale": "1:1",
+       "brokenOut": 0
+      }
+     ],
+     "annotations": [],
+     "selection": []
+    }
+   },
+   "t": 316794
   },
   {
    "step": 7,
@@ -636,101 +643,6 @@
       "at": [
        5,
        0,
-       8
-      ]
-     }
-    }
-   },
-   "ok": true,
-   "at": [
-    691,
-    626
-   ],
-   "state": {
-    "focus": {
-     "kind": "other",
-     "tag": "iframe"
-    },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Crop view",
-     "text": [
-      "Crop view",
-      "Select closed profile"
-     ]
-    },
-    "dialogs": [],
-    "panels": null,
-    "list": null,
-    "selection": {
-     "count": 0,
-     "items": []
-    },
-    "features": {
-     "rows": [],
-     "rollbackAfter": null
-    },
-    "parts": [],
-    "undo": {
-     "undo": false,
-     "redo": false
-    },
-    "message": null,
-    "tooltip": null,
-    "sketch": null,
-    "drawing": {
-     "tab": "Part 1 Drawing 1",
-     "sheet": "Sheet1",
-     "sheets": [
-      "Sheet1"
-     ],
-     "tool": "Crop view",
-     "views": [
-      {
-       "name": "Front",
-       "kind": "base",
-       "parent": null,
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Isometric",
-       "kind": "isometric",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Right",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      },
-      {
-       "name": "Top",
-       "kind": "projected",
-       "parent": "Front",
-       "scale": "1:1",
-       "brokenOut": 0
-      }
-     ],
-     "annotations": [],
-     "selection": []
-    }
-   },
-   "t": 342967
-  },
-  {
-   "step": 8,
-   "do": {
-    "do": "click",
-    "on": {
-     "view_point": {
-      "view": "Front",
-      "at": [
-       5,
-       0,
        2
       ]
      }
@@ -751,7 +663,9 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile"
+      "Edit closed profile",
+      "Profile",
+      "×"
      ]
     },
     "dialogs": [],
@@ -811,13 +725,18 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 358738
+   "t": 333677
   },
   {
-   "step": 9,
+   "step": 8,
    "do": {
     "do": "click",
     "on": {
@@ -839,7 +758,9 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile",
+      "Edit closed profile",
+      "Profile",
+      "×",
       "Spline",
       "Spline point"
      ]
@@ -901,21 +822,29 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 373794
+   "t": 349712
   },
   {
-   "step": 10,
+   "step": 9,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Add spline point"
+     "menu": "Spline point"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Add spline point\"}",
+   "ok": true,
+   "at": [
+    119,
+    185
+   ],
    "state": {
     "focus": {
      "kind": "other",
@@ -926,9 +855,9 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile",
-      "Spline",
-      "Spline point"
+      "Edit closed profile",
+      "Profile",
+      "×"
      ]
     },
     "dialogs": [],
@@ -988,13 +917,18 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 389250
+   "t": 366576
   },
   {
-   "step": 11,
+   "step": 10,
    "do": {
     "do": "click",
     "on": {
@@ -1023,7 +957,9 @@
      "title": "Crop view",
      "text": [
       "Crop view",
-      "Select closed profile"
+      "Edit closed profile",
+      "Profile",
+      "×"
      ]
     },
     "dialogs": [],
@@ -1083,13 +1019,18 @@
       }
      ],
      "annotations": [],
-     "selection": []
+     "selection": [
+      {
+       "kind": "EDGE",
+       "owner": "Front"
+      }
+     ]
     }
    },
-   "t": 404901
+   "t": 383004
   },
   {
-   "step": 12,
+   "step": 11,
    "do": {
     "do": "click",
     "on": {
@@ -1106,14 +1047,7 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Crop view",
-     "text": [
-      "Crop view",
-      "Select closed profile"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1139,7 +1073,7 @@
      "sheets": [
       "Sheet1"
      ],
-     "tool": "Crop view",
+     "tool": null,
      "views": [
       {
        "name": "Front",
@@ -1174,10 +1108,10 @@
      "selection": []
     }
    },
-   "t": 420847
+   "t": 400037
   },
   {
-   "step": 13,
+   "step": 12,
    "do": {
     "do": "wait",
     "until": "ms",
@@ -1189,14 +1123,7 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": {
-     "kind": "drawing-panel",
-     "title": "Crop view",
-     "text": [
-      "Crop view",
-      "Select closed profile"
-     ]
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -1222,7 +1149,7 @@
      "sheets": [
       "Sheet1"
      ],
-     "tool": "Crop view",
+     "tool": null,
      "views": [
       {
        "name": "Front",
@@ -1257,10 +1184,10 @@
      "selection": []
     }
    },
-   "t": 436048
+   "t": 416061
   },
   {
-   "step": 14,
+   "step": 13,
    "do": {
     "do": "key",
     "key": "Escape"
@@ -1340,7 +1267,7 @@
      "selection": []
     }
    },
-   "t": 454229
+   "t": 433277
   }
  ]
 }
