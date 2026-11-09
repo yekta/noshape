@@ -243,8 +243,9 @@ impl DrawingEditor {
                 Some(crate::drawing_view::Panel::Cell { table, note: Some(_), .. }) => Some(*table),
                 _ => None,
             };
-            // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one.)
-            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. }) && Some(t.id) != editing) {
+            // (Nor a custom table: live2 drw-custom-table-insert lists none after placing one; nor a cut list,
+            // drw-cut-list-table-properties.)
+            for t in sheet.tables.iter().filter(|t| !matches!(t.kind, TableKind::Hole { .. } | TableKind::Custom { .. } | TableKind::CutList { .. }) && Some(t.id) != editing) {
                 let parts: Vec<&str> = b.geometry.texts.iter().filter(|x| matches!(b.picks.get(x.pick as usize), Some(PickTarget::Table(id)) if *id == t.id)).map(|x| x.text.as_str()).collect();
                 annotations.push(("table", parts.join(" ").split_whitespace().collect::<Vec<_>>().join(" ")));
             }

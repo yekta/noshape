@@ -470,12 +470,18 @@ impl DrawingEditor {
         let key_of = |v: ViewId| views::view_source(self.current_sheet(), v).map(|(k, _)| k);
         let source_label = match &d.bom_source {
             _ if d.bom_data.is_some() => "BOM data".to_string(),
-            // A picked composite: its Part Studio, on the Insert row's ▾ (live 2299).
+            // A picked composite: its Part Studio and its name, on the Insert row's ▾ (live 2299; live2
+            // drw-cut-list-table-properties: "Part Studio 1 Composite part 1").
             _ if !bom && d.cut_source.is_some() => d
                 .cut_source
                 .as_ref()
-                .and_then(|c| self.sources.get(&SourceKey { version: c.version.clone(), ..SourceKey::studio(c.tab) }).map(|s| s.name.clone()).or_else(|| self.doc.read(cx).session.doc.tab(c.tab).map(|t| t.name.clone())))
+                .and_then(|c| {
+                    let studio = self.sources.get(&SourceKey { version: c.version.clone(), ..SourceKey::studio(c.tab) }).map(|s| s.name.clone()).or_else(|| self.doc.read(cx).session.doc.tab(c.tab).map(|t| t.name.clone()))?;
+                    Some(format!("{studio} {}", c.label))
+                })
                 .unwrap_or_default(),
+            // (A cut list's Insert row is empty until a composite part is picked: live2 drw-cut-list-table-properties.)
+            _ if !bom => String::new(),
             Some(s) => s.label.clone(),
             None => sources.iter().find(|s| Some(s.0) == d.view || (d.view.is_some() && key_of(s.0) == d.view.and_then(key_of))).map(|s| s.1.clone()).unwrap_or_default(),
         };

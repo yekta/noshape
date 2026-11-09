@@ -593,16 +593,21 @@ def compare(live, ours, whole_document=True):
         for side in (a, b):
             d = side.get("dialog")
             if isinstance(d, dict) and d.get("kind") == "drawing-panel":
-                d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d.get("text") or []]
+                # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own. (First:
+                # the names below are matched with spaces, "BOM\u00a0:\u00a0start\u00a0pin-block\u00a0asm", live2
+                # drw-bom-table-properties.)
+                d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d.get("text") or []]
+                d["text"] = [re.sub(r"\bstart \S+ asm( Copy \d+)?\b", "start asm", t) if isinstance(t, str) else t for t in d["text"]]
                 # Live's start studio is named after its start document ("start block Copy 1", live2 drw-custom-table-*).
-                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]]
-                # Live's DOM text keeps its no-break spaces ("Part\u00a01"); a document's name is each side's own.
-                d["text"] = [t.replace("\u00a0", " ") if isinstance(t, str) else t for t in d["text"]][:30]
+                d["text"] = [re.sub(r"^start [\w-]+( Copy \d+)?$", "Part Studio 1", t) if isinstance(t, str) else t for t in d["text"]][:30]
                 if d.get("title") in ("View properties", "BOM table properties", "Cut list table properties", "Custom table properties", "Image properties") and len(d["text"]) > 2 and d["text"][1] in ("Document", "Document:"):
                     d["text"][2] = "<document>"
             dr = side.get("drawing")
             if isinstance(dr, dict) and isinstance(dr.get("tab"), str):
                 dr["tab"] = re.sub(r"^start \S+ asm( Copy \d+)? ", "start asm ", dr["tab"])
+                # A drawing of live's start studio is named after it, as its dialogs' texts above ("start frame-drawing
+                # Copy 1 Drawing 1", live2 drw-cut-list-table-properties).
+                dr["tab"] = re.sub(r"^start (?!asm )[\w-]+( Copy \d+)? ", "Part Studio 1 ", dr["tab"])
                 # A tab name live's lane document already had gets " (1)" (live2 drw-detail-view).
                 dr["tab"] = re.sub(r" \(\d+\)$", "", dr["tab"])
         # Live's recorder can't read a table's cells (its text is null there).
