@@ -1,11 +1,11 @@
 {
  "scenario": "docs-trash-restore",
- "recorded": "2026-11-08T06:35:59.863Z",
+ "recorded": "2026-11-09T13:07:19.904Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 29238546"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "documents"
@@ -49,7 +49,7 @@
    "ok": true,
    "at": [
     407,
-    667
+    802
    ],
    "state": {
     "focus": {
@@ -96,7 +96,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 3718
+   "t": 3348
   },
   {
    "step": 2,
@@ -109,7 +109,7 @@
    "ok": true,
    "at": [
     494,
-    905
+    790
    ],
    "state": {
     "focus": {
@@ -148,7 +148,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 5971
+   "t": 5540
   },
   {
    "step": 3,
@@ -191,7 +191,7 @@
     },
     "url": "/documents?resourceType=resourceuserowner&nodeId=6ad49ec58b4a0a5a73d38e52"
    },
-   "t": 8305
+   "t": 7799
   },
   {
    "step": 4,
@@ -233,7 +233,7 @@
     },
     "url": "/documents?nodeId=4&resourceType=filter"
    },
-   "t": 10529
+   "t": 10082
   },
   {
    "step": 5,
@@ -246,7 +246,7 @@
    "ok": true,
    "at": [
     407,
-    344
+    608
    ],
    "state": {
     "focus": {
@@ -285,7 +285,7 @@
     },
     "url": "/documents?nodeId=4&resourceType=filter"
    },
-   "t": 13838
+   "t": 14004
   },
   {
    "step": 6,
@@ -298,7 +298,7 @@
    "ok": true,
    "at": [
     471,
-    381
+    645
    ],
    "state": {
     "focus": {
@@ -314,7 +314,7 @@
     "parts": [],
     "undo": null,
     "message": "uip Plate has been restored. × Close",
-    "tooltip": "This document is in the trash and cannot be opened.",
+    "tooltip": null,
     "sketch": null,
     "drawing": null,
     "document": null,
@@ -328,8 +328,8 @@
     },
     "url": "/documents?nodeId=4&resourceType=filter"
    },
-   "t": 16615
+   "t": 16275
   }
  ],
- "tabsOpened": 14
+ "tabsOpened": 12
 }
