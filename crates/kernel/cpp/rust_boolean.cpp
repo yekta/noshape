@@ -2878,11 +2878,28 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
   if (trace)
     for (const Job& j : jobs)
     {
-      const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(j.fa), sb = BRep_Tool::Surface(j.fb);
-      const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(!occ::down_cast<Geom_CylindricalSurface>(sa).IsNull() ? sa : sb);
-      const occ::handle<Geom_ToroidalSurface>    to = occ::down_cast<Geom_ToroidalSurface>(!occ::down_cast<Geom_ToroidalSurface>(sa).IsNull() ? sa : sb);
-      if (cy.IsNull() || to.IsNull() || j.ms < 2.0)
+      const GeomAdaptor_Surface ga(BRep_Tool::Surface(j.fa)), gb(BRep_Tool::Surface(j.fb));
+      const bool a_cyl = ga.GetType() == GeomAbs_Cylinder && gb.GetType() == GeomAbs_Torus;
+      const bool b_cyl = gb.GetType() == GeomAbs_Cylinder && ga.GetType() == GeomAbs_Torus;
+      if (!(a_cyl || b_cyl) || j.ms < 2.0)
         continue;
+      const gp_Cylinder cyl = (a_cyl ? ga : gb).Cylinder();
+      const gp_Torus    tor = (a_cyl ? gb : ga).Torus();
+      struct
+      {
+        double r;
+        gp_Ax3 p;
+        double Radius() const { return r; }
+        gp_Ax3 Position() const { return p; }
+      } cy0{cyl.Radius(), cyl.Position()}, *cy = &cy0;
+      struct
+      {
+        double R, r;
+        gp_Ax3 p;
+        double MajorRadius() const { return R; }
+        double MinorRadius() const { return r; }
+        gp_Ax3 Position() const { return p; }
+      } to0{tor.MajorRadius(), tor.MinorRadius(), tor.Position()}, *to = &to0;
       const gp_Ax3 ca = cy->Position(), ta = to->Position();
       double u0, u1, v0, v1, p0, p1, q0, q1;
       BRepTools::UVBounds(j.fa, u0, u1, v0, v1);
@@ -2891,7 +2908,7 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
         j.key[0], j.key[1], j.key[2], j.key[3], j.ms, j.lines.size(),
         ca.Location().X(), ca.Location().Y(), ca.Location().Z(), ca.Direction().X(), ca.Direction().Y(), ca.Direction().Z(), ca.XDirection().X(), ca.XDirection().Y(), ca.XDirection().Z(), cy->Radius(),
         ta.Location().X(), ta.Location().Y(), ta.Location().Z(), ta.Direction().X(), ta.Direction().Y(), ta.Direction().Z(), ta.XDirection().X(), ta.XDirection().Y(), ta.XDirection().Z(), to->MajorRadius(), to->MinorRadius(),
-        cy == occ::down_cast<Geom_CylindricalSurface>(sa) ? "cyl" : "tor", u0, u1, v0, v1, p0, p1, q0, q1, ca.Direction().Angle(ta.Direction()));
+        a_cyl ? "cyl" : "tor", u0, u1, v0, v1, p0, p1, q0, q1, ca.Direction().Angle(ta.Direction()));
       for (const IntTools_Curve& ic : j.lines)
       {
         const occ::handle<Geom_Curve> c = ic.Curve();
