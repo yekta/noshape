@@ -66,7 +66,12 @@ What blend takes over:
   axes, as live's part vertices (ui 10-25 d): 129/382/255, live 131/387/258, volume / area / parts now as live.
   Suite (suite-mc*.log, same build): only cf-surface-pattern changes; no assembly studio has a connector on a sketch
   vertex (scan: core-scratch /tmp/core-mcscan.py); model 422, model-core 105, ops mate 17 pass; T1 features_b::
-  mate_connector_on_a_sketch_vertex_is_world_aligned. Landing. Next: the 2 faces / 5 edges / 3 vertices left.
+  mate_connector_on_a_sketch_vertex_is_world_aligned. Queued 57f3d800.
+- What's left (faces after SP3, /root/core-scratch/sp/sp-faces.json vs live.jsonl index 36 bodies): total area
+  44,150.7 vs 44,144.8 mm²; most dents' areas ~1 % off (positions slightly off; live's boxes are loose, can't say
+  how); live has 125 small faces (<30 mm boxes) for our 85 dents, and two 0.005 / 0.006 mm² slivers we lack.
+  Asked live (REQUESTS 2419): evFaceTangentPlane on JPC at six parameters, its surface definition, and how many grid
+  points pass qContainsPoint. Ours: 85 stamps.
 - Queue (lead 09:xx): (1) the spring: live 2411 answered (behaviours "core (2411)"): a union joins truly coincident
   rounds (synthetic: one edge 0..40); the spring keeps a tolerant vertex because Part 1's and Part 2's rounds are
   0-6.33 µm apart: find why ours joins curves 6 µm apart (unify / fuse tolerance), under bool's gate. (2) After the
