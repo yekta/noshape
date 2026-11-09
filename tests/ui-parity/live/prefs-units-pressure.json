@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-units-pressure",
- "recorded": "2026-11-08T03:25:06.780Z",
+ "recorded": "2026-11-09T06:53:32.962Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "preferences"
@@ -308,7 +308,9 @@
     {
      "label": "Material libraries › Libraries",
      "kind": "list",
-     "value": []
+     "value": [
+      "Onshape Material Library"
+     ]
     },
     {
      "label": "Material libraries › Add material library…",
@@ -647,7 +649,9 @@
       {
        "label": "Material libraries › Libraries",
        "kind": "list",
-       "value": []
+       "value": [
+        "Onshape Material Library"
+       ]
       },
       {
        "label": "Material libraries › Add material library…",
@@ -673,7 +677,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 7944
+   "t": 2374
   },
   {
    "step": 2,
@@ -986,7 +990,9 @@
       {
        "label": "Material libraries › Libraries",
        "kind": "list",
-       "value": []
+       "value": [
+        "Onshape Material Library"
+       ]
       },
       {
        "label": "Material libraries › Add material library…",
@@ -1012,8 +1018,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 10941
+   "t": 4730
   }
  ],
- "tabsOpened": 14
+ "tabsOpened": 7
 }

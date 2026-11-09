@@ -1,19 +1,19 @@
 {
  "scenario": "doc-tab-menu-export",
- "recorded": "2026-11-09T00:01:43.453Z",
+ "recorded": "2026-11-09T07:23:14.671Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "0b618ab9fce66b9e840241e7",
-  "workspace": "45bdee620049fdaf34558107",
-  "element": "71a7791ea1b86edf81c74cc8",
+  "document": "9381901d48fc707dd1e71988",
+  "workspace": "ff6872e15ab94a5bbacf888b",
+  "element": "5a22d4fe34aa3ca6e91dbb7d",
   "start": "doc-tabs",
-  "startElement": "71a7791ea1b86edf81c74cc8",
-  "runner": "live2 "
+  "startElement": "5a22d4fe34aa3ca6e91dbb7d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 60242
+   "t": 52628
   },
   {
    "step": 2,
@@ -328,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 62817
+   "t": 68559
   },
   {
    "step": 3,
@@ -353,7 +353,7 @@
      "title": "Export",
      "fields": [
       {
-       "label": "Export",
+       "label": "File name",
        "kind": "input",
        "value": "Part Studio 1"
       },
@@ -370,12 +370,12 @@
       {
        "label": "Version",
        "kind": "select",
-       "value": "25.0"
+       "value": "38.1"
       },
       {
        "label": "Use latest version",
        "kind": "checkbox",
-       "value": false
+       "value": true
       },
       {
        "label": "Options",
@@ -485,7 +485,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 65217
+   "t": 84501
   },
   {
    "step": 4,
@@ -591,7 +591,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70171
+   "t": 91878
   }
  ]
 }

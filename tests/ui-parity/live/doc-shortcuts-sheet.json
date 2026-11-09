@@ -1,19 +1,19 @@
 {
  "scenario": "doc-shortcuts-sheet",
- "recorded": "2026-11-08T04:04:01.181Z",
+ "recorded": "2026-11-09T06:56:37.612Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "a065721fe3c2162b633a98a8",
-  "workspace": "b744007ffe12f7bf3df6bf51",
-  "element": "7a6a82b82ce31a97761e95ea",
+  "document": "ce3d59f7f060a8a3d362a4f5",
+  "workspace": "a114ef0f41b3f5e4cdd6c766",
+  "element": "6af692c12fa791d5a57a4b8d",
   "start": "doc-tabs",
-  "startElement": "7a6a82b82ce31a97761e95ea",
-  "runner": "live2 "
+  "startElement": "6af692c12fa791d5a57a4b8d",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -121,9 +121,22 @@
    },
    "state": {
     "focus": {
-     "kind": "none"
+     "kind": "other",
+     "tag": "div"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "modal",
+     "title": "",
+     "fields": [
+      {
+       "label": "Keyboard shortcutsCustomize keyboard shortcuts",
+       "kind": "input",
+       "value": ""
+      }
+     ],
+     "buttons": [],
+     "text": "Keyboard shortcutsCustomize keyboard shortcuts General Part Studio Assembly 3D view Sketch Feature Studio Drawing shift enter Accept & repeat command enter Accept command escape Cancel space Clear selection ctrl/cmd c Copy shift c Curve/surface analysis delete / backspace Delete selection shift d Dihedral analysis ctrl/cmd shift f FeatureScript search ctrl u Feedback/Report a bug a Flip primary axis k Hide/show mate connectors shift / Keyboard shortcuts shift Lock mate inference ctrl m Mate conn"
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -210,7 +223,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 124129
+   "t": 51805
   },
   {
    "step": 2,
@@ -315,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 127670
+   "t": 59856
   }
  ]
 }

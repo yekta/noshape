@@ -1,19 +1,19 @@
 {
  "scenario": "doc-plus-menu",
- "recorded": "2026-11-08T04:00:51.716Z",
+ "recorded": "2026-11-09T07:06:02.564Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "e6f764c536ba6096f0ded62e",
-  "workspace": "a8546386659f533d0021ac26",
-  "element": "95491d039742a807891fddff",
+  "document": "f1be1f225b48370d809ebc1a",
+  "workspace": "4418bf2cecc07ee52ed9b1eb",
+  "element": "9c5534b7e7927d4ea6025ef8",
   "start": "doc-tabs",
-  "startElement": "95491d039742a807891fddff",
-  "runner": "live2 "
+  "startElement": "9c5534b7e7927d4ea6025ef8",
+  "runner": "live2 .nstate-uip-2.json"
  },
  "start": {
   "focus": {
@@ -127,7 +127,26 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Applications",
+      "Create Material Library",
+      "Create Feature Studio",
+      "Create CAM Studio",
+      "Create PCB Studio",
+      "Create Render Studio",
+      "Create Part Studio",
+      "Create Assembly",
+      "Create Variable Studio",
+      "Create Drawing…",
+      "Create folder",
+      "Import…",
+      "Paste tab"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -211,7 +230,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 145932
+   "t": 52880
   },
   {
    "step": 2,
@@ -235,7 +254,26 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": null,
+    "list": {
+     "kind": "menu",
+     "rows": [
+      "Applications",
+      "Create Material Library",
+      "Create Feature Studio",
+      "Create CAM Studio",
+      "Create PCB Studio",
+      "Create Render Studio",
+      "Create Part Studio",
+      "Create Assembly",
+      "Create Variable Studio",
+      "Create Drawing…",
+      "Create folder",
+      "Import…",
+      "Paste tab"
+     ],
+     "highlighted": null,
+     "disabled": []
+    },
     "selection": {
      "count": 0,
      "items": []
@@ -319,7 +357,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 150198
+   "t": 70428
   }
  ]
 }

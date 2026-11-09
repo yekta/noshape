@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-language-save",
- "recorded": "2026-11-08T08:12:24.886Z",
+ "recorded": "2026-11-09T07:00:13.978Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 29238546"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "preferences"
@@ -677,7 +677,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 2341
+   "t": 2294
   },
   {
    "step": 2,
@@ -988,14 +988,21 @@
        "value": false
       },
       {
-       "label": "Material-Bibliotheken › Entfernen",
-       "kind": "button",
-       "value": true
+       "label": "Material-Bibliotheken › Libraries",
+       "kind": "list",
+       "value": [
+        "Onshape Material Library"
+       ]
       },
       {
        "label": "Material-Bibliotheken › Material-Bibliothek hinzufügen …",
        "kind": "button",
        "value": true
+      },
+      {
+       "label": "Benutzer-Exportregeln › Rules",
+       "kind": "list",
+       "value": []
       },
       {
        "label": "Benutzer-Exportregeln › Exportregel hinzufügen …",
@@ -1011,8 +1018,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 4713
+   "t": 4528
   }
  ],
- "tabsOpened": 15
+ "tabsOpened": 7
 }

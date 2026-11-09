@@ -1,11 +1,11 @@
 {
  "scenario": "prefs-export-rule-blank",
- "recorded": "2026-11-08T02:16:13.051Z",
+ "recorded": "2026-11-09T06:55:05.160Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 e35e115e"
+  "recorder": "2026-11-08.5 3dedc795"
  },
  "live": {
   "page": "preferences"
@@ -372,14 +372,14 @@
       {
        "label": "Convention",
        "kind": "input",
-       "value": ""
+       "value": "${name}"
       }
      ],
      "buttons": [
       "Add",
       "Cancel"
      ],
-     "text": "Scope Part Assembly Drawing Part Studio File Format All file formats PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL DXF DWG Convention 249 characters remaining"
+     "text": "Scope Part Assembly Drawing Part Studio File Format All file formats PARASOLID ACIS STEP IGES PVZ JT RHINO GLTF GLB OBJ 3MF STL DXF DWG Convention ${name} 249 characters remaining"
     },
     "dialogs": [],
     "panels": null,
@@ -702,7 +702,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 3503
+   "t": 2338
   },
   {
    "step": 2,
@@ -1063,7 +1063,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 5391
+   "t": 4304
   },
   {
    "step": 3,
@@ -1424,7 +1424,7 @@
     },
     "url": "/user/settings"
    },
-   "t": 7277
+   "t": 6194
   },
   {
    "step": 4,
@@ -1766,8 +1766,8 @@
     },
     "url": "/user/settings"
    },
-   "t": 9500
+   "t": 8439
   }
  ],
- "tabsOpened": 12
+ "tabsOpened": 7
 }
