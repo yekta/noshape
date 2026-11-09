@@ -1,0 +1,184 @@
+--- a/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_Inter.pxx
++++ b/src/ModelingAlgorithms/TKGeomAlgo/IntCurveSurface/IntCurveSurface_Inter.pxx
+@@ -43,9 +43,78 @@
+ 
+ #include "IntCurveSurface_InterUtils.pxx"
+ 
++#include <algorithm>
++#include <cmath>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <type_traits>
++#include <vector>
++
+ namespace IntCurveSurface_InterImpl
+ {
+ 
++// noshape: a face's polyhedron (its sampled surface, one per span of it) kept for the next curve against the same
++// surface and bounds: Boolean and defeaturing runs intersect every edge with every face, each call sampling the face's
++// spans again (c2-impeller-loft's Delete face 2: 503 polyhedra made 6,381 times). Keyed by what the polyhedron is
++// made from: the surface's kind, the bounds, the sample counts and its points on a 4 x 4 grid (in space: a moved copy
++// is another surface).
++template <typename SurfaceType, typename SurfaceTool>
++std::vector<double> PolyhedronKey(const SurfaceType& theSurface,
++                                  const int          theKind,
++                                  const double       theU1,
++                                  const double       theV1,
++                                  const double       theU2,
++                                  const double       theV2,
++                                  const int          theNbU,
++                                  const int          theNbV)
++{
++  std::vector<double> aKey{double(SurfaceTool::GetType(theSurface)), double(theKind), theU1, theV1, theU2, theV2, double(theNbU), double(theNbV)};
++  for (int i = 0; i <= 3; ++i)
++  {
++    for (int j = 0; j <= 3; ++j)
++    {
++      const gp_Pnt aP = SurfaceTool::Value(theSurface, theU1 + (theU2 - theU1) * (0.1 + 0.8 * i / 3.0), theV1 + (theV2 - theV1) * (0.1 + 0.8 * j / 3.0));
++      // (To 1e-11: two adaptors of one surface can differ in the last bits, their span caches apart.)
++      aKey.push_back(std::round(aP.X() * 1e11));
++      aKey.push_back(std::round(aP.Y() * 1e11));
++      aKey.push_back(std::round(aP.Z() * 1e11));
++    }
++  }
++  return aKey;
++}
++
++template <typename PolyhedronType, typename MakeFunc>
++std::shared_ptr<const PolyhedronType> CachedPolyhedron(std::vector<double>&& theKey, MakeFunc theMake)
++{
++  // (One for all threads (the pave filler's pairs on the pool each meet most of a part's faces), built outside the
++  // lock; emptied past 300k sample points.)
++  static std::mutex                                                          aMutex;
++  static std::map<std::vector<double>, std::shared_ptr<const PolyhedronType>> aCache;
++  static size_t                                                              aPoints = 0;
++  {
++    std::lock_guard<std::mutex> aLock(aMutex);
++    const auto                  anIt = aCache.find(theKey);
++    if (anIt != aCache.end())
++    {
++      return anIt->second;
++    }
++  }
++  std::shared_ptr<const PolyhedronType> aPoly(theMake());
++  std::lock_guard<std::mutex>           aLock(aMutex);
++  if (aPoints > 300000)
++  {
++    aCache.clear();
++    aPoints = 0;
++  }
++  const auto anIns = aCache.emplace(std::move(theKey), aPoly);
++  if (anIns.second)
++  {
++    aPoints += static_cast<size_t>(std::max(aPoly->NbPoints(), 0));
++  }
++  return anIns.first->second;
++}
++
+ constexpr double THE_TOLTANGENCY         = 0.00000001;
+ constexpr double THE_TOLERANCE_ANGULAIRE = 1.e-12;
+ constexpr double THE_TOLERANCE           = 0.00000001;
+@@ -474,39 +543,48 @@
+       {
+         nbsv = 40;
+       }
+-      PolyhedronType polyhedron(theSurface, nbsu, nbsv, theU1, theV1, theU2, theV2);
+-      theInternalPerformPoly(theCurve,
+-                             thePolygon,
+-                             theSurface,
+-                             polyhedron,
+-                             theU1,
+-                             theV1,
+-                             theU2,
+-                             theV2);
++      auto aMake = [&]() { return new PolyhedronType(theSurface, nbsu, nbsv, theU1, theV1, theU2, theV2); };
++      if constexpr (std::is_same_v<SurfaceType, occ::handle<Adaptor3d_Surface>>)
++      {
++        const std::shared_ptr<const PolyhedronType> polyhedron = CachedPolyhedron<PolyhedronType>(
++          PolyhedronKey<SurfaceType, SurfaceTool>(theSurface, 0, theU1, theV1, theU2, theV2, nbsu, nbsv),
++          aMake);
++        theInternalPerformPoly(theCurve, thePolygon, theSurface, *polyhedron, theU1, theV1, theU2, theV2);
++      }
++      else
++      {
++        const std::unique_ptr<PolyhedronType> polyhedron(aMake());
++        theInternalPerformPoly(theCurve, thePolygon, theSurface, *polyhedron, theU1, theV1, theU2, theV2);
++      }
+     }
+     else
+     {
+-      occ::handle<Adaptor3d_Surface> aS = SurfaceTool::UTrim(theSurface, theU1, theU2, 1.e-9);
+-      aS                                = aS->VTrim(theV1, theV2, 1.e-9);
+-      occ::handle<Adaptor3d_TopolTool> aTopTool = new Adaptor3d_TopolTool(aS);
+-      double                           defl     = 0.1;
+-      aTopTool->SamplePnts(defl, 10, 10);
+-
+-      int                        nbpu = aTopTool->NbSamplesU();
+-      int                        nbpv = aTopTool->NbSamplesV();
+-      NCollection_Array1<double> Upars(1, nbpu), Vpars(1, nbpv);
+-      aTopTool->UParameters(Upars);
+-      aTopTool->VParameters(Vpars);
+-
+-      PolyhedronType polyhedron(theSurface, Upars, Vpars);
+-      theInternalPerformPoly(theCurve,
+-                             thePolygon,
+-                             theSurface,
+-                             polyhedron,
+-                             theU1,
+-                             theV1,
+-                             theU2,
+-                             theV2);
++      auto aMake = [&]() {
++        occ::handle<Adaptor3d_Surface> aS = SurfaceTool::UTrim(theSurface, theU1, theU2, 1.e-9);
++        aS                                = aS->VTrim(theV1, theV2, 1.e-9);
++        occ::handle<Adaptor3d_TopolTool> aTopTool = new Adaptor3d_TopolTool(aS);
++        double                           defl     = 0.1;
++        aTopTool->SamplePnts(defl, 10, 10);
++
++        int                        nbpu = aTopTool->NbSamplesU();
++        int                        nbpv = aTopTool->NbSamplesV();
++        NCollection_Array1<double> Upars(1, nbpu), Vpars(1, nbpv);
++        aTopTool->UParameters(Upars);
++        aTopTool->VParameters(Vpars);
++        return new PolyhedronType(theSurface, Upars, Vpars);
++      };
++      if constexpr (std::is_same_v<SurfaceType, occ::handle<Adaptor3d_Surface>>)
++      {
++        const std::shared_ptr<const PolyhedronType> polyhedron = CachedPolyhedron<PolyhedronType>(
++          PolyhedronKey<SurfaceType, SurfaceTool>(theSurface, 1, theU1, theV1, theU2, theV2, 0, 0),
++          aMake);
++        theInternalPerformPoly(theCurve, thePolygon, theSurface, *polyhedron, theU1, theV1, theU2, theV2);
++      }
++      else
++      {
++        const std::unique_ptr<PolyhedronType> polyhedron(aMake());
++        theInternalPerformPoly(theCurve, thePolygon, theSurface, *polyhedron, theU1, theV1, theU2, theV2);
++      }
+     }
+   }
+   else
+@@ -687,9 +765,20 @@
+       nbsv = 20;
+     }
+ 
+-    PolyhedronType polyhedron(theSurface, nbsu, nbsv, U1new, V1new, U2new, V2new);
+-    Intf_Tool      bndTool;
+-    Bnd_Box        boxLine;
++    // (noshape: kept, as InternalPerformPolygonBounds' (straight edges against a free-form face).)
++    auto aMake = [&]() { return new PolyhedronType(theSurface, nbsu, nbsv, U1new, V1new, U2new, V2new); };
++    std::shared_ptr<const PolyhedronType> aPoly;
++    if constexpr (std::is_same_v<SurfaceType, occ::handle<Adaptor3d_Surface>>)
++    {
++      aPoly = CachedPolyhedron<PolyhedronType>(PolyhedronKey<SurfaceType, SurfaceTool>(theSurface, 2, U1new, V1new, U2new, V2new, nbsu, nbsv), aMake);
++    }
++    else
++    {
++      aPoly.reset(aMake());
++    }
++    const PolyhedronType& polyhedron = *aPoly;
++    Intf_Tool             bndTool;
++    Bnd_Box               boxLine;
+     bndTool.LinBox(theLine, polyhedron.Bounding(), boxLine);
+ 
+     for (int nbseg = 1; nbseg <= bndTool.NbSegments(); nbseg++)

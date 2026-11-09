@@ -3,6 +3,26 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## OCCT patch 0027: a face's polyhedron kept (11-09 10:25 UTC; lead: the impeller's Delete face 2 first)
+- IntCurveSurface (TKGeomAlgo, IntCurveSurface_Inter.pxx): the edge / face intersection sampled the face into a
+  polyhedron on every call, per span of the face and again per C2 span of the edge (Delete face 2's input: 503
+  polyhedra made 6,381 times). Now kept in one cache for all threads (a mutex-guarded map, emptied past 300k sample
+  points), keyed by the surface's kind, the bounds, the sample counts and the surface at 4 x 4 points rounded to
+  1e-11 (two adaptors of one surface differ in the last bits). Both paths: InternalPerformPolygonBounds (B-spline and
+  other free-form) and PerformConicSurfLine (a straight edge). Only for IntCurveSurface_HInter (HLRBRep's instance
+  unchanged in behaviour). First tries kept per thread (8, then 64 entries) or keyed exactly: no hits on the
+  pool.
+- Dumped inputs (core's, vibe4 ~/agents/bool-cases/defeature-{21,7}; scratch probe in bool-c, kernel tests
+  xprobe::probe_defeature_dump), loaded vibe4: Delete face 2's defeaturing 9.9 -> 3.9-4.8 s, Delete face 1's 9.4 ->
+  3.5-3.8 s; the results identical (faces, edges, volume to the last digit). What is left there is OCCT's own face /
+  face and edge / face walking (IntPatch), no polyhedra.
+- Model suite on it (OCCT_ROOT=prefix27h): every document's line as before (75/87, 764/951), kernel tests 350/350;
+  c2-impeller-loft 41.1 -> 21.6 s, c2-sm-louver 5.9 -> 5.1, c2-rings-loft 5.4 -> 4.8, cf-fill-pattern 4.2 -> 3.8,
+  c2-sm-corner-break 3.5 -> 3.2, cf-surface-pattern 4.7 -> 4.4 s, nothing slower past 0.1 s.
+- Build: my OCCT tree vibe4 ~/agents/bool-occt (scripts/build-occt.sh, gcc-15 x86-64, patches 0001-0026 in prefix,
+  0027 in prefix27h); libs for /root/occt and /opt/occt: /root/bool-scratch/occt/libTKGeomAlgo.a.0027 and
+  libTKHLR.a.0027 (the lead syncs them).
+
 ## From core (2026-11-09 08:25 UTC, lead: speed; Boolean work to bool): c2-impeller-loft's Delete face 2 is the pave filler's edge-face pairs
 Delete face 2 (4.8 s, live 12 ms) is one BRepAlgoAPI_Defeaturing (8 of 34 faces with the fillets, serial). Alone on
 its dumped input (vibe5 ~/core-cases/dump/defeature-21.brep + .txt, NOSHAPE_DUMP_OPS; probe `probe_defeature_dump` in
