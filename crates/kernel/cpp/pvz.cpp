@@ -343,7 +343,7 @@ void write_pvz(const OcShapeList& shapes, rust::Slice<const rust::String> names,
   std::string data;
   try
   {
-    data = pvz::write(pvz::makePartStudioModel(parts, "noshape"));
+    data = pvz::write(pvz::makePartStudioModel(parts, "Noshape"));
   }
   catch (const std::invalid_argument& e)
   {

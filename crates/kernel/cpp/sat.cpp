@@ -462,7 +462,7 @@ void write_acis(const OcShapeList& shapes, rust::Str path)
     require_non_null(shapes.items[i], "shape");
     sat.body(exchange_prepared(shapes.items[i], false), bodies[i]);
   }
-  const std::string product = "noshape", version = "ACIS 7.0 NT", date = ctime_now();
+  const std::string product = "Noshape", version = "ACIS 7.0 NT", date = ctime_now();
   std::string       out = "700 0 " + std::to_string(bodies.size()) + " 0\n";
   out += "@" + std::to_string(product.size()) + " " + product + " @" + std::to_string(version.size()) + " " + version + " @" + std::to_string(date.size()) + " " + date + "\n";
   out += "1 9.9999999999999995e-07 1e-10\n";

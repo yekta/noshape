@@ -471,7 +471,7 @@ pub fn write_iges_parts(path: &Path, parts: &[ExportShape], unit: LengthUnit) ->
     let v = parts.iter().map(|p| scaled(&p.shape, f)).collect::<Result<Vec<_>>>()?;
     let l = vec_to_list(&v);
     let (names, colours) = names_colours(parts);
-    ck(ffi::write_iges(&l, &names, &colours, path_str(path)?, "NOSHAPE", crate::VERSION))
+    ck(ffi::write_iges(&l, &names, &colours, path_str(path)?, "Noshape", crate::VERSION))
 }
 
 /// The Parasolid versions the Export dialog offers, newest first (Onshape's
@@ -501,7 +501,7 @@ pub fn write_iges_assembly(path: &Path, parts: &[ExportShape], instances: &[Step
             (0..3).flat_map(move |r| [m.x_axis[r], m.y_axis[r], m.z_axis[r], m.w_axis[r] * f])
         })
         .collect();
-    ck(ffi::write_iges_assembly(&l, &names, &colours, &part, &tf, path_str(path)?, "NOSHAPE", crate::VERSION))
+    ck(ffi::write_iges_assembly(&l, &names, &colours, &part, &tf, path_str(path)?, "Noshape", crate::VERSION))
 }
 
 /// Write an assembly as a Parasolid text file the way Onshape exports an

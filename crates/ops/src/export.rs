@@ -783,7 +783,7 @@ fn gltf(meshes: &[(String, k::Tessellation, [f32; 4])], binary: bool) -> Vec<u8>
         buffer["uri"] = serde_json::Value::String(format!("data:application/octet-stream;base64,{}", base64(&buf)));
     }
     let doc = serde_json::json!({
-        "asset": {"version": "2.0", "generator": "noshape"},
+        "asset": {"version": "2.0", "generator": "Noshape"},
         "scene": 0,
         "scenes": [{"nodes": (0..nodes.len()).collect::<Vec<_>>()}],
         "nodes": nodes,
