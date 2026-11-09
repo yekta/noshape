@@ -516,6 +516,9 @@ pub struct RefDoc {
     pub path: std::path::PathBuf,
     /// The document thumbnail (66x40 in the row, live 111).
     pub thumbnail: Option<std::sync::Arc<RenderImage>>,
+    /// A newer version is there (the "Newer versions available for n documents" count): not this document's own
+    /// row (Change to version…), nor one just updated (it stays listed, live ver-linked-selective-update).
+    pub newer: bool,
 }
 
 /// The open Reference manager: tab (0 Update to latest, 1 Selective
@@ -548,7 +551,7 @@ impl AssemblyView {
             }
             if !versions.is_empty() {
                 let thumbnail = dm.session.store.get_meta("thumbnail").ok().flatten().as_deref().and_then(crate::library::decode_thumbnail);
-                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail });
+                out.push(RefDoc { name: dm.name(), current: dm.session.store.branch(dm.session.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into()), versions, keys: Vec::new(), path: dm.session.path.clone(), thumbnail, newer: false });
             }
         }
         // Other documents (and this one pinned to a version).
@@ -573,7 +576,7 @@ impl AssemblyView {
             }
             let current = versions.iter().find(|v| v.microversion == mv).map(|v| v.label.clone()).unwrap_or_else(|| format!("state {}", mv.short()));
             let thumbnail = crate::assembly_hooks::file_thumbnail(&path);
-            out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail });
+            out.push(RefDoc { name: info.name, current, versions, keys, path, thumbnail, newer: true });
         }
         out
     }
@@ -586,7 +589,7 @@ impl AssemblyView {
         let docs = self.referenced_docs(scope.as_deref(), cx);
         // Change to version… on this document's own parts opens on Selective update (live asm-menu-change-to-version);
         // with a newer version of a linked document, on Update to latest (live 604–607).
-        let tab = u8::from(scope.is_some() && docs.iter().all(|d| d.keys.is_empty()));
+        let tab = u8::from(scope.is_some() && docs.iter().all(|d| !d.newer));
         self.ui.ref_manager = Some(RefManager { scope, tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
         cx.notify();
     }
@@ -621,13 +624,33 @@ impl AssemblyView {
     /// lists what is still out of date (live 606–607).
     fn apply_reference_manager(&mut self, cx: &mut Context<Self>) {
         let Some(m) = self.ui.ref_manager.take() else { return };
+        let mut updated: Vec<(String, String)> = Vec::new();
         for (i, d) in m.docs.iter().enumerate() {
             if m.tab == 1 && !m.checked.contains(&i) {
                 continue;
             }
-            self.update_reference(d, m.chosen.get(&i).copied().unwrap_or(0), m.scope.as_deref(), cx);
+            let to = d.versions.get(m.chosen.get(&i).copied().unwrap_or(0)).map(|v| v.label.clone()).unwrap_or_default();
+            // The instances it moves (named in the toast, live ver-linked-update-all).
+            let names: Vec<String> = self.assembly(cx).map(|a| a.instances.iter().filter(|x| m.scope.as_ref().is_none_or(|s| s.contains(&x.id)) && x.source.external_key().is_some_and(|k| d.keys.iter().any(|dk| dk == k))).map(|x| x.name.clone()).collect()).unwrap_or_default();
+            if self.update_reference(d, m.chosen.get(&i).copied().unwrap_or(0), m.scope.as_deref(), cx) > 0 {
+                updated.extend(names.into_iter().map(|n| (n, to.clone())));
+            }
         }
-        let docs = self.referenced_docs(m.scope.as_deref(), cx);
+        // Live: "Version of Part 1 <1> updated to V2."
+        if !updated.is_empty() {
+            let to = updated[0].1.clone();
+            let names: Vec<String> = updated.into_iter().map(|(n, _)| n).collect();
+            self.message = Some((false, format!("Version of {} updated to {to}.", names.join(", "))));
+        }
+        let mut docs = self.referenced_docs(m.scope.as_deref(), cx);
+        // On Selective update a document brought up to date stays listed, "V2 ⇨ V2", no longer counted (live
+        // ver-linked-selective-update); Update to latest drops it (ver-linked-update-all).
+        for (i, d) in m.docs.into_iter().enumerate() {
+            if m.tab == 1 && m.checked.contains(&i) && d.newer && !docs.iter().any(|x| x.path == d.path) {
+                let to = d.versions.get(m.chosen.get(&i).copied().unwrap_or(0)).map(|v| v.label.clone()).unwrap_or_default();
+                docs.push(RefDoc { current: to, newer: false, ..d });
+            }
+        }
         self.ui.ref_manager = Some(RefManager { scope: m.scope, tab: m.tab, docs, checked: HashSet::new(), chosen: HashMap::new() });
         self.check_external_updates(cx);
         self.refresh_scene(true, cx);
@@ -655,7 +678,6 @@ impl AssemblyView {
                 .when(!on, |d| d.text_color(rgb(0x333333)))
                 .child(label)
         };
-        let n = m.docs.len();
         let mut list = v_flex().flex_1().min_h_0();
         for (i, d) in m.docs.iter().enumerate() {
             let chosen = m.chosen.get(&i).copied().unwrap_or(0);
@@ -741,10 +763,11 @@ impl AssemblyView {
                     }),
             );
         }
-        let enabled = n > 0 && (tab == 0 || !m.checked.is_empty());
         // Live 607: the line stays, "Newer versions available for 0 documents"; this document's own row (Change to
-        // version…) isn't a newer one (asm-menu-change-to-version).
-        let newer = m.docs.iter().filter(|d| !d.keys.is_empty()).count();
+        // version…) isn't a newer one (asm-menu-change-to-version). Update all needs a newer version, Update selected a
+        // ticked row (live ver-linked-selective-update).
+        let newer = m.docs.iter().filter(|d| d.newer).count();
+        let enabled = if tab == 0 { newer > 0 } else { !m.checked.is_empty() };
         let info = format!("Newer versions available for {newer} document{}", if newer == 1 { "" } else { "s" });
         Some(
             v_flex()

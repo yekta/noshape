@@ -422,7 +422,24 @@ pub fn start(window: &mut Window, cx: &mut Context<Workspace>) {
             let fsv = ws.update(cx, |w, _| w.active_feature_studio()).ok().flatten();
             let result: Result<(), String> = match what {
                 "click" | "dblclick" | "rclick" | "hover" => match cx.update(|_, cx| fsv.as_ref().and_then(|v| v.read(cx).ui_target_point(&target, cx)).unwrap_or_else(|| locate(&target, &ps, &asm, &drw, cx))).unwrap_or_else(|e| Err(e.to_string())) {
-                    Ok(at) => {
+                    Ok(mut at) => {
+                        // A control below its list's fold is wheeled into view first, as a browser's click scrolls to
+                        // it (ver-show-more-changes: Show more changes… under the history's fold).
+                        let name = control_name(&target).unwrap_or_default();
+                        for _ in 0..16 {
+                            let Some(c) = noshape_app_core::ui_script::clip_of(&name).filter(|c| c.size.height > px(30.)) else { break };
+                            if c.top() + px(10.) < at.y && at.y < c.bottom() - px(10.) {
+                                break;
+                            }
+                            let wheel = ScrollWheelEvent { position: point(c.right() - px(40.), c.center().y), delta: ScrollDelta::Pixels(point(px(0.), (c.center().y - at.y).clamp(px(-600.), px(600.)))), ..Default::default() };
+                            let _ = cx.update(|window, cx| window.dispatch_event(PlatformInput::ScrollWheel(wheel), cx));
+                            sleep(cx, 120).await;
+                            redraw(cx).await;
+                            match cx.update(|_, cx| locate(&target, &ps, &asm, &drw, cx)).unwrap_or_else(|e| Err(e.to_string())) {
+                                Ok(p) => at = p,
+                                Err(_) => break,
+                            }
+                        }
                         eprintln!("UI-SCRIPT step {} {what} at ({:.0}, {:.0})", i + 1, f32::from(at.x), f32::from(at.y));
                         let from = pointer.unwrap_or(at);
                         // A hover where the pointer already rests (an earlier click there, which hid its tooltip)

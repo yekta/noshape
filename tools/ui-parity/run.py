@@ -475,6 +475,19 @@ def drop_rows(state, drop):
     return state
 
 
+# The Insert dialog's fixed text (live reads its rows too, but its lane document holds other runs' studios).
+INSERT_FIXED = {"Current document", "Other documents", "Standard content", "Part Studios", "Assemblies", "(Search Part Studios)", "(Search Assemblies)"}
+# Panels live's recorder read only from these times on: ours isn't compared against older takes there.
+PANELS_READ_SINCE = {"Insert parts and assemblies": "2026-11-09T00:00"}
+
+
+def insert_panel(state):
+    d = (state or {}).get("dialog")
+    if isinstance(d, dict) and d.get("kind") == "panel" and d.get("title") == "Insert parts and assemblies":
+        d["text"] = [t for t in d.get("text") or [] if t in INSERT_FIXED]
+    return state
+
+
 def runner_names(state, start, live_side):
     """A panel's text naming the runners' own documents (asm-menu-change-configuration, -change-to-version): live2's
     document ("noshape ui parity live2-1") and ours (the start's name) read alike, and live2's Part Studio, which its
@@ -494,6 +507,22 @@ def runner_names(state, start, live_side):
     return state
 
 
+def drawn_rows_only(a, b):
+    """Live's page draws a long feature list's rows on screen only (ver-show-more-changes: 25 of 62): ours is compared
+    on those rows, and a rollback bar past them (which live's reader can't reach) isn't compared."""
+    fa, fb = (a or {}).get("features"), (b or {}).get("features")
+    if not (isinstance(fa, dict) and isinstance(fb, dict)):
+        return b
+    ra, rb = fa.get("rows") or [], fb.get("rows") or []
+    if len(ra) < 20 or len(ra) >= len(rb) or [r.get("name") for r in ra] != [r.get("name") for r in rb[:len(ra)]]:
+        return b
+    fb = dict(fb, rows=rb[:len(ra)])
+    shown = {r.get("name") for r in ra}
+    if fa.get("rollbackAfter") is None and fb.get("rollbackAfter") not in shown:
+        fb["rollbackAfter"] = None
+    return dict(b, features=fb)
+
+
 def scenario_start(name):
     try:
         return json.loads((ROOT / "tests" / "ui-parity" / f"{name}.json").read_text()).get("start")
@@ -506,6 +535,11 @@ def compare(live, ours, whole_document=True):
     document or a page (README "Documents, tabs and preferences"); otherwise live's runner works in a lane copy whose
     tab bar isn't the start's, so `document` isn't compared."""
     pairs = [("start", live.get("start"), ours.get("start"), None, None, None)]
+    # A scenario whose first step clicks a tab: which tab the start shows is the runners' convention (live2's opened
+    # on that tab until 11-08, on the start's own since: ver-create-version-drawings-warning), not compared.
+    first = (live.get("steps") or [{}])[0].get("do") or {}
+    if isinstance(first, dict) and isinstance(first.get("on"), dict) and "doc_tab" in first["on"]:
+        pairs = []
     clipboard_free = not copies(live)
     ours_steps = {s.get("step"): s for s in ours.get("steps", [])}
     for s in live.get("steps", []):
@@ -525,8 +559,11 @@ def compare(live, ours, whole_document=True):
                 first = (name, ".step", "ok", f"failed: {failed}")
             CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
             continue
-        a = runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True)
-        b = runner_names(json.loads(json.dumps(b)), start_name, False)
+        a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
+        b = insert_panel(runner_names(json.loads(json.dumps(b)), start_name, False))
+        bd = (b or {}).get("dialog")
+        if isinstance(bd, dict) and str(live.get("recorded", "")) < PANELS_READ_SINCE.get(bd.get("title"), "") and (a or {}).get("dialog") is None:
+            b = dict(b, dialog=None)
         if isinstance((a or {}).get("message"), str) and t is not None:
             toast_shown.setdefault(a["message"], t)
         if a is not None and a.get("message") is None and isinstance((b or {}).get("message"), str) and t is not None \
@@ -546,6 +583,7 @@ def compare(live, ours, whole_document=True):
             b["dialog"] = None
         drop = PLAN_ROWS | LOCAL_ROWS | (CLIPBOARD_ROWS if clipboard_free else set())
         a, b = fold_start_edits(drop_rows(a, drop)), fold_start_edits(drop_rows(b, drop))
+        b = drawn_rows_only(a, b)
         b = same_fieldless_focus(a, b)
         # A native <select> picked from: live's pointer stays on it and its title (the picked value) shows as a
         # tooltip; ours' pointer is on the list's row it picked (ver-filter-tab).

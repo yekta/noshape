@@ -293,6 +293,10 @@ impl Render for DateTimeField {
         let focused = self.focus.is_focused(window);
         if !focused {
             self.s.typed.clear();
+        } else {
+            // Live's recorder reads it as the focused input, its value (live ver-filter-date).
+            let text = self.text();
+            crate::ui_script::note_focus(move || serde_json::json!({ "kind": "other", "tag": "input", "text": text, "selection": [null, null], "all": false }));
         }
         let invalid = self.is_partial();
         let mut segments = h_flex().flex_1().min_w_0().text_size(px(14.));
@@ -328,6 +332,14 @@ impl Render for DateTimeField {
             .size_full()
             .when(invalid, |d| d.bg(gpui_kit::rgb(0xfde7e9)))
             .on_key_down(cx.listener(Self::on_key))
+            // A click elsewhere (a greyed button too) takes the keyboard away, as a browser's input loses it
+            // (live ver-filter-date: focus none after Search).
+            .on_mouse_down_out(cx.listener(|t, _: &MouseDownEvent, window, cx| {
+                if t.focus.is_focused(window) {
+                    window.blur(cx);
+                    cx.notify();
+                }
+            }))
             // A click past the segments selects the nearest end (the browser's input).
             .on_mouse_down(MouseButton::Left, cx.listener(|t, _: &MouseDownEvent, window, cx| {
                 let i = t.s.selected.unwrap_or(MONTH);

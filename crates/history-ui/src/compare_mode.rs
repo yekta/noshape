@@ -165,6 +165,7 @@ pub fn compare(doc: &Entity<DocModel>, base: (Side, String), target: (Side, Stri
     let active = doc.read(cx).session.active_tab;
     let missing = active.is_some_and(|t| s.base.tab(t).is_none() || s.target.tab(t).is_none());
     cx.default_global::<Sessions>().0.insert(doc.entity_id(), s);
+    doc.update(cx, |d, _| d.comparing = true);
     changed(doc, cx);
     if missing {
         doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Info("Can't open tab. The tab does not exist in this document comparison.".into())));
@@ -188,6 +189,7 @@ pub fn follow(doc: &Entity<DocModel>, cx: &mut App) {
 /// Leave compare mode.
 pub fn stop(doc: &Entity<DocModel>, cx: &mut App) {
     if cx.default_global::<Sessions>().0.remove(&doc.entity_id()).is_some() {
+        doc.update(cx, |d, _| d.comparing = false);
         changed(doc, cx);
     }
 }
@@ -521,7 +523,8 @@ pub fn ui_state(doc: &Entity<DocModel>, tab: Option<TabId>, cx: &App) -> Option<
     // As live's recorder names the panel's marks: only in the base (">") is "added" (the base has it over the
     // target), only in the target ("<") "removed", "≠" modified.
     let change = |r: &FeatureCompare| match r.status {
-        _ if r.moved.is_some() => (Some("moved"), None),
+        // (A moved row's indicator cell is empty, live ver-compare-moved-feature.)
+        _ if r.moved.is_some() => (Some("moved"), Some("")),
         Some(ChangeKind::Modified) => (Some("modified"), Some("≠")),
         Some(ChangeKind::Removed) => (Some("added"), Some(">")),
         Some(ChangeKind::Added) => (Some("removed"), Some("<")),

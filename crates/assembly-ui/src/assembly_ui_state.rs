@@ -663,19 +663,17 @@ impl AssemblyView {
         }
         // Reference manager (live assembly/111–112): its two tabs.
         if let Some(r) = &self.ui.ref_manager {
-            // Live's recorder reads it as a panel (asm-menu-change-to-version): the tabs, the line, each document's
-            // checkbox (Selective update), name and "current ⇨ chosen", the button.
-            let n = r.docs.iter().filter(|d| !d.keys.is_empty()).count();
-            let mut text = vec!["Update to latest".to_string(), "Selective update".into(), format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" })];
+            // As live's recorder reads it (ver-linked-selective-update): the tabs, the line, each document's
+            // "current ⇨ chosen" (a checkbox on Selective update), the button's label and state.
+            let n = r.docs.iter().filter(|d| d.newer).count();
+            let mut fields = vec![json!({ "label": format!("Newer versions available for {n} document{}", if n == 1 { "" } else { "s" }), "kind": "text", "text": "" })];
             for (i, d) in r.docs.iter().enumerate() {
-                if r.tab == 1 {
-                    text.push(if r.checked.contains(&i) { "[x] ".into() } else { "[ ] ".into() });
-                }
                 let chosen = r.chosen.get(&i).copied().unwrap_or(0);
-                text.extend([d.name.clone(), d.current.clone(), "⇨".into(), d.versions.get(chosen).map(|v| v.label.clone()).unwrap_or_default()]);
+                let text = format!("{} ⇨ {}", d.current, d.versions.get(chosen).map(|v| v.label.as_str()).unwrap_or(""));
+                fields.push(if r.tab == 1 { json!({ "label": d.name, "kind": "boolean", "checked": r.checked.contains(&i), "text": text }) } else { json!({ "label": d.name, "kind": "string", "text": text }) });
             }
-            text.push(if r.tab == 0 { "Update all".into() } else { "Update selected".into() });
-            out.push(panel("Reference manager", text));
+            let enabled = if r.tab == 0 { n > 0 } else { !r.checked.is_empty() };
+            out.push(json!({ "title": "Reference manager", "kind": "feature", "tabs": [{ "label": "Update to latest", "selected": r.tab == 0 }, { "label": "Selective update", "selected": r.tab == 1 }], "fields": fields, "error": null, "ok": if enabled { "enabled" } else { "disabled" }, "okLabel": if r.tab == 0 { "Update all" } else { "Update selected" } }));
         }
         if let Some(p) = self.section_props(cx) {
             out.push(crate::section_dialog::state(&p));
@@ -703,7 +701,18 @@ impl AssemblyView {
                 current,
             ]));
         }
-        // (The Insert dialog is a list panel live's recorder doesn't read as a dialog: asm-insert-open-escape.)
+        // The Insert dialog, as live's recorder reads it since 11-09 (ver-insert-create-version): its tabs, then on
+        // Current document the document, its sub-tabs, the search box's hint and the rows (not compared: live's lane
+        // document holds other runs' studios).
+        if self.insert_open {
+            let mut text: Vec<String> = ["Current document", "Other documents", "Standard content"].map(String::from).to_vec();
+            if self.ui.insert_source == 0 {
+                text.push(self.doc.read(cx).name());
+                text.extend(["Part Studios", "Assemblies"].map(String::from));
+                text.push(if self.ui.insert_tab == 0 { "(Search Part Studios)".into() } else { "(Search Assemblies)".into() });
+            }
+            out.push(panel("Insert parts and assemblies", text));
+        }
         out
     }
 }

@@ -47,6 +47,8 @@ pub struct DocModel {
     /// Undo and Redo are off while a dialog edits something already there (live 2323: Undo greyed while Update
     /// Variable Studio is open).
     pub undo_held: bool,
+    /// Versions and history › Compare is on: Undo and Redo are off (live ver-compare-moved-feature, fs-compare).
+    pub comparing: bool,
     /// The link of the notice shown last ([`DocModel::info_with_link`]).
     notice_link: Option<NoticeLink>,
 }
@@ -107,7 +109,7 @@ impl DocModel {
     /// undo/redo stacks (Onshape's page load; the history stays).
     pub fn new(mut session: Session) -> Self {
         session.forget_undo();
-        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false, notice_link: None }
+        Self { session, studio_cache: Default::default(), pending: PendingEdit::default(), client_step: None, window_snapshot: None, undo_held: false, comparing: false, notice_link: None }
     }
 
     /// An info notice with a link after it ([`notice_bubble`] draws it in whichever view shows the notice).
@@ -263,12 +265,12 @@ impl DocModel {
 
     /// Undo is possible (a pending edit counts: Undo commits then reverts it).
     pub fn can_undo(&self) -> bool {
-        !self.undo_held && (self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo())
+        !self.undo_held && !self.comparing && (self.pending.0.is_some() || self.client_step_here(false) || self.session.can_undo())
     }
 
     /// Redo is possible (not over a pending edit, whose commit clears it).
     pub fn can_redo(&self) -> bool {
-        !self.undo_held && self.pending.0.is_none() && (self.client_step_here(true) || self.session.can_redo())
+        !self.undo_held && !self.comparing && self.pending.0.is_none() && (self.client_step_here(true) || self.session.can_redo())
     }
 
     /// Push a client-only undo step over the last commit (see
@@ -323,7 +325,7 @@ impl DocModel {
     }
 
     pub fn undo(&mut self, cx: &mut Context<Self>) {
-        if self.undo_held {
+        if self.undo_held || self.comparing {
             return;
         }
         self.flush_pending(cx);
@@ -344,7 +346,7 @@ impl DocModel {
     }
 
     pub fn redo(&mut self, cx: &mut Context<Self>) {
-        if self.undo_held {
+        if self.undo_held || self.comparing {
             return;
         }
         self.flush_pending(cx);

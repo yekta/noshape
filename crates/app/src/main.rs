@@ -259,7 +259,7 @@ fn register_assembly_hooks() {
         release_tab_items: release_dialog::tab_items,
         open_release_candidate: release_dialog::open_release_candidate,
         last_viewed_config: release_dialog::last_viewed_config,
-        create_version: history_panel::open_create_version_in,
+        create_version: history_panel::open_create_version,
         tab_properties: |doc, tab, window, cx| doc_dialogs::tab_properties(doc, tab, None, window, cx),
         instance_list_properties: || preferences_window::ListPrefs::load().instance_list_properties,
         set_instance_list_properties: preferences_window::set_instance_list_properties,

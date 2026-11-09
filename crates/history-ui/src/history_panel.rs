@@ -648,8 +648,9 @@ fn create_version_dialog(doc: Entity<DocModel>, in_document: bool, at: Option<Mi
             .children(stale_drawings_warning(&doc, &stale, cx))
             .footer(
                 os::modal_footer()
-                    .child(os::modal_ok(os::primary_button("ok", "Create")))
-                    .child(os::cancel_button("create-edit", "Create version and edit properties", cx).on_click(move |_, window, cx| {
+                    // Live ver-create-version-publish-fs: "Create and publish" while Publish is ticked.
+                    .child(os::modal_ok(os::primary_button("ok", if publish.get() { "Create and publish" } else { "Create" })))
+                    .child(os::cancel_button("create-edit", if publish.get() { "Create version, publish, and edit properties" } else { "Create version and edit properties" }, cx).on_click(move |_, window, cx| {
                         edit_after.set(true);
                         if create2(window, cx) {
                             window.close_dialog(cx);
@@ -801,6 +802,8 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
     h_flex()
         .id("publish-fs")
         .map(|d| crate::ui_script::mark(d, || "checkbox:Publish custom features and tables".into()))
+        // A clicked checkbox takes the keyboard (live ver-create-version-publish-fs); Enter / Esc stay the dialog's.
+        .focusable()
         .w_full()
         .p(px(10.))
         .gap(px(8.))
@@ -1489,6 +1492,8 @@ impl Render for HistoryPanel {
             });
             list.push(row.into_any_element());
             if let Some(key) = more_at.get(&ix).cloned() {
+                // (Live's recorder reads it as a row of the list, ver-show-more-changes.)
+                drawn.push(serde_json::json!({ "name": "Show more changes…", "kind": "version", "selected": false }));
                 list.push(
                     div()
                         .id(SharedString::from(format!("hist-more-{key}")))

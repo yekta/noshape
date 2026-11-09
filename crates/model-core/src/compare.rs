@@ -412,7 +412,9 @@ fn lcs_ids(a: &[crate::reference::FeatureId], b: &[crate::reference::FeatureId])
             out.push(a[i]);
             i += 1;
             j += 1;
-        } else if t[at(i + 1, j)] >= t[at(i, j + 1)] {
+        // On a tie the base's feature is kept (live ver-compare-moved-feature: Sketch 2 dragged above Extrude 1 shows
+        // Extrude 1 as moved).
+        } else if t[at(i + 1, j)] > t[at(i, j + 1)] {
             i += 1;
         } else {
             j += 1;

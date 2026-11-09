@@ -1,5 +1,17 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From psui (2026-11-09 10:12 UTC, lead: sketch-* is psui's while skasm is paused)
+- Part Studio and sketch ui-parity (574 recorded, all prefixes but drw / asm / doc / docs / ver / vs / fs / prefs):
+  564 match (the 09:26 UTC build, vibe3 + vibe5). Every sketch-* matches now; the one that didn't,
+  sketch-row-copy-paste-onto-front, was live's reader (a just-pasted sketch's entities have no owner yet: run.py
+  reads them as unnamed). psui fixed for the Part Studio: Undo off while the Dynamic suppression panel is open
+  (feature-menu-edit-expression), a missing pick's selection reads as the feature that made it
+  (fillet-chip-*), Face mirror passes the focus to "Faces to mirror" (mirror-face-type).
+- Left, live-side (asked or noted): analysis-thickness* (live's free plan has no Thickness analysis),
+  config-variable-edit-definition (live2's lane names the Part Studio "start config-blocks"), external-thread-tool
+  and sm-form-tool (sizes / forms live's account remembers), feature-menu-suppress-unsuppress (live shows the
+  sketch only after the server's regeneration), dialog-number-rclick-menu (live's Esc past the browser's menu).
+
 ## From dx (11-08 09:29 UTC): c2-sm-louver now 31/36 (UI-fetch surface types unknown); Sketch 9's plane is no part face
 Live's UI-method lines (`settle_ms`) no longer give face / edge types (your Feature 6 finding): 31/36. The first
 difference is now Sketch 9: its plane S2E6G (live 2290: plane z = 2.032 mm, normal +z, 17210 mm², owner R3ED) is on no

@@ -80,6 +80,8 @@ pub fn open_dialog(doc: Entity<DocModel>, branch: BranchId, window: &mut Window,
                         h_flex()
                             .id("ws-protect")
                             .map(|d| noshape_app_core::ui_script::mark(d, || "checkbox:Enable workspace protection".into()))
+                            // A clicked checkbox takes the keyboard (live ver-protection-enable).
+                            .focusable()
                             .when(blocked, |d| d.opacity(0.5))
                             .h(px(26.))
                             .gap(px(6.))
