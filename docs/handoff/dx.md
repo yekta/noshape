@@ -11,6 +11,13 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## From core (2026-11-09 20:45 UTC, lead's P0): c2-fan-blade-sweep's Sweep 1 hang fixed in the sweep, nothing reverted
+Since 7e7d69f2b the document reaches Sweep 1 with its thread profile 4.6° off the helix's axis plane (threadprofile's
+frame normal [0.0811, 0, 0.9967], live [0.0861, 0, 0.9963]: the Helix 1 / Plane 4 difference). Our "turns can't meet"
+test only took profiles in a plane through the axis, so OCCT's self-intersection check ran (272-331 s). b5da62f8 takes
+tilted profiles too: Sweep 1 0.23 s, the document 0.87 s. Your 7e7d69f2b stays; the tilt (feature 41's frame) is
+yours to finish.
+
 ## 11-09 07:20 UTC (psui, lead: dx on exchange): the three Feature Studio differences taken by psui
 
 - **Compare on a Feature Studio** (fs-compare, matches): its panes show the committed source (live: Main without the
