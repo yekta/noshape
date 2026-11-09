@@ -376,6 +376,14 @@ impl Workspace {
         }
     }
 
+    /// Tab › Show code: the Part Studio shown, its code panel docked on the right (live part-studio/615).
+    fn show_code(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
+        self.activate(tab, window, cx);
+        if let Some(TabView::PartStudio(v)) = self.views.get(&tab) {
+            v.update(cx, |v, cx| v.show_code(window, cx));
+        }
+    }
+
     pub(crate) fn activate(&mut self, tab: TabId, window: &mut Window, cx: &mut Context<Self>) {
         self.reveal_active_tab = true;
         if let Some(prev) = self.active.filter(|p| *p != tab) {
@@ -527,6 +535,15 @@ impl Workspace {
 
     /// The active Feature Studio's editor state (ui-parity driver), if it is one.
     pub(crate) fn ui_feature_studio_state(&self, cx: &App) -> Option<serde_json::Value> {
+        // Comparing: the compare's left (base) code pane, at its top, with nothing to commit or undo.
+        if let Some(text) = self.active.and_then(|t| noshape_history_ui::compare_mode::code_base(&self.doc, t, cx)) {
+            return Some(serde_json::json!({
+                "featurestudio": { "caret": [0, 0], "line": text.split('\n').next().unwrap_or(""), "lines": text.split('\n').count(), "committed": null, "notices": 0 },
+                "unsaved": false,
+                "comparing": true,
+                "list": null,
+            }));
+        }
         match self.active.and_then(|t| self.views.get(&t)) {
             Some(TabView::FeatureStudio(v)) => {
                 let st = v.read(cx).ui_state(cx);
@@ -1713,10 +1730,7 @@ impl Workspace {
                                 dd::tab_properties(doc, id, thumb, w, cx)
                             }));
                             let menu = if kind == "partstudio" {
-                                menu.item(I::new("Show code").on_click(move |_, w, cx| {
-                                    let doc = v7.read(cx).doc.clone();
-                                    dd::show_code(doc, id, w, cx)
-                                }))
+                                menu.item(I::new("Show code").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.show_code(id, w, cx))))
                             } else {
                                 menu
                             };
@@ -1747,10 +1761,7 @@ impl Workspace {
                                 dd::tab_properties(doc, id, thumb, w, cx)
                             }));
                         let menu = if kind == "partstudio" {
-                            menu.item(I::new("Show code").on_click(move |_, w, cx| {
-                                let doc = v7.read(cx).doc.clone();
-                                dd::show_code(doc, id, w, cx)
-                            }))
+                            menu.item(I::new("Show code").on_click(move |_, w, cx| v7.update(cx, |t, cx| t.show_code(id, w, cx))))
                         } else {
                             menu
                         };
@@ -3170,10 +3181,7 @@ pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_me
         }))
         .item(I::new("Rename").on_click(move |_, w, cx| v2.update(cx, |t, cx| t.start_tab_rename(id, w, cx))));
     let m = if kind == "partstudio" {
-        m.item(I::new("Show code").on_click(move |_, w, cx| {
-            let doc = v3.read(cx).doc.clone();
-            crate::doc_dialogs::show_code(doc, id, w, cx)
-        }))
+        m.item(I::new("Show code").on_click(move |_, w, cx| v3.update(cx, |t, cx| t.show_code(id, w, cx))))
     } else {
         m
     };

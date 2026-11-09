@@ -504,7 +504,9 @@ fn panel_rows(s: &CompareSession, a: &noshape_model::partstudio::PartStudio, b: 
 /// Versions"): its two sides and, on a Part Studio, the panel's rows (`change`: modified, removed, added, moved).
 pub fn ui_state(doc: &Entity<DocModel>, tab: Option<TabId>, cx: &App) -> Option<serde_json::Value> {
     let s = session(doc, cx)?;
-    let mut out = serde_json::json!({ "base": s.base_label, "target": s.target_label, "only_differences": s.only_differences, "features": null, "selected": null });
+    // A Feature Studio's compare has no Only show differences (live fs-compare).
+    let code = tab.and_then(|t| s.base.tab(t)).is_some_and(|t| matches!(t.content, TabContent::FeatureStudio(_)));
+    let mut out = serde_json::json!({ "base": s.base_label, "target": s.target_label, "only_differences": (!code).then_some(s.only_differences), "features": null, "selected": null });
     let ps = |d: &Document| tab.and_then(|t| d.tab(t)).and_then(|t| match &t.content {
         TabContent::PartStudio(p) => Some(p.clone()),
         _ => None,
@@ -874,9 +876,18 @@ impl CodeCompare {
     }
 }
 
-/// The text a Feature Studio shows (saved edits included).
+/// The text a Feature Studio's compare shows: its committed source (live fs-compare: Main without the uncommitted
+/// line).
 fn fs_text(f: &noshape_model::custom::FeatureStudio) -> &str {
-    f.draft.as_deref().unwrap_or(&f.source)
+    &f.source
+}
+
+/// While comparing, Feature Studio `tab`'s left (base) pane text, as live's recorder reads the first code editor.
+pub fn code_base(doc: &Entity<DocModel>, tab: TabId, cx: &App) -> Option<String> {
+    match &session(doc, cx)?.base.tab(tab)?.content {
+        TabContent::FeatureStudio(f) => Some(fs_text(f).to_string()),
+        _ => None,
+    }
 }
 
 /// `text` with tabs as 4 spaces (Ace), and `range` moved along.

@@ -319,7 +319,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
-- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
+- **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_show_code`](#tab_show_code), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
 - **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
@@ -610,6 +610,23 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | Tab name or id. |
+
+#### tab_show_code
+
+A Part Studio's FeatureScript representation (Tab › Show code).
+
+The view-only code the Part Studio tab's Show code panel shows: the FeatureScript version and geometry.fs import, the "Default Units" annotation, main / build / buildPrivate = definePartStudio(…), and one `features.<id> = function(id) { … }` block per feature in list order. Queries are written as qUnion([]).
+
+Examples:
+
+```json
+{"tab": "Housing"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
+| `tab` | string | required | Part Studio tab name or id. |
 
 #### tab_delete
 

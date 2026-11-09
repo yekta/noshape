@@ -150,6 +150,16 @@ pub fn ops() -> Vec<Op> {
         },
         Op {
             group: "tab",
+            verb: "show_code",
+            summary: "A Part Studio's FeatureScript representation (Tab › Show code)",
+            description: "The view-only code the Part Studio tab's Show code panel shows: the FeatureScript version and geometry.fs import, the \"Default Units\" annotation, main / build / buildPrivate = definePartStudio(…), and one `features.<id> = function(id) { … }` block per feature in list order. Queries are written as qUnion([]).",
+            fields: vec![doc_field(), req("tab", s(), "Part Studio tab name or id.")],
+            mutates: false,
+            destructive: false,
+            run: tab_show_code,
+        },
+        Op {
+            group: "tab",
             verb: "delete",
             summary: "Delete a tab",
             description: "As in Onshape, undo does not bring it back (history restore does). Fails if it is the last tab. Other tabs that use it (assembly instances, drawings, derived parts) are listed in the reply; they will show errors.",
@@ -508,6 +518,16 @@ fn tab_duplicate(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let id = od.session.edit_document(&docedit::duplicate_tab_description(&name), |d| docedit::duplicate_tab(d, tab))?.ok_or_else(|| OpError::not_found("tab vanished"))?;
     let t = od.doc().tab(id).expect("created");
     Ok(json!({ "tab": { "id": id.to_string(), "name": t.name, "kind": t.content.kind_name() } }).into())
+}
+
+fn tab_show_code(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    let od = ctx.doc(a.opt_str("doc")?)?;
+    let tab = doc::find_tab(od.doc(), a.str("tab")?)?;
+    let Some(noshape_model::document::TabContent::PartStudio(ps)) = od.doc().tab(tab).map(|t| &t.content) else {
+        return Err(OpError::param("tab", "Show code is only for a Part Studio"));
+    };
+    let code = crate::show_code::part_studio_code(ps, &od.doc().settings.units);
+    Ok(json!({ "code": code }).into())
 }
 
 fn tab_delete(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {

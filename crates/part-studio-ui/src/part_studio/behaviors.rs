@@ -318,6 +318,8 @@ pub struct UiState {
     pub cap_hover: Option<usize>,
     /// Open Appearance editor, and faces of a hovered appearance row.
     pub appearance_edit: Option<super::appearance::AppearanceEdit>,
+    /// Tab › Show code: the code panel docked on the right (live part-studio/615).
+    pub show_code: Option<AnyView>,
     /// `NOSHAPE_PERF`: the opened studio's first preview (1) and full (2) displays had their frames armed.
     pub open_frames: u8,
     /// The opened studio's first full display was applied (until then its scenes build off the UI thread).
@@ -719,6 +721,7 @@ impl UiState {
             section_parts: None,
             cap_hover: None,
             appearance_edit: None,
+            show_code: None,
             open_frames: 0,
             first_full_shown: false,
             cache_checked: false,

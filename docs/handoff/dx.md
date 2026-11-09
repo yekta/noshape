@@ -11,6 +11,25 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-09 07:20 UTC (psui, lead: dx on exchange): the three Feature Studio differences taken by psui
+
+- **Compare on a Feature Studio** (fs-compare, matches): its panes show the committed source (live: Main without the
+  uncommitted line); the recorder reads the left pane (caret at the top, nothing to commit, no Undo); no "Only show
+  differences" there (compare_mode `code_base`, workspace `ui_feature_studio_state`).
+- **Show code** is live's right-docked, view-only panel ("The FeatureScript representation of this Part Studio is
+  view only." ×), not a modal: part-studio-ui `show_code` / `render_code_panel`; the highlighted code view comes from
+  feature-studio-ui (`ReadonlyCode`, hook `code_view`). The text is live's frame (ops `show_code.rs`, new op
+  `tab_show_code`, e2e `show_code_lists_each_feature`): header, Default Units, main/build/buildPrivate =
+  definePartStudio, one `features.F<id>` block per feature, values as `{ 'value' : try(…), 'expression' : "…" }.value`.
+  Not yet as live: queries are `qUnion([])` (live packs them with qCompressed), enums are quoted option ids (live
+  `CPlaneType.OFFSET`), feature ids are ours. fs-ps-show-code's last difference is live's take without Export…
+  (re-record asked, REQUESTS 07:13).
+- **Notices counts:** live2 asked for the texts (REQUESTS 07:13): fs-shortcuts-sheet (the runner now types "/" for
+  shift+/ as Playwright does; live counts 2 notices, ours 1) and fs-ed-error-squiggle (live 1 before Commit, 2
+  later; ours 2 at once).
+- Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
+  only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
+
 ## 11-09 03:39 UTC: exchange "still mine" (lead 11-09): hose x_t, B-spline STL grid, o-ring x_t; drawings' EDGE
 
 - **Hose Parasolid:** a closed single-span B-spline wall whose seam knot won't come down (degree 6 / 12 round the

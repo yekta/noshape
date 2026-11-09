@@ -84,6 +84,8 @@ pub struct Hooks {
     pub materials_of: fn(&AddedLibrary) -> MaterialLibrary,
     /// The Add material library modal.
     pub open_add_material_library: fn(OnAddLibrary, &mut Window, &mut App),
+    /// FeatureScript shown view only, highlighted (Show code).
+    pub code_view: fn(String, &mut Window, &mut App) -> AnyView,
 }
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
@@ -95,6 +97,10 @@ pub fn register(hooks: Hooks) {
 
 fn hooks() -> &'static Hooks {
     HOOKS.get().expect("the app registers the Part Studio hooks at startup (noshape_part_studio_ui::part_studio_hooks::register)")
+}
+
+pub fn code_view(code: String, window: &mut Window, cx: &mut App) -> AnyView {
+    (hooks().code_view)(code, window, cx)
 }
 
 pub fn open_document_window(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
@@ -242,5 +248,6 @@ pub fn register_for_tests() {
         repair_panel: |_, _, _| None,
         materials_of: |_| MaterialLibrary::default(),
         open_add_material_library: |_, _, _| {},
+        code_view: |_, _, cx| cx.new(|_| gpui_kit::Empty).into(),
     });
 }

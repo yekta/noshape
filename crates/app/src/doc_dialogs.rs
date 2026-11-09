@@ -741,41 +741,6 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
     }
 }
 
-/// Tab › Show code: the element as FeatureScript-style code (read-only).
-pub fn show_code(doc: Entity<DocModel>, tab: noshape_model::document::TabId, window: &mut Window, cx: &mut App) {
-    let (title, code) = {
-        let d = &doc.read(cx).session.doc;
-        let t = d.tab(tab);
-        (t.map(|t| t.name.clone()).unwrap_or_default(), t.map(|t| element_code(&t.name, &t.content)).unwrap_or_default())
-    };
-    let st = cx.new(|cx| TextareaState::new(window, cx).rows(30).default_value(code));
-    window.open_dialog(cx, move |dialog, _, cx| {
-        os::modal(dialog, title.clone(), 820.)
-            .child(os::modal_body().child(div().font_family("monospace").child(Textarea::new(&st).h(px(560.)).text_size(px(13.)))))
-            .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
-    });
-}
-
-/// FeatureScript-style text of a Part Studio: one call per feature with its
-/// parameters.
-fn element_code(name: &str, content: &TabContent) -> String {
-    let mut out = String::from("FeatureScript 2384;\nimport(path : \"onshape/std/common.fs\", version : \"2384.0\");\n\n");
-    let TabContent::PartStudio(ps) = content else { return out };
-    let ident: String = name.chars().filter(|c| c.is_alphanumeric()).collect();
-    out.push_str(&format!("export const {} = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {{\n    }}\n    {{\n", if ident.is_empty() { "partStudio".into() } else { format!("{}{}", ident[..1].to_lowercase(), &ident[1..]) }));
-    for f in &ps.features {
-        let params = serde_json::to_value(&f.params).unwrap_or_default();
-        let fields: Vec<String> = match params {
-            serde_json::Value::Object(m) => m.into_iter().map(|(k, v)| format!("\"{k}\" : {v}")).collect(),
-            other => vec![other.to_string()],
-        };
-        let call = if f.suppressed { "// suppressed: " } else { "" };
-        out.push_str(&format!("        {call}{}(context, id + \"{}\", {{ {} }});\n", f.type_id, f.id.0, fields.join(", ")));
-    }
-    out.push_str("    });\n");
-    out
-}
-
 /// Tab › Move to document… (live doc-tab-menu-move-to-document): New document (its name, "Untitled document",
 /// selected) | Other documents (pick one), the tabs being moved, [Move] [Cancel]. The tabs go to the other document
 /// and are deleted here (op `tab_move_to_document`).

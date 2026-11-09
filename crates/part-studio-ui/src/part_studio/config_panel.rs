@@ -56,6 +56,7 @@ impl PartStudioView {
 
     pub(super) fn toggle_panel(&mut self, panel: RightPanel, window: &mut Window, cx: &mut Context<Self>) {
         self.right_panel = if self.right_panel == Some(panel) { None } else { Some(panel) };
+        self.ui.show_code = None;
         let _ = window;
         cx.notify();
     }
@@ -202,7 +203,54 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// Tab › Show code: this Part Studio's FeatureScript, view only, docked on the right in place of a panel (live
+    /// part-studio/615, dom/fs-showcode.txt).
+    pub fn show_code(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let units = self.doc.read(cx).session.doc.settings.units;
+        let Some(code) = self.studio(cx).map(|ps| noshape_ops::show_code::part_studio_code(ps, &units)) else { return };
+        self.right_panel = None;
+        self.ui.show_code = Some(crate::part_studio_hooks::code_view(code, window, cx));
+        cx.notify();
+    }
+
+    fn render_code_panel(&self, view: AnyView, cx: &mut Context<Self>) -> AnyElement {
+        let pal = p();
+        crate::ui::right_resizable(v_flex().relative(), 6.)
+            .w(px(crate::ui::right_panel_w() + 6.))
+            .max_w(relative(0.5))
+            .h_full()
+            .flex_none()
+            .bg(gpui_kit::rgb(0xffffff))
+            .border_l_1()
+            .border_color(pal.border)
+            .child(
+                h_flex()
+                    .h(px(30.))
+                    .flex_none()
+                    .px(px(10.))
+                    .text_size(px(13.))
+                    .text_color(pal.text)
+                    .child(div().flex_1().min_w_0().truncate().child("The FeatureScript representation of this Part Studio is view only."))
+                    .child(
+                        div()
+                            .id("show-code-close")
+                            .map(|d| crate::ui_script::mark(d, || "button:Close".into()))
+                            .cursor_pointer()
+                            .child(crate::assets::icon("close", 16., cx))
+                            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                this.ui.show_code = None;
+                                cx.notify();
+                            })),
+                    ),
+            )
+            .child(div().flex_1().min_h_0().child(view))
+            .into_any_element()
+    }
+
     pub(super) fn render_right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if let Some(view) = self.ui.show_code.clone() {
+            return Some(self.render_code_panel(view, cx));
+        }
         let panel = self.right_panel?;
         // Live: suppressing the only Hole with its table open closes the panel at once (no button left).
         if panel == RightPanel::HoleTable && !self.has_holes() {

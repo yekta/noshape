@@ -367,6 +367,27 @@ fn assembly_with_mates() {
     assert_eq!(r["name"], "Pin guide", "a custom name stays: {r}");
 }
 
+/// Tab › Show code (live dom/fs-showcode.txt): the Part Studio as FeatureScript, one block per feature, view only;
+/// an Assembly has no Show code.
+#[test]
+fn show_code_lists_each_feature() {
+    let path = scratch("show-code.noshape");
+    let mut ctx = Ctx::new();
+    call(&mut ctx, "document_create", json!({ "path": path.to_str().unwrap() }));
+    call(&mut ctx, "sketch_create", json!({ "plane": "plane:top" }));
+    call(&mut ctx, "sketch_draw", json!({ "sketch": "Sketch 1", "tool": "corner_rectangle", "points": [[0, 0], [20, 10]] }));
+    let region = call(&mut ctx, "sketch_get", json!({ "sketch": "Sketch 1" }))["regions"][0]["id"].as_str().unwrap().to_string();
+    call(&mut ctx, "feature_add", json!({ "type": "extrude", "params": { "entities": [region], "depth": "5 mm" } }));
+    let code = call(&mut ctx, "tab_show_code", json!({ "tab": "Part Studio 1" }))["code"].as_str().unwrap().to_string();
+    assert!(code.contains("const buildPrivate = definePartStudio(function(context is Context, configuration is map, lookup is function)"), "{code}");
+    let sketch = code.find("annotation { \"Feature Name\" : \"Sketch 1\" }").expect("Sketch 1's block");
+    let extrude = code.find("annotation { \"Feature Name\" : \"Extrude 1\" }").expect("Extrude 1's block");
+    assert!(sketch < extrude, "in list order: {code}");
+    assert!(code.contains("'expression' : \"5 mm\" }.value"), "the depth as live writes it: {code}");
+    let e = try_call(&mut ctx, "tab_show_code", json!({ "tab": "Assembly 1" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("tab"), "{e:?}");
+}
+
 /// Two tabs of one name (two imports of one file): the name is an error that
 /// gives both ids, never silently the first tab; each id works.
 #[test]

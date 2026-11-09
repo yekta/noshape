@@ -167,19 +167,8 @@ fn keystroke(key: &str) -> Option<Keystroke> {
         k if k.len() > 1 && k.starts_with('F') => return Keystroke::parse(&[spec.join("-"), k.to_lowercase()].iter().filter(|s| !s.is_empty()).cloned().collect::<Vec<_>>().join("-")).ok(),
         k => k,
     };
-    // Shift with a symbol key types its shifted symbol (US layout) and, as GPUI reads a keyboard (X11's
-    // keystroke_from_xkb), no shift: shift+/ is "?".
-    const SHIFTED: [(&str, &str); 21] = [
-        ("/", "?"), ("1", "!"), ("2", "@"), ("3", "#"), ("4", "$"), ("5", "%"), ("6", "^"), ("7", "&"), ("8", "*"), ("9", "("), ("0", ")"),
-        ("-", "_"), ("=", "+"), ("[", "{"), ("]", "}"), (";", ":"), ("'", "\""), (",", "<"), (".", ">"), ("`", "~"), ("\\", "|"),
-    ];
-    let name = match SHIFTED.iter().find(|(k, _)| *k == name) {
-        Some((_, shifted)) if spec.iter().any(|m| m == "shift") => {
-            spec.retain(|m| m != "shift");
-            shifted
-        }
-        _ => name,
-    };
+    // Shift with a symbol key, as live's runner (Playwright) presses it: Shift held, the key's own text ("shift+/"
+    // types "/", live fs-shortcuts-sheet).
     let ch = (name.chars().count() == 1).then(|| name.to_string());
     let upper = ch.as_ref().is_some_and(|c| c.chars().all(char::is_uppercase));
     if upper {
@@ -1001,6 +990,10 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
     // A Feature Studio: its editor, and its autocomplete as the list.
     if let Some(fs) = ws.ui_feature_studio_state(cx) {
         s["featurestudio"] = fs["featurestudio"].clone();
+        // The compare view has no Undo / Redo (live fs-compare).
+        if fs["comparing"] == true {
+            s["undo"] = json!({ "undo": false, "redo": false });
+        }
         if fs["unsaved"] == true {
             s["undo"]["undo"] = json!(true);
         }

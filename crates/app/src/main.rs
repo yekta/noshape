@@ -310,6 +310,7 @@ fn register_part_studio_hooks() {
         repair_panel: repair_mode::render_panel,
         materials_of: material_libraries::materials_of,
         open_add_material_library: |on_add, window, cx| material_libraries::open(on_add, window, cx),
+        code_view: |code, window, cx| cx.new(|cx| noshape_feature_studio_ui::feature_studio::ReadonlyCode::new(code, window, cx)).into(),
     });
 }
 

@@ -1968,6 +1968,28 @@ enum Tok {
     Plain,
 }
 
+/// FeatureScript shown view only, highlighted as the editor (a Part Studio's Show code, live part-studio/615).
+pub struct ReadonlyCode {
+    editor: Entity<EditorState>,
+}
+
+impl ReadonlyCode {
+    pub fn new(code: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let editor = cx.new(|cx| {
+            let mut st = EditorState::new(window, cx).language("featurescript").line_number(true).soft_wrap(true).default_value(code);
+            st.set_highlighter_factory(Rc::new(|_| Some(Box::new(ScriptHighlighter::default()) as Box<dyn InputHighlighter>)), cx);
+            st
+        });
+        Self { editor }
+    }
+}
+
+impl Render for ReadonlyCode {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        Editor::new(&self.editor).readonly(true).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))
+    }
+}
+
 /// A small lexer-based highlighter for FeatureScript (Onshape's Ace colours,
 /// live dom/feature-studio-editor.txt).
 struct ScriptHighlighter {

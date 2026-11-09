@@ -227,6 +227,8 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("s", ShortcutToolbar, doc),
         KeyBinding::new("shift-?", ToggleShortcutHelp, doc),
         KeyBinding::new("?", ToggleShortcutHelp, doc),
+        // Shift with the / key where it reaches us unshifted (a browser reads it as Shift+/ on any layout).
+        KeyBinding::new("shift-/", ToggleShortcutHelp, doc),
         KeyBinding::new("alt-t", TabManager, doc_mod),
         // Not from the Feature Studio's code editor, where Ctrl+Space is the editor's own (FS-EDITOR-COMPLETE).
         KeyBinding::new("ctrl-space", SwitchRecentTab, Some(RECENT_TAB_CONTEXT)),
