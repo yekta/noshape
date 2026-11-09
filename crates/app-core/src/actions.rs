@@ -373,6 +373,21 @@ pub fn take_requested_tab() -> Option<noshape_model::document::TabId> {
     REQUESTED_TAB.lock().take()
 }
 
+/// The caret (1-based line, column) the requested Feature Studio tab opens with.
+static REQUESTED_CARET: parking_lot::Mutex<Option<(usize, usize)>> = parking_lot::Mutex::new(None);
+
+/// [`request_activate_tab`] for a Feature Studio, its caret at a 1-based line and column (a custom table's Switch to:
+/// its definition, live fs-tables-switch-to-studio).
+pub fn request_activate_tab_at(tab: noshape_model::document::TabId, line: usize, column: usize, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+    *REQUESTED_CARET.lock() = Some((line, column));
+    request_activate_tab(tab, window, cx);
+}
+
+/// The caret [`request_activate_tab_at`] asked for, once.
+pub fn take_requested_caret() -> Option<(usize, usize)> {
+    REQUESTED_CARET.lock().take()
+}
+
 /// The selection the requested tab opens with.
 static REQUESTED_SELECTION: parking_lot::Mutex<Option<Vec<noshape_model::reference::Reference>>> = parking_lot::Mutex::new(None);
 

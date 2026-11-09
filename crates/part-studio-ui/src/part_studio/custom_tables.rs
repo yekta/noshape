@@ -150,6 +150,14 @@ impl PartStudioView {
         let (mine, ws) = self.offered_tables(cx);
         let fs_name = shown.fs_name.clone();
         let fs_tab = shown.fs;
+        // Its definition in the studio ("export const partFaces = |defineTable(…"), 1-based.
+        let def_at = match self.doc.read(cx).session.doc.tab(fs_tab).map(|t| &t.content) {
+            Some(noshape_model::document::TabContent::FeatureStudio(f)) => {
+                let head = format!("export const {} = ", shown.name);
+                f.source.lines().enumerate().find_map(|(i, l)| l.find(&head).map(|c| (i + 1, c + head.chars().count() + 1)))
+            }
+            _ => None,
+        };
         let workspace_fs = shown.version.is_none();
         // The selector (live: 220 × 33, #aaa border, badge + name ▾) and ⋯.
         let selector = h_flex()
@@ -189,7 +197,10 @@ impl PartStudioView {
             .on_click(move |e: &ClickEvent, window, cx| {
                 let label = format!("Switch to {fs_name}");
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |m, _, _| {
-                    m.item(crate::os_menu::OsMenuItem::new(label.clone()).disabled(!workspace_fs).on_click(move |_, w, cx| crate::actions::request_activate_tab(fs_tab, w, cx)))
+                    m.item(crate::os_menu::OsMenuItem::new(label.clone()).disabled(!workspace_fs).on_click(move |_, w, cx| match def_at {
+                        Some((line, column)) => crate::actions::request_activate_tab_at(fs_tab, line, column, w, cx),
+                        None => crate::actions::request_activate_tab(fs_tab, w, cx),
+                    }))
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
             });

@@ -2277,6 +2277,11 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &ActivateRequestedTab, window, cx| {
                 if let Some(t) = crate::actions::take_requested_tab() {
                     this.activate(t, window, cx);
+                    if let Some((line, column)) = crate::actions::take_requested_caret()
+                        && let Some(TabView::FeatureStudio(v)) = this.views.get(&t)
+                    {
+                        v.update(cx, |v, cx| v.goto_line(line, column, window, cx));
+                    }
                     if let Some(selection) = crate::actions::take_requested_selection()
                         && let Some(TabView::PartStudio(v)) = this.views.get(&t)
                     {
