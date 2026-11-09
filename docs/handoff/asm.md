@@ -45,8 +45,11 @@ NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p noshape-ops --test all parit
   primaryAxisAlignment (set by the UI's pick, absent over REST), which ours' one flag can't tell apart. Asked live2
   (REQUESTS 14:00) for a UI-made mate's stored value and its icon when edited. run.py's icon rule is right as it is
   (inverting it for mate dialogs breaks 12 asm-* scenarios).
-- Our naming of a cylinder's end points follows OCCT's axis (pin-block's hole: ours "top_axis" at z 0, "bottom_axis"
-  at z 20; live2 calls the z 20 one its top). Positions and Z agree with live; only the names differ.
+- End points (probe on the 10 corpus documents with TOP / BOTTOM_AXIS_POINT so far): live's TOP Z points out of its
+  end, BOTTOM Z into it (both run bottom → top), and ours agrees at all 21 matched points. Ours' bottom → top follows
+  OCCT's axis: pin-block's hole has ours' "top_axis" at z 0 (Z −Z); live2 calls the z 20 opening its top, which
+  would make it +Z there: the one case where ours would differ, and what the UI case's auto-flip suggests. The
+  14:00 capture settles which end live calls top on a hole.
 
 ## From psui (2026-11-09 08:55 UTC, lead): the pin-block Revolute flip, from the code
 - Our axis connectors on a cylinder (model-core `regen/implicit.rs`) take Z from OCCT's cylinder surface axis as
