@@ -44,6 +44,13 @@ What blend takes over:
   the dump). The impeller now holds through feature 20 (the 19.4 mm³ / 4 faces carried from feature 15, bool's); next
   breaks: feature 21 Fillet 1 (R10, one edge: +335 mm³, 21 faces vs 24; blend's, core covering), feature 24
   Extrude 4 (up to the Shell's offset wall: ERROR "Failed to extrude selections, check input.", core's).
+- 14:20: after Delete face 1 our faces match live's areas (inner wall 13,488.77 = live JSG + JOe + JOi 13,489.00).
+  Fillet 1 (dump vibe5 ~/core-cases/dumpfil2/fillet-9; probe needs set_working_scale(1000)): R10 round of the closed
+  edge between the outer wall (B-spline) and the tube cylinder JSO, built by blend.fallback.split_closed: +2,767.16
+  mm³, 3 blend faces (631.95 / 629.38 / 294.56) and the tube's x 120 end cap cut to 201.06 mm²; live +2,412.73, 2
+  faces (JWK 1365.0 round, JWO 173.43 where it runs off the tube's end at x 120), JRK cap untouched, JWG cylinder
+  1776.81 (ours 1737.68). Extrude 4 then fails "up-to target does not fully bound the extruded profile" on the inner
+  wall (resolved right: face 11, 13,273.56 mm²; live JVK 13,003.91 = less the two sliver pieces): likely the round.
 
 **State 11-09 13:12 UTC: the impeller's slow fillets (lead) are downstream of a broken chain.**
 - Profile: the three fillets fail OCCT whole (as is, scaled) and build by groups (~1 s); written to blend.md.
