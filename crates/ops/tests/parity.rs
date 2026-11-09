@@ -388,7 +388,8 @@ fn exchange_round_trip() {
         // its own STEP of cf-wave-spring as 7559 mm³ for 916.5: Onshape's failure is no target): then the Parasolid's.
         let volume = |v: &[PartState]| v.iter().filter_map(|p| p.volume).sum::<f64>();
         let xt = (!selfs["PARASOLID"].is_null()).then(|| parts_from_live_import(&selfs["PARASOLID"], false));
-        let expected = |format: &str| -> Option<Vec<PartState>> {
+        // `ours`: what live's import of our file is held to (an STL of live's off its model by over 1 %: the model's).
+        let expected = |format: &str, ours: bool| -> Option<Vec<PartState>> {
             let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], format == "STL"))?;
             match &xt {
                 Some(x) if format != "STL" && (volume(&own) - volume(x)).abs() > 1e-3 * volume(x).abs() => {
@@ -396,8 +397,8 @@ fn exchange_round_trip() {
                     Some(x.clone())
                 }
                 // (An STL mesh too, within twice live's own STL's error: the same density, its vertices elsewhere.)
-                Some(x) if format == "STL" => Some(held_to_model(own, x, 2.0)),
-                Some(x) => Some(held_to_model(own, x, 1.0)),
+                Some(x) if format == "STL" => Some(held_to_model(own, x, 2.0, ours)),
+                Some(x) => Some(held_to_model(own, x, 1.0, false)),
                 _ => Some(own),
             }
         };
@@ -409,7 +410,7 @@ fn exchange_round_trip() {
             }
             imports += 1;
             let ours = import(&scratch(&format!("{name}-import-{ext}.noshape")), &file);
-            let diff = match (ours, expected(format)) {
+            let diff = match (ours, expected(format, false)) {
                 (Err(e), _) => vec![e],
                 (Ok(_), None) => vec!["live-self.json has no import of it".into()],
                 (Ok(ours), Some(live)) if format == "STL" => differences(&live, &mesh_counts(ours)),
@@ -474,7 +475,7 @@ fn exchange_round_trip() {
             // (An STL as live will read it: its own mesh's parts, volume and area, against what live's import of it
             // is held to; the file live has may be older.)
             if format == "STL"
-                && let (Ok(b), Some(live)) = (&back, expected(format))
+                && let (Ok(b), Some(live)) = (&back, expected(format, true))
             {
                 let d = differences(&live, &mesh_counts(b.clone()));
                 println!("{name}: ours.stl as live will read it: {}", if d.is_empty() { "matches".into() } else { d.join("; ") });
@@ -491,7 +492,7 @@ fn exchange_round_trip() {
             };
             selfs_ok += usize::from(diff.is_empty());
             println!("{name}: ours reads ours.{ext} back: {}", if diff.is_empty() { "matches".into() } else { diff.join("; ") });
-            let (Some(live), false) = (expected(format), theirs[format].is_null()) else {
+            let (Some(live), false) = (expected(format, true), theirs[format].is_null()) else {
                 waiting += 1;
                 continue;
             };
@@ -520,7 +521,7 @@ fn exchange_round_trip() {
 /// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the
 /// import is off from it by up to 1 %, within as much as the import is off (cf-spur-gear's STEP: no pcurves, the
 /// tooth chamfers' edges 4-pole curves; live reads its 32-tooth gear 0.2 % over its model: ours is held to be as close).
-fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64) -> Vec<PartState> {
+fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_to_model: bool) -> Vec<PartState> {
     if own.len() != model.len() {
         return own;
     }
@@ -539,9 +540,9 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64) -> Vec<Pa
             continue;
         }
         // An STL of live's off its model by over 1 % (cf-spur-gear's 65-tooth gear: 5601 mm³ for 5915.7, live's
-        // failure, no target): the model's, within 1 % as an STL read back is.
+        // failure, no target): for live's import of ours, the model's, within 1 % as an STL read back is.
         if d > 1e-2 * b.abs() {
-            if slack >= 2.0 {
+            if failures_to_model {
                 let p = &mut out[o];
                 p.volume = Some(b);
                 p.volume_band = Some([b * 0.99, b * 1.01]);
@@ -572,9 +573,15 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64) -> Vec<Pa
 fn an_import_off_its_model_holds_ours_as_close() {
     let part = |volume: f64, band: f64| PartState { name: "Part 1".into(), faces: 6, edges: 12, vertices: 8, volume: Some(volume), volume_band: Some([volume - band, volume + band]), ..Default::default() };
     let model = [part(4761.97e-9, 1.3e-9), part(100.0e-9, 0.01e-9)];
-    let held = held_to_model(vec![part(4771.70e-9, 0.3e-9), part(100.0e-9, 0.01e-9)], &model, 1.0);
+    let held = held_to_model(vec![part(4771.70e-9, 0.3e-9), part(100.0e-9, 0.01e-9)], &model, 1.0, false);
     assert!(differences(&held, &[part(4757.60e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "ours 0.09 % under the model, live's 0.2 % over");
     assert!(!differences(&held, &[part(4750.0e-9, 0.0), part(100.0e-9, 0.0)]).is_empty(), "further from the model than live");
+    // An STL of live's 5 % off its model (cf-spur-gear's 65-tooth gear): live's import of ours is held to the model.
+    let model = [part(5915.65e-9, 0.0)];
+    let off = vec![part(5601.22e-9, 0.0)];
+    let ours = [part(5906.96e-9, 0.0)];
+    assert!(differences(&held_to_model(off.clone(), &model, 2.0, true), &ours).is_empty(), "ours within 1 % of the model");
+    assert!(!differences(&held_to_model(off, &model, 2.0, false), &ours).is_empty(), "importing live's own file: live's reading");
 }
 
 /// Live's import that splits its own model's edges (the hose's STEP) is its shortcoming: ours is held to the model's
