@@ -33,6 +33,19 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 03:17 UTC: c2-hunting-knife's Loft 3 as live (landing); the keep mark landed (d00d91d6).**
+- Live 2291's Loft 3 face (4 x 26 poles) is exactly a Coons patch with the cubic Hermite 1 - 3u² + 2u³ across the
+  guides and linear between the profiles, on its boundaries in their own parameters (0.00 µm; /root/core-scratch/
+  knife_fill.py). loft_guided.cpp `hermite_coons` builds it as an exact B-spline (replaces GeomFill Stretch in
+  `face_on_edges`); `chain_bspline` keeps each piece at its length share (GeomConvert_CompCurveToBSplineCurve's
+  WithRatio off; Approx_CurvilinearParameter's [0, 1] set to the length) and `ease_lines` gives a straight run between
+  a spline and an arc a cubic speed from one's to the other's (live's guide speeds 1.13 -> 0.96 -> 1). T1 kernel
+  features::a_loft_between_guides_fades_them_across_as_live (fails with OCCT's ratio).
+- Knife 11 -> 14/52 (blade 4983.62 mm³, band 4982.05-4991.53; face within 4.5 µm of live's 25 points); next Fillet 2
+  ERROR (blend.md 02:48). Model suite 760 -> 763/951, no document worse; kernel 345 / model 422 pass; Loft 3 27 ms as
+  before (the discarded sampled face no longer built). Left: our G0 is OCCT's degree-5 approximation of Split 2's cut
+  (live: the sketch's cubic), up to 1.3 mm off live's pairing: TICKETS SPLIT-EXACT-EXTRUSION-SECTION.
+
 **State 11-09 01:00 UTC: the "keep" mark landing (a32d463cc).**
 - Intentional splits survive later unifies: `k::imprint_kept` (hole.rs thread split, split.rs Split / opSplitFace,
   curves.rs offset curve, surfacing_c.rs wrap / isocline, custom ops.rs op_wrap) marks the new edges; common.cpp

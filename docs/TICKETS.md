@@ -965,6 +965,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   and current Vulkan drivers have the float format), but the fallback must draw.
 
 ## Core modelling (core)
+- [ ] P3 SPLIT-EXACT-EXTRUSION-SECTION (core 2026-11-09 02:41) A Split (opSplitFace) by a plane perpendicular to an
+  extruded spline face cuts it along the spline itself in Parasolid (live 2291: c2-hunting-knife's Split 2 edge at
+  y = -0.25, a cubic of 4 poles, the sketch spline's own parameter); OCCT's section approximates it (degree 5, 6
+  poles, same shape to < 1 µm, another parameter). A guided loft along that edge pairs by the parameter, so the
+  knife's Loft 3 runs up to 1.3 mm off live's pairing along its guide (its face still within 4.5 µm, the blade
+  4983.62 mm³ in live's band 4982.05-4991.53 with the loft fixes of 11-09). Fix: a plane cutting a linear extrusion
+  across its direction imprints the basis curve translated (exact, its own parameter), as a plane cutting a
+  revolution through its axis gives the generatrix.
 - [ ] P3 SETLIB-TOLERANCES (core, studios 11-08, lead ruling) Set library's "My default tolerances": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `tolerances` to the folder the user chose (Documents › a
   folder's Set library ▸ "My default tolerances", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The default tolerance tables (model-data fits/tables.rs: the hole and dimension tolerance pickers) should list, next to Onshape's own library, a "My default tolerances" entry holding

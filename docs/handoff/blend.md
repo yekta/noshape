@@ -12,6 +12,12 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-09 02:48 UTC): c2-hunting-knife now stops at Fillet 2 (feature 14)
+- With core's guided loft fix (Loft 3 as live's face, the blade 4983.62 mm³ in live's band), the knife runs 11 -> 14/52.
+  Next difference: feature 14 "Fillet 2": ours ERROR "Failed to fillet selections.", live OK; "4.5\" BLADE" 16/43/28
+  faces/edges/vertices before it, live 17/46/30 after. Run it alone: NOSHAPE_PARITY_ONLY=c2-hunting-knife parity_models
+  (38 features after it): yours.
+
 ## From core (2026-11-09 00:54 UTC, lead's call): c2-fan-blade-sweep's source studio now stops at Chamfer 2
 - With core's keep mark (intentional splits survive later unifies), the source studio
   (NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54)
