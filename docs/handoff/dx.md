@@ -32,7 +32,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
      sheet metal walls, core's (TICKETS SHEETMETAL-COPLANAR-WALLS).
   4. The hose's STEP / IGES / Parasolid, 3: our files make live's import split a tube's ring edge (12/13/3 for the
      model's 12/12/0); live's own STEP is worse (12/16/8).
-  5. The spur gear's STEP (volume +0.2 %) and STL part count: open.
+  5. The spur gear's STL: live's own STL of its 65-tooth gear is 5.3 % off its model (5601 mm³ for 5915.7): live's
+     import of ours is now held to the model within 1 % (ours 5907). Its STEP (volume +0.2 %): open.
+- 00:45 UTC, with vibe4's stale dx-exchange copy replaced by /root/parity/exchange (live-ours.json there is from
+  11-08 16:31–17:25; **sync it before running the suite on a build host**): live imports ours 37/48; ours imports
+  live's 45/48 → 46 with the STL rule split. Asked live for one batch re-import of all 12 ours.stl (REQUESTS 00:45)
+  with a question on cf-o-ring-generator's x_t (27/30/8 in live for 27/26/0).
+- "ours imports live's" leftovers: the spur gear's STEP and IGES areas (−0.024 %, −0.12 %) are our integrator on
+  its B-spline faces: a fine mesh of our own import gives live's numbers (4761.73 mm³ / 4123.68 mm² for live's
+  4761.97 / 4123.70; our integral 4757.60 / 4122.70). Core's (TICKETS INTEGRATOR-BSPLINE-GEAR).
+- Mine left in exchange: the hose's STEP / IGES / x_t writing (a tube's ring edge split in live's import; x_t 22
+  faces for 12: its closed B-spline surfaces aren't periodic, so the writer splits them), cf-o-ring's x_t (waiting
+  on live), a facet grid for B-spline faces (the hoses' tubes, −0.5 % volume at REST's 5°).
 
 ## 11-08 20:11 UTC: STL presets as live's facetter (lead: do the meshing work)
 

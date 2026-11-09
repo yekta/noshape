@@ -4076,6 +4076,11 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   text's glyph regions aren't live's. 13 of 17 features lost behind it.
 - [ ] P2 SUITE-LOUVER-SKETCH-9 (skasm, paused; core 2026-11-08 20:05 UTC): c2-sm-louver's Sketch 9 frame origin [0, 0,
   606.17] mm, live [-708.49, 351.45, 2.03] (on a sheet metal definition face); 5 of 36 features lost.
+- [ ] P3 INTEGRATOR-BSPLINE-GEAR (core; dx 2026-11-09 00:46 UTC, data exchange) cf-spur-gear's live.step read in ours:
+  the 32-tooth gear's volume / area by our integral 4757.60 mm³ / 4122.70 mm², by a fine mesh of the same import
+  4761.73 / 4123.68, live's import 4761.97 / 4123.70 (also its IGES: area −0.12 %). The integral misses on its
+  tooth faces (no pcurves in the file, 4-pole edge curves), as in P2 I1's blend faces. Exchange suite "ours imports
+  live's": the last two misses.
 - [ ] P2 SHEETMETAL-COPLANAR-WALLS (core; dx 2026-11-09 00:09 UTC, data exchange) cf-sheet-metal-model-plus's "Sheet
   Metal Up to Part": seven planar faces on x = 25 lie up to 1.7e-4 mm apart (two on x = 13, 4.6e-4 mm), where live's
   model has them on one plane. Exported (STEP, IGES) and read back, live's import (and ours) merges coplanar faces only
