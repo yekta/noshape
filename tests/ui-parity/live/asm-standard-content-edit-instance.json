@@ -1,6 +1,6 @@
 {
  "scenario": "asm-standard-content-edit-instance",
- "recorded": "2026-11-09T11:59:44.441Z",
+ "recorded": "2026-11-09T19:41:18.374Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -10,7 +10,7 @@
  "live": {
   "document": "5337f675c06cff98a9e89387",
   "workspace": "43a8565f5c2f4c8c1459dc4f",
-  "element": "2495c5782fdba12f6751c932",
+  "element": "15f2672e9a9e02524c4a326d",
   "start": "two-blocks",
   "startElement": "fbd9c2146a18cf5cba6d5b3a",
   "runner": "live2 .nstate-uip-3.json"
@@ -318,7 +318,7 @@
     },
     "drawing": null
    },
-   "t": 41712
+   "t": 40458
   },
   {
    "step": 2,
@@ -350,13 +350,15 @@
       "Class",
       "Component",
       "Size",
+      "Head slot",
+      "[x] Head slot",
       "Length",
       "Thread length",
       "Material",
       "Finish",
       "Part number",
       "Description",
-      "Hex socket head cap screw M3x0.50 x 10 Stainless Steel ",
+      "Countersunk Bolt #10-24 x 0.25 Stainless Steel ",
       "Insert"
      ]
     },
@@ -365,15 +367,19 @@
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Nuts / O-rings / Pins / Washers / Class / Cross recess head screws / Hex head bolts & screws / Self-tapping screws / Set screws (hex socket) / Set screws (slotted) / Slotted head screws / Socket head screws / Component / Hex socket countersunk head screw ISO 1",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Keys / Nuts / Pins & studs / Retaining rings / Washers / Class / Countersunk bolts / Hex bolts / Lag screws / Machine screws / Miniature screws / Round head bolts / Set screws (hex socket) / Set screws (slotted) / Set screws (square head) / Socket head screws ",
       "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
        {
         "placeholder": null,
         "value": ""
        },
        {
         "placeholder": null,
-        "value": "Hex socket head cap screw M3x0.50 x 10 Stainless Steel "
+        "value": "Countersunk Bolt #10-24 x 0.25 Stainless Steel "
        }
       ]
      }
@@ -492,7 +498,7 @@
     },
     "drawing": null
    },
-   "t": 48206
+   "t": 45305
   },
   {
    "step": 3,
@@ -524,13 +530,15 @@
       "Class",
       "Component",
       "Size",
+      "Head slot",
+      "[x] Head slot",
       "Length",
       "Thread length",
       "Material",
       "Finish",
       "Part number",
       "Description",
-      "Hex socket head cap screw M3x0.50 x 10 Stainless Steel ",
+      "Countersunk Bolt #10-24 x 0.25 Stainless Steel ",
       "Insert"
      ]
     },
@@ -539,15 +547,19 @@
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Nuts / O-rings / Pins / Washers / Class / Cross recess head screws / Hex head bolts & screws / Self-tapping screws / Set screws (hex socket) / Set screws (slotted) / Slotted head screws / Socket head screws / Component / Hex socket countersunk head screw ISO 1",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Keys / Nuts / Pins & studs / Retaining rings / Washers / Class / Countersunk bolts / Hex bolts / Lag screws / Machine screws / Miniature screws / Round head bolts / Set screws (hex socket) / Set screws (slotted) / Set screws (square head) / Socket head screws ",
       "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
        {
         "placeholder": null,
         "value": ""
        },
        {
         "placeholder": null,
-        "value": "Hex socket head cap screw M3x0.50 x 10 Stainless Steel "
+        "value": "Countersunk Bolt #10-24 x 0.25 Stainless Steel "
        }
       ]
      }
@@ -559,7 +571,7 @@
       {
        "kind": "INSTANCE",
        "owner": null,
-       "id": "Mivslb9idmlU05PTz"
+       "id": "M0zgDhi/gWIcxevXt"
       }
      ]
     },
@@ -602,7 +614,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": true,
        "editing": false,
@@ -681,7 +693,7 @@
     },
     "drawing": null
    },
-   "t": 57474
+   "t": 53095
   },
   {
    "step": 4,
@@ -713,13 +725,15 @@
       "Class",
       "Component",
       "Size",
+      "Head slot",
+      "[x] Head slot",
       "Length",
       "Thread length",
       "Material",
       "Finish",
       "Part number",
       "Description",
-      "Hex socket head cap screw M3x0.50 x 10 Stainless Steel ",
+      "Countersunk Bolt #10-24 x 0.25 Stainless Steel ",
       "Insert"
      ]
     },
@@ -728,15 +742,19 @@
      {
       "id": "assembly-insert-dialog",
       "title": "Insert parts and assemblies",
-      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Nuts / O-rings / Pins / Washers / Class / Cross recess head screws / Hex head bolts & screws / Self-tapping screws / Set screws (hex socket) / Set screws (slotted) / Slotted head screws / Socket head screws / Component / Hex socket countersunk head screw ISO 1",
+      "text": "Insert parts and assemblies / Current document / Other documents / Standard content / Standard content / Onshape standard content / Custom standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Keys / Nuts / Pins & studs / Retaining rings / Washers / Class / Countersunk bolts / Hex bolts / Lag screws / Machine screws / Miniature screws / Round head bolts / Set screws (hex socket) / Set screws (slotted) / Set screws (square head) / Socket head screws ",
       "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
        {
         "placeholder": null,
         "value": ""
        },
        {
         "placeholder": null,
-        "value": "Hex socket head cap screw M3x0.50 x 10 Stainless Steel "
+        "value": "Countersunk Bolt #10-24 x 0.25 Stainless Steel "
        }
       ]
      }
@@ -785,7 +803,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -864,7 +882,7 @@
     },
     "drawing": null
    },
-   "t": 66827
+   "t": 62015
   },
   {
    "step": 5,
@@ -930,7 +948,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -960,6 +978,28 @@
     "sketch": null,
     "assembly": {
      "instances": [
+      {
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        70.747398,
+        0,
+        1,
+        0,
+        28.585119,
+        0,
+        0,
+        1,
+        -13.102658,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
       {
        "name": "Part 2 <1>",
        "fixed": false,
@@ -1003,42 +1043,20 @@
         0,
         1
        ]
-      },
-      {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        70.747398,
-        0,
-        1,
-        0,
-        28.585119,
-        0,
-        0,
-        1,
-        -15.391361,
-        0,
-        0,
-        0,
-        1
-       ]
       }
      ],
      "mates": []
     },
     "drawing": null
    },
-   "t": 72533
+   "t": 67088
   },
   {
    "step": 6,
    "do": {
     "do": "rclick",
     "on": {
-     "instance": "Hex"
+     "instance": "Countersunk"
     }
    },
    "ok": true,
@@ -1072,7 +1090,7 @@
       "Edit standard content instance…",
       "Select instances with same configuration",
       "Select instances with same part and same configuration",
-      "Copy Hex socket head cap screw M3x0.50 x 10 <1>",
+      "Copy Countersunk Bolt #10-24 x 0.25 <1>",
       "Move to new subassembly",
       "Export…",
       "Add comment",
@@ -1129,7 +1147,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1159,6 +1177,28 @@
     "sketch": null,
     "assembly": {
      "instances": [
+      {
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        70.747398,
+        0,
+        1,
+        0,
+        28.585119,
+        0,
+        0,
+        1,
+        -13.102658,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
       {
        "name": "Part 2 <1>",
        "fixed": false,
@@ -1202,35 +1242,13 @@
         0,
         1
        ]
-      },
-      {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        70.747398,
-        0,
-        1,
-        0,
-        28.585119,
-        0,
-        0,
-        1,
-        -15.391361,
-        0,
-        0,
-        0,
-        1
-       ]
       }
      ],
      "mates": []
     },
     "drawing": null
    },
-   "t": 77708
+   "t": 72705
   },
   {
    "step": 7,
@@ -1258,13 +1276,15 @@
       "Class",
       "Component",
       "Size",
+      "Head slot",
+      "[x] Head slot",
       "Length",
       "Thread length",
       "Material",
       "Finish",
       "Part number",
       "Description",
-      "Hex socket head cap screw M3x0.50 x 10 Stainless Steel ",
+      "Countersunk Bolt #10-24 x 0.25 Stainless Steel ",
       "Update"
      ]
     },
@@ -1273,15 +1293,19 @@
      {
       "id": "assembly-insert-dialog",
       "title": "Edit standard content",
-      "text": "Edit standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Nuts / O-rings / Pins / Washers / Class / Cross recess head screws / Hex head bolts & screws / Self-tapping screws / Set screws (hex socket) / Set screws (slotted) / Slotted head screws / Socket head screws / Component / Hex socket countersunk head screw ISO 10642 / Hex socket head cap screw ISO 4762 / Hexalobular socket cheese head screw ISO 14580 / Hexalobular socket pan head screw ISO 145",
+      "text": "Edit standard content / Standard / ANSI inch / DIN / ISO / NAS / PEM® / SAE / Category / Bolts & screws / Keys / Nuts / Pins & studs / Retaining rings / Washers / Class / Countersunk bolts / Hex bolts / Lag screws / Machine screws / Miniature screws / Round head bolts / Set screws (hex socket) / Set screws (slotted) / Set screws (square head) / Socket head screws / Square head bolts / T-head bolts / Tapping screws / Component / Countersunk bolt / Countersunk square neck bolt / Size / #10-24 / #1",
       "inputs": [
+       {
+        "placeholder": null,
+        "value": true
+       },
        {
         "placeholder": null,
         "value": ""
        },
        {
         "placeholder": null,
-        "value": "Hex socket head cap screw M3x0.50 x 10 Stainless Steel "
+        "value": "Countersunk Bolt #10-24 x 0.25 Stainless Steel "
        }
       ]
      }
@@ -1330,7 +1354,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1360,6 +1384,28 @@
     "sketch": null,
     "assembly": {
      "instances": [
+      {
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        70.747398,
+        0,
+        1,
+        0,
+        28.585119,
+        0,
+        0,
+        1,
+        -13.102658,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
       {
        "name": "Part 2 <1>",
        "fixed": false,
@@ -1403,35 +1449,13 @@
         0,
         1
        ]
-      },
-      {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        70.747398,
-        0,
-        1,
-        0,
-        28.585119,
-        0,
-        0,
-        1,
-        -15.391361,
-        0,
-        0,
-        0,
-        1
-       ]
       }
      ],
      "mates": []
     },
     "drawing": null
    },
-   "t": 82243
+   "t": 76656
   },
   {
    "step": 8,
@@ -1499,7 +1523,7 @@
        "cls": "is-instance"
       },
       {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -1529,6 +1553,28 @@
     "sketch": null,
     "assembly": {
      "instances": [
+      {
+       "name": "Countersunk Bolt #10-24 x 0.25 <1>",
+       "fixed": false,
+       "transform": [
+        1,
+        0,
+        0,
+        70.747398,
+        0,
+        1,
+        0,
+        28.585119,
+        0,
+        0,
+        1,
+        -13.102658,
+        0,
+        0,
+        0,
+        1
+       ]
+      },
       {
        "name": "Part 2 <1>",
        "fixed": false,
@@ -1572,35 +1618,13 @@
         0,
         1
        ]
-      },
-      {
-       "name": "Hex socket head cap screw M3x0.50 x 10 <1>",
-       "fixed": false,
-       "transform": [
-        1,
-        0,
-        0,
-        70.747398,
-        0,
-        1,
-        0,
-        28.585119,
-        0,
-        0,
-        1,
-        -15.391361,
-        0,
-        0,
-        0,
-        1
-       ]
       }
      ],
      "mates": []
     },
     "drawing": null
    },
-   "t": 87997
+   "t": 80739
   }
  ]
 }
