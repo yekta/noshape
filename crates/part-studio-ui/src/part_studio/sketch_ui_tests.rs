@@ -3456,3 +3456,23 @@ fn linked_custom_features_offer_a_used_feature_not_on_the_toolbar(cx: &mut TestA
     assert!(!linked, "on the toolbar: not linked any more");
     cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&type_id, None, cx)));
 }
+
+/// Delete part's preview outlines the part it removes (live 10-27), computed off the UI thread and kept: a refresh
+/// (a hover) reuses it instead of computing it again (20-28 ms each on c2-bottle-split's Split 1).
+#[gpui::test]
+fn a_removed_parts_outline_is_computed_once_off_the_ui_thread(cx: &mut TestAppContext) {
+    let (window, view, _top, _) = block_part(cx, "removed-outline");
+    let body = cx.update(|cx| view.read(cx).display.bodies.first().map(|b| b.id.clone()).expect("the block"));
+    view.update(cx, |v, _| v.selection = vec![Reference::Body(body.clone())]);
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.start_feature("deleteBodies", w, cx))).unwrap();
+    wait_until(cx, window, |cx| {
+        let v = view.read(cx);
+        v.pending.is_none() && v.ui.preview_before.is_some() && v.display.body(&body).is_none()
+    });
+    wait_until(cx, window, |cx| view.read(cx).ui.removed_outline.as_ref().is_some_and(|(_, o)| o.is_some()));
+    let key = cx.update(|cx| view.read(cx).ui.removed_outline.as_ref().map(|(k, _)| k.clone()));
+    // A refresh keeps it: no second computation (the slot doesn't go back to computing).
+    cx.update(|cx| view.update(cx, |v, cx| v.refresh_scene(false, cx)));
+    let after = cx.update(|cx| view.read(cx).ui.removed_outline.as_ref().map(|(k, o)| (k.clone(), o.is_some())));
+    assert_eq!(after, key.map(|k| (k, true)));
+}

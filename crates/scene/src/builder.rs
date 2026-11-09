@@ -1682,7 +1682,11 @@ pub fn hover_silhouette(display: &StudioDisplay, faces: &[Reference], up: &Uploa
 
 /// The silhouette of `faces` (see [`hover_silhouette`]) in `color`, `width` px.
 pub fn silhouette(display: &StudioDisplay, faces: &[Reference], color: u32, width: f32, up: &Uploader) -> Option<Instance> {
-    let k = theme::lin(color);
+    silhouette_data(display, faces, width).map(|d| silhouette_instance(&d, color, up))
+}
+
+/// [`silhouette`]'s segments, without the GPU (a background task's part: 20-28 ms for a whole part of c2-bottle-split).
+pub fn silhouette_data(display: &StudioDisplay, faces: &[Reference], width: f32) -> Option<SilhouetteData> {
     let want: std::collections::HashSet<&Reference> = faces.iter().collect();
     let q = |p: &[f32; 3]| [(p[0] * 1e6).round() as i64, (p[1] * 1e6).round() as i64, (p[2] * 1e6).round() as i64];
     let mut out = SilhouetteData::default();
@@ -1724,7 +1728,13 @@ pub fn silhouette(display: &StudioDisplay, faces: &[Reference], color: u32, widt
             out.segments.push(SilhouetteSegment { a, b, n1: n1.into(), n2: n2.into(), pick_id: 0, width });
         }
     }
-    (!out.segments.is_empty()).then(|| Instance::new(Drawable::Lines(up.upload_silhouettes(&out))).with_color([k[0], k[1], k[2], 1.0]).unpickable().layer(12))
+    (!out.segments.is_empty()).then_some(out)
+}
+
+/// [`silhouette_data`] uploaded, in `color`.
+pub fn silhouette_instance(data: &SilhouetteData, color: u32, up: &Uploader) -> Instance {
+    let k = theme::lin(color);
+    Instance::new(Drawable::Lines(up.upload_silhouettes(data))).with_color([k[0], k[1], k[2], 1.0]).unpickable().layer(12)
 }
 
 /// A mate connector's state for its glyph.

@@ -223,7 +223,7 @@ impl PartStudioView {
                 let btn = crate::ui::split_tool_button_with("tb-add-custom", crate::ui::initials_icon(&f.name), false, cx).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| this.start_feature(&id, window, cx)));
                 let (name, id) = (f.name.clone(), f.type_id.clone());
                 let view = cx.entity();
-                let btn = btn.os_context_menu(move |m, _, _| my_feature_menu(m, view.clone(), id.clone()));
+                let btn = btn.os_context_menu(move |m, _, cx| my_feature_menu(m, view.clone(), id.clone(), cx));
                 crate::ui_script::wrap(crate::ui::with_tooltip("tt-add-custom", name.clone(), btn).into_any_element(), move || format!("tool:{name}"))
             }
             None => {
@@ -258,7 +258,7 @@ impl PartStudioView {
                                     .gap(px(4.))
                                     .child(div().w(px(30.)).flex_none().flex().items_center().justify_center().child(crate::ui::initials_icon(&name)))
                                     .child(div().flex_1().text_size(px(14.)).child(name.clone()))
-                                    .os_context_menu(move |m, _, _| my_feature_menu(m, rv.clone(), rid.clone()));
+                                    .os_context_menu(move |m, _, cx| my_feature_menu(m, rv.clone(), rid.clone(), cx));
                                 crate::ui_script::mark(row, move || format!("menu:{n}"))
                             })
                                 .on_click(move |_, window, cx| {
@@ -288,11 +288,14 @@ impl PartStudioView {
 /// The toolbar faces' key of the ⊞ group.
 const ADD_CUSTOM_FACE: &str = "add-custom";
 
-/// An added feature's right-click menu (live 2213): Open linked document (the version it comes from), Remove (off
-/// the toolbar at once, no prompt).
-fn my_feature_menu(m: crate::os_menu::OsMenu, view: Entity<PartStudioView>, type_id: String) -> crate::os_menu::OsMenu {
+/// An added feature's right-click menu (live 2213: Sort custom features · Update… · Update all… · Open linked document
+/// · Remove · Customize toolbar… · Hide "Search tools"): Open linked document (the version it comes from), Remove (off
+/// the toolbar at once, no prompt), then the toolbar's own two. (Sort custom features, Update… and Update all…: what
+/// they do is asked of live, REQUESTS 11-09 20:44.)
+fn my_feature_menu(m: crate::os_menu::OsMenu, view: Entity<PartStudioView>, type_id: String, cx: &App) -> crate::os_menu::OsMenu {
     let linked = noshape_model::custom::parse_type_id(&type_id).and_then(|(studio, _)| crate::derived::ExternalRef::parse(studio));
-    let v = view.clone();
+    let hidden = view.read(cx).ui.toolbar.hide_search;
+    let (v, v2, v3) = (view.clone(), view.clone(), view.clone());
     let id = type_id.clone();
     m.list_no_icons()
         .item(crate::os_menu::OsMenuItem::new("Open linked document").disabled(linked.is_none()).on_click(move |_, _, cx| {
@@ -302,4 +305,12 @@ fn my_feature_menu(m: crate::os_menu::OsMenu, view: Entity<PartStudioView>, type
             })
         }))
         .item(crate::os_menu::OsMenuItem::new("Remove").on_click(move |_, _, cx| view.update(cx, |this, cx| this.remove_my_feature(&id, cx))))
+        .item(crate::os_menu::OsMenuItem::new("Customize toolbar…").on_click(move |_, window, cx| v2.update(cx, |this, cx| this.start_toolbar_customize(window, cx))))
+        .item(crate::os_menu::OsMenuItem::new(if hidden { "Show \"Search tools\"" } else { "Hide \"Search tools\"" }).on_click(move |_, _, cx| {
+            v3.update(cx, |this, cx| {
+                this.ui.toolbar.hide_search = !this.ui.toolbar.hide_search;
+                this.ui.toolbar.save();
+                cx.notify();
+            })
+        }))
 }

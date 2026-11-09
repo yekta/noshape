@@ -1216,6 +1216,46 @@ impl PartStudioView {
         cx.notify();
     }
 
+    /// The outline of the parts the open feature removes (its active field's parts the preview no longer has), from
+    /// the model before it: cached, and computed in the background (the scene refreshes when it's in).
+    fn removed_outline(&mut self, cx: &mut Context<Self>) -> Option<noshape_render::Instance> {
+        let (Some(e), Some(before)) = (&self.edit, self.ui.preview_before.clone()) else {
+            self.ui.removed_outline = None;
+            return None;
+        };
+        let faces: Vec<Reference> = e.dialog.read(cx).active_refs().iter().filter_map(|r| match r {
+            Reference::Body(b) if self.display.body(b).is_none() => before.body(b).map(|d| d.face_refs.clone()),
+            _ => None,
+        }).flatten().collect();
+        if faces.is_empty() {
+            self.ui.removed_outline = None;
+            return None;
+        }
+        let key = (Arc::as_ptr(&before) as usize, faces);
+        if let Some((k, outline)) = &self.ui.removed_outline
+            && *k == key
+        {
+            return outline.clone();
+        }
+        self.ui.removed_outline = Some((key.clone(), None));
+        let work = cx.background_spawn({
+            let faces = key.1.clone();
+            async move { scene_builder::silhouette_data(&before, &faces, 2.0) }
+        });
+        cx.spawn(async move |this, cx| {
+            let data = work.await;
+            let _ = this.update(cx, |this, cx| {
+                if this.ui.removed_outline.as_ref().is_some_and(|(k, _)| *k == key) {
+                    let outline = data.map(|d| scene_builder::silhouette_instance(&d, crate::theme::viewport::REMOVED_OUTLINE, this.gpu.uploader()));
+                    this.ui.removed_outline = Some((key, outline));
+                    this.refresh_scene(false, cx);
+                }
+            });
+        })
+        .detach();
+        None
+    }
+
     /// Rebuild highlight state and push the scene to the viewport.
     /// Scene options with the view state that isn't kept in `opts`: zebra
     /// stripes (which can hide the edges).
@@ -1385,6 +1425,7 @@ impl PartStudioView {
         extra.extend(self.context_ref_overlay(&selection, cx));
         self.sync_manipulator(cx);
         self.sync_pick_filter(cx);
+        let removed_outline = self.removed_outline(cx);
         let built = self.built.as_ref().expect("built");
         // Live (behaviours "URGENT (10-22)"): a failing feature's inputs are
         // drawn red while its dialog is open.
@@ -1622,15 +1663,9 @@ impl PartStudioView {
             // A part the feature removes (Delete part's Entities to delete):
             // its silhouette from the model before it, on top at any slider
             // position (live 10-27: (255,192,76), 2 px, no inner edges).
-            if let (Some(e), Some(before)) = (&self.edit, &self.ui.preview_before) {
-                let faces: Vec<Reference> = e.dialog.read(cx).active_refs().iter().filter_map(|r| match r {
-                    Reference::Body(b) if self.display.body(b).is_none() => before.body(b).map(|d| d.face_refs.clone()),
-                    _ => None,
-                }).flatten().collect();
-                if let Some(mut s) = (!faces.is_empty()).then(|| scene_builder::silhouette(before, &faces, crate::theme::viewport::REMOVED_OUTLINE, 2.0, self.gpu.uploader())).flatten() {
-                    s.compare = noshape_render::scene::compare::POST;
-                    scene.instances.push(s);
-                }
+            if let Some(mut s) = removed_outline {
+                s.compare = noshape_render::scene::compare::POST;
+                scene.instances.push(s);
             }
             for (k, inst) in scene.instances.iter_mut().enumerate().take(extra_end).skip(built.static_instances) {
                 let fill = matches!(inst.drawable, noshape_render::Drawable::Mesh(_)) && inst.layer == scene_builder::HIGHLIGHT_FILL_LAYER;
@@ -5439,7 +5474,8 @@ impl PartStudioView {
         let related = self.row_ctx.related.contains(&f.id);
         // The feature being edited shows its draft's name (live: a Hole's
         // row reads "Ø 6.35 mm ↧ 12 mm" while its dialog is open).
-        let draft = self.edit.as_ref().map(|e| e.dialog.read(cx).row_feature()).filter(|d| d.id == f.id);
+        // (Only the edited row builds it: ~2 ms a row on cf-spur-gear's Spur Gear, every row re-drawn as a dialog opens.)
+        let draft = self.edit.as_ref().filter(|e| e.dialog.read(cx).feature.id == f.id).map(|e| e.dialog.read(cx).row_feature());
         // The name shows the active configuration's values (a configured
         // Variable reads "#w = 80 mm" under L; qa4 round 4 S4-a).
         let configured = draft.is_none().then(|| self.studio(cx).filter(|s| s.configuration.configured.iter().any(|c| c.feature == f.id)).map(|s| s.configuration.for_editing(f, &self.current_config(s)))).flatten();

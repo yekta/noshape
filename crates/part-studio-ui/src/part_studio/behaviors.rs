@@ -149,6 +149,9 @@ pub(super) const SELECT_OTHER_SIZE: (f32, f32) = (220., 149.);
 pub type ConsumedLines = (Vec<Reference>, Vec<Reference>, Vec<Reference>, usize, Vec<noshape_render::Instance>);
 
 /// View state for the behaviors above.
+/// A removed part's outline's key: the model before the feature (by address) and the part's faces.
+pub type RemovedOutlineKey = (usize, Vec<Reference>);
+
 pub struct UiState {
     /// Edit in context: the assembly shown around the part.
     pub(super) in_context: Option<super::in_context::InContextUi>,
@@ -435,6 +438,10 @@ pub struct UiState {
     /// the model before the edited feature.
     pub preview_opacity: f32,
     pub preview_before: Option<Arc<StudioDisplay>>,
+    /// The outline of a part the open feature removes, over its preview: for the model before it (by address) and
+    /// those faces; `None` inside while a background task computes it (20-28 ms for a whole part: refresh_scene ran
+    /// it on every hover, c2-bottle-split's Split 1).
+    pub removed_outline: Option<(RemovedOutlineKey, Option<noshape_render::Instance>)>,
     /// Regeneration context before the edited feature.
     pub before_context: Option<Arc<noshape_model::regen::context::Context>>,
     /// The edited feature's parameters when std's editing logic last ran
@@ -788,6 +795,7 @@ impl UiState {
             message_timed: None,
             preview_opacity: crate::feature_dialog::PREVIEW_REST,
             preview_before: None,
+            removed_outline: None,
             before_context: None,
             decal_sized: None,
             std_edit_old: None,

@@ -9,6 +9,25 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## 2026-11-09 22:11 UTC: the added feature's menu, and dialog open's p95
+
+**The added custom feature's menu** (▾ entry and face): Open linked document · Remove · Customize toolbar… · Hide /
+Show "Search tools" (the toolbar's own two, live 2213's order). Sort custom features, Update… and Update all… aren't
+there yet: no recording reads what they do and the help page doesn't describe them; asked live (REQUESTS 20:44) with
+what a studio's row shows when it adds several features.
+
+**Dialog open's p95** (focused `ui-latency`, vibe5 release, 12 documents): 16-21 ms now, from 18-28 (49 on
+cf-spur-gear). What remains is the wait for the next 60 Hz frame (a sample's 300 ms timer lands at one phase of it,
+c2-helical-sweep ~14 ms every time) plus the frame's own 4-7 ms. Two causes found with perf scopes (no perf sampling
+on the vibe hosts: perf_event_paranoid 4):
+- **A removed part's outline** (Delete part's preview outlines the part it removes; Split 1's part counts too, its
+  pieces have new ids) was `scene_builder::silhouette` over all its faces on every `refresh_scene`: 20-28 ms on
+  c2-bottle-split, on each hover too. Now cached per model and faces, computed off the UI thread
+  (`scene_builder::silhouette_data` + `silhouette_instance`; test `a_removed_parts_outline_is_computed_once_off_the_ui_thread`).
+- **Every feature row built the open dialog's draft feature** (`row_feature()`) to check whether it was the edited
+  row: ~2 ms a row on cf-spur-gear (the Spur Gear's parameters), all rows redrawn as a dialog opens. Now only the
+  edited row builds it.
+
 ## 2026-11-09 20:34 UTC: custom features on the toolbar (user P0), and the Part Studio speed re-measure
 
 **User P0 (lead 11-09): a custom feature added from another document showed no sign it was added.** Placement is
