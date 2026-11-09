@@ -1,0 +1,39 @@
+{
+ "name": "docs-new-doc-location-sort",
+ "about": "Create › Document…: the Document location box's Sort (↓≡): Name: Z → A; Cancel",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Document…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Sort"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Name: Z → A"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

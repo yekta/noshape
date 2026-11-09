@@ -3881,6 +3881,8 @@ pub struct Location {
     pub chosen: Rc<RefCell<PathBuf>>,
     /// A folder that can't be a destination (the folder being moved).
     pub exclude: Option<PathBuf>,
+    /// The header's Sort (↓≡): its rows by name either way or newest first (live documents/900).
+    sort: Rc<std::cell::Cell<FolderSort>>,
 }
 
 /// The names the user's history is written under (see `StartView::me`).
@@ -3912,7 +3914,7 @@ fn outside_folders() -> Vec<PathBuf> {
 impl Location {
     /// A browser starting at `chosen`.
     pub fn new(chosen: PathBuf) -> Self {
-        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None }
+        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None, sort: Default::default() }
     }
 
     /// The place shown in the header: "Owned by me" or the folder's name.
@@ -3929,6 +3931,11 @@ impl Location {
             v.extend(extra);
         }
         v.retain(|f| self.exclude.as_ref() != Some(f));
+        match self.sort.get() {
+            FolderSort::NameAsc => v.sort_by_cached_key(|f| folder_label(f).to_lowercase()),
+            FolderSort::NameDesc => v.sort_by_cached_key(|f| std::cmp::Reverse(folder_label(f).to_lowercase())),
+            FolderSort::Modified => v.sort_by_cached_key(|f| std::cmp::Reverse(std::fs::metadata(f).and_then(|m| m.modified()).ok())),
+        }
         v
     }
 
@@ -3992,7 +3999,34 @@ impl Location {
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(os::glyph(if at_root { os::GLYPH_OWNED } else { os::GLYPH_FOLDER }, 18., pal.text))
                             .child(self.shown()),
-                    ),
+                    )
+                    .child(div().flex_1())
+                    .child({
+                        let sort = self.sort.clone();
+                        div()
+                            .id("loc-sort")
+                            .map(|d| crate::ui_script::mark(d, || "button:Sort".into()))
+                            .w(px(28.))
+                            .h(px(28.))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(px(3.))
+                            .cursor_pointer()
+                            .hover(|d| d.bg(rgb(0xeaeaea)))
+                            .tooltip(crate::ui::tooltip("Sort"))
+                            .child(os::glyph(os::GLYPH_SORT, 20., pal.text))
+                            .os_dropdown_menu("loc-sort-dd", false, move |m, _, _| {
+                                let item = |label: &'static str, k: FolderSort| {
+                                    let sort = sort.clone();
+                                    OsMenuItem::new(label).checked(sort.get() == k).on_click(move |_, window, _| {
+                                        sort.set(k);
+                                        window.refresh();
+                                    })
+                                };
+                                m.item(item("Name: A → Z", FolderSort::NameAsc)).item(item("Name: Z → A", FolderSort::NameDesc)).item(item("Last modified", FolderSort::Modified))
+                            })
+                    }),
             )
             .child(div().id("loc-list").flex_1().min_h_0().overflow_y_scrollbar().child(list))
             .into_any_element()

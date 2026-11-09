@@ -379,7 +379,8 @@ states above.
   panel's `{"field": "Properties › Description"}` (`Name`, `Library label`) and `{"button": "Properties › Undo"}`
   (`Redo`, `Apply`); the column chooser's `{"field": "Search…"}` and a column's grip `{"col_grip": "Owned by"}` (a
   `drag`'s ends, `"edge": "top"` on the drop); Advanced search's `{"button": "Advanced search help"}` (its ?).
-  New document's location box: `{"button": "Home"}`, `{"button": "Back"}`, a folder row `{"list_row": "uip Folder"}`;
+  New document's location box: `{"button": "Home"}`, `{"button": "Back"}`, its ↓≡ `{"button": "Sort"}` (by tooltip;
+  the menu's rows by text), a folder row `{"list_row": "uip Folder"}`;
   its Document labels box `{"field": "Search labels"}`.
 - Targets on Preferences: a control by its section and label, `{"field": "Units › Length default unit", "pick":
   "Inch"}` (a select), `{"field": "Units › Length default unit › Display decimals"}` (the select after it),

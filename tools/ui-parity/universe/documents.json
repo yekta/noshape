@@ -386,7 +386,23 @@
    "where": "New document or New folder dialog › location box ↓≡",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:2470"
+   "source": "behaviours.md:2470",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Document…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Sort"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-new-document-create-public-document",
