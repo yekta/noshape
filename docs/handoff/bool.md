@@ -15,10 +15,16 @@ scratch /root/bool-scratch.
   tests 350/350, model suite unchanged but for main's own (c2-extension-spring now compared to 12 of 16), g++-13 builds.
 - Tried, not kept: marching the edges first (the fallback of 64 points on both offsets): edges 707-921 ms and the
   Shell then fails.
-- Next: the traces (8 curves where three offsets meet, ~45 ms each for ~1.6 mm: ~6 ms a step). `eval_grad` on a
-  free-form offset keeps one parameter hint per surface for every caller (Surf::hint), so queries at different places
-  restart from far-off hints (ShapeAnalysis UVFromIso 10 % of the Shell). A hint per caller, or the traces each on
-  their own copies of the surfaces (then on all threads), are the two ways in.
+- **Traces in parallel (712f60f8, lead 11-09: deterministic output, the same topology, points within 1e-9 m):** each
+  open trace of a round runs dry on all threads on its own copies of the surfaces (fresh ShapeAnalysis_Surface, no
+  last foot), its own classifier and polylines, reading only the round's points; then they are taken in order (one
+  closed by an earlier one skipped, add_triple merging a new point with one made this round, `make_edge`), and before
+  each the wall's surfaces take the feet that trace ended on (as one traced in place left them). Without the feet the
+  later steps' approximations moved curve ends by up to 1.4 um; with them the result is byte-identical to before
+  (shell-9 / -53 BREPs: the same md5 as the old code, on 1, 2 and 16 threads, run after run). Traces 364 + 61 -> 172 +
+  29 ms, quadrics 1.5 -> 1.28 s. qa's shellmatrix / boolmatrix / gpf identical, kernel tests 351/351, g++-13 builds.
+  Scratch: bool-c's probe (PROBE_OUT writes the result; xprobe::probe_compare; XOLDTRACE / XPTS switches in bool-c's
+  copy only).
 
 ## OCCT patch 0027: a face's polyhedron kept (11-09 10:25 UTC; lead: the impeller's Delete face 2 first)
 - IntCurveSurface (TKGeomAlgo, IntCurveSurface_Inter.pxx): the edge / face intersection sampled the face into a
