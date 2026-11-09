@@ -29,8 +29,12 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Exchange suite (vibe4, /root/parity/exchange synced): ours imports live's 46/48, live imports ours 40/48 (the
   hose x_t / STL and the o-ring x_t wait on live's re-import), ours reads ours back 43/48.
 - **Drawings, live 2402:** `EDGE <view>` is live's pixel reader: orange inside a view's box without the dark frame.
-  Only a base view gets the dark frame; a selected projected / section / auxiliary / detail view reads EDGE. Ours
-  now says so (drawing_ui_state.rs); the score is being rerun.
+  A selected section, auxiliary or detail view reads EDGE (light frame); a projected one either way by its pixels
+  (block-drawing's Right VIEW, Top EDGE), so ours keeps VIEW there. 1255 -> 1259/1409 states, 124/176 scenarios
+  (main's own today: 124, 1255). Left: 65 states where live lists one item and ours none, mostly something orange
+  inside a view (a closed crop spline, a painted or just-placed dimension, a BOM row's view).
+- Hose x_t refit at Parasolid's 1e-8 (1e-9 made it 10.9 MB; 3.3 MB now, reads back matching). Batch re-import of all
+  12 folders asked (REQUESTS 04:07).
 
 ## 11-09 01:14 UTC: drawing interaction (lead): 121 → 123/176 scenarios, 1248 → 1253/1409 states
 
