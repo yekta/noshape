@@ -3,6 +3,11 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**11-09 05:16 (lead):** vibe2's T2 hang (P1 T2-ASM-STANDARD-CONTENT-HANG, asm) was the load behind the 18:54 / 23:24 runs'
+speed; the nightly T2 now stops at 4 h (tonight's copy from 02:09 until ~06:10). To do: the speed part of the index again on
+a quiet vibe2 under the feature-time definition: the 04:00 run (35fd1ddf) if vibe2 was quiet during its model stage, else
+the model suite alone (vibe2:qa-parity/run-suites.sh's first line) and tools/parity/index.py over that report.
+
 **11-08 23:45:** psui's speed change noted: bin/suites-diff.py compares the new run's `regen_ms.wall` with the previous run's
 `ours` across the change (both wall times), features' time with features' time after; the 23:24 run (19036006) predates it;
 the next run (~04:00) is the first with the new definition: its SCORE speed row says so.
