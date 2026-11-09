@@ -61,6 +61,11 @@ pub fn compile_with(tab: TabId, source: &str, resolver: &dyn Resolver, deps: u64
     compiled
 }
 
+/// Whether [`compile_with`] has `source` of `tab` (with `deps`) cached.
+pub(super) fn is_compiled(tab: TabId, source: &str, deps: u64) -> bool {
+    CACHE.lock().contains_key(&(tab.0, source_hash(source) ^ deps.rotate_left(17)))
+}
+
 /// Feature Studio `tab` of another document's version, its features named after `key` (its `ext:` key); uncached
 /// (the caller keeps it: a version never changes).
 pub(super) fn compile_external(tab: TabId, key: &str, source: &str, resolver: &dyn Resolver) -> CompiledStudio {

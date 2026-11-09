@@ -116,8 +116,8 @@ impl Workspace {
     pub fn new(doc: Entity<DocModel>, gpu: Gpu, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let subs = vec![cx.subscribe_in(&doc, window, |this: &mut Self, _, ev: &DocEvent, window, cx| match ev {
             DocEvent::TabsChanged | DocEvent::Reloaded | DocEvent::UnitsChanged { .. } => {
-                // Register custom feature schemas of the (new) Feature Studios.
-                let _ = this.doc.read(cx).custom_features();
+                // Register custom feature schemas of the (new) Feature Studios (in the background).
+                crate::doc_model::compile_custom_features(&this.doc, cx);
                 this.sync_tabs(window, cx);
                 this.refresh_behind(false, cx);
                 cx.notify();
@@ -158,8 +158,9 @@ impl Workspace {
         let focus_lost = cx.on_focus_lost(window, |this: &mut Self, window, cx| this.focus_active(window, cx));
         let active = doc.read(cx).session.doc.ordered_tabs().first().map(|t| t.id);
         noshape_render::perf::milestone("workspace: subscribed");
-        let _ = doc.read(cx).custom_features();
-        noshape_render::perf::milestone("workspace: custom features compiled");
+        // Compiled in the background, not before the window's first frame (~50 ms of a document with custom features).
+        crate::doc_model::compile_custom_features(&doc, cx);
+        noshape_render::perf::milestone("workspace: custom features compiling");
         let thumbnailer = cx.new(|cx| crate::start_thumbnail::Thumbnailer::new(doc.clone(), gpu.clone(), cx));
         let tab_thumbs = cx.new(|_| crate::tab_thumbs::TabThumbs::new(doc.clone()));
         noshape_render::perf::milestone("workspace: thumbnailers");

@@ -422,6 +422,8 @@ pub struct UiState {
     pub dialog_width: Option<Pixels>,
     /// Toolbar customization (removed tools, group order, S toolbar).
     pub toolbar: super::toolbar_prefs::ToolbarPrefs,
+    /// The user's custom features as of this revision (custom_features.rs `MyCustomFeaturesRev`).
+    pub my_custom_rev: u64,
     /// Customize toolbar… while it is open.
     pub tb_custom: Option<crate::toolbar_customize::Customize>,
     /// The Isolate slider being dragged (pressed on it, button still down).
@@ -780,6 +782,7 @@ impl UiState {
             dialog_pos: None,
             dialog_width: None,
             toolbar: super::toolbar_prefs::ToolbarPrefs::load(),
+            my_custom_rev: 0,
             tb_custom: None,
             iso_slider_drag: None,
             message_timed: None,
@@ -2425,7 +2428,7 @@ impl PartStudioView {
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
-        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
+        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features_lazy();
         let (regen, seed) = (self.regen.clone(), self.regen_seed.clone());
         self.ui.preview_cancel.abort();
         self.ui.preview_cancel = Default::default();
@@ -2489,7 +2492,7 @@ impl PartStudioView {
         let config = self.current_config(&studio);
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
-        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
+        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features_lazy();
         let (regen, seed) = (self.regen.clone(), self.regen_seed.clone());
         self.ui.preview_tool_cancel.abort();
         self.ui.preview_tool_cancel = Default::default();

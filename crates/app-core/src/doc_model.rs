@@ -134,6 +134,18 @@ impl DocModel {
         noshape_model::custom::DocumentScripts::from_document(&self.session.doc)
     }
 
+    /// The custom features for a regeneration: compiled in its background task on first use, not on the UI thread
+    /// (a document's first compile takes ~50 ms).
+    pub fn custom_features_lazy(&self) -> std::sync::Arc<noshape_model::custom::LazyScripts> {
+        noshape_model::custom::LazyScripts::new(noshape_model::custom::DocumentScripts::sources(&self.session.doc))
+    }
+
+    /// The custom features if compiled already (what a frame may read), else None: [`compile_custom_features`]
+    /// compiles them in the background.
+    pub fn custom_features_if_compiled(&self) -> Option<std::sync::Arc<noshape_model::custom::DocumentScripts>> {
+        noshape_model::custom::DocumentScripts::if_compiled(&self.session.doc)
+    }
+
     pub fn name(&self) -> String {
         self.session.name()
     }
@@ -409,6 +421,23 @@ impl Drop for DocModel {
 
 /// The message bubble of a document notice: `msg` with its link when [`DocModel::info_with_link`] gave it one (the link
 /// closes the bubble after it runs), and ×. The Part Studio's, the Assembly's and the workspace's toasts all draw it.
+/// Compile `doc`'s Feature Studios in the background (their schemas registered for the toolbar and the feature
+/// list), then redraw; nothing when they are compiled already.
+pub fn compile_custom_features(doc: &Entity<DocModel>, cx: &mut App) {
+    let src = noshape_model::custom::DocumentScripts::sources(&doc.read(cx).session.doc);
+    if src.compiled() {
+        return;
+    }
+    let work = cx.background_spawn(async move {
+        noshape_model::custom::DocumentScripts::from_sources(&src);
+    });
+    cx.spawn(async move |cx| {
+        work.await;
+        cx.update(|cx| cx.refresh_windows());
+    })
+    .detach();
+}
+
 pub fn notice_bubble(id: impl Into<ElementId>, kind: impl Into<crate::os_ui::BubbleKind>, msg: String, doc: &Entity<DocModel>, on_close: impl Fn(&ClickEvent, &mut Window, &mut App) + Clone + 'static, cx: &App) -> Stateful<Div> {
     match doc.read(cx).notice_link(&msg) {
         Some(link) => {

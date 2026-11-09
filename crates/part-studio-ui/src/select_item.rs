@@ -37,6 +37,9 @@ const FEATURE_FILTERS: [(&str, &str); 7] = [("FeatureScript samples", "custom-fe
 pub enum SelectItemEvent {
     /// A tab (`tab`, `tab#part`, or `ext:` key of another document / version).
     Picked(String),
+    /// Add custom features: a Feature Studio's own row, its features' type ids (help "Custom features": the top
+    /// level inserts all custom features inside it).
+    PickedAll(Vec<String>),
     Close,
     /// Create version…: this document (`None`) or another one.
     CreateVersion(Option<PathBuf>),
@@ -124,6 +127,8 @@ pub struct SelectItemPanel {
     pub thumbs: HashMap<String, Arc<RenderImage>>,
     /// The current value (highlighted row).
     pub value: String,
+    /// Add custom features: the type ids on the user's toolbar, shown as added (a click toggles one off).
+    added: HashSet<String>,
     /// A ✓ in the header, enabled or not (the sketch's Insert DXF or DWG:
     /// greyed until a file is picked); `None`: only the ✕.
     pub ok: Option<bool>,
@@ -328,6 +333,7 @@ impl SelectItemPanel {
             lib_image_select: None,
             lib_image_thumb: None,
             collapsed: HashSet::new(),
+            added: HashSet::new(),
             frame_profiles,
             frame_pick: None,
             frame_selects: HashMap::new(),
@@ -356,6 +362,15 @@ impl SelectItemPanel {
     pub fn version_label(&self) -> Option<String> {
         let d = if self.other_documents { self.other.as_ref() } else { self.current.as_ref() }?;
         d.version.and_then(|i| d.versions.get(i)).map(|v| v.label.clone())
+    }
+
+    /// The version as Add custom features' toast names it: "version V1", "published version V4" (a version published
+    /// with Publish FeatureScript…; lead's live check 11-09, behaviours "lead (2026-11-09 ~20:00 UTC)").
+    pub fn version_phrase(&self) -> Option<String> {
+        let d = if self.other_documents { self.other.as_ref() } else { self.current.as_ref() }?;
+        let v = d.version.and_then(|i| d.versions.get(i))?;
+        let published = noshape_ops::versions::is_published_fs(&d.path, v.microversion);
+        Some(format!("{}version {}", if published { "published " } else { "" }, v.label))
     }
 
     /// Other documents' filter list is shown (no document or search open).
@@ -474,6 +489,19 @@ impl SelectItemPanel {
         self.graph = false;
         self.load_version_sources(true, cx);
         cx.notify();
+    }
+
+    /// Add custom features: the features shown as added.
+    pub fn added(&self) -> &HashSet<String> {
+        &self.added
+    }
+
+    /// Add custom features: the features on the user's toolbar (shown as added).
+    pub fn set_added(&mut self, added: HashSet<String>, cx: &mut Context<Self>) {
+        if self.added != added {
+            self.added = added;
+            cx.notify();
+        }
     }
 
     fn pick(&mut self, value: String, cx: &mut Context<Self>) {
@@ -648,8 +676,9 @@ impl SelectItemPanel {
         out
     }
 
-    /// A Feature Studio's row (▾, its icon and name; a click folds it), then its features (initials and name; a
-    /// click picks the type id, which stays light blue), those matching the search (live 2213).
+    /// A Feature Studio's row (▾, its icon and name: the ▾ folds it, the rest adds all its features), then its
+    /// features (initials and name; a click picks the type id), those matching the search (live 2213, help "Custom
+    /// features"). A feature on the user's toolbar stays light blue: a click on it toggles it off.
     fn feature_rows(&self, s: &RefSource, features: &[(String, String)], query: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let pal = p();
         let studio_hit = query.is_empty() || s.name.to_lowercase().contains(query);
@@ -660,7 +689,8 @@ impl SelectItemPanel {
         let open = !self.collapsed.contains(&s.tab) || !query.is_empty();
         let key = s.tab.clone();
         // As live's recorder reads the rows: check boxes, the studio's checked once one of its features is picked.
-        let picked = features.iter().any(|(t, _)| *t == self.value);
+        let picked = features.iter().any(|(t, _)| *t == self.value || self.added.contains(t));
+        let all: Vec<String> = features.iter().map(|(t, _)| t.clone()).collect();
         crate::ui_script::note_field(|| serde_json::json!({ "label": s.name, "kind": "boolean", "checked": picked, "child": false }));
         let mut out = vec![
             h_flex()
@@ -668,23 +698,46 @@ impl SelectItemPanel {
                 .h(px(40.))
                 .flex_none()
                 .cursor_pointer()
-                .child(div().w(px(31.)).pl(px(9.)).flex_none().child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 10., pal.text)))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("sel-fs-fold-{}", s.tab)))
+                        .w(px(31.))
+                        .h_full()
+                        .pl(px(9.))
+                        .flex()
+                        .items_center()
+                        .flex_none()
+                        .child(crate::ui::glyph(if open { "expander-down" } else { "expander-right" }, 10., pal.text))
+                        .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            cx.stop_propagation();
+                            if !this.collapsed.remove(&key) {
+                                this.collapsed.insert(key.clone());
+                            }
+                            cx.notify();
+                        })),
+                )
                 .child(div().ml(px(9.)).flex_none().child(crate::assets::icon("feature-studio", 28., cx)))
                 .child(div().flex_1().min_w_0().ml(px(28.)).truncate().text_size(px(13.33)).font_weight(FontWeight::LIGHT).child(crate::ui::user_text(s.name.clone())))
                 .tooltip(crate::ui::user_tooltip(s.name.clone()))
-                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
-                    if !this.collapsed.remove(&key) {
-                        this.collapsed.insert(key.clone());
-                    }
-                    cx.notify();
-                }))
+                .when(self.mode != PanelMode::CustomFeatures, |d| {
+                    let key = s.tab.clone();
+                    d.on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        if !this.collapsed.remove(&key) {
+                            this.collapsed.insert(key.clone());
+                        }
+                        cx.notify();
+                    }))
+                })
+                .when(self.mode == PanelMode::CustomFeatures, |d| d.on_click(cx.listener(move |_, _: &ClickEvent, _, cx| cx.emit(SelectItemEvent::PickedAll(all.clone())))))
+                // Live (lead 11-09): the studio's row stays light blue too while one of its features is added.
+                .when(self.mode == PanelMode::CustomFeatures && features.iter().any(|(t, _)| self.added.contains(t)), |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
                 .into_any_element(),
         ];
         if !open {
             return out;
         }
         for (type_id, name) in hits {
-            let on = self.value == *type_id;
+            let on = if self.mode == PanelMode::CustomFeatures { self.added.contains(type_id) } else { self.value == *type_id };
             let t = type_id.clone();
             crate::ui_script::note_field(|| serde_json::json!({ "label": format!("{} {name}", crate::ui::feature_initials(name)), "kind": "boolean", "checked": false, "child": true }));
             out.push(

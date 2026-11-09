@@ -2474,6 +2474,7 @@ impl PartStudioView {
                         }
                     }
                     E::LibraryImage(name) => this.insert_library_image(name, cx),
+                    E::PickedAll(_) => {}
                     E::Close => this.set_tool(Tool::Select, cx),
                     E::ImportFile => this.import_insert_file(image, window, cx),
                     E::CreateVersion(None) => crate::part_studio_hooks::create_version(this.doc.clone(), window, cx),

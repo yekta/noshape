@@ -3347,3 +3347,112 @@ fn a_spline_from_before_handle_arms_shows_its_arms_on_entering_its_sketch(cx: &m
     assert_eq!(drawn(cx), (2, 2), "regenerated: the scene draws both");
     assert_eq!(cx.update(|cx| view.read(cx).draft_history_state()), (false, false), "not an undo step");
 }
+
+/// User P0 (lead 11-09, help "Custom features"): a feature clicked in Add custom features joins the toolbar with
+/// live's toast and shows as added; clicked again it comes off (no second entry); a Feature Studio's row adds all its
+/// features; the list is alphabetical and every open Part Studio follows it (an account setting).
+#[gpui::test]
+fn add_custom_features_toggles_adds_all_and_sorts(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "custom-toggle");
+    let source = r#"FeatureScript 3044;
+import(path : "onshape/std/common.fs", version : "3044.0");
+annotation { "Feature Type Name" : "Zeta probe" }
+export const zetaProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+    });
+annotation { "Feature Type Name" : "alpha probe" }
+export const alphaProbe = defineFeature(function(context is Context, id is Id, definition is map)
+    precondition
+    {
+    }
+    {
+    });
+"#;
+    let (zeta, alpha) = cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let mut fs = None;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_document("Add a Feature Studio", cx, |d| fs = Some(d.add_tab("Probes", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(source)))));
+                let _ = doc.custom_features();
+            });
+            let fs = fs.expect("the studio");
+            (noshape_model::custom::type_id(fs, "zetaProbe"), noshape_model::custom::type_id(fs, "alphaProbe"))
+        })
+    });
+    let mine = |cx: &mut TestAppContext| cx.update(|cx| view.read(cx).ui.toolbar.custom_features.iter().map(|f| f.name.clone()).collect::<Vec<_>>());
+    cx.update(|cx| view.update(cx, |v, _| v.ui.toolbar.custom_features.clear()));
+    // A click adds it, with live's toast (fs-ps-acf-click-adds).
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&zeta, Some("version V1".into()), cx)));
+    assert_eq!(mine(cx), ["Zeta probe"]);
+    let toast = cx.update(|cx| view.read(cx).message.clone().map(|(_, m)| m));
+    assert_eq!(toast.as_deref(), Some("Custom feature \"Zeta probe\" was added to your toolbar from version V1."));
+    // Again: off the toolbar, its toast gone; not a second entry.
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&zeta, Some("version V1".into()), cx)));
+    assert!(mine(cx).is_empty(), "the second click takes it off");
+    assert!(cx.update(|cx| view.read(cx).message.is_none()));
+    // The studio's row: both, alphabetical (help: "Onshape automatically lists custom features alphabetically").
+    cx.update(|cx| view.update(cx, |v, cx| v.add_all_my_features(&[zeta.clone(), alpha.clone()], None, cx)));
+    assert_eq!(mine(cx), ["alpha probe", "Zeta probe"]);
+    // All on: the row takes them all off.
+    cx.update(|cx| view.update(cx, |v, cx| v.add_all_my_features(&[zeta.clone(), alpha.clone()], None, cx)));
+    assert!(mine(cx).is_empty());
+    // Account-wide: another Part Studio view reloads the saved list when it draws.
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&alpha, None, cx)));
+    cx.update(|cx| view.update(cx, |v, cx| {
+        v.ui.my_custom_rev = 0;
+        v.ui.toolbar.custom_features.clear();
+        v.reload_my_features_if_changed(cx);
+    }));
+    assert_eq!(mine(cx), ["alpha probe"], "the saved list, reloaded");
+    // The panel shows it as added.
+    cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.open_add_custom_features(w, cx))).unwrap();
+    let added = cx.update(|cx| view.read(cx).ui.add_features.as_ref().map(|a| a.panel.read(cx).added().contains(&alpha)));
+    assert_eq!(added, Some(true));
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&alpha, None, cx)));
+}
+
+/// Help "Custom features": a custom feature in the Feature list that isn't on the user's toolbar (removed, or a
+/// shared document's) is offered by "Linked custom features in this Part Studio" ▾; on the toolbar, it isn't.
+#[gpui::test]
+fn linked_custom_features_offer_a_used_feature_not_on_the_toolbar(cx: &mut TestAppContext) {
+    let (window, view) = part_studio(cx, "custom-linked");
+    noshape_model::custom::set_external_tab_loader(noshape_ops::derived::external_tab);
+    // Another document with the feature, at its V1.
+    let dir = std::env::temp_dir().join(format!("noshape-ui-custom-linked-src-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let src_path = dir.join("probes.noshape");
+    let _ = std::fs::remove_file(&src_path);
+    let source = "FeatureScript 3044;\nimport(path : \"onshape/std/common.fs\", version : \"3044.0\");\nannotation { \"Feature Type Name\" : \"Linked probe\" }\nexport const linkedProbe = defineFeature(function(context is Context, id is Id, definition is map)\n    precondition\n    {\n    }\n    {\n    });\n";
+    let mut doc = noshape_model::Document::new();
+    let fs = doc.add_tab("Probes", noshape_model::TabContent::FeatureStudio(noshape_model::custom::FeatureStudio::new(source)));
+    let mut session = noshape_ops::session::Session::create(&src_path, doc).unwrap();
+    let mv = session.head().unwrap();
+    session.create_version("V1", "").unwrap();
+    drop(session);
+    let key = noshape_ops::derived::ExternalRef { path: src_path.canonicalize().unwrap(), microversion: mv, tab: fs.to_string() }.key();
+    assert!(noshape_model::custom::external_studio(&key).is_some(), "the other document's studio compiles");
+    let type_id = noshape_model::custom::studio_type_id(&key, "linkedProbe");
+    // Used in this Part Studio, not on the toolbar.
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            v.ui.toolbar.custom_features.clear();
+            let (tab, units) = (v.tab, v.doc.read(cx).session.doc.settings.units);
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Insert the linked probe", cx, |ps| {
+                    let f = ps.new_feature(&type_id, &units).expect("the linked feature's type");
+                    ps.features.push(f);
+                });
+            });
+        })
+    });
+    draw(cx, window);
+    let linked = cx.update(|cx| view.update(cx, |v, cx| v.linked_custom_tools(cx).is_some()));
+    assert!(linked, "offered while not on the toolbar");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&type_id, None, cx)));
+    let linked = cx.update(|cx| view.update(cx, |v, cx| v.linked_custom_tools(cx).is_some()));
+    assert!(!linked, "on the toolbar: not linked any more");
+    cx.update(|cx| view.update(cx, |v, cx| v.toggle_my_feature(&type_id, None, cx)));
+}

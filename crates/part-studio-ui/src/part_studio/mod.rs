@@ -742,7 +742,7 @@ impl PartStudioView {
         let doc_vars = noshape_model::variables::element_variables(&self.doc.read(cx).session.doc, self.tab);
         let derived: Arc<dyn noshape_model::regen::derived::DerivedProvider> = self.doc.read(cx).derived_provider();
         let derived2 = derived.clone();
-        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features();
+        let custom: Arc<dyn noshape_model::custom::CustomFeatureProvider> = self.doc.read(cx).custom_features_lazy();
         let custom2 = custom.clone();
         let regen = self.regen.clone();
         let regen2 = self.regen.clone();
@@ -3104,7 +3104,8 @@ impl PartStudioView {
             None => (crate::toolbar_customize::full_order(&self.ui.toolbar.group_order, TOOLSETS), self.ui.toolbar.removed.clone()),
         };
         let is_removed = |id: &str| removed.iter().any(|r| r == id);
-        let custom = self.doc.read(cx).custom_features().feature_types();
+        // Compiled already, else none yet (the background compile redraws when done).
+        let custom = self.doc.read(cx).custom_features_if_compiled().map(|s| s.feature_types()).unwrap_or_default();
         let collapse_from = if customizing { usize::MAX } else { Self::toolbar_collapse_from(&order, &removed, custom.len(), !self.ui.toolbar.custom_features.is_empty(), hidden, viewport_w) };
         fn field(v: &mut PartStudioView) -> Option<&mut crate::toolbar_customize::Customize> {
             v.ui.tb_custom.as_mut()
@@ -3128,10 +3129,14 @@ impl PartStudioView {
                     bar = bar.child(crate::ui::tool_separator()).child(el);
                     first = false;
                 }
+                // Live's toolbar: Linked custom features in this Part Studio, then Custom features in this workspace.
+                if let Some(linked) = self.linked_custom_tools(cx) {
+                    bar = bar.child(crate::ui::tool_separator()).child(linked);
+                }
                 if !custom.is_empty() {
                     bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom.clone(), cx));
-                    custom_shown = true;
                 }
+                custom_shown = true;
                 continue;
             }
             let group = TOOLBAR[gi];
@@ -3173,8 +3178,13 @@ impl PartStudioView {
             };
         }
         // ⊞ removed: the custom features still end the toolbar.
-        if !custom.is_empty() && !custom_shown {
-            bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom, cx));
+        if !custom_shown {
+            if let Some(linked) = self.linked_custom_tools(cx) {
+                bar = bar.child(crate::ui::tool_separator()).child(linked);
+            }
+            if !custom.is_empty() {
+                bar = bar.child(crate::ui::tool_separator()).child(self.custom_tools(custom, cx));
+            }
         }
         let view = cx.entity();
         crate::ui::toolbar()

@@ -118,6 +118,13 @@ latency() {
   env NOSHAPE_PERF=1 NOSHAPE_PERF_SCRIPT=ui-latency NOSHAPE_PRESENT="${MODES[0]}" RUST_LOG=info ${BENCH_ENV//,/ } \
     "$bin" "$work/latency.noshape" > "$log" 2>&1 &
   local pid=$!
+  # The window focused, as a user's (an unfocused one is frame-capped, perf_script.rs): on macOS the script activates
+  # it; Xvfb has no window manager to do that.
+  if [[ -n ${DISPLAY:-} ]] && command -v xdotool >/dev/null; then
+    local w=""
+    for _ in $(seq 1 120); do w=$(xdotool search --pid "$pid" 2>/dev/null | head -1); [[ -n $w ]] && break; sleep 0.25; done
+    [[ -n $w ]] && xdotool windowfocus "$w" 2>/dev/null
+  fi
   wait_for 'BENCH SUMMARY row-click' "$log" $((DELAY + 300)) || echo "::warning::no latency BENCH SUMMARY"
   kill "$pid" 2>/dev/null; sleep 2; kill -9 "$pid" 2>/dev/null
   grep -a "BENCH SUMMARY\|panicked\|ERROR" "$log" | cut -c1-400

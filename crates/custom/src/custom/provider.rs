@@ -215,17 +215,59 @@ pub struct DocumentScripts {
     files_hash: u64,
 }
 
+/// What [`DocumentScripts::from_document`] reads of a document: its Feature Studios' sources, the tabs they can
+/// import and its file tabs. Cheap to take (no compile), so the UI thread takes it and a background task compiles it
+/// ([`DocumentScripts::from_sources`], [`LazyScripts`]).
+#[derive(Clone, Debug)]
+pub struct ScriptSources {
+    importables: Importables,
+    files: Vec<(TabId, crate::file_tab::FileTab)>,
+}
+
+impl ScriptSources {
+    /// Every studio compiled already (the compile cache has each): compiling them costs no compile.
+    pub fn compiled(&self) -> bool {
+        let (sources, _, deps) = &self.importables;
+        sources.iter().all(|(tab, _, src)| super::studio::is_compiled(*tab, src, *deps))
+    }
+}
+
 impl DocumentScripts {
     pub fn from_document(doc: &Document) -> Arc<Self> {
+        Self::from_sources(&Self::sources(doc))
+    }
+
+    /// The document's sources, uncompiled.
+    pub fn sources(doc: &Document) -> ScriptSources {
+        let files = doc
+            .ordered_tabs()
+            .into_iter()
+            .filter_map(|t| match &t.content {
+                TabContent::File(f) => Some((t.id, f.clone())),
+                _ => None,
+            })
+            .collect();
+        ScriptSources { importables: importables(doc), files }
+    }
+
+    /// The scripts of `doc` when its studios are compiled already, else None (compiling them is a background
+    /// task's: the first compile of a document's studios takes ~50 ms).
+    pub fn if_compiled(doc: &Document) -> Option<Arc<Self>> {
+        let src = Self::sources(doc);
+        src.compiled().then(|| Self::from_sources(&src))
+    }
+
+    /// `sources` compiled (each studio cached by its source), their feature types registered.
+    pub fn from_sources(src: &ScriptSources) -> Arc<Self> {
         // Regenerations with these scripts evaluate custom features through the host.
         crate::register();
-        let (sources, others, deps) = importables(doc);
+        let (sources, others, deps) = (&src.importables.0, &src.importables.1, src.importables.2);
         let mut compiled: HashMap<TabId, Arc<CompiledStudio>> = HashMap::new();
         let mut studios = Vec::new();
-        for (tab, name, src) in &sources {
+        for (tab, name, source) in sources {
             let c = {
-                let resolver = DocResolver { studios: &sources, compiled: &compiled, others: &others };
-                compile_with(*tab, src, &resolver, deps)
+                let resolver = DocResolver { studios: sources, compiled: &compiled, others };
+                compile_with(*tab, source, &resolver, deps)
             };
             // A studio with errors keeps its last good schemas active, so
             // features using it stay editable while the source is fixed.
@@ -237,14 +279,7 @@ impl DocumentScripts {
             compiled.insert(*tab, c.clone());
             studios.push((*tab, name.clone(), c));
         }
-        let files = doc
-            .ordered_tabs()
-            .into_iter()
-            .filter_map(|t| match &t.content {
-                TabContent::File(f) => Some((t.id, f.clone())),
-                _ => None,
-            })
-            .collect::<Vec<(TabId, crate::file_tab::FileTab)>>();
+        let files = src.files.clone();
         let mut h = std::collections::hash_map::DefaultHasher::new();
         let mut latest = LATEST_FILES.write();
         for (t, f) in &files {
@@ -266,6 +301,36 @@ impl DocumentScripts {
     /// toolbars and tool search.
     pub fn feature_types(&self) -> Vec<&'static FeatureType> {
         self.studios.iter().filter(|(_, _, c)| !c.has_errors()).flat_map(|(_, _, c)| c.features.iter().map(|f| f.feature_type)).collect()
+    }
+}
+
+/// A document's scripts compiled on first use: a regeneration's provider, so its background task compiles, not the
+/// UI thread that starts it.
+#[derive(Debug)]
+pub struct LazyScripts {
+    sources: ScriptSources,
+    compiled: std::sync::OnceLock<Arc<DocumentScripts>>,
+}
+
+impl LazyScripts {
+    pub fn new(sources: ScriptSources) -> Arc<Self> {
+        Arc::new(Self { sources, compiled: Default::default() })
+    }
+
+    pub fn get(&self) -> &Arc<DocumentScripts> {
+        self.compiled.get_or_init(|| DocumentScripts::from_sources(&self.sources))
+    }
+}
+
+impl CustomFeatureProvider for LazyScripts {
+    fn studio(&self, tab: &str) -> Option<Arc<CompiledStudio>> {
+        self.get().studio(tab)
+    }
+    fn file(&self, tab: &str) -> Option<crate::file_tab::FileTab> {
+        self.get().file(tab)
+    }
+    fn version(&self, tab: &str) -> u64 {
+        self.get().version(tab)
     }
 }
 

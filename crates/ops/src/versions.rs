@@ -7,6 +7,14 @@ use noshape_model::document::{Document, TabContent};
 /// (`<key><version id>` = "1").
 pub const PUBLISHED_FS_KEY: &str = "published_featurescript:";
 
+/// Whether the version at `microversion` of the document at `path` was published with Publish FeatureScript… (the
+/// Add custom features toast: "… from published version V4.").
+pub fn is_published_fs(path: &std::path::Path, microversion: noshape_store::MicroversionId) -> bool {
+    let Ok(store) = noshape_store::Document::open_read_only(path) else { return false };
+    let Ok(graph) = store.graph() else { return false };
+    graph.versions.iter().filter(|v| v.microversion == microversion).any(|v| store.get_meta(&format!("{PUBLISHED_FS_KEY}{}", v.id)).ok().flatten().is_some())
+}
+
 /// Store meta key of a workspace's description (`<key><branch id>`).
 pub const WORKSPACE_DESCRIPTION_KEY: &str = "workspace_description:";
 

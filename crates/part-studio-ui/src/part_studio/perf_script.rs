@@ -8,7 +8,7 @@
 //! `ui-latency` times the UI thread's part of showing an action, from the action to the end of the paint of the
 //! first frame that draws it (its present to the screen excluded): a feature dialog opening (Edit on each of the last
 //! features in turn, cancelled after) and a feature row click (the list's and the graphics' highlight), 20 each, then
-//! logs `BENCH SUMMARY dialog-open` / `row-click`.
+//! logs `BENCH SUMMARY dialog-open` / `row-click`. It focuses its window first (an unfocused one is frame-capped).
 
 use super::PartStudioView;
 use gpui_kit::*;
@@ -204,6 +204,13 @@ impl PartStudioView {
         log::info!(target: "perf", "perf script: ui-latency on {} features", features.len());
         cx.spawn(async move |this, cx| {
             let pause = || std::time::Duration::from_millis(300);
+            // A user's window has the focus: GPUI caps an inactive one at ~30 fps for frames awaited with
+            // `on_next_frame`, which is how a sample finds its frame (unfocused, every sample waited 35-40 ms: Xvfb with
+            // no window manager, the CI Macs). Focused, it waits for the next frame only.
+            let _ = cx.update_window(window, |_, w, _| w.activate_window());
+            cx.background_executor().timer(pause()).await;
+            let active = cx.update_window(window, |_, w, _| w.is_window_active()).unwrap_or(false);
+            log::info!(target: "perf", "perf script: ui-latency window active {active}");
             for (kind, n) in [("dialog-open", 20usize), ("row-click", 20)] {
                 let mut ms = Vec::new();
                 let (mut handler, mut wait, mut frame) = (Vec::new(), Vec::new(), Vec::new());

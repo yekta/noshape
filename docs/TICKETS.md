@@ -6,6 +6,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## psui, 2026-11-09
+- [ ] P0 FAN-BLADE-SWEEP-HANG (dx, speed regression; found by psui's re-measure 11-09 19:40): c2-fan-blade-sweep's
+  **Sweep 1 takes 331 s** (live 58 ms; the whole document 332.9 s, live 1.4 s: qa's 18:11 model run on vibe2,
+  `speed: … ×234.8`), 1.25 s in qa's 12:21 run (4e549553). The app opening it shows no model for minutes, the CLI
+  too. Stack (vibe5, release main 9c5206e7): `sweep` (model-core regen/features/solid_a.rs:554, the tight-bend check
+  `res.shape.self_intersects()`) › `BOPAlgo_ArgumentAnalyzer::TestSelfInterferences` › `IntPatch_PrmPrmIntersection`
+  on the swept solid. Only change on that path since the good run: dx's 7e7d69f2b (13:20, a profile's arcs of one
+  circle become one edge), which changes Sweep 1's profile. Repro: `noshape-cli call feature_list` on the corpus
+  document (qa's vibe2 ~/qa-parity/saved/c2-fan-blade-sweep.noshape).
 - [ ] P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents**. psui 11-09:
   a STEP assembly with subassemblies now becomes live's folder of linked documents (behaviours "dx 1742 (B)"): a
   folder named after the file, one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1),

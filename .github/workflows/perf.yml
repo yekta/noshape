@@ -283,7 +283,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb imagemagick mesa-vulkan-drivers libvulkan1 \
+          sudo apt-get install -y --no-install-recommends xvfb imagemagick xdotool mesa-vulkan-drivers libvulkan1 \
             libxkbcommon-x11-0 libxcb-xkb1 libx11-xcb1 libfontconfig1 python3-pil
           echo "DELAY=120" >> "$GITHUB_ENV"
           echo "FRAMES=60" >> "$GITHUB_ENV"

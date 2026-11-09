@@ -9,6 +9,41 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## 2026-11-09 20:34 UTC: custom features on the toolbar (user P0), and the Part Studio speed re-measure
+
+**User P0 (lead 11-09): a custom feature added from another document showed no sign it was added.** Placement is
+live's (lead checked live at ~20:00, behaviours "lead (2026-11-09 ~20:00 UTC)"): no button of its own, ⊞ becomes
+[⊞][▾], the ▾ lists the features then Add custom features. What makes it visible, now as live:
+- the green toast "Custom feature "X" was added to your toolbar from version V1." (5 s, ×), "from published version
+  V4" when the version was published with Publish FeatureScript… (`versions::is_published_fs`);
+- in the panel, a feature on the toolbar and its Feature Studio's row stay light blue (`SelectItemPanel::set_added`), a
+  second click takes it off (no second entry), the studio's row adds all its features (all on: all off; help);
+- the list alphabetical, an account setting every open Part Studio follows (`MyCustomFeaturesRev`);
+- right-click › Remove on the ▾'s rows too (Open linked document, Remove; plain ⊞ when none are left);
+- "Linked custom features in this Part Studio" ▾ (live's `part-studio-linked-feature-tools`, before Custom features in
+  this workspace): the studio's features from other documents not on the toolbar.
+Tests: part-studio-ui `add_custom_features_toggles_adds_all_and_sorts`, `linked_custom_features_offer_a_used_feature_not_on_the_toolbar`;
+checked on Xvfb (/root/psui-scratch/cf-s22c.png, cf-s33c.png). Not done: the ▾ row menu's other live items (Sort custom
+features, Update…, Update all…, Customize toolbar…), and a toast per feature when a studio's row adds several (the
+last one shows; live not checked).
+
+**Speed re-measure under the feature-time rule (lead 11-09), vibe5, release main 9c5206e7, 87 corpus documents
+(qa's saved set):** every scored open is under live (cf-surface-pattern 8.7 s, live 25.2); 67/87 first opens and 84/87
+reopens show the model within 0.5 s. Found and fixed:
+- **The bench's latency was the bench's own frame cap.** GPUI caps an unfocused window at ~30 fps for frames awaited
+  with `on_next_frame`, which is how `ui-latency` finds its frame: unfocused (Xvfb without a window manager, the CI
+  Macs) every sample waited 35-40 ms. Focused: row click 4.5 ms p50 / 9.8 p95 action to painted frame, dialog open
+  12.8 / 26.5 (UI CPU 2 / 4-7 ms). The script now activates its window (macOS), bench.sh focuses it with xdotool on
+  Linux (perf.yml installs it). Earlier "54 ms p95" numbers in this handoff were that cap.
+- **A document's Feature Studios compiled on the UI thread before the window's first frame** (~50 ms on the cf-*
+  documents): now in the background (`doc_model::compile_custom_features`, regenerations get `LazyScripts`, the toolbar
+  reads `custom_features_if_compiled`). Regeneration starts at ~60 ms instead of 110-170; the model's frame is the
+  same (the compile is in the regeneration now), reopens 40-80 ms sooner on three of four.
+- **Not ours, a P0 for dx:** c2-fan-blade-sweep's Sweep 1 takes 331 s (live 58 ms) since 7e7d69f2b; docs/TICKETS.md
+  FAN-BLADE-SWEEP-HANG.
+Left in this area: reopens over 0.5 s on llvmpipe are its software draw of big models (cf-fill-pattern), not ours;
+dialog open p95 26 ms (one frame over) not looked into yet.
+
 ## Now (2026-11-09 01:12 UTC): the Variable Studio and documents areas while studios is paused
 - State in docs/handoff/studios.md (psui entries 11-08 22:42 on). Helper: /root/psui-scratch/bin/uipdiff.py <repo>
   <outdir> <scenario> prints every difference per step after run.py's normalisation.
