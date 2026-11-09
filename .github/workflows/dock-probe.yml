@@ -1,0 +1,53 @@
+# One-off (lead, 11-09): times a user's document on macOS and Windows with the v0.4.39 CLI. The document comes
+# encrypted from a short-lived private share (secrets DOCK_PROBE_URL / DOCK_PROBE_KEY); nothing is uploaded or kept.
+name: dock-probe
+on:
+  push:
+    branches: [lead-dock-probe]
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest, asset: macos-arm64, ext: tar.gz }
+          - { os: windows-latest, asset: windows-x86_64, ext: zip }
+          - { os: ubuntu-24.04, asset: linux-x86_64, ext: tar.gz }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      URL: ${{ secrets.DOCK_PROBE_URL }}
+      KEY: ${{ secrets.DOCK_PROBE_KEY }}
+    steps:
+      - name: Probe
+        run: |
+          set -u
+          w="$RUNNER_TEMP/p"; mkdir -p "$w"; cd "$w"
+          gh release download v0.4.39 -R "$GITHUB_REPOSITORY" -p "noshape-cli-0.4.39-${{ matrix.asset }}.${{ matrix.ext }}"
+          if [ "${{ matrix.ext }}" = zip ]; then unzip -q *.zip; else tar xzf *.tar.gz; fi
+          C=$(find . -type f \( -name noshape-cli -o -name noshape-cli.exe \) | head -1); echo "cli $C"
+          curl -fsSL "$URL" -o d.enc
+          openssl enc -d -aes-256-cbc -pbkdf2 -in d.enc -out dock.noshape -pass "pass:$KEY"; rm -f d.enc
+          export HOME="$w/home"; mkdir -p "$HOME"
+          summ() { python3 -c "
+          import json,sys
+          d=json.load(open(sys.argv[1])); fs=d.get('features',[])
+          bad=[(f['name'],f['status'],(f.get('message') or '')[:70]) for f in fs if f['status'] not in ('Ok','Suppressed')]
+          top=sorted([(round(f.get('regen_ms') or 0),f['name']) for f in fs])[-6:]
+          print('  features',len(fs),'sum_ms',round(sum((f.get('regen_ms') or 0) for f in fs)),'not_ok',bad); print('  top',top)" "$1" || head -c 400 "$1"; }
+          t() { local s=$(python3 -c 'import time;print(time.time())'); "$@"; local e=$?; python3 -c "import time;print('  wall %.2f s (exit $e)'%(time.time()-$s))"; }
+          for tab in "E2 - C Stand" "E1-30 - Egik Gece Standi"; do
+            echo "== open + feature list: $tab"; t "$C" feature list --doc dock.noshape --tab "$tab" > f.json 2> f.err; summ f.json; tail -3 f.err
+          done
+          for v in "50 mm" "30 mm"; do
+            cp dock.noshape dh.noshape
+            echo "== E1-30 #Hs = $v: set"; t "$C" variable set --doc dh.noshape --tab "E1-30 - Egik Gece Standi" --variable "#Hs" --value "$v" > s.json 2> s.err; tail -2 s.err
+            echo "== E1-30 #Hs = $v: feature list"; t "$C" feature list --doc dh.noshape --tab "E1-30 - Egik Gece Standi" > f.json 2> f.err; summ f.json; tail -3 f.err
+          done
+          rm -rf "$w"
