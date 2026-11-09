@@ -134,6 +134,23 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
+**2026-11-09 04:45 UTC (psui): the full run's differences (lead: ours vs live-side, fix ours, biggest loss first).**
+Points lost by area (weight × (1 − match × coverage), 02:57 run): documents 1.13, Feature Studio 0.40, versions 0.28,
+Part Studio 0.14, Variable Studio 0.12 (drawings 0.55 and assemblies 0.10 left to dx and asm; asm's 8 in asm.md).
+Fixed (landed 35fd1ddf, 88bb798a; queued with the regression check): Copy version closes Versions and history, Close
+document shows the documents page, a new Feature Studio's caret at its end, the Material Library tab (notice, menu),
+the documents page's Copy workspace… dialog, its Properties Undo / Redo, the row Labels icon, crumbs' titles, the
+location box's select-then-Open, the column chooser's Esc, the Tab manager's Enter, dark mode from the account menu
+(shown, not saved, its notice), notes' bubbles, drawing Properties (Drawn by, Approver, dates, Last changed,
+Inspection count), the VS type select's keyboard (live 2399), column widths as a document edit (2398), the Insert
+dialog's drill-in and greyed ✓, a custom table's Switch to at its definition, focusable native selects. Live-side,
+asked again (REQUESTS 04:2x): 16 doc-tab-menu-* taken before live's tab menus gained Export…, takes read mid-load or
+mid-close, reader / account-state ones (the + menu, the Shift+/ sheet, prefs after a library removal), questions on
+the advanced search caret, crumb titles, sort menus' highlighted row, dark mode's link. Open on ours: fs-compare's
+editor click lands 9 lines lower than live's on a long studio (live's runner clicks Ace's content box: not modelled
+yet), Ctrl+click into std source (fs-ed-ctrl-click-std), System check opens a page in live, a second documents
+window for a folder's Open in new browser tab.
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;
