@@ -38,6 +38,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 13:19 UTC: live2 2416 / 2417 answered; runner rule for added sheets
+
+- 2416: on Sheet1 and on an added sheet alike a click on the title block selects one note or line (handles): the 94
+  / 35 text-less lines and title block notes live's recorder lists on an added sheet only are its reading of the
+  export, ours is right. The runner leaves them out where ours lists no line or note (drw-sheet-insert 5/5,
+  drw-sheet-duplicate 6/6 on the b3 outputs). 2417: drw-inspection-item re-recorded: the panel stays after the click
+  (as ours), the first Esc ends the tool; drawing suite b5 on the rebased tree running for the numbers.
+
 ## 11-09 13:03 UTC: c2-fan-blade-sweep Extrude 4: a blind start offset ignores Opposite direction
 
 - "base" 0.2 mm off: Sketch 5's plane is right (our frame = live's, x = -60); Extrude 4 has Starting offset 0.1 mm
