@@ -52,6 +52,7 @@
 #include <Geom_BSplineSurface.hxx>
 #include <NCollection_Array2.hxx>
 #include <Geom_Circle.hxx>
+#include <gp_Lin.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Ellipse.hxx>
@@ -976,6 +977,7 @@ struct BodyWriter
   bool    solid_body;
 
   ShapeIMap faces, edges, vertices;
+  ShapeAncMap edge_faces; // every face's edges -> the faces they bound
   std::vector<int>       face_idx, face_surface, face_shell, face_front;
   std::vector<XSurface>  surfaces;
   std::vector<char>      face_sense;
@@ -995,6 +997,40 @@ struct BodyWriter
   Node& add(int type, int index) { return w.add(type, index); }
 
   // ---- surfaces
+
+  // The direction a cone's seam takes in the file: that of a coaxial cylinder it shares an edge with (the
+  // seams of cf-o-ring-generator's chamfer cones lay 22.5° off their cylinders': live's import cut each circle
+  // between them in two, at both seams), else the cone's own. `turn`: the angle from the cone's X to it about X × Y.
+  gp_Dir seam_direction(const TopoDS_Face& f, const gp_Ax3& a, double& turn) const
+  {
+    turn = 0;
+    const gp_Dir n = a.XDirection().Crossed(a.YDirection());
+    for (TopExp_Explorer ex(f, TopAbs_EDGE); ex.More(); ex.Next())
+    {
+      const TopoDS_Edge& e = TopoDS::Edge(ex.Current());
+      if (BRep_Tool::Degenerated(e) || !edge_faces.Contains(e))
+        continue;
+      for (const TopoDS_Shape& g : edge_faces.FindFromKey(e))
+      {
+        if (g.IsSame(f))
+          continue;
+        TopLoc_Location                         loc;
+        const occ::handle<Geom_CylindricalSurface> c = occ::down_cast<Geom_CylindricalSurface>(basis_surface(BRep_Tool::Surface(TopoDS::Face(g), loc)));
+        if (c.IsNull())
+          continue;
+        const gp_Ax3 ca = c->Position().Transformed(loc.Transformation());
+        if (std::abs(ca.Direction().Dot(n)) < 1 - 1e-12 || gp_Lin(a.Axis()).Distance(ca.Location()) > kPrecision)
+          continue;
+        gp_XYZ x = ca.XDirection().XYZ() - n.XYZ() * ca.XDirection().XYZ().Dot(n.XYZ());
+        if (x.Modulus() < 1e-9)
+          continue;
+        const gp_Dir to(x);
+        turn = a.XDirection().AngleWithRef(to, n);
+        return to;
+      }
+    }
+    return a.XDirection();
+  }
 
   XSurface surface_of(const TopoDS_Face& f, int face_index)
   {
@@ -1044,10 +1080,12 @@ struct BodyWriter
       const double alpha = c->SemiAngle();
       const gp_XYZ z     = a.Direction().XYZ();
       const gp_XYZ A     = alpha > 0 ? z : z.Reversed();
-      const gp_XYZ X     = a.XDirection().XYZ();
+      double       turn  = 0;
+      const gp_XYZ X     = seam_direction(f, a, turn).XYZ();
       // XT u turns about A; OCCT's about Z (or -Z when indirect).
       const bool same_turn = (A.Dot(a.XDirection().XYZ().Crossed(a.YDirection().XYZ())) > 0);
       xs.su                = same_turn ? 1 : -1;
+      xs.ou                = -xs.su * turn;
       xs.sv                = alpha > 0 ? std::cos(alpha) : -std::cos(alpha);
       const double h       = std::abs(alpha);
       Node&        nd      = head(52);
@@ -1768,6 +1806,8 @@ struct BodyWriter
     }
 
     // Surfaces and face senses.
+    for (int fi = 0; fi < nf; ++fi)
+      TopExp::MapShapesAndAncestors(faces(fi + 1), TopAbs_EDGE, TopAbs_FACE, edge_faces);
     face_sense.resize(nf);
     for (int fi = 0; fi < nf; ++fi)
     {

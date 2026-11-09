@@ -1641,3 +1641,31 @@ fn stl_bspline_tube_on_a_grid() {
     let v: f64 = t.indices.chunks(3).map(|c| p(c[0]).dot(p(c[1]).cross(p(c[2])))).sum::<f64>() / 6.0;
     assert!((v - exact).abs() < 3e-3 * exact, "mesh {:.3} mm³, exact {:.3}", v * 1e9, exact * 1e9);
 }
+
+/// A cone written with its seam where its coaxial cylinder's is (cf-o-ring-generator's chamfer cones, 22.5° off their
+/// cylinders': live's import cut each circle between them in two, at both seams; live's own file has them together).
+#[test]
+fn parasolid_cone_seam_on_its_cylinders() {
+    let dir = std::env::temp_dir().join(format!("noshape-xt-seam-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let turned = DVec3::new(22.5f64.to_radians().cos(), 22.5f64.to_radians().sin(), 0.0);
+    let cyl = make_cylinder(&Plane::new(DVec3::ZERO, DVec3::Z, DVec3::X), 0.01, 0.02, std::f64::consts::TAU).unwrap();
+    let cone = make_cone(&Plane::new(DVec3::new(0.0, 0.0, 0.02), DVec3::Z, turned), 0.01, 0.006, 0.004, std::f64::consts::TAU).unwrap();
+    let part = fuse(&cyl, &cone).unwrap().shape;
+    let x_dirs = |s: &Shape| -> Vec<DVec3> {
+        s.faces().iter().filter_map(|f| match f.face_surface() {
+            Ok(Surface::Cylinder { x_dir, .. } | Surface::Cone { x_dir, .. }) => Some(x_dir),
+            _ => None,
+        }).collect()
+    };
+    let before = x_dirs(&part);
+    assert!(before.len() == 2 && before[0].distance(before[1]) > 0.1, "the model's seams apart: {before:?}");
+    let path = dir.join("seam.x_t");
+    write_parasolid(&path, std::slice::from_ref(&part), LengthUnit::Meter, false).unwrap();
+    let back = read_parasolid(&path, LengthUnit::Meter).unwrap();
+    let after = x_dirs(&back);
+    assert!(after.len() == 2 && after[0].distance(after[1]) < 1e-9, "the file's seams apart: {after:?}");
+    let (a, b) = (volume_properties(&part).unwrap().mass, volume_properties(&back).unwrap().mass);
+    assert!((a - b).abs() < 1e-9 * a, "{a} vs {b}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
