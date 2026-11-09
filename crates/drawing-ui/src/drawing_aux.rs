@@ -56,13 +56,14 @@ impl DrawingEditor {
         self.pk().aux_pick(mode)
     }
 
-    /// Reference indicator › Edit auxiliary view: the dialog for that view
-    /// (label, Reverse, Show view reference indicator; the checkmark applies).
+    /// Reference indicator › Edit auxiliary view: the Auxiliary view panel for that view (label, tabs, its edge as
+    /// a chip, Reverse, Show view reference indicator; the checkmark applies).
     pub fn edit_aux_view(&mut self, id: noshape_model::drawing::ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let Some(v) = self.current_sheet().view(id).cloned() else { return };
         let r = v.aux_ref.clone();
         let label = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Auxiliary id").placeholder_style(gpui_kit::base::input::PlaceholderStyle { italic: false, weight: Some(gpui_kit::FontWeight::NORMAL), color: Some(gpui_kit::rgb(0x999999).into()) }).default_value(r.as_ref().map(|r| r.letter.clone()).unwrap_or_default()));
-        self.aux_edit = Some((id, AuxDlg { mode: 0, label, reverse: v.flip, show_ref: r.as_ref().is_none_or(|r| r.show), anchor: r.map(|r| r.anchor) }));
+        // (`anchor`: the view's edge, shown as the chip; where its indicator sits when it has one.)
+        self.aux_edit = Some((id, AuxDlg { mode: 0, label, reverse: v.flip, show_ref: r.as_ref().is_none_or(|r| r.show), anchor: Some(r.map_or([0.0; 2], |r| r.anchor)) }));
         cx.notify();
     }
 
@@ -79,10 +80,47 @@ impl DrawingEditor {
     }
 
     /// The editing dialog (an existing auxiliary view).
+    /// Edit auxiliary view...: the Auxiliary view panel (live drw-aux-edit: its tabs, the prompt, the view's edge as
+    /// the chip "Edge ×", Show view reference indicator), with ✓ and ✕.
     pub fn render_aux_edit(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (_, d) = self.aux_edit.as_ref()?;
         let pal = p();
-        let (reverse, show) = (d.reverse, d.show_ref);
+        let (mode, reverse, show, picked) = (d.mode, d.reverse, d.show_ref, d.anchor.is_some());
+        let field_text = match mode {
+            1 => "Select a sketch line or centerline",
+            2 => "Select a hole axis",
+            _ => "Select a linear edge",
+        };
+        crate::ui_script::note_dialog(|| {
+            let mut text = vec!["Auxiliary view", "Normal", "In line", "Axis", field_text];
+            if picked {
+                text.extend(["Edge", "×"]);
+            }
+            text.push("Show view reference indicator");
+            serde_json::json!({ "kind": "drawing-panel", "title": "Auxiliary view", "text": text })
+        });
+        let tab = |id: &'static str, label: &'static str, m: u8, cx: &mut Context<Self>| {
+            let on = mode == m;
+            div()
+                .id(id)
+                .map(|d| crate::ui_script::mark(d, || format!("tab:{label}")))
+                .h(px(26.))
+                .px(px(8.))
+                .flex()
+                .items_center()
+                .text_size(px(13.33))
+                .cursor_pointer()
+                .border_b_1()
+                .when(on, |d| d.border_b_2().border_color(pal.accent).text_color(pal.emphasis).font_weight(FontWeight::MEDIUM))
+                .when(!on, |d| d.border_color(gpui_kit::rgb(0xdddddd)).text_color(pal.text))
+                .child(label)
+                .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    if let Some((_, d)) = &mut this.aux_edit {
+                        d.mode = m;
+                    }
+                    cx.notify();
+                }))
+        };
         Some(
             v_flex()
                 .id("dr-aux-edit")
@@ -94,6 +132,7 @@ impl DrawingEditor {
                 .shadow(crate::drawing_chrome::dialog_shadow())
                 .text_color(pal.text)
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     h_flex()
                         .h(px(28.))
@@ -111,12 +150,64 @@ impl DrawingEditor {
                     v_flex()
                         .p(px(3.))
                         .child(gpui_kit::base::input::input_frame(div().mt(px(1.)).border_b_1().border_color(pal.accent).child(Input::new(&d.label).appearance(false).small().text_size(px(13.33)).text_color(gpui_kit::rgb(0x555555)).pl(px(3.)))))
-                        .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("auxe-rev").label("Reverse").checked(reverse).on_click(cx.listener(|this, v: &bool, _, cx| {
-                            if let Some((_, d)) = &mut this.aux_edit {
-                                d.reverse = *v;
-                            }
-                            cx.notify();
-                        }))))
+                        .child(h_flex().mt(px(3.)).child(tab("auxe-normal", "Normal", 0, cx)).child(tab("auxe-inline", "In line", 1, cx)).child(tab("auxe-axis", "Axis", 2, cx)))
+                        .child(
+                            h_flex()
+                                .mt(px(3.))
+                                .gap(px(4.))
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .h(px(26.))
+                                        .px(px(6.))
+                                        .flex()
+                                        .items_center()
+                                        .text_size(px(12.))
+                                        .border_1()
+                                        .border_color(if picked { gpui_kit::rgb(0xd3d7d9) } else { pal.accent })
+                                        .when(!picked, |d| d.bg(gpui_kit::rgb(0xe8f1fb)))
+                                        .child(field_text),
+                                )
+                                .child(
+                                    div()
+                                        .id("auxe-reverse")
+                                        .size(px(26.))
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .border_1()
+                                        .border_color(gpui_kit::rgb(0xd3d7d9))
+                                        .when(reverse, |d| d.bg(gpui_kit::rgb(0xcfdbe5)))
+                                        .cursor_pointer()
+                                        .tooltip(crate::ui::tooltip("Reverse"))
+                                        .child(crate::assets::icon(&crate::assets::icon_path("flip"), 18., cx))
+                                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                            if let Some((_, d)) = &mut this.aux_edit {
+                                                d.reverse = !d.reverse;
+                                            }
+                                            cx.notify();
+                                        })),
+                                ),
+                        )
+                        // The view's edge as a chip under the prompt; ✕ takes it off (✓ then keeps the view's own).
+                        .when(picked, |b| {
+                            b.child(
+                                h_flex()
+                                    .mt(px(2.))
+                                    .h(px(22.))
+                                    .px(px(6.))
+                                    .gap(px(6.))
+                                    .text_size(px(12.))
+                                    .bg(gpui_kit::rgb(0xe8f1fb))
+                                    .child("Edge")
+                                    .child(div().id("auxe-edge-x").cursor_pointer().child("×").on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                                        if let Some((_, d)) = &mut this.aux_edit {
+                                            d.anchor = None;
+                                        }
+                                        cx.notify();
+                                    }))),
+                            )
+                        })
                         .child(div().h(px(26.)).flex().items_center().px(px(4.)).child(crate::drawing_chrome::DrCheckbox::new("auxe-show").label("Show view reference indicator").checked(show).on_click(cx.listener(|this, v: &bool, _, cx| {
                             if let Some((_, d)) = &mut this.aux_edit {
                                 d.show_ref = *v;
