@@ -114,8 +114,8 @@ pub trait DrawingClipboard {
     /// live request 1598, qa DWG-LINE-COPY) and images (live request 1613).
     fn copy_selection(&self, sheet: usize, annotations: &[u64], tables: &[u64], sketch: &[u32], images: &[u64]) -> Result<ViewClipboard, String>;
 
-    /// Copy views `ids` of sheet `sheet` (with their derived views and attached
-    /// annotations and tables).
+    /// Copy views `ids` of sheet `sheet` with their attached annotations and tables, not the views derived from them
+    /// (live drw-view-copy-paste: Front's Copy, Paste gives one view).
     fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String>;
 }
 
@@ -140,7 +140,11 @@ impl DrawingClipboard for Drawing {
     fn copy_views(&self, sheet: usize, ids: &[ViewId], sources: Option<&Sources>) -> Result<ViewClipboard, String> {
         let src = self.sheets.get(sheet).ok_or("No sheet")?;
         let mut tmp = Drawing { sheets: vec![src.clone(), Sheet { views: vec![], annotations: vec![], tables: vec![], images: vec![], sketch: Default::default(), ..src.clone() }], projection: self.projection, units_mm: self.units_mm, props: self.props.clone(), active_sheet: 0, continuation: None, drawn_by: self.drawn_by.clone(), sources_at: None, meta: self.meta.clone() };
-        tmp.move_views_to_sheet(0, ids, 1, sources)?;
+        let moved = tmp.move_views_to_sheet(0, ids, 1, sources)?;
+        let derived: Vec<ViewId> = moved.iter().filter(|(old, _)| !ids.contains(old)).map(|(_, new)| *new).collect();
+        for v in derived.into_iter().rev() {
+            tmp.sheets[1].remove_view(v);
+        }
         Ok(ViewClipboard { noshape_drawing_views: 1, sheet: tmp.sheets.swap_remove(1), anchor: None, origin: None })
     }
 }
@@ -283,24 +287,24 @@ mod tests {
     use crate::drawing::{ViewKind, ViewOrientation};
 
     #[test]
-    fn copy_and_paste_views_keep_their_children() {
+    fn copy_and_paste_views_without_their_derived_views() {
         let mut d = Drawing::default();
         let tab = TabId::new_random();
         let s = &mut d.sheets[0];
         s.views.push(DrawingView { id: ViewId(1), kind: ViewKind::Base { source: tab, config: Default::default(), orientation: ViewOrientation::Front, part: None }, position: [100.0, 100.0], ..Default::default() });
         s.views.push(DrawingView { id: ViewId(2), kind: ViewKind::Projected { parent: ViewId(1), direction: Some([1.0, 0.0]) }, position: [180.0, 100.0], ..Default::default() });
+        // Live drw-view-copy-paste: Front's Copy, then Paste, adds Front alone.
         let clip = d.copy_views(0, &[ViewId(1)], None).expect("copy");
-        assert_eq!(clip.sheet.views.len(), 2, "the projected child is copied too");
+        assert_eq!(clip.sheet.views.len(), 1, "the projected view isn't copied");
         let back = ViewClipboard::from_json(&clip.to_json()).expect("round trip");
         assert!(ViewClipboard::from_json("{\"a\":1}").is_none());
         let ids = d.sheets[0].paste_views(&back, Some([300.0, 200.0]));
-        assert_eq!(ids, vec![ViewId(3), ViewId(4)]);
+        assert_eq!(ids, vec![ViewId(3)]);
         let s = &d.sheets[0];
-        assert_eq!(s.views.len(), 4);
-        // The pasted child points at the pasted parent; the pair is centered on the cursor.
-        assert_eq!(s.parent_of(ViewId(4)), Some(ViewId(3)));
-        let (a, b) = (s.view(ViewId(3)).unwrap().position, s.view(ViewId(4)).unwrap().position);
-        assert!(((a[0] + b[0]) * 0.5 - 300.0).abs() < 1e-9 && (a[1] - 200.0).abs() < 1e-9);
+        assert_eq!(s.views.len(), 3);
+        // Centered on the cursor.
+        let a = s.view(ViewId(3)).unwrap().position;
+        assert!((a[0] - 300.0).abs() < 1e-9 && (a[1] - 200.0).abs() < 1e-9);
     }
 
     #[test]
