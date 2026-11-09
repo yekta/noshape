@@ -4112,6 +4112,10 @@ features' alignment applied twice), FACEBLEND-MESSAGES, FACEBLEND-ISOCURVES-TEST
   4761.73 / 4123.68, live's import 4761.97 / 4123.70 (also its IGES: area −0.12 %). The integral misses on its
   tooth faces (no pcurves in the file, 4-pole edge curves), as in P2 I1's blend faces. Exchange suite "ours imports
   live's": the last two misses.
+  Also the single-span closed B-spline walls of cf-hose-routing's hoses (degree 6 and 12 round the tube): face_moments
+  cuts them into 8 Gauss segments round, 3e-6 off a Richardson-extrapolated mesh volume (7088.026 / 7088.034 mm³ for
+  the model and its x_t read back, whose geometry agrees within 2e-7: 7088.0074 / 7088.0088): "ours reads ours.x_t
+  back" misses by that alone.
 - [ ] P2 SHEETMETAL-COPLANAR-WALLS (core; dx 2026-11-09 00:09 UTC, data exchange) cf-sheet-metal-model-plus's "Sheet
   Metal Up to Part": seven planar faces on x = 25 lie up to 1.7e-4 mm apart (two on x = 13, 4.6e-4 mm), where live's
   model has them on one plane. Exported (STEP, IGES) and read back, live's import (and ours) merges coplanar faces only

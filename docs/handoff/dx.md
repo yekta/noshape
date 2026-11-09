@@ -11,6 +11,27 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-09 03:39 UTC: exchange "still mine" (lead 11-09): hose x_t, B-spline STL grid, o-ring x_t; drawings' EDGE
+
+- **Hose Parasolid:** a closed single-span B-spline wall whose seam knot won't come down (degree 6 / 12 round the
+  tube) is refit as a periodic cubic within 1e-9 m (`periodic_refit`, xt.cpp): ours reads it back 12/12/0, as live's
+  own hose; live's import of it waits on the batch below. Its read-back volume is 1.1e-6 over the model's: not the
+  geometry (Richardson-extrapolated mesh volumes agree within 2e-7) but face_moments' 8 Gauss segments round a
+  single-span wall (TICKETS INTEGRATOR-BSPLINE-GEAR, core's).
+- **STL B-spline faces on a grid** (`spline_lines`, mesh.cpp): per knot span, equal steps of the normal's turn within
+  the angle and half the chord; triangulated in the grid's indices (in lengths the hoses' 0.17 × 10 mm cells let a
+  seam node fan across the tube: −10 % area). Hoses 8218 mm³ / 16,496 mm² (model 8232 / 16,494, live's STL 8223):
+  "ours.stl as live will read it" matches. Live cuts its periodic cubic hoses into 32 spans × 3 steps (96 round);
+  ours, one span, 72. clamp / knob / pulley counts unchanged (no B-splines), T1 `stl_bspline_tube_on_a_grid`.
+- **o-ring Parasolid** (live 2400: four circles came in as two arcs each, at both faces' seams): the chamfer cones'
+  seams lay 22.5° off their cylinders'; a cone now takes the seam of a coaxial cylinder it shares an edge with
+  (`seam_direction`, T1 `parasolid_cone_seam_on_its_cylinders`). Live's own file has all its seams on ±Z.
+- Exchange suite (vibe4, /root/parity/exchange synced): ours imports live's 46/48, live imports ours 40/48 (the
+  hose x_t / STL and the o-ring x_t wait on live's re-import), ours reads ours back 43/48.
+- **Drawings, live 2402:** `EDGE <view>` is live's pixel reader: orange inside a view's box without the dark frame.
+  Only a base view gets the dark frame; a selected projected / section / auxiliary / detail view reads EDGE. Ours
+  now says so (drawing_ui_state.rs); the score is being rerun.
+
 ## 11-09 01:14 UTC: drawing interaction (lead): 121 → 123/176 scenarios, 1248 → 1253/1409 states
 
 - 37 of the 54 failing first differ in `drawing.selection` (live's recorder reads selection colours, README
