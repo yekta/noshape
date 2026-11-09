@@ -661,6 +661,15 @@ def compare(live, ours, whole_document=True):
             for x in anns[1]:
                 if x.get("kind") == "table":
                     x["text"] = None
+        # Live's recorder lists an added sheet's format, its border and title block, as text-less lines (and the
+        # projection symbol's circles) and the title block's notes ("DWG NO.", "----": 35 on an inserted sheet, 94 on
+        # block-drawing's duplicate), not Sheet1's, though both sheets' are selectable item by item alike (live2
+        # 2416): where live lists ten text-less lines or more and ours no line or note, live's lines, circles and
+        # notes are left out.
+        if sum(1 for x in anns[0] if x.get("kind") == "line" and x.get("text") is None) >= 10 and not any(x.get("kind") in ("line", "note") for x in anns[1]):
+            dr = a.get("drawing")
+            if isinstance(dr, dict):
+                dr["annotations"] = [x for x in anns[0] if x.get("kind") not in ("line", "circle", "note")]
         # Live's tooltip text reads its line breaks as spaces ("…to fillet. 1 missing selection").
         for side in (a, b):
             if isinstance(side.get("tooltip"), str):

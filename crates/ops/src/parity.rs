@@ -3156,6 +3156,9 @@ impl<'a> Translator<'a> {
         let made = self.call("sketch_create", args)?;
         let id = made["sketch"].as_str().ok_or("sketch_create gave no id")?.to_string();
         let frame = self.frames.get(&oid).copied();
+        if std::env::var_os("NOSHAPE_PARITY_TRACE").is_some() {
+            eprintln!("TRACE sketch {:?} plane {plane} ours {} live {frame:?}", f["name"], made["frame"]);
+        }
         // A direction in Onshape's sketch (x, y) → ours ([x, y] mm): through
         // the model, onto our sketch's axes.
         let our_axes = (f3(&made["frame"]["x"]), f3(&made["frame"]["y"]));
