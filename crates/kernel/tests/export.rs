@@ -1623,3 +1623,21 @@ fn iges_from_live_takes_the_label() {
     let names: Vec<Option<&str>> = parts.iter().map(|p| p.name.as_deref()).collect();
     assert_eq!(names, [Some("Long bra")]);
 }
+
+/// An STL's B-spline tube on a grid as live's facetter makes it (cf-hose-routing's swept hoses: even 5° steps round
+/// the tube, its volume within 0.1 % of the model's): a Ø 6 mm disc swept along a bent spline at REST's 5°, no chord
+/// limit, comes within 0.3 % (BRepMesh's own mesh lost 0.8 % on the hoses).
+#[test]
+fn stl_bspline_tube_on_a_grid() {
+    let pts = [DVec3::ZERO, DVec3::new(0.03, 0.0, 0.012), DVec3::new(0.06, 0.0, -0.012), DVec3::new(0.09, 0.01, 0.0)];
+    let path = make_wire(&[make_interpolated_spline(&pts, &[], false).unwrap()]).unwrap();
+    let start = path.edges()[0].tangent_at(0.0).unwrap();
+    let disc = make_face_from_wire(&make_wire(&[make_circle(DVec3::ZERO, start, 0.003).unwrap()]).unwrap(), true).unwrap();
+    let tube = sweep(&disc, &path, &SweepOptions { with_correction: true, ..Default::default() }).unwrap().shape;
+    assert!(tube.faces().iter().any(|f| matches!(f.face_surface(), Ok(Surface::BSpline { .. }))), "a B-spline wall");
+    let exact = volume_properties(&tube).unwrap().mass;
+    let t = tessellate_export(&tube, 100.0 * 2e-6, 10f64.to_radians()).unwrap();
+    let p = |i: u32| DVec3::from(t.positions[i as usize].map(f64::from));
+    let v: f64 = t.indices.chunks(3).map(|c| p(c[0]).dot(p(c[1]).cross(p(c[2])))).sum::<f64>() / 6.0;
+    assert!((v - exact).abs() < 3e-3 * exact, "mesh {:.3} mm³, exact {:.3}", v * 1e9, exact * 1e9);
+}

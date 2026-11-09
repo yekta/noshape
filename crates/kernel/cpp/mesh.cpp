@@ -48,6 +48,7 @@
 #include <NCollection_DataMap.hxx>
 #include <TopoDS_Compound.hxx>
 #include <BRep_Builder.hxx>
+#include <Geom_BSplineSurface.hxx>
 #include <Geom_Line.hxx>
 #include <array>
 #include <deque>
@@ -192,10 +193,98 @@ void export_grid(const BRepAdaptor_Surface& s, double u0, double u1, double v0, 
   }
 }
 
-// An export's sphere, torus or revolved circle as live's facetter makes it: the boundary nodes and the nodes of `export_grid`'s grid
-// that lie inside the face (a quarter cell clear of its boundary along both directions), triangulated in the
-// parameters scaled to lengths (planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh
-// deflection and angle are twice Parasolid's (mesh.rs). False (nothing written) when the face isn't clean.
+// A B-spline face's grid lines along one direction (u when `in_u`) over [a, b], the other direction's [c0, c1]: per
+// knot span, steps of equal turn of the surface normal, as many as keep each within `ang` and its chord's sag within
+// `tol` / 2 on the 9 iso lines across (live's facets of cf-hose-routing's periodic cubic hoses: 32 spans of 11.25°
+// round each tube, 3 equal steps in each at 5°). Spans that hardly turn join the next. Empty when the face is too
+// fine for a grid.
+std::vector<double> spline_lines(const BRepAdaptor_Surface& S, bool in_u, double a, double b, double c0, double c1, double tol, double ang)
+{
+  std::vector<double> knots{a};
+  if (S.GetType() == GeomAbs_BSplineSurface)
+  {
+    const int                  nk = in_u ? S.NbUKnots() : S.NbVKnots();
+    NCollection_Array1<double> k(1, nk);
+    if (in_u)
+      S.BSpline()->UKnots(k);
+    else
+      S.BSpline()->VKnots(k);
+    for (int i = 1; i <= nk; ++i)
+      if (k(i) > a + 1e-9 * (b - a) && k(i) < b - 1e-9 * (b - a))
+        knots.push_back(k(i));
+  }
+  knots.push_back(b);
+  if (knots.size() > 4097)
+    return {};
+  constexpr int kIso = 9, kSamples = 24;
+  auto normal = [&](double t, double c, gp_Pnt& p, gp_Dir& n) {
+    gp_Vec du, dv;
+    S.D1(in_u ? t : c, in_u ? c : t, p, du, dv);
+    const gp_Vec x = du.Crossed(dv);
+    if (!(x.SquareMagnitude() > 1e-20 * du.SquareMagnitude() * dv.SquareMagnitude()))
+      return false;
+    n = gp_Dir(x);
+    return true;
+  };
+  // Each sample interval's steps (turn over the angle a step may span on its radius), the most of the iso lines'.
+  auto step = [&](double radius) { return std::min(ang, radius > tol / 2 ? 2 * std::acos(1 - tol / 2 / radius) : 3.14159265358979323846); };
+  std::vector<double> t, w;
+  for (size_t s = 0; s + 1 < knots.size(); ++s)
+    for (int i = 0; i < kSamples; ++i)
+    {
+      const double t0 = knots[s] + (knots[s + 1] - knots[s]) * i / kSamples, t1 = knots[s] + (knots[s + 1] - knots[s]) * (i + 1) / kSamples;
+      double most = 0;
+      for (int j = 0; j < kIso; ++j)
+      {
+        const double c = c0 + (c1 - c0) * j / (kIso - 1);
+        gp_Pnt p0, p1;
+        gp_Dir n0, n1;
+        if (!normal(t0, c, p0, n0) || !normal(t1, c, p1, n1))
+          continue;
+        const double turn = n0.Angle(n1);
+        if (turn > 1e-12)
+          most = std::max(most, turn / step(p0.Distance(p1) / turn));
+      }
+      t.push_back(t0);
+      w.push_back(most);
+    }
+  t.push_back(b);
+  // Lines at equal steps within each run of spans ending in one that turns.
+  std::vector<double> lines{a};
+  size_t from = 0;
+  for (size_t s = 0; s + 1 < knots.size(); ++s)
+  {
+    const size_t to = (s + 1) * kSamples;
+    double span = 0, run = 0;
+    for (size_t i = s * kSamples; i < to; ++i)
+      span += w[i];
+    if (span < 1.0 / 16 && s + 2 < knots.size())
+      continue;
+    for (size_t i = from; i < to; ++i)
+      run += w[i];
+    const int n = std::max(1, (int)std::ceil(run - 1e-9));
+    double acc = 0;
+    size_t i = from;
+    for (int k = 1; k < n; ++k)
+    {
+      const double target = run * k / n;
+      while (i + 1 < to && acc + w[i] < target)
+        acc += w[i++];
+      lines.push_back(t[i] + (t[i + 1] - t[i]) * (w[i] > 0 ? (target - acc) / w[i] : 0));
+    }
+    lines.push_back(t[to]);
+    from = to;
+    if (lines.size() > 65536)
+      return {};
+  }
+  return lines;
+}
+
+// An export's sphere, torus, revolved circle or B-spline face as live's facetter makes it: the boundary nodes and the
+// nodes of its grid (`export_grid`'s, `spline_lines`') that lie inside the face (a quarter cell clear of its boundary
+// along both directions), triangulated in the parameters scaled to lengths (a B-spline's in its grid's indices;
+// planar_cdt); a seam's two sides are a whole ring's ends. The export's BRepMesh deflection and angle are twice Parasolid's (mesh.rs). False (nothing
+// written) when the face isn't clean.
 bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm)
 {
   std::vector<cdt::Pt>          uv;
@@ -210,11 +299,26 @@ bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm
     u0 = std::min(u0, q.x), u1 = std::max(u1, q.x);
     v0 = std::min(v0, q.y), v1 = std::max(v1, q.y);
   }
-  int nu = 1, nv = 1;
-  export_grid(S, u0, u1, v0, v1, prm.Deflection / 2, prm.Angle / 2, nu, nv);
-  if ((double)nu * nv > 3e7)
+  std::vector<double> us, vs;
+  const double        tol = prm.Deflection / 2, ang = prm.Angle / 2;
+  const bool spline = S.GetType() == GeomAbs_BSplineSurface || S.GetType() == GeomAbs_BezierSurface;
+  if (spline)
+  {
+    us = spline_lines(S, true, u0, u1, v0, v1, tol, ang);
+    vs = spline_lines(S, false, v0, v1, u0, u1, tol, ang);
+  }
+  else
+  {
+    int nu = 1, nv = 1;
+    export_grid(S, u0, u1, v0, v1, tol, ang, nu, nv);
+    for (int i = 0; i <= nu; ++i)
+      us.push_back(u0 + (u1 - u0) * i / nu);
+    for (int j = 0; j <= nv; ++j)
+      vs.push_back(v0 + (v1 - v0) * j / nv);
+  }
+  if (us.size() < 2 || vs.size() < 2 || (double)us.size() * (double)vs.size() > 3e7)
     return false;
-  const double du = (u1 - u0) / nu, dv = (v1 - v0) / nv;
+  const int nu = (int)us.size() - 1, nv = (int)vs.size() - 1;
   // Grid nodes inside: on each row between the boundary's crossings (even-odd), likewise on each column.
   std::vector<std::pair<cdt::Pt, cdt::Pt>> seg;
   for (const auto& r : rings)
@@ -232,26 +336,26 @@ bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm
         xs.push_back(ax + (at - ay) * (bx - ax) / (by - ay));
     }
     std::sort(xs.begin(), xs.end());
-    const double lo0 = rows ? u0 : v0, step = rows ? du : dv;
-    const int    n   = rows ? nu : nv;
+    const std::vector<double>& g = rows ? us : vs;
+    const int                  n = rows ? nu : nv;
     for (size_t k = 0; k + 1 < xs.size(); k += 2)
-    {
-      const int first = std::max(1, (int)std::ceil((xs[k] + step / 4 - lo0) / step));
-      const int last  = std::min(n - 1, (int)std::floor((xs[k + 1] - step / 4 - lo0) / step));
-      for (int i = first; i <= last; ++i)
-        in[rows ? (size_t)(line - 1) * w + (size_t)(i - 1) : (size_t)(i - 1) * w + (size_t)(line - 1)] |= rows ? 1 : 2;
-    }
+      for (int i = std::max(1, (int)(std::lower_bound(g.begin(), g.end(), xs[k]) - g.begin())); i < n && g[(size_t)i] <= xs[k + 1]; ++i)
+      {
+        const double quarter = std::min(g[(size_t)i] - g[(size_t)i - 1], g[(size_t)i + 1] - g[(size_t)i]) / 4;
+        if (g[(size_t)i] >= xs[k] + quarter && g[(size_t)i] <= xs[k + 1] - quarter)
+          in[rows ? (size_t)(line - 1) * w + (size_t)(i - 1) : (size_t)(i - 1) * w + (size_t)(line - 1)] |= rows ? 1 : 2;
+      }
   };
   for (int j = 1; j < nv; ++j)
-    spans(true, j, v0 + dv * j);
+    spans(true, j, vs[(size_t)j]);
   for (int i = 1; i < nu; ++i)
-    spans(false, i, u0 + du * i);
+    spans(false, i, us[(size_t)i]);
   const size_t ring_nodes = uv.size();
   for (int j = 1; j < nv; ++j)
     for (int i = 1; i < nu; ++i)
       if (in[(size_t)(j - 1) * w + (size_t)(i - 1)] == 3)
       {
-        const double u = u0 + du * i, v = v0 + dv * j;
+        const double u = us[(size_t)i], v = vs[(size_t)j];
         uv.push_back({u, v});
         xyz.push_back(S.Value(u, v));
       }
@@ -273,9 +377,15 @@ bool grid_face(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm
   const double lu = su.Magnitude(), lv = sv.Magnitude();
   if (!(lu > 0) || !(lv > 0))
     return false;
+  // (A B-spline face's grid in its lines' indices, each cell a unit square: its cells are far from square in lengths
+  // (cf-hose-routing's 0.17 × 10 mm), where a boundary node between two rows fans across the tube.)
+  auto index = [](const std::vector<double>& g, double x) {
+    const size_t i = (size_t)std::clamp<std::ptrdiff_t>(std::upper_bound(g.begin(), g.end(), x) - g.begin() - 1, 0, (std::ptrdiff_t)g.size() - 2);
+    return (double)i + (x - g[i]) / (g[i + 1] - g[i]);
+  };
   std::vector<cdt::Pt> plane = uv;
   for (cdt::Pt& q : plane)
-    q = {q.x * lu, q.y * lv};
+    q = spline ? cdt::Pt{index(us, q.x), index(vs, q.y)} : cdt::Pt{q.x * lu, q.y * lv};
   std::vector<int> tris;
   if (!cdt::triangulate(plane, rings, tris, ring_nodes))
     return false;
@@ -764,7 +874,8 @@ public:
   }
 };
 
-// An export's sphere, torus or revolved circle: `grid_face`, else `fallback`; any other revolution `plain`.
+// An export's sphere, torus or revolved circle: `grid_face`, else `fallback`; a B-spline face `grid_face`, else
+// `plain`; any other revolution `plain`.
 class GridAlgo : public IMeshTools_MeshAlgo
 {
 public:
@@ -772,10 +883,13 @@ public:
 
   void Perform(const IMeshData::IFaceHandle& f, const IMeshTools_Parameters& prm, const Message_ProgressRange& range) override
   {
-    // A surface of revolution of anything but a circle: as the display meshes it.
-    gp_Ax1 axis;
-    double r = 0;
-    if (!swept_circle(*f->GetSurface(), axis, r))
+    // A surface of revolution of anything but a circle: as the display meshes it; a B-spline face as that too when
+    // its grid fails.
+    gp_Ax1                    axis;
+    double                    r      = 0;
+    const GeomAbs_SurfaceType type   = f->GetSurface()->GetType();
+    const bool                spline = type == GeomAbs_BSplineSurface || type == GeomAbs_BezierSurface;
+    if (!spline && !swept_circle(*f->GetSurface(), axis, r))
     {
       myPlain->Perform(f, prm, range);
       return;
@@ -790,6 +904,11 @@ public:
     }
     if (done)
       return;
+    if (spline)
+    {
+      myPlain->Perform(f, prm, range);
+      return;
+    }
     if (std::getenv("NOSHAPE_MESH_DEBUG"))
       std::fprintf(stderr, "mesh: an export grid face went to BRepMesh\n");
     myFallback->Perform(f, prm, range);
@@ -799,13 +918,15 @@ private:
   occ::handle<IMeshTools_MeshAlgo> myFallback, myPlain;
 };
 
-// The export path (`exact`): spheres, tori and revolved circles on `export_grid`'s grid; every other face as the display meshes it.
+// The export path (`exact`): spheres, tori, revolved circles and B-spline faces on their grids; every other face as
+// the display meshes it.
 class ExportAlgoFactory : public IMeshTools_MeshAlgoFactory
 {
 public:
   occ::handle<IMeshTools_MeshAlgo> GetAlgo(const GeomAbs_SurfaceType type, const IMeshTools_Parameters& prm) const override
   {
-    if (type == GeomAbs_Torus || type == GeomAbs_Sphere || type == GeomAbs_SurfaceOfRevolution)
+    if (type == GeomAbs_Torus || type == GeomAbs_Sphere || type == GeomAbs_SurfaceOfRevolution || type == GeomAbs_BSplineSurface ||
+        type == GeomAbs_BezierSurface)
       return new GridAlgo(new BRepMesh_DelaunayNodeInsertionMeshAlgo<ExportGridSplitter, BRepMesh_DelaunayBaseMeshAlgo>(), myOwn->GetAlgo(type, prm));
     return myOwn->GetAlgo(type, prm);
   }
