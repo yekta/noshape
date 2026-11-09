@@ -1855,10 +1855,39 @@ pub fn unchanged(a: &Shape, b: &Shape) -> bool {
     if (ba.min - bb.min).abs().max_element() > tol || (ba.max - bb.max).abs().max_element() > tol {
         return false;
     }
+    // The same edges (ends and lengths): what a Boolean that missed the part hands back, measured without the
+    // volumes (each ~1 s on c2-impeller-loft's shelled loft: its Extrude 1 2.1 s, live 34 ms). A real change cuts new
+    // edges; edges only split (a touching tool) still go by the volumes.
+    if a.count(ShapeType::Edge) == b.count(ShapeType::Edge) && same_edges(a, b, 1e-3 * tol) {
+        return true;
+    }
     match (a.volume(), b.volume()) {
         (Ok(va), Ok(vb)) => (va - vb).abs() <= 1e-9 * va.abs().max(1e-12),
         _ => false,
     }
+}
+
+/// Each edge of `b` one of `a`'s (its length and ends within `tol`): `a`'s sorted by length, searched within `tol`.
+fn same_edges(a: &Shape, b: &Shape, tol: f64) -> bool {
+    let prints = |s: &Shape| -> Option<Vec<(f64, DVec3, DVec3)>> {
+        s.edges()
+            .iter()
+            .map(|e| e.edge_info().ok())
+            .filter(|i| !i.as_ref().is_some_and(|i| i.degenerated))
+            .map(|i| i.map(|i| if i.start.to_array() <= i.end.to_array() { (i.length, i.start, i.end) } else { (i.length, i.end, i.start) }))
+            .collect()
+    };
+    let (Some(mut pa), Some(pb)) = (prints(a), prints(b)) else { return false };
+    if pa.len() != pb.len() {
+        return false;
+    }
+    pa.sort_by(|x, y| x.0.total_cmp(&y.0));
+    let mut used = vec![false; pa.len()];
+    pb.iter().all(|(l, s, e)| {
+        let from = pa.partition_point(|x| x.0 < l - tol);
+        let hit = (from..pa.len()).take_while(|&j| pa[j].0 <= l + tol).find(|&j| !used[j] && pa[j].1.distance(*s) <= tol && pa[j].2.distance(*e) <= tol);
+        hit.map(|j| used[j] = true).is_some()
+    })
 }
 
 /// Whether the tools can account for a cut that leaves nothing of `target`

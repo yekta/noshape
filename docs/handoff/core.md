@@ -40,8 +40,11 @@ What blend takes over:
 2. Done: asm-robot-relations 137/7, asm-scissor-lift 191/12 with and without 20ecf8ca alike (vibe5
    ~/core-cases/asm2docs, asm2-with / asm2-without logs): main's (a32d463cc..680dcece7), handed to qa (qa.md 06:52).
 3. The Shell's box (z 6.21, live 0): the quadrics Shell's inlet wall at metre scale (live's own loft too), handed to
-   bool (bool.md 07:01, probe /root/core-scratch/imp/features-with-probes.rs). Next: profile Delete face 2 (4.7 s)
-   and Extrude 1 (2.2 s); Boolean / Shell work to bool.md. 20ecf8ca landed as 92a16991 (06:54).
+   bool (bool.md 07:01, probe /root/core-scratch/imp/features-with-probes.rs). 20ecf8ca landed as 92a16991 (06:54).
+   Profile (impprof*.log, NOSHAPE_KERNEL_PROFILE, read the reopen block): Extrude 1 = eval::unchanged's two volumes
+   (1.9 s: the segmented Gauss over the shelled offset walls, ~1 s each) + op_boolean 237 ms; the faces come back
+   rebuilt (no TShape identity). Now `same_edges` first (every edge's length and ends within 1e-9 of the size):
+   2146 -> 238 ms; model 422, model-core 105 pass; suite 764/951 (the band), no document worse; interleaved A/B level (ab-edges*.out). Delete face 2 = one op_defeature 4.8 s (OCCT, serial): next, perf.
 
 **State 11-09 06:30 UTC: the impeller's Loft Gehäuse as live (landing); 62a7e4bc landed.**
 - Suite ranking in core's area (suite-ease.log, 763/951): impeller 38 lost at Loft Gehäuse (+0.076 % volume); the
