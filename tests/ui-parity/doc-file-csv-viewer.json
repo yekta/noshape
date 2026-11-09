@@ -1,0 +1,15 @@
+{
+ "name": "doc-file-csv-viewer",
+ "about": "The CSV file tab opened (a numbered grid)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-files",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "uip-table.csv"
+   }
+  }
+ ]
+}

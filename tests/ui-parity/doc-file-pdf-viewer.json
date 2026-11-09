@@ -1,0 +1,15 @@
+{
+ "name": "doc-file-pdf-viewer",
+ "about": "The PDF file tab opened (a PDF viewer)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-files",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "uip-page.pdf"
+   }
+  }
+ ]
+}

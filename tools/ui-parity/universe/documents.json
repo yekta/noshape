@@ -322,7 +322,23 @@
    "where": "documents page › Create › Document… (\"Search labels\")",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:17"
+   "source": "behaviours.md:17",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Document…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "field": "Search labels"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-new-document-document-location-folder-browser-home-back-breadcrumb-folder",
@@ -331,7 +347,37 @@
    "where": "documents page › Create › Document…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:17"
+   "source": "behaviours.md:17",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Document…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "list_row": "uip Folder"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "menu": "Document…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Back"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-document-location-sort-name-a-z-name-z-a-last-modified",
@@ -2545,7 +2591,17 @@
    "where": "document navbar right (opens the notices bottom panel)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1923"
+   "source": "behaviours.md:1923",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "FeatureScript notices"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "navbar-left-rail-document-notes-refresh-notes-edit-notes-apply-cancel-show-previ",
@@ -2554,7 +2610,37 @@
    "where": "document left rail",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1560"
+   "source": "behaviours.md:1560",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Document notes"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Edit notes"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Document notes"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Refresh notes"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "navbar-left-rail-comments",
@@ -2581,7 +2667,17 @@
    "where": "document left rail",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1562"
+   "source": "behaviours.md:1562",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Performance"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "navbar-left-rail-ai-advisor",
@@ -2998,7 +3094,23 @@
    "where": "☰ › Copy version… (viewing a version)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29699"
+   "source": "behaviours.md:29699",
+   "via": [
+    [
+     {
+      "on": {
+       "history_row": "V1"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "menu": "Copy version…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-print-pop-up-toast-when-pop-ups-are-blocked",
@@ -4277,7 +4389,17 @@
    "where": "hover an inactive tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1735"
+   "source": "behaviours.md:1735",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "hover"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-insert-new-tab-menu",
@@ -4625,7 +4747,17 @@
    "where": "open a PNG/JPG tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:30206"
+   "source": "behaviours.md:30206",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "dx-image.png"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-pdf-tab-viewer-browser-pdf-viewer",
@@ -4634,7 +4766,17 @@
    "where": "open a PDF tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1726"
+   "source": "behaviours.md:1726",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "uip-page.pdf"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-txt-md-tab-viewer-raw-monospace",
@@ -4643,7 +4785,17 @@
    "where": "open a TXT/MD tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:30209"
+   "source": "behaviours.md:30209",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "uip-notes.txt"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-csv-tab-viewer-numbered-grid",
@@ -4652,7 +4804,17 @@
    "where": "open a CSV tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:30211"
+   "source": "behaviours.md:30211",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "uip-table.csv"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-json-tab-viewer-read-only-one-line-editor",
@@ -4661,7 +4823,17 @@
    "where": "open a JSON tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:30215"
+   "source": "behaviours.md:30215",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "uip-data.json"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-cad-file-tab-card-icon-name-size-uploaded-update-download",
@@ -4688,7 +4860,17 @@
    "where": "document tab bar",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:224"
+   "source": "behaviours.md:224",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Create Material Library"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tabmenu-delete",
@@ -5363,7 +5545,17 @@
    "where": "right-click a tab: Material Library tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:224"
+   "source": "behaviours.md:224",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Material Library 1"
+      },
+      "do": "rclick"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-delete-tabs-warning-failed-or-missing-features-in-n-tabs-list-delete-canc",
@@ -5444,7 +5636,23 @@
    "where": "Drawing tab › Properties…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29641"
+   "source": "behaviours.md:29641",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part 1 Drawing 1"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-properties-variable-studio-name-description-category-part-number-revision",
@@ -5501,7 +5709,23 @@
    "where": "imported file tab › Properties…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29644"
+   "source": "behaviours.md:29644",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "dx-plate.dxf"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Properties…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-properties-undo-redo-apply-save-close",
@@ -5533,7 +5757,23 @@
    "where": "Part Studio / Assembly / imported CAD tab › Export…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1730"
+   "source": "behaviours.md:1730",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Export…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-export-drawing-tab-format-pdf-dwg-dxf-dwt-svg-png-jpeg-tiff-options-incl-",
@@ -5542,7 +5782,23 @@
    "where": "Drawing tab › Export…",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1556"
+   "source": "behaviours.md:1556",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_tab": "Part 1 Drawing 1"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Export…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-open-close-tabs-panel-alt-t-toggles",
@@ -5656,7 +5912,17 @@
    "where": "Tabs panel filter row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1748"
+   "source": "behaviours.md:1748",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Filter:Part Studio"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-list-view-detail-view",
@@ -5692,7 +5958,17 @@
    "where": "Tabs panel footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1755"
+   "source": "behaviours.md:1755",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Toggle preview"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-help-document-tabs-help-page",
@@ -5701,7 +5977,17 @@
    "where": "Tabs panel footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1740"
+   "source": "behaviours.md:1740",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Tab manager help"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-click-a-row-to-open-the-tab",
@@ -5729,7 +6015,25 @@
    "where": "Tabs panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1739"
+   "source": "behaviours.md:1739",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Search tabs"
+      },
+      "do": "click"
+     },
+     {
+      "do": "key",
+      "key": "ArrowDown"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "tab-manager-row-right-click-menus-same-as-the-tab-bar-s-folder-rename-unpack-mov",
@@ -5820,7 +6124,21 @@
    "where": "shift+/",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1189"
+   "source": "behaviours.md:1189",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "?"
+     },
+     {
+      "on": {
+       "field": "Search shortcuts"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-keyboard-shortcuts-sheet-pop-out-onshape-keyboard-shortcuts-page",
@@ -5829,7 +6147,21 @@
    "where": "shift+/",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:12530"
+   "source": "behaviours.md:12530",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "?"
+     },
+     {
+      "on": {
+       "button": "Pop out keyboard shortcuts"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-keyboard-shortcuts-sheet-customize-keyboard-shortcuts-opens-preferences-k",
@@ -5838,7 +6170,21 @@
    "where": "shift+/",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1190"
+   "source": "behaviours.md:1190",
+   "via": [
+    [
+     {
+      "do": "key",
+      "key": "?"
+     },
+     {
+      "on": {
+       "button": "Customize keyboard shortcuts"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "shortcut-ctrl-space-hold-quick-tab-switching-space-cycles-mru-tabs-release-ctrl-",
@@ -6032,7 +6378,25 @@
    "where": "document toolbar",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:6550"
+   "source": "behaviours.md:6550",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Undo"
+      },
+      "do": "click"
+     }
+    ],
+    [
+     {
+      "on": {
+       "button": "Redo"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "pref-open-preferences-my-account-preferences",

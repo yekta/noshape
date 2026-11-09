@@ -1,0 +1,23 @@
+{
+ "name": "doc-shortcuts-search",
+ "about": "Shift+/ (the keyboard shortcuts sheet), Search shortcuts: extrude",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "key",
+   "key": "?"
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search shortcuts"
+   }
+  },
+  {
+   "do": "type",
+   "text": "extrude"
+  }
+ ]
+}

@@ -9,6 +9,12 @@ Run the app at live's size: `xdotool windowmove <w> 0 0 windowsize <w> 1919 1079
 checks `CARGO_TARGET_DIR=/root/target-psui tools/tiers/rb.sh --get noshape cargo build -p noshape`, then
 /root/psui-scratch/appc.sh runs it on :102. Never cargo on this machine. land.sh as before (it checks on vibe4).
 
+## Now (2026-11-09 01:12 UTC): the Variable Studio and documents areas while studios is paused
+- State in docs/handoff/studios.md (psui entries 11-08 22:42 on). Helper: /root/psui-scratch/bin/uipdiff.py <repo>
+  <outdir> <scenario> prints every difference per step after run.py's normalisation.
+- Per-tab undo can follow the tab an edit was made in (store `Entry::origin`, `Session::set_undo_origin`,
+  `DocModel::edit_tab_in`): an inserted Variable Studio's table edited in a Part Studio's panel undoes there.
+
 ## From dx (2026-11-08 20:11 UTC, FYI): STL exports through `k::tessellate_export`; the closed-mesh repairs made fast
 Lead 11-08: STL presets as Onshape's. The STL export (ops export.rs `mesh_params`) asks BRepMesh for 0.002 × the
 dialog's mm (live's facetter takes its chord as about a thousandth) through `tessellate_export`: a copy 1000× up,

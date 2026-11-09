@@ -72,6 +72,36 @@ a shortcoming, not a target), vs-type-* (focus only, as noted below).
 **2026-11-08 23:53 UTC: psui took documents batch 7 (lead, while studios is paused until Monday)**: the via entries, the new
 docs-* / doc-* / prefs-* scenarios and the documents page's marks below. Versions stay yours.
 
+**2026-11-09 01:12 UTC (psui): live2's 27 vs-* recordings (798cb3b9) run: 4 → 19 match; all 99 vs-* 82 match
+(538/563 states).** Fixed from them: Filter inputs takes live's `:name` / `:internalid` / `:variablename` /
+`:hasvisibilitycondition`; a configuration row click only selects its cell (the row menu's Switch to shows it), Enter
+in the add row leaves the cell selected, the add row's typed name reads as a row; Set to #<variable> has no toast; the
+Insert dialog's ▦ is "Set to last viewed configuration" and ▾'s two items toast "Configuration parameters already
+match last viewed / default value." when nothing changes, a pick unfolds the studio (and shows a configured one's
+inputs), a lone studio is listed unfolded and several folded, a studio there only through Insert into all isn't
+ticked, the Version graph opens over the list (which stays); an automatic table's ⋯ has no Edit / Remove reference;
+the table title is its name's field (a click renames; the fold glyph folds); a Value literal with more decimals than
+the workspace's shows rounded ("1.235 mm", the typed text its tooltip); after a number the autocomplete also lists
+functions by the unit's first letter ("45 mm" → mm, max(, min(); Enter commits when the highlighted entry changes
+nothing; **an edit of an inserted table made in a Part Studio's panel is undone in the Part Studio, not in the
+studio** (store: an undo entry's `origin`, `Session::set_undo_origin`, `DocModel::edit_tab_in`). Runner / run.py:
+"+" typed as "+" (it typed "-"), a hover where the pointer rests comes from outside, `panel_more` is the panel's first
+⋯ (`ui_script::mark_first`), a modal's field over a feature dialog reads "other", a feature dialog's focused button /
+link is fieldless focus, live's Free-plan upgrade modal (vs-tab-release) isn't compared. **Asked live2 again
+(REQUESTS 2398 / 2399, 00:47):** vs-fs-monitor / -profile, the reader checks, vs-type-pick-then-type (the lead's
+question: where the typed 45 lands), plus screenshots for vs-ps-* step 4 (Variable Studio 1 gone from the list after
+a pick), vs-column-resize (undo on: is the width the document's?), vs-ps-new-variable ("Unknown of Sketch 1"), the
+Version graph and a configured studio's inputs. Left: those, and the known live-side ones above.
+
+**2026-11-09 01:12 UTC (psui): documents batch 7, chunk 2 written (25 scenarios, coverage 79.9 → 87.9 %).** Document
+notes (Edit / Cancel, preview + Apply, Refresh), Performance, { } notices, the shortcut sheet's search / customize /
+pop out, the Tab manager's help / preview / type filter / keyboard, the toolbar's Undo / Redo, Properties of a
+drawing and a file tab, Copy version (viewing V1), the tab hover card, the Material Library tab's menu, the five
+imported-file viewers (new start `doc-files` with CSV, JSON, TXT, PDF and PNG files), New document's location box
+and labels; via only for Export Drawing (drw-export-dialog) and Export (tab). Not written: the Import to Onshape
+modal (a CAD file picker), Ctrl/Shift+click tabs, scroll arrows, nested crumbs, Ctrl+Space, shortcuts from the top
+bar, the location box's Sort (ours has none yet), Copy workspace's browser marks. Asked live2 for both chunks.
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;

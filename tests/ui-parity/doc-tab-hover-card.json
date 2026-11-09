@@ -1,0 +1,16 @@
+{
+ "name": "doc-tab-hover-card",
+ "about": "An inactive tab hovered (its card with a thumbnail after about 1 s)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   },
+   "ms": 2000
+  }
+ ]
+}

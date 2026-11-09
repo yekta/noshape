@@ -1,0 +1,27 @@
+{
+ "name": "doc-tab-manager-type-filter",
+ "about": "Tab manager, the Part Studio type filter, then Clear",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Filter:Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Clear filters"
+   }
+  }
+ ]
+}

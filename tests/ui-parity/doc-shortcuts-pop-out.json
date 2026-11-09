@@ -1,0 +1,19 @@
+{
+ "name": "doc-shortcuts-pop-out",
+ "about": "Shift+/, the sheet's ↗ pop out",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "key",
+   "key": "?"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Pop out keyboard shortcuts"
+   }
+  }
+ ]
+}

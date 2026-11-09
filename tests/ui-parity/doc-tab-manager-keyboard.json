@@ -1,0 +1,33 @@
+{
+ "name": "doc-tab-manager-keyboard",
+ "about": "Tab manager, its Search tabs box clicked, then ↓ ↓ and Enter (the footer's \"tab or ↑↓ to navigate, ↵ to open\")",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search tabs"
+   }
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "ArrowDown"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

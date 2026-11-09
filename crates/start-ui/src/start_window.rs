@@ -3947,7 +3947,7 @@ impl Location {
         for (i, f) in children.iter().enumerate() {
             let (c, f2) = (self.chosen.clone(), f.clone());
             list = list.child(
-                os::row_states(h_flex().id(SharedString::from(format!("loc-{i}"))).h(px(30.)).px(px(8.)).gap(px(7.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)), false)
+                os::row_states(h_flex().id(SharedString::from(format!("loc-{i}"))).map(|d| crate::ui_script::mark(d, || format!("list_row:{}", folder_label(f)))).h(px(30.)).px(px(8.)).gap(px(7.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)), false)
                     .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
                     .child(div().flex_1().min_w_0().truncate().child(folder_label(f)))
                     .on_click(move |_, window, _| {
@@ -3977,10 +3977,11 @@ impl Location {
                     .gap(px(12.))
                     .border_b_1()
                     .border_color(rgb(os::MODAL_DIVIDER))
-                    .child(div().id("loc-home").cursor_pointer().child(os::glyph(os::GLYPH_HOME, 20., pal.text)).on_click(go(self.root.clone())))
+                    .child(div().id("loc-home").map(|d| crate::ui_script::mark(d, || "button:Home".into())).cursor_pointer().child(os::glyph(os::GLYPH_HOME, 20., pal.text)).on_click(go(self.root.clone())))
                     .child(
                         div()
                             .id("loc-back")
+                            .map(|d| crate::ui_script::mark(d, || "button:Back".into()))
                             .when(!at_root, |d| d.cursor_pointer().on_click(go(parent)))
                             .child(os::glyph(os::GLYPH_BACK, 18., pal.text)),
                     )
@@ -4055,7 +4056,7 @@ impl LabelPick {
                     })),
             );
         }
-        field = field.child(div().flex_1().min_w(px(120.)).child(os::input_h(Input::new(search).appearance(false).disabled(none), 30.).text_size(px(14.)).pl(px(8.))));
+        field = field.child(div().flex_1().min_w(px(120.)).map(|d| crate::ui_script::mark(d, || "field:Search labels".into())).child(os::input_h(Input::new(search).appearance(false).disabled(none), 30.).text_size(px(14.)).pl(px(8.))));
         let matches: Vec<String> = self.all.iter().filter(|l| !chosen.contains(l) && (query.is_empty() || l.to_lowercase().contains(&query))).cloned().collect();
         let mut col = v_flex().relative().child(field);
         if focused && !none {

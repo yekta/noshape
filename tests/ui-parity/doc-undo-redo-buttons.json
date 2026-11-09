@@ -1,0 +1,33 @@
+{
+ "name": "doc-undo-redo-buttons",
+ "about": "Suppress Extrude 1, then the toolbar's Undo and Redo buttons",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "block",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Undo"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Redo"
+   }
+  }
+ ]
+}

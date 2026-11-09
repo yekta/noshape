@@ -1,0 +1,15 @@
+{
+ "name": "doc-file-json-viewer",
+ "about": "The JSON file tab opened (a read-only editor)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-files",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "uip-data.json"
+   }
+  }
+ ]
+}

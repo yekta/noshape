@@ -1,0 +1,21 @@
+{
+ "name": "doc-featurescript-notices",
+ "about": "The navbar's FeatureScript notices { } (the notices panel at the bottom), clicked again",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "FeatureScript notices"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "FeatureScript notices"
+   }
+  }
+ ]
+}

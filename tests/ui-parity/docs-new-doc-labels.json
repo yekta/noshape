@@ -1,0 +1,33 @@
+{
+ "name": "docs-new-doc-labels",
+ "about": "Create › Document…: Document labels' Search labels clicked; Cancel",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Document…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search labels"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

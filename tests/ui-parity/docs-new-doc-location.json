@@ -1,0 +1,45 @@
+{
+ "name": "docs-new-doc-location",
+ "about": "Create › Document…: the Document location browser: into uip Folder, Back, Home; Cancel",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Document…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "list_row": "uip Folder"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Back"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Home"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

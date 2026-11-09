@@ -113,7 +113,8 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         call(ctx, "import_files", json!({ "files": [path] })).map_err(|e| format!("start file {name}: {e}"))?;
     }
     // (The run opens on Part Studio 1, where the versions' features go too.)
-    if start["tabs"].as_array().is_some_and(|t| !t.is_empty()) || start.get("feature_studio").is_some() {
+    let has = |key: &str| start[key].as_array().is_some_and(|t| !t.is_empty());
+    if has("tabs") || has("files") || start.get("feature_studio").is_some() {
         call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
     }
     // Versions (README "Versions and history"): each made after what comes before it, then its own `features` in Main.
@@ -416,6 +417,19 @@ mod tests {
         assert!(r.is_ok(), "{r:?}");
         let r = call(&mut ctx, "drawing_insert_cad", json!({ "drawing": "Part 1 Drawing 1", "file": "dx-plate.dxf" })).unwrap();
         assert_eq!(r["entities"], 5, "{r}");
+        let _ = std::fs::remove_dir_all(&dir);
+        // doc-files: its five file tabs (CSV, JSON, TXT, PDF and a PNG), the run on Part Studio 1.
+        let mut start = starts["doc-files"].clone();
+        start["files_dir"] = json!(format!("{root}/files"));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("doc-files.noshape"), &start).unwrap();
+        let info = call(&mut ctx, "document_info", json!({})).unwrap();
+        let tabs: Vec<&str> = info["tabs"].as_array().unwrap().iter().filter_map(|t| t["name"].as_str()).collect();
+        for f in ["dx-image.png", "uip-table.csv", "uip-data.json", "uip-notes.txt", "uip-page.pdf"] {
+            assert!(tabs.contains(&f), "{f} in {tabs:?}");
+        }
+        let ui = call(&mut ctx, "ui_state", json!({})).unwrap();
+        assert_eq!(ui["active_tab"]["name"], "Part Studio 1", "{}", ui["active_tab"]);
         let _ = std::fs::remove_dir_all(dir);
     }
 }

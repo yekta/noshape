@@ -1,0 +1,21 @@
+{
+ "name": "doc-tab-manager-help",
+ "about": "Tab manager, its footer ? (help: Document tabs)",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Tab manager help"
+   }
+  }
+ ]
+}

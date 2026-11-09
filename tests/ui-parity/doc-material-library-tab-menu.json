@@ -1,0 +1,31 @@
+{
+ "name": "doc-material-library-tab-menu",
+ "about": "+ › Create Material Library, then its tab's menu (Open in new browser tab, Properties…, Export), Esc",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Material Library"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Material Library 1"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "name": "doc-notes-preview-apply",
+ "about": "Document notes, Edit notes, type **uip**, Show preview, then Apply",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document notes"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Edit notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "**uip**"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show preview"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Notes › Apply"
+   }
+  }
+ ]
+}

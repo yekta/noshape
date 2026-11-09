@@ -1,0 +1,21 @@
+{
+ "name": "doc-performance-panel",
+ "about": "Left rail › Performance (Tab performance, Tab graphics, Document performance, System), then Close",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Performance"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

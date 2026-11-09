@@ -1,0 +1,27 @@
+{
+ "name": "doc-tab-properties-file",
+ "about": "A file tab's menu › Properties… (Name, Description, Part number, …), Close",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "block-drawing-files",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "dx-plate.dxf"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Properties…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Close"
+   }
+  }
+ ]
+}

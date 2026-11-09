@@ -262,6 +262,16 @@ document's modals, and the tabs that are no Part Studio, Assembly or Drawing (Va
   "select" | "checkbox", "value"}], "buttons"}`). On a Variable or Feature Studio tab the Part Studio keys
   (`features`, `parts`, `selection`, `sketch`, `drawing`) are `null` / empty; `focus`, `dialog`, `list` and `tooltip`
   are read as everywhere.
+- More document targets (psui, 11-09, studios.md batch 7): the left rail's `{"button": "Document notes"}` /
+  `"Performance"` and a rail panel's header buttons by tooltip (`"Refresh notes"`, `"Edit notes"`, `"Show preview"`,
+  `"Close"`), Document notes' text links `{"button": "Notes › Apply"}` / `"Notes › Cancel"`; the navbar's
+  `{"button": "FeatureScript notices"}` ({ }); the toolbar's `{"button": "Undo"}` / `"Redo"`; the keyboard shortcuts
+  sheet's `{"field": "Search shortcuts"}`, `{"button": "Customize keyboard shortcuts"}`, `{"button": "Pop out keyboard
+  shortcuts"}` (its ↗); the Tab manager's type filters `{"button": "Filter:Part Studio"}` (by tooltip), its
+  `{"button": "Clear filters"}` (Clear), footer `{"button": "Toggle preview"}` and `{"button": "Tab manager help"}`
+  (?), its search box `{"field": "Search tabs"}` (the header's `{"button": "Search tabs"}` shows / hides it); a history row `{"history_row": "V1"}` clicked opens that version. Start `doc-files`: block plus file tabs
+  dx-image.png, uip-table.csv, uip-data.json, uip-notes.txt, uip-page.pdf (tests/ui-parity/files), uploaded in that
+  order, opening on Part Studio 1.
 
 ### Variable Studio and Versions (studios, 11-07)
 - A start's Variable Studio tab may hold variables: `{"kind": "variablestudio", "name": "Variable Studio 1",
@@ -368,6 +378,8 @@ states above.
   panel's `{"field": "Properties › Description"}` (`Name`, `Library label`) and `{"button": "Properties › Undo"}`
   (`Redo`, `Apply`); the column chooser's `{"field": "Search…"}` and a column's grip `{"col_grip": "Owned by"}` (a
   `drag`'s ends, `"edge": "top"` on the drop); Advanced search's `{"button": "Advanced search help"}` (its ?).
+  New document's location box: `{"button": "Home"}`, `{"button": "Back"}`, a folder row `{"list_row": "uip Folder"}`;
+  its Document labels box `{"field": "Search labels"}`.
 - Targets on Preferences: a control by its section and label, `{"field": "Units › Length default unit", "pick":
   "Inch"}` (a select), `{"field": "Units › Length default unit › Display decimals"}` (the select after it),
   `{"checkbox": "Decimal format › Use comma as decimal separator"}`, a section's button `{"button": "Units › Save
@@ -548,8 +560,9 @@ isn't the list's). Live's root row reading "<name> Copy 1" (its runner opens a c
 menus lose the rows of cloud features noshape leaves out ("Add comment", "Create task…"); a menu that lost one is a row shorter, so it
 may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
-Focus (lead 11-08): a `focus` with no text field ("none", or "other" on a button, a row, a menu: live's Chrome
-focuses a clicked button, ours' buttons take no focus) equals another such; a text field's focus (an input, a
+Focus (lead 11-08): a `focus` with no text field ("none", or "other" on a button, a row, a menu, or "field" on a
+feature dialog's button or link: live's Chrome focuses a clicked button, ours' buttons take no focus) equals another
+such; a text field's focus (an input, a
 textarea, a select, or ours' "other" with `text`) is compared as recorded. A scenario whose later steps depend on the
 clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it.
 

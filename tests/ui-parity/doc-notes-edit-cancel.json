@@ -1,0 +1,31 @@
+{
+ "name": "doc-notes-edit-cancel",
+ "about": "Left rail › Document notes, Edit notes, type a line, Cancel",
+ "area": "psui",
+ "source": "universe documents (psui 11-09, studios.md batch 7)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Document notes"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Edit notes"
+   }
+  },
+  {
+   "do": "type",
+   "text": "uip note"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Notes › Cancel"
+   }
+  }
+ ]
+}
