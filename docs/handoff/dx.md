@@ -38,7 +38,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
-## 11-09 10:12 UTC: o-ring rings, drawings 1304/1409 (136/176)
+## 11-09 09:58 UTC: o-ring rings, drawings 1304/1409 (136/176)
 
 - **o-ring Parasolid** (live 2411): live's own x_t writes each circle between the cylinder and the cone as one ring
   edge without a vertex (its seams opposite, +Z / −Z: alignment never mattered); ours wrote the model's two arcs (cut
@@ -55,7 +55,7 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
   start studio's drawing tab compared as "Part Studio 1 Drawing 1".
 - Left (not ours, or unknown): the revision table scenarios (live's account can't insert one), DWG export's Version
   (2018 there is a remembered choice, behaviours 2000), sheet properties' view list order (live's two recordings
-  disagree), added sheets listing the format's lines and notes as annotations (asked live whether that is
+  disagree), added sheets listing the format's lines and notes as annotations (asked live2 at 09:59 whether that is
   Onshape's own: an added sheet's format as sketch lines and notes), Esc after an inspection item.
 
 ## 11-09 08:49 UTC: Edit auxiliary view as live's panel; drawings 1284/1409
