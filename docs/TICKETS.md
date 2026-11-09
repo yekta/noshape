@@ -941,11 +941,11 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     loft. bool's 627e05f5 (Delete face 2's defeaturing 9.9 → 3.9 s) is after this green.
   - Load, not regressions: asm-face-menu, -section-view, -select-other, asm-section-view-turn-off, docs-trash-delete-forever,
     docs-trash-details (all six match alone on 4e549553); cf-drive-train-generator 3.0 → 5.3 s, learning-center-michael 1.2 → 1.9 s.
-  **qa 16:28, the 12:21 run (green 4e549553) against the 08:00 one:** models 75 → 76/87, features 764/951 → 787/947, scenarios
+  **qa 16:26, the 12:21 run (green 4e549553) against the 08:00 one:** models 75 → 76/87, features 764/951 → 787/947, scenarios
   1282/1403 → 1336/1435, parity index 87.6 → 88.7. No new failure. asm-config-input-menu-copy-input differs again (asm, above).
   Speed flags (c2-fan-blade-sweep 0.6 → 2.3 s, cf-fill-pattern 7.2 → 11.0, cf-surface-pattern 14.0 → 19.4, c2-sm-corner-break,
   cf-sheet-metal-shaped-flange, c2-hunting-knife ×1.4–1.6) ran beside tonight's T2 hang copy on vibe2, still alive at 16:25 (14 h):
-  re-measured on vibe2 at load 1.0 (16:27).
+  re-measuring on vibe2 at load 1.0 (from 16:26).
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
