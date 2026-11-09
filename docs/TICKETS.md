@@ -29,6 +29,13 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   "Could not create valid swept body, check input.", live OK (Part 5 15/32/20, 664406.43 mm³).
 - [x] (skasm 11-07: a round of a boss rim whose wall is shorter than the radius, Allow edge overflow off, rolls on the cap and over the wall's far edge as live's (blend_section::cliff_rim_blend: the torus tangent to the cap at R - sqrt(h(2r - h)), through the far circle; live's face data: cap r 2, round down to the base circle; 76.35 mm³ a boss, live 76.32); Fillets 4 and 3 as live, cf-snap-hook 7 -> 9/18, next: Fillet 5 (85 faces, live 30); suite 631 -> 640, nothing lower; T1 kernel_robustness::a_round_past_its_wall_rolls_over_the_far_edge) P1 SNAP-HOOK-FILLET-4 (skasm, lead 11-06 23:15; parity suite) cf-snap-hook's Fillet 4 (feature 7): ours "Failed
   to fillet selections.", live OK (Case 402571.66 mm³).
+- [ ] P2 BOOL-ROTIEREN-TANGENT (bool, parked by the lead 11-09) c2-housing-draft's Rotieren 1: a revolved cut whose
+  face touches the plate's underside tangentially along a circle (r 15.2 mm) goes to OCCT (correct, 526 ms in the
+  corpus; ~0.3 s of the document). Ours takes it with the WIP but its history differs from OCCT's: OCCT counts the
+  plate's r 15.2-15.3 mm strips between the ribs as coincident with the revolved face (0.24 um apart) and splits the -y
+  strip at the tool's seam. Matching needs a free-form face's region within the grey band of a plane taken as
+  coincident. WIP: /root/bool-scratch/wip/rotieren1-tangent-1109.patch (branch bool-contact; debug prints in it);
+  case vibe4 ~/agents/bool-corpora/hd/39bba82f912dcab3; bool.md "Rotieren 1 taken, history differs from OCCT".
 - [x] P1 SHFALL-A7AB-EXTRA-VERTEX (bool, lead 11-08: fix within a day, after c2-housing-draft's Rotieren 1) **a Shell
   slab fuse ours now takes keeps an extra vertex on a straight edge after the merge: ours is wrong there, not OCCT.**
   shfall a7ab967d0e6d4517 (Fuse, 23 tools), taken since revolutions of arcs are noshape's free-form faces (cf-snap-hook

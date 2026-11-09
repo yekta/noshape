@@ -19,7 +19,7 @@ scratch /root/bool-scratch.
   the final round's classification (~0.6 s, rays against the spheres' faces) and round 0 (0.6 s, OCCT's sections).
   Profiling: in-process sampler copied into kernel tests (crates/model/tests/sampler.rs; NOSHAPE_SAMPLE_OUT around
   brep_corpus_replay; /root/bool-scratch/spprof.sh <corpus>, prof2.py on vibe4). No gdb on the hosts.
-- Rotieren 1: asked the lead (park, or a band-coincidence rule to match OCCT's history); see its entry below.
+- Rotieren 1: parked by the lead (11-09): P2 BOOL-ROTIEREN-TANGENT in TICKETS; see its entry below.
 - **Landed 895a5311 (06:04 UTC)** with its gate: corpora + parity56 0 differences, taken counts and declines as
   main's; knurl/gear level (spur gear 2.2 -> 1.7 s); shfall its known 2; model suite 75/87, 763/951 before and after,
   every line alike; cf-surface-pattern 13.8 -> 5.6 s in the suite (live 4.2), Surface Pattern 3 10.6 -> 3.6 s.
