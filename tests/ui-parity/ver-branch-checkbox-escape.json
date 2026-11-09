@@ -1,0 +1,37 @@
+{
+ "name": "ver-branch-checkbox-escape",
+ "about": "V1's Branch to create workspace…: Open new workspace unticked, then Esc closes the dialog",
+ "area": "psui",
+ "source": "lead 11-09 (a clicked checkbox takes the keyboard; Enter / Esc stay the dialog's)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Branch to create workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Open new workspace"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -421,12 +421,15 @@ TEXT_TAGS = {"input", "textarea", "select"}
 def no_field_focus(focus):
     """Whether no text field has the keyboard: "none", or "other" on a button, a row, a menu (live: Chrome focuses a
     clicked button; ours' buttons take no focus), or a feature dialog's button or link ("field" with tag button / a:
-    vs-insert-help, vs-insert-version-graph). Two such are compared as equal (README "Focus")."""
+    vs-insert-help, vs-insert-version-graph), or a checkbox. Two such are compared as equal (README "Focus")."""
     if not isinstance(focus, dict):
         return focus is None
     if focus.get("kind") == "none":
         return True
     if focus.get("kind") == "field" and focus.get("tag") in ("button", "a") and not focus.get("text"):
+        return True
+    # A checkbox (an <input> whose value reads "on", no text selection: live ver-branch-no-open).
+    if focus.get("tag") == "input" and focus.get("text") in ("on", "off") and focus.get("selection") in (None, [None, None]):
         return True
     return focus.get("kind") == "other" and focus.get("tag") not in TEXT_TAGS and not focus.get("text") and focus.get("selection") in (None, [None, None])
 

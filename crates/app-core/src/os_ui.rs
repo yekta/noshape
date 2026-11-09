@@ -311,6 +311,9 @@ fn checkbox_with(id: impl Into<ElementId>, label: AnyElement, on: bool) -> State
     h_flex()
         .debug_selector(move || selector.to_string())
         .id(id)
+        // A click gives it the keyboard, as a browser's checkbox (live ver-branch-no-open); in a dialog Enter and Esc
+        // stay the dialog's (its key context is above).
+        .focusable()
         .h(px(27.))
         .pl(px(4.))
         .gap(px(4.))

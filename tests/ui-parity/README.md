@@ -585,8 +585,8 @@ menus lose the rows of cloud features noshape leaves out ("Add comment", "Create
 may fit where live's had to move under the still pointer: its highlighted row isn't compared (face-rclick-menu).
 
 Focus (lead 11-08): a `focus` with no text field ("none", or "other" on a button, a row, a menu, or "field" on a
-feature dialog's button or link: live's Chrome focuses a clicked button, ours' buttons take no focus) equals another
-such; a text field's focus (an input, a
+feature dialog's button or link, or a checkbox: live's Chrome focuses a clicked button, ours' buttons take no focus)
+equals another such; a text field's focus (an input, a
 textarea, a select, or ours' "other" with `text`) is compared as recorded. A scenario whose later steps depend on the
 clicked button holding the keyboard (Enter or Space re-activating it) is the exception: its recordings show it.
 
