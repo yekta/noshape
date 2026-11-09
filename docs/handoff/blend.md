@@ -12,16 +12,22 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
-## From dx (2026-11-09 11:09 UTC, lead: blend paused till Monday): c2-fan-blade-sweep's Chamfer 2, in progress
-- Cause: the thread's band (core's keep mark on its edge) survived OCCT's chamfer (91 faces, the mark on) and then
-  `merge_full_rounds` (finish_blend_faces) joined the band and the boss next to it: two coaxial cylinders of one
-  radius, its rule for a full round's halves. It now leaves a kept edge alone. And the fillet / variable fillet /
-  chamfer copies of the input (`BRepBuilderAPI_Copy`) lost every keep mark: carried now (`carry_kept_marks`), as the
-  Booleans' copies do.
-- Source studio fb207f79: 18 -> 22/22 (to the end). Derived 2 (other source 8b633129, the STEP import) built too
-  (parity translator: qEverything(BODY)'s default bodies aren't parts) and the blade's last edge joined (dx's
-  import code). c2-fan-blade-sweep 0 -> 23/53; next: feature 5 Extrude 1 ("klammer" 7/15/10, live 6/12/8).
-- Suite checks running (state below when done).
+## From dx (2026-11-09 11:40 UTC, lead: blend paused till Monday): c2-fan-blade-sweep's Chamfer 2 fixed
+- Cause: OCCT's chamfer kept the thread's band (91 faces, core's keep mark on its edge), then `merge_full_rounds`
+  (finish_blend_faces) joined the band and the boss next to it: two coaxial cylinders of one radius whose other edges
+  make one loop, its rule for a full round's halves. It now leaves a kept edge alone. And the fillet / variable fillet
+  / chamfer copies of their input (`BRepBuilderAPI_Copy`) dropped every keep mark: carried now (`carry_kept_marks`),
+  as the Booleans' copies do. crates/brep untouched (no gate needed). T1 blend::a_chamfer_keeps_a_kept_split_of_a_cylinder
+  (fails without it).
+- Source studio fb207f79: 18 -> 22/22, to the end. With dx's two other changes (Derived 2's qEverything(BODY) in the
+  parity translator; the STEP blade's last edge joined in the import) c2-fan-blade-sweep 0 -> 23/53; next: feature 5
+  Extrude 1 ("klammer" 7/15/10, live 6/12/8; its Sketch 2 has untranslated entities: a zero-length line, 12
+  PROJECTED not found), dx's to look at.
+- Checks: model suite 75/87, 764 -> 787/951 (only c2-fan-blade-sweep moved), kernel 351 tests, model features_a,
+  exchange suite unchanged (46/48 ours imports live's), g++-13 clean.
+- Seen on the way, for core: a thread's band on a full cylinder doesn't survive a REMOVE extrude that cuts the boss
+  in half (thread M8 on a Ø8 x 20 cylinder, then a rectangle on Top x < 0 extruded 25 mm REMOVE: one Ø8 cylinder
+  face left of two). Not needed by any suite document so far.
 
 ## From core (2026-11-09 02:48 UTC): c2-hunting-knife now stops at Fillet 2 (feature 14)
 - With core's guided loft fix (Loft 3 as live's face, the blade 4983.62 mm³ in live's band), the knife runs 11 -> 14/52.

@@ -38,13 +38,16 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
-## 11-09 11:09 UTC: c2-fan-blade-sweep (lead: blend's Chamfer 2 while blend is paused): 0 -> 23/53, in progress
+## 11-09 11:40 UTC: c2-fan-blade-sweep 0 -> 23/53 (lead: blend's Chamfer 2 while blend is paused); o-ring confirmed
 
 - Chamfer 2: merge_full_rounds joined the thread's kept band; the blends' input copies dropped keep marks (blend.md
-  11:09). Derived 2: the translator's qEverything(BODY) ids skip the source's default bodies. The STEP blade's last
-  edge: merge_same_surface_faces joins pieces whose curves on the faces run over other ranges, on a copy made
-  same-range (join_loop_pieces' new `refit`, off for Booleans). Next: Extrude 1 "klammer" (feature 5). Suite checks
-  (kernel, model, model suite, exchange) running before landing.
+  11:40, T1 blend::a_chamfer_keeps_a_kept_split_of_a_cylinder). Derived 2: the translator's qEverything(BODY) ids
+  skip the source's default bodies (live 2340). The STEP blade's last edge: merge_same_surface_faces joins pieces
+  whose curves on the faces run over other ranges, on a copy made same-range, the joined edge refit
+  (join_loop_pieces' `refit`, off for Booleans: their results unchanged). Model suite 764 -> 787/951, nothing else
+  moved. Next in the document: feature 5 Extrude 1 "klammer" (its Sketch 2's untranslated entities).
+- Live 2415: cf-o-ring-generator's x_t now 27/26/0 in live, nothing else changed in the 12 files: live imports ours
+  42/48 (ours imports live's 46/48).
 
 ## 11-09 09:58 UTC: o-ring rings, drawings 1304/1409 (136/176)
 
