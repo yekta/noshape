@@ -505,9 +505,9 @@ fn exchange_round_trip() {
                 let own = (!selfs[format].is_null()).then(|| parts_from_live_import(&selfs[format], false));
                 if let (Some(x), Some(own)) = (&xt, own)
                     && let Some(held) = model_topology(&own, x)
-                    && differences(&held, &read).is_empty()
+                    && (differences(&held, &read).is_empty() || splits_no_more(&held, &own, &read))
                 {
-                    println!("{name}: live's own {format} import splits its model's edges or faces: live's import of ours keeps the model's (live's shortcoming)");
+                    println!("{name}: live's own {format} import splits its model's edges or faces: live's import of ours keeps the model's or splits less (live's shortcoming)");
                     diff.clear();
                 }
             }
@@ -516,6 +516,26 @@ fn exchange_round_trip() {
         }
     }
     println!("exchange score: ours imports live's files {imports_ok}/{imports}; live imports ours {exports_ok}/{} ({waiting} of {exports} not imported by live yet); ours reads ours back {selfs_ok}/{exports}", exports - waiting);
+}
+
+/// Live's import of our file splitting fewer of the model's edges than its import of its own (cf-hose-routing's
+/// STEP: 12/13/2 for its model's 12/12/0, its own file 12/16/8: its importer splits ring edges at a periodic face's
+/// seam): part for part (by volume), counts between the model's (`held`) and its own file's (`own`), volume and area
+/// as `held` holds them.
+fn splits_no_more(held: &[PartState], own: &[PartState], read: &[PartState]) -> bool {
+    if held.len() != read.len() || own.len() != read.len() {
+        return false;
+    }
+    let by_volume = |v: &[PartState]| {
+        let mut v: Vec<PartState> = v.to_vec();
+        v.sort_by(|a, b| a.volume.unwrap_or(0.0).total_cmp(&b.volume.unwrap_or(0.0)));
+        v
+    };
+    let (h, o, r) = (by_volume(held), by_volume(own), by_volume(read));
+    let between = |m: u64, x: u64, l: u64| m <= x && x <= l;
+    let counts = h.iter().zip(&o).zip(&r).all(|((h, o), r)| between(h.faces, r.faces, o.faces) && between(h.edges, r.edges, o.edges) && between(h.vertices, r.vertices, o.vertices));
+    let as_held: Vec<PartState> = r.iter().zip(&h).map(|(r, h)| PartState { faces: h.faces, edges: h.edges, vertices: h.vertices, face_types: h.face_types.clone(), edge_types: h.edge_types.clone(), ..r.clone() }).collect();
+    counts && differences(&h, &as_held).is_empty()
 }
 
 /// Live's import of its own export, each part's volume and area held to its model's (its Parasolid import) where the
@@ -569,6 +589,15 @@ fn held_to_model(own: Vec<PartState>, model: &[PartState], slack: f64, failures_
 }
 
 /// A part live reads off its model is held to the model, as close as live's own import of the file.
+#[test]
+fn an_import_splitting_fewer_edges_than_lives_own_is_lives_shortcoming() {
+    let part = |f: u64, e: u64, v: u64| PartState { name: "Hose".into(), faces: f, edges: e, vertices: v, volume: Some(8.2e-6), volume_band: Some([8.19e-6, 8.21e-6]), ..Default::default() };
+    let (held, own) = ([part(12, 12, 0)], [part(12, 16, 8)]);
+    assert!(splits_no_more(&held, &own, &[part(12, 13, 2)]), "between the model and live's own file");
+    assert!(!splits_no_more(&held, &own, &[part(12, 17, 2)]), "more edges than live's own");
+    assert!(!splits_no_more(&held, &own, &[part(11, 13, 2)]), "fewer faces than the model");
+}
+
 #[test]
 fn an_import_off_its_model_holds_ours_as_close() {
     let part = |volume: f64, band: f64| PartState { name: "Part 1".into(), faces: 6, edges: 12, vertices: 8, volume: Some(volume), volume_band: Some([volume - band, volume + band]), ..Default::default() };
