@@ -917,7 +917,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     sheet as a modal where live's step 1 has none).
   - asm: asm-config-input-menu-copy-input differs alone: step 2 `.focus.kind` live "other" / ours "none".
   - feature-menu-remove-expression matches alone (load).
-  **qa 12:33, the 08:00 run (green 72e620b0) against the 04:00 one:** models 75/87, features 763 → 764/951, scenarios 1229/1401 →
+  **qa 12:23, the 08:00 run (green 72e620b0) against the 04:00 one:** models 75/87, features 763 → 764/951, scenarios 1229/1401 →
   1282/1403, parity index 87.0 → 87.6 (speed 83.1 → 78.0, feature time; vibe2 still loaded by tonight's T2 hang copy, 10 h old at
   12:20). Flags:
   - core / bool: c2-impeller-loft 17.9 → 73.6 s, and "Delete face 1", "Delete face 2" ("Could not delete selected faces.") and

@@ -6,7 +6,7 @@ causes of difference, each with its ticket.
 
 | date | green | models | features | scenarios | biggest causes (tickets) |
 |---|---|---|---|---|---|
-| 2026-11-09 | 72e620b0 (qa 12:33: the 08:00 run, models on vibe2) | 75/87 | 764/951 | 1282/1403 (7818/8077 states) | c2-impeller-loft's later features fail on its now-correct loft (SUITE-REGRESSIONS-1108); speed on a loaded vibe2 |
+| 2026-11-09 | 72e620b0 (qa 12:23: the 08:00 run, models on vibe2) | 75/87 | 764/951 | 1282/1403 (7818/8077 states) | c2-impeller-loft's later features fail on its now-correct loft (SUITE-REGRESSIONS-1108); speed on a loaded vibe2 |
 | 2026-11-09 | 35fd1ddf (qa 08:05: the 04:00 run, models on vibe2) | 75/87 | 763/951 | 1229/1401 (7728/8069 states) | no new flags; first run with speed by the features' own regeneration time (psui 5516428a0), measured on a loaded vibe2: re-measured on a quiet host next |
 | 2026-11-09 | 19036006 (qa 04:08: the 23:24 run, models on vibe2) | 75/87 | 760/951 | 1151/1331 (7375/7722 states) | speed not comparable: vibe2 loaded by day-old T2 processes; the old (wall) speed definition, the last run with it |
 | 2026-11-08 | d6904caf (qa 23:35: the 18:54 run, models on vibe2) | 75/87 | 760/951 | 1082/1285 (7042/7407 states) | speed fell with vibe2's load (median ×1.21); flags in SUITE-REGRESSIONS-1108 |
