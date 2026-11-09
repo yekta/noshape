@@ -779,6 +779,17 @@ void free_later(std::vector<TopoDS_Shape>&& shapes)
   q->cv.notify_one();
 }
 
+// Set once the process exits: Windows runs the exiting thread's thread_local destructors after the atexit handlers,
+// inside its shutdown, where no thread can be started (the freer's first start threw out of ~Built: the CLI's exit
+// code 0xC0000409 after a user's E2 printed its result).
+std::atomic<bool> g_exiting{false};
+
+void watch_exit()
+{
+  static std::once_flag once;
+  std::call_once(once, [] { std::atexit([] { g_exiting.store(true); }); });
+}
+
 // This thread's last result (its flat body, the shapes built for its entities, the tolerance), for
 // rust_boolean_keep.
 struct Built
@@ -789,7 +800,7 @@ struct Built
   std::vector<char>         target_face;
   double                    tol = 0;
   bool                      set = false;
-  Built()                        = default;
+  Built() { watch_exit(); }
   Built(const Built&)            = delete;
   Built& operator=(const Built&) = delete;
   Built(Built&&)                 = default;
@@ -804,8 +815,22 @@ struct Built
       all.insert(all.end(), std::make_move_iterator(x->begin()), std::make_move_iterator(x->end()));
       x->clear();
     }
-    if (!all.empty())
+    if (all.empty())
+      return;
+    // (At the exit, left to it: nothing to gain freeing them, and no thread to free them on.)
+    if (g_exiting.load())
+    {
+      static_cast<void>(new std::vector<TopoDS_Shape>(std::move(all)));
+      return;
+    }
+    try
+    {
       free_later(std::move(all));
+    }
+    catch (...)
+    {
+      // (No freer thread: freed here as `all` goes.)
+    }
   }
 };
 thread_local Built t_built;
