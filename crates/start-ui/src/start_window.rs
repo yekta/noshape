@@ -266,6 +266,19 @@ fn load_prefs() -> Prefs {
     std::fs::read(prefs_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
 }
 
+/// An import's choices and where its result goes (see `StartView::import_cad`).
+struct ImportJob {
+    choice: noshape_ops::import::ImportChoice,
+    how: crate::start_hooks::PageImport,
+    place: PathBuf,
+    gpu: crate::gpu::Gpu,
+    handle: AnyWindowHandle,
+    view: Entity<StartView>,
+}
+
+/// How long Import files… waits for the file system to give a file before it says so (a hung network share).
+const IMPORT_READ_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// The documents page opens on Owned by me with its Folders open next time (the ui-parity driver's page starts: live's
 /// account).
 pub fn open_on_owned_by_me() {
@@ -330,6 +343,8 @@ pub struct StartView {
     folders_open: bool,
     /// "Last opened by me" is expanded.
     recent_open: bool,
+    /// The Notifications bell's panel (live: the documents page's bell, where an import's steps show).
+    notifications_open: bool,
     /// A folder's own subfolder section is expanded (top-level "Folders" is
     /// `folders_open`, collapsed by default).
     sub_open: bool,
@@ -522,6 +537,7 @@ impl StartView {
             folders_open: prefs.folders_open,
             renaming: None,
             recent_open: true,
+            notifications_open: false,
             sub_open: true,
             columns: prefs.columns.clone(),
             cols_open: false,
@@ -810,10 +826,8 @@ impl StartView {
                             let split = how != crate::start_hooks::PageImport::Single;
                             let groups: Vec<Vec<PathBuf>> = if split { files.iter().map(|p| vec![p.clone()]).collect() } else { vec![files.clone()] };
                             for g in groups {
-                                let result = Self::import_cad(&g, &choice, how, &place, gpu.clone(), cx);
-                                Self::report_import(&g, result, handle, cx);
+                                Self::import_cad(g, ImportJob { choice, how, place: place.clone(), gpu: gpu.clone(), handle, view: view.clone() }, cx);
                             }
-                            view.update(cx, |this, cx| this.force_rescan(cx));
                         };
                         crate::start_hooks::import_dialog(cad, Box::new(on_import), window, cx);
                     });
@@ -824,25 +838,82 @@ impl StartView {
     }
 
     /// The modal's documents for `paths` (noshape_ops::import_documents: one document, or a split file's folder of
-    /// linked documents), the one to open opened.
-    fn import_cad(paths: &[PathBuf], choice: &noshape_ops::import::ImportChoice, how: crate::start_hooks::PageImport, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
+    /// linked documents), made in the background while the bell's entry walks live's steps ("Importing <file>…":
+    /// Uploading… → Uploaded, Translating… → Translated, Post-processing done, "Created link to <document>", which
+    /// opens it; behaviours "STEP import flow", "dx speed"). The page stays as it is (live). A file the file system
+    /// doesn't give within [`IMPORT_READ_TIMEOUT`] fails the import, saying so.
+    fn import_cad(paths: Vec<PathBuf>, job_of: ImportJob, cx: &mut App) {
+        use crate::notifications::{self as bell, Step};
+        let ImportJob { choice, how, place, gpu, handle, view } = job_of;
         use noshape_ops::import_documents as imp;
-        let new_doc = crate::user_units::new_document;
-        if how != crate::start_hooks::PageImport::Single
-            && let Some(made) = imp::import_split(&paths[0], choice, how == crate::start_hooks::PageImport::PerPart, place, &new_doc)?
-        {
-            if let Some(top) = made.open {
-                crate::start_hooks::open_document_window(top, None, gpu, cx)?;
+        let names = paths.iter().map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect::<Vec<_>>().join(", ");
+        let job = bell::start_job(cx, format!("Importing {names}…"), vec![Step::running("Uploading…")]);
+        let template = crate::user_units::new_document();
+        let ex = cx.background_executor().clone();
+        cx.spawn(async move |cx| {
+            let fail = |why: String, read: bool, cx: &mut App| {
+                let mut steps = if read { vec![Step::done("Uploaded")] } else { Vec::new() };
+                steps.extend([Step::failed(why.clone()), Step::failed("No post-processing")]);
+                bell::update_job(cx, job, format!("Import {names} failed"), steps, true, None);
+                let msg = format!("Import failed: {why}");
+                let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
+            };
+            // Uploading: the files read through once (a hung network share stops here, not in the translation).
+            let files = paths.clone();
+            let read = ex
+                .spawn(async move { files.iter().try_for_each(|p| std::fs::read(p).map(drop).map_err(|e| format!("{}: {e}", p.display()))) })
+                .with_timeout(IMPORT_READ_TIMEOUT, &ex)
+                .await;
+            let unread = match read {
+                Ok(Ok(())) => None,
+                Ok(Err(e)) => Some(e),
+                Err(_) => Some(format!("{names} could not be read: no answer from the file system in {} s", IMPORT_READ_TIMEOUT.as_secs())),
+            };
+            if let Some(why) = unread {
+                cx.update(|cx| fail(why, false, cx));
+                return;
             }
-            return Ok(());
-        }
-        let (target, errors) = imp::import_single(paths, choice, place, new_doc())?;
-        crate::start_hooks::open_document_window(target, None, gpu, cx)?;
-        // A file that didn't translate next to ones that did: the reason.
-        if !errors.is_empty() {
-            anyhow::bail!("{}", errors.join("\n"));
-        }
-        Ok(())
+            cx.update(|cx| bell::update_job(cx, job, format!("Importing {names}…"), vec![Step::done("Uploaded"), Step::running("Translating…")], false, None));
+            let made = ex
+                .spawn(async move {
+                    let new_doc = move || template.clone();
+                    if how != crate::start_hooks::PageImport::Single
+                        && let Some(m) = imp::import_split(&paths[0], &choice, how == crate::start_hooks::PageImport::PerPart, &place, &new_doc)?
+                    {
+                        let folder = m.folder.as_ref().and_then(|f| f.file_name()).map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+                        return anyhow::Ok((m.open, folder, Vec::new()));
+                    }
+                    let (target, errors) = imp::import_single(&paths, &choice, &place, new_doc())?;
+                    let name = target.file_stem().map(|n| format!("Created link to {}", n.to_string_lossy())).unwrap_or_default();
+                    Ok((Some(target), name, errors))
+                })
+                .await;
+            cx.update(|cx| {
+                match made {
+                    Ok((open, link_text, errors)) => {
+                        let mut steps = vec![Step::done("Uploaded"), Step::done("Translated"), Step::done("Post-processing done")];
+                        // A file that didn't translate next to ones that did: the reason.
+                        if !errors.is_empty() {
+                            steps.push(Step::failed(errors.join("\n")));
+                            let msg = format!("Import failed: {}", errors.join("\n"));
+                            let _ = handle.update(cx, |_, window, cx| Self::notify(window, cx, AlertKind::Error, msg));
+                        }
+                        let link = open.map(|path| {
+                            let action: bell::LinkAction = Rc::new(move |_: &mut Window, cx: &mut App| {
+                                if let Err(e) = crate::start_hooks::open_document_window(path.clone(), None, gpu.clone(), cx) {
+                                    log::warn!("open {}: {e:#}", path.display());
+                                }
+                            });
+                            (link_text, action)
+                        });
+                        bell::update_job(cx, job, format!("Import {names}"), steps, false, link);
+                    }
+                    Err(e) => fail(format!("{e:#}"), true, cx),
+                }
+                view.update(cx, |this, cx| this.force_rescan(cx));
+            });
+        })
+        .detach();
     }
 
     /// A new document for a file that isn't CAD: DXF / DWG the file and a
@@ -2398,9 +2469,23 @@ impl StartView {
                     // Live documents/23: the search box is centred between the 220 px left
                     // column and a 388 px right block (x 681–1071 at 1919 px).
                     // The update banner (the app's, start_hooks) beside the account menu, inside the block's fixed width.
-                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).child(help_menu(cx)).child(user_menu(cx))),
+                    .child(div().w(px(388.)).flex_none().flex().justify_end().items_center().gap(px(8.)).pr(px(10.)).child(self.render_bell(cx)).child(help_menu(cx)).child(user_menu(cx))),
             )
             .into_any_element()
+    }
+
+    fn render_bell(&self, cx: &mut Context<Self>) -> AnyElement {
+        let view = cx.entity();
+        crate::notifications::bell_button(
+            self.notifications_open,
+            move |_, cx| {
+                view.update(cx, |this, cx| {
+                    this.notifications_open = !this.notifications_open;
+                    cx.notify();
+                })
+            },
+            cx,
+        )
     }
 
     /// A left-nav row: 32 px, 18 px glyph, 14 px label; the current one is
@@ -3713,6 +3798,19 @@ impl Render for StartView {
             .child(body.cached(StyleRefinement::default().w_full().flex_1().min_h_0()))
             .child(self.render_footer())
             .children(self.shortcut_sheet.as_ref().map(|(s, _)| s.clone().into_any_element()))
+            // The bell's panel under the top bar's right end (as in a document's window).
+            .children(self.notifications_open.then(|| {
+                let view = cx.entity();
+                div().absolute().top(px(crate::ui::NAVBAR_H)).right(px(40.)).child(crate::notifications::panel(
+                    move |_, cx| {
+                        view.update(cx, |this, cx| {
+                            this.notifications_open = false;
+                            cx.notify();
+                        })
+                    },
+                    cx,
+                ))
+            }))
             // Advanced search: under the search box, left-aligned with it (live documents/110).
             .when(self.adv_open, |d| {
                 let b = self.adv_anchor.get();

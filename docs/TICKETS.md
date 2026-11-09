@@ -17,8 +17,10 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   document), a flat assembly (ours: one document, as Import to a single document), a parts-only file (live's docs:
   each part its own document and a generated top assembly; ours: one document), a second split's names (ours:
   folder " (1)"), and which document opens (ours: the top one). Not yet: Parasolid / IGES assemblies (split as one
-  document each), live's extra Part Studio documents past 100 unique parts at a level, and the import runs on the
-  main thread (as the single-document import always has).
+  document each), and live's extra Part Studio documents past 100 unique parts at a level. psui 11-09 16:43: the
+  page's import (single and split) runs in the background, its progress in the page's new Notifications bell (live's
+  steps, the document's link), a file read hanging past 30 s fails it saying so; the page no longer opens the
+  document by itself (live: you stay on the page, the bell's link opens it).
 
 ## From the user, 2026-11-04
 - [x] (skasm 11-08: live 2270: no constraint button is dimmed; a selection a constraint can't take (a handle arm in Concentric too) gets std's words in the yellow banner, kept until the next message, × or a constraint added, the selection cleared and no tool; Midpoint on two points and Symmetric on two lines start their tool with the picks; scene sketch_mode a_constraint_a_selection_cant_take_refuses_with_lives_words, e2e coincident_on_one_point_is_a_no_op, ui-parity sketch-constraint-refusals 91/91) P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an

@@ -995,27 +995,17 @@ impl Workspace {
     /// The Notifications bell (live: right of the navbar, a blue unread
     /// count; EX11): its panel lists export and import results.
     fn render_bell(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let count = crate::notifications::unread(cx);
-        h_flex()
-            .id("notifications-bell")
-            .relative()
-            .h(px(32.))
-            .px(px(6.))
-            .rounded(px(3.))
-            .items_center()
-            .cursor_pointer()
-            .hover(|d| d.bg(p().border))
-            .when(self.notifications_open, |d| d.bg(p().border))
-            .tooltip(crate::ui::tooltip("Notifications"))
-            .child(crate::assets::icon("bell", 20., cx))
-            .children(crate::notifications::badge(count).map(|b| {
-                div().absolute().top(px(2.)).right(px(0.)).min_w(px(15.)).h(px(15.)).px(px(3.)).rounded_full().bg(gpui_kit::rgb(0x1651b0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child(b)
-            }))
-            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                this.notifications_open = !this.notifications_open;
-                cx.notify();
-            }))
-            .into_any_element()
+        let ws = cx.entity();
+        crate::notifications::bell_button(
+            self.notifications_open,
+            move |_, cx| {
+                ws.update(cx, |this, cx| {
+                    this.notifications_open = !this.notifications_open;
+                    cx.notify();
+                })
+            },
+            cx,
+        )
     }
 
     /// Help ▾ at the right of the navbar (Onshape's `?▾`).

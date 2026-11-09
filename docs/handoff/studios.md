@@ -134,6 +134,18 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
+**2026-11-09 16:43 UTC (psui): the documents page's import in the background, its progress in the bell (lead).**
+Import files… (single and split, `StartView::import_cad`) reads the files with a 30 s timeout ("<file> could not be
+read: no answer from the file system in 30 s", a failed entry and the page's alert), then translates and builds on
+the background executor. The page now has live's Notifications bell (`notifications::bell_button`, shared with the
+document window): the entry walks "Importing <file>…" › Uploading… / Translating… to "Import <file>" with ✓
+Uploaded · Translated · Post-processing done · "Created link to <document>" (a split: the folder's name), whose link
+opens the document; the page stays where it is (live behaviours "STEP import flow" 2.). Job entries:
+`notifications::start_job` / `update_job` (steps, link), tests app `notification_job_tests`. Checked on Xvfb
+(/root/psui-scratch/imp/: split, the link, a FIFO as a hung file). Asked live2 (REQUESTS 16:11) for the entry's look
+while running and what a split's last line links to. Split itself (13:40 entry below, 14:49): op
+`documents_import`, `noshape_ops::import_documents`; live2's 14:37 capture pending.
+
 **2026-11-09 13:26 UTC (psui): lead's list from live2 2351 / 2403 / 2405.** Labels… in a row menu opens the Details
 panel with Document labels open (no dialog), as the row's Labels icon. Import to Onshape: the cards swap the checkbox
 list (Split: "Create one document per part or assembly(not recommended)" in the composite part's place, with live's

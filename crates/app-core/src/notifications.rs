@@ -24,7 +24,40 @@ pub struct Notification {
     pub open: bool,
     /// A failure (red ⓘ).
     pub failed: bool,
+    /// An import's steps as they run (live: "Uploading…" → "Uploaded", …); empty: `body` is the message.
+    pub steps: Vec<Step>,
+    /// The last row a link (live: "Created link to <u>file</u>"): its text; the action is in [`Notifications`].
+    pub link: Option<String>,
 }
+
+/// One step of a running job's entry.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Step {
+    pub text: String,
+    pub state: StepState,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StepState {
+    Running,
+    Done,
+    Failed,
+}
+
+impl Step {
+    pub fn running(text: impl Into<String>) -> Self {
+        Step { text: text.into(), state: StepState::Running }
+    }
+    pub fn done(text: impl Into<String>) -> Self {
+        Step { text: text.into(), state: StepState::Done }
+    }
+    pub fn failed(text: impl Into<String>) -> Self {
+        Step { text: text.into(), state: StepState::Failed }
+    }
+}
+
+/// A link row's action.
+pub type LinkAction = std::rc::Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// The session's notifications, newest first.
 #[derive(Default)]
@@ -32,6 +65,7 @@ pub struct Notifications {
     pub items: Vec<Notification>,
     pub only_unread: bool,
     next: u64,
+    links: std::collections::HashMap<u64, LinkAction>,
 }
 
 impl Global for Notifications {}
@@ -42,8 +76,41 @@ pub fn push(cx: &mut App, title: impl Into<String>, body: impl Into<String>, fai
     let n = cx.default_global::<Notifications>();
     n.next += 1;
     let id = n.next;
-    n.items.insert(0, Notification { id, title: title.into(), body: body.into(), time, unread: true, open: false, failed });
+    n.items.insert(0, Notification { id, title: title.into(), body: body.into(), time, unread: true, open: false, failed, steps: Vec::new(), link: None });
     cx.refresh_windows();
+}
+
+/// A running job's entry (an import: "Importing <file>…" with its steps), unread at once (the bell's count is the
+/// click's feedback); [`update_job`] moves it on. Returns its id.
+pub fn start_job(cx: &mut App, title: impl Into<String>, steps: Vec<Step>) -> u64 {
+    push(cx, title, "", false);
+    let n = cx.default_global::<Notifications>();
+    let id = n.next;
+    if let Some(i) = n.items.iter_mut().find(|i| i.id == id) {
+        i.steps = steps;
+    }
+    id
+}
+
+/// The job's entry now: its title, steps, whether it failed, and its last row's link (text and action).
+pub fn update_job(cx: &mut App, id: u64, title: impl Into<String>, steps: Vec<Step>, failed: bool, link: Option<(String, LinkAction)>) {
+    let title = title.into();
+    update(cx, move |n| {
+        if let Some((_, action)) = &link {
+            n.links.insert(id, action.clone());
+        }
+        if let Some(i) = n.items.iter_mut().find(|i| i.id == id) {
+            i.title = title;
+            i.steps = steps;
+            i.failed = failed;
+            i.link = link.map(|(text, _)| text);
+            i.unread = true;
+        }
+    });
+}
+
+fn link_action(cx: &App, id: u64) -> Option<LinkAction> {
+    cx.try_global::<Notifications>().and_then(|n| n.links.get(&id).cloned())
 }
 
 pub fn unread(cx: &App) -> usize {
@@ -70,6 +137,30 @@ pub fn time_label(secs: i64, now: i64) -> String {
 fn update(cx: &mut App, f: impl FnOnce(&mut Notifications)) {
     f(cx.default_global::<Notifications>());
     cx.refresh_windows();
+}
+
+/// The Notifications bell (live: in the navbar and on the documents page, a blue unread count; EX11): `open` while its
+/// panel shows; a click calls `toggle`.
+pub fn bell_button(open: bool, toggle: impl Fn(&mut Window, &mut App) + 'static, cx: &App) -> AnyElement {
+    let count = unread(cx);
+    h_flex()
+        .id("notifications-bell")
+        .relative()
+        .h(px(32.))
+        .px(px(6.))
+        .rounded(px(3.))
+        .items_center()
+        .cursor_pointer()
+        .hover(|d| d.bg(p().border))
+        .when(open, |d| d.bg(p().border))
+        .map(|d| crate::ui_script::mark(d, || "button:Notifications".into()))
+        .tooltip(crate::ui::tooltip("Notifications"))
+        .child(crate::assets::icon("bell", 20., cx))
+        .children(badge(count).map(|b| {
+            div().absolute().top(px(2.)).right(px(0.)).min_w(px(15.)).h(px(15.)).px(px(3.)).rounded_full().bg(gpui_kit::rgb(0x1651b0)).flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::BOLD).text_color(gpui_kit::rgb_static(0xffffff)).child(b)
+        }))
+        .on_click(move |_, window, cx| toggle(window, cx))
+        .into_any_element()
 }
 
 /// The panel under the bell: header, then the items (a click opens one and
@@ -105,13 +196,48 @@ pub fn panel(on_close: impl Fn(&mut Window, &mut App) + 'static, cx: &App) -> An
                         .child(div().flex_1().min_w_0().truncate().text_size(px(13.)).font_weight(FontWeight::BOLD).text_color(pal.text).child(crate::ui::user_text(n.title.clone())))
                         .child(div().flex_none().text_size(px(11.)).text_color(pal.text_muted).child(time_label(n.time, now))),
                 )
+                // A job's steps: done ✓ green, running "…" grey, failed ✕ red; the link row last (live).
+                .when(n.open && !n.steps.is_empty(), |d| {
+                    // A long step (a failure's reason) wraps.
+                    let step_row = |glyph: &'static str, color: Rgba, text: String| h_flex().items_start().pl(px(28.)).gap(px(6.)).text_size(px(13.)).text_color(pal.text).child(div().w(px(10.)).flex_none().text_color(color).font_weight(FontWeight::BOLD).child(glyph)).child(div().flex_1().min_w_0().child(crate::ui::user_text(text)));
+                    d.children(n.steps.iter().map(|s| match s.state {
+                        StepState::Done => step_row("✓", gpui_kit::rgb(0x2e8b3a), s.text.clone()),
+                        StepState::Running => step_row("…", gpui_kit::rgb(0x999999), s.text.clone()).text_color(pal.text_muted),
+                        StepState::Failed => step_row("✕", gpui_kit::rgb(0xd9534f), s.text.clone()),
+                    }))
+                    .when_some(n.link.clone(), |d, text| {
+                        let action = link_action(cx, id);
+                        d.child(
+                            h_flex()
+                                .pl(px(28.))
+                                .gap(px(6.))
+                                .text_size(px(13.))
+                                .child(div().w(px(10.)).flex_none().text_color(gpui_kit::rgb(0x2e8b3a)).font_weight(FontWeight::BOLD).child("✓"))
+                                .child(
+                                    div()
+                                        .id(SharedString::from(format!("notification-link-{id}")))
+                                        .debug_selector(move || format!("notification-link-{id}"))
+                                        .text_color(blue)
+                                        .underline()
+                                        .cursor_pointer()
+                                        .child(crate::ui::user_text(text))
+                                        .on_click(move |_, window, cx| {
+                                            cx.stop_propagation();
+                                            if let Some(a) = &action {
+                                                a(window, cx);
+                                            }
+                                        }),
+                                ),
+                        )
+                    })
+                })
                 // An import's steps (" · " apart) are rows with a green ✓ (live).
-                .when(n.open && n.body.contains(" · "), |d| {
+                .when(n.open && n.steps.is_empty() && n.body.contains(" · "), |d| {
                     d.children(n.body.split(" · ").map(|step| {
                         h_flex().pl(px(28.)).gap(px(6.)).text_size(px(13.)).text_color(pal.text).child(div().text_color(gpui_kit::rgb(0x2e8b3a)).font_weight(FontWeight::BOLD).child("✓")).child(crate::ui::user_text(step.to_string()))
                     }))
                 })
-                .when(n.open && !n.body.contains(" · "), |d| d.child(div().pl(px(28.)).text_size(px(13.)).text_color(pal.text).child(crate::ui::user_text(n.body.clone()))))
+                .when(n.open && n.steps.is_empty() && !n.body.contains(" · "), |d| d.child(div().pl(px(28.)).text_size(px(13.)).text_color(pal.text).child(crate::ui::user_text(n.body.clone()))))
                 .on_click(move |_, _, cx| {
                     update(cx, |s| {
                         if let Some(i) = s.items.iter_mut().find(|i| i.id == id) {
