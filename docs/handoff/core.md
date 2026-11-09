@@ -33,6 +33,25 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 20:36 UTC: fan-blade's Sweep 1 (P0, lead) landed; the impeller's rib sketch translated; hex text rejoin waits.**
+- Landed b5da62f8: c2-fan-blade-sweep's Sweep 1 (272 s on main) was one OCCT self-intersection check
+  (BOPAlgo_ArgumentAnalyzer) on its thread. `helical_sweep_clear` now takes any planar profile, not only one in a plane
+  through the axis: each point's (r, w = z - rise·θ) is kept by the screw, so the turns can't meet when the profile's w
+  spans less than a pitch (less twice OCCT's own offset of the swept corners, ~50 µm on a tilted profile), the screw
+  crosses its plane the same way everywhere and its (r, w) outline doesn't cross itself. Its profile is tilted 4.6°
+  (the Helix 1 / Plane 4 difference, dx's). Sweep 1 0.23 s, the document 0.87 s (live 1.4 s); T1 model-core
+  sweep_tests (0°, 5° skipped; 20 mm, 40° checked).
+- c2-impeller-loft Extrude 4's sketch (bool's finding): the translator drew fit splines from the feature's stored
+  points (0.5 mm off the arcs their ends are coincident with; live's solve moves them) and never mapped their ends,
+  `<id>.<n>.internal` points or `startDerivative` / `endDerivative`: the rib region never closed. Now drawn from live's
+  solved sketch (`solved_entity`), the points and handle tips mapped (`map_drawn`): the rib (53.29 mm²) closes.
+  Extrude 4 still fails on its up-to face (Fillet 1's run-off upstream, blend's). Suite with / without running
+  (vibe5 suite-spl.log, vibe4 suite-spl-base.log).
+- Hex bookcase text (skasm.md 18:40): `rejoin_pieces` + `Nurbs::joined`, model suite 792 -> 816 (hex 4 -> 15, fan-blade
+  28 -> 41), nothing worse; on local branch core-rejoin-wip (stash core-rejoin-split-1909 too) until its assembly
+  suite baseline is run (with it: 4/24, occurrences 1261/1731, mates 170/345; vibe5 ~/core-cases/asmall-mine.log).
+- Louver Sketch 9 is on Sheet metal model 2's flat (skasm.md): design question to the lead.
+
 **State 11-09 14:36 UTC: tight boxes by what the faces hold (lead, from bool's finding); the hex text parked in skasm.md.**
 - bool: the impeller's z 6.21 box was our tight box sampling the inlet wall's whole parameter rectangle (the trimmed
   corners of its extended surface). geom.cpp `face_box`: analytic faces keep OCCT's optimal box; a free-form face
