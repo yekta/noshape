@@ -42,7 +42,12 @@ What blend takes over:
   project_along (24 vs 4). The rest: bool (Shells, defeaturing, Booleans), skasm (louver, corner break), blend.
 - query.rs contains_point: any face through Shape::contains_point (the surface's feet classified) before the
   distance: Surface Pattern 5 520 -> 122 ms (live 71); suite the same both ways (suite-cp*.log), A/B level
-  elsewhere (ab-cp.out). Landing.
+  elsewhere (ab-cp.out). Queued 98907e7a.
+- cf-surface-pattern SP3's last 2 faces: live 2419 answered (core/q2413/jpc.txt): 85 grid points kept as ours (same
+  pairs), JPC's box = its B-spline's [0, 1]², the TP samples fit to 1e-14. Our spheres sit a median 0.17 mm (max
+  0.37) off live's (sp/cmp_live.py), along y = the loft's v: Loft 1's middle-section knot is 0.49687 in live, 0.50034
+  in ours (sp/knot.py, knot_live.py: no chord rule tried gives 0.49687; live's own surface gives 0.50034 by ours, so
+  the pairing and sections are equal). Asked live for three controlled lofts (REQUESTS, line in the file after 2419).
 
 **State 11-09 09:05 UTC: REQUESTS 2413 filed (spring's coincident rounds); the impeller's Move face offsets.**
 - Live REQUESTS 2413: union of two parts' coincident spline rounds (and straight ones), the spring's own two edges.
