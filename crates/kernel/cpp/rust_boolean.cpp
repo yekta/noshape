@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <GeomAdaptor_Surface.hxx>
 #include <Geom_BSplineCurve.hxx>
+#include <Geom_CylindricalSurface.hxx>
+#include <Geom_ToroidalSurface.hxx>
 #include <condition_variable>
 #include <deque>
 #include <functional>
@@ -2873,6 +2875,32 @@ static void occt_ahead(rust::Slice<const uint32_t> pairs)
       std::fprintf(stderr, "  %.2f ms %s types %d/%d done %d lines %zu poles%s\n", j.ms, j.own ? "own" : "occt", ta, tb, int(j.done), j.lines.size(), poles.c_str());
     }
   }
+  if (trace)
+    for (const Job& j : jobs)
+    {
+      const occ::handle<Geom_Surface> sa = BRep_Tool::Surface(j.fa), sb = BRep_Tool::Surface(j.fb);
+      const occ::handle<Geom_CylindricalSurface> cy = occ::down_cast<Geom_CylindricalSurface>(!occ::down_cast<Geom_CylindricalSurface>(sa).IsNull() ? sa : sb);
+      const occ::handle<Geom_ToroidalSurface>    to = occ::down_cast<Geom_ToroidalSurface>(!occ::down_cast<Geom_ToroidalSurface>(sa).IsNull() ? sa : sb);
+      if (cy.IsNull() || to.IsNull() || j.ms < 2.0)
+        continue;
+      const gp_Ax3 ca = cy->Position(), ta = to->Position();
+      double u0, u1, v0, v1, p0, p1, q0, q1;
+      BRepTools::UVBounds(j.fa, u0, u1, v0, v1);
+      BRepTools::UVBounds(j.fb, p0, p1, q0, q1);
+      std::fprintf(stderr, "CYLTOR key %u.%u.%u.%u %.2f ms lines %zu | cyl o(%.17g %.17g %.17g) d(%.17g %.17g %.17g) x(%.17g %.17g %.17g) r %.17g | tor o(%.17g %.17g %.17g) d(%.17g %.17g %.17g) x(%.17g %.17g %.17g) R %.17g r %.17g | a %s uv %.17g %.17g %.17g %.17g | b uv %.17g %.17g %.17g %.17g | angle %.17g\n",
+        j.key[0], j.key[1], j.key[2], j.key[3], j.ms, j.lines.size(),
+        ca.Location().X(), ca.Location().Y(), ca.Location().Z(), ca.Direction().X(), ca.Direction().Y(), ca.Direction().Z(), ca.XDirection().X(), ca.XDirection().Y(), ca.XDirection().Z(), cy->Radius(),
+        ta.Location().X(), ta.Location().Y(), ta.Location().Z(), ta.Direction().X(), ta.Direction().Y(), ta.Direction().Z(), ta.XDirection().X(), ta.XDirection().Y(), ta.XDirection().Z(), to->MajorRadius(), to->MinorRadius(),
+        cy == occ::down_cast<Geom_CylindricalSurface>(sa) ? "cyl" : "tor", u0, u1, v0, v1, p0, p1, q0, q1, ca.Direction().Angle(ta.Direction()));
+      for (const IntTools_Curve& ic : j.lines)
+      {
+        const occ::handle<Geom_Curve> c = ic.Curve();
+        if (c.IsNull())
+          continue;
+        const gp_Pnt a = c->Value(c->FirstParameter()), b = c->Value(c->LastParameter());
+        std::fprintf(stderr, "   line %s [%.6g %.6g] (%.9g %.9g %.9g) -> (%.9g %.9g %.9g) tol %.3g\n", c->DynamicType()->Name(), c->FirstParameter(), c->LastParameter(), a.X(), a.Y(), a.Z(), b.X(), b.Y(), b.Z(), ic.Tolerance());
+      }
+    }
   for (Job& j : jobs)
     if (j.done)
       t_free->ahead.emplace(j.key, std::move(j.lines));
