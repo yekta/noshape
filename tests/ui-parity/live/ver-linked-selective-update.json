@@ -1,6 +1,6 @@
 {
  "scenario": "ver-linked-selective-update",
- "recorded": "2026-11-09T08:33:42.735Z",
+ "recorded": "2026-11-09T09:35:01.101Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "978323c434311ea291f97261",
-  "workspace": "62e89602734d9abb9d574882",
-  "element": "93547aee8691a2bb88f4f614",
+  "document": "78e6fe74b691cf2e56b16847",
+  "workspace": "c6c374210c37d8626e6352ee",
+  "element": "022b85b85bc71d983972113d",
   "start": "doc-linked",
-  "startElement": "93547aee8691a2bb88f4f614",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "022b85b85bc71d983972113d",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -186,7 +186,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 37738
+   "t": 33026
   },
   {
    "step": 2,
@@ -322,7 +322,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55299
+   "t": 38041
   },
   {
    "step": 3,
@@ -464,7 +464,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 72870
+   "t": 40889
   },
   {
    "step": 4,
@@ -606,7 +606,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 89482
+   "t": 44212
   },
   {
    "step": 5,
@@ -765,7 +765,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 104960
+   "t": 46990
   },
   {
    "step": 6,
@@ -907,7 +907,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 122084
+   "t": 50418
   },
   {
    "step": 7,
@@ -1049,7 +1049,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 139539
+   "t": 65006
   }
  ]
 }

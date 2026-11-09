@@ -1,6 +1,6 @@
 {
  "scenario": "ver-show-more-changes",
- "recorded": "2026-11-09T07:56:53.804Z",
+ "recorded": "2026-11-09T09:31:59.965Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,12 +8,12 @@
   "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "cc745dd2fdf40b2a9971d2c8",
-  "workspace": "4197f3c960766bc66e760db5",
-  "element": "8d79db825b060f5d3dce11c7",
+  "document": "1c48f59c1a8eb5d48e8e846b",
+  "workspace": "1d3664d751ef3bcb55620feb",
+  "element": "94597afbc6512d7ffd9eabd9",
   "start": "doc-versions-many",
-  "startElement": "8d79db825b060f5d3dce11c7",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "94597afbc6512d7ffd9eabd9",
+  "runner": "live2 .nstate-uip-1.json"
  },
  "start": {
   "focus": {
@@ -601,7 +601,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 30340
+   "t": 31582
   },
   {
    "step": 2,
@@ -1165,7 +1165,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 40123
+   "t": 40992
   },
   {
    "step": 3,
@@ -1177,8 +1177,8 @@
    },
    "ok": true,
    "at": [
-    223,
-    1748
+    252,
+    627
    ],
    "state": {
     "focus": {
@@ -1693,8 +1693,53 @@
        "selected": false
       },
       {
-       "name": "Show more changes…",
-       "kind": "version",
+       "name": "Part Studio 1 :: Add feature : Sketch 12",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 11",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 10",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 9",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 8",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 7",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 6",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 5",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 4",
+       "kind": "change",
+       "selected": false
+      },
+      {
+       "name": "Part Studio 1 :: Add feature : Sketch 3",
+       "kind": "change",
        "selected": false
       },
       {
@@ -1729,7 +1774,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 48914
+   "t": 50877
   }
  ]
 }

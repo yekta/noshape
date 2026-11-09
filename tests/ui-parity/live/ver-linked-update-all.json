@@ -1,6 +1,6 @@
 {
  "scenario": "ver-linked-update-all",
- "recorded": "2026-11-09T07:57:41.729Z",
+ "recorded": "2026-11-09T09:33:48.675Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
@@ -8,11 +8,11 @@
   "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "3d76befb89cd4f8b415fa410",
-  "workspace": "00dd8917d593544eec8dcada",
-  "element": "6135d8e64f4793d24cd08e5f",
+  "document": "5d936f61ef30666c987ce337",
+  "workspace": "9eef7162e49ccee56f5df9a0",
+  "element": "5f3b4bad5b06f6c0dbf25457",
   "start": "doc-linked",
-  "startElement": "6135d8e64f4793d24cd08e5f",
+  "startElement": "5f3b4bad5b06f6c0dbf25457",
   "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
@@ -186,7 +186,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 38205
+   "t": 38679
   },
   {
    "step": 2,
@@ -206,7 +206,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": null,
+     "title": "Reference manager",
      "kind": "feature",
      "tabs": [
       {
@@ -218,10 +218,21 @@
        "selected": false
       }
      ],
-     "fields": [],
+     "fields": [
+      {
+       "label": "Newer versions available for 1 document",
+       "kind": "text",
+       "text": ""
+      },
+      {
+       "label": "uip Source",
+       "kind": "string",
+       "text": "V1 ⇨ V2"
+      }
+     ],
      "error": null,
-     "ok": null,
-     "titleState": "ok"
+     "ok": "enabled",
+     "okLabel": "Update all"
     },
     "dialogs": [],
     "panels": [
@@ -311,7 +322,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 43539
+   "t": 43748
   },
   {
    "step": 3,
@@ -331,7 +342,7 @@
      "kind": "none"
     },
     "dialog": {
-     "title": null,
+     "title": "Reference manager",
      "kind": "feature",
      "tabs": [
       {
@@ -343,10 +354,16 @@
        "selected": false
       }
      ],
-     "fields": [],
+     "fields": [
+      {
+       "label": "Newer versions available for 0 documents",
+       "kind": "text",
+       "text": ""
+      }
+     ],
      "error": null,
-     "ok": null,
-     "titleState": "ok"
+     "ok": "disabled",
+     "okLabel": "Update all"
     },
     "dialogs": [],
     "panels": [
@@ -436,7 +453,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50083
+   "t": 50435
   }
  ]
 }
