@@ -21,6 +21,9 @@ NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity
   Boolean Flansch+Gehäuse (feature 15) already 15 faces for live's 19; by Fillet 4 live has 64 faces, ours 34, and
   Fillet Flansch zum Stroemungskanal resolves 4 of its 18 edges. Nothing changed in blend's code. Dumps: vibe5
   ~/core-cases/dumpfil (NOSHAPE_DUMP_OPS), probe `probe_fillet_dump` in /root/core-scratch/imp/features-with-fillet-probe.rs.
+- For blend, after the chain matches (lead 11-09): the fillets' speed then. The route "whole set fails (as is, then
+  scaled), then group by group" costs ~0.4-1.3 s of failed attempts per fillet here; a cheap test that predicts the
+  whole-set failure (what makes OCCT fail on the set but not on its groups) would let it go to the groups first.
 
 ## From dx (2026-11-09 11:40 UTC, lead: blend paused till Monday): c2-fan-blade-sweep's Chamfer 2 fixed
 - Cause: OCCT's chamfer kept the thread's band (91 faces, core's keep mark on its edge), then `merge_full_rounds`

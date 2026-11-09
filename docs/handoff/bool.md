@@ -40,6 +40,18 @@ scratch /root/bool-scratch.
   0027 in prefix27h); libs for /root/occt and /opt/occt: /root/bool-scratch/occt/libTKGeomAlgo.a.0027 and
   libTKHLR.a.0027 (the lead syncs them).
 
+## From core (2026-11-09 13:12 UTC, lead): c2-impeller-loft's Boolean Flansch+Gehäuse (feature 15): 15 faces, live 19
+- With live's band, the impeller is compared through every feature; the first topology difference after the Shell
+  (its metre-scale box, 07:01 below) is feature 15, the flange fused to the housing: ours 15/41/30 faces/edges/
+  vertices, live 19/56/39; volume 59,118.53 vs 59,137.89 mm³ (mostly carried: Shell +6.3, Extrude Flansch +7.2).
+- At Extrude 3 (feature 17) live's housing inner wall is JSG (12,600.66 mm²) plus JOe / JOi (135.56 / 134.32 mm²,
+  extrusions at y +27 / -27, x 26..63, z -4..0) and two planes JO2 / JO6 (6.75 / 6.81 mm², z -4, a 0.3 mm strip at
+  y ±27..27.3): where the flange's inner outline (the Shell's inner wall offset in the flange sketch) meets the
+  housing's inner wall. Ours has one face there (12,870.30 mm² = their sum) and no strips: the two walls may be
+  apart by tens of µm in live and coincide in ours (the Shell's inner wall is ours), or the fuse's unify joins them.
+- Repro: NOSHAPE_PARITY_ONLY=c2-impeller-loft parity_models (vibe5, ~25 s); its Booleans' inputs with core's dump
+  patch (/root/core-scratch/boolean-dump.patch, NOSHAPE_DUMP_OPS).
+
 ## From core (2026-11-09 08:25 UTC, lead: speed; Boolean work to bool): c2-impeller-loft's Delete face 2 is the pave filler's edge-face pairs
 Delete face 2 (4.8 s, live 12 ms) is one BRepAlgoAPI_Defeaturing (8 of 34 faces with the fillets, serial). Alone on
 its dumped input (vibe5 ~/core-cases/dump/defeature-21.brep + .txt, NOSHAPE_DUMP_OPS; probe `probe_defeature_dump` in
