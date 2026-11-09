@@ -245,16 +245,8 @@ impl Render for ThemingPrefsView {
                     if this.edited == this.saved {
                         return;
                     }
-                    let mut prefs = ListPrefs::load();
-                    prefs.dark_mode = this.edited;
-                    prefs.save();
                     this.saved = this.edited;
-                    // Live: applies at once, no reload.
-                    crate::theme::set_dark(this.edited);
-                    // The viewports rebuild their scenes in the new colors.
-                    crate::graphics_prefs::set(crate::graphics_prefs::get(cx), false, cx);
-                    crate::preferences_hooks::apply_kit_theme(cx);
-                    cx.refresh_windows();
+                    apply_theme(this.edited, cx);
                     toast(crate::i18n::tr("Theme updated."), cx);
                 })))),
         )
@@ -621,4 +613,17 @@ impl Render for UpdatesPrefsView {
                 .child(div().pl(px(16.)).pt(px(2.)).text_size(px(12.)).text_color(gpui_kit::rgb_static(if noshape_scene::palette::is_dark() { 0xbbbbbb } else { 0x777777 })).child(tr("A banner says when an update is ready; it is installed when you restart noshape."))),
         )
     }
+}
+
+/// Light or dark mode, saved and applied at once in every window (Preferences › Theming's Save theme, the account
+/// menu's View in dark mode beta; live: no reload).
+pub fn apply_theme(dark: bool, cx: &mut App) {
+    let mut prefs = ListPrefs::load();
+    prefs.dark_mode = dark;
+    prefs.save();
+    crate::theme::set_dark(dark);
+    // The viewports rebuild their scenes in the new colors.
+    crate::graphics_prefs::set(crate::graphics_prefs::get(cx), false, cx);
+    crate::preferences_hooks::apply_kit_theme(cx);
+    cx.refresh_windows();
 }

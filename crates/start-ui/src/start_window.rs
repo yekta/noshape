@@ -1515,7 +1515,7 @@ impl StartView {
         let pal = p();
         let btn = |id: &'static str, icon: &'static str, tip: &'static str, panel: DocPanel, cx: &mut Context<Self>| {
             let on = self.panel == Some(panel);
-            crate::ui::rail_button(id, icon, on, false, cx).tooltip(crate::ui::tooltip(tip)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_panel(panel, cx)))
+            crate::ui::rail_button(id, icon, on, false, cx).map(|d| crate::ui_script::mark(d, move || format!("button:{tip}"))).tooltip(crate::ui::tooltip(tip)).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.toggle_panel(panel, cx)))
         };
         v_flex()
             .w(px(40.))
@@ -1753,17 +1753,17 @@ impl StartView {
                                 .pt(px(14.))
                                 .w(px(325.))
                                 .child(label("Name", true))
-                                .child(boxed(Input::new(&pe.name).appearance(false).text_size(px(14.)).into_any_element(), 32.))
+                                .child(boxed(Input::new(&pe.name).appearance(false).text_size(px(14.)).into_any_element(), 32.).map(|d| crate::ui_script::mark(d, || "field:Properties › Name".into())))
                                 .child(gap())
                                 .child(label("Description", false))
-                                .child(boxed(Input::new(&pe.description).appearance(false).text_size(px(14.)).into_any_element(), 52.))
+                                .child(boxed(Input::new(&pe.description).appearance(false).text_size(px(14.)).into_any_element(), 52.).map(|d| crate::ui_script::mark(d, || "field:Properties › Description".into())))
                                 .child(gap())
                                 .child(label("Category", false))
                                 // The category picker reads as disabled (one local category).
                                 .child(boxed(h_flex().w_full().text_size(px(14.)).child(div().flex_1().child("Onshape Document")).child(os::glyph(os::GLYPH_CARET, 8., rgb(0x666666))).into_any_element(), 32.).bg(rgb(0xeeeeee)))
                                 .child(gap())
                                 .child(label("Library label", false))
-                                .child(boxed(Input::new(&pe.label).appearance(false).text_size(px(14.)).into_any_element(), 32.)),
+                                .child(boxed(Input::new(&pe.label).appearance(false).text_size(px(14.)).into_any_element(), 32.).map(|d| crate::ui_script::mark(d, || "field:Properties › Library label".into()))),
                         )
                         .into_any_element()
                 }
@@ -2141,9 +2141,9 @@ impl StartView {
                 .px(px(20.))
                 .gap(px(3.))
                 .justify_end()
-                .child(div().opacity(0.25).child(crate::ui::icon_button("props-undo", "undo", 30., false, cx)))
-                .child(div().opacity(0.25).child(crate::ui::icon_button("props-redo", "redo", 30., false, cx)))
-                .child(os::primary_button("props-apply", "Apply").when(!changed, |b| b.opacity(0.5)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                .child(div().opacity(0.25).map(|d| crate::ui_script::mark(d, || "button:Properties › Undo".into())).child(crate::ui::icon_button("props-undo", "undo", 30., false, cx)))
+                .child(div().opacity(0.25).map(|d| crate::ui_script::mark(d, || "button:Properties › Redo".into())).child(crate::ui::icon_button("props-redo", "redo", 30., false, cx)))
+                .child(os::primary_button("props-apply", "Apply").map(|d| crate::ui_script::mark(d, || "button:Properties › Apply".into())).when(!changed, |b| b.opacity(0.5)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     if changed {
                         this.apply_props(window, cx);
                     }
@@ -2603,6 +2603,10 @@ impl StartView {
                 // `#666`, the leaf 16 px / 500 `#333`, blue › between them.
                 div()
                     .id("crumb-root")
+                    .map(|d| {
+                        let r = root.to_string();
+                        crate::ui_script::mark(d, move || format!("crumb:{r}"))
+                    })
                     .child(root)
                     .when(in_folder, |d| {
                         d.font_weight(FontWeight::NORMAL)
@@ -2616,7 +2620,10 @@ impl StartView {
         for (i, c) in crumbs.into_iter().enumerate() {
             let target = c.clone();
             row = row.child(os::glyph(os::GLYPH_CHEVRON_RIGHT, 14., pal.accent)).child(os::glyph(os::GLYPH_FOLDER, 18., pal.text)).child(
-                div().id(("crumb", i)).child(folder_label(&c)).when(i < last, |d| {
+                div().id(("crumb", i)).map(|d| {
+                    let name = folder_label(&c);
+                    crate::ui_script::mark(d, move || format!("crumb:{name}"))
+                }).child(folder_label(&c)).when(i < last, |d| {
                     d.font_weight(FontWeight::NORMAL)
                         .text_color(rgb(0x666666))
                         .cursor_pointer()
@@ -2943,6 +2950,10 @@ impl StartView {
             tiles = tiles.child(
                 h_flex()
                     .id(("recent-tile", i))
+                    .map(|el| {
+                        let name = d.name.clone();
+                        crate::ui_script::mark(el, move || format!("recent_card:{name}"))
+                    })
                     .w(px(267.))
                     .h(px(68.))
                     .mt(px(6.))
@@ -3005,6 +3016,7 @@ impl StartView {
                 d.child(
                     div()
                         .id("folder-sort")
+                        .map(|d| crate::ui_script::mark(d, || "button:Folders sort".into()))
                         .w(px(28.))
                         .h(px(28.))
                         .flex()
@@ -3083,6 +3095,7 @@ impl StartView {
         let active = self.sort_shown && key == Some(self.sort);
         h_flex()
             .id(id)
+            .map(|d| crate::ui_script::mark(d, move || format!("col_header:{label}")))
             .h_full()
             .pl(px(16.))
             .gap(px(6.))
@@ -3154,7 +3167,7 @@ impl StartView {
                     this.save_prefs();
                     cx.notify();
                 })))
-                .child(div().w(px(142.)).child(os::input_h(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)), 32.).text_size(px(14.)).pl(px(7.)))),
+                .child(div().w(px(142.)).map(|d| crate::ui_script::mark(d, || "field:Search…".into())).child(os::input_h(Input::new(&self.col_search).prefix(os::glyph(os::GLYPH_SEARCH, 14., pal.text_muted)), 32.).text_size(px(14.)).pl(px(7.)))),
         );
         for (i, (c, shown)) in self.columns.clone().into_iter().enumerate() {
             if !q.is_empty() && !c.label().to_lowercase().contains(&q) {
@@ -3176,6 +3189,10 @@ impl StartView {
                     .child(
                         div()
                             .id(("col-grip", i))
+                            .map(|d| {
+                                let name = c.label();
+                                crate::ui_script::mark(d, move || format!("col_grip:{name}"))
+                            })
                             .opacity(0.7)
                             .cursor_grab()
                             .child(os::glyph(os::GLYPH_GRIP, 16., pal.text))
@@ -3409,7 +3426,7 @@ impl StartView {
                     // right end (share is cloud-only): Send to trash, Labels.
                     .when(selected && !d.trashed, |r| {
                         let (d3, d4) = (d.clone(), d.clone());
-                        let icon = |id: &'static str, glyph: &'static [u8], tip: &'static str| div().id(id).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
+                        let icon = |id: &'static str, glyph: &'static [u8], tip: &'static str| div().id(id).map(|d| crate::ui_script::mark(d, move || format!("row_icon:{tip}"))).size(px(20.)).flex_none().cursor_pointer().tooltip(crate::ui::tooltip(tip)).child(os::glyph(glyph, 20., pal.text));
                         r.child(div().flex_1()).child(
                             h_flex()
                                 .flex_none()
@@ -3774,7 +3791,10 @@ fn user_menu(cx: &App) -> AnyElement {
                 .child(os::glyph(os::GLYPH_CARET, 8., pal.text)),
         )
         .os_dropdown_menu("user-menu-dd", false, |m, _, _| {
-            m.item(OsMenuItem::new("Preferences…").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Preferences, cx)))
+            // Live (cp-1719 c1-account-menu): My account · View support tickets · App Store dev portal · View in dark
+            // mode beta · Sign out; the cloud ones left out, Company settings kept (release management, local).
+            m.item(OsMenuItem::new("My account").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Profile, cx)))
+                .item(OsMenuItem::new("View in dark mode beta").on_click(|_, _, cx| noshape_preferences_ui::prefs_general::apply_theme(!gpui_kit::hex_theme_active(), cx)))
                 .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
         })
         .into_any_element()
@@ -3785,6 +3805,7 @@ fn view_toggle(id: &'static str, glyph: &'static [u8], tip: &'static str, select
     let pal = p();
     div()
         .id(id)
+        .map(|d| crate::ui_script::mark(d, move || format!("button:{tip}")))
         .w(px(28.))
         .h(px(26.))
         .flex()

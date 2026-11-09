@@ -360,6 +360,14 @@ states above.
   at" for the unlabelled Latest select under it), its buttons `"Reset"` / `"Search"`. The start leaves its documents
   in Recently opened (live's account opened them) and the page on Owned by me with Folders open. `documents.place` is
   the highlighted left-column entry (Owned by me inside its folders; null over search results).
+- More documents-page targets (psui, 11-09): `{"recent_card": "uip Bracket"}` a Last opened by me card;
+  `{"col_header": "Name"}` the list's column header (sorts); `{"crumb": "Owned by me"}` a breadcrumb crumb in a
+  folder; the Folders row's `{"button": "Folders sort"}` (its ↓≡ menu), `{"button": "List"}` / `{"button": "Grid"}`;
+  the selected row's inline icons `{"row_icon": "Labels"}` / `"Send to trash"` (by tooltip); the right strip's
+  `{"button": "Details"}`, `"Properties"`, `"Versions and history"`, `"Document notes"` (by tooltip); the Properties
+  panel's `{"field": "Properties › Description"}` (`Name`, `Library label`) and `{"button": "Properties › Undo"}`
+  (`Redo`, `Apply`); the column chooser's `{"field": "Search…"}` and a column's grip `{"col_grip": "Owned by"}` (a
+  `drag`'s ends, `"edge": "top"` on the drop); Advanced search's `{"button": "Advanced search help"}` (its ?).
 - Targets on Preferences: a control by its section and label, `{"field": "Units › Length default unit", "pick":
   "Inch"}` (a select), `{"field": "Units › Length default unit › Display decimals"}` (the select after it),
   `{"checkbox": "Decimal format › Use comma as decimal separator"}`, a section's button `{"button": "Units › Save

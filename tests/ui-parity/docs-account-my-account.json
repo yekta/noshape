@@ -1,0 +1,21 @@
+{
+ "name": "docs-account-my-account",
+ "about": "The account menu › My account (the account's Profile page)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Account menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "My account"
+   }
+  }
+ ]
+}

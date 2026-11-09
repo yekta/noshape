@@ -1,0 +1,37 @@
+{
+ "name": "docs-props-edit-undo",
+ "about": "uip Plate's Properties panel: Description typed, then the panel's Undo (nothing saved)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Properties"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Properties › Description"
+   }
+  },
+  {
+   "do": "type",
+   "text": "A plate"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Properties › Undo"
+   }
+  }
+ ]
+}

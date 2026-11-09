@@ -1,0 +1,27 @@
+{
+ "name": "docs-row-icon-labels",
+ "about": "Select uip Plate's row, then its inline Labels icon (the Labels dialog); Cancel",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_row": "uip Plate"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "row_icon": "Labels"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

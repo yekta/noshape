@@ -225,7 +225,7 @@ fn control_name(t: &Value) -> Option<String> {
     }
     // A face / edge / vertex point with an `instance` is geometry (in that part's coordinates), not the list row.
     let geometry = ["face", "edge", "vertex"].iter().any(|k| t.get(*k).is_some_and(Value::is_array));
-    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "editor", "cp_header", "notice", "profile_badge", "table_cell"]
+    ["tool", "field", "feature", "part", "menu", "tab", "checkbox", "list_row", "dropdown", "instance", "mate", "doc_tab", "config_more", "config_row", "sheet_tab", "sheet_ref", "sheet_table", "panel_row", "panel_more", "caret", "context_more", "navbar", "nav", "doc_row", "history_row", "var_cell", "var_header", "table_title", "crumb", "col_header", "col_grip", "row_icon", "recent_card", "editor", "cp_header", "notice", "profile_badge", "table_cell"]
         .iter()
         .filter(|k| !(geometry && **k == "instance"))
         .find_map(|k| t.get(*k).and_then(Value::as_str).map(|v| format!("{k}:{v}")))
@@ -788,6 +788,27 @@ pub fn start_page(cx: &mut App) {
                     sleep(cx, step["ms"].as_u64().unwrap_or(500)).await;
                     Ok(())
                 }
+                // A drag on a page (the column chooser's grips), as in a document.
+                "drag" => match (find(&target, cx), find(&step.get("to").cloned().unwrap_or(Value::Null), cx)) {
+                    (Ok(a), Ok(b)) => {
+                        let start = pointer.unwrap_or(a);
+                        for k in 1..=3 {
+                            let p = start + (a - start) * (k as f32 / 3.0);
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: None, modifiers: mods }), cx));
+                            sleep(cx, 20).await;
+                        }
+                        let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseDown(MouseDownEvent { button: MouseButton::Left, position: a, modifiers: mods, click_count: 1, first_mouse: false }), cx));
+                        pointer = Some(b);
+                        for k in 1..=15 {
+                            let p = a + (b - a) * (k as f32 / 15.0);
+                            let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseMove(MouseMoveEvent { position: p, pressed_button: Some(MouseButton::Left), modifiers: mods }), cx));
+                            sleep(cx, 30).await;
+                        }
+                        let _ = w.update(cx, |_, window, cx| window.dispatch_event(PlatformInput::MouseUp(MouseUpEvent { button: MouseButton::Left, position: b, modifiers: mods, click_count: 1 }), cx));
+                        Ok(())
+                    }
+                    (Err(e), _) | (_, Err(e)) => Err(e),
+                },
                 other => Err(format!("unknown step {other} on a page")),
             };
             // A document a step opened is built and drawn before its state is read.

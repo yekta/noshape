@@ -1,0 +1,33 @@
+{
+ "name": "docs-folders-sort",
+ "about": "The Folders row's sort ▾ › Name: Z → A, then › Name: A → Z (back)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Folders sort"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Name: Z → A"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Folders sort"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Name: A → Z"
+   }
+  }
+ ]
+}

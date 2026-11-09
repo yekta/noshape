@@ -594,7 +594,8 @@ impl Render for AdvancedSearch {
                 h_flex()
                     .p(px(10.))
                     .gap(px(3.))
-                    .child(div().opacity(0.6).child(crate::assets::icon("help", 20., cx)))
+                    // Live: the search help page (here the guide's Documents section).
+                    .child(div().id("adv-help").map(|d| crate::ui_script::mark(d, || "button:Advanced search help".into())).cursor_pointer().opacity(0.6).child(crate::assets::icon("help", 20., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Documents", cx)))
                     .child(div().flex_1())
                     .child(os::secondary_button("adv-reset", "Reset", cx).on_click(cx.listener(|t, _: &ClickEvent, window, cx| t.reset(window, cx))))
                     .child(os::primary_button("adv-go", "Search").on_click(cx.listener(|t, _: &ClickEvent, _, cx| {

@@ -1,0 +1,25 @@
+{
+ "name": "docs-advanced-search-help",
+ "about": "The search box's ▾ (Advanced search), its ? (help in a browser tab); Esc",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "caret": "Search"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Advanced search help"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

@@ -1,0 +1,30 @@
+{
+ "name": "vs-type-pick-then-type",
+ "about": "Pick height's Variable type Angle, then type 45 and Enter: where the typing goes (live leaves an empty input focused after a type pick: the Value cell, or nothing?)",
+ "area": "psui",
+ "source": "lead 11-08: vs-type-* focus evidence",
+ "start": "vs-vars",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Variable Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "var_cell": "height:Variable type",
+    "pick": "Angle"
+   }
+  },
+  {
+   "do": "type",
+   "text": "45"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  }
+ ]
+}

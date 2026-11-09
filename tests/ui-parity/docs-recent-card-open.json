@@ -1,0 +1,15 @@
+{
+ "name": "docs-recent-card-open",
+ "about": "Owned by me's Last opened by me card for uip Bracket: a click opens the document",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "recent_card": "uip Bracket"
+   }
+  }
+ ]
+}

@@ -1,0 +1,21 @@
+{
+ "name": "docs-versions-panel",
+ "about": "uip Bracket's Versions and history panel",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  }
+ ]
+}

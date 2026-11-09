@@ -1,0 +1,21 @@
+{
+ "name": "docs-folders-view-toggle",
+ "about": "The Folders row's List view, then Grid view (back)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "List"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Grid"
+   }
+  }
+ ]
+}

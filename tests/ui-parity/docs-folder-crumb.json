@@ -1,0 +1,21 @@
+{
+ "name": "docs-folder-crumb",
+ "about": "Open uip Folder (double-click its tile), then the breadcrumb's Owned by me",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "doc_row": "uip Folder"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "crumb": "Owned by me"
+   }
+  }
+ ]
+}

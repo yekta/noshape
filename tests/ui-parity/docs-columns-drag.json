@@ -1,0 +1,25 @@
+{
+ "name": "docs-columns-drag",
+ "about": "+ Add's column chooser: drag Owned by's grip above Modified",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "drag",
+   "from": {
+    "col_grip": "Owned by"
+   },
+   "to": {
+    "col_grip": "Modified",
+    "edge": "top"
+   }
+  }
+ ]
+}

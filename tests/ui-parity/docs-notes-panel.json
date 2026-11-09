@@ -1,0 +1,21 @@
+{
+ "name": "docs-notes-panel",
+ "about": "uip Bracket's Document notes panel (read-only)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_row": "uip Bracket"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Document notes"
+   }
+  }
+ ]
+}

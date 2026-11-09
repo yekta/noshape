@@ -1,0 +1,29 @@
+{
+ "name": "docs-columns-search",
+ "about": "+ Add's column chooser: Search… typed Desc; Esc",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Add"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Search…"
+   }
+  },
+  {
+   "do": "type",
+   "text": "Desc"
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

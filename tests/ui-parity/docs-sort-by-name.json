@@ -1,0 +1,21 @@
+{
+ "name": "docs-sort-by-name",
+ "about": "The list header's Name: sorted by name, then again (Z → A)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "col_header": "Name"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "col_header": "Name"
+   }
+  }
+ ]
+}

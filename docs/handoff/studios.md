@@ -69,6 +69,9 @@ reads no tabs and a "Standard" field: another panel's?), vs-tab-menu-copy-clipbo
 closed in doc-plus-menu: focus after the context menu), vs-undo-value (live's Ctrl+Z on a selected cell does nothing:
 a shortcoming, not a target), vs-type-* (focus only, as noted below).
 
+**2026-11-08 23:53 UTC: psui took documents batch 7 (lead, while studios is paused until Monday)**: the via entries, the new
+docs-* / doc-* / prefs-* scenarios and the documents page's marks below. Versions stay yours.
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;

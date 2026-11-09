@@ -158,7 +158,16 @@
    "where": "documents page › Owned by me, above the list",
    "freq": 1,
    "cloud": false,
-   "source": "behaviours.md:20"
+   "source": "behaviours.md:20",
+   "via": [
+    [
+     {
+      "on": {
+       "recent_card": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-create",
@@ -551,7 +560,21 @@
    "where": "documents page › selected row",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:50"
+   "source": "behaviours.md:50",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "row_icon": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-sort-the-list-by-a-column-header",
@@ -560,7 +583,16 @@
    "where": "documents page › list header (Name / Modified / …)",
    "freq": 2,
    "cloud": false,
-   "source": "dom/documents-list.txt"
+   "source": "dom/documents-list.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "col_header": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-add-column-chooser",
@@ -610,7 +642,24 @@
    "where": "documents page › + Add panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "on": {
+       "field": "Search…"
+      }
+     },
+     {
+      "do": "type"
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-column-chooser-modified",
@@ -734,7 +783,22 @@
    "where": "documents page › + Add panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:38"
+   "source": "behaviours.md:38",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Add"
+      }
+     },
+     {
+      "do": "drag",
+      "on": {
+       "col_grip": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-search-in-location-box-type-enter",
@@ -1035,7 +1099,21 @@
    "where": "documents page › search ▾ panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:46"
+   "source": "behaviours.md:46",
+   "via": [
+    [
+     {
+      "on": {
+       "caret": "Search"
+      }
+     },
+     {
+      "on": {
+       "button": "Advanced search help"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-search-results-view-search-results-in-location-part-number-revisi",
@@ -1044,7 +1122,23 @@
    "where": "documents page after a search",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:64"
+   "source": "behaviours.md:64",
+   "via": [
+    [
+     {
+      "on": {
+       "field": "Search"
+      }
+     },
+     {
+      "do": "type"
+     },
+     {
+      "do": "key",
+      "key": "Enter"
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-folders-section-collapse-expand",
@@ -1053,7 +1147,16 @@
    "where": "documents page › Folders row",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:42"
+   "source": "behaviours.md:42",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Folders"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-open-a-folder-double-click-its-tile",
@@ -1081,7 +1184,22 @@
    "where": "documents page header inside a folder",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:42"
+   "source": "behaviours.md:42",
+   "via": [
+    [
+     {
+      "do": "dblclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "crumb": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-folders-sort-name-a-z-name-z-a-last-modified",
@@ -1090,7 +1208,21 @@
    "where": "documents page › Folders row ↓≡",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:42"
+   "source": "behaviours.md:42",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Folders sort"
+      }
+     },
+     {
+      "on": {
+       "menu": "*"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-folders-grid-view-list-view-toggle",
@@ -1099,7 +1231,16 @@
    "where": "documents page › Folders row (remembered)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:42"
+   "source": "behaviours.md:42",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:List|Grid"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-empty-states-no-documents-owned-by-you-nothing-in-trash-get-start",
@@ -1848,7 +1989,21 @@
    "where": "documents page › right strip › Properties",
    "freq": 3,
    "cloud": false,
-   "source": "dom/documents-right-panel-properties.txt"
+   "source": "dom/documents-right-panel-properties.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Properties"
+      }
+     },
+     {
+      "on": {
+       "field": "re:Properties › .+"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-properties-panel-undo-redo-apply",
@@ -1857,7 +2012,16 @@
    "where": "documents page › right strip › Properties footer",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:51"
+   "source": "behaviours.md:51",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "re:Properties › (Undo|Redo|Apply)"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-notes-panel-read-only-no-notes-available",
@@ -1866,7 +2030,21 @@
    "where": "documents page › right strip › Document notes",
    "freq": 3,
    "cloud": false,
-   "source": "dom/documents-right-panel-notes.txt"
+   "source": "dom/documents-right-panel-notes.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "button": "Document notes"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-versions-and-history-panel",
@@ -1875,7 +2053,21 @@
    "where": "documents page › right strip (internals belong to the versions area)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:53"
+   "source": "behaviours.md:53",
+   "via": [
+    [
+     {
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "on": {
+       "button": "Versions and history"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "navbar-notifications-bell-only-show-unread",
@@ -2146,7 +2338,16 @@
    "where": "navbar right end",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:28974"
+   "source": "behaviours.md:28974",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Account menu"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "account-menu-my-account",
@@ -2155,7 +2356,21 @@
    "where": "navbar › avatar ▾",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:28974"
+   "source": "behaviours.md:28974",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Account menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "My account"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "account-menu-view-support-tickets",
@@ -2182,7 +2397,21 @@
    "where": "navbar › avatar ▾",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:28974"
+   "source": "behaviours.md:28974",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Account menu"
+      }
+     },
+     {
+      "on": {
+       "menu": "View in dark mode beta"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "account-menu-sign-out",

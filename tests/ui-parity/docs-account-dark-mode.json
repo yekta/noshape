@@ -1,0 +1,21 @@
+{
+ "name": "docs-account-dark-mode",
+ "about": "The account menu › View in dark mode beta (live2: restore light mode after it)",
+ "area": "psui",
+ "source": "studios' documents batch 7 (psui 11-09)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Account menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View in dark mode beta"
+   }
+  }
+ ]
+}
