@@ -1,18 +1,18 @@
 {
  "scenario": "doc-menu-copy-workspace",
- "recorded": "2026-11-08T02:41:33.033Z",
+ "recorded": "2026-11-09T05:09:54.851Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-07.11"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "8ae81331e796751ddd219b17",
-  "workspace": "4e5ec65751269c1ea237941c",
-  "element": "6872bad217100bddaf262588",
+  "document": "3e27835c6e61bcd9f539578c",
+  "workspace": "23c629c4b734e5cefb78d9a2",
+  "element": "24de51ac2624da6048fc7483",
   "start": "doc-tabs",
-  "startElement": "6872bad217100bddaf262588",
+  "startElement": "24de51ac2624da6048fc7483",
   "runner": "live2 "
  },
  "start": {
@@ -266,7 +266,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 151667
+   "t": 111744
   },
   {
    "step": 2,
@@ -285,7 +285,7 @@
     "focus": {
      "kind": "other",
      "tag": "input",
-     "text": "live2 uip doc-tabs 2026-11-08T02:38:54 - Copy",
+     "text": "live2 uip doc-tabs 2026-11-09T05:07:54 - Copy",
      "selection": [
       0,
       45
@@ -299,7 +299,7 @@
       {
        "label": "Document name",
        "kind": "input",
-       "value": "live2 uip doc-tabs 2026-11-08T02:38:54 - Copy"
+       "value": "live2 uip doc-tabs 2026-11-09T05:07:54 - Copy"
       }
      ],
      "buttons": [
@@ -394,7 +394,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 165706
+   "t": 118561
   },
   {
    "step": 3,
@@ -407,29 +407,13 @@
    "ok": true,
    "at": [
     1212,
-    416
+    466
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Copy the active workspace to a new document",
-     "fields": [
-      {
-       "label": "Document name",
-       "kind": "input",
-       "value": "live2 uip doc-tabs 2026-11-08T02:38:54 - Copy"
-      }
-     ],
-     "buttons": [
-      "Create public document",
-      "Cancel"
-     ],
-     "text": "Document name Copy document to Owned by me uip Folder noshape test A nested-asm-B.step"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -516,7 +500,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 173901
+   "t": 133166
   }
  ]
 }

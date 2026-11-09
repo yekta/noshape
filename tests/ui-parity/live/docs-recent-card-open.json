@@ -1,6 +1,6 @@
 {
  "scenario": "docs-recent-card-open",
- "recorded": "2026-11-09T03:02:51.439Z",
+ "recorded": "2026-11-09T05:06:11.578Z",
  "app": {
   "name": "live",
   "version": "1.223.92697.90c317e616c3",
@@ -48,7 +48,7 @@
    },
    "ok": true,
    "at": [
-    372,
+    370,
     478
    ],
    "state": {
@@ -60,9 +60,8 @@
     "panels": null,
     "list": null,
     "selection": {
-     "count": null,
-     "items": [],
-     "error": "TypeError: window.__wr is not a function"
+     "count": 0,
+     "items": []
     },
     "features": {
      "rows": [
@@ -121,8 +120,8 @@
     },
     "url": "/documents/8314e3a39f233abde0cccb64/w/f577795489a3a78e368c0705/e/7c6278ecab0f5fc55b52c2f8"
    },
-   "t": 18458
+   "t": 37541
   }
  ],
- "tabsOpened": 6
+ "tabsOpened": 14
 }

@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-menu-move-to-document",
- "recorded": "2026-11-08T06:34:07.803Z",
+ "recorded": "2026-11-09T04:48:33.382Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "69872346ea7bc2e0ca280cbd",
-  "workspace": "e27425582c1fa5f10bba689f",
-  "element": "b0d4751c88d352b2e57fbd46",
+  "document": "1c54748a4c0a6a1d618c4909",
+  "workspace": "d8c5512fb68dbaa5b6d9f0e9",
+  "element": "23d45a8550432d5d0534f5ed",
   "start": "doc-tabs",
-  "startElement": "b0d4751c88d352b2e57fbd46",
+  "startElement": "23d45a8550432d5d0534f5ed",
   "runner": "live2 "
  },
  "start": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70380
+   "t": 56879
   },
   {
    "step": 2,
@@ -239,7 +239,8 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…"
+      "Move to document…",
+      "Export…"
      ],
      "highlighted": null,
      "disabled": []
@@ -327,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 74969
+   "t": 59064
   },
   {
    "step": 3,
@@ -340,7 +341,7 @@
    "ok": true,
    "at": [
     587,
-    950
+    928
    ],
    "state": {
     "focus": {
@@ -460,7 +461,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 84691
+   "t": 61710
   },
   {
    "step": 4,
@@ -473,34 +474,13 @@
    "ok": true,
    "at": [
     1212,
-    294
+    344
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Move to document",
-     "fields": [
-      {
-       "label": "Document name",
-       "kind": "input",
-       "value": "Untitled document"
-      },
-      {
-       "label": "Move all referenced tabs",
-       "kind": "checkbox",
-       "value": true
-      }
-     ],
-     "buttons": [
-      "Move",
-      "Cancel"
-     ],
-     "text": "New document Other documents Document name 1 tab selected Part Studio 2 1 referenced tab will be moved Show details Move all referenced tabs"
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -587,7 +567,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 89584
+   "t": 66405
   }
  ]
 }

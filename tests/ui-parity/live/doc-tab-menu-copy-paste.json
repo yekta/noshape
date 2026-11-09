@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-menu-copy-paste",
- "recorded": "2026-11-08T05:00:26.934Z",
+ "recorded": "2026-11-09T04:37:06.867Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "d8617836d921b172eb4676b4",
-  "workspace": "0fef53055ddeffecae3ea511",
-  "element": "f124edbad24ad6a5d0e7b489",
+  "document": "2f8102df6154064b0b76cc88",
+  "workspace": "129d0ae0123625e0c660b826",
+  "element": "5c548b00bd003e2c5835863a",
   "start": "doc-tabs",
-  "startElement": "f124edbad24ad6a5d0e7b489",
+  "startElement": "5c548b00bd003e2c5835863a",
   "runner": "live2 "
  },
  "start": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 59845
+   "t": 79947
   },
   {
    "step": 2,
@@ -239,7 +239,8 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…"
+      "Move to document…",
+      "Export…"
      ],
      "highlighted": null,
      "disabled": []
@@ -327,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 65390
+   "t": 82192
   },
   {
    "step": 3,
@@ -340,7 +341,7 @@
    "ok": true,
    "at": [
     587,
-    904
+    882
    ],
    "state": {
     "focus": {
@@ -433,7 +434,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 70285
+   "t": 84428
   },
   {
    "step": 4,
@@ -560,18 +561,21 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 75349
+   "t": 86706
   },
   {
    "step": 5,
    "do": {
     "do": "click",
     "on": {
-     "menu": "Paste Part Studio 2"
+     "menu": "Paste tab"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Paste Part Studio 2\"}",
+   "ok": true,
+   "at": [
+    121,
+    943
+   ],
    "state": {
     "focus": {
      "kind": "none"
@@ -579,28 +583,7 @@
     "dialog": null,
     "dialogs": [],
     "panels": null,
-    "list": {
-     "kind": "menu",
-     "rows": [
-      "Applications",
-      "Create tutorial…",
-      "Create Material Library",
-      "Create Feature Studio",
-      "Create CAM Studio",
-      "Create PCB Studio",
-      "Create Render Studio",
-      "Create Part Studio",
-      "Create Assembly",
-      "Create Variable Studio",
-      "Create Drawing…",
-      "Create folder",
-      "Create table",
-      "Import…",
-      "Paste tab"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "list": null,
     "selection": {
      "count": 0,
      "items": []
@@ -684,7 +667,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 77337
+   "t": 88955
   }
  ]
 }

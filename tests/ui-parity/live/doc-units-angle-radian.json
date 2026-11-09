@@ -1,18 +1,18 @@
 {
  "scenario": "doc-units-angle-radian",
- "recorded": "2026-11-08T03:29:17.622Z",
+ "recorded": "2026-11-09T05:06:38.813Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.2 50b19f57 + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "9f64bad0cc1dd11719604293",
-  "workspace": "49978940e2cde654a854fb8b",
-  "element": "6ea84df6f9750ca0f73db856",
+  "document": "68fda8a2dfa28e8d975c50f1",
+  "workspace": "f347428db900e5a6f3964116",
+  "element": "01bfab22d8342b9ec8dd3103",
   "start": "doc-tabs",
-  "startElement": "6ea84df6f9750ca0f73db856",
+  "startElement": "01bfab22d8342b9ec8dd3103",
   "runner": "live2 "
  },
  "start": {
@@ -73,11 +73,6 @@
      "active": true
     },
     {
-     "name": "Folder 1",
-     "kind": "folder",
-     "active": false
-    },
-    {
      "name": "Assembly 1",
      "kind": "assembly",
      "active": false
@@ -95,6 +90,16 @@
     {
      "name": "Feature Studio 1",
      "kind": "featurestudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 3",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Folder 1",
+     "kind": "folder",
      "active": false
     }
    ],
@@ -233,11 +238,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -256,6 +256,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -266,7 +276,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 111116
+   "t": 181601
   },
   {
    "step": 2,
@@ -376,11 +386,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -399,6 +404,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -409,7 +424,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 113755
+   "t": 185371
   },
   {
    "step": 3,
@@ -521,11 +536,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -544,6 +554,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -554,7 +574,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 116205
+   "t": 189437
   },
   {
    "step": 4,
@@ -627,11 +647,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -650,6 +665,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -660,7 +685,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 120097
+   "t": 197908
   },
   {
    "step": 5,
@@ -788,11 +813,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -811,6 +831,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -821,7 +851,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 129439
+   "t": 202824
   },
   {
    "step": 6,
@@ -931,11 +961,6 @@
        "active": true
       },
       {
-       "name": "Folder 1",
-       "kind": "folder",
-       "active": false
-      },
-      {
        "name": "Assembly 1",
        "kind": "assembly",
        "active": false
@@ -954,6 +979,16 @@
        "name": "Feature Studio 1",
        "kind": "featurestudio",
        "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Folder 1",
+       "kind": "folder",
+       "active": false
       }
      ],
      "folder": null,
@@ -964,7 +999,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 134124
+   "t": 218384
   }
  ]
 }

@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-menu-create-drawing",
- "recorded": "2026-11-08T04:34:56.756Z",
+ "recorded": "2026-11-09T04:39:01.455Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "fd4a9f50f5675904291769dc",
-  "workspace": "7675d38893021df1d4b128a9",
-  "element": "19d5da36694bf14bf4fcebd0",
+  "document": "9c51d95947f092e2391f9d85",
+  "workspace": "865e2880bdcebf45ba67efc0",
+  "element": "3e1dfaed2c4e58223d668eb3",
   "start": "doc-tabs",
-  "startElement": "19d5da36694bf14bf4fcebd0",
+  "startElement": "3e1dfaed2c4e58223d668eb3",
   "runner": "live2 "
  },
  "start": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 46354
+   "t": 68402
   },
   {
    "step": 2,
@@ -240,6 +240,7 @@
       "Create Drawing of Assembly 1…",
       "Select as document thumbnail",
       "Move to document…",
+      "Export…",
       "Release…"
      ],
      "highlighted": null,
@@ -328,7 +329,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 50742
+   "t": 70841
   },
   {
    "step": 3,
@@ -341,7 +342,7 @@
    "ok": true,
    "at": [
     388,
-    880
+    858
    ],
    "state": {
     "focus": {
@@ -450,7 +451,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 55802
+   "t": 73469
   },
   {
    "step": 4,
@@ -463,29 +464,13 @@
    "ok": true,
    "at": [
     1367,
-    532
+    582
    ],
    "state": {
     "focus": {
-     "kind": "other",
-     "tag": "div"
+     "kind": "none"
     },
-    "dialog": {
-     "kind": "modal",
-     "title": "Create Drawing: New drawing name",
-     "fields": [
-      {
-       "label": "New drawing name",
-       "kind": "input",
-       "value": "Assembly 1 Drawing 1"
-      }
-     ],
-     "buttons": [
-      "OK",
-      "Cancel"
-     ],
-     "text": "Existing templates Custom template Onshape Owned by me Recently opened Created by me Shared with me Public AllANSIISOJIS Template Document Owner ANSI_A_INCH.dwt Onshape ANSI Drawing Templates Onshape ISO_A4_Portrait.dwt Onshape ISO Drawing Templates Onshape ISO_A3.dwt Onshape ISO Drawing Templates Onshape ANSI_B_MM.dwt Onshape ANSI Drawing Templates Onshape ISO_A4.dwt Onshape ISO Drawing Templates Onshape ANSI_A_MM.dwt Onshape ANSI Drawing Templates Onshape live bom asm Drawing 1.dwt noshape mm "
-    },
+    "dialog": null,
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -572,7 +557,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 60777
+   "t": 75649
   }
  ]
 }

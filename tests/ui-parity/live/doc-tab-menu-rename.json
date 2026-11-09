@@ -1,18 +1,18 @@
 {
  "scenario": "doc-tab-menu-rename",
- "recorded": "2026-11-08T04:06:27.143Z",
+ "recorded": "2026-11-09T04:57:15.922Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-08.3 6f77db4f + live2 2026-11-08.1"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-08.2"
  },
  "live": {
-  "document": "920850eff02a2c501594ed86",
-  "workspace": "89249c5b1a200503470dd510",
-  "element": "3737c7927ca0f76950327261",
+  "document": "e9abb8a0e4a31b750e6c557e",
+  "workspace": "20c94fb5d956d66f2d61d344",
+  "element": "bc6c90191cffca2c1f25637d",
   "start": "doc-tabs",
-  "startElement": "3737c7927ca0f76950327261",
+  "startElement": "bc6c90191cffca2c1f25637d",
   "runner": "live2 "
  },
  "start": {
@@ -206,7 +206,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 86919
+   "t": 57204
   },
   {
    "step": 2,
@@ -239,7 +239,8 @@
       "Duplicate",
       "Copy to clipboard",
       "Select as document thumbnail",
-      "Move to document…"
+      "Move to document…",
+      "Export…"
      ],
      "highlighted": null,
      "disabled": []
@@ -327,7 +328,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 91967
+   "t": 60140
   },
   {
    "step": 3,
@@ -340,7 +341,7 @@
    "ok": true,
    "at": [
     587,
-    815
+    793
    ],
    "state": {
     "focus": {
@@ -440,7 +441,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 97314
+   "t": 64526
   },
   {
    "step": 4,
@@ -547,7 +548,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 99619
+   "t": 66986
   },
   {
    "step": 5,
@@ -559,7 +560,7 @@
    "pointer": {
     "at": [
      586,
-     815
+     793
     ],
     "hover": [],
     "element": "canvas#canvas"
@@ -655,7 +656,7 @@
     "variables": null,
     "featurestudio": null
    },
-   "t": 101623
+   "t": 69075
   }
  ]
 }
