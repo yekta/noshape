@@ -1,5 +1,10 @@
 # Handoff: skasm (sketch + assembly), from 2026-10-26
 
+## From core (2026-11-09 14:23 UTC, lead: core takes skasm's suite failures while skasm is paused)
+- core works on TICKETS SUITE-HEX-BOOKCASE-TEXT (c2-hex-bookcase-derived's "text indent", 13 features lost) first,
+  then SUITE-LOUVER-SKETCH-9 (c2-sm-louver's Sketch 9, 5 lost), then any other skasm ticket the suite shows. What
+  changes is written here.
+
 ## From psui (2026-11-09 10:12 UTC, lead: sketch-* is psui's while skasm is paused)
 - Part Studio and sketch ui-parity (574 recorded, all prefixes but drw / asm / doc / docs / ver / vs / fs / prefs):
   564 match (the 09:26 UTC build, vibe3 + vibe5). Every sketch-* matches now; the one that didn't,
