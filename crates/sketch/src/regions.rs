@@ -95,6 +95,27 @@ impl ProfileSegment {
         self.point_at(1.0)
     }
 
+    /// This segment followed by `next`, a further piece of the same curve, as one segment.
+    fn joined(&self, next: &ProfileSegment) -> Option<ProfileSegment> {
+        use ProfileSegment::*;
+        match (self, next) {
+            (Line { a, .. }, Line { b, .. }) => Some(Line { a: *a, b: *b }),
+            (Arc { center, radius, start_angle, end_angle, ccw }, Arc { start_angle: s2, end_angle: e2, ccw: c2, .. }) if ccw == c2 => {
+                Some(Arc { center: *center, radius: *radius, start_angle: *start_angle, end_angle: end_angle + (e2 - s2), ccw: *ccw })
+            }
+            (EllipseArc { center, major_axis, major_radius, minor_radius, start_param, end_param, ccw }, EllipseArc { start_param: s2, end_param: e2, ccw: c2, .. }) if ccw == c2 => {
+                Some(EllipseArc { center: *center, major_axis: *major_axis, major_radius: *major_radius, minor_radius: *minor_radius, start_param: *start_param, end_param: end_param + (e2 - s2), ccw: *ccw })
+            }
+            (Spline { .. }, Spline { .. }) => {
+                let (a, b) = (self.nurbs()?, next.nurbs()?);
+                let size = a.ctrl.iter().chain(&b.ctrl).fold(0.0f64, |m, p| m.max(p.abs().max_element()));
+                let j = a.joined(&b, 1e-12 * (1.0 + size))?;
+                Some(Spline { control_points: j.ctrl, knots: j.knots, degree: j.degree, weights: j.weights })
+            }
+            _ => None,
+        }
+    }
+
     /// Same segment traversed in the opposite direction.
     pub fn reversed(&self) -> ProfileSegment {
         match self {
@@ -1098,7 +1119,8 @@ pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
                 }
             }
         }
-        let Some(merged) = chain_loops(&segs, close) else { continue };
+        let Some(mut merged) = chain_loops(&segs, close) else { continue };
+        merged.iter_mut().for_each(|l| rejoin_pieces(l, close));
         let (outer, holes): (Vec<ProfileLoop>, Vec<ProfileLoop>) = merged.into_iter().partition(|l| l.signed_area() > 0.0);
         let mut outer = outer.into_iter();
         let (Some(outer), None) = (outer.next(), outer.next()) else { continue };
@@ -1108,6 +1130,26 @@ pub fn union_touching(regions: &[Region]) -> Vec<Option<Region>> {
         out[g] = Some(Region { id: regions[g].id.clone(), outer, holes, joined });
     }
     out
+}
+
+/// Consecutive pieces of one entity in a loop (split where a united region's edge met it) as one segment again, as
+/// live's united regions have one edge per curve (c2-hex-bookcase-derived's text over its face's edges).
+fn rejoin_pieces(lp: &mut ProfileLoop, close: impl Fn(DVec2, DVec2) -> bool) {
+    let mut i = 0;
+    while lp.segments.len() > 1 && i < lp.segments.len() {
+        let j = (i + 1) % lp.segments.len();
+        let joined = if lp.sources[i] == lp.sources[j] && close(lp.segments[i].end(), lp.segments[j].start()) { lp.segments[i].joined(&lp.segments[j]) } else { None };
+        let Some(s) = joined else {
+            i += 1;
+            continue;
+        };
+        lp.segments[i] = s;
+        lp.segments.remove(j);
+        lp.sources.remove(j);
+        if j < i {
+            i -= 1;
+        }
+    }
 }
 
 /// Segments chained end to start into closed loops; `None` where a loop could continue more than one way or not at all.

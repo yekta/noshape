@@ -197,8 +197,8 @@ fn wires_open_and_closed() {
     }
 }
 
-/// An ellipse split along its major axis, both halves picked: one region bounded by the two halves of the ellipse
-/// (live motor-mount-jack's slot: one wall face); a region beside them stays apart.
+/// An ellipse split along its major axis, both halves picked: one region bounded by the whole ellipse again (live
+/// motor-mount-jack's slot: one wall face); a region beside them stays apart.
 #[test]
 fn touching_regions_unite_without_their_shared_line() {
     let mut sk = Sketch::new();
@@ -212,10 +212,38 @@ fn touching_regions_unite_without_their_shared_line() {
     assert_eq!(united.iter().filter(|u| u.is_some()).count(), 2);
     let ellipse = united.iter().flatten().find(|r| r.area() > 2.0).unwrap();
     assert_close(ellipse.area(), 2.0 * PI, 1e-9);
-    assert_eq!(ellipse.outer.segments.len(), 2);
-    assert!(ellipse.outer.segments.iter().all(|s| matches!(s, regions::ProfileSegment::EllipseArc { .. })));
+    assert_eq!(ellipse.outer.segments.len(), 1);
+    let regions::ProfileSegment::EllipseArc { start_param, end_param, .. } = ellipse.outer.segments[0] else { panic!("{:?}", ellipse.outer) };
+    assert_close((end_param - start_param).abs(), 2.0 * PI, 1e-12);
     assert!(ellipse.holes.is_empty());
     assert_close(united.iter().flatten().map(|r| r.area()).sum(), total, 1e-9);
+}
+
+/// A spline closed by a line, cut in two by a line across both, both halves picked: the united region's spline and
+/// line are whole again, one segment each (c2-hex-bookcase-derived's glyphs over its face's edges: one wall per curve).
+#[test]
+fn united_pieces_of_one_curve_are_one_segment() {
+    let mut sk = Sketch::new();
+    let ctrl = [v(0.0, 0.0), v(1.0, 3.0), v(3.0, 4.0), v(5.0, 2.0), v(6.0, 0.0)];
+    sk.add_bspline(&ctrl, 3).unwrap();
+    sk.add_line(v(6.0, 0.0), v(0.0, 0.0));
+    sk.add_line(v(2.5, -1.0), v(3.5, 5.0));
+    let regions: Vec<_> = sk.regions().into_iter().filter(|r| r.area() > 0.0).collect();
+    assert_eq!(regions.len(), 2);
+    let united: Vec<_> = regions::union_touching(&regions).into_iter().flatten().collect();
+    assert_eq!(united.len(), 1);
+    let outer = &united[0].outer;
+    assert_eq!(outer.segments.len(), 2, "{outer:?}");
+    let whole = regions::ProfileSegment::Spline { control_points: ctrl.to_vec(), knots: noshape_sketch::nurbs::clamped_uniform_knots(5, 3), degree: 3, weights: None };
+    let spline = outer.segments.iter().find(|s| matches!(s, regions::ProfileSegment::Spline { .. })).unwrap();
+    let spline = if (spline.start() - v(0.0, 0.0)).length() < 1e-12 { spline.clone() } else { spline.reversed() };
+    let regions::ProfileSegment::Spline { control_points, knots, .. } = &spline else { unreachable!() };
+    assert_eq!(control_points.len(), 5);
+    assert_eq!(knots.len(), 9);
+    for i in 0..=20 {
+        let s = i as f64 / 20.0;
+        assert!((spline.point_at(s) - whole.point_at(s)).length() < 1e-9);
+    }
 }
 
 /// A disc filling a ring's hole unites with it (a whole loop shared); a lens and the crescents beside it, which share

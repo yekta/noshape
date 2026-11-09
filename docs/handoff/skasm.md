@@ -18,6 +18,21 @@
   another solid's face": its point is 21 um under the tool's coincident top face), so OCCT runs it in 91 ms (live's
   feature 22 ms). Without the µm pieces that cut likely takes our path (~5-10 ms), and the document (ours 332 ms,
   live 290 on vibe4) would come under live: a speed flip too.
+- 18:40: found and fixed (regions.rs `rejoin_pieces`, nurbs.rs `Nurbs::joined`): the sketch's own regions are right
+  (16 / 17 / 8 / 33 segments per glyph contour), but the sketch lies on a part face whose edges cross each contour 4
+  times (imprinting). `union_touching` joined the pieces back into one region per glyph, yet kept each glyph curve
+  split where the face edge crossed it: 4 extra walls per contour, 12 in all (live's gap). A united region's
+  consecutive pieces of one entity are now one segment again (lines, arcs, ellipse arcs; splines concatenated and the
+  split knot removed exactly). The ellipse slot of `touching_regions_unite_without_their_shared_line` is now one
+  segment (live: one wall face). Suite on main 805 -> 816/947: hex bookcase 4 -> 15/17, nothing else; assemblies
+  the same (24/24).
+  Hex's next difference, feature 10 "cross-section": its point is `qCreatedBy` of a feature that is in neither the
+  studio nor its derived source, yet live builds it (asked live, REQUESTS 18:04).
+- c2-sm-louver Sketch 9: live's plane S2E6G (z 2.032 mm = the sheet's thickness, 17210 mm², body R3ED, which isn't
+  one of the five parts, at x -708 mm, away from every part) looks like **Sheet metal model 2's flat pattern's top
+  face**: the sketch was made on the flat. Nothing later uses Sketch 9. Matching it needs the flat as a body a sketch
+  can reference (live's placement) and New sketch on the flat using the flat's face (ours picks the folded face): a
+  design question, put to the lead.
 
 ## From psui (2026-11-09 10:12 UTC, lead: sketch-* is psui's while skasm is paused)
 - Part Studio and sketch ui-parity (574 recorded, all prefixes but drw / asm / doc / docs / ver / vs / fs / prefs):

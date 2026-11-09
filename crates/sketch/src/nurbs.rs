@@ -17,6 +17,77 @@ pub struct Nurbs {
     pub weights: Option<Vec<f64>>,
 }
 
+/// Removes the interior knot `u` up to `num` times where the curve stays within `tol` (Piegl & Tiller A5.8, on
+/// homogeneous points).
+fn remove_knot(p: usize, mut knots: Vec<f64>, mut pw: Vec<[f64; 3]>, u: f64, num: usize, tol: f64) -> (Vec<f64>, Vec<[f64; 3]>) {
+    let dist = |a: [f64; 3], b: [f64; 3]| ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt();
+    let lerp = |a: [f64; 3], b: [f64; 3], t: f64| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+    let Some(r) = knots.iter().rposition(|k| *k == u) else { return (knots, pw) };
+    let s = knots.iter().filter(|k| **k == u).count();
+    let n = pw.len() - 1;
+    if r <= p || r > n || s > p {
+        return (knots, pw);
+    }
+    let ord = p + 1;
+    let (mut first, mut last) = (r - p, r - s);
+    let fout = (2 * r - s - p) / 2;
+    let mut t = 0;
+    let mut temp = vec![[0.0; 3]; 2 * p + 1];
+    while t < num.min(s) {
+        let off = first - 1;
+        temp[0] = pw[off];
+        temp[last + 1 - off] = pw[last + 1];
+        let (mut i, mut j, mut ii, mut jj) = (first, last, 1, last - off);
+        while j as isize - i as isize > t as isize {
+            let ai = (u - knots[i]) / (knots[i + ord + t] - knots[i]);
+            let aj = (u - knots[j - t]) / (knots[j + ord] - knots[j - t]);
+            temp[ii] = [0, 1, 2].map(|c| (pw[i][c] - (1.0 - ai) * temp[ii - 1][c]) / ai);
+            temp[jj] = [0, 1, 2].map(|c| (pw[j][c] - aj * temp[jj + 1][c]) / (1.0 - aj));
+            i += 1;
+            ii += 1;
+            j -= 1;
+            jj -= 1;
+        }
+        let ok = if j < i + t {
+            dist(temp[ii - 1], temp[jj + 1]) <= tol
+        } else {
+            let ai = (u - knots[i]) / (knots[i + ord + t] - knots[i]);
+            dist(pw[i], lerp(temp[ii - 1], temp[ii + t + 1], ai)) <= tol
+        };
+        if !ok {
+            break;
+        }
+        let (mut i, mut j) = (first, last);
+        while j as isize - i as isize > t as isize {
+            pw[i] = temp[i - off];
+            pw[j] = temp[j - off];
+            i += 1;
+            j -= 1;
+        }
+        first -= 1;
+        last += 1;
+        t += 1;
+    }
+    if t == 0 {
+        return (knots, pw);
+    }
+    knots.drain(r + 1 - t..=r);
+    let (mut i, mut j) = (fout, fout);
+    for k in 1..t {
+        if k % 2 == 1 {
+            i += 1;
+        } else {
+            j -= 1;
+        }
+    }
+    for k in i + 1..=n {
+        pw[j] = pw[k];
+        j += 1;
+    }
+    pw.truncate(n + 1 - t);
+    (knots, pw)
+}
+
 /// Clamped uniform knot vector on `[0, 1]`.
 pub fn clamped_uniform_knots(n_ctrl: usize, degree: usize) -> Vec<f64> {
     let p = degree;
@@ -406,6 +477,23 @@ impl Nurbs {
                 c = l;
             }
         c
+    }
+
+    /// This curve followed by `next` (which starts where this ends, same degree) as one curve, the joint's knot removed
+    /// as often as the two allow within `tol` (two pieces of one curve give that curve back).
+    pub fn joined(&self, next: &Nurbs, tol: f64) -> Option<Nurbs> {
+        let p = self.degree;
+        if next.degree != p || self.weights.is_some() != next.weights.is_some() {
+            return None;
+        }
+        let (u, b0) = (self.domain().1, next.domain().0);
+        let w = self.weight(self.ctrl.len() - 1) / next.weight(0);
+        let mut knots = self.knots[..self.knots.len() - 1].to_vec();
+        knots.extend(next.knots[p + 1..].iter().map(|k| k - b0 + u));
+        let mut pw = self.homog();
+        pw.extend(next.homog()[1..].iter().map(|q| [q[0] * w, q[1] * w, q[2] * w]));
+        let (knots, pw) = remove_knot(p, knots, pw, u, p, tol);
+        Some(Nurbs::from_homog(p, knots, pw, self.weights.is_some()))
     }
 
     /// Same curve with reversed direction; parameter `u` maps to `a + b - u`.
@@ -966,6 +1054,28 @@ mod tests {
         let (a, b) = conic.split(0.3).unwrap();
         assert!((a.point(0.2) - conic.point(0.2)).length() < 1e-10);
         assert!((b.point(0.9) - conic.point(0.9)).length() < 1e-10);
+    }
+
+    #[test]
+    fn split_pieces_join_back_into_the_curve() {
+        let conic = Nurbs::conic(DVec2::new(1.0, 0.0), DVec2::new(1.0, 1.0), DVec2::new(0.0, 1.0), 0.4);
+        for c in [sample(), conic] {
+            let (l, r) = c.split(0.4).unwrap();
+            let j = l.joined(&r, 1e-12).unwrap();
+            assert_eq!((j.ctrl.len(), j.knots.len()), (c.ctrl.len(), c.knots.len()));
+            for i in 0..=10 {
+                let u = i as f64 / 10.0;
+                assert!((j.point(u) - c.point(u)).length() < 1e-12);
+            }
+            // Reversed pieces (a loop running against the curve) join into the reversed curve.
+            let j = r.reversed().joined(&l.reversed(), 1e-12).unwrap();
+            assert_eq!(j.ctrl.len(), c.ctrl.len());
+            assert!((j.point(j.domain().0 + 0.25) - c.point(0.75)).length() < 1e-12);
+        }
+        // Pieces of different curves meeting at a corner stay apart at the joint.
+        let a = Nurbs::new(2, vec![DVec2::ZERO, DVec2::new(1.0, 1.0), DVec2::new(2.0, 0.0)]);
+        let b = Nurbs::new(2, vec![DVec2::new(2.0, 0.0), DVec2::new(3.0, 1.0), DVec2::new(4.0, 0.0)]);
+        assert_eq!(a.joined(&b, 1e-12).unwrap().ctrl.len(), 5);
     }
 
     #[test]
