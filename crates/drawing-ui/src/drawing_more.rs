@@ -269,6 +269,8 @@ impl DrawingEditor {
                     self.commit("Foreshorten", d, cx);
                 }
                 self.tool = Tool::Select;
+                // (Live: nothing stays selected, drw-dimension-foreshorten.)
+                self.selection.clear();
             }
             Tool::GdtLeader { id } => {
                 let leader = noshape_scene::drawing_tools::annotation_edit::leader_to(&self.pk(), c);

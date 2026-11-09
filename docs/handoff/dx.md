@@ -38,6 +38,27 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 07:59 UTC: live's batch (2406), drawing selection by live's pixel reader, sheet metal STL
+
+- **Live's re-import (04:24):** the hose STL reads 8,218.0 mm³ as predicted. The hose x_t written periodic was a
+  step back: live's import dropped the four hoses ("imported with errors"), so the walls are split again (reverted;
+  ours reads back 22 faces a hose, live imports all 8 parts as at 2343). The o-ring x_t is unchanged in live (27/30/8,
+  the same split points) though our cones now take their cylinders' seam: live splits at (0, +r) and at ≈ −112.5°,
+  which is where some of our ring circles start, not our cones' seam any more. Starting rings at their cylinders'
+  seam made our own reader split one (27/27/2): left out. Open; a question for live with the next batch: what do its
+  own file's ring circles and faces have where ours differ.
+- **Sheet metal STL:** "2 parts of 3" is live's own reading too (the 36,045 mm³ part sits inside the filling part and
+  becomes its hollow, live.stl gives the same). What differs is Part 1's volume, 10,139.76 mm³ for live's 10,147.18
+  (model 10,148.5): no hole or fold in ours (manifold, the B-spline face within 0.018 mm), the bends' facets coarser
+  than live's; with SHEETMETAL-COPLANAR-WALLS' sliver faces in our model still to come (core). Left.
+- **Drawings:** `drawing.selection` as live's pixel reader (2402): a closed crop spline waiting for ✓ is EDGE of its
+  view (and the view not VIEW); a break being edited EDGE; a selected table, dimension or hatch inside a view's box
+  EDGE of that view when its lines and text there pass 60 pixels, with the Select tool and no panel or hatch dialog;
+  a placed BOM table and a placed foreshorten no longer stay selected (live draws neither orange). 1259 -> 1270/1409
+  states, 127 -> 128/176 scenarios (main's this morning: 1255, 124), no scenario worse. Left in selection: 59
+  states, many pixel-only (block-drawing's projected Top EDGE, its Right VIEW), a sketch circle left orange after
+  its tool's Escape (drw-*-existing-profile step 4), callouts' Group / Add stacked framing Front.
+
 ## 11-09 03:39 UTC: exchange "still mine" (lead 11-09): hose x_t, B-spline STL grid, o-ring x_t; drawings' EDGE
 
 - **Hose Parasolid:** a closed single-span B-spline wall whose seam knot won't come down (degree 6 / 12 round the

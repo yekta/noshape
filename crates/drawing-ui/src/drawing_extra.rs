@@ -1268,7 +1268,8 @@ impl DrawingEditor {
                 self.apply_hole_table_dlg(&mut table);
                 self.edit_sheet(name, cx, |s| s.tables.push(table));
                 self.tool = Tool::Select;
-                self.selection = vec![Sel::Table(id)];
+                // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table).
+                self.selection.clear();
             }
             Tool::Datum { anchor: None } => {
                 // On a GD&T frame edge or a dimension's lines (the red

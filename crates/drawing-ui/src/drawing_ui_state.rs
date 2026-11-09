@@ -315,6 +315,53 @@ impl DrawingEditor {
             Tool::BrokenOut { parent: Some(v), done: true, .. } => selection.push(("EDGE".into(), self.ui_view_name(*v))),
             _ => {}
         }
+        // A crop profile drawn and closed, waiting for ✓, is orange in its view, and the view under it no longer
+        // framed (drw-crop-spline, drw-crop-edit); a picked existing profile isn't (drw-crop-existing-profile).
+        if let Some((v, _)) = self.crop_dlg.as_ref().filter(|d| d.picked.is_none()).and_then(|d| d.pending.as_ref()) {
+            let name = self.ui_view_name(*v);
+            selection.retain(|(k, o)| !(k == "VIEW" && *o == name));
+            selection.push(("EDGE".into(), name));
+        }
+        // A break being edited (Edit... on its line: drw-break-edit; not while its menu is open).
+        if let Some((v, _)) = self.break_dlg.as_ref().and_then(|d| d.edit) {
+            selection.push(("EDGE".into(), self.ui_view_name(v)));
+        }
+        // Anything else drawn in selection colours inside a view's box (a selected table, dimension, hatch): live's
+        // reader counts its orange pixels there, more than 60 an EDGE of that view (2402: drw-bom-* EDGE Isometric
+        // under a selected BOM table). Only while nothing else is going on: a tool or a panel takes the highlight
+        // (drw-dimension-foreshorten, Edit hatch region in drw-hatch-edit; BOM table properties keeps it,
+        // drw-bom-table-properties); a centermark's thin lines don't count (drw-centermark-align).
+        if let Some(b) = self.built.as_ref().filter(|_| matches!(self.tool, Tool::Select) && self.panel.is_none() && self.hatch_dlg.is_none()) {
+            let thin = |id: u64| sheet.annotations.iter().any(|a| a.id == id && matches!(a.kind, AnnotationKind::Centermark { .. } | AnnotationKind::Centerline { .. } | AnnotationKind::CircleCenterline { .. }));
+            let lit = |pick: u32| {
+                let Some(p) = b.picks.get(pick as usize) else { return false };
+                self.selection.iter().any(|s| match (s, p) {
+                    (Sel::Table(a), PickTarget::Table(t)) | (Sel::Hatch(a), PickTarget::Hatch(t)) => a == t,
+                    (Sel::Annotation(a), PickTarget::Annotation(t)) => a == t && !thin(*a),
+                    (Sel::Sketch(a), PickTarget::SketchEntity(t)) => a == t,
+                    _ => false,
+                })
+            };
+            for v in &sheet.views {
+                let Some(pl) = self.placement(v.id) else { continue };
+                let inside = |p: [f64; 2]| p[0] >= pl.min[0] && p[0] <= pl.max[0] && p[1] >= pl.min[1] && p[1] <= pl.max[1];
+                let mut px = 0.0;
+                for l in b.geometry.lines.iter().filter(|l| lit(l.pick)) {
+                    for w in l.points.windows(2) {
+                        if inside([(w[0][0] + w[1][0]) / 2.0, (w[0][1] + w[1][1]) / 2.0]) {
+                            px += (w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1]) * self.zoom;
+                        }
+                    }
+                }
+                // (A text's ink: about one and a half times its height a character.)
+                for t in b.geometry.texts.iter().filter(|t| lit(t.pick) && inside(t.pos)) {
+                    px += t.text.chars().count() as f64 * t.height * self.zoom * 1.5;
+                }
+                if px > 60.0 {
+                    selection.push(("EDGE".into(), self.ui_view_name(v.id)));
+                }
+            }
+        }
         selection.sort();
         selection.dedup();
         let selection: Vec<Value> = selection.into_iter().map(|(k, o)| json!({ "kind": k, "owner": o })).collect();

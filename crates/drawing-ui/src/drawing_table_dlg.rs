@@ -447,11 +447,11 @@ impl DrawingEditor {
             return false;
         }
         let Some((t, name)) = self.table_dlg_table(self.cursor) else { return true };
-        let id = t.id;
         self.edit_sheet(name, cx, |s| s.tables.push(t));
         self.table_dlg = None;
         self.tool = Tool::Select;
-        self.selection = vec![Sel::Table(id)];
+        // Placed, not selected (live: a new BOM table isn't drawn orange, drw-bom-table).
+        self.selection.clear();
         cx.notify();
         true
     }
