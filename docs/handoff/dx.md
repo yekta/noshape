@@ -38,6 +38,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 13:36 UTC: c2-fan-blade-sweep at 28/53, next Extrude 8 (open)
+
+- Extrude 8: REMOVE, UP_TO_NEXT, Opposite direction, merge scope "base"; Sketch 9 = one Ø7.5 circle (+ a construction
+  Ø6.8 circle Used from Poti2's boss). After it ours has live's parts with live's counts and volumes ("base"
+  46/115/68, 87941.45 mm³ for live's 87941.18) plus one more: a Ø6.8 x 2 mm cylinder (3/2/0, 72.63 mm³) live hasn't.
+  So the cut leaves a piece live's removes: ours ends "up to next" at the first face any of the profile meets
+  (next_parts: every solid, op_prism_until); Parasolid's next is likely per profile point or the first face covering
+  the whole profile. To check: the piece's place against Poti2's boss and base's hole (NOSHAPE_PARITY_SAVE=<dir> keeps
+  the document; /tmp/fanq.sh on vibe5 rolls back to Extrude 8 and lists the parts), then a live capture of an
+  up-to-next cut whose profile only partly meets the first body if it stays unclear.
+- Tooling: NOSHAPE_PARITY_TRACE now also prints each sketch's plane and both frames (ours, live's).
+
 ## 11-09 13:25 UTC: drawings 1319/1406 states, 142/176 scenarios (b5, rebased on main with live2's re-records)
 
 - New matches: drw-inspection-item (re-recorded), drw-sheet-insert, drw-sheet-duplicate (runner rule) and three more;
