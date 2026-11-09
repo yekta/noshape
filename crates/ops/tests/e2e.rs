@@ -740,7 +740,7 @@ fn workspace_units_are_not_an_undo_step() {
 fn help_and_the_featurescript_library_read_offline() {
     let mut ctx = Ctx::new();
     let h = call(&mut ctx, "app_user_guide", json!({}));
-    assert!(h["guide"].as_str().is_some_and(|g| g.starts_with("# noshape help")), "{h}");
+    assert!(h["guide"].as_str().is_some_and(|g| g.starts_with("# Noshape help")), "{h}");
     // A dialog's ? opens one section: its heading and text, up to the next.
     let c = call(&mut ctx, "app_user_guide", json!({ "section": "Compare" }));
     let text = c["guide"].as_str().unwrap();
