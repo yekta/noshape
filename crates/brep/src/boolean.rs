@@ -3152,6 +3152,11 @@ impl Ctx<'_> {
     /// end) or only off the curve (a section's error: a crossing on it a few micrometres from its end is still a
     /// point of it).
     fn split_reach(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<Vec<u32>> {
+        Ok(self.split_params(s, sorted_x, te, at_ends)?.0)
+    }
+
+    /// [`Self::split_reach`]'s chain and its vertices' parameters on `s` (0 and 1 at its ends).
+    fn split_params(&self, s: &Seg, sorted_x: &[(f64, u32)], te: f64, at_ends: bool) -> R<(Vec<u32>, Vec<f64>)> {
         let tol = self.tol;
         let reach = |w: u32| self.pool.pair(te, self.pool.t[w as usize]);
         let end_reach = |w: u32| if at_ends { reach(w) } else { self.pool.pair(0.0, self.pool.t[w as usize]) };
@@ -3164,7 +3169,7 @@ impl Ctx<'_> {
             Geo::Arc { k, .. } => (k.c - DVec3::splat(k.r), k.c + DVec3::splat(k.r)),
             Geo::Ell { e, t0, sweep, .. } => e.piece_box(t0, sweep),
             Geo::Nurbs { id, t0, t1 } => free::piece_box(&self.ncurves[id as usize].c, t0, t1),
-            Geo::Apex { .. } => return Ok(vec![s.v[0], s.v[1]]),
+            Geo::Apex { .. } => return Ok((vec![s.v[0], s.v[1]], vec![0.0, 1.0])),
         };
         let (lo, hi) = (lo - DVec3::splat(tol_far), hi + DVec3::splat(tol_far));
         let start = sorted_x.partition_point(|x| x.0 < lo.x);
@@ -3239,16 +3244,26 @@ impl Ctx<'_> {
             }
         }
         let mut chain = vec![s.v[0]];
-        chain.extend(on.into_iter().map(|x| x.1));
+        chain.extend(on.iter().map(|x| x.1));
         chain.push(s.v[1]);
-        Ok(chain)
+        let mut ts = vec![0.0];
+        ts.extend(on.iter().map(|x| x.0));
+        ts.push(1.0);
+        Ok((chain, ts))
     }
 
     /// The pieces of `s` between the vertices of `chain` (its split points in order).
     fn pieces_of(&self, s: &Seg, chain: &[u32]) -> Vec<Seg> {
+        self.pieces_at(s, chain, None)
+    }
+
+    /// [`Self::pieces_of`] with the inner vertices' parameters on `s` where known (`ts`, as `split_params` gives
+    /// them), else found.
+    fn pieces_at(&self, s: &Seg, chain: &[u32], ts: Option<&[f64]>) -> Vec<Seg> {
         chain
             .windows(2)
-            .map(|w| {
+            .enumerate()
+            .map(|(i, w)| {
                 let g = match s.g {
                     Geo::Line => Geo::Line,
                     Geo::Apex { a0, a1 } => Geo::Apex { a0, a1 },
@@ -3258,6 +3273,8 @@ impl Ctx<'_> {
                                 0.0
                             } else if v == s.v[1] && end {
                                 1.0
+                            } else if let Some(ts) = ts {
+                                ts[i + usize::from(end)]
                             } else {
                                 self.seg_param(s, self.p(v)).0
                             }
@@ -3271,6 +3288,8 @@ impl Ctx<'_> {
                                 0.0
                             } else if v == s.v[1] && end {
                                 1.0
+                            } else if let Some(ts) = ts {
+                                ts[i + usize::from(end)]
                             } else {
                                 self.seg_param(s, self.p(v)).0
                             }
@@ -3284,6 +3303,8 @@ impl Ctx<'_> {
                                 0.0
                             } else if v == s.v[1] && end {
                                 1.0
+                            } else if let Some(ts) = ts {
+                                ts[i + usize::from(end)]
                             } else {
                                 self.seg_param(s, self.p(v)).0
                             }
@@ -5089,10 +5110,40 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
     if !cx.pool.regroup.lock().expect("the groups").is_empty() {
         return Err(Decline("vertices to merge first"));
     }
-    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| cx.split_reach(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false))?;
+    // (Each chain's parameters on its curve where split_params found it (not one turned from another period's):
+    // pieces_at then skips finding them again, a B-spline's point search each.)
+    let section_ts: Vec<std::sync::OnceLock<Vec<f64>>> = (0..cx.sections.len()).map(|_| std::sync::OnceLock::new()).collect();
+    let section_chains = by_period(cx.sections.len(), &|k| cx.sections[k].0, &|k| {
+        let (chain, ts) = cx.split_params(&cx.sections[k].0, &by_x, sec_acc(&cx.sections[k].0), false)?;
+        let _ = section_ts[k].set(ts);
+        Ok(chain)
+    })?;
     let own: Vec<usize> = (0..extra_segs.len()).filter(|&k| extra_of[k] == usize::MAX).collect();
-    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| cx.split_reach(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false))?.into_iter();
-    let extra_chains: Vec<R<Vec<u32>>> = (0..extra_segs.len()).map(|k| if extra_of[k] == usize::MAX { own_chains.next().expect("a curve's split points") } else { section_chains[extra_of[k]].clone() }).collect();
+    let own_ts: Vec<std::sync::OnceLock<Vec<f64>>> = (0..own.len()).map(|_| std::sync::OnceLock::new()).collect();
+    let mut own_chains = by_period(own.len(), &|i| extra_segs[own[i]].1, &|i| {
+        let (chain, ts) = cx.split_params(&extra_segs[own[i]].1, &by_x, sec_acc(&extra_segs[own[i]].1), false)?;
+        let _ = own_ts[i].set(ts);
+        Ok(chain)
+    })?
+    .into_iter()
+    .zip(own_ts);
+    // (Vertices to merge found splitting the curves: done again from the start before the pieces are classified
+    // (cf-surface-pattern's 85 tools: two rounds of 0.85 s each, 240 and 18 groups).)
+    if !cx.pool.regroup.lock().expect("the groups").is_empty() {
+        return Err(Decline("vertices to merge first"));
+    }
+    // (A curve's split points, and their parameters on it where known.)
+    type Chain = (R<Vec<u32>>, Option<Vec<f64>>);
+    let extra_chains: Vec<Chain> = (0..extra_segs.len())
+        .map(|k| {
+            if extra_of[k] == usize::MAX {
+                let (c, ts) = own_chains.next().expect("a curve's split points");
+                (c, ts.into_inner())
+            } else {
+                (section_chains[extra_of[k]].clone(), section_ts[extra_of[k]].get().cloned())
+            }
+        })
+        .collect();
     // (A piece from a vertex back to it, all of it within that vertex's tolerance (80 um of a section at a Shell
     // slab's vertex of 0.32 mm): none, as OCCT's micro edge.)
     let micro = |piece: &Seg| {
@@ -5100,20 +5151,20 @@ fn boolean_in(op: Op, args: &[&Body], tol: f64, touching_only: bool, src: Option
         w == piece.v[1] && [0.0, 0.25, 0.5, 0.75, 1.0].iter().all(|&t| (cx.seg_at(piece, t) - cx.p(w)).length() <= tol.max(cx.pool.t[w as usize]))
     };
     let mut face_extra: Vec<Vec<usize>> = vec![Vec::new(); cx.faces.len()];
-    for ((&(f, s), chain), &te) in extra_segs.iter().zip(extra_chains).zip(&extra_te) {
+    for ((&(f, s), (chain, ts)), &te) in extra_segs.iter().zip(extra_chains).zip(&extra_te) {
         crate::check_cancel()?;
         let chain = chain?;
-        for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
+        for piece in cx.pieces_at(&s, &chain, ts.as_deref()).into_iter().filter(|x| !micro(x)) {
             face_extra[f].push(get_sedge(&cx, &mut sedges, piece, te.0, te.1).0);
         }
     }
     // The faces each section edge was made by (OCCT: they generated it).
     let mut section_faces: Vec<(usize, usize)> = Vec::new();
-    for (k, chain) in section_chains.into_iter().enumerate() {
+    for (k, (chain, ts)) in section_chains.into_iter().zip(section_ts).enumerate() {
         let (s, fs, ft) = cx.sections[k];
         crate::check_cancel()?;
         let chain = chain?;
-        for piece in cx.pieces_of(&s, &chain).into_iter().filter(|x| !micro(x)) {
+        for piece in cx.pieces_at(&s, &chain, ts.into_inner().as_deref()).into_iter().filter(|x| !micro(x)) {
             let (si, _) = get_sedge(&cx, &mut sedges, piece, 0.0, None);
             section_faces.push((si, fs));
             section_faces.push((si, ft));

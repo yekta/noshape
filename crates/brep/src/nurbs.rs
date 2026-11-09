@@ -18,9 +18,9 @@ pub struct NurbsCurve {
 
 /// A NURBS curve's non-empty knot spans as Bézier pieces of its homogeneous form (w x, w y, w z, w): (start, end,
 /// control points). Evaluated by de Casteljau's algorithm instead of the basis functions each time. Then their
-/// control points' boxes.
+/// control points' boxes, then `param_of`'s samples as runs on one span each (span, first, past the last).
 #[derive(Debug, Default)]
-pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>);
+pub struct Spans(OnceLock<Vec<(f64, f64, Vec<DVec4>)>>, OnceLock<Vec<(DVec3, DVec3)>>, OnceLock<Vec<(usize, usize, usize)>>);
 
 impl Clone for Spans {
     /// (Empty: a copy's poles may be changed, scaled.)
@@ -510,19 +510,29 @@ impl NurbsCurve {
                 look(k, &mut best);
             }
         } else {
-            let mut runs: Vec<(f64, usize, usize)> = Vec::new();
-            let (mut from, mut span) = (0, self.span_of(t0));
-            for k in 1..=n + 1 {
-                let next = if k <= n { self.span_of(t0 + (t1 - t0) * k as f64 / n as f64) } else { usize::MAX };
-                if next != span {
+            // (The samples' spans found once a curve: a section refitted through 129 points has 2049 samples.)
+            let on_spans = self.spans.2.get_or_init(|| {
+                let mut out = Vec::new();
+                let (mut from, mut span) = (0, self.span_of(t0));
+                for k in 1..=n + 1 {
+                    let next = if k <= n { self.span_of(t0 + (t1 - t0) * k as f64 / n as f64) } else { usize::MAX };
+                    if next != span {
+                        out.push((span, from, k));
+                        from = k;
+                        span = next;
+                    }
+                }
+                out
+            });
+            let mut runs: Vec<(f64, usize, usize)> = on_spans
+                .iter()
+                .map(|&(span, from, k)| {
                     let (lo, hi) = boxes[span];
                     let scale = lo.abs().max(hi.abs()).max(p.abs()).max_element();
                     let away = ((lo - p).max(p - hi).max(DVec3::ZERO).length() - 1e-12 * scale).max(0.0);
-                    runs.push((away * away, from, k));
-                    from = k;
-                    span = next;
-                }
-            }
+                    (away * away, from, k)
+                })
+                .collect();
             runs.sort_by(|a, b| a.0.total_cmp(&b.0));
             for (away, k0, k1) in runs {
                 if away > best.1 {
