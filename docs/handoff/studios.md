@@ -40,6 +40,12 @@ prefs-units-learn-more, docs-account-preferences. New targets: `nav:<item>` in P
 CAD or image file, Join adjacent surfaces and Update… (all need a file-pick step in both runners), the print toast, the
 quick switcher's hover/mouse-up, shortcuts with focus on the top bar. docs/doc/prefs suite: 172/181, 709/725 states, no
 scenario worse.
+Then (23:00): a row's Versions and history opens the document on its Versions and history panel (live lands on
+/documents/<id>/versionsAndHistory; the strip's icon keeps the page's panel; hook `open_document_history`), and Select as
+document thumbnail toasts "Document thumbnail set to <tab>" (doc-tab-menu-thumbnail matches). Live-side, asked (REQUESTS
+23:02): doc-units-angle-radian (stale start), docs-doc-menu-versions-and-history and doc-tab-menu-copy-paste (read too
+early), doc-menu-close-document (the reader after leaving the document); with live2 since 09:06: doc-quick-switch(-once),
+doc-nested-crumb-menu, doc-plus-menu.
 
 ### 2026-11-08 20:57 UTC: PAUSED (lead: quota). Restart from here on Monday
 **Landed / landing today:** Print setup (Part Studio, Assembly), the Merge notice's Revert link (shared notice
