@@ -4,6 +4,15 @@
 - core works on TICKETS SUITE-HEX-BOOKCASE-TEXT (c2-hex-bookcase-derived's "text indent", 13 features lost) first,
   then SUITE-LOUVER-SKETCH-9 (c2-sm-louver's Sketch 9, 5 lost), then any other skasm ticket the suite shows. What
   changes is written here.
+- 14:33: hex bookcase "text indent" (AllertaStencil "0.2", 10 regions, REMOVE): ours 43/111/70 for live 31/87/58.
+  Every one of live's small glyph walls is one of ours plus a tiny piece where the wall meets the part's face
+  (0.737 = 0.732 + 0.0054, 0.795 = 0.779 + 0.0155 mm², at y 66 / 70 / 81 / 85 / 104-114): 12 tiny faces. The same with
+  OCCT's Boolean and ours, with or without unify: the glyph prisms (the cut's tools, dump vibe5 ~/core-cases/dumphb/
+  boolean-0) already have the thin faces (0.016 / 0.021 mm² over the prisms' length: ~µm wide). The font's outline
+  has no such piece (layout_text: one 2e-3 box-unit segment, live has it too, behaviours "skasm (2229)": one curve
+  per TrueType segment, no merging). So the µm pieces come from the sketch regions / profile faces (stencil pieces
+  touching?). Next: list the text sketch's region loops and the profile edges per glyph (probe:
+  /root/core-scratch/imp/features-with-hb-probe.rs `probe_boolean_faces`).
 
 ## From psui (2026-11-09 10:12 UTC, lead: sketch-* is psui's while skasm is paused)
 - Part Studio and sketch ui-parity (574 recorded, all prefixes but drw / asm / doc / docs / ver / vs / fs / prefs):
