@@ -78,6 +78,23 @@ but its box reaches z 6.21 mm (live 0): the inlet's offset wall (the one run on 
   (96), boolmatrix, cli-shell-gpf identical to main's (CLIs main1109 / quad1109); kernel tests 349/349; model suite
   75/87, 764/951 (impeller's loft matching is main's since the base, not this); cf-snap-hook 1692 -> 1316 ms, c2-bottle-
   split 156 -> 68 ms in the suite.
+- **sp-cut's tool 18, correctness (11-09 09:20 UTC; landing with this note):** pieces of the part's face 0 straddled
+  tool 18 because OCCT's section of the pair (B-spline face / sphere) is 0.26 off in places and the refit through 129
+  points (refined_section) wandered 3 mm between them, kept because that was under half of OCCT's tolerance. Now the
+  refit is refined where it strays (the middle of two points brought onto both faces, refit, up to five rounds, to
+  1e-7): the section on both faces at every sample. Gate: corpora + parity56 the same (taken, declines), knurl / gear
+  the same outcomes, shfall its 2, kernel tests 350/350; model suite 75/87, 764/951, and c2-impeller-loft's Shell
+  Gehäuse now builds (45,279.19 mm3, live 45,272.92; was "Could not shell part"); cf-surface-pattern's numbers move in
+  the 7th digit. **cf-surface-pattern's 10 parts against live's 6 are upstream:** our pattern's tools remove ~90,000
+  mm3 of the 126,856 mm3 part where live's remove ~18,700 (bool.md 11-08: the spheres differ, core's area).
+- **Grouped states, second try (patch /root/bool-scratch/wip/state-groups-1109-v2-debug.patch, debug prints in it):**
+  with the sections refined, the remaining leaks go through "dangling" pieces: tool 16's face has two sections (with
+  tools 6 and 11) between the same two vertices 38 um apart, 1-11 um apart from each other (inside the Boolean's tol
+  of 1e-5: a sliver in the grey band), never made a piece, both left as slits in one piece that then spans tool 11.
+  With dangling pieces kept out of groups, sp-cut's result is the same as without grouping and its Boolean 3.75 ->
+  3.2 s (vibe3); but the knurl (k25-25 8.66 / 8.79 s) and gears (639 / 643 ms) gain nothing (their classification
+  already goes by symmetry). Not landed: 15 % of one case for the risk. The grey-band sliver itself (two sections
+  within tol between the same vertices: one edge, as an OCCT common block?) is a separate question.
 - **Tried, not kept: states shared within groups** (/root/bool-scratch/wip/state-groups-1109.patch): pieces of one
   solid meeting across a curve no face of solid t has share their state against t (one piece's rays per group;
   coincident faces' solids counted, pieces on t's faces, sheets and turned periods apart). In sp-cut 1069 pieces'
