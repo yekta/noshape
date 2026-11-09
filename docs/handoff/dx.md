@@ -38,6 +38,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 13:25 UTC: drawings 1319/1406 states, 142/176 scenarios (b5, rebased on main with live2's re-records)
+
+- New matches: drw-inspection-item (re-recorded), drw-sheet-insert, drw-sheet-duplicate (runner rule) and three more;
+  nothing worse (the export scenarios' totals shrank in their new recordings, still all matching). Left open:
+  drw-sheet-delete step 6, "menu:Delete is not shown" after a right-click on the new sheet's row straight after
+  Duplicate (drw-sheet-move-up clicks the row first and passes): the runner probably finds the row where it was
+  before the panel re-laid out. Next: c2-fan-blade-sweep's Extrude 8 (a part too many).
+
 ## 11-09 13:19 UTC: live2 2416 / 2417 answered; runner rule for added sheets
 
 - 2416: on Sheet1 and on an added sheet alike a click on the title block selects one note or line (handles): the 94
