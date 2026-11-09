@@ -99,6 +99,10 @@ fn run(ctx: &mut Option<Ctx>, path: &Path, dm: &mut DocModel, tool: &str, args: 
     // Preferences an agent changed apply to every window, as the dialogs' do.
     if std::mem::take(&mut ctx.reload_prefs) {
         crate::graphics_prefs::init(cx);
+        let dark = noshape_ops::prefs::dark_mode();
+        if dark != noshape_scene::palette::is_dark() {
+            noshape_preferences_ui::prefs_general::apply_theme(dark, cx);
+        }
     }
     r
 }

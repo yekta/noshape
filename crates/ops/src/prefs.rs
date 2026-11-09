@@ -22,6 +22,29 @@ pub fn save_graphics(prefs: &GraphicsPrefs) {
     }
 }
 
+/// Preferences › Theming's dark mode (the account menu's View in dark mode beta), in the Preferences page's file
+/// (preferences-ui `ListPrefs`, its other settings kept).
+pub fn dark_mode() -> bool {
+    general_prefs().get("darkMode").and_then(Value::as_bool).unwrap_or(false)
+}
+
+/// Save dark mode on or off.
+pub fn set_dark_mode(dark: bool) {
+    let mut m = general_prefs();
+    m.insert("darkMode".into(), json!(dark));
+    if let Ok(t) = serde_json::to_string_pretty(&m) {
+        let _ = std::fs::write(general_path(), t);
+    }
+}
+
+fn general_path() -> std::path::PathBuf {
+    noshape_scene::config_dir().join("preferences.json")
+}
+
+fn general_prefs() -> Map<String, Value> {
+    std::fs::read(general_path()).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default()
+}
+
 /// The Graphics preferences dialog's number fields and their ranges
 /// (crates/app-core/src/graphics_prefs_dialog.rs rows).
 const NUMBERS: [(&str, f64, f64); 9] = [

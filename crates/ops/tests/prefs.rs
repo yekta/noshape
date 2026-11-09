@@ -29,6 +29,14 @@ fn graphics_preferences_toolbar_and_shortcuts_read_set_and_kept() {
     assert_eq!(e.param.as_deref(), Some("graphics.fov_deg"), "{e:?}");
     let e = call(&mut ctx, "ui_preferences", json!({ "graphics": { "nope": 1 } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("graphics.nope"), "{e:?}");
+    // Dark mode (the account menu's View in dark mode beta), kept beside the Preferences page's other settings.
+    std::fs::write(dir.join("preferences.json"), r#"{"language":"de"}"#).unwrap();
+    assert_eq!(call(&mut ctx, "ui_preferences", json!({})).unwrap()["dark_mode"], false);
+    assert_eq!(call(&mut ctx, "ui_preferences", json!({ "dark_mode": true })).unwrap()["dark_mode"], true);
+    let kept: Value = serde_json::from_slice(&std::fs::read(dir.join("preferences.json")).unwrap()).unwrap();
+    assert_eq!(kept, json!({ "language": "de", "darkMode": true }));
+    let e = call(&mut ctx, "ui_preferences", json!({ "dark_mode": "yes" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("dark_mode"), "{e:?}");
 
     // The toolbar: Customize toolbar… and the S shortcut toolbar.
     let t = call(&mut ctx, "ui_toolbar", json!({})).unwrap();

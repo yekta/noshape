@@ -5630,9 +5630,9 @@ Examples:
 
 #### ui_preferences
 
-Graphics preferences (the camera menu's Graphics preferences…).
+Graphics preferences (the camera menu's Graphics preferences…) and dark mode.
 
-The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors "#rrggbb", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once.
+The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors "#rrggbb", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open.
 
 Examples:
 
@@ -5644,6 +5644,7 @@ Examples:
 | field | type | | description |
 |---|---|---|---|
 | `graphics` | object |  | Preferences to change, by name (see the reply). |
+| `dark_mode` | boolean |  | Dark mode on (true) or off (false). |
 
 #### ui_toolbar
 

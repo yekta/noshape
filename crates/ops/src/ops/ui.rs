@@ -34,9 +34,12 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "ui",
             verb: "preferences",
-            summary: "Graphics preferences (the camera menu's Graphics preferences…)",
-            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once.",
-            fields: vec![opt("graphics", json!({ "type": "object" }), "Preferences to change, by name (see the reply).")],
+            summary: "Graphics preferences (the camera menu's Graphics preferences…) and dark mode",
+            description: "The user's Graphics preferences: `graphics` without fields replies with them (ambient_occlusion 0–1, fov_deg 20–120, line widths in px 0.1–3, shininess 0.01–1, colors \"#rrggbb\", construction [dash, gap, dash, gap] px); with fields, those change and are saved (per user, for every document), as the dialog's ✓ does. render_image draws with them; with the app open (live mode) every window applies them at once. `dark_mode` turns dark mode on or off (Preferences › Theming, the account menu's View in dark mode beta), saved and applied at once with the app open.",
+            fields: vec![
+                opt("graphics", json!({ "type": "object" }), "Preferences to change, by name (see the reply)."),
+                opt("dark_mode", json!({ "type": "boolean" }), "Dark mode on (true) or off (false)."),
+            ],
             mutates: false,
             destructive: false,
             run: preferences,
@@ -220,7 +223,11 @@ fn preferences(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
         crate::prefs::save_graphics(&prefs);
         ctx.reload_prefs = true;
     }
-    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "shown_in_app": ctx.serving }).into())
+    if a.get("dark_mode").is_some() {
+        crate::prefs::set_dark_mode(a.bool_or("dark_mode", false)?);
+        ctx.reload_prefs = true;
+    }
+    Ok(json!({ "graphics": crate::prefs::graphics_json(&prefs), "dark_mode": crate::prefs::dark_mode(), "shown_in_app": ctx.serving }).into())
 }
 
 fn toolbar(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
