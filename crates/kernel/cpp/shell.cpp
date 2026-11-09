@@ -151,6 +151,7 @@
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <ShapeFix_Edge.hxx>
+#include <GCPnts_AbscissaPoint.hxx>
 #include <GeomAPI_IntSS.hxx>
 #include <OSD_Parallel.hxx>
 #include <TopAbs.hxx>
@@ -3329,11 +3330,21 @@ bool solve_line(const Surf& s, const gp_XYZ& o, const gp_XYZ& d, gp_XYZ& x, doub
 } // namespace quad
 
 namespace quad {
-// Box-overlapping pairs of a shape's sub-shapes, less those whose two shapes are both in `old`.
+// An edge and a face (their TShapes).
+using EdgeFace = std::set<std::pair<const void*, const void*>>;
+
+// Box-overlapping pairs of a shape's sub-shapes, less those whose two shapes are both in `old`, and the edge / face
+// pairs of `by_distance` found clearly apart (past `apart`, by their distance): an edge of a kept face against that
+// face's own offset, the wall away all along it (c2-impeller-loft's Shell Gehäuse: a 120 mm edge 3 mm from the inner
+// wall its whole length took OCCT's edge / face intersection 3.7 s to find nothing, the distance 50 ms; other pairs'
+// distances cost more than their intersections, c2-rings-loft's 253 B-spline edges against offset faces).
 class NewPairsIteratorSI : public BOPDS_IteratorSI
 {
 public:
-  NewPairsIteratorSI(const occ::handle<NCollection_BaseAllocator>& a, const ShapeIMap& old) : BOPDS_IteratorSI(a), old_(old) {}
+  NewPairsIteratorSI(const occ::handle<NCollection_BaseAllocator>& a, const ShapeIMap& old, double apart, const EdgeFace& by_distance)
+      : BOPDS_IteratorSI(a), old_(old), apart_(apart), by_distance_(by_distance)
+  {
+  }
 
 protected:
   void Intersect(const occ::handle<IntTools_Context>& ctx, const bool obb, const double fuzzy) override
@@ -3354,17 +3365,80 @@ protected:
       }
       myLists(k) = std::move(kept);
     }
+    // (Each edge / face pair's distance on all threads; a pair kept unless it was found clearly apart.)
+    struct EF
+    {
+      int  list, at;
+      bool apart = false;
+    };
+    std::vector<EF> efs;
+    for (int k = 0; k < myLists.Length(); ++k)
+      for (int i = 0; i < myLists(k).Length(); ++i)
+      {
+        int n1, n2;
+        myLists(k)(i).Indices(n1, n2);
+        const TopAbs_ShapeEnum t1 = myDS->ShapeInfo(n1).ShapeType(), t2 = myDS->ShapeInfo(n2).ShapeType();
+        if (!((t1 == TopAbs_EDGE && t2 == TopAbs_FACE) || (t1 == TopAbs_FACE && t2 == TopAbs_EDGE)))
+          continue;
+        const TopoDS_Shape& e = t1 == TopAbs_EDGE ? myDS->Shape(n1) : myDS->Shape(n2);
+        const TopoDS_Shape& f = t1 == TopAbs_EDGE ? myDS->Shape(n2) : myDS->Shape(n1);
+        if (by_distance_.count({e.TShape().get(), f.TShape().get()}) != 0)
+          efs.push_back({k, i});
+      }
+    if (efs.empty() || !(apart_ > 0))
+      return;
+    OSD_Parallel::For(0, static_cast<int>(efs.size()), [&](int j) {
+      if (noshape_should_break() != 0)
+        return;
+      int n1, n2;
+      myLists(efs[(size_t)j].list)(efs[(size_t)j].at).Indices(n1, n2);
+      const TopoDS_Shape& a = myDS->Shape(n1);
+      const TopoDS_Shape& b = myDS->Shape(n2);
+      const TopoDS_Shape& e = a.ShapeType() == TopAbs_EDGE ? a : b;
+      const TopoDS_Shape& f = a.ShapeType() == TopAbs_EDGE ? b : a;
+      if (BRep_Tool::Degenerated(TopoDS::Edge(e)))
+        return;
+      // (Touching at a vertex: never apart; its distance, nothing, can take long to find.)
+      for (TopExp_Explorer v(e, TopAbs_VERTEX); v.More(); v.Next())
+        for (TopExp_Explorer w(f, TopAbs_VERTEX); w.More(); w.Next())
+          if (v.Current().IsSame(w.Current()))
+            return;
+      try
+      {
+        BRepExtrema_DistShapeShape d(a, b);
+        efs[(size_t)j].apart = d.IsDone() && d.NbSolution() > 0 && d.Value() > apart_;
+      }
+      catch (const Standard_Failure&)
+      {
+        efs[(size_t)j].apart = false;
+      }
+    });
+    std::vector<std::vector<char>> drop((size_t)myLists.Length());
+    for (int k = 0; k < myLists.Length(); ++k)
+      drop[(size_t)k].assign((size_t)myLists(k).Length(), 0);
+    for (const EF& x : efs)
+      drop[(size_t)x.list][(size_t)x.at] = x.apart;
+    for (int k = 0; k < myLists.Length(); ++k)
+    {
+      NCollection_DynamicArray<BOPDS_Pair> kept;
+      for (int i = 0; i < myLists(k).Length(); ++i)
+        if (!drop[(size_t)k][(size_t)i])
+          kept.Append(myLists(k)(i));
+      myLists(k) = std::move(kept);
+    }
   }
 
 private:
   const ShapeIMap& old_;
+  double           apart_;
+  const EdgeFace&  by_distance_;
 };
 
 // OCCT's self-interference check of a shape, over the pairs where a shape not in `old` takes part.
 class NewPairsCheckerSI : public BOPAlgo_CheckerSI
 {
 public:
-  explicit NewPairsCheckerSI(const ShapeIMap& old) : old_(old) {}
+  NewPairsCheckerSI(const ShapeIMap& old, double apart, const EdgeFace& by_distance) : old_(old), apart_(apart), by_distance_(by_distance) {}
 
 protected:
   void Init(const Message_ProgressRange&) override
@@ -3374,7 +3448,7 @@ protected:
     myDS->SetArguments(myArguments);
     myDS->Init(myFuzzyValue);
     myContext   = new IntTools_Context;
-    auto* it    = new NewPairsIteratorSI(myAllocator, old_);
+    auto* it    = new NewPairsIteratorSI(myAllocator, old_, apart_, by_distance_);
     it->SetDS(myDS);
     it->Prepare(myContext, myUseOBB, myFuzzyValue);
     it->UpdateByLevelOfCheck(myLevelOfCheck);
@@ -3383,6 +3457,8 @@ protected:
 
 private:
   const ShapeIMap& old_;
+  double           apart_;
+  const EdgeFace&  by_distance_;
 };
 
 // Edge `ne`'s curve on face `nf` (an offset of `of`, its surface the offset of `of`'s in the same frame): projected,
@@ -7250,7 +7326,21 @@ bool by_quadrics_with(const TopoDS_Shape& solid, const std::vector<TopoDS_Shape>
     // vertices 0.1 mm apart, one 0.1 mm loose), and checking them took Shell 4 0.5 s.
     ShapeIMap in;
     TopExp::MapShapes(so, in);
-    quad::NewPairsCheckerSI        checker(in);
+    // (A kept face's long edges (past 20 walls) against its own offset, measured: farther apart than a tenth of the
+    // wall, no crossing. A short edge's intersection is quicker than its distance.)
+    quad::EdgeFace own_offset;
+    for (TopExp_Explorer xf(wall, TopAbs_FACE); xf.More(); xf.Next())
+      if (const Source* src = sources.Seek(xf.Current()); src != nullptr && !src->face.IsNull())
+        for (TopExp_Explorer xe(src->face, TopAbs_EDGE); xe.More(); xe.Next())
+        {
+          const TopoDS_Edge& E = TopoDS::Edge(xe.Current());
+          if (BRep_Tool::Degenerated(E))
+            continue;
+          BRepAdaptor_Curve c(E);
+          if (GCPnts_AbscissaPoint::Length(c) > 20 * thickness)
+            own_offset.insert({E.TShape().get(), xf.Current().TShape().get()});
+        }
+    quad::NewPairsCheckerSI checker(in, 0.1 * thickness, own_offset);
     NCollection_List<TopoDS_Shape> args;
     args.Append(wall);
     checker.SetArguments(args);
