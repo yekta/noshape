@@ -1,19 +1,19 @@
 {
  "scenario": "asm-menu-switch-to-part-studio",
- "recorded": "2026-11-07T01:46:59.899Z",
+ "recorded": "2026-11-09T12:11:47.984Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-06.5 ef66d403 + live2 2026-11-07.2"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "a1e7207bcd206771836609af",
-  "workspace": "6d6324b30f07aa9904363635",
-  "element": "9452246ce6753e6807509107",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "f76a4bb25ee4478ae8587fd6",
   "start": "two-blocks",
-  "startElement": "593cbc316fd295523e79fef3",
-  "runner": "live2 .nstate-uip-1.json"
+  "startElement": "fbd9c2146a18cf5cba6d5b3a",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -21,6 +21,7 @@
   },
   "dialog": null,
   "dialogs": [],
+  "panels": null,
   "list": null,
   "selection": {
    "count": 0,
@@ -155,6 +156,7 @@
     },
     "dialog": null,
     "dialogs": [],
+    "panels": null,
     "list": {
      "kind": "context-menu",
      "rows": [
@@ -302,7 +304,7 @@
     },
     "drawing": null
    },
-   "t": 33127
+   "t": 36539
   },
   {
    "step": 2,
@@ -312,65 +314,43 @@
      "menu": "Switch to Part Studio 1"
     }
    },
-   "ok": false,
-   "error": "target not found: {\"menu\":\"Switch to Part Studio 1\"}",
+   "ok": true,
+   "at": [
+    225,
+    609
+   ],
    "state": {
     "focus": {
      "kind": "none"
     },
     "dialog": null,
     "dialogs": [],
-    "list": {
-     "kind": "context-menu",
-     "rows": [
-      "Properties…",
-      "Instance properties…",
-      "Hide",
-      "Hide other instances",
-      "Hide all instances",
-      "Show center of mass",
-      "Isolate…",
-      "Make transparent…",
-      "Suppress",
-      "Dynamic suppression",
-      "Fix",
-      "Use best available tessellation",
-      "Edit in context",
-      "Add mate connector to instance origin…",
-      "Replace instances…",
-      "Switch to start two-blocks",
-      "Copy Part 2 <1>",
-      "Move to new subassembly",
-      "Change to version…",
-      "Export…",
-      "Release…",
-      "Add comment",
-      "Zoom to selection",
-      "Create Drawing of Part 2…",
-      "Add selection to folder…",
-      "Create empty subassembly",
-      "Delete"
-     ],
-     "highlighted": null,
-     "disabled": []
-    },
+    "panels": null,
+    "list": null,
     "selection": {
-     "count": 0,
-     "items": []
+     "count": 1,
+     "items": [
+      {
+       "kind": null,
+       "owner": "Part 2",
+       "id": "JKD",
+       "name": "Part 2"
+      }
+     ]
     },
     "features": {
      "rows": [
       {
-       "name": "start two-blocks asm",
+       "name": "Sketch 1",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Origin",
+       "name": "Extrude 1",
        "state": "ok",
        "selected": false,
        "editing": false,
@@ -379,36 +359,31 @@
        "cls": ""
       },
       {
-       "name": "Part 1 <1>",
+       "name": "Sketch 2",
        "state": "ok",
        "selected": false,
        "editing": false,
        "related": false,
-       "hidden": false,
-       "cls": "is-instance"
+       "hidden": true,
+       "cls": "ns-list-item-hidden"
       },
       {
-       "name": "Part 2 <1>",
+       "name": "Extrude 2",
        "state": "ok",
        "selected": false,
        "editing": false,
-       "related": false,
+       "related": true,
        "hidden": false,
-       "cls": "is-instance  fake-hover context-menu-active"
-      },
-      {
-       "name": "Mate features (0)",
-       "state": "ok",
-       "selected": false,
-       "editing": false,
-       "related": false,
-       "hidden": false,
-       "cls": "is-folder"
+       "cls": "related-highlight"
       }
      ],
-     "rollbackAfter": null
+     "rollbackAfter": "Extrude 2"
     },
-    "parts": [],
+    "parts": [
+     "Part 1",
+     "Part 2"
+    ],
+    "partsHeading": "Parts (2)",
     "undo": {
      "undo": false,
      "redo": false
@@ -467,7 +442,7 @@
     },
     "drawing": null
    },
-   "t": 35383
+   "t": 45701
   }
  ]
 }

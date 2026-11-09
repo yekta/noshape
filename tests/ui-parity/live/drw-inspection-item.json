@@ -1,19 +1,19 @@
 {
  "scenario": "drw-inspection-item",
- "recorded": "2026-11-07T11:58:02.244Z",
+ "recorded": "2026-11-09T12:15:38.433Z",
  "app": {
   "name": "live",
   "version": "web runtime ca5abdc1f92d5fa41125",
   "platform": "linux (Chrome over CDP, software GL)",
-  "recorder": "2026-11-07.6 ade395e0 + live2 2026-11-07.5"
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
  },
  "live": {
-  "document": "b53c968665192de2f2abd604",
-  "workspace": "7b0b6595e901fbd641dd1a39",
-  "element": "a02688868d4c4f7082a4bf35",
+  "document": "5337f675c06cff98a9e89387",
+  "workspace": "43a8565f5c2f4c8c1459dc4f",
+  "element": "fea1b55dd78b69d78a6deb38",
   "start": "block-drawing",
-  "startElement": "7fc07371758a5353920f612d",
-  "runner": "live2 .nstate-uip-2.json"
+  "startElement": "392bca590892e6ffb484a34b",
+  "runner": "live2 .nstate-uip-3.json"
  },
  "start": {
   "focus": {
@@ -41,7 +41,7 @@
   "tooltip": null,
   "sketch": null,
   "drawing": {
-   "tab": "Part 1 Drawing 1",
+   "tab": "Part 1 Drawing 1 (1)",
    "sheet": "Sheet1",
    "sheets": [
     "Sheet1"
@@ -121,7 +121,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -161,7 +161,7 @@
      "selection": []
     }
    },
-   "t": 219258
+   "t": 238917
   },
   {
    "step": 2,
@@ -209,7 +209,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -249,7 +249,7 @@
      "selection": []
     }
    },
-   "t": 234150
+   "t": 266630
   },
   {
    "step": 3,
@@ -297,7 +297,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -342,7 +342,7 @@
      "selection": []
     }
    },
-   "t": 249615
+   "t": 294962
   },
   {
    "step": 4,
@@ -351,6 +351,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -377,7 +385,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -422,7 +430,7 @@
      "selection": []
     }
    },
-   "t": 265514
+   "t": 323653
   },
   {
    "step": 5,
@@ -490,7 +498,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -535,7 +543,7 @@
      "selection": []
     }
    },
-   "t": 279630
+   "t": 352241
   },
   {
    "step": 6,
@@ -598,7 +606,7 @@
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -643,7 +651,7 @@
      "selection": []
     }
    },
-   "t": 294943
+   "t": 380626
   },
   {
    "step": 7,
@@ -663,7 +671,34 @@
      "kind": "other",
      "tag": "iframe"
     },
-    "dialog": null,
+    "dialog": {
+     "kind": "drawing-panel",
+     "title": "Inspection item",
+     "text": [
+      "Inspection item",
+      "Manual",
+      "Automatic",
+      "Number:",
+      "2",
+      "Circle",
+      "Circle (Drawing)",
+      "Diamond",
+      "Double Circle",
+      "Flag",
+      "Hexagon",
+      "Octagon",
+      "Rectangle",
+      "Square Circle",
+      "Triangle",
+      "Tight Fit",
+      "1 Character",
+      "2 Characters",
+      "2 Characters (Drawing)",
+      "3 Characters",
+      "4 Characters",
+      "5 Characters"
+     ]
+    },
     "dialogs": [],
     "panels": null,
     "list": null,
@@ -680,11 +715,11 @@
      "undo": false,
      "redo": false
     },
-    "message": "Error saving change. Your document is saved. Refresh the browser to continue. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
@@ -724,12 +759,16 @@
       {
        "kind": "dimension",
        "text": "1.575"
+      },
+      {
+       "kind": "inspectionsymbol",
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 309582
+   "t": 422985
   },
   {
    "step": 8,
@@ -738,6 +777,14 @@
     "key": "Escape"
    },
    "ok": true,
+   "pointer": {
+    "at": [
+     830,
+     33
+    ],
+    "hover": [],
+    "element": "div.navbar-document-and-workspace-names.os-row"
+   },
    "state": {
     "focus": {
      "kind": "other",
@@ -760,16 +807,16 @@
      "undo": false,
      "redo": false
     },
-    "message": "Error saving change. Your document is saved. Refresh the browser to continue. × Close",
+    "message": null,
     "tooltip": null,
     "sketch": null,
     "drawing": {
-     "tab": "Part 1 Drawing 1",
+     "tab": "Part 1 Drawing 1 (1)",
      "sheet": "Sheet1",
      "sheets": [
       "Sheet1"
      ],
-     "tool": "Inspection item",
+     "tool": null,
      "views": [
       {
        "name": "Front",
@@ -804,12 +851,16 @@
       {
        "kind": "dimension",
        "text": "1.575"
+      },
+      {
+       "kind": "inspectionsymbol",
+       "text": "1"
       }
      ],
      "selection": []
     }
    },
-   "t": 325236
+   "t": 450954
   }
  ]
 }
