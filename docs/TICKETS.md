@@ -876,6 +876,18 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
     c2-rings-loft 10.3 → 19.6 s, c2-sm-corner-break 5.2 → 9.2, cf-drive-train-generator 5.9 → 10.3, c2-sm-louver 8.2 → 13.0,
     cf-fill-pattern 8.2 → 13.1, cf-surface-pattern 24.2 → 33.4, c2-valve-config 1.3 → 2.3 … Re-check on the next run before
     acting; c2-fan-blade-sweep 0.2 → 1.4 s is its Derived 1 now building (287 ms), not a slowdown.
+  **qa 04:08 (11-09), the 23:24 run (green 19036006) against the 18:54 one:** models 75/87, features 760/951 (same), scenarios
+  1082/1285 → 1151/1331, parity index 79.6 → 81.8 (speed 63.5 → 58.4). Flags:
+  - **Speed numbers from vibe2 are not usable now (lead: infra):** vibe2 has 8 cores at load 12–13, three T2 test processes
+    (target-t2 `assembly::tests::standard_content_parts_regenerat…`) running for 1–2 days at ~80 % CPU each, beside the
+    watcher's tests. Against the 14:11 run the median document is 1.58× slower (q25 1.28, q90 1.8), and documents flagged at
+    18:54 went back (c2-rings-loft 19.6 → 11.5 s, c2-sm-corner-break 9.2 → 5.3) while others rose (cf-sheet-metal-model-plus
+    2.0 → 3.1, cf-part-draft 4.4 → 6.3, learning-center-michael 1.5 → 2.3): load, not code. None filed against an area.
+  - psui: doc-shortcuts-sheet and shortcut-shift-slash differ alone too (on 35fd1ddf): the keyboard shortcuts sheet's field
+    reads "Keyboard shortcutsCustomize keyboard shortcuts", live "Search shortcuts" (doc-shortcuts-sheet: ours shows the
+    sheet as a modal where live's step 1 has none).
+  - asm: asm-config-input-menu-copy-input differs alone: step 2 `.focus.kind` live "other" / ours "none".
+  - feature-menu-remove-expression matches alone (load).
 - [ ] P1 SUITE-REGRESSIONS-1107 (core, blend, skasm, dx: each its own line) **qa's 20:34 suite run (green 843a9357) against
   the 16:34 one (f159ebd4), both on vibe2: features that built and now fail, and regenerations > 30 % and > 0.5 s slower**
   (qa-scratch/suites/1107-2034-843a9357/worse.txt; candidates are the range's commits, not bisected):
