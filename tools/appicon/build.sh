@@ -1,13 +1,14 @@
 #!/bin/bash
 # Rebuilds every app icon from the in-app logo, crates/app/assets/icons/noshape-logo.svg (the one source of the mark):
 # packaging/icons/{noshape.svg, favicon.svg, noshape-256.png, noshape-512.png, noshape.ico, noshape.icns}.
-# Needs python3, rsvg-convert, ImageMagick (magick), png2icns (icnsutils) and oxipng.  Run from the repo root.
+# Needs python3, rsvg-convert, ImageMagick (magick), png2icns (icnsutils) and oxipng. PNGs stay 8-bit RGBA (oxipng --nx):
+# macOS ignores an .icns whose PNGs are grayscale and boxes the app in a grey tile (11-09).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 icons=packaging/icons
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 python3 -I "$here/gen.py" crates/app/assets/icons/noshape-logo.svg "$t"
-png() { rsvg-convert -w "$2" -h "$2" "$t/$1.svg" -o "$3"; oxipng -q -o 4 --strip safe "$3"; }
+png() { rsvg-convert -w "$2" -h "$2" "$t/$1.svg" -o "$3"; oxipng -q -o 4 --strip safe --nx "$3"; }
 
 cp "$t/tile-256.svg" "$icons/noshape.svg"
 cp "$t/favicon.svg" "$icons/favicon.svg"
