@@ -752,6 +752,14 @@ impl StartView {
         }
     }
 
+    fn open_history(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
+        let gpu = cx.global::<crate::gpu::GpuGlobal>().0.clone();
+        match crate::start_hooks::open_document_history(path, gpu, cx) {
+            Ok(()) => self.force_rescan(cx),
+            Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Could not open document: {e:#}")),
+        }
+    }
+
     fn new_document(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let start = match &self.source {
             Source::Folder(f) => f.clone(),
@@ -2357,7 +2365,9 @@ impl StartView {
             .item(item("Copy workspace…", &view, &d, |t, d, w, cx| t.copy_workspace(d, w, cx)))
             .separator()
             .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
-            .item(item("Versions and history", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Versions, cx)))
+            // The document itself, on its Versions and history panel (live: /documents/<id>/versionsAndHistory); the
+            // strip's icon is the page's own panel.
+            .item(item("Versions and history", &view, &d, |t, d, w, cx| t.open_history(d.path, w, cx)))
             // The Details panel with its Document labels open, no dialog (live2 2351 (4)).
             .item(item("Labels…", &view, &d, |t, d, _, cx| {
                 t.details_labels_open = true;

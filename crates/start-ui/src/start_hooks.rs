@@ -13,6 +13,9 @@ pub struct Hooks {
     pub open_document_window: fn(PathBuf, Option<noshape_model::Document>, Gpu, &mut App) -> anyhow::Result<()>,
     /// Open the document (or bring its window to the front) at a tab: a search result row (a part or a tab).
     pub open_document_at: fn(PathBuf, noshape_model::document::TabId, Gpu, &mut App) -> anyhow::Result<()>,
+    /// Open the document (or bring its window to the front) with its Versions and history panel open: a row's
+    /// right-click › Versions and history.
+    pub open_document_history: fn(PathBuf, Gpu, &mut App) -> anyhow::Result<()>,
     /// The build as the documents page shows it ("0.4.4.c8d74e607a47").
     pub build_label: fn() -> String,
     /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and the card.
@@ -45,6 +48,10 @@ pub fn open_document_window(path: PathBuf, create_with: Option<noshape_model::Do
 
 pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
     (hooks().open_document_at)(path, tab, gpu, cx)
+}
+
+pub fn open_document_history(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_document_history)(path, gpu, cx)
 }
 
 pub fn import_dialog(paths: Vec<PathBuf>, on_import: ImportCallback, window: &mut Window, cx: &mut App) {

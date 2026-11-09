@@ -817,11 +817,16 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Tab › Select as document thumbnail.
+    /// Tab › Select as document thumbnail, and live's toast saying so (doc-tab-menu-thumbnail).
     fn select_thumbnail(&mut self, tab: TabId, cx: &mut Context<Self>) {
         self.doc.update(cx, |d, cx| {
-            let _ = d.session.store.set_meta("thumbnail_tab", Some(tab.0.to_string().as_bytes()));
+            if let Err(e) = d.session.store.set_meta("thumbnail_tab", Some(tab.0.to_string().as_bytes())) {
+                cx.emit(DocEvent::Error(format!("Could not set the document thumbnail: {e:#}")));
+                return;
+            }
+            let name = d.session.doc.tab(tab).map(|t| t.name.clone()).unwrap_or_default();
             cx.emit(DocEvent::HistoryChanged);
+            cx.emit(DocEvent::Info(format!("Document thumbnail set to {name}")));
         });
     }
 
@@ -1401,6 +1406,13 @@ impl Workspace {
             self.release_drafts = Some(cx.new(|cx| crate::release_dialog::ReleaseDraftsPanel::new(doc, cx)));
         }
         cx.notify();
+    }
+
+    /// The Versions and history panel, opened if it isn't.
+    pub fn show_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.history.is_none() {
+            self.toggle_history(window, cx);
+        }
     }
 
     fn toggle_history(&mut self, window: &mut Window, cx: &mut Context<Self>) {

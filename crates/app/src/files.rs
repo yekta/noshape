@@ -110,6 +110,20 @@ pub fn open_document_at(path: PathBuf, tab: noshape_model::document::TabId, gpu:
     Ok(())
 }
 
+/// Open a document (or bring its window to the front) with its Versions and history panel open (the documents
+/// page's row › Versions and history: live lands on the document's /versionsAndHistory).
+pub fn open_document_history(path: PathBuf, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    open_document_window(path.clone(), None, gpu, cx)?;
+    if let Some(h) = cx.try_global::<OpenDocs>().and_then(|o| o.0.get(&canonical(&path)).copied()) {
+        let _ = h.update(cx, |_, window, cx| {
+            if let Some(ws) = crate::os_menu::content_view(window, cx).and_then(|v| v.downcast::<workspace::Workspace>().ok()) {
+                ws.update(cx, |w, cx| w.show_history(window, cx));
+            }
+        });
+    }
+    Ok(())
+}
+
 /// A document at a version in a window of its own, read-only (Onshape opens
 /// a version in a new browser tab): another window on the same file, not the
 /// document's registered one. Returns the window and its workspace.
