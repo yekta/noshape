@@ -268,6 +268,10 @@ pub struct VariableStudio {
     /// strip's Configuration panel).
     #[serde(default, skip_serializing_if = "VsConfiguration::is_empty")]
     pub configuration: VsConfiguration,
+    /// Its table's column widths in px (Name, Variable type, Value, Description), set by dragging a header's edge
+    /// (live vs-column-resize: a document edit); empty: the defaults.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub column_widths: Vec<f32>,
 }
 
 /// A Variable Studio's configuration inputs (as a Part Studio's) and the
@@ -466,7 +470,7 @@ impl StudioRef {
 
 impl Default for VariableStudio {
     fn default() -> Self {
-        Self { variables: Vec::new(), insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default() }
+        Self { variables: Vec::new(), insert_into_all: true, inserted: Vec::new(), configuration: VsConfiguration::default(), column_widths: Vec::new() }
     }
 }
 
@@ -752,7 +756,7 @@ mod studio_scope_tests {
     }
 
     fn vs(vars: &[(&str, &str)], all: bool) -> VariableStudio {
-        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None, other_values: Default::default() }).collect(), insert_into_all: all, inserted: Vec::new(), configuration: VsConfiguration::default() }
+        VariableStudio { variables: vars.iter().map(|(n, e)| VariableDef { name: n.to_string(), expr: ExprValue::new(*e), kind: None, description: String::new(), description_expr: false, import: None, other_values: Default::default() }).collect(), insert_into_all: all, inserted: Vec::new(), configuration: VsConfiguration::default(), column_widths: Vec::new() }
     }
 
     fn doc_with(studios: Vec<VariableStudio>) -> (crate::Document, TabId, Vec<TabId>) {

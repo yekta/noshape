@@ -41,6 +41,8 @@ pub struct VariableStudioView {
     inserted_views: HashMap<TabId, Entity<VariableStudioView>>,
     /// The last "Collapse all tables" seen ([collapse_generation]).
     collapse_seen: u64,
+    /// A header edge being dragged: its column and the guide's x in the table (its own tab only).
+    col_drag: Option<(usize, f32)>,
     /// Enter added a variable from the Name row: focus the next (empty)
     /// Name row once it's rebuilt, as Onshape does.
     focus_add_row: bool,
@@ -152,6 +154,7 @@ impl VariableStudioView {
             help_bounds: Default::default(),
             inserted_views: HashMap::new(),
             collapse_seen: collapse_generation(tab),
+            col_drag: None,
             focus_add_row: false,
             cell_focus: HashMap::new(),
             cell_selected: None,
@@ -491,10 +494,26 @@ fn cell_input(st: &Entity<InputState>) -> Div {
     div().flex_1().ml(px(-4.)).child(Input::new(st).appearance(false).text_size(px(13.33)))
 }
 
-/// Column `c`'s width: the Part Studio Variable table's, shared by every table (live 11-02: dragging a header edge
-/// there resizes the inserted Variable Studio tables too).
+/// Column `c`'s width: a Variable Studio tab's own (its document's, while it draws: live vs-column-resize), else the
+/// Part Studio Variable table's, shared by every table there (live 11-02: dragging a header edge there resizes the
+/// inserted Variable Studio tables too).
 fn col_w(c: usize) -> f32 {
-    crate::ui::var_col_widths()[c]
+    STUDIO_COLS.with(|w| w.get()).unwrap_or_else(crate::ui::var_col_widths)[c]
+}
+
+thread_local! {
+    /// The widths of the Variable Studio tab being drawn (set around its render).
+    static STUDIO_COLS: std::cell::Cell<Option<[f32; 4]>> = const { std::cell::Cell::new(None) };
+}
+
+/// A Variable Studio tab's header edge being dragged (its column).
+#[derive(Clone)]
+struct VsColDrag(usize);
+
+impl Render for VsColDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+    }
 }
 
 fn cell_div(c: usize) -> Div {
@@ -763,6 +782,17 @@ impl VariableStudioView {
 
 impl Render for VariableStudioView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Its own tab draws at the widths its document keeps; in a panel the panel's.
+        let widths = if self.host.is_none() { self.studio(cx).and_then(|s| <[f32; 4]>::try_from(s.column_widths.clone()).ok()) } else { None };
+        STUDIO_COLS.with(|w| w.set(widths.or_else(|| self.host.is_none().then(crate::ui::var_col_widths))));
+        let el = self.render_view(window, cx);
+        STUDIO_COLS.with(|w| w.set(None));
+        el
+    }
+}
+
+impl VariableStudioView {
+    fn render_view(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let pal = p();
         // "Collapse all tables" ran in this table's group.
         let generation = collapse_generation(self.group());
@@ -1100,7 +1130,9 @@ impl Render for VariableStudioView {
         let (collapse_mark, menu_mark) = (format!("button:Collapse:{title}"), format!("button:Table menu:{title}"));
         // In a panel the title row spans the panel (live, part-studio/77).
         let in_panel = self.host.is_some();
+        let own_tab = !in_panel;
         let table = v_flex()
+            .relative()
             .when(!in_panel, |d| d.w(px((0..4).map(col_w).sum::<f32>() + 1.)))
             .when(in_panel, |d| d.w_full())
             .child(
@@ -1218,8 +1250,50 @@ impl Render for VariableStudioView {
                         .text_size(px(14.))
                         .font_weight(FontWeight::BOLD)
                         .text_color(pal.text)
-                        .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| cell_div(c).map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}"))).justify_center().child(h))),
+                        .children(["Name", "Variable type", "Value", "Description"].into_iter().enumerate().map(|(c, h)| {
+                            let dragging = self.col_drag.is_some_and(|d| d.0 == c);
+                            cell_div(c)
+                                .map(|d| crate::ui_script::mark(d, move || format!("var_header:{h}")))
+                                .justify_center()
+                                .relative()
+                                .child(h)
+                                // Its own tab: a 5 px col-resize handle inside the right edge (as the Part Studio's table).
+                                .when(own_tab, |d| {
+                                    d.child(
+                                        div()
+                                            .id(("vs-col", c))
+                                            .absolute()
+                                            .top_0()
+                                            .bottom_0()
+                                            .right_0()
+                                            .w(px(5.))
+                                            .cursor(CursorStyle::ResizeColumn)
+                                            .when(dragging, |d| d.bg(rgb(0xaaaaaa)))
+                                            .hover(|d| d.bg(rgb(0xaaaaaa)))
+                                            .on_drag(VsColDrag(c), |d, _, _, cx| cx.new(|_| d.clone())),
+                                    )
+                                })
+                        }))
+                        // The guide follows the pointer (at least 40 px); the width applies on release as an edit.
+                        .on_drag_move(cx.listener(|this, e: &DragMoveEvent<VsColDrag>, _, cx| {
+                            let c = e.drag(cx).0;
+                            let left: f32 = 1. + (0..c).map(col_w).sum::<f32>();
+                            let x = f32::from(e.event.position.x - e.bounds.left()).max(left + crate::ui::VAR_COL_MIN);
+                            if this.col_drag != Some((c, x)) {
+                                this.col_drag = Some((c, x));
+                                cx.notify();
+                            }
+                        }))
+                        .on_drop(cx.listener(|this, d: &VsColDrag, _, cx| {
+                            if let Some((c, x)) = this.col_drag.take().filter(|x| x.0 == d.0) {
+                                let mut ws: [f32; 4] = std::array::from_fn(col_w);
+                                ws[c] = (x - 1. - ws[..c].iter().sum::<f32>()).round().max(crate::ui::VAR_COL_MIN);
+                                this.edit(noshape_ops::variable_studio::RESIZE_COLUMN, cx, |s| s.column_widths = ws.to_vec());
+                            }
+                            cx.notify();
+                        })),
                 )
+                .children(self.col_drag.map(|(_, x)| div().absolute().top(px(35.)).bottom_0().left(px(x)).w(px(1.)).bg(rgb(0x000000))))
                 .children(rows)
                 .when(only.is_none(), |t| {
                     // The add row's other columns are one borderless cell band

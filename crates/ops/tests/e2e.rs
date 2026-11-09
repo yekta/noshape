@@ -907,6 +907,14 @@ fn variable_studio_tables_in_part_studios() {
     let s = call(&mut ctx, "variable_studio_settings", json!({ "tab": "Sizes", "insert_into_all": true }));
     assert_eq!(s["insert_into_all"], true, "{s}");
     assert!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"].as_str().unwrap().ends_with(":: Insert into all Part Studios and Assemblies"));
+    // Its table's column widths: an undoable edit kept in the document (live vs-column-resize).
+    let s = call(&mut ctx, "variable_studio_settings", json!({ "tab": "Sizes", "column_widths": [140, 140, 200, 140] }));
+    assert_eq!(s["column_widths"], json!([140.0, 140.0, 200.0, 140.0]), "{s}");
+    assert_eq!(call(&mut ctx, "history_list", json!({ "limit": 1 }))["history"][0]["description"], "Sizes :: Resize table column");
+    call(&mut ctx, "history_undo", json!({ "tab": "Sizes" }));
+    assert_eq!(call(&mut ctx, "variable_studio_settings", json!({ "tab": "Sizes" }))["column_widths"], json!([]));
+    let e = try_call(&mut ctx, "variable_studio_settings", json!({ "tab": "Sizes", "column_widths": [10, 140, 140, 140] })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("column_widths"), "{e:?}");
 }
 
 /// A Variable Studio's Configuration panel through the config ops: a List

@@ -2204,9 +2204,9 @@ Examples:
 
 #### variable_studio_settings
 
-A Variable Studio's "Insert into all Part Studios and Assemblies" checkbox (edits the document (one undoable history entry)).
+A Variable Studio's "Insert into all Part Studios and Assemblies" checkbox and its table's column widths (edits the document (one undoable history entry)).
 
-On: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit ("Insert into all Part Studios and Assemblies" / "Do not insert into all Part Studios and Assemblies").
+`insert_into_all` on: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit ("Insert into all Part Studios and Assemblies" / "Do not insert into all Part Studios and Assemblies"), not an undo step. `column_widths`: the table's four column widths in px (Name, Variable type, Value, Description; each at least 40), as dragging a header's edge: one undoable edit "Resize table column". Without either, replies with both.
 
 Examples:
 
@@ -2218,7 +2218,8 @@ Examples:
 |---|---|---|---|
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `tab` | string | required | The Variable Studio, by name or id. |
-| `insert_into_all` | boolean | required | The checkbox. |
+| `insert_into_all` | boolean |  | The checkbox. |
+| `column_widths` | array of number |  | Four widths in px. |
 
 ### config
 

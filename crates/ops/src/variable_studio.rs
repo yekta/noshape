@@ -289,6 +289,9 @@ pub fn created_reference(c: &mut TabContent, studio: TabId) {
 
 /// A Variable Studio's "Insert into all Part Studios and Assemblies"
 /// checkbox: its history text for the new state.
+/// A column of a Variable Studio's table resized (live vs-column-resize: "Variable Studio 1 :: Resize table column").
+pub const RESIZE_COLUMN: &str = "Resize table column";
+
 pub fn insert_into_all_description(on: bool) -> &'static str {
     if on { "Insert into all Part Studios and Assemblies" } else { "Do not insert into all Part Studios and Assemblies" }
 }

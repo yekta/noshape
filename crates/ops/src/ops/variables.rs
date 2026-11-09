@@ -232,9 +232,14 @@ pub fn ops() -> Vec<Op> {
         Op {
             group: "variable",
             verb: "studio_settings",
-            summary: "A Variable Studio's \"Insert into all Part Studios and Assemblies\" checkbox",
-            description: "On: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit (\"Insert into all Part Studios and Assemblies\" / \"Do not insert into all Part Studios and Assemblies\").",
-            fields: vec![doc_field(), req("tab", s(), "The Variable Studio, by name or id."), req("insert_into_all", json!({ "type": "boolean" }), "The checkbox.")],
+            summary: "A Variable Studio's \"Insert into all Part Studios and Assemblies\" checkbox and its table's column widths",
+            description: "`insert_into_all` on: the studio's variables are available in every Part Studio and Assembly of the document (except where its reference was removed). A configured studio can't be inserted into all (the checkbox is greyed). One edit (\"Insert into all Part Studios and Assemblies\" / \"Do not insert into all Part Studios and Assemblies\"), not an undo step. `column_widths`: the table's four column widths in px (Name, Variable type, Value, Description; each at least 40), as dragging a header's edge: one undoable edit \"Resize table column\". Without either, replies with both.",
+            fields: vec![
+                doc_field(),
+                req("tab", s(), "The Variable Studio, by name or id."),
+                opt("insert_into_all", json!({ "type": "boolean" }), "The checkbox."),
+                opt("column_widths", json!({ "type": "array", "items": { "type": "number" } }), "Four widths in px."),
+            ],
             mutates: true,
             destructive: false,
             run: studio_settings,
@@ -437,8 +442,18 @@ fn create_studio(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn studio_settings(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let tab = studio_tab(od.doc(), a.str("tab")?).map_err(|e| e.with_param("tab"))?;
-    let on = a.get("insert_into_all").and_then(Value::as_bool).ok_or_else(|| OpError::param("insert_into_all", "true or false"))?;
+    if let Some(ws) = a.opt_array("column_widths")? {
+        let ws: Vec<f32> = ws.iter().map(|w| w.as_f64().map(|w| w as f32)).collect::<Option<_>>().filter(|ws: &Vec<f32>| ws.len() == 4 && ws.iter().all(|w| *w >= 40.)).ok_or_else(|| OpError::param("column_widths", "four widths in px, each at least 40"))?;
+        od.session.edit_tab(tab, vs::RESIZE_COLUMN, |c| {
+            if let TabContent::VariableStudio(v) = c {
+                v.column_widths = ws.clone();
+            }
+        })?;
+    }
     let s = vs_studio(od, tab)?;
+    let Some(on) = a.get("insert_into_all").map(|v| v.as_bool().ok_or_else(|| OpError::param("insert_into_all", "true or false"))).transpose()? else {
+        return Ok(json!({ "studio": od.doc().tab(tab).map(|t| t.name.clone()), "insert_into_all": s.insert_into_all, "column_widths": s.column_widths }).into());
+    };
     if on && !s.configuration.is_empty() {
         return Err(OpError::invalid("a configured Variable Studio can't be inserted into all Part Studios and Assemblies (insert it with variable_insert_studio in one configuration)").with_param("insert_into_all"));
     }
@@ -450,7 +465,8 @@ fn studio_settings(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             }
         })?;
     }
-    Ok(json!({ "studio": od.doc().tab(tab).map(|t| t.name.clone()), "insert_into_all": on }).into())
+    let widths = vs_studio(od, tab)?.column_widths.clone();
+    Ok(json!({ "studio": od.doc().tab(tab).map(|t| t.name.clone()), "insert_into_all": on, "column_widths": widths }).into())
 }
 
 fn name_error(e: NameError, name: &str) -> OpError {
