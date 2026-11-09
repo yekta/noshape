@@ -1897,7 +1897,7 @@ impl Render for FeatureStudioView {
                         // Live document/70 (Ace): 13 px monospace on 16 px lines, the first
                         // line right under the toolbar. The kit editor keeps an 8 px top
                         // padding (its size's), clipped off here.
-                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().map(|d| crate::ui_script::mark(d, || "editor:code".into())).child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(13.)).line_height(px(16.))),
+                        div().absolute().top(px(-8.)).left_0().right_0().bottom_0().map(|d| crate::ui_script::mark(d, || "editor:code".into())).child(Editor::new(&self.editor).readonly(read_only).bordered(false).h_full().text_size(px(14.)).line_height(px(16.))),
                     )
                     .children(self.render_profile(cx))
                     // The diagnostic tooltip follows the pointer (re-render only

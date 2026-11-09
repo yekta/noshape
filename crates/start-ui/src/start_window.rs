@@ -49,21 +49,32 @@ pub fn init(cx: &mut App) {
 
 // ----------------------------------------------------------------- window
 
-struct StartWindowGlobal {
-    handle: AnyWindowHandle,
-    view: WeakEntity<StartView>,
+/// The documents windows (live: any number of browser tabs on the documents page; a folder's "Open in new browser
+/// tab" opens another), oldest first.
+#[derive(Default)]
+struct StartWindows(Vec<(AnyWindowHandle, WeakEntity<StartView>)>);
+impl Global for StartWindows {}
+
+/// The documents window in front: the active one, else the newest.
+fn front(cx: &App) -> Option<(AnyWindowHandle, WeakEntity<StartView>)> {
+    let all = &cx.try_global::<StartWindows>()?.0;
+    let active = cx.active_window();
+    all.iter().find(|(h, _)| Some(*h) == active).or(all.last()).cloned()
 }
-impl Global for StartWindowGlobal {}
 
 /// Show the start window, or bring the existing one to the front.
 pub fn show(cx: &mut App) {
-    if let Some(g) = cx.try_global::<StartWindowGlobal>() {
-        let (handle, view) = (g.handle, g.view.clone());
-        if handle.update(cx, |_, window, _| window.activate_window()).is_ok() {
-            let _ = view.update(cx, |v, cx| v.rescan(cx));
-            return;
-        }
+    if let Some((handle, view)) = front(cx)
+        && handle.update(cx, |_, window, _| window.activate_window()).is_ok()
+    {
+        let _ = view.update(cx, |v, cx| v.rescan(cx));
+        return;
     }
+    open_new(None, cx);
+}
+
+/// Another documents window, at `source` (else where a new one starts).
+fn open_new(source: Option<Source>, cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(None, size(px(1200.), px(780.)), cx))),
         window_min_size: Some(size(px(760.), px(480.))),
@@ -83,11 +94,14 @@ pub fn show(cx: &mut App) {
                 v.read(cx).ui_state(window, cx)
             }).unwrap_or(serde_json::Value::Null)
         });
+        if let Some(source) = source {
+            view.update(cx, |v, cx| v.set_source(source, cx));
+        }
         let fh = view.read(cx).focus.clone();
         window.defer(cx, move |window, cx| fh.focus(window, cx));
         view
     }) {
-        Ok((handle, view)) => cx.set_global(StartWindowGlobal { handle, view: view.downgrade() }),
+        Ok((handle, view)) => cx.default_global::<StartWindows>().0.push((handle, view.downgrade())),
         Err(e) => log::error!("could not open the start window: {e:#}"),
     }
 }
@@ -97,13 +111,13 @@ pub fn show(cx: &mut App) {
 pub fn show_with_error(message: impl Into<String>, cx: &mut App) {
     show(cx);
     let message = message.into();
-    if let Some(handle) = cx.try_global::<StartWindowGlobal>().map(|g| g.handle) {
+    if let Some((handle, _)) = front(cx) {
         // A document that couldn't be opened (qa OPEN-ERROR-SILENT): the
         // bubble stays until its × closes it; an 8 s one could run out before
         // a slow start showed the window.
         let _ = handle.update(cx, |_, window, cx| {
             let id = cx.default_global::<StartToast>().1 + 1;
-            *cx.default_global::<StartToast>() = StartToast(Some(Toast { kind: AlertKind::Error.into(), bold: None, text: message, restore: None, brief: false }), id);
+            *cx.default_global::<StartToast>() = StartToast(Some((window.window_handle().window_id(), Toast { kind: AlertKind::Error.into(), bold: None, text: message, restore: None, brief: false })), id);
             window.refresh();
         });
     }
@@ -113,15 +127,16 @@ pub fn show_with_error(message: impl Into<String>, cx: &mut App) {
 /// any window).
 pub fn show_and_create(cx: &mut App) {
     show(cx);
-    let Some((handle, view)) = cx.try_global::<StartWindowGlobal>().map(|g| (g.handle, g.view.clone())) else { return };
+    let Some((handle, view)) = front(cx) else { return };
     let _ = handle.update(cx, |_, window, cx| {
         let _ = view.update(cx, |v, cx| v.new_document(window, cx));
     });
 }
 
-/// Re-read the library and redraw (e.g. after a document window closed).
+/// Re-read the library and redraw every documents window (e.g. after a document window closed).
 pub fn refresh(cx: &mut App) {
-    if let Some(view) = cx.try_global::<StartWindowGlobal>().map(|g| g.view.clone()) {
+    let views: Vec<_> = cx.try_global::<StartWindows>().map(|g| g.0.iter().map(|(_, v)| v.clone()).collect()).unwrap_or_default();
+    for view in views {
         let _ = view.update(cx, |v, cx| {
             v.force_rescan(cx);
             cx.notify();
@@ -129,13 +144,12 @@ pub fn refresh(cx: &mut App) {
     }
 }
 
-/// Called when a window closed: forgets the start window if it was that one.
+/// Called when a window closed: forgets it if it was a documents window.
 pub fn forget_if(id: WindowId, cx: &mut App) -> bool {
-    let is_start = cx.try_global::<StartWindowGlobal>().is_some_and(|g| g.handle.window_id() == id);
-    if is_start {
-        cx.remove_global::<StartWindowGlobal>();
-    }
-    is_start
+    let g = cx.default_global::<StartWindows>();
+    let before = g.0.len();
+    g.0.retain(|(h, _)| h.window_id() != id);
+    g.0.len() != before
 }
 
 // ----------------------------------------------------------------- state
@@ -694,7 +708,7 @@ impl StartView {
     fn toast(window: &mut Window, cx: &mut App, toast: Toast) {
         let id = cx.default_global::<StartToast>().1 + 1;
         let secs = if toast.brief { 3 } else { 8 };
-        *cx.default_global::<StartToast>() = StartToast(Some(toast), id);
+        *cx.default_global::<StartToast>() = StartToast(Some((window.window_handle().window_id(), toast)), id);
         window.refresh();
         let handle = window.window_handle();
         cx.spawn(async move |cx| {
@@ -1202,9 +1216,9 @@ impl StartView {
         }
         let v = view.clone();
         let f2 = f.clone();
-        // Live's "Open in new browser tab": the documents page is one window here, so it opens the folder in it.
+        // Live's "Open in new browser tab": another documents window, at the folder.
         menu.item(item("Open", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
-            .item(item("Open in new browser tab", &f, |t, f, _, cx| t.set_source(Source::Folder(f), cx)))
+            .item(item("Open in new browser tab", &f, |_, f, _, cx| open_new(Some(Source::Folder(f)), cx)))
             .item(item("Rename", &f, |t, f, w, cx| t.rename_folder(f, w, cx)))
             .item(item("Details", &f, |t, f, _, cx| t.show_folder_details(f, cx)))
             .item(item("Move to…", &f, |t, f, w, cx| t.move_folder(f, w, cx)))
@@ -3734,7 +3748,7 @@ impl Render for StartView {
                 )
             })
             // Onshape right-click menus (`os_context_menu`).
-            .children(cx.try_global::<StartToast>().and_then(|t| t.0.clone()).map(|t| {
+            .children(cx.try_global::<StartToast>().and_then(|t| t.0.clone()).filter(|(w, _)| *w == window.window_handle().window_id()).map(|(_, t)| {
                 // Onshape: top center, 8 px from the top of the page (over the top bar).
                 let text = match &t.bold {
                     Some(b) => StyledText::new(format!("{b}{}", t.text)).with_highlights([(0..b.len(), HighlightStyle { font_weight: Some(FontWeight::BOLD), ..Default::default() })]).into_any_element(),
@@ -3771,7 +3785,8 @@ struct Toast {
 
 /// The documents page's message bubble and its generation.
 #[derive(Default)]
-struct StartToast(Option<Toast>, u64);
+/// The message bubble and the documents window it shows in.
+struct StartToast(Option<(WindowId, Toast)>, u64);
 
 impl Global for StartToast {}
 

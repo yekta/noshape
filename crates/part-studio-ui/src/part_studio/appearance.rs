@@ -71,11 +71,24 @@ pub struct AppearanceEdit {
     /// Colour, transparency and quality at opening: ✓ stays at 20 % until
     /// one changes (live).
     initial: ([u8; 3], f32, TessQuality),
+    /// What the document's appearances were before the first change went in (live commits as you type: ✕ and Esc
+    /// put them back), and the values last put in.
+    before: Option<(Vec<FaceAppearance>, std::collections::BTreeMap<BodyId, noshape_model::partstudio::PartProperties>)>,
+    applied: ([u8; 3], f32, TessQuality),
+    /// It adds a face appearance (✓ is on from the start).
+    adds: bool,
     pub(super) hex: Entity<InputState>,
     /// R, G, B.
     pub(super) channels: [Entity<InputState>; 3],
     pub(super) alpha: Entity<InputState>,
     _subs: Vec<Subscription>,
+}
+
+impl AppearanceEdit {
+    /// ✓ is on: something changed, or it adds a face appearance.
+    fn acceptable(&self) -> bool {
+        self.adds || self.initial != (self.rgb, self.transparency, self.tessellation)
+    }
 }
 
 /// sRGB 0..255 to linear 0..1.
@@ -198,6 +211,8 @@ impl PartStudioView {
 
     /// Open the Appearance editor.
     pub(super) fn edit_appearance(&mut self, target: EditTarget, window: &mut Window, cx: &mut Context<Self>) {
+        // An editor still open: what it put in is its own undo step.
+        self.doc.update(cx, |doc, cx| doc.flush_pending(cx));
         let studio = self.studio(cx).cloned();
         let (color, tess) = match (&target, &studio) {
             (EditTarget::Parts(b), Some(s)) => {
@@ -294,7 +309,7 @@ impl PartStudioView {
                 && let Some(e) = &mut this.ui.appearance_edit
             {
                 e.transparency = 1.0 - v.clamp(0.0, 1.0);
-                cx.notify();
+                this.apply_appearance(false, cx);
             }
             this.appearance_enter(ev, cx);
         }));
@@ -325,7 +340,8 @@ impl PartStudioView {
                 s.select_all(window, cx);
             });
         }
-        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), hex, channels, alpha, _subs: subs });
+        let adds = matches!(target, EditTarget::Faces(_, None));
+        self.ui.appearance_edit = Some(AppearanceEdit { target, rgb, transparency, tessellation: tess, mixer: false, mix: crate::color_mixer::MixerState::from_rgb(rgb), alpha_drag: false, initial: (rgb, transparency, tess), before: None, applied: (rgb, transparency, tess), adds, hex, channels, alpha, _subs: subs });
         cx.notify();
     }
 
@@ -333,12 +349,11 @@ impl PartStudioView {
     fn appearance_enter(&mut self, ev: &InputEvent, cx: &mut Context<Self>) {
         let InputEvent::PressEnter { .. } = ev else { return };
         let Some(e) = &self.ui.appearance_edit else { return };
-        if e.initial != (e.rgb, e.transparency, e.tessellation) {
+        if e.acceptable() {
             self.accept_appearance(cx);
         } else {
-            self.ui.appearance_edit = None;
+            self.cancel_appearance(cx);
         }
-        cx.notify();
     }
 
     /// Tab / Shift+Tab: the next or previous field, A → # → R → G → B (live), its text selected.
@@ -354,7 +369,7 @@ impl PartStudioView {
         cx.notify();
     }
 
-    fn set_edit_color(&mut self, rgb: [u8; 3], window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn set_edit_color(&mut self, rgb: [u8; 3], window: &mut Window, cx: &mut Context<Self>) {
         self.set_edit_color_from(rgb, None, window, cx);
     }
 
@@ -377,7 +392,7 @@ impl PartStudioView {
                 ch.update(cx, |s, cx| s.set_value(rgb[i].to_string(), window, cx));
             }
         }
-        cx.notify();
+        self.apply_appearance(false, cx);
     }
 
     /// The A slider and field (`alpha` 0–1).
@@ -386,7 +401,7 @@ impl PartStudioView {
         e.transparency = 1.0 - alpha.clamp(0.0, 1.0);
         let field = e.alpha.clone();
         field.update(cx, |s, cx| s.set_value(noshape_units::to_fixed(f64::from(alpha), 2), window, cx));
-        cx.notify();
+        self.apply_appearance(false, cx);
     }
 
     /// Apply the editor (✓).
@@ -400,11 +415,11 @@ impl PartStudioView {
         }
     }
 
-    fn accept_appearance(&mut self, cx: &mut Context<Self>) {
+    /// ✓: what the editor put in is one undo step ("Edit appearance"); a new face appearance is added even unchanged.
+    pub(super) fn accept_appearance(&mut self, cx: &mut Context<Self>) {
+        self.apply_appearance(true, cx);
         let Some(e) = self.ui.appearance_edit.take() else { return };
         self.appearance_closed(&e.target, cx);
-        let color = [srgb_to_lin(e.rgb[0]), srgb_to_lin(e.rgb[1]), srgb_to_lin(e.rgb[2]), 1.0 - e.transparency];
-        let tess = e.tessellation;
         if let EditTarget::ConfiguredCell(part, row) = &e.target {
             let value = noshape_model::configured_properties::color_text(e.rgb, 1.0 - e.transparency);
             let (part, row) = (part.clone(), *row);
@@ -412,32 +427,87 @@ impl PartStudioView {
             self.config_dirty(cx);
             return;
         }
-        self.doc.update(cx, |doc, cx| {
-            doc.edit_studio(self.tab, "Edit appearance", cx, |ps| match &e.target {
-                EditTarget::Parts(bodies) => {
-                    for b in bodies {
-                        let p = ps.part_properties.entry(b.clone()).or_default();
-                        p.appearance = Some(Appearance { color });
-                        p.tessellation = (tess != TessQuality::Auto).then_some(tess);
-                    }
-                }
-                EditTarget::Faces(faces, index) => noshape_ops::appearance::set_face_appearance(ps, *index, AppearanceTarget::Faces(faces.clone()), color),
-                EditTarget::ConfiguredCell(..) => {}
-                EditTarget::Feature(f, index) => {
-                    let target = AppearanceTarget::Feature(*f);
-                    let index = index.or_else(|| ps.appearances.iter().position(|x| x.target == target));
-                    noshape_ops::appearance::set_face_appearance(ps, index, target, color);
-                }
-                EditTarget::Features(fs) => {
-                    for f in fs {
-                        let target = AppearanceTarget::Feature(*f);
-                        let index = ps.appearances.iter().position(|x| x.target == target);
-                        noshape_ops::appearance::set_face_appearance(ps, index, target, color);
-                    }
-                }
-            });
-        });
+        self.doc.update(cx, |doc, cx| doc.flush_pending(cx));
         cx.notify();
+    }
+
+    /// ✕ or Esc: the appearances as they were before the editor opened; a session that changed nothing leaves no undo
+    /// step.
+    pub(super) fn cancel_appearance(&mut self, cx: &mut Context<Self>) {
+        let Some(e) = self.ui.appearance_edit.take() else { return };
+        self.appearance_closed(&e.target, cx);
+        if let Some((appearances, parts)) = e.before {
+            self.doc.update(cx, |doc, cx| {
+                doc.edit_tab_deferred(self.tab, "Edit appearance", cx, |c| {
+                    if let noshape_model::document::TabContent::PartStudio(ps) = c {
+                        ps.appearances = appearances;
+                        ps.part_properties = parts;
+                    }
+                });
+                doc.flush_pending(cx);
+            });
+        }
+        cx.notify();
+    }
+
+    /// Live commits the editor as you type: its values go into the document at once (Undo turns on), joined into one
+    /// pending edit until ✓ (`force`: put them in even unchanged). A configured property's cell waits for ✓.
+    fn apply_appearance(&mut self, force: bool, cx: &mut Context<Self>) {
+        cx.notify();
+        let Some(e) = &mut self.ui.appearance_edit else { return };
+        let now = (e.rgb, e.transparency, e.tessellation);
+        let new_faces = matches!(e.target, EditTarget::Faces(_, None));
+        if matches!(e.target, EditTarget::ConfiguredCell(..)) || (now == e.applied && !(force && new_faces)) {
+            return;
+        }
+        e.applied = now;
+        let color = [srgb_to_lin(e.rgb[0]), srgb_to_lin(e.rgb[1]), srgb_to_lin(e.rgb[2]), 1.0 - e.transparency];
+        let (target, tess, first) = (e.target.clone(), e.tessellation, e.before.is_none());
+        let applied = self.doc.update(cx, |doc, cx| {
+            doc.edit_tab_deferred(self.tab, "Edit appearance", cx, |c| {
+                let noshape_model::document::TabContent::PartStudio(ps) = c else { return None };
+                let before = first.then(|| (ps.appearances.clone(), ps.part_properties.clone()));
+                let added = match &target {
+                    EditTarget::Parts(bodies) => {
+                        for b in bodies {
+                            let p = ps.part_properties.entry(b.clone()).or_default();
+                            p.appearance = Some(Appearance { color });
+                            p.tessellation = (tess != TessQuality::Auto).then_some(tess);
+                        }
+                        None
+                    }
+                    EditTarget::Faces(faces, index) => {
+                        noshape_ops::appearance::set_face_appearance(ps, *index, AppearanceTarget::Faces(faces.clone()), color);
+                        index.is_none().then(|| ps.appearances.len() - 1)
+                    }
+                    EditTarget::ConfiguredCell(..) => None,
+                    EditTarget::Feature(f, index) => {
+                        let target = AppearanceTarget::Feature(*f);
+                        let index = index.or_else(|| ps.appearances.iter().position(|x| x.target == target));
+                        noshape_ops::appearance::set_face_appearance(ps, index, target, color);
+                        None
+                    }
+                    EditTarget::Features(fs) => {
+                        for f in fs {
+                            let target = AppearanceTarget::Feature(*f);
+                            let index = ps.appearances.iter().position(|x| x.target == target);
+                            noshape_ops::appearance::set_face_appearance(ps, index, target, color);
+                        }
+                        None
+                    }
+                };
+                Some((before, added))
+            })
+        });
+        let Some(Some((before, added))) = applied else { return };
+        let Some(e) = &mut self.ui.appearance_edit else { return };
+        if before.is_some() {
+            e.before = before;
+        }
+        // A new face appearance is that row from now on.
+        if let (Some(i), EditTarget::Faces(_, index)) = (added, &mut e.target) {
+            *index = Some(i);
+        }
     }
 
     /// The row's Suppress / Unsuppress: its faces show their part's colour meanwhile (live 2292).
@@ -544,8 +614,7 @@ impl PartStudioView {
             _ => Vec::new(),
         };
         let fields: Vec<serde_json::Value> = faces.map(|_| serde_json::json!({ "label": "Faces or features", "kind": "query", "items": items, "active": true, "state": "ok" })).into_iter().collect();
-        let changed = e.initial != (e.rgb, e.transparency, e.tessellation);
-        let ok = if changed || matches!(e.target, EditTarget::Faces(_, None)) { "enabled" } else { "disabled" };
+        let ok = if e.acceptable() { "enabled" } else { "disabled" };
         Some(serde_json::json!({ "title": title.to_string(), "titleState": "ok", "kind": "feature", "tabs": [], "fields": fields, "error": null, "ok": ok }))
     }
 
@@ -554,7 +623,7 @@ impl PartStudioView {
         let pal = p();
         let is_part = matches!(e.target, EditTarget::Parts(..));
         let (title, faces) = self.appearance_heading(&e.target, cx);
-        let changed = e.initial != (e.rgb, e.transparency, e.tessellation);
+        let changed = e.acceptable();
         let rgb = e.rgb;
         let alpha = 1.0 - e.transparency;
         let (mixer, mix) = (e.mixer, e.mix);
@@ -700,7 +769,7 @@ impl PartStudioView {
                 if let Some(e) = &mut this.ui.appearance_edit {
                     e.tessellation = TessQuality::ALL[i];
                 }
-                cx.notify();
+                this.apply_appearance(false, cx);
             })
         })
         .h(px(26.))
@@ -757,12 +826,7 @@ impl PartStudioView {
                                 .justify_center()
                                 .cursor(CursorStyle::Arrow)
                                 .child(crate::assets::icon("dialog-cancel", 24., cx))
-                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                                    if let Some(e) = this.ui.appearance_edit.take() {
-                                        this.appearance_closed(&e.target, cx);
-                                    }
-                                    cx.notify();
-                                })),
+                                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.cancel_appearance(cx))),
                         ),
                 )
                 .when_some(faces, |d, label| {

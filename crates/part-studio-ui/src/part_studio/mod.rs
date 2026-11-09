@@ -6852,10 +6852,9 @@ impl Render for PartStudioView {
                 }
                 // Live (behaviours request 1663 (a)): one Esc cancels every
                 // appearance editor, even typing in its hex field.
-                if let Some(e) = this.ui.appearance_edit.take() {
-                    this.appearance_closed(&e.target, cx);
+                if this.ui.appearance_edit.is_some() {
+                    this.cancel_appearance(cx);
                     window.focus(&this.focus, cx);
-                    cx.notify();
                     return;
                 }
                 if this.ui.env_picker.take().is_some() {

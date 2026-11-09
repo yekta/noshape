@@ -134,6 +134,15 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
+**2026-11-09 06:50 UTC (psui): the "open on ours" four.** The code editor's click now lands where live's runner
+clicks Ace (400 px in, 300 px down, else the middle) and the editor's text is live's 14 px: fs-compare and
+fs-ps-custom-feature-error land on live's line and column. fs-ed-ctrl-click-std is live-side: its click missed the
+word (y 527 for line 6; asked live2, REQUESTS 06:04); ours opens std as live's notes say. Help › System check is a
+page in its own window; documents windows are a list (a folder's Open in new browser tab opens another at the
+folder; a bubble shows in its own window); the appearance editor commits as you type (Undo on at once, ✓ one step,
+✕ / Esc restore with no step); View in repair only from a Part Studio. 202-scenario check: 127 → 131, none worse.
+Left to dx: fs-compare's version text in Compare (live shows V1's), fs-ps-show-code, the notices counts.
+
 **2026-11-09 04:45 UTC (psui): the full run's differences (lead: ours vs live-side, fix ours, biggest loss first).**
 Points lost by area (weight × (1 − match × coverage), 02:57 run): documents 1.13, Feature Studio 0.40, versions 0.28,
 Part Studio 0.14, Variable Studio 0.12 (drawings 0.55 and assemblies 0.10 left to dx and asm; asm's 8 in asm.md).

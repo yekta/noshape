@@ -1452,8 +1452,8 @@ impl Render for HistoryPanel {
                             m
                         };
                         // Live rp-904/905: change and version rows, and a merge's point in its workspace (not the
-                        // source's point, 2383).
-                        let m = if kind == RowKind::Merged {
+                        // source's point, 2383); from a Part Studio only (live fs-compare).
+                        let m = if kind == RowKind::Merged || !repair_here {
                             m
                         } else {
                             m.item(crate::os_menu::OsMenuItem::new("View in repair").on_click(move |_, _, cx| {

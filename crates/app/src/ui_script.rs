@@ -252,6 +252,8 @@ fn locate(t: &Value, studio: &Studio, assembly: &Option<Entity<crate::assembly_v
                 Some("bottom") => point(b.center().x, b.bottom() - px(3.)),
                 Some("left") => point(b.left() + px(3.), b.center().y),
                 Some("right") => point(b.right() - px(3.), b.center().y),
+                // The code editor where live's runner clicks Ace's scroller: at most 400 px in and 300 px down.
+                _ if name.starts_with("editor:") => point(b.left() + (b.size.width / 2.).min(px(400.)), b.top() + (b.size.height / 2.).min(px(300.))),
                 _ => b.center(),
             });
         }
@@ -717,7 +719,7 @@ pub fn start_page(cx: &mut App) {
             let Some(w) = follow(cx) else { break };
             // (Also a help link: live's opens a browser tab, docs-advanced-search-help.)
             let help = step["on"]["button"].as_str().is_some_and(|b| b.to_lowercase().contains("help") || b.starts_with("Learn more"));
-            stay.set(step["on"]["menu"].as_str() == Some("Open in new browser tab") || help);
+            stay.set(matches!(step["on"]["menu"].as_str(), Some("Open in new browser tab" | "System check")) || help);
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);

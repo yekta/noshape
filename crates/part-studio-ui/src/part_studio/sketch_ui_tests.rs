@@ -1485,6 +1485,52 @@ fn the_appearance_editors_fields_tab_and_enter_as_live(cx: &mut TestAppContext) 
     assert!(cx.update(|cx| view.read(cx).ui.appearance_edit.is_none()), "Enter closed the editor");
 }
 
+/// Live (ui-parity appearance-face-row-remove): the appearance editor commits as you type, so Undo turns on with the
+/// first change; ✓ makes the session one undo step, and ✕ puts the appearances back with no step.
+#[gpui::test]
+fn the_appearance_editor_commits_as_you_type(cx: &mut TestAppContext) {
+    use super::super::appearance::EditTarget;
+    use noshape_model::reference::FeatureId;
+    let (window, view) = part_studio(cx, "appearance-live");
+    cx.update(|cx| {
+        view.update(cx, |v, cx| {
+            let tab = v.tab;
+            v.doc.update(cx, |doc, cx| {
+                doc.edit_studio(tab, "Add features", cx, |ps| {
+                    ps.features.push(noshape_model::partstudio::Feature { id: FeatureId(9002), type_id: "extrude".into(), name: "Extrude 1".into(), suppressed: false, params: Default::default(), folder: None, custom_name: false, hidden: false, suppression_expr: None, sub_features: Vec::new() });
+                })
+            });
+        })
+    });
+    cx.update_window(window, |_, w, _| w.activate_window()).unwrap();
+    let state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let v = view.read(cx);
+            let d = v.doc.read(cx);
+            let colors: Vec<[f32; 4]> = v.studio(cx).map(|s| s.appearances.iter().map(|a| a.color).collect()).unwrap_or_default();
+            (colors.len(), colors.first().map(|c| c[0]), d.session.undo_len(), d.can_undo())
+        })
+    };
+    let open = |cx: &mut TestAppContext| cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.edit_appearance(EditTarget::Feature(FeatureId(9002), None), w, cx))).unwrap();
+    let set = |cx: &mut TestAppContext, rgb: [u8; 3]| cx.update_window(window, |_, w, cx| view.update(cx, |v, cx| v.set_edit_color(rgb, w, cx))).unwrap();
+    let (_, _, steps, _) = state(cx);
+    open(cx);
+    set(cx, [200, 0, 0]);
+    let (n, r, now, undo) = state(cx);
+    assert_eq!((n, now, undo), (1, steps, true), "the first change is in the document at once, Undo on, no step yet");
+    assert!(r.is_some_and(|r| (r - super::super::appearance::srgb_to_lin(200)).abs() < 1e-6), "{r:?}");
+    set(cx, [10, 0, 0]);
+    cx.update(|cx| view.update(cx, |v, cx| v.accept_appearance(cx)));
+    let (n, _, after, _) = state(cx);
+    assert_eq!((n, after), (1, steps + 1), "✓: one undo step for the session");
+    open(cx);
+    set(cx, [90, 0, 0]);
+    cx.update(|cx| view.update(cx, |v, cx| v.cancel_appearance(cx)));
+    let (n, r, after_cancel, _) = state(cx);
+    assert_eq!((n, after_cancel), (1, steps + 1), "✕: no new step");
+    assert!(r.is_some_and(|r| (r - super::super::appearance::srgb_to_lin(10)).abs() < 1e-6), "✕ put the colour back: {r:?}");
+}
+
 /// core-workflow 8.2.11: Extrude 1 › Add appearance to feature… opens "Face appearance 1" with "Extrude 1" in its
 /// Faces or features field, black, the focus on the body; Sketch 1's editor is "Appearance" at #999 (live 1663).
 #[gpui::test]
