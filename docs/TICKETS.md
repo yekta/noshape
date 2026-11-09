@@ -298,6 +298,17 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-09 05:00 release (qa list 04:04, checked on green 62a7e4bc; newest 35fd1ddf is UI only; the latest release is v0.4.37)
+- **qa 04:04: no blocker.** Greens since the v0.4.37 cut (3fd65b5c9) with geometry changes swept on vibe3 (volume sweep 20, cf
+  corpus 13, the 48 ticket documents): 3137184e → 62a7e4bc, 12 greens, all unchanged (the UI-only ones not swept). Fuzz since
+  v0.4.37's publish: v0.4.37 180 seeds, greens d6904caf / fc228df9 / d00d91d6 180 seeds, 0 deaths. Suites (SUITE-REGRESSIONS-1108):
+  c2-impeller-loft's "Fillet Bohrungssitz Ansaugflasch" fails since the 18:54 run (core / blend; not a crash); speed numbers from
+  vibe2 are load-bound now (day-old T2 processes there).
+- Open, not new in this cut (in v0.4.36 and v0.4.37): P1 WIN-SHOW-IN-EXPLORER (studios; still no fix on main, so this cut has it
+  too), P1 SAVED-SKETCH-PLANE-LOST (blend).
+- Open P0s, long-running, not new: BLEND-RUST, SHELL-SLOW, REGEN-SPEED. At publish: the smoke, sweeps on the release CLI, the agent
+  session, qa-os.yml, the updater and title bar menus.
+
 ## Release blockers for the 2026-11-08 17:00 release (qa list 16:49, checked on green 3fd65b5c, 3137184e's sweep running; the latest release is v0.4.36)
 - **qa 16:49: no blocker.** Greens since the v0.4.36 cut (405d7ca81) swept on vibe3 (volume sweep 20, cf corpus 13, the 48 ticket
   documents): 5a964e07 → 3fd65b5c, 18 greens, all unchanged. Fuzz since v0.4.36's publish: v0.4.36 163 seeds, greens f31db8f7 /
