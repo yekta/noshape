@@ -98,9 +98,12 @@ impl NotesPanel {
         let Some(st) = self.editor.take() else { return };
         let text = st.read(cx).value().to_string();
         let r = self.doc.update(cx, |dm, _| dm.session.store.set_meta(NOTES_KEY, Some(text.as_bytes())));
-        if let Err(e) = r {
-            self.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Error(format!("Could not save the notes: {e}"))));
-        }
+        // Live doc-notes-preview-apply: "Notes saved."
+        let ev = match r {
+            Ok(()) => crate::doc_model::DocEvent::Info("Notes saved.".into()),
+            Err(e) => crate::doc_model::DocEvent::Error(format!("Could not save the notes: {e}")),
+        };
+        self.doc.update(cx, |_, cx| cx.emit(ev));
         self.notes = read_notes(&self.doc, cx);
         cx.notify();
     }
@@ -119,8 +122,10 @@ impl Render for NotesPanel {
         let close = header_icon("notes-close", "close", "Close").on_click(cx.listener(|_, _, _, cx| cx.emit(ClosePanel)));
         let header = match &self.editor {
             None => panel_header("Document notes")
+                // Live doc-notes-refresh: "Notes fetched."
                 .child(header_icon("notes-refresh", "refresh", "Refresh notes").on_click(cx.listener(|this, _, _, cx| {
                     this.notes = read_notes(&this.doc, cx);
+                    this.doc.update(cx, |_, cx| cx.emit(crate::doc_model::DocEvent::Info("Notes fetched.".into())));
                     cx.notify();
                 })))
                 .child(header_icon("notes-edit", "edit", "Edit notes").on_click(cx.listener(|this, _, window, cx| this.edit(window, cx))))

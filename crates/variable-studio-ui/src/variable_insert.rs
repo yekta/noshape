@@ -51,6 +51,8 @@ struct DialogState {
     /// Studios folded or unfolded with their caret, or unfolded by a pick: the others as listed (live: a lone studio
     /// expanded, several folded, vs-insert-dialog / vs-ps-shadowed).
     toggled: HashSet<(Option<std::path::PathBuf>, TabId)>,
+    /// A studio picked among several: the list shows only it, the header a ‹ back (live vs-ps-shadowed step 4).
+    drilled: Option<(Option<std::path::PathBuf>, TabId)>,
     other: bool,
     /// Other documents: the chosen document and version (microversion).
     document: Option<std::path::PathBuf>,
@@ -132,6 +134,9 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
         return;
     }
     let path = external.as_ref().map(|e| e.path.clone());
+    let several = studios.len() > 1;
+    let drilled = state.borrow().drilled.clone().filter(|k| k.0 == path && studios.iter().any(|s| s.0 == k.1));
+    let studios: Vec<_> = studios.into_iter().filter(|s| drilled.as_ref().is_none_or(|k| k.1 == s.0)).collect();
     let lone = studios.len() == 1;
     for (id, name, names, cfg) in studios {
         let cur = current_ref(current, target, id, &external);
@@ -238,11 +243,16 @@ fn studio_rows(ctx: &Rows, src: &noshape_model::Document, external: Option<vars:
                     )
                 })
                 .on_click(move |_, window, cx| {
-                    // A pick unfolds the studio (live vs-ps-shadowed); a configured one shows its inputs (live
-                    // assembly/592: inline under the row).
+                    // A pick unfolds the studio (live vs-ps-shadowed); among several it drills into it; a configured
+                    // one shows its inputs (live assembly/592: inline under the row).
                     {
                         let mut s = st_pick.borrow_mut();
-                        if !open && !s.toggled.remove(&key_pick) {
+                        if several {
+                            // Drilled into, it is the lone studio listed: unfolded.
+                            s.drilled = Some(key_pick.clone());
+                            s.toggled.remove(&key_pick);
+                        }
+                        if !several && !open && !s.toggled.remove(&key_pick) {
                             s.toggled.insert(key_pick.clone());
                         }
                         if configured {
@@ -579,6 +589,7 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
                 None if place.is_none() && url_q.is_empty() => {
                     for (k, label) in PLACES.iter().enumerate() {
                         let st = state.clone();
+                        crate::ui_script::note_field(|| serde_json::json!({ "label": label, "kind": "list_row" }));
                         rows.push(
                             h_flex()
                                 .id(("ivs-place", k))
@@ -752,6 +763,8 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
         };
         let own_label = state.borrow().own_version.as_ref().map(|(_, l)| l.clone()).unwrap_or(branch);
         let (st_g, doc_v) = (state.clone(), doc.clone());
+        let st_back = state.clone();
+        let drilled = state.borrow().drilled.is_some();
         let document_row = h_flex()
             .h(px(40.))
             .flex_none()
@@ -760,6 +773,13 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             .gap(px(6.))
             .border_b_1()
             .border_color(rgb(0xeeeeee))
+            // Drilled into a studio: ‹ back to the list (live 4-step4).
+            .when(drilled, |d| {
+                d.child(div().id("ivs-drill-back").map(|d| crate::ui_script::mark(d, || "button:Back".into())).flex_none().cursor_pointer().child(crate::ui::glyph("ui-chevron-left", 14., pal.text)).on_click(move |_, window, _| {
+                    st_back.borrow_mut().drilled = None;
+                    window.refresh();
+                }))
+            })
             .child(
                 v_flex()
                     .flex_1()
@@ -854,7 +874,9 @@ fn open_with(doc: Entity<DocModel>, target: InsertTarget, state: DialogState, wi
             fields.extend(crate::ui_script::take_fields());
             let tabs = serde_json::json!([{ "label": "Current document", "selected": !other }, { "label": "Other documents", "selected": other }]);
             let title_state = if changed { "ok" } else { "error" };
-            serde_json::json!({ "title": title, "titleState": title_state, "ok": "enabled", "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
+            // Nothing picked yet: the title red and ✓ greyed (live vs-insert-other-documents).
+            let ok = if changed { "enabled" } else { "disabled" };
+            serde_json::json!({ "title": title, "titleState": title_state, "ok": ok, "kind": "feature", "tabs": tabs, "fields": fields, "error": null })
         });
         dialog
             .w(px(300.))

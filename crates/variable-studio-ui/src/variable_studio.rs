@@ -51,6 +51,9 @@ pub struct VariableStudioView {
     /// border); a typed key or a double-click opens the editor; Enter / a click away commit, Esc reverts.
     cell_focus: HashMap<String, FocusHandle>,
     cell_selected: Option<String>,
+    /// After a Variable type pick, that row's type select keeps the keyboard in its search input (live
+    /// vs-type-pick-then-type): the row, the input.
+    type_search: Option<(usize, Entity<InputState>)>,
     cell_editing: Option<String>,
     /// A Value cell's `#` list (live vs-value-autocomplete), keyed by the cell.
     completion: Option<crate::var_complete::VarCompletion>,
@@ -158,6 +161,7 @@ impl VariableStudioView {
             focus_add_row: false,
             cell_focus: HashMap::new(),
             cell_selected: None,
+            type_search: None,
             cell_editing: None,
             completion: None,
             ui_drawn: Vec::new(),
@@ -302,6 +306,39 @@ impl VariableStudioView {
 
     /// The focus handle of a cell (one per cell, always tracked, so a click
     /// can focus it right away).
+    /// A Variable type picked on row `i`: its select's search input takes the keyboard. Typing shows the search in
+    /// the cell; Enter picks the first type the text starts (else keeps the type) and selects the next row's type
+    /// cell; Esc closes the search (live vs-type-pick-then-type).
+    fn start_type_search(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false));
+        let sub = cx.subscribe_in(&st, window, move |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
+            InputEvent::Change => cx.notify(),
+            InputEvent::PressEnter { .. } => {
+                let q = st.read(cx).value().trim().to_lowercase();
+                let pick = (!q.is_empty()).then(|| TYPE_KINDS.iter().copied().find(|k| kind_label(*k).to_lowercase().starts_with(&q))).flatten();
+                if let Some(k) = pick {
+                    let units = this.doc.read(cx).session.doc.settings.units;
+                    this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k, &units));
+                }
+                this.type_search = None;
+                let next = format!("t{}", i + 1);
+                this.cell_selected = Some(next.clone());
+                let fh = this.cell_focus_handle(&next, cx);
+                window.focus(&fh, cx);
+                cx.notify();
+            }
+            InputEvent::Blur if this.type_search.as_ref().is_some_and(|(_, s)| s == st) => {
+                this.type_search = None;
+                cx.notify();
+            }
+            _ => {}
+        });
+        self.subs.push(sub);
+        st.update(cx, |s, cx| s.focus(window, cx));
+        self.type_search = Some((i, st));
+        cx.notify();
+    }
+
     fn cell_focus_handle(&mut self, key: &str, cx: &mut Context<Self>) -> FocusHandle {
         self.cell_focus.entry(key.to_string()).or_insert_with(|| cx.focus_handle()).clone()
     }
@@ -515,6 +552,9 @@ impl Render for VsColDrag {
         div()
     }
 }
+
+/// Onshape's variable types in its Variable type select's order (behaviours.md, Variable Studio).
+const TYPE_KINDS: [VarKind; 5] = [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport];
 
 fn cell_div(c: usize) -> Div {
     div().w(px(col_w(c))).h(px(ROW_H)).flex_none().flex().items_center().bg(p().bg_senary).border_r_1().border_b_1().border_color(rgb(RULE))
@@ -869,9 +909,13 @@ impl VariableStudioView {
                 noshape_units::format_quantity(q, &noshape_units::UnitPrefs { length: unit, ..units })
             });
             let shown = shown.or_else(|| (!editing).then(|| rounded_literal(&v.expr.text, &units)).flatten());
+            // From import: the imported value, "Not set" before a file is picked (live vs-type-from-import).
+            let import_text = (v.kind == Some(VarKind::FromImport)).then(|| v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Not set".into()));
             if crate::ui_script::active() {
                 // A cell being typed in shows what's typed (live vs-edit-value: "50" before Enter).
-                let value = if editing { expr.read(cx).value().to_string() } else { shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text)) };
+                let value = if let Some(t) = &import_text {
+                    t.clone()
+                } else if editing { expr.read(cx).value().to_string() } else { shown.clone().unwrap_or_else(|| noshape_units::localize(&v.expr.text)) };
                 let typed = |st: &Entity<InputState>, saved: &str| if st.read(cx).focus_handle(cx).is_focused(window) { st.read(cx).value().to_string() } else { saved.to_string() };
                 drawn.push(serde_json::json!({ "name": typed(&name, &v.name), "type": kind_label(v.kind.unwrap_or(VarKind::Any)), "value": value, "description": typed(&desc, &desc_text) }));
             }
@@ -882,7 +926,7 @@ impl VariableStudioView {
                 // From import: the imported value and the Edit pencil (help:
                 // "In the Value cell, click the Edit pencil icon").
                 _ if from_import => {
-                    let text = v.import.as_ref().map(|imp| noshape_model::variables::import_value(&self.doc.read(cx).session.doc, imp).map(|x| x.to_string()).unwrap_or_else(|e| e)).unwrap_or_else(|| "Select CSV file".into());
+                    let text = import_text.clone().unwrap_or_default();
                     let (doc, tab) = (self.doc.clone(), self.tab);
                     cell_div(2)
                         .id(("vs-val", i))
@@ -1032,21 +1076,33 @@ impl VariableStudioView {
                                     .when(overwritten.contains(&v.name), |d| d.child(div().id(("vs-over", i)).absolute().right(px(8.)).top(px(12.)).tooltip(crate::ui::tooltip("Overwritten in another variable table.")).child(crate::ui::glyph("info", 10., rgb(0x666666))))),
                             ))
                             .child({
-                                // Onshape's types (behaviours.md, Variable Studio).
-                                const KINDS: [VarKind; 5] = [VarKind::Length, VarKind::Angle, VarKind::Number, VarKind::Any, VarKind::FromImport];
-                                let current = KINDS.iter().position(|k| *k == kind).unwrap_or(0);
+                                let current = TYPE_KINDS.iter().position(|k| *k == kind).unwrap_or(0);
                                 let var_name = v.name.clone();
-                                let cell = type_cell(("vs-kind", i), KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
-                                    let k = KINDS[k];
+                                let cell = type_cell(("vs-kind", i), TYPE_KINDS.iter().map(|k| kind_label(*k).to_string()).collect(), current, move |k, window, cx| {
+                                    let k = TYPE_KINDS[k];
                                     kinds.update(cx, |this, cx| {
                                         let units = this.doc.read(cx).session.doc.settings.units;
                                         this.edit("Change variable type", cx, |s| noshape_ops::variable_studio::set_kind(s, i, k, &units));
-                                        // From import: its settings are in the Variable dialog.
-                                        if k == VarKind::FromImport {
-                                            crate::variable_import::open(this.doc.clone(), this.tab, i, window, cx);
-                                        }
+                                        // The select keeps the keyboard; From import's file is picked with the Value cell's pencil
+                                        // (live vs-type-from-import: no dialog, "Not set").
+                                        this.start_type_search(i, window, cx);
                                     })
                                 });
+                                let tkey = format!("t{i}");
+                                let tfh = self.cell_focus_handle(&tkey, cx);
+                                let selected = self.cell_selected.as_deref() == Some(tkey.as_str()) && tfh.is_focused(window);
+                                // The search typed after a pick, over the cell (empty: unseen, still holding the keyboard).
+                                let search = self.type_search.as_ref().filter(|(r, _)| *r == i).map(|(_, st)| {
+                                    let shown = !st.read(cx).value().is_empty();
+                                    div().absolute().inset_0().bg(pal.panel).when(!shown, |d| d.opacity(0.)).border_b_2().border_color(rgb(0x1651b0)).flex().items_center().child(cell_input(st))
+                                });
+                                let cell = div()
+                                    .id(("vs-kind-cell", i))
+                                    .relative()
+                                    .track_focus(&tfh)
+                                    .child(cell)
+                                    .children(search)
+                                    .when(selected, |d| d.child(div().absolute().inset_0().border_2().border_color(rgb(0x1651b0))));
                                 crate::ui_script::mark(cell, || format!("var_cell:{var_name}:Variable type"))
                             }),
                     )

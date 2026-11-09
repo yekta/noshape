@@ -49,6 +49,7 @@ impl AssemblyView {
                     material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
                     computed_mass: computed.map(|m| format!("{} kg", noshape_units::to_fixed(m, 4))),
                     bom_options: None,
+                    drawing_info: None,
                     values: MetaValues {
                         name,
                         description: props.description.clone().unwrap_or_default(),
@@ -57,6 +58,7 @@ impl AssemblyView {
                         meta: props.meta.clone(),
                         mass_override: props.mass_override.map(|m| format!("{m} kg")),
                         bom: 0,
+                        drawing: None,
                     },
                 };
                 let (doc, view) = (self.doc.clone(), cx.entity());
@@ -1013,6 +1015,7 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
         material: None,
         computed_mass: computed,
         bom_options: Some(BomBehavior::ALL.iter().map(|b| b.label().to_string()).collect()),
+        drawing_info: None,
         values: MetaValues {
             name,
             description: props.description.clone().unwrap_or_default(),
@@ -1021,6 +1024,7 @@ fn open_assembly_metadata_with(doc: Entity<crate::doc_model::DocModel>, tab: nos
             meta: props.meta.clone(),
             mass_override: props.mass_override.map(|m| format!("{m} kg")),
             bom: BomBehavior::ALL.iter().position(|b| *b == props.bom_behavior).unwrap_or(0),
+            drawing: None,
         },
     };
     let on_save = move |v: crate::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {

@@ -684,11 +684,11 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
                 let density = |_: &BodyId| p.density;
                 computed_mass = ctx.and_then(|c| noshape_model::regen::measure::mass_properties(&c, std::slice::from_ref(b), &density)?.mass).map(|m| format!("{} kg", noshape_units::to_fixed(m, 4)));
             }
-            ("Onshape Part", MetaValues { name: item.name.clone(), description: p.description.unwrap_or_default(), part_number: p.part_number.unwrap_or_default(), revision: p.revision.unwrap_or_default(), meta: p.meta, mass_override: p.mass_override.map(|m| format!("{m} kg")), bom: 0 })
+            ("Onshape Part", MetaValues { name: item.name.clone(), description: p.description.unwrap_or_default(), part_number: p.part_number.unwrap_or_default(), revision: p.revision.unwrap_or_default(), meta: p.meta, mass_override: p.mass_override.map(|m| format!("{m} kg")), bom: 0, drawing: None })
         }
         (Some(TabContent::Assembly(a)), _) => {
             let p = &a.properties;
-            ("Onshape Assembly", MetaValues { name: item.name.clone(), description: p.description.clone().unwrap_or_default(), part_number: p.part_number.clone().unwrap_or_default(), revision: p.revision.clone().unwrap_or_default(), meta: p.meta.clone(), mass_override: None, bom: 0 })
+            ("Onshape Assembly", MetaValues { name: item.name.clone(), description: p.description.clone().unwrap_or_default(), part_number: p.part_number.clone().unwrap_or_default(), revision: p.revision.clone().unwrap_or_default(), meta: p.meta.clone(), mass_override: None, bom: 0, drawing: None })
         }
         _ => {
             let desc = d.session.store.get_meta(&format!("tab_description:{}", tab.0)).ok().flatten().map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default();
@@ -701,7 +701,7 @@ fn open_item_properties(doc: Entity<DocModel>, item: ReleaseItem, on_saved: impl
             (category, MetaValues { name: item.name.clone(), description: desc, part_number: tab_part_number(d, tab), meta, ..MetaValues::default() })
         }
     };
-    let spec = MetaSpec { category, material, computed_mass, bom_options: None, values };
+    let spec = MetaSpec { category, material, computed_mass, bom_options: None, drawing_info: None, values };
     crate::properties_dialog::open_properties(
         spec,
         move |v, window, cx| {

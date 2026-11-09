@@ -61,6 +61,11 @@ pub fn mass_number(x: f64) -> String {
     if t == "-0" { "0".into() } else { t.to_string() }
 }
 
+/// A drawing's own fields, after Title 3 (live doc-tab-properties-drawing).
+const DRAWING_FIELDS: [&str; 4] = ["Drawn by", "Approver", "Date drawn", "Date approved"];
+/// A drawing's shown fields, after Not revision managed.
+const DRAWING_INFO: [&str; 3] = ["Last changed date", "Last changed by", "Inspection count"];
+
 /// A new item's unit of measure.
 pub const DEFAULT_UNIT: &str = "Each";
 
@@ -76,6 +81,8 @@ pub struct MetaValues {
     pub mass_override: Option<String>,
     /// Subassembly BOM behavior (assemblies), index into the options.
     pub bom: usize,
+    /// A drawing's Drawn by, Approver, Date drawn and Date approved (dates MM/DD/YYYY as shown).
+    pub drawing: Option<[String; 4]>,
 }
 
 /// What the modal shows besides the values.
@@ -87,6 +94,8 @@ pub struct MetaSpec {
     pub computed_mass: Option<String>,
     /// Assemblies: the "Subassembly BOM behavior" options.
     pub bom_options: Option<Vec<String>>,
+    /// Drawings: Last changed date, Last changed by and Inspection count (shown, not edited).
+    pub drawing_info: Option<[String; 3]>,
     pub values: MetaValues,
 }
 
@@ -135,6 +144,9 @@ pub struct MetaForm {
     project: Entity<InputState>,
     product_line: Entity<InputState>,
     titles: [Entity<InputState>; 3],
+    /// Drawings: Drawn by, Approver, Date drawn, Date approved; and the shown Last changed date / by, Inspection count.
+    drawing: Option<[Entity<InputState>; 4]>,
+    drawing_info: Option<[String; 3]>,
     mass: Entity<InputState>,
     /// Values not held by text inputs.
     state: Option<String>,
@@ -183,12 +195,13 @@ impl MetaForm {
         let project = text(&opt(&v.meta.project), window, cx);
         let product_line = text(&opt(&v.meta.product_line), window, cx);
         let titles = [text(&opt(&v.meta.title1), window, cx), text(&opt(&v.meta.title2), window, cx), text(&opt(&v.meta.title3), window, cx)];
+        let drawing = v.drawing.as_ref().map(|d| [text(&d[0], window, cx), text(&d[1], window, cx), text(&d[2], window, cx), text(&d[3], window, cx)]);
         let mass = {
             let m = v.mass_override.clone().unwrap_or_default();
             cx.new(|cx| InputState::new(window, cx).placeholder("Computed value").default_value(m))
         };
         let mut subs = Vec::new();
-        for st in [&name, &part_number, &revision, &vendor, &project, &product_line, &titles[0], &titles[1], &titles[2], &mass] {
+        for st in [&name, &part_number, &revision, &vendor, &project, &product_line, &titles[0], &titles[1], &titles[2], &mass].into_iter().chain(drawing.iter().flatten()) {
             subs.push(cx.subscribe(st, |this: &mut Self, _, ev: &InputEvent, cx| {
                 if matches!(ev, InputEvent::Change) {
                     this.changed(cx);
@@ -242,6 +255,8 @@ impl MetaForm {
             project,
             product_line,
             titles,
+            drawing,
+            drawing_info: spec.drawing_info,
             mass,
             state: v.meta.state.clone(),
             not_revision_managed: v.meta.not_revision_managed,
@@ -300,6 +315,7 @@ impl MetaForm {
                 },
             },
             mass_override: self.mass_on.then(|| t(&self.mass)),
+            drawing: self.drawing.as_ref().map(|d| d.each_ref().map(|st| st.read(cx).value().trim().to_string())),
             bom: self.bom,
         }
     }
@@ -331,6 +347,11 @@ impl MetaForm {
         set(&self.titles[0], v.meta.title1.clone().unwrap_or_default(), window, cx);
         set(&self.titles[1], v.meta.title2.clone().unwrap_or_default(), window, cx);
         set(&self.titles[2], v.meta.title3.clone().unwrap_or_default(), window, cx);
+        if let (Some(d), Some(dv)) = (&self.drawing, &v.drawing) {
+            for (st, val) in d.iter().zip(dv.iter()) {
+                set(st, val.clone(), window, cx);
+            }
+        }
         set(&self.mass, v.mass_override.clone().unwrap_or_default(), window, cx);
         self.state = v.meta.state.clone();
         self.not_revision_managed = v.meta.not_revision_managed;
@@ -440,7 +461,14 @@ impl MetaForm {
                 fields.push(input("Material", m.clone()));
             }
             if titled {
-                fields.extend([input("Title 1", text(&self.titles[0])), input("Title 2", text(&self.titles[1])), input("Title 3", text(&self.titles[2])), check("Not revision managed", self.not_revision_managed)]);
+                fields.extend([input("Title 1", text(&self.titles[0])), input("Title 2", text(&self.titles[1])), input("Title 3", text(&self.titles[2]))]);
+                if let Some(d) = &self.drawing {
+                    fields.extend(DRAWING_FIELDS.iter().zip(d.iter()).map(|(l, st)| input(l, text(st))));
+                }
+                fields.push(check("Not revision managed", self.not_revision_managed));
+                if let Some(info) = &self.drawing_info {
+                    fields.extend(DRAWING_INFO.iter().zip(info.iter()).map(|(l, v)| input(l, v.clone())));
+                }
             }
             if item {
                 fields.push(check("Exclude from all BOMs", self.exclude_from_bom));
@@ -547,9 +575,10 @@ impl Render for MetaForm {
         // category. Parts, assemblies and drawings have them all.
         let kind = self.spec_category;
         let numbered = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio");
-        let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio");
+        // A drawing has its own fields in their place (live doc-tab-properties-drawing).
+        let sourced = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape Drawing");
         let titled = kind != "Onshape Feature Studio";
-        let item = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File");
+        let item = !matches!(kind, "Onshape Part Studio" | "Onshape Feature Studio" | "Onshape Variable Studio" | "Onshape File" | "Onshape Drawing");
         self.note_ui_state(numbered, sourced, titled, item, cx);
         let mut form = v_flex()
             .w_full()
@@ -585,11 +614,21 @@ impl Render for MetaForm {
             form = form
                 .child(group(label("Title 1", false), self.field("Title 1", &self.titles[0], cx)))
                 .child(group(label("Title 2", false), self.field("Title 2", &self.titles[1], cx)))
-                .child(group(label("Title 3", false), self.field("Title 3", &self.titles[2], cx)))
-                .child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                    this.not_revision_managed = !this.not_revision_managed;
-                    this.changed(cx);
-                })));
+                .child(group(label("Title 3", false), self.field("Title 3", &self.titles[2], cx)));
+            if let Some(d) = self.drawing.clone() {
+                for (l, st) in DRAWING_FIELDS.iter().zip(d.iter()) {
+                    form = form.child(group(label(*l, false), self.field(l, st, cx)));
+                }
+            }
+            form = form.child(check_row("meta-nrm", "Not revision managed", self.not_revision_managed).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.not_revision_managed = !this.not_revision_managed;
+                this.changed(cx);
+            })));
+            if let Some(info) = self.drawing_info.clone() {
+                for (l, v) in DRAWING_INFO.iter().zip(info) {
+                    form = form.child(group(label(*l, false), gray_box(v, false).into_any_element()));
+                }
+            }
         }
         if item {
         form = form

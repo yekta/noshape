@@ -271,8 +271,8 @@ pub fn ops() -> Vec<Op> {
             group: "drawing",
             verb: "element_properties",
             summary: "Read or set the drawing's own properties (Tab › Properties: part number, revision, description, titles)",
-            description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3; strings). One edit (\"Properties\").",
-            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3."), opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them.")]),
+            description: "The drawing element's Properties (right-click its tab › Properties). Live (behaviours \"dx title block mappings\"): the title block's DWG NO. is the drawing's Part number and REV its Revision (\"-\" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3, drawn_by, approver; strings; created (Date drawn) and approved (Date approved) as YYYY-MM-DD). One edit (\"Properties\").",
+            fields: with(common(), vec![opt("set", json!({ "type": "object" }), "Properties to change: part_number, revision, description, title1, title2, title3, drawn_by, approver, created, approved."), opt("custom", json!({ "type": "object" }), "Custom properties: name → value (\"\" or null clears); company_custom_properties defines them.")]),
             mutates: true,
             destructive: false,
             run: element_properties,
@@ -1614,9 +1614,12 @@ fn edit_hatch(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
 fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
     let od = ctx.doc(a.opt_str("doc")?)?;
     let mut t = target(od, a)?;
-    let json_of = |m: &noshape_model::drawing::DrawingMeta| json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "created": m.created, "custom": m.item.custom });
+    let json_of = |d: &noshape_model::drawing::Drawing| {
+        let m = &d.meta;
+        json!({ "part_number": m.number, "revision": m.revision, "description": m.description, "title1": m.title1, "title2": m.title2, "title3": m.title3, "drawn_by": d.drawn_by, "approver": m.approver, "created": m.created, "approved": m.approved, "custom": m.item.custom })
+    };
     if a.get("set").is_none() && a.get("custom").is_none() {
-        return Ok(json!({ "properties": json_of(&t.d.meta) }).into());
+        return Ok(json!({ "properties": json_of(&t.d) }).into());
     }
     super::custom_props::apply_custom(a, &mut t.d.meta.item.custom)?;
     let empty = serde_json::Map::new();
@@ -1634,13 +1637,23 @@ fn element_properties(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
             "title1" => m.title1 = text,
             "title2" => m.title2 = text,
             "title3" => m.title3 = text,
-            _ => return Err(OpError::param(&format!("set.{k}"), "part_number, revision, description, title1, title2 or title3")),
+            "approver" => m.approver = text,
+            "created" | "approved" => {
+                let ok = text.is_empty() || text.split('-').map(|x| x.parse::<u32>().ok()).collect::<Option<Vec<_>>>().is_some_and(|p| p.len() == 3);
+                if !ok {
+                    return Err(OpError::param(&format!("set.{k}"), "a date YYYY-MM-DD"));
+                }
+                let date = Some(text).filter(|x| !x.is_empty());
+                if k == "created" { m.created = date } else { m.approved = date }
+            }
+            "drawn_by" => t.d.drawn_by = Some(text).filter(|x| !x.is_empty()),
+            _ => return Err(OpError::param(&format!("set.{k}"), "part_number, revision, description, title1, title2, title3, drawn_by, approver, created or approved")),
         }
     }
-    let (si, meta) = (t.sheet, t.d.meta.clone());
+    let (si, drawing) = (t.sheet, t.d.clone());
     commit(od, t.tab, si, t.d, "Properties")?;
     let mut v = reply(od, t.tab, si, false)?;
-    v["properties"] = json_of(&meta);
+    v["properties"] = json_of(&drawing);
     Ok(v.into())
 }
 

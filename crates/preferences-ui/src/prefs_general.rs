@@ -615,12 +615,18 @@ impl Render for UpdatesPrefsView {
     }
 }
 
-/// Light or dark mode, saved and applied at once in every window (Preferences › Theming's Save theme, the account
-/// menu's View in dark mode beta; live: no reload).
+/// Light or dark mode, saved and applied at once in every window (Preferences › Theming's Save theme; live: no
+/// reload).
 pub fn apply_theme(dark: bool, cx: &mut App) {
     let mut prefs = ListPrefs::load();
     prefs.dark_mode = dark;
     prefs.save();
+    show_theme(dark, cx);
+}
+
+/// Light or dark mode in every window without saving it (the account menu's View in dark mode beta: live says "You
+/// may persist this setting", in Preferences).
+pub fn show_theme(dark: bool, cx: &mut App) {
     crate::theme::set_dark(dark);
     // The viewports rebuild their scenes in the new colors.
     crate::graphics_prefs::set(crate::graphics_prefs::get(cx), false, cx);

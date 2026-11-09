@@ -108,8 +108,12 @@ fn opens_on_tab() -> Option<String> {
     let start = read_json(&starts).ok()?[name].clone();
     // A scenario that first clicks a document tab opens on it (live's runner: appearance-part-row-configure's start is
     // config-blocks' Part Studio); whole-document starts (studios' scenarios, a start with tabs or a Feature Studio:
-    // live2's runner builds them as documents, fs-studio / fs-custom) open on the first tab and click it.
-    let whole = scenario["area"] == "studios" || start.get("tabs").is_some_and(|t| t.as_array().is_some_and(|a| !a.is_empty())) || start.get("feature_studio").is_some();
+    // live2's runner builds them as documents, fs-studio / fs-custom, doc-files, doc-linked) open on the first tab and
+    // click it.
+    let whole = scenario["area"] == "studios"
+        || ["tabs", "files"].iter().any(|k| start.get(*k).is_some_and(|t| t.as_array().is_some_and(|a| !a.is_empty())))
+        || start.get("feature_studio").is_some()
+        || start.get("linked").is_some();
     if let Some(tab) = scenario["steps"].get(0).and_then(|s| s["on"]["doc_tab"].as_str()).filter(|_| !whole) {
         return Some(tab.to_string());
     }
@@ -711,7 +715,9 @@ pub fn start_page(cx: &mut App) {
         let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
             let Some(w) = follow(cx) else { break };
-            stay.set(step["on"]["menu"].as_str() == Some("Open in new browser tab"));
+            // (Also a help link: live's opens a browser tab, docs-advanced-search-help.)
+            let help = step["on"]["button"].as_str().is_some_and(|b| b.to_lowercase().contains("help") || b.starts_with("Learn more"));
+            stay.set(step["on"]["menu"].as_str() == Some("Open in new browser tab") || help);
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
@@ -985,8 +991,9 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
         "drawing": null,
         "variables": ws.ui_variables_state(cx),
     });
-    // A Material Library: live's recorder reads its tab's (empty) list as the feature list (doc-plus-create-material-library).
-    if ws.active_is_material_library(cx) {
+    // A Material Library or a file: live's recorder reads its tab's (empty) list as the feature list
+    // (doc-plus-create-material-library, doc-file-*-viewer).
+    if ws.active_is_library_or_file(cx) {
         s["features"] = json!({ "rows": [], "rollbackAfter": null });
     }
     // A Feature Studio: its editor, and its autocomplete as the list.

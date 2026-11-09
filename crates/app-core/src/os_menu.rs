@@ -169,6 +169,8 @@ pub struct OsMenu {
     items: Vec<OsMenuItem>,
     /// Rows' side tooltips (`side_tip`), by row.
     tips: std::collections::HashMap<usize, (SharedString, SharedString)>,
+    /// Rows that leave the menu open when picked ([`OsMenu::item_keep_open`]).
+    keep_open: std::collections::HashSet<usize>,
     focus: FocusHandle,
     hovered: Option<usize>,
     /// The row under a pointer that hasn't moved since the menu opened is found once, on the first paint.
@@ -244,7 +246,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, tips: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -369,6 +371,13 @@ impl OsMenu {
         if cond { f(self) } else { self }
     }
 
+    /// A row whose pick leaves the menu open (a toggle: the account menu's View in dark mode beta, live
+    /// docs-account-dark-mode).
+    pub fn item_keep_open(mut self, item: impl Into<OsMenuItem>) -> Self {
+        self.keep_open.insert(self.items.len());
+        self.item(item)
+    }
+
     pub fn item(mut self, item: impl Into<OsMenuItem>) -> Self {
         self.items.push(item.into());
         self
@@ -485,6 +494,13 @@ impl OsMenu {
     fn activate(&mut self, ix: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(OsMenuItem::Item { disabled: false, handler, .. }) = self.items.get(ix) {
             let handler = handler.clone();
+            if self.keep_open.contains(&ix) {
+                if let Some(h) = handler {
+                    h(&ClickEvent::default(), window, cx);
+                }
+                cx.notify();
+                return;
+            }
             // Focus goes back first, so a prompt the item opens returns there too.
             let ret = self.dismiss(window, cx);
             if let Some(ret) = self.action_focus.clone().or(ret) {

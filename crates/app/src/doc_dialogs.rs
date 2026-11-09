@@ -165,8 +165,13 @@ fn copy_dialog(doc: Entity<DocModel>, mv: Option<noshape_store::MicroversionId>,
                     .child(os::field_label("Copy document to"))
                     .child(location.render()),
             )
-            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", "Create document"))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
-            .on_ok(move |_, _, cx| {
+            .footer(os::modal_footer().child(os::modal_ok(os::primary_button("ok", location.ok_label("Create document")))).child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))))
+            .on_ok(move |_, window, cx| {
+                // "Open": into the folder selected in the box, the dialog stays.
+                if loc.open_picked() {
+                    window.refresh();
+                    return false;
+                }
                 let new_name = n.read(cx).value().trim().to_string();
                 if new_name.is_empty() {
                     return false;
@@ -596,15 +601,46 @@ fn assembly_mass_later(doc: &Entity<DocModel>, tab: String, cx: &mut App) -> Tas
     })
 }
 
+/// "2026-11-09" as the Properties dialog shows it, "11/09/2026".
+fn us_date(iso: &str) -> String {
+    let p: Vec<&str> = iso.split('-').collect();
+    match p.as_slice() {
+        [y, m, d] => format!("{m}/{d}/{y}"),
+        _ => iso.to_string(),
+    }
+}
+
+/// "11/09/2026" (as typed in the dialog) as the drawing keeps it, "2026-11-09"; `None` for anything else.
+fn iso_date(us: &str) -> Option<String> {
+    let p: Vec<u32> = us.trim().split('/').map(|x| x.parse().ok()).collect::<Option<_>>()?;
+    match p.as_slice() {
+        [m, d, y] if (1..=12).contains(m) && (1..=31).contains(d) => Some(format!("{y:04}-{m:02}-{d:02}")),
+        _ => None,
+    }
+}
+
+/// A store timestamp (ms since the epoch, UTC) as MM/DD/YYYY.
+fn us_date_of_millis(ms: i64) -> String {
+    let (y, m, d) = noshape_model::drawing::format::civil_from_days(ms.div_euclid(86_400_000));
+    format!("{m:02}/{d:02}/{y:04}")
+}
+
 pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId, thumb: Option<std::sync::Arc<RenderImage>>, window: &mut Window, cx: &mut App) {
     let drawing = {
-        let d = &doc.read(cx).session.doc;
-        d.tab(tab).and_then(|t| match &t.content {
-            noshape_model::document::TabContent::Drawing(dr) => Some((t.name.clone(), (*dr.meta).clone())),
+        let session = &doc.read(cx).session;
+        session.doc.tab(tab).and_then(|t| match &t.content {
+            noshape_model::document::TabContent::Drawing(dr) => {
+                // Live doc-tab-properties-drawing: Drawn by, Approver, the dates (MM/DD/YYYY), and the shown Last
+                // changed date (the document's latest change), Last changed by and Inspection count.
+                let changed = session.head().ok().and_then(|h| session.store.microversion(h).ok()).map(|m| us_date_of_millis(m.created)).unwrap_or_default();
+                let inspections = dr.sheets.iter().flat_map(|s| s.annotations.iter()).filter(|a| a.inspection.is_some()).count();
+                let fields = [dr.drawn_by.clone().unwrap_or_default(), dr.meta.approver.clone(), dr.meta.created.as_deref().map(us_date).unwrap_or_default(), dr.meta.approved.as_deref().map(us_date).unwrap_or_default()];
+                Some((t.name.clone(), (*dr.meta).clone(), fields, [changed, String::new(), inspections.to_string()]))
+            }
             _ => None,
         })
     };
-    if let Some((name, m)) = drawing {
+    if let Some((name, m, fields, info)) = drawing {
         use noshape_app_core::properties_dialog::{MetaSpec, MetaValues};
         let mut item = m.item.clone();
         (item.title1, item.title2, item.title3) = (Some(m.title1.clone()), Some(m.title2.clone()), Some(m.title3.clone()));
@@ -613,7 +649,8 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
             material: None,
             computed_mass: None,
             bom_options: None,
-            values: MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta: item, mass_override: None, bom: 0 },
+            drawing_info: Some(info),
+            values: MetaValues { name, description: m.description.clone(), part_number: m.number.clone(), revision: m.revision.clone(), meta: item, mass_override: None, bom: 0, drawing: Some(fields) },
         };
         noshape_app_core::properties_dialog::open_properties(
             spec,
@@ -630,6 +667,12 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
                             (m.number, m.revision, m.description) = (v.part_number.clone(), v.revision.clone(), v.description.clone());
                             (m.title1, m.title2, m.title3) = (t1, t2, t3);
                             m.item = item;
+                            if let Some([by, approver, drawn, approved]) = &v.drawing {
+                                m.approver = approver.clone();
+                                m.created = iso_date(drawn).or(m.created.take());
+                                m.approved = iso_date(approved);
+                                dr.drawn_by = Some(by.clone()).filter(|b| !b.is_empty());
+                            }
                         }
                     })
                 });
@@ -665,7 +708,7 @@ pub fn tab_properties(doc: Entity<DocModel>, tab: noshape_model::document::TabId
         meta.not_revision_managed = text("tab_not_revision_managed") == "1";
         noshape_app_core::properties_dialog::MetaValues { name, description: text("tab_description"), part_number: text("tab_part_number"), revision: text("tab_revision"), meta, ..Default::default() }
     };
-    let spec = noshape_app_core::properties_dialog::MetaSpec { category, material: None, computed_mass: None, bom_options: None, values };
+    let spec = noshape_app_core::properties_dialog::MetaSpec { category, material: None, computed_mass: None, bom_options: None, drawing_info: None, values };
     let save = move |v: noshape_app_core::properties_dialog::MetaValues, _: &mut Window, cx: &mut App| {
             let r = doc.update(cx, |d, _| -> anyhow::Result<()> {
                 let store = &mut d.session.store;

@@ -786,6 +786,7 @@ impl PartStudioView {
             material: Some(props.material.clone().unwrap_or_else(|| "Unassigned".into())),
             computed_mass: computed.map(|m| format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac))),
             bom_options: None,
+            drawing_info: None,
             values: MetaValues {
                 name,
                 description: props.description.clone().unwrap_or_default(),
@@ -796,6 +797,7 @@ impl PartStudioView {
                 meta: props.meta.clone(),
                 mass_override: props.mass_override.map(|m| format!("{} {msym}", crate::properties_dialog::mass_number(m * mfac))),
                 bom: 0,
+                drawing: None,
             },
         };
         let (doc, view, tab) = (self.doc.clone(), cx.entity(), self.tab);

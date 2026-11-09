@@ -128,7 +128,7 @@ impl TabManager {
     pub fn new(doc: Entity<DocModel>, active: Option<TabId>, workspace: WeakEntity<crate::workspace::Workspace>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search tabs"));
         let subs = vec![
-            cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, _, cx| match ev {
+            cx.subscribe_in(&search, window, |this: &mut Self, st, ev: &InputEvent, window, cx| match ev {
                 InputEvent::Change => {
                     this.query = st.read(cx).value().to_string();
                     let m = this.matches(cx);
@@ -140,6 +140,9 @@ impl TabManager {
                 InputEvent::PressEnter { .. } => {
                     if let Some(t) = this.selected {
                         cx.emit(TabManagerEvent::Open(t));
+                        // The search keeps the keyboard (live doc-tab-manager-keyboard).
+                        let st = st.clone();
+                        window.defer(cx, move |window, cx| st.update(cx, |s, cx| s.focus(window, cx)));
                     }
                 }
                 _ => {}

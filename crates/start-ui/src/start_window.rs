@@ -2143,7 +2143,28 @@ impl StartView {
             description: field(&d.description, window, cx),
             label: field(&d.library_label, window, cx),
             saved: (d.name.clone(), d.description.clone(), d.library_label.clone()),
+            redo: None,
         });
+    }
+
+    /// The Properties panel's ↶ (back to the saved values) and ↷ (the edits again) (live docs-props-edit-undo).
+    fn props_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(pe) = self.props.as_mut() else { return };
+        let now = (pe.name.read(cx).value().to_string(), pe.description.read(cx).value().to_string(), pe.label.read(cx).value().to_string());
+        let to = if redo {
+            let Some(r) = pe.redo.take() else { return };
+            r
+        } else {
+            if now == pe.saved {
+                return;
+            }
+            pe.redo = Some(now);
+            pe.saved.clone()
+        };
+        for (st, v) in [(&pe.name, to.0), (&pe.description, to.1), (&pe.label, to.2)] {
+            st.update(cx, |s, cx| s.set_value(v, window, cx));
+        }
+        cx.notify();
     }
 
     /// Live documents/113: ↶ ↷ (pale) and Apply, disabled until a field changes.
@@ -2151,6 +2172,7 @@ impl StartView {
         let pe = self.props.as_ref()?;
         let now = (pe.name.read(cx).value().to_string(), pe.description.read(cx).value().to_string(), pe.label.read(cx).value().to_string());
         let changed = now != pe.saved && !now.0.trim().is_empty();
+        let (changed_any, can_redo) = (now != pe.saved, pe.redo.is_some());
         Some(
             h_flex()
                 .h(px(64.))
@@ -2158,8 +2180,8 @@ impl StartView {
                 .px(px(20.))
                 .gap(px(3.))
                 .justify_end()
-                .child(div().opacity(0.25).map(|d| crate::ui_script::mark(d, || "button:Properties › Undo".into())).child(crate::ui::icon_button("props-undo", "undo", 30., false, cx)))
-                .child(div().opacity(0.25).map(|d| crate::ui_script::mark(d, || "button:Properties › Redo".into())).child(crate::ui::icon_button("props-redo", "redo", 30., false, cx)))
+                .child(div().id("props-undo-w").when(!changed_any, |d| d.opacity(0.25)).map(|d| crate::ui_script::mark(d, || "button:Properties › Undo".into())).child(crate::ui::icon_button("props-undo", "undo", 30., false, cx)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.props_undo(false, window, cx))))
+                .child(div().id("props-redo-w").when(!can_redo, |d| d.opacity(0.25)).map(|d| crate::ui_script::mark(d, || "button:Properties › Redo".into())).child(crate::ui::icon_button("props-redo", "redo", 30., false, cx)).on_click(cx.listener(|this, _: &ClickEvent, window, cx| this.props_undo(true, window, cx))))
                 .child(os::primary_button("props-apply", "Apply").map(|d| crate::ui_script::mark(d, || "button:Properties › Apply".into())).when(!changed, |b| b.opacity(0.5)).on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
                     if changed {
                         this.apply_props(window, cx);
@@ -2624,6 +2646,8 @@ impl StartView {
                         let r = root.to_string();
                         crate::ui_script::mark(d, move || format!("crumb:{r}"))
                     })
+                    // A crumb's name is its title (live docs-folder-crumb: the tooltip under the pointer).
+                    .tooltip(crate::ui::user_tooltip(root.clone()))
                     .child(root)
                     .when(in_folder, |d| {
                         d.font_weight(FontWeight::NORMAL)
@@ -2640,7 +2664,7 @@ impl StartView {
                 div().id(("crumb", i)).map(|d| {
                     let name = folder_label(&c);
                     crate::ui_script::mark(d, move || format!("crumb:{name}"))
-                }).child(folder_label(&c)).when(i < last, |d| {
+                }).child(folder_label(&c)).tooltip(crate::ui::user_tooltip(folder_label(&c))).when(i < last, |d| {
                     d.font_weight(FontWeight::NORMAL)
                         .text_color(rgb(0x666666))
                         .cursor_pointer()
@@ -3241,9 +3265,11 @@ impl StartView {
                             this.cols_open = false;
                             cx.notify();
                         }))
-                        .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| {
+                        // Esc closes it and the page takes the keyboard back (live docs-columns-search: focus none).
+                        .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
                             if e.keystroke.key == "escape" {
                                 this.cols_open = false;
+                                window.focus(&this.focus, cx);
                                 cx.notify();
                             }
                         }))
@@ -3453,9 +3479,12 @@ impl StartView {
                                     cx.stop_propagation();
                                     this.trash(d3.clone(), window, cx);
                                 })))
-                                .child(icon("row-labels", os::GLYPH_LABEL, "Labels").on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                                // The Details panel with its Document labels open (live docs-row-icon-labels; the row menu's
+                                // Labels… is the dialog).
+                                .child(icon("row-labels", os::GLYPH_LABEL, "Labels").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
-                                    this.labels_dialog(d4.clone(), window, cx);
+                                    this.details_labels_open = true;
+                                    this.show_panel(d4.clone(), DocPanel::Details, cx);
                                 }))),
                         )
                     })
@@ -3764,6 +3793,8 @@ struct PropsEdit {
     description: Entity<InputState>,
     label: Entity<InputState>,
     saved: (String, String, String),
+    /// The edits an Undo took back (Redo brings them back).
+    redo: Option<(String, String, String)>,
 }
 
 /// Onshape's account button at the top-right (avatar, name, ▾). Its menu
@@ -3811,7 +3842,14 @@ fn user_menu(cx: &App) -> AnyElement {
             // Live (cp-1719 c1-account-menu): My account · View support tickets · App Store dev portal · View in dark
             // mode beta · Sign out; the cloud ones left out, Company settings kept (release management, local).
             m.item(OsMenuItem::new("My account").on_click(|_, _, cx| crate::preferences_window::show(crate::preferences_window::Page::Profile, cx)))
-                .item(OsMenuItem::new("View in dark mode beta").on_click(|_, _, cx| noshape_preferences_ui::prefs_general::apply_theme(!gpui_kit::hex_theme_active(), cx)))
+                // Shown, not saved; turning dark says so (live docs-account-dark-mode).
+                .item_keep_open(OsMenuItem::new("View in dark mode beta").on_click(|_, window, cx| {
+                    let dark = !gpui_kit::hex_theme_active();
+                    noshape_preferences_ui::prefs_general::show_theme(dark, cx);
+                    if dark {
+                        StartView::toast(window, cx, Toast { kind: os::BubbleKind::Info, bold: None, text: "You are now viewing in dark mode. You may persist this setting. Go to user preferences.".into(), restore: None, brief: false });
+                    }
+                }))
                 .item(OsMenuItem::new("Company settings").on_click(|_, _, cx| crate::company_settings::show(crate::company_settings::Section::ReleaseManagement, cx)))
         })
         .into_any_element()
@@ -3900,6 +3938,8 @@ pub struct Location {
     pub exclude: Option<PathBuf>,
     /// The header's Sort (↓≡): its rows by name either way or newest first (live documents/900).
     sort: Rc<std::cell::Cell<FolderSort>>,
+    /// A folder row clicked once: selected, the dialog's button reads "Open" (live docs-new-doc-location).
+    picked: Rc<RefCell<Option<PathBuf>>>,
 }
 
 /// The names the user's history is written under (see `StartView::me`).
@@ -3931,7 +3971,19 @@ fn outside_folders() -> Vec<PathBuf> {
 impl Location {
     /// A browser starting at `chosen`.
     pub fn new(chosen: PathBuf) -> Self {
-        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None, sort: Default::default() }
+        Self { root: canon(&crate::file_dialogs::documents_dir()), others: outside_folders(), chosen: Rc::new(RefCell::new(canon(&chosen))), exclude: None, sort: Default::default(), picked: Default::default() }
+    }
+
+    /// The dialog's primary button: "Open" while a folder row is selected, else `label`.
+    pub fn ok_label(&self, label: &'static str) -> &'static str {
+        if self.picked.borrow().is_some() { "Open" } else { label }
+    }
+
+    /// The primary button while a folder row is selected: into that folder (true; the dialog stays).
+    pub fn open_picked(&self) -> bool {
+        let Some(f) = self.picked.borrow_mut().take() else { return false };
+        *self.chosen.borrow_mut() = f;
+        true
     }
 
     /// The place shown in the header: "Owned by me" or the folder's name.
@@ -3968,21 +4020,30 @@ impl Location {
         if children.is_empty() {
             list = list.items_center().pt(px(15.)).child(os::info_box("No additional folders"));
         }
+        let picked = self.picked.borrow().clone();
         for (i, f) in children.iter().enumerate() {
-            let (c, f2) = (self.chosen.clone(), f.clone());
+            let (c, p, f2) = (self.chosen.clone(), self.picked.clone(), f.clone());
+            // A click selects the folder (it takes the keyboard), a double-click goes into it (live docs-new-doc-location).
             list = list.child(
-                os::row_states(h_flex().id(SharedString::from(format!("loc-{i}"))).map(|d| crate::ui_script::mark(d, || format!("list_row:{}", folder_label(f)))).h(px(30.)).px(px(8.)).gap(px(7.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)), false)
+                os::row_states(h_flex().id(SharedString::from(format!("loc-{i}"))).map(|d| crate::ui_script::mark(d, || format!("list_row:{}", folder_label(f)))).focusable().h(px(30.)).px(px(8.)).gap(px(7.)).rounded(px(3.)).cursor_pointer().text_size(px(14.)), picked.as_ref() == Some(f))
                     .child(os::glyph(os::GLYPH_FOLDER, 18., pal.text))
                     .child(div().flex_1().min_w_0().truncate().child(folder_label(f)))
-                    .on_click(move |_, window, _| {
-                        *c.borrow_mut() = f2.clone();
+                    .on_click(move |e, window, _| {
+                        if e.click_count() >= 2 {
+                            *c.borrow_mut() = f2.clone();
+                            *p.borrow_mut() = None;
+                        } else {
+                            *p.borrow_mut() = Some(f2.clone());
+                        }
                         window.refresh();
                     }),
             );
         }
+        // Home and Back clear a selected row (live: at the top, Back only does that).
         let go = |to: PathBuf| {
-            let c = self.chosen.clone();
+            let (c, p) = (self.chosen.clone(), self.picked.clone());
             move |_: &ClickEvent, window: &mut Window, _: &mut App| {
+                *p.borrow_mut() = None;
                 *c.borrow_mut() = to.clone();
                 window.refresh();
             }
@@ -4006,7 +4067,7 @@ impl Location {
                         div()
                             .id("loc-back")
                             .map(|d| crate::ui_script::mark(d, || "button:Back".into()))
-                            .when(!at_root, |d| d.cursor_pointer().on_click(go(parent)))
+                            .when(!at_root || picked.is_some(), |d| d.cursor_pointer().on_click(go(parent)))
                             .child(os::glyph(os::GLYPH_BACK, 18., pal.text)),
                     )
                     .child(
@@ -4198,8 +4259,11 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
                 fields.push(serde_json::json!({ "label": "Document labels", "kind": "input", "value": l.chosen.borrow().join(", "), "search": st.read(cx).value().to_string() }));
             }
             // (Live's recorder reads no field for the location browser.)
-            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok_label, "Cancel"] })
+            let ok = location.as_ref().map_or(ok_label, |l| l.1.ok_label(ok_label));
+            serde_json::json!({ "kind": "modal", "title": title, "fields": fields, "buttons": [ok, "Cancel"] })
         });
+        let ok = location.as_ref().map_or(ok_label, |l| l.1.ok_label(ok_label));
+        let loc_ok = location.clone();
         os::modal_doc_page(dialog, title, if location.is_some() { 598. } else { 460. })
             .child(
                 // Live documents/10: the first label right under the header,
@@ -4229,10 +4293,15 @@ fn prompt_name(prompt: NamePrompt, window: &mut Window, cx: &mut App, then: impl
             )
             .footer(
                 os::modal_footer()
-                    .child(os::modal_ok(os::primary_button("ok", ok_label)))
+                    .child(os::modal_ok(os::primary_button("ok", ok)))
                     .child(os::modal_cancel(os::cancel_button("cancel", "Cancel", cx))),
             )
             .on_ok(move |_, window, cx| {
+                // "Open": into the selected folder, the dialog stays.
+                if loc_ok.as_ref().is_some_and(|l| l.1.open_picked()) {
+                    window.refresh();
+                    return false;
+                }
                 let name = st.read(cx).value().to_string();
                 then(name, window, cx)
             })

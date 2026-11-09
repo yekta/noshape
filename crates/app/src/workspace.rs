@@ -423,9 +423,9 @@ impl Workspace {
         }
     }
 
-    /// Whether the active tab is a Material Library (ui-parity driver).
-    pub(crate) fn active_is_material_library(&self, cx: &App) -> bool {
-        self.active.and_then(|t| self.doc.read(cx).session.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::MaterialLibrary(_)))
+    /// Whether the active tab is a Material Library or a file (ui-parity driver: live reads an empty feature list there).
+    pub(crate) fn active_is_library_or_file(&self, cx: &App) -> bool {
+        self.active.and_then(|t| self.doc.read(cx).session.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::MaterialLibrary(_) | TabContent::File(_)))
     }
 
     /// The active tab's Feature Studio, if it is one (ui-parity driver).
@@ -1761,14 +1761,20 @@ impl Workspace {
                         } else {
                             menu
                         };
-                        let menu = menu
-                            .separator()
-                            .item(I::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))))
-                            .item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
-                                let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
-                                cx.set_global(dd::CopiedTab(t));
-                            }))
-                            .separator();
+                        // A Material Library has no Duplicate or Copy to clipboard; its Update… comes before Move to
+                        // document… (live doc-material-library-tab-menu).
+                        let menu = if kind == "materiallibrary" {
+                            let d2 = view.read(cx).doc.clone();
+                            menu.separator().item(I::new("Update…").on_click(move |_, w, cx| crate::material_library_view::update(d2.clone(), id, w, cx)))
+                        } else {
+                            menu.separator()
+                                .item(I::new("Duplicate").on_click(move |_, _, cx| v1.update(cx, |t, cx| t.duplicate_tab(id, cx))))
+                                .item(I::new("Copy to clipboard").on_click(move |_, _, cx| {
+                                    let t = v8.read(cx).doc.read(cx).session.doc.tab(id).cloned();
+                                    cx.set_global(dd::CopiedTab(t));
+                                }))
+                                .separator()
+                        };
                         // The active Drawing: Change to version… (live tab menu, after
                         // Copy to clipboard; not on an inactive Drawing tab): point
                         // every view at a version of the document.
@@ -1827,11 +1833,10 @@ impl Workspace {
                         } else {
                             menu
                         };
-                        // Material Library tabs: Export… (CSV) and Update… (help: customizing part materials).
+                        // Material Library tabs end with Export (a CSV download, no dialog: live doc-material-library-tab-menu).
                         if kind == "materiallibrary" {
-                            let (d1, d2) = (view.read(cx).doc.clone(), view.read(cx).doc.clone());
-                            menu.item(I::new("Export…").on_click(move |_, w, cx| crate::material_library_view::export(d1.clone(), id, w, cx)))
-                                .item(I::new("Update…").on_click(move |_, w, cx| crate::material_library_view::update(d2.clone(), id, w, cx)))
+                            let d1 = view.read(cx).doc.clone();
+                            menu.item(I::new("Export").on_click(move |_, w, cx| crate::material_library_view::export(d1.clone(), id, w, cx)))
                         } else {
                             menu
                         }

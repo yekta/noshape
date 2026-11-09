@@ -177,7 +177,7 @@ INPUT_BUTTONS = {"Apply", "Cancel", "Save", "OK"}
 # Tooltips live draws as an element's native `title` (the OS's tooltip, which its recorder can't read): ours' is read as
 # none while live's is (dom/panel-versions-history.txt: a history row's tip="Open version V1").
 NATIVE_TITLE_TOOLTIPS = re.compile(r"^Open (version|workspace) ")
-CLOUD_ONLY = {"Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
+CLOUD_ONLY = {"View support tickets", "App Store dev portal", "Sign out", "Add comment", "Copy link", "Share…", "Transfer ownership…", "Applications", "Create CAM Studio", "Create PCB Studio",
               "Create Render Studio", "Create tutorial…", "Explore Onshape", "What's new", "Forums", "Report a bug",
               "Import from", "Create task…"}
 # Rows live showed for a while and no longer has (live 2336: the + menu's "Create table" only in its 05:00–06:20
@@ -398,7 +398,8 @@ def copies(live):
 
 # Rows only Onshape's paid plans show (live's account is free: its Show analysis tools menu has no Thickness
 # analysis); ours has them, as parity is behaviour, not a plan's limits. Not compared.
-PLAN_ROWS = {"Thickness analysis…", "Edit thickness analysis", "Turn thickness analysis off"}
+# The account menu's Company settings: a company plan's (live's account is free; ours keeps the company's settings).
+PLAN_ROWS = {"Thickness analysis…", "Edit thickness analysis", "Turn thickness analysis off", "Company settings"}
 
 
 def fold_start_edits(state):
@@ -608,6 +609,14 @@ def compare(live, ours, whole_document=True):
             b["dialog"], b["focus"] = None, a.get("focus")
         if isinstance(b.get("dialog"), dict):
             b["dialog"].pop("native", None)
+        # A paid plan's upsell tooltip (docs-account-my-account: "Try Onshape Professional"): ours has no plans.
+        if isinstance(a.get("tooltip"), str) and "Onshape Professional" in a["tooltip"] and b.get("tooltip") is None:
+            b["tooltip"] = a["tooltip"]
+        # A user's name (live's account's, ours the system's): Drawn by (doc-tab-properties-drawing).
+        for side in (a, b):
+            for f in ((side.get("dialog") or {}).get("fields") or []) if isinstance(side.get("dialog"), dict) else []:
+                if isinstance(f, dict) and f.get("label") == "Drawn by" and f.get("value"):
+                    f["value"] = "<user>"
         # The Free plan's public-document icon's tooltip under the pointer (docs-row-menu): ours has no public documents.
         if a.get("tooltip") == "This is a public document." and b.get("tooltip") is None:
             b["tooltip"] = a["tooltip"]

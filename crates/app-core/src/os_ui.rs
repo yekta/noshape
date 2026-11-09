@@ -621,6 +621,9 @@ fn select_field_inner(id: impl Into<ElementId>, options: Vec<String>, disabled: 
     let field = div()
         .debug_selector(move || selector.to_string())
         .id(id)
+        // A click gives it the keyboard, as a browser's <select> (live prefs-units-frequency); one with its own
+        // handle also opens from the keys.
+        .when(opts.focus.is_none(), |d| d.focusable())
         .when_some(opts.focus, |d, f| {
             d.track_focus(&f)
                 // Chrome's focus ring on a focused `<select>` (2 px #3e94ff).

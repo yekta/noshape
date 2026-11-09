@@ -6546,6 +6546,11 @@ fn title_block_maps_the_drawings_own_properties() {
     assert_eq!(field(&mut ctx, "Revision"), "C");
     let e = try_call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "bogus": "x" } })).unwrap_err();
     assert_eq!(e.param.as_deref(), Some("set.bogus"), "{e:?}");
+    // The Properties dialog's drawing fields (live doc-tab-properties-drawing): Drawn by, Approver, the dates.
+    let p = call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "drawn_by": "A. Drafter", "approver": "B. Checker", "approved": "2026-11-09" } }));
+    assert_eq!((p["properties"]["drawn_by"].clone(), p["properties"]["approver"].clone(), p["properties"]["approved"].clone()), (json!("A. Drafter"), json!("B. Checker"), json!("2026-11-09")), "{p}");
+    let e = try_call(&mut ctx, "drawing_element_properties", json!({ "drawing": tab, "set": { "approved": "soon" } })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("set.approved"), "{e:?}");
 }
 
 /// Live ("(7) Dragging feature rows"): a fillet moved above the Extrude its edge comes from fails with its own

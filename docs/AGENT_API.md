@@ -4322,7 +4322,7 @@ Examples:
 
 Read or set the drawing's own properties (Tab › Properties: part number, revision, description, titles) (edits the document (one undoable history entry)).
 
-The drawing element's Properties (right-click its tab › Properties). Live (behaviours "dx title block mappings"): the title block's DWG NO. is the drawing's Part number and REV its Revision ("-" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3; strings). One edit ("Properties").
+The drawing element's Properties (right-click its tab › Properties). Live (behaviours "dx title block mappings"): the title block's DWG NO. is the drawing's Part number and REV its Revision ("-" when unset), never the part's; TITLE shows the sheet reference part's Title 1–3; DRAWN's date is when the drawing was made (`created`). Without `set`, replies with them; `set` changes the ones it names (part_number, revision, description, title1, title2, title3, drawn_by, approver; strings; created (Date drawn) and approved (Date approved) as YYYY-MM-DD). One edit ("Properties").
 
 Examples:
 
@@ -4336,7 +4336,7 @@ Examples:
 | `doc` | string |  | Path of the .noshape document. Default: the current document (the last one created or opened). |
 | `drawing` | string | required | Drawing tab, by name ("Part 1 Drawing 1") or id. |
 | `sheet` | integer or string |  | Sheet: number (1 = first) or name ("Sheet1"). Default: the sheet the drawing shows. |
-| `set` | object |  | Properties to change: part_number, revision, description, title1, title2, title3. |
+| `set` | object |  | Properties to change: part_number, revision, description, title1, title2, title3, drawn_by, approver, created, approved. |
 | `custom` | object |  | Custom properties: name → value ("" or null clears); company_custom_properties defines them. |
 
 #### drawing_format_line

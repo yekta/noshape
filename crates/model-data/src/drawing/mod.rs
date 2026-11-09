@@ -3229,6 +3229,11 @@ pub struct DrawingMeta {
     /// line, state, unit…; its Title 1–3 are the fields above).
     #[serde(skip_serializing_if = "item_meta_is_empty")]
     pub item: crate::partstudio::ItemMeta,
+    /// Properties › Approver and Date approved (YYYY-MM-DD) (live doc-tab-properties-drawing).
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub approver: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub approved: Option<String>,
 }
 
 fn item_meta_is_empty(m: &crate::partstudio::ItemMeta) -> bool {
