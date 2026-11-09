@@ -38,6 +38,21 @@ scratch /root/bool-scratch.
   cf-snap-hook, c2-housing-draft}.
 - c2-valve-config Circular pattern 1 (309 / 67): our 7 one-at-a-time cuts, 34 ms each, no single hotspot
   (classification 20 %, cylinder pairs 18 %, OCCT sections 14 %).
+- **Landed 672ecdbf (06:35 UTC):** the unify memo (Surface Pattern 3's usd.check 1049 -> 504 ms); suite unchanged,
+  kernel tests 349/349, g++-13 builds.
+- **Surface Pattern 3 now (06:40, kernel profile):** 3.65 s: our Boolean 2.7 s (OCCT's sections asked ahead 0.58 s,
+  once: later rounds reuse them; the final round's classification ~0.6 s; two restart rounds ~0.25 s each), unify
+  0.66 s, op_unify 0.27 s. Live 537 ms.
+- **Tried, not kept: states shared within groups** (/root/bool-scratch/wip/state-groups-1109.patch): pieces of one
+  solid meeting across a curve no face of solid t has share their state against t (one piece's rays per group;
+  coincident faces' solids counted, pieces on t's faces, sheets and turned periods apart). In sp-cut 1069 pieces'
+  states then differ from their own rays; with each group checked by one more piece's rays 29 of 2675 groups disagree
+  and are redone, 277 states still differ, and the cut declines "a non-manifold result". Cause: pieces of the target's
+  face 0 inside tool 18 by their own rays meet pieces outside it across sections with tools 6 / 10 / 7 / 17 only (no
+  section of 18 between): either OCCT's sections of 18 with the target miss parts (a piece then straddles 18's face,
+  its point deciding) or the rays are wrong there. Either way the input is inconsistent, and that may be why
+  cf-surface-pattern has 10 parts where live has 6. Worth a look before any grouping goes in (the knurl and gears
+  would gain too).
 
 ## Heads-up from core (2026-11-09 00:54 UTC, lead's call): unify steps skip edges marked "keep"
 - Intentional splits now survive later unifies, as live's: a thread's Split face, the Split feature / opSplitFace,
