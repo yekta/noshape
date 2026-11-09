@@ -2317,9 +2317,16 @@ fn contains_point(q: &QueryCx, e: &Ent, p: DVec3) -> bool {
                 return q.plane(e).is_some_and(|pl| (p - pl.origin).dot(pl.normal).abs() < 1e-8);
             }
             if matches!(e, Ent::Face(..))
-                && let Some(inside) = q.shape(e).and_then(|f| planar_face_contains(&f, p))
+                && let Some(f) = q.shape(e)
             {
-                return inside;
+                if let Some(inside) = planar_face_contains(&f, p) {
+                    return inside;
+                }
+                // Any other face: the point's feet on its surface classified in it (cf-surface-pattern's Surface
+                // Pattern 5 asks it of 66 grid points: BRepExtrema's distance took 6.5 ms each on its B-spline face).
+                if let Ok(inside) = f.contains_point(p, 1e-7) {
+                    return inside;
+                }
             }
             // OCCT entities carry ~1e-7 tolerances after booleans and blends.
             q.distance_to_point(e, p).is_some_and(|d| d < 1e-7)

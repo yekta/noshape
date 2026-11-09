@@ -33,6 +33,17 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 12:26 UTC: the slow-feature list in core's area (lead 11-09).**
+- Impeller Extrude 4 (op_prism_until 162, live 41): a prism only as long as the target's box needs: level in an
+  interleaved A/B (123-154 either way), reverted; the time is the split against the Shell's offset wall.
+- featprof (vibe5, /root/core-scratch/featprof-1109.log, bin/featprof.py): left in core's area: cf-surface-pattern
+  Surface Pattern 5 (520 vs 71: 66 qContainsPoint grid points by BRepExtrema's distance, 6.5 ms each), op_prism_until
+  (impeller Extrude 4 194, c2-valve-config Extrude 3 94, rings-loft Extrude 5 47), screw taper's volume (82), Split 1's
+  project_along (24 vs 4). The rest: bool (Shells, defeaturing, Booleans), skasm (louver, corner break), blend.
+- query.rs contains_point: any face through Shape::contains_point (the surface's feet classified) before the
+  distance: Surface Pattern 5 520 -> 122 ms (live 71); suite the same both ways (suite-cp*.log), A/B level
+  elsewhere (ab-cp.out). Landing.
+
 **State 11-09 09:05 UTC: REQUESTS 2413 filed (spring's coincident rounds); the impeller's Move face offsets.**
 - Live REQUESTS 2413: union of two parts' coincident spline rounds (and straight ones), the spring's own two edges.
 - Impeller, non-Boolean slow features: Remove Bohrung Flansch is 126 ms now (its 2 s was eval::unchanged, fixed).
