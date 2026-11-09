@@ -38,6 +38,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - Also from psui: the code editor's click lands where live's runner clicks Ace, its text is 14 px; View in repair
   only from a Part Studio. 85 of the 99 fs-* match (84 before; 216-scenario check: none worse).
 
+## 11-09 08:49 UTC: Edit auxiliary view as live's panel; drawings 1284/1409
+
+- Edit auxiliary view... is live's Auxiliary view panel (label, Normal / In line / Axis, the prompt and Reverse, the
+  view's edge as the chip "Edge ×", Show view reference indicator) with ✓ and ✕: drw-aux-edit 9/9. drw-*: 1284/1409
+  states, 131/176 scenarios (main's this morning: 1255, 124).
+- Tried and dropped (no change in the score): selected table cells' outline inside a view as EDGE (the BOM row
+  right-click), a light-framed view only past 60 pixels of its own edges, a detail's circle EDGE of its parent.
+  The 42 selection states left are pixel-bound (which views live frames dark, small highlights) or single cases
+  (Esc after Max/min dimension or Center point circle leaves it orange; callouts' Group framing Front).
+- The "flaky" Parasolid thread test (land.sh --status) was the last dx failure on record, 11-08 21:52 (d40ce5c5,
+  fixed by 7f07f4e4), not today's batches: no flake, no ticket.
+
 ## 11-09 07:59 UTC: live's batch (2406), drawing selection by live's pixel reader, sheet metal STL
 
 - **Live's re-import (04:24):** the hose STL reads 8,218.0 mm³ as predicted. The hose x_t written periodic was a
