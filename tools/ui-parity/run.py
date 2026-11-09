@@ -559,6 +559,9 @@ def compare(live, ours, whole_document=True):
                 first = (name, ".step", "ok", f"failed: {failed}")
             CAUSES.setdefault(".step", [0, f"ok / failed: {failed}"])[0] += 1
             continue
+        # Live's document runner (run.mjs) blanks the tooltip after every step but a hover; its page runner (a state
+        # with `url`: docs-*, prefs-*) reads it.
+        tip_blanked = isinstance(a, dict) and "url" not in a and (step or {}).get("do") != "hover"
         a = insert_panel(runner_names(normalize_live(json.loads(json.dumps(a))), start_name, True))
         b = insert_panel(runner_names(json.loads(json.dumps(b)), start_name, False))
         bd = (b or {}).get("dialog")
@@ -590,7 +593,7 @@ def compare(live, ours, whole_document=True):
         pick = ((step or {}).get("on") or {}).get("pick") if isinstance(step, dict) else None
         if isinstance(pick, str) and a.get("tooltip") == pick and b.get("tooltip") is None:
             b["tooltip"] = pick
-        if a.get("tooltip") is None and isinstance(b.get("tooltip"), str) and NATIVE_TITLE_TOOLTIPS.match(b["tooltip"]):
+        if a.get("tooltip") is None and isinstance(b.get("tooltip"), str) and (tip_blanked or NATIVE_TITLE_TOOLTIPS.match(b["tooltip"])):
             b["tooltip"] = None
         # A page's native <select> holding the keyboard: its open list is the OS's popup, which live's recorder can't read.
         if isinstance(a.get("focus"), dict) and a["focus"].get("tag") == "select" and a.get("list") is None:

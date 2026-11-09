@@ -3211,11 +3211,11 @@ impl Interactivity {
                     .clone();
 
                 let tooltip_is_hoverable = tooltip_builder.hoverable;
-                let build_tooltip = Rc::new(move |window: &mut Window, cx: &mut App| {
+                let build_tooltip: Rc<dyn Fn(&mut Window, &mut App) -> Option<(AnyView, bool)>> = Rc::new(move |window: &mut Window, cx: &mut App| {
                     Some(((tooltip_builder.build)(window, cx), tooltip_is_hoverable))
                 });
                 // Use bounds instead of testing hitbox since this is called during prepaint.
-                let check_is_hovered_during_prepaint = Rc::new({
+                let check_is_hovered_during_prepaint: Rc<dyn Fn(&Window) -> bool> = Rc::new({
                     let pending_mouse_down = pending_mouse_down.clone();
                     let source_bounds = hitbox.bounds;
                     move |window: &Window| {
@@ -3229,12 +3229,28 @@ impl Interactivity {
                     let hitbox = hitbox.clone();
                     move |window: &Window| hitbox.is_hovered(window)
                 });
-                let check_is_hovered = Rc::new({
+                let check_is_hovered: Rc<dyn Fn(&Window) -> bool> = Rc::new({
                     let hitbox = hitbox.clone();
                     move |window: &Window| {
                         pending_mouse_down.borrow().is_none() && hitbox.is_hovered(window)
                     }
                 });
+                let painted_at = element_state.tooltip_painted_at.get_or_insert_with(Default::default).replace(Some(hitbox.bounds));
+                let moved = painted_at.is_none_or(|b| b != hitbox.bounds && !b.contains(&window.mouse_position()));
+                if moved && window.pointer_rests() && check_is_hovered(window) && tooltip_pressed.may_show(true) {
+                    handle_tooltip_mouse_move(
+                        &active_tooltip,
+                        &build_tooltip,
+                        &check_is_hovered,
+                        &check_is_hovered_during_prepaint,
+                        self.tooltip_id,
+                        window.current_view(),
+                        DispatchPhase::Bubble,
+                        self.tooltip_show_delay.unwrap_or(DEFAULT_TOOLTIP_SHOW_DELAY),
+                        window,
+                        cx,
+                    );
+                }
                 register_tooltip_mouse_handlers(
                     &active_tooltip,
                     self.tooltip_id,
@@ -3658,6 +3674,11 @@ pub struct InteractiveElementState {
     long_press_tooltip_active: Option<Rc<Cell<bool>>>,
     /// NOSHAPE PATCH: see [`TooltipPressGate`].
     tooltip_pressed: Option<TooltipPressGate>,
+    /// NOSHAPE PATCH (agent psui): where the element was at its last paint (none before its first), so one that
+    /// appears or moves under the resting pointer shows its tooltip as a browser's (a row that slides up under it, a
+    /// crumb that becomes the page title); one an overlay uncovers doesn't (live: a toolbar button under a closed
+    /// dialog shows none).
+    tooltip_painted_at: Option<Rc<Cell<Option<Bounds<Pixels>>>>>,
 }
 
 /// Whether or not the element or a group that contains it is clicked by the mouse.

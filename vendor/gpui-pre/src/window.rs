@@ -1312,6 +1312,8 @@ pub struct Window {
     default_prevented: bool,
     mouse_position: Point<Pixels>,
     mouse_hit_test: HitTest,
+    /// NOSHAPE PATCH (agent psui): see `pointer_rests`.
+    pointer_rests: bool,
     modifiers: Modifiers,
     capslock: Capslock,
     scale_factor: f32,
@@ -2228,6 +2230,7 @@ impl Window {
             default_prevented: true,
             mouse_position,
             mouse_hit_test: HitTest::default(),
+            pointer_rests: false,
             modifiers,
             capslock,
             scale_factor,
@@ -3526,6 +3529,12 @@ impl Window {
     /// This is used for focus-visible styling to show focus indicators only for keyboard navigation.
     pub fn last_input_was_keyboard(&self) -> bool {
         self.last_input_modality == InputModality::Keyboard
+    }
+
+    /// NOSHAPE PATCH (agent psui): the pointer is in the window with no button held (its last event a move or a
+    /// release), so an element a frame puts under it is entered as a browser's fake move enters it.
+    pub(crate) fn pointer_rests(&self) -> bool {
+        self.pointer_rests
     }
 
     pub(crate) fn last_input_was_touch(&self) -> bool {
@@ -5867,16 +5876,19 @@ impl Window {
             PlatformInput::MouseMove(mouse_move) => {
                 self.mouse_position = mouse_move.position;
                 self.modifiers = mouse_move.modifiers;
+                self.pointer_rests = mouse_move.pressed_button.is_none();
                 PlatformInput::MouseMove(mouse_move)
             }
             PlatformInput::MouseDown(mouse_down) => {
                 self.mouse_position = mouse_down.position;
                 self.modifiers = mouse_down.modifiers;
+                self.pointer_rests = false;
                 PlatformInput::MouseDown(mouse_down)
             }
             PlatformInput::MouseUp(mouse_up) => {
                 self.mouse_position = mouse_up.position;
                 self.modifiers = mouse_up.modifiers;
+                self.pointer_rests = true;
                 PlatformInput::MouseUp(mouse_up)
             }
             PlatformInput::MousePressure(mouse_pressure) => {
@@ -5884,6 +5896,7 @@ impl Window {
             }
             PlatformInput::MouseExited(mouse_exited) => {
                 self.modifiers = mouse_exited.modifiers;
+                self.pointer_rests = false;
                 PlatformInput::MouseExited(mouse_exited)
             }
             PlatformInput::ModifiersChanged(modifiers_changed) => {

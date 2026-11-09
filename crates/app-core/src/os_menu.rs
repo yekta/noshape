@@ -230,6 +230,8 @@ pub struct OsMenu {
     ring: Option<Bounds<Pixels>>,
     /// Long labels cut with "…" on one line instead of wrapping.
     truncate: bool,
+    /// The checked row is the active one, `#b2ddf6` whatever the pointer is on (live's sort menus, class `active`).
+    active_checked: bool,
 }
 
 /// An `OsMenu`'s one-shot Esc handler.
@@ -246,7 +248,7 @@ impl Focusable for OsMenu {
 impl OsMenu {
     pub fn build(window: &mut Window, cx: &mut App, f: impl FnOnce(Self, &mut Window, &mut Context<Self>) -> Self) -> Entity<Self> {
         bind_keys(cx);
-        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
+        cx.new(|cx| f(Self { items: Vec::new(), focus: cx.focus_handle(), hovered: None, hover_checked: false, bounds: Rc::new(Cell::new(Bounds::default())), row_tops: Default::default(), _subs: Vec::new(), parent: None, return_focus: None, plain: false, snippets: false, select: None, native: false, toolbar: false, dropdown: false, min_width: None, row_height: None, text_inset: None, text_px: None, camera: false, on_escape: None, page: false, action_focus: None, ring: None, truncate: false, active_checked: false, tips: Default::default(), keep_open: Default::default() }, window, cx))
     }
 
     /// Select-list style, `width` wide (the field's width).
@@ -280,6 +282,12 @@ impl OsMenu {
     /// The camera and render options menu's style.
     pub fn camera(mut self) -> Self {
         self.camera = true;
+        self
+    }
+
+    /// The checked row drawn active (see `active_checked`).
+    pub fn active_checked(mut self) -> Self {
+        self.active_checked = true;
         self
     }
 
@@ -584,6 +592,7 @@ impl Render for OsMenu {
         let plain_menu = !dropdown && !snippets && select.is_none() && !self.toolbar;
         let camera = self.camera;
         let truncate = self.truncate;
+        let active_checked = self.active_checked;
         let window_w = window.viewport_size().width;
         let hover_bg = gpui_kit::rgb(0xdef1fb);
         let bounds = self.bounds.clone();
@@ -694,6 +703,7 @@ impl Render for OsMenu {
                         .map_or_else(|| row(ix), |(text, extra)| crate::ui::with_side_tooltip_expanded(row(ix), text, extra))
                         .text_color(if *disabled { pal.text_faint } else if snippets { pal.text } else if dropdown || camera { gpui_kit::rgb(0x555555) } else if select.is_some() && !native { gpui_kit::rgb(0x666666) } else { pal.text })
                         .when(hovered && !*disabled && select.is_none(), |d| d.bg(hover_bg))
+                        .when(active_checked && *checked, |d| d.bg(gpui_kit::rgb(0xb2ddf6)))
                         // Chrome's native list: #1967d2 / white; in dark #99c8ff / black (live dk-pref-select-open).
                         .when(select.is_some() && (hovered || (no_hover && *checked)), |d| match (native, noshape_scene::palette::is_dark()) {
                             (true, true) => d.bg(gpui_kit::rgb_static(0x99c8ff)).text_color(gpui_kit::rgb_static(0x000000)),
@@ -936,7 +946,7 @@ fn state_of(menu: &Entity<OsMenu>, in_camera: bool, cx: &App) -> Option<serde_js
     }
     // A page dropdown's highlighted row is its chosen one, not the hovered one (live in-context-context-none:
     // "Context 1"; in-context-follow-position: none with Follow position hovered).
-    if m.page {
+    if m.page || m.active_checked {
         highlighted = checks.iter().position(|c| *c);
     }
     Some(serde_json::json!({ "kind": "context-menu", "rows": rows, "highlighted": highlighted, "disabled": disabled }))

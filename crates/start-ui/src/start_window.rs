@@ -2664,8 +2664,9 @@ impl StartView {
             .child(
                 // Live dom/documents-folder-row: parent crumbs 16 px / 400
                 // `#666`, the leaf 16 px / 500 `#333`, blue › between them.
+                // The top level's title is another element than the crumb a click turns into it (live: its tooltip shows).
                 div()
-                    .id("crumb-root")
+                    .id(if in_folder { "crumb-root" } else { "place-title" })
                     .map(|d| {
                         let r = root.to_string();
                         crate::ui_script::mark(d, move || format!("crumb:{r}"))
@@ -3033,7 +3034,12 @@ impl StartView {
                     .text_color(pal.text)
                     .child(div().w(px(82.)).h(px(54.)).flex_none().rounded(px(4.)).bg(rgb(0xf5f5f5)).flex().items_center().justify_center().child(self.thumbnail(&d, 76., 48., false)))
                     .child(div().flex_1().min_w_0().truncate().child(crate::ui::user_text(d.name.clone())))
-                    .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| this.on_doc_click(&d1, ev, window, cx)))
+                    // A card opens its document on one click (live docs-recent-card-open).
+                    .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                        this.selected = Some(d1.path.clone());
+                        this.open_path(d1.path.clone(), window, cx);
+                        cx.notify();
+                    }))
                     .os_context_menu(move |menu, _, cx| {
                         let path = d2.path.clone();
                         v.update(cx, |this, cx| this.select(&path, cx));
@@ -3102,7 +3108,7 @@ impl StartView {
                                     })
                                 })
                             };
-                            m.item(item("Name: A → Z", FolderSort::NameAsc)).item(item("Name: Z → A", FolderSort::NameDesc)).item(item("Last modified", FolderSort::Modified))
+                            m.active_checked().item(item("Name: A → Z", FolderSort::NameAsc)).item(item("Name: Z → A", FolderSort::NameDesc)).item(item("Last modified", FolderSort::Modified))
                         }),
                 )
                 .child(div().w(px(1.)).h(px(22.)).mx(px(4.)).bg(rgb(0xd7d7d7)))
@@ -3441,8 +3447,7 @@ impl StartView {
         } else {
             docs
             .iter()
-            .enumerate()
-            .map(|(ix, d)| {
+            .map(|d| {
                 let selected = self.selected.as_ref() == Some(&d.path);
                 let open = crate::doc_files::is_document_open(&d.path, cx);
                 let v2 = cx.entity();
@@ -3450,7 +3455,8 @@ impl StartView {
                 let p1 = d.path.clone();
                 let cell = |w: f32| div().w(px(w)).flex_none().pl(px(16.)).truncate();
                 h_flex()
-                    .id(SharedString::from(format!("row-{ix}")))
+                    // A row is its document (a row that slides up under the pointer is another one: its tooltip shows).
+                    .id(SharedString::from(format!("row-{}", d.path.display())))
                     .map(|r| crate::ui_script::mark(r, || format!("doc_row:{}", d.name)))
                     .h(px(42.))
                     .flex_none()
@@ -4208,7 +4214,7 @@ impl Location {
                                         window.refresh();
                                     })
                                 };
-                                m.item(item("Name: A → Z", FolderSort::NameAsc)).item(item("Name: Z → A", FolderSort::NameDesc)).item(item("Last modified", FolderSort::Modified))
+                                m.active_checked().item(item("Name: A → Z", FolderSort::NameAsc)).item(item("Name: Z → A", FolderSort::NameDesc)).item(item("Last modified", FolderSort::Modified))
                             })
                     }),
             )

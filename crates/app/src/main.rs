@@ -32,6 +32,8 @@ mod agent_setup;
 mod updates;
 #[cfg(test)]
 mod start_links_tests;
+#[cfg(test)]
+mod tooltip_rehover_tests;
 mod cli_mode;
 mod live_server;
 mod doc_dialogs;

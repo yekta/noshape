@@ -134,6 +134,18 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
+**2026-11-09 12:28 UTC (psui): the docs-* differences from live's 2407 answers.** Sort menus (Folders, the location
+box) draw the checked row active (`#b2ddf6`, ✓) and read it as highlighted (`OsMenu::active_checked`). A "Last opened
+by me" card opens its document on one click. A tooltip under a resting pointer as a browser's (vendored gpui-pre
+`div.rs`, NOSHAPE PATCH `tooltip_painted_at`, and `Window::pointer_rests`): an element that appears or moves under a
+pointer that doesn't move shows its tooltip (the top-level "Owned by me" title after the crumb click: its own element
+id `place-title`; a documents row slid up under it: rows keyed by path); one an overlay uncovers doesn't (live: no
+toolbar tooltip after a dialog closes). Tests: app `tooltip_rehover_tests`. run.py: live's document runner (run.mjs,
+live's and live2's) blanks the tooltip after every step but a hover, so ours' isn't compared there; its page runner
+(states with `url`: docs-*, prefs-*) reads it. Live-side, asked (REQUESTS 12:17): docs-trash-restore (the account's
+trash had other documents), docs-new-doc-location-sort (Z → A kept from an earlier pick: does it persist?),
+docs-doc-menu-versions-and-history (old reader's error), what Labels… opens. docs/doc: 162 → 169/181.
+
 **2026-11-09 06:50 UTC (psui): the "open on ours" four.** The code editor's click now lands where live's runner
 clicks Ace (400 px in, 300 px down, else the middle) and the editor's text is live's 14 px: fs-compare and
 fs-ps-custom-feature-error land on live's line and column. fs-ed-ctrl-click-std is live-side: its click missed the
