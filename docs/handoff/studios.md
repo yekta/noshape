@@ -28,6 +28,19 @@ Studio is: `match × coverage`, from the interaction suite (tests/ui-parity, doc
 
 (log below, newest first)
 
+### 2026-11-09 22:49 UTC: documents coverage 285 → 304 of 313 (psui, lead: lowest interaction area)
+
+Nine scenarios (source "psui 11-09 (documents coverage)"), all running on ours; live has yet to record them (REQUESTS
+"documents coverage"): doc-cad-file-card, doc-cad-file-import-options, doc-cad-file-import (start doc-cad-file: doc-files
+plus uip-asm.step uploaded untranslated as a file tab, as live keeps a CAD file until its own Import…),
+doc-file-tab-download, doc-tab-menu-change-to-version, doc-tab-menu-export-view-rules, prefs-env-profile-cycle,
+prefs-units-learn-more, docs-account-preferences. New targets: `nav:<item>` in Preferences, `button:View export rules`,
+`button:Units › Learn more about default units.`, the Import to Onshape modal's cards (`button:<title>`) and checks
+(`checkbox:<label>`, noted as modal fields). Left uncovered (9): the Import modal's single/split choice, + › Import… of a
+CAD or image file, Join adjacent surfaces and Update… (all need a file-pick step in both runners), the print toast, the
+quick switcher's hover/mouse-up, shortcuts with focus on the top bar. docs/doc/prefs suite: 172/181, 709/725 states, no
+scenario worse.
+
 ### 2026-11-08 20:57 UTC: PAUSED (lead: quota). Restart from here on Monday
 **Landed / landing today:** Print setup (Part Studio, Assembly), the Merge notice's Revert link (shared notice
 bubble), Restore to Main… dialog, the Variable Studio's `#` autocomplete (`var_complete` now in app-core), live's

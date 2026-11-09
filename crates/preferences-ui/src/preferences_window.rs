@@ -524,6 +524,7 @@ impl PreferencesView {
                 .when(active, |d| d.bg(rgb(0xb2ddf6)).font_weight(FontWeight::BOLD))
                 .when(!active, |d| d.hover(|d| d.text_color(pal.accent)))
                 .child(label)
+                .map(|d| crate::ui_script::mark(d, move || format!("nav:{label}")))
                 .on_click(cx.listener(move |this, _: &ClickEvent, _, cx| this.go_to(page, cx)))
         };
         let on_profile = self.page == Page::Profile;
@@ -1300,6 +1301,7 @@ pub fn export_rules_link(id: &'static str) -> Stateful<Div> {
         .cursor_pointer()
         .hover(|d| d.underline())
         .child("View export rules")
+        .map(|d| crate::ui_script::mark(d, || "button:View export rules".into()))
         .on_click(|_, _, cx| show(Page::ExportRules, cx))
 }
 

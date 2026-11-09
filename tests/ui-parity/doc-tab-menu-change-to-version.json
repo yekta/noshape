@@ -1,0 +1,25 @@
+{
+ "name": "doc-tab-menu-change-to-version",
+ "about": "the active drawing tab › Change to version… (the Reference manager); Escape",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part 1 Drawing 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Change to version…"
+   }
+  },
+  {
+   "do": "key",
+   "key": "Escape"
+  }
+ ]
+}

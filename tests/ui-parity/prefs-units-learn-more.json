@@ -1,0 +1,15 @@
+{
+ "name": "prefs-units-learn-more",
+ "about": "Units › Learn more about default units. (the help page)",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Units › Learn more about default units."
+   }
+  }
+ ]
+}

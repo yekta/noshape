@@ -1,0 +1,27 @@
+{
+ "name": "doc-cad-file-import",
+ "about": "the STEP file tab › Import… › Import: its assembly's tabs added",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "doc-cad-file",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "uip-asm.step"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  }
+ ]
+}

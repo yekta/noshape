@@ -1,0 +1,57 @@
+{
+ "name": "doc-cad-file-import-options",
+ "about": "the STEP file tab › Import…: Import to Onshape at once (no file dialog, no Join adjacent surfaces; live2 2403); Combine, Y up, back to Import to this document, composite, Import appearances off; Cancel",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "doc-cad-file",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "uip-asm.step"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Import…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Combine to a single Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Orient imported models with Y Axis Up"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Import to this document"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Create a composite part when importing multiple or non-solid bodies"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Import appearances"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-cancel"
+   }
+  }
+ ]
+}

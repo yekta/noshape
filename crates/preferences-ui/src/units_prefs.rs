@@ -222,6 +222,7 @@ impl Render for UnitsPrefsView {
                                     .underline()
                                     .cursor_pointer()
                                     .child("Learn more about default units.")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Units › Learn more about default units.".into()))
                                     .on_click(|_, _, cx| noshape_app_core::help::open("Default units", cx)),
                             ),
                     )

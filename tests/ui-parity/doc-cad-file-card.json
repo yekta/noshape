@@ -1,0 +1,15 @@
+{
+ "name": "doc-cad-file-card",
+ "about": "the STEP file tab: its card (STEP icon, name, size, Uploaded …, Update… / Download)",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "doc-cad-file",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "uip-asm.step"
+   }
+  }
+ ]
+}

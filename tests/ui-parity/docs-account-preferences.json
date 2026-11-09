@@ -1,0 +1,27 @@
+{
+ "name": "docs-account-preferences",
+ "about": "Account menu › My account › Preferences (left nav)",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "docs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Account menu"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "My account"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "nav": "Preferences"
+   }
+  }
+ ]
+}

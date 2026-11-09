@@ -508,7 +508,17 @@
    "where": "documents page Import files… or tab bar + › Import…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "button": "Combine to a single Part Studio"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-import-appearances",
@@ -517,7 +527,17 @@
    "where": "Import to Onshape modal (checkbox, on by default)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "checkbox": "Import appearances"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-orient-imported-models-with-y-axis-up",
@@ -526,7 +546,17 @@
    "where": "Import to Onshape modal (checkbox)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "checkbox": "Orient imported models with Y Axis Up"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-create-a-composite-part-when-importing-multiple-or-non-",
@@ -535,7 +565,17 @@
    "where": "Import to Onshape modal (checkbox)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "checkbox": "Create a composite part when importing multiple or non-solid bodies"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-import-to-onshape-join-adjacent-surfaces",
@@ -553,7 +593,37 @@
    "where": "Import to Onshape modal",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:31"
+   "source": "behaviours.md:31",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "button": "modal-ok"
+      }
+     }
+    ],
+    [
+     {
+      "do": "click",
+      "on": {
+       "menu": "Import…"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "button": "modal-cancel"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "documents-page-import-progress-in-notifications-uploaded-translated-post-process",
@@ -3056,7 +3126,37 @@
    "where": "☰ › Copy workspace…",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29689"
+   "source": "behaviours.md:29689",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "button": "Document menu"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ],
+    [
+     {
+      "do": "rclick",
+      "on": {
+       "doc_row": "*"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "menu": "Copy workspace…"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "dialog-copy-workspace-create-public-document-cancel",
@@ -4942,7 +5042,17 @@
    "where": "open a STEP/other CAD file tab",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:34"
+   "source": "behaviours.md:34",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "doc_tab": "uip-asm.step"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-imported-file-tab-icons-per-format",
@@ -4951,7 +5061,25 @@
    "where": "tab bar / Tab manager",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5513"
+   "source": "behaviours.md:5513",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "doc_tab": "uip-page.pdf"
+      }
+     }
+    ],
+    [
+     {
+      "do": "click",
+      "on": {
+       "doc_tab": "uip-asm.step"
+      }
+     }
+    ]
+   ]
   },
   {
    "id": "tab-bar-material-library-tab-create-material-library",
@@ -5861,16 +5989,16 @@
    "via": [
     [
      {
+      "do": "rclick",
       "on": {
-       "doc_tab": "Part Studio 2"
-      },
-      "do": "rclick"
+       "doc_tab": "*"
+      }
      },
      {
+      "do": "click",
       "on": {
        "menu": "Export…"
-      },
-      "do": "click"
+      }
      }
     ]
    ]
@@ -6542,22 +6670,21 @@
    "via": [
     [
      {
+      "do": "click",
       "on": {
-       "field": "Open Preferences"
+       "button": "Account menu"
       }
-     }
-    ],
-    [
+     },
      {
+      "do": "click",
       "on": {
-       "checkbox": "Open Preferences"
+       "menu": "My account"
       }
-     }
-    ],
-    [
+     },
      {
+      "do": "click",
       "on": {
-       "button": "Open Preferences"
+       "nav": "Preferences"
       }
      }
     ]
@@ -8492,22 +8619,15 @@
    "via": [
     [
      {
+      "do": "click",
       "on": {
-       "field": "User export rules › effect on Export… file name; View export rules link"
+       "menu": "Export…"
       }
-     }
-    ],
-    [
+     },
      {
+      "do": "click",
       "on": {
-       "checkbox": "User export rules › effect on Export… file name; View export rules link"
-      }
-     }
-    ],
-    [
-     {
-      "on": {
-       "button": "User export rules › effect on Export… file name; View export rules link"
+       "button": "View export rules"
       }
      }
     ]
@@ -8616,7 +8736,37 @@
    "where": "My account › Preferences",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:12976"
+   "source": "behaviours.md:12976",
+   "via": [
+    [
+     {
+      "do": "click",
+      "on": {
+       "checkbox": "Theming › Dark mode"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "button": "Theming › Save theme"
+      }
+     }
+    ],
+    [
+     {
+      "do": "click",
+      "on": {
+       "button": "Account menu"
+      }
+     },
+     {
+      "do": "click",
+      "on": {
+       "menu": "View in dark mode beta"
+      }
+     }
+    ]
+   ]
   }
  ],
  "gaps": [

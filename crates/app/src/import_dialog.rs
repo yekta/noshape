@@ -127,8 +127,10 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
                 .flex_none()
                 .justify_center()
                 .child(crate::assets::icon(icon, 150., cx));
+            // The suite's targets: a card by its title, a checkbox by its label (ui-parity README).
             v_flex()
                 .id(id)
+                .map(|d| noshape_app_core::ui_script::mark(d, move || format!("button:{title}")))
                 .w(px(180.))
                 .h(px(230.))
                 .flex_none()
@@ -150,8 +152,10 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
         // `muted`: grey text right after the label (live: "…assembly(not recommended)", no space).
         let label_width = if page { PAGE_LABEL_WIDTH } else { LABEL_WIDTH };
         let check = |id: &'static str, label: &'static str, muted: Option<&'static str>, tip: &'static str, on: bool, set: fn(&mut Choice, bool), choice: Rc<Cell<Choice>>| {
+            noshape_app_core::ui_script::note_modal_field(|| serde_json::json!({ "label": label, "kind": "checkbox", "value": on }));
             h_flex()
                 .id(id)
+                .map(|d| noshape_app_core::ui_script::mark(d, move || format!("checkbox:{label}")))
                 .w_full()
                 .items_start()
                 .gap(px(7.))

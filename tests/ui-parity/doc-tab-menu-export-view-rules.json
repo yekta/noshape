@@ -1,0 +1,32 @@
+{
+ "name": "doc-tab-menu-export-view-rules",
+ "about": "a Part Studio tab › Export… › View export rules (Preferences at User export rules)",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "doc-tabs",
+ "steps": [
+  {
+   "do": "wait",
+   "until": "ms",
+   "ms": 300
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Export…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "View export rules"
+   }
+  }
+ ]
+}

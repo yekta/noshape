@@ -110,6 +110,14 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
     for f in start["files"].as_array().into_iter().flatten() {
         let name = f.as_str().ok_or_else(|| format!("a start file that isn't a name: {f}"))?;
         let path = files_dir.as_ref().map_or_else(|| std::path::PathBuf::from(name), |d| d.join(name));
+        // A CAD file stays a file tab as uploaded (README `files`: no translation; its own Import… translates it).
+        let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if crate::import::IMPORT_EXTS.contains(&ext.as_str()) {
+            let bytes = std::fs::read(&path).map_err(|e| format!("start file {name}: {e}"))?;
+            let od = ctx.doc(None).map_err(|e| format!("start file {name}: {e}"))?;
+            od.session.edit_document(&format!("Import {name}"), |d| crate::import::add_file_tab(d, noshape_model::file_tab::FileTab::new(name, &bytes, noshape_model::file_tab::now()), None, None)).map_err(|e| format!("start file {name}: {e}"))?;
+            continue;
+        }
         call(ctx, "import_files", json!({ "files": [path] })).map_err(|e| format!("start file {name}: {e}"))?;
     }
     // A linked document (README "Variable Studio and Versions" `linked`): built from its own start beside this one, its

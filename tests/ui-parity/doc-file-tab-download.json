@@ -1,0 +1,21 @@
+{
+ "name": "doc-file-tab-download",
+ "about": "a PDF file tab › Download",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "doc-files",
+ "steps": [
+  {
+   "do": "rclick",
+   "on": {
+    "doc_tab": "uip-page.pdf"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Download"
+   }
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+{
+ "name": "prefs-env-profile-cycle",
+ "about": "Environment profile: Create profile \"uip profile\", density On, Save profile settings, select Onshape (default), select uip profile, Delete profile › OK (the account back as it was)",
+ "area": "studios",
+ "source": "psui 11-09 (documents coverage)",
+ "start": "prefs-page",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create profile"
+   }
+  },
+  {
+   "do": "type",
+   "text": "uip profile"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Environment profile settings › Match pixel density on high resolution displays (can affect performance)",
+    "pick": "On"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Environment profile settings › Save profile settings"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Environment profile settings › Environment profile",
+    "pick": "Onshape (default)"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Environment profile settings › Environment profile",
+    "pick": "uip profile"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Delete profile"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "modal-ok"
+   }
+  }
+ ]
+}
