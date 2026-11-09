@@ -804,9 +804,10 @@ impl StartView {
                 cx.defer(move |cx| {
                     let _ = handle.update(cx, |_, window, cx| {
                         let files = cad.clone();
-                        let on_import = move |choice: noshape_ops::import::ImportChoice, split: bool, _: &mut Window, cx: &mut App| {
-                            // Split: a document each (a native assembly zip keeps its
-                            // subassemblies and parts together).
+                        let on_import = move |choice: noshape_ops::import::ImportChoice, how: crate::start_hooks::PageImport, _: &mut Window, cx: &mut App| {
+                            // Split: a document per file (a native assembly zip keeps its subassemblies and parts
+                            // together); live's linked documents per subassembly or per part: docs/TICKETS.md.
+                            let split = how != crate::start_hooks::PageImport::Single;
                             let groups: Vec<Vec<PathBuf>> = if split { files.iter().map(|p| vec![p.clone()]).collect() } else { vec![files.clone()] };
                             for g in groups {
                                 let result = Self::import_cad(&g, &choice, &place, gpu.clone(), cx);
@@ -1381,25 +1382,6 @@ impl StartView {
         self.labels.toggle(path, label);
         self.labels.save();
         cx.notify();
-    }
-
-    /// Row menu › Labels…: check the document's labels.
-    fn labels_dialog(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
-        let view = cx.entity();
-        let search = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).placeholder("Search labels"));
-        window.subscribe(&search, cx, |_, ev: &InputEvent, window, _| {
-            if let InputEvent::Change = ev {
-                window.refresh();
-            }
-        })
-        .detach();
-        window.open_dialog(cx, move |dialog, _, cx| {
-            let labels = view.read(cx).labels.clone();
-            let body = Self::label_checklist(&view, &d.path, &search, &labels, cx);
-            os::modal_doc_page(dialog, "Labels", 400.)
-                .child(os::modal_body().child(body))
-                .footer(os::modal_footer().child(os::modal_cancel(os::cancel_button("close", "Close", cx))))
-        });
     }
 
     /// Onshape's labels box (live documents-details-panel): the 30 px
@@ -2327,7 +2309,11 @@ impl StartView {
             .separator()
             .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
             .item(item("Versions and history", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Versions, cx)))
-            .item(item("Labels…", &view, &d, |t, d, w, cx| t.labels_dialog(d, w, cx)))
+            // The Details panel with its Document labels open, no dialog (live2 2351 (4)).
+            .item(item("Labels…", &view, &d, |t, d, _, cx| {
+                t.details_labels_open = true;
+                t.show_panel(d, DocPanel::Details, cx);
+            }))
             .separator()
             .item(item("Move to…", &view, &d, |t, d, w, cx| t.move_to(d, w, cx)))
             .item(item(crate::file_dialogs::show_in_folder_label(), &view, &d, |_, d, _, cx| open_in_file_manager(&d.path, true, cx)))
@@ -3509,8 +3495,7 @@ impl StartView {
                                     cx.stop_propagation();
                                     this.trash(d3.clone(), window, cx);
                                 })))
-                                // The Details panel with its Document labels open (live docs-row-icon-labels; the row menu's
-                                // Labels… is the dialog).
+                                // The Details panel with its Document labels open (live docs-row-icon-labels), as the row menu's Labels….
                                 .child(icon("row-labels", os::GLYPH_LABEL, "Labels").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                                     cx.stop_propagation();
                                     this.details_labels_open = true;

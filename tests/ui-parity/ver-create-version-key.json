@@ -1,6 +1,6 @@
 {
  "name": "ver-create-version-key",
- "about": "Ctrl+Alt+V: the Create version dialog, Escape",
+ "about": "Ctrl+Alt+V does nothing (live has no Create version key, live2 2405), then Escape",
  "area": "studios",
  "source": "everyday (studios 11-07, Versions batch 1)",
  "start": "doc-versions",

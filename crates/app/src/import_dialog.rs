@@ -42,11 +42,15 @@ struct Choice {
     join: bool,
     /// The documents page's "Split into multiple documents".
     split: bool,
+    /// Split's "Create one document per part or assembly".
+    per_part: bool,
 }
 
 impl Choice {
     fn ops(self) -> noshape_ops::import::ImportChoice {
-        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite: self.composite, join: self.join }
+        // The composite part's box shows only on Import to a single document / this document.
+        let composite = self.composite && !self.combine && !self.split;
+        noshape_ops::import::ImportChoice { combine: self.combine, appearances: self.appearances, density: self.density, y_up: self.y_up, unit: self.unit, composite, join: self.join }
     }
 }
 
@@ -73,7 +77,23 @@ pub fn open(doc: Entity<DocModel>, paths: Vec<PathBuf>, after: Option<TabId>, ke
 /// whether to split. The start window builds the documents (start hooks).
 pub fn open_for_page(paths: Vec<PathBuf>, on_import: noshape_start_ui::start_hooks::ImportCallback, window: &mut Window, cx: &mut App) {
     let unit = noshape_app_core::user_units::current().units.length;
-    show(paths, unit, true, true, Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| on_import(c.ops(), c.split, window, cx)), window, cx);
+    show(
+        paths,
+        unit,
+        true,
+        true,
+        Rc::new(move |c: Choice, window: &mut Window, cx: &mut App| {
+            use noshape_start_ui::start_hooks::PageImport;
+            let how = match (c.split, c.per_part) {
+                (false, _) => PageImport::Single,
+                (true, false) => PageImport::Split,
+                (true, true) => PageImport::PerPart,
+            };
+            on_import(c.ops(), how, window, cx)
+        }),
+        window,
+        cx,
+    );
 }
 
 /// What Import does with the options.
@@ -127,7 +147,9 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
         };
         // Bootstrap form-check (live DOM): 14 px box (radius 3.5, 1 px #aaa;
         // checked #0d6efd), 14 px / 600 #333 label that wraps, then the ?.
-        let check = |id: &'static str, label: &'static str, tip: &'static str, on: bool, set: fn(&mut Choice, bool), choice: Rc<Cell<Choice>>| {
+        // `muted`: grey text right after the label (live: "…assembly(not recommended)", no space).
+        let label_width = if page { PAGE_LABEL_WIDTH } else { LABEL_WIDTH };
+        let check = |id: &'static str, label: &'static str, muted: Option<&'static str>, tip: &'static str, on: bool, set: fn(&mut Choice, bool), choice: Rc<Cell<Choice>>| {
             h_flex()
                 .id(id)
                 .w_full()
@@ -149,16 +171,25 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
                         .when(on, |d| d.child(gpui_kit::component::Icon::new(gpui_kit::component::IconName::Check).size(px(11.)).text_color(gpui_kit::rgb_static(0xffffff)))),
                 )
                 // GPUI has no inline boxes: wrap the label with the ? as a
-                // trailing inline element in live's 358 px label box (dom/
+                // trailing inline element in live's label box (dom/
                 // dialog-import-in-document.txt), so the ? follows the last
                 // word ("…non-solid bodies ?") or starts a line of its own.
                 .child({
                     let mut wrapper = text_system.line_wrapper(label_font.clone(), px(14.));
-                    let fragments = [LineFragment::text(label), LineFragment::element(px(TIP_GAP + TIP_SIZE), 1)];
-                    let breaks: Vec<usize> = wrapper.wrap_line(&fragments, px(LABEL_WIDTH), IndentAdjustment::NoIndent).map(|b| b.ix).collect();
-                    let mut lines = wrapped_lines(label, &breaks);
+                    let text = format!("{label}{}", muted.unwrap_or(""));
+                    let fragments = [LineFragment::text(&text), LineFragment::element(px(TIP_GAP + TIP_SIZE), 1)];
+                    let breaks: Vec<usize> = wrapper.wrap_line(&fragments, px(label_width), IndentAdjustment::NoIndent).map(|b| b.ix).collect();
+                    let mut lines = wrapped_lines(&text, label.len(), &breaks);
                     let last = lines.pop().unwrap_or_default();
-                    let line = |t: String| div().text_size(px(14.)).line_height(px(21.)).font_weight(FontWeight::SEMIBOLD).text_color(pal.text).whitespace_nowrap().child(t);
+                    // The muted part regular weight and grey (live).
+                    let line = |(bold, grey): (String, String)| {
+                        h_flex()
+                            .text_size(px(14.))
+                            .line_height(px(21.))
+                            .whitespace_nowrap()
+                            .when(!bold.is_empty(), |d| d.child(div().font_weight(FontWeight::SEMIBOLD).text_color(pal.text).child(bold)))
+                            .when(!grey.is_empty(), |d| d.child(div().text_color(pal.text_muted).child(grey)))
+                    };
                     v_flex()
                         .flex_1()
                         .min_w_0()
@@ -167,7 +198,7 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
                             h_flex()
                                 .items_end()
                                 .gap(px(TIP_GAP))
-                                .when(!last.is_empty(), |d| d.child(line(last)))
+                                .when(!last.0.is_empty() || !last.1.is_empty(), |d| d.child(line(last)))
                                 .child(div().id(SharedString::from(format!("{id}-tip"))).mb(px(1.)).size(px(TIP_SIZE)).flex_none().rounded_full().border_1().border_color(rgb(0xcccccc)).flex().items_center().justify_center().text_size(px(11.)).text_color(rgb(0xaaaaaa)).child("?").tooltip(crate::ui::tooltip(tip))),
                         )
                 })
@@ -198,12 +229,14 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
                         )
                     })
                     // Live document/77: the checkbox rows are 34 px apart.
-                    .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
-                    .when(density, |d| d.child(check("imp-dens", "Import material density", "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
-                    .child(check("imp-yup", "Orient imported models with Y Axis Up", "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
-                    // Live G41, live2 2403: Combine to a single Part Studio has no composite part.
-                    .when(!c.combine, |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
-                    .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
+                    .child(v_flex().gap(px(13.)).when(!stl, |d| d.child(check("imp-app", "Import appearances", None, "Appearances defined on models will be imported.", c.appearances, |c, v| c.appearances = v, choice.clone())))
+                    .when(density, |d| d.child(check("imp-dens", "Import material density", None, "Material density defined on models will be imported.", c.density, |c, v| c.density = v, choice.clone())))
+                    .child(check("imp-yup", "Orient imported models with Y Axis Up", None, "Models built in an environment with Y-axis up, such as SOLIDWORKS, Creo, or Inventor, will keep their original orientation upon import.", c.y_up, |c, v| c.y_up = v, choice.clone()))
+                    // The cards swap the list (live2 2403): Split has one document per part or assembly in the composite
+                    // part's place, Combine to a single Part Studio neither (live G41).
+                    .when(c.split, |d| d.child(check("imp-per-part", "Create one document per part or assembly", Some("(not recommended)"), "Each part and assembly is given its own document. For large assemblies, this option can create a large number of documents that can be difficult to manage.", c.per_part, |c, v| c.per_part = v, choice.clone())))
+                    .when(!c.combine && !c.split, |d| d.child(check("imp-comp", "Create a composite part when importing multiple or non-solid bodies", None, "Parts within a single Part Studio will become a composite part upon import", c.composite, |c, v| c.composite = v, choice.clone())))
+                    .when(!mesh && join, |d| d.child(check("imp-join", "Join adjacent surfaces", None, "Adjacent surfaces with overlapping edges will be joined upon import.", c.join, |c, v| c.join = v, choice.clone()))))
                     // Live dom/dialog-import-stl.txt: "Units" (14 px / 600) over a 212 px select.
                     .when(units_select, |d| {
                         let ch = choice.clone();
@@ -227,24 +260,30 @@ fn show(paths: Vec<PathBuf>, doc_unit: noshape_units::LengthUnit, page: bool, jo
     });
 }
 
-/// Live's checkbox label box (dom/dialog-import-in-document.txt: 358 px) and
-/// the ? after the label text.
+/// Live's checkbox label box (dom/dialog-import-in-document.txt: 358 px; the documents page's 590 px modal 548 px:
+/// its labels on one line, live2 2403) and the ? after the label text.
 const LABEL_WIDTH: f32 = 358.;
+const PAGE_LABEL_WIDTH: f32 = 548.;
 const TIP_GAP: f32 = 8.;
 const TIP_SIZE: f32 = 18.;
 
-/// The lines of `label` broken at `breaks` (the byte index each new line
-/// starts at; the ? element sits at `label.len()`). The last entry is the
-/// text before the ?, empty when the ? wraps onto a line of its own.
-fn wrapped_lines(label: &str, breaks: &[usize]) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut start = 0;
-    for &b in breaks.iter().filter(|&&b| b > 0 && b <= label.len()) {
-        lines.push(label[start..b].trim_end().to_string());
-        start = b;
-    }
-    lines.push(label[start..].trim_end().to_string());
-    lines
+/// The lines of `text` broken at `breaks` (the byte index each new line
+/// starts at; the ? element sits at `text.len()`), each as its part within the
+/// first `bold` bytes and the rest. The last entry is the text before the ?,
+/// empty when the ? wraps onto a line of its own.
+fn wrapped_lines(text: &str, bold: usize, breaks: &[usize]) -> Vec<(String, String)> {
+    let mut starts = vec![0];
+    starts.extend(breaks.iter().copied().filter(|&b| b > 0 && b <= text.len()));
+    let ends = starts.iter().skip(1).copied().chain([text.len()]);
+    starts
+        .iter()
+        .zip(ends)
+        .map(|(&a, b)| {
+            let line = text[a..b].trim_end();
+            let cut = bold.clamp(a, a + line.len()) - a;
+            (line[..cut].to_string(), line[cut..].to_string())
+        })
+        .collect()
 }
 
 /// Translate the files and add their tabs (shared with the agent API:
@@ -324,12 +363,19 @@ mod tests {
 
     #[::core::prelude::v1::test]
     fn the_question_mark_follows_the_last_word() {
+        let plain = |text: &str, breaks: &[usize]| wrapped_lines(text, text.len(), breaks).into_iter().map(|(b, g)| b + &g).collect::<Vec<_>>();
         let label = "Create a composite part when importing multiple or non-solid bodies";
         // Live: "…multiple or" / "non-solid bodies ?".
-        assert_eq!(wrapped_lines(label, &[51]), ["Create a composite part when importing multiple or", "non-solid bodies"]);
+        assert_eq!(plain(label, &[51]), ["Create a composite part when importing multiple or", "non-solid bodies"]);
         // One line with room for the ?.
-        assert_eq!(wrapped_lines("Join adjacent surfaces", &[]), ["Join adjacent surfaces"]);
+        assert_eq!(plain("Join adjacent surfaces", &[]), ["Join adjacent surfaces"]);
         // The ? alone on the next line.
-        assert_eq!(wrapped_lines("Join adjacent surfaces", &[22]), ["Join adjacent surfaces", ""]);
+        assert_eq!(plain("Join adjacent surfaces", &[22]), ["Join adjacent surfaces", ""]);
+        // A muted part after the label, on its line or wrapped (live2 2403: "…assembly(not recommended)").
+        let (label, text) = ("Create one document per part or assembly", "Create one document per part or assembly(not recommended)");
+        let pair = |b: &str, g: &str| (b.to_string(), g.to_string());
+        assert_eq!(wrapped_lines(text, label.len(), &[]), [pair(label, "(not recommended)")]);
+        assert_eq!(wrapped_lines(text, label.len(), &[32]), [pair("Create one document per part or", ""), pair("assembly", "(not recommended)")]);
+        assert_eq!(wrapped_lines(text, label.len(), &[45]), [pair("Create one document per part or assembly", "(not"), pair("", "recommended)")]);
     }
 }

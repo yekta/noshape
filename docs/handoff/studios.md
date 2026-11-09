@@ -134,6 +134,15 @@ read mid-load or mid-close (8), ver-merge-replace's target, and five questions (
 the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
 checkbox takes the focus from the name field; ours keeps it).
 
+**2026-11-09 14:02 UTC (psui): lead's list from live2 2351 / 2403 / 2405.** Labels… in a row menu opens the Details
+panel with Document labels open (no dialog), as the row's Labels icon. Import to Onshape: the cards swap the checkbox
+list (Split: "Create one document per part or assembly(not recommended)" in the composite part's place, with live's
+tooltip; Combine: no composite), and the page modal's labels are one line (548 px). Split's documents themselves are
+still one per file: docs/TICKETS.md IMPORT-SPLIT-DOCUMENTS. Ctrl+Alt+V: the scenario's about and the versions universe
+no longer count it (sc-create-version dropped; live's Customize list keeps Create version unassigned, as ours). Already
+in main from this morning: the user guide's Ctrl+Alt+V line, Copy workspace's New folder, Copy version… closing the
+panel, Compare with base in its own window, no custom features button in a version without any. docs/doc 170/181.
+
 **2026-11-09 12:28 UTC (psui): the docs-* differences from live's 2407 answers.** Sort menus (Folders, the location
 box) draw the checked row active (`#b2ddf6`, ✓) and read it as highlighted (`OsMenu::active_checked`). A "Last opened
 by me" card opens its document on one click. A tooltip under a resting pointer as a browser's (vendored gpui-pre

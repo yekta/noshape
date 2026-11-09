@@ -15,16 +15,23 @@ pub struct Hooks {
     pub open_document_at: fn(PathBuf, noshape_model::document::TabId, Gpu, &mut App) -> anyhow::Result<()>,
     /// The build as the documents page shows it ("0.4.4.c8d74e607a47").
     pub build_label: fn() -> String,
-    /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and whether to
-    /// split them into a document each.
+    /// Import files…'s "Import to Onshape" modal for these CAD files; Import calls back with the options and the card.
     pub import_dialog: fn(Vec<PathBuf>, ImportCallback, &mut Window, &mut App),
     /// The Help menu's rows (the app's help_menu: Help, FeatureScript documentation, Keyboard shortcuts, System check,
     /// About, then its setup rows).
     pub help_items: fn(crate::os_menu::OsMenu) -> crate::os_menu::OsMenu,
 }
 
-/// What Import does with the modal's options (and "Split into multiple documents").
-pub type ImportCallback = Box<dyn Fn(noshape_ops::import::ImportChoice, bool, &mut Window, &mut App)>;
+/// What Import does with the modal's options and its documents (Combine to a single Part Studio is in the options).
+pub type ImportCallback = Box<dyn Fn(noshape_ops::import::ImportChoice, PageImport, &mut Window, &mut App)>;
+
+/// Import files…'s documents: the card picked, and Split's "Create one document per part or assembly".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PageImport {
+    Single,
+    Split,
+    PerPart,
+}
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 

@@ -5,6 +5,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 (docs/TESTS.md).
 
 
+## psui, 2026-11-09
+- [ ] P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents** makes one
+  document per file; live (behaviours "live-exploration" G, live2 2403) puts the top assembly in its own document,
+  each subassembly with its parts in another, linked to it (more than 100 unique parts at a level: extra Part Studio
+  documents), and its **Create one document per part or assembly(not recommended)** box gives every part and assembly
+  its own document. The modal shows both as live's (cards swap the list); the documents themselves need linked
+  instances across the new documents, and an op for the page's import (none yet: `import_files` imports into one
+  document).
+
 ## From the user, 2026-11-04
 - [x] (skasm 11-08: live 2270: no constraint button is dimmed; a selection a constraint can't take (a handle arm in Concentric too) gets std's words in the yellow banner, kept until the next message, × or a constraint added, the selection cleared and no tool; Midpoint on two points and Symmetric on two lines start their tool with the picks; scene sketch_mode a_constraint_a_selection_cant_take_refuses_with_lives_words, e2e coincident_on_one_point_is_a_no_op, ui-parity sketch-constraint-refusals 91/91) P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an
   end point to its handle tip) can't be selected; in Onshape the arm is its own entity (hover, click, constraints and

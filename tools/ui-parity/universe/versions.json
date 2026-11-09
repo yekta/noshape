@@ -1298,17 +1298,6 @@
        "button": "Create"
       }
      }
-    ],
-    [
-     {
-      "do": "key",
-      "key": "mod+alt+v"
-     },
-     {
-      "on": {
-       "button": "Create"
-      }
-     }
     ]
    ]
   },
@@ -1349,16 +1338,6 @@
       "on": {
        "button": "Cancel"
       }
-     }
-    ],
-    [
-     {
-      "do": "key",
-      "key": "mod+alt+v"
-     },
-     {
-      "do": "key",
-      "key": "Escape"
      }
     ]
    ]
@@ -3598,23 +3577,6 @@
    "source": "ui2-help/raw/Release_obsoleting_parts.htm"
   },
   {
-   "id": "sc-create-version",
-   "category": "shortcut",
-   "name": "Create version",
-   "where": "Preferences › Keyboard shortcuts: assignable, Unassigned by default",
-   "freq": 3,
-   "cloud": false,
-   "source": "dom/customize-keyboard-shortcuts.txt",
-   "via": [
-    [
-     {
-      "do": "key",
-      "key": "mod+alt+v"
-     }
-    ]
-   ]
-  },
-  {
    "id": "sc-compare-esc",
    "category": "shortcut",
    "name": "Esc in compare",
@@ -3645,16 +3607,6 @@
    "cloud": false,
    "source": "behaviours.md:6844",
    "via": [
-    [
-     {
-      "do": "key",
-      "key": "mod+alt+v"
-     },
-     {
-      "do": "key",
-      "key": "Escape"
-     }
-    ],
     [
      {
       "on": {
