@@ -26,12 +26,7 @@ pub struct Hooks {
 pub type ImportCallback = Box<dyn Fn(noshape_ops::import::ImportChoice, PageImport, &mut Window, &mut App)>;
 
 /// Import files…'s documents: the card picked, and Split's "Create one document per part or assembly".
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PageImport {
-    Single,
-    Split,
-    PerPart,
-}
+pub use noshape_ops::import_documents::PageImport;
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 

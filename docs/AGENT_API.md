@@ -320,7 +320,7 @@ The operations by group. Field types are JSON types; lengths and angles take exp
 - **ops**: [`ops_list`](#ops_list), [`ops_describe`](#ops_describe), [`ops_call`](#ops_call)
 - **document**: [`document_create`](#document_create), [`document_update_workspace`](#document_update_workspace), [`document_update_references`](#document_update_references), [`document_open`](#document_open), [`document_info`](#document_info), [`document_close`](#document_close), [`document_protect`](#document_protect), [`document_unprotect`](#document_unprotect), [`document_set_units`](#document_set_units)
 - **tab**: [`tab_create`](#tab_create), [`tab_rename`](#tab_rename), [`tab_duplicate`](#tab_duplicate), [`tab_show_code`](#tab_show_code), [`tab_delete`](#tab_delete), [`tab_folder_create`](#tab_folder_create), [`tab_move`](#tab_move), [`tab_move_to_document`](#tab_move_to_document), [`tab_folder_unpack`](#tab_folder_unpack), [`tab_activate`](#tab_activate), [`tab_manager`](#tab_manager)
-- **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library)
+- **documents**: [`documents_list`](#documents_list), [`documents_create_folder`](#documents_create_folder), [`documents_rename`](#documents_rename), [`documents_move`](#documents_move), [`documents_copy`](#documents_copy), [`documents_details`](#documents_details), [`documents_trash`](#documents_trash), [`documents_restore`](#documents_restore), [`documents_delete`](#documents_delete), [`documents_empty_trash`](#documents_empty_trash), [`documents_label`](#documents_label), [`documents_forget_recent`](#documents_forget_recent), [`documents_set_library`](#documents_set_library), [`documents_import`](#documents_import)
 - **feature**: [`feature_frame_profiles`](#feature_frame_profiles), [`feature_types`](#feature_types), [`feature_schema`](#feature_schema), [`feature_add`](#feature_add), [`feature_edit`](#feature_edit), [`feature_get`](#feature_get), [`feature_list`](#feature_list), [`feature_delete`](#feature_delete), [`feature_suppress`](#feature_suppress), [`feature_dynamic_suppression`](#feature_dynamic_suppression), [`feature_clear_missing`](#feature_clear_missing), [`feature_dependencies`](#feature_dependencies), [`feature_add_folder`](#feature_add_folder), [`feature_rename_folder`](#feature_rename_folder), [`feature_unpack_folder`](#feature_unpack_folder), [`feature_rollback`](#feature_rollback), [`feature_rename`](#feature_rename), [`feature_reorder`](#feature_reorder), [`feature_set_visibility`](#feature_set_visibility), [`feature_size_plane`](#feature_size_plane), [`feature_show_all`](#feature_show_all)
 - **sketch**: [`sketch_create`](#sketch_create), [`sketch_draw`](#sketch_draw), [`sketch_constrain`](#sketch_constrain), [`sketch_dimension`](#sketch_dimension), [`sketch_set_dimension`](#sketch_set_dimension), [`sketch_dimension_options`](#sketch_dimension_options), [`sketch_delete`](#sketch_delete), [`sketch_set_construction`](#sketch_set_construction), [`sketch_get`](#sketch_get), [`sketch_paste`](#sketch_paste), [`sketch_export`](#sketch_export), [`sketch_copy_entities`](#sketch_copy_entities), [`sketch_trim`](#sketch_trim), [`sketch_extend`](#sketch_extend), [`sketch_split`](#sketch_split), [`sketch_spline_point`](#sketch_spline_point), [`sketch_fillet`](#sketch_fillet), [`sketch_chamfer`](#sketch_chamfer), [`sketch_offset`](#sketch_offset), [`sketch_mirror`](#sketch_mirror), [`sketch_linear_pattern`](#sketch_linear_pattern), [`sketch_circular_pattern`](#sketch_circular_pattern), [`sketch_transform`](#sketch_transform), [`sketch_use`](#sketch_use), [`sketch_intersection`](#sketch_intersection), [`sketch_text`](#sketch_text), [`sketch_insert_dxf`](#sketch_insert_dxf), [`sketch_insert_image`](#sketch_insert_image)
 - **variable**: [`variable_list`](#variable_list), [`variable_create`](#variable_create), [`variable_set`](#variable_set), [`variable_delete`](#variable_delete), [`variable_move`](#variable_move), [`variable_insert_studio`](#variable_insert_studio), [`variable_remove_studio`](#variable_remove_studio), [`variable_move_studio`](#variable_move_studio), [`variable_create_studio`](#variable_create_studio), [`variable_studio_settings`](#variable_studio_settings)
@@ -988,6 +988,31 @@ Examples:
 | `library` | one of `frame_profiles`, `sheet_metal_forms`, `tolerances`, `images`, `standard_content` | required | Which library (its key; the menu's row also works). |
 | `folder` | string |  | The folder's path (required unless `clear`). |
 | `clear` | boolean |  | Unset that library. |
+
+#### documents_import
+
+Import CAD files as new documents (Create ▾ › Import files…: Import to a single document, Split into multiple documents, Combine to a single Part Studio) (edits the document (one undoable history entry)).
+
+The documents page's Import to Onshape modal. `mode` "single" (default): one document for all the files, named after the first (with its extension), its Part Studios and Assemblies first, the files in "CAD Imports", V1 made at once. "split": each file its own document; a STEP assembly with subassemblies becomes a folder named after the file holding one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1) and the top document named after the file (Assembly 1, its own parts' Part Studios), each assembly using its subassemblies' documents at their V1. "per_part": as split, every part and assembly its own document. `combine` is Combine to a single Part Studio. The reply lists the documents made (`open`: the one the page opens) and the files that failed, with why.
+
+Examples:
+
+```json
+{"files": ["/path/to/gearbox.step"]}
+{"files": ["/path/to/gearbox.step"], "mode": "split"}
+{"files": ["/path/to/a.step", "/path/to/b.x_t"], "mode": "split", "folder": "Imports"}
+```
+
+| field | type | | description |
+|---|---|---|---|
+| `files` | array of string | required | Paths of the CAD files. |
+| `folder` | string |  | Where (default the documents folder). |
+| `mode` | one of `single`, `split`, `per_part` |  | Import to a single document (default), Split into multiple documents, or Split with "Create one document per part or assembly". |
+| `combine` | boolean |  | Combine to a single Part Studio. |
+| `appearances` | boolean |  | Import appearances. |
+| `y_up` | boolean |  | Orient imported models with Y Axis Up. |
+| `composite` | boolean |  | Create a composite part (Import to a single document only). |
+| `join` | boolean |  | Join adjacent surfaces. |
 
 ### feature
 

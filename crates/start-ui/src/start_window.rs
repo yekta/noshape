@@ -805,12 +805,12 @@ impl StartView {
                     let _ = handle.update(cx, |_, window, cx| {
                         let files = cad.clone();
                         let on_import = move |choice: noshape_ops::import::ImportChoice, how: crate::start_hooks::PageImport, _: &mut Window, cx: &mut App| {
-                            // Split: a document per file (a native assembly zip keeps its subassemblies and parts
-                            // together); live's linked documents per subassembly or per part: docs/TICKETS.md.
+                            // Split: each file its own document, a STEP assembly with subassemblies a folder of
+                            // linked documents (noshape_ops::import_documents).
                             let split = how != crate::start_hooks::PageImport::Single;
                             let groups: Vec<Vec<PathBuf>> = if split { files.iter().map(|p| vec![p.clone()]).collect() } else { vec![files.clone()] };
                             for g in groups {
-                                let result = Self::import_cad(&g, &choice, &place, gpu.clone(), cx);
+                                let result = Self::import_cad(&g, &choice, how, &place, gpu.clone(), cx);
                                 Self::report_import(&g, result, handle, cx);
                             }
                             view.update(cx, |this, cx| this.force_rescan(cx));
@@ -823,31 +823,20 @@ impl StartView {
         });
     }
 
-    /// A new document for CAD files with the modal's options, named after the
-    /// first file (with its extension, as live): its Part Studios / Assemblies
-    /// first, then "CAD Imports"; V1 made at once.
-    fn import_cad(paths: &[PathBuf], choice: &noshape_ops::import::ImportChoice, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
-        use noshape_ops::import as imp;
-        let mut doc = crate::user_units::new_document();
-        let units = doc.settings.units;
-        doc.tabs.clear();
-        doc.settings.tab_order.clear();
-        let (inputs, mut errors) = imp::read_inputs(paths, choice, true, &units);
-        let (_, failed) = imp::apply(&mut doc, inputs, choice, None, &units);
-        errors.extend(failed);
-        if !doc.tabs.iter().any(|t| !matches!(t.content, noshape_model::TabContent::File(_))) {
-            anyhow::bail!("{}", errors.join("\n"));
+    /// The modal's documents for `paths` (noshape_ops::import_documents: one document, or a split file's folder of
+    /// linked documents), the one to open opened.
+    fn import_cad(paths: &[PathBuf], choice: &noshape_ops::import::ImportChoice, how: crate::start_hooks::PageImport, place: &Path, gpu: crate::gpu::Gpu, cx: &mut App) -> anyhow::Result<()> {
+        use noshape_ops::import_documents as imp;
+        let new_doc = crate::user_units::new_document;
+        if how != crate::start_hooks::PageImport::Single
+            && let Some(made) = imp::import_split(&paths[0], choice, how == crate::start_hooks::PageImport::PerPart, place, &new_doc)?
+        {
+            if let Some(top) = made.open {
+                crate::start_hooks::open_document_window(top, None, gpu, cx)?;
+            }
+            return Ok(());
         }
-        let models: Vec<_> = doc.ordered_tabs().iter().filter(|t| !matches!(t.content, noshape_model::TabContent::File(_))).map(|t| t.id).collect();
-        let rest: Vec<_> = doc.settings.tab_order.iter().copied().filter(|id| !models.contains(id)).collect();
-        doc.settings.tab_order = models.into_iter().chain(rest).collect();
-        // Live request 1742: the document is named after the whole file
-        // name ("nested-asm-A.step") and has V1 at once (Start → V1 → Main).
-        let (_, name) = imp::import_names(&paths[0]);
-        let target = Self::free_target(place, &name);
-        let mut session = noshape_ops::session::Session::create(&target, doc)?;
-        session.create_version("V1", "")?;
-        drop(session);
+        let (target, errors) = imp::import_single(paths, choice, place, new_doc())?;
         crate::start_hooks::open_document_window(target, None, gpu, cx)?;
         // A file that didn't translate next to ones that did: the reason.
         if !errors.is_empty() {
@@ -873,21 +862,10 @@ impl StartView {
         } else {
             crate::file_tab_view::add_file_tab(&mut doc, stored, None, None);
         }
-        crate::start_hooks::open_document_window(Self::free_target(place, &name), Some(doc), gpu, cx)
+        crate::start_hooks::open_document_window(noshape_ops::import_documents::free_document_path(place, &name), Some(doc), gpu, cx)
     }
 
     /// "<name>.noshape" in `place`, else "<name> (2).noshape", ….
-    fn free_target(place: &Path, name: &str) -> PathBuf {
-        let clean = lib::sanitize_name(name);
-        let mut target = place.join(format!("{clean}.{}", lib::EXT));
-        let mut n = 2;
-        while target.exists() {
-            target = place.join(format!("{clean} ({n}).{}", lib::EXT));
-            n += 1;
-        }
-        target
-    }
-
     /// An import's result in the Notifications bell (live EX11), and a failure's alert.
     fn report_import(paths: &[PathBuf], result: anyhow::Result<()>, handle: AnyWindowHandle, cx: &mut App) {
         let names: Vec<String> = paths.iter().map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()).collect();

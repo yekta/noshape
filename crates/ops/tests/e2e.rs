@@ -1775,6 +1775,68 @@ fn import_step_assembly_keeps_its_subassembly() {
     assert_eq!(r["parts"].as_array().unwrap().len(), 3, "{r}");
 }
 
+/// Import files… › Split into multiple documents (live behaviours "dx 1742 (B)", live's own file): a folder named
+/// after the file holding "Sub" (its Assembly, a Part Studio per part, CAD Imports, V1) and "nested-asm.step"
+/// (Assembly 1, Part 1's Part Studio, CAD Imports, V1) whose Assembly 1 uses Sub's Assembly at Sub's V1; with
+/// "Create one document per part or assembly" every part has its own document too.
+#[test]
+fn documents_import_splits_a_step_assembly_into_linked_documents() {
+    let dir = scratch("docs-import-split");
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let mut ctx = Ctx::new();
+    ctx.documents = Some(dir.clone());
+    let file = concat!(env!("CARGO_MANIFEST_DIR"), "/../kernel/tests/data/step/nested-asm.step");
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split" }));
+    let folder = dir.join("nested-asm.step");
+    assert_eq!(r["folder"], folder.display().to_string(), "{r}");
+    let (sub, top) = (folder.join("Sub.noshape"), folder.join("nested-asm.step.noshape"));
+    assert_eq!(r["documents"], json!([sub.display().to_string(), top.display().to_string()]), "{r}");
+    assert_eq!(r["open"], top.display().to_string());
+    let tabs = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "document_info", json!({}))["tabs"].as_array().unwrap().iter().filter(|t| t["kind"] != "File").map(|t| t["name"].as_str().unwrap().to_string()).collect() };
+    let instances = |ctx: &mut Ctx, tab: &str| -> Vec<(String, Value)> {
+        let a = call(ctx, "assembly_list", json!({ "tab": tab }));
+        a["instances"].as_array().unwrap().iter().map(|i| (i["name"].as_str().unwrap().to_string(), i["source"].clone())).collect()
+    };
+    let versions = |ctx: &mut Ctx| -> Vec<String> { call(ctx, "history_list", json!({}))["versions"].as_array().unwrap().iter().map(|v| v["name"].as_str().unwrap().to_string()).collect() };
+    call(&mut ctx, "document_open", json!({ "path": sub.to_str().unwrap() }));
+    assert_eq!(tabs(&mut ctx), ["Sub", "Part 2", "Part 3"]);
+    let names: Vec<String> = instances(&mut ctx, "Sub").into_iter().map(|i| i.0).collect();
+    assert_eq!(names, ["Part 2 <1>", "Part 3 <1>"]);
+    assert_eq!(versions(&mut ctx), ["V1"]);
+    call(&mut ctx, "document_open", json!({ "path": top.to_str().unwrap() }));
+    assert_eq!(tabs(&mut ctx), ["Assembly 1", "Part 1"]);
+    let top_instances = instances(&mut ctx, "Assembly 1");
+    let names: Vec<&str> = top_instances.iter().map(|i| i.0.as_str()).collect();
+    // Live 1742: "Sub <1>" then "Part 1 <1>" (the reverse of the file's order, as Import to a single document).
+    assert_eq!(names, ["Sub <1>", "Part 1 <1>"]);
+    assert_eq!(top_instances[0].1["version_of"]["document"], "Sub.noshape", "Sub <1> is Sub's document: {:?}", top_instances[0]);
+    assert_eq!(versions(&mut ctx), ["V1"]);
+    // Sub's parts come through its document: three occurrences in all.
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" }));
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 3, "{list}");
+    call(&mut ctx, "document_close", json!({}));
+    call(&mut ctx, "document_close", json!({}));
+    // Again with one document per part: the folder "nested-asm.step (1)", Part 1 to Part 3 each their own document.
+    let r = call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "per_part" }));
+    let folder = dir.join("nested-asm.step (1)");
+    let mut docs: Vec<String> = r["documents"].as_array().unwrap().iter().map(|d| std::path::Path::new(d.as_str().unwrap()).strip_prefix(&folder).unwrap().display().to_string()).collect();
+    docs.sort();
+    assert_eq!(docs, ["Part 1.noshape", "Part 2.noshape", "Part 3.noshape", "Sub.noshape", "nested-asm.step.noshape"], "{r}");
+    call(&mut ctx, "document_open", json!({ "path": folder.join("Sub.noshape").to_str().unwrap() }));
+    assert_eq!(tabs(&mut ctx), ["Sub"]);
+    let subs = instances(&mut ctx, "Sub");
+    assert!(subs.iter().all(|i| i.1["version_of"]["part"].is_string()), "{subs:?}");
+    let list = call(&mut ctx, "assembly_list", json!({ "tab": "Sub" }));
+    assert_eq!(list["occurrences"].as_array().unwrap().len(), 2, "{list}");
+    // Not a STEP assembly, or a nonexistent file: named.
+    let e = try_call(&mut ctx, "documents_import", json!({ "files": ["/tmp/nope.step"], "mode": "split" })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("files[0]"));
+    let e = try_call(&mut ctx, "documents_import", json!({ "files": [file], "mode": "split", "combine": true })).unwrap_err();
+    assert_eq!(e.param.as_deref(), Some("combine"));
+}
+
 #[test]
 fn import_step_round_trip() {
     let mut ctx = Ctx::new();

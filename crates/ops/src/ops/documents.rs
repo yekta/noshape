@@ -157,7 +157,62 @@ pub fn ops() -> Vec<Op> {
             destructive: false,
             run: set_library,
         },
+        Op {
+            group: "documents",
+            verb: "import",
+            summary: "Import CAD files as new documents (Create ▾ › Import files…: Import to a single document, Split into multiple documents, Combine to a single Part Studio)",
+            description: "The documents page's Import to Onshape modal. `mode` \"single\" (default): one document for all the files, named after the first (with its extension), its Part Studios and Assemblies first, the files in \"CAD Imports\", V1 made at once. \"split\": each file its own document; a STEP assembly with subassemblies becomes a folder named after the file holding one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1) and the top document named after the file (Assembly 1, its own parts' Part Studios), each assembly using its subassemblies' documents at their V1. \"per_part\": as split, every part and assembly its own document. `combine` is Combine to a single Part Studio. The reply lists the documents made (`open`: the one the page opens) and the files that failed, with why.",
+            fields: vec![
+                req("files", json!({ "type": "array", "items": { "type": "string" }, "minItems": 1 }), "Paths of the CAD files."),
+                opt("folder", s(), "Where (default the documents folder)."),
+                opt("mode", json!({ "type": "string", "enum": ["single", "split", "per_part"] }), "Import to a single document (default), Split into multiple documents, or Split with \"Create one document per part or assembly\"."),
+                opt("combine", json!({ "type": "boolean" }), "Combine to a single Part Studio."),
+                opt("appearances", json!({ "type": "boolean", "default": true }), "Import appearances."),
+                opt("y_up", json!({ "type": "boolean" }), "Orient imported models with Y Axis Up."),
+                opt("composite", json!({ "type": "boolean" }), "Create a composite part (Import to a single document only)."),
+                opt("join", json!({ "type": "boolean" }), "Join adjacent surfaces."),
+            ],
+            mutates: true,
+            destructive: false,
+            run: import_files,
+        },
     ]
+}
+
+fn import_files(ctx: &mut Ctx, a: &Args) -> Result<OpOutput, OpError> {
+    use crate::import_documents::{self as imp, PageImport};
+    let place = folder_arg(ctx, a, "folder")?;
+    let files: Vec<PathBuf> = a.array("files")?.iter().enumerate().map(|(i, v)| v.as_str().map(PathBuf::from).ok_or_else(|| OpError::param(&format!("files[{i}]"), "a path"))).collect::<Result<_, _>>()?;
+    for (i, f) in files.iter().enumerate() {
+        if !f.is_file() {
+            return Err(OpError::not_found(format!("{}: no such file", f.display())).with_param(format!("files[{i}]")));
+        }
+    }
+    let how = match a.opt_str("mode")? {
+        None | Some("single") => PageImport::Single,
+        Some("split") => PageImport::Split,
+        Some("per_part") => PageImport::PerPart,
+        Some(_) => return Err(OpError::param("mode", "single, split or per_part")),
+    };
+    let flag = |k: &str| a.get(k).and_then(Value::as_bool);
+    let mut choice = crate::import::ImportChoice::defaults(&files, noshape_units::LengthUnit::Millimeter);
+    choice.combine = flag("combine").unwrap_or(false);
+    choice.appearances = flag("appearances").unwrap_or(true);
+    choice.y_up = flag("y_up").unwrap_or(false);
+    // The composite part's box shows on Import to a single document only (live2 2403).
+    choice.composite = flag("composite").unwrap_or(false) && !choice.combine && how == PageImport::Single;
+    choice.join = flag("join").unwrap_or(false);
+    if how != PageImport::Single && choice.combine {
+        return Err(OpError::param("combine", "Combine to a single Part Studio is its own card: not with split or per_part"));
+    }
+    let (made, failed) = imp::import_documents(&files, &choice, how, &place, &noshape_model::Document::new);
+    let paths = |v: &[PathBuf]| v.iter().map(|p| p.display().to_string()).collect::<Vec<_>>();
+    let failed: Vec<Value> = failed.into_iter().map(|(g, why)| json!({ "files": paths(&g), "error": why })).collect();
+    if made.documents.is_empty() {
+        let why = failed.iter().filter_map(|f| f["error"].as_str()).collect::<Vec<_>>().join("; ");
+        return Err(OpError::invalid(format!("nothing imported: {why}")).with_param("files"));
+    }
+    Ok(json!({ "open": made.open.map(|p| p.display().to_string()), "documents": paths(&made.documents), "folder": made.folder.map(|p| p.display().to_string()), "failed": failed }).into())
 }
 
 fn documents(ctx: &Ctx) -> PathBuf {

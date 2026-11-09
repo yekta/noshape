@@ -6,13 +6,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 
 
 ## psui, 2026-11-09
-- [ ] P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents** makes one
-  document per file; live (behaviours "live-exploration" G, live2 2403) puts the top assembly in its own document,
-  each subassembly with its parts in another, linked to it (more than 100 unique parts at a level: extra Part Studio
-  documents), and its **Create one document per part or assembly(not recommended)** box gives every part and assembly
-  its own document. The modal shows both as live's (cards swap the list); the documents themselves need linked
-  instances across the new documents, and an op for the page's import (none yet: `import_files` imports into one
-  document).
+- [ ] P2 IMPORT-SPLIT-DOCUMENTS: the documents page's Import files… › **Split into multiple documents**. psui 11-09:
+  a STEP assembly with subassemblies now becomes live's folder of linked documents (behaviours "dx 1742 (B)"): a
+  folder named after the file, one document per subassembly (its Assembly, one Part Studio per part, CAD Imports, V1),
+  the top document named after the file (Assembly 1, its own parts' Part Studios), each assembly using its
+  subassemblies' documents at their V1; **Create one document per part or assembly** gives every part its own
+  document too (`noshape_ops::import_documents`, op `documents_import`, e2e
+  documents_import_splits_a_step_assembly_into_linked_documents). Left, waiting on live2 (REQUESTS 14:37): three
+  levels (ours: each subassembly's document uses its own subassemblies'), a subassembly used twice (ours: one
+  document), a flat assembly (ours: one document, as Import to a single document), a parts-only file (live's docs:
+  each part its own document and a generated top assembly; ours: one document), a second split's names (ours:
+  folder " (1)"), and which document opens (ours: the top one). Not yet: Parasolid / IGES assemblies (split as one
+  document each), live's extra Part Studio documents past 100 unique parts at a level, and the import runs on the
+  main thread (as the single-document import always has).
 
 ## From the user, 2026-11-04
 - [x] (skasm 11-08: live 2270: no constraint button is dimmed; a selection a constraint can't take (a handle arm in Concentric too) gets std's words in the yellow banner, kept until the next message, × or a constraint added, the selection cleared and no tool; Midpoint on two points and Symmetric on two lines start their tool with the picks; scene sketch_mode a_constraint_a_selection_cant_take_refuses_with_lives_words, e2e coincident_on_one_point_is_a_no_op, ui-parity sketch-constraint-refusals 91/91) P1 SKETCH-SPLINE-HANDLE-ARM (skasm, lead 11-06 23:15, from the user) a spline's handle (the tangent arm from an

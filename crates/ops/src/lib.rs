@@ -32,6 +32,7 @@ pub mod error;
 pub mod export;
 pub mod file_preview;
 pub mod import;
+pub mod import_documents;
 pub mod in_context;
 pub mod install;
 pub mod live;

@@ -45,6 +45,7 @@ pub const EXAMPLES: &[(&str, &[&str])] = &[
     ("tab_folder_unpack", &[r##"{"folder": "Folder 1"}"##]),
     ("documents_list", &[r##"{}"##, r##"{"place": "trash"}"##, r##"{"label": "Brackets"}"##]),
     ("documents_create_folder", &[r##"{"name": "Fixtures"}"##]),
+    ("documents_import", &[r##"{"files": ["/path/to/gearbox.step"]}"##, r##"{"files": ["/path/to/gearbox.step"], "mode": "split"}"##, r##"{"files": ["/path/to/a.step", "/path/to/b.x_t"], "mode": "split", "folder": "Imports"}"##]),
     ("documents_rename", &[r##"{"path": "/home/ann/noshape/Bracket.noshape", "name": "Bracket v2"}"##]),
     ("documents_move", &[r##"{"path": "/home/ann/noshape/Bracket.noshape", "to": "/home/ann/noshape/Fixtures"}"##]),
     ("documents_copy", &[r##"{"path": "/home/ann/noshape/Bracket.noshape"}"##]),
