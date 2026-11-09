@@ -2827,7 +2827,7 @@ fn op_wrap(i: &mut Interp, a: Vec<Value>) -> R<Value> {
                 let Some((bi, _)) = dst_face else { return err("IMPRINT needs a destination face") };
                 let body = ev.ctx.bodies[bi].clone();
                 let edges: Vec<Shape> = res.shape.faces().iter().flat_map(|f| f.edges()).collect();
-                let imp = k::imprint(&body.shape, &edges).map_err(|e| FeatureError::new(format!("The wrapped edges could not split the destination: {e}")))?;
+                let imp = k::imprint_kept(&body.shape, &edges).map_err(|e| FeatureError::new(format!("The wrapped edges could not split the destination: {e}")))?;
                 let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &imp.history, &imp.shape, &BTreeMap::new(), None);
                 ev.replace_body(bi, imp.shape, names);
                 Ok(())

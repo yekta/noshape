@@ -3,6 +3,11 @@
 #include <Geom2d_TrimmedCurve.hxx>
 #include <numeric>
 #include "internal.hpp"
+#include <BRepBuilderAPI_MakeVertex.hxx>
+#include <BRepExtrema_DistShapeShape.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <BRep_CurveRepresentation.hxx>
+#include <BRep_TEdge.hxx>
 
 #include <Geom_BSplineCurve.hxx>
 #include <Geom_TrimmedCurve.hxx>
@@ -2642,6 +2647,118 @@ OcShapeList OwnCopy::subs(const OcShapeList& l) const
     out.sources.push_back(nullptr);
   }
   return out;
+}
+
+} // namespace noshape
+
+namespace noshape {
+
+// ---------------------------------------------------------------- kept edges
+
+namespace
+{
+// The mark itself: no geometry, ignored by OCCT's readers, writers and checks (they ask each representation what it
+// is). Copied with the edge's representations where OCCT copies them.
+class KeepEdgeMark : public BRep_CurveRepresentation
+{
+public:
+  KeepEdgeMark()
+      : BRep_CurveRepresentation(TopLoc_Location())
+  {
+  }
+  occ::handle<BRep_CurveRepresentation> Copy() const override { return new KeepEdgeMark(); }
+  DEFINE_STANDARD_RTTI_INLINE(KeepEdgeMark, BRep_CurveRepresentation)
+};
+} // namespace
+
+bool kept_edge(const TopoDS_Shape& e)
+{
+  if (e.IsNull() || e.ShapeType() != TopAbs_EDGE)
+    return false;
+  const occ::handle<BRep_TEdge> te = occ::down_cast<BRep_TEdge>(e.TShape());
+  if (te.IsNull())
+    return false;
+  for (const occ::handle<BRep_CurveRepresentation>& c : te->Curves())
+    if (c->IsKind(STANDARD_TYPE(KeepEdgeMark)))
+      return true;
+  return false;
+}
+
+void mark_kept_edge(const TopoDS_Shape& e)
+{
+  if (kept_edge(e))
+    return;
+  const occ::handle<BRep_TEdge> te = occ::down_cast<BRep_TEdge>(e.TShape());
+  if (!te.IsNull())
+    te->ChangeCurves().Append(new KeepEdgeMark());
+}
+
+void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)>& image)
+{
+  ShapeIMap edges;
+  TopExp::MapShapes(from, TopAbs_EDGE, edges);
+  for (int i = 1; i <= edges.Extent(); ++i)
+    if (kept_edge(edges(i)))
+      for (const TopoDS_Shape& x : image(edges(i)))
+        if (!x.IsNull() && x.ShapeType() == TopAbs_EDGE)
+          mark_kept_edge(x);
+}
+
+uint32_t mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol)
+{
+  require_non_null(s.shape, "shape");
+  TopoDS_Compound c;
+  BRep_Builder    b;
+  b.MakeCompound(c);
+  for (const TopoDS_Shape& x : along.items)
+    b.Add(c, x);
+  Bnd_Box cb;
+  BRepBndLib::Add(c, cb);
+  if (cb.IsVoid())
+    return 0;
+  cb.Enlarge(tol);
+  ShapeIMap edges;
+  TopExp::MapShapes(s.shape, TopAbs_EDGE, edges);
+  uint32_t n = 0;
+  for (int i = 1; i <= edges.Extent(); ++i)
+  {
+    const TopoDS_Edge& e = TopoDS::Edge(edges(i));
+    if (BRep_Tool::Degenerated(e) || !BRep_Tool::IsGeometric(e))
+      continue;
+    BRepAdaptor_Curve ac(e);
+    const gp_Pnt      m = ac.Value(0.5 * (ac.FirstParameter() + ac.LastParameter()));
+    if (cb.IsOut(m))
+      continue;
+    BRepExtrema_DistShapeShape d(BRepBuilderAPI_MakeVertex(m).Vertex(), c);
+    if (d.IsDone() && d.NbSolution() > 0 && d.Value() <= tol)
+    {
+      mark_kept_edge(e);
+      ++n;
+    }
+  }
+  return n;
+}
+
+void carry_kept_marks(const TopoDS_Shape& in, const ShapeUpgrade_UnifySameDomain& u)
+{
+  const occ::handle<BRepTools_History> h = u.History();
+  if (h.IsNull())
+    return;
+  carry_kept_marks(in, [&](const TopoDS_Shape& x) {
+    std::vector<TopoDS_Shape> out;
+    for (const TopoDS_Shape& m : h->Modified(x))
+      out.push_back(m);
+    return out;
+  });
+}
+
+void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s)
+{
+  ShapeIMap edges;
+  TopExp::MapShapes(s, TopAbs_EDGE, edges);
+  for (int i = 1; i <= edges.Extent(); ++i)
+    if (kept_edge(edges(i)))
+      u.KeepShape(edges(i));
 }
 
 } // namespace noshape

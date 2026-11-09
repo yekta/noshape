@@ -809,6 +809,7 @@ std::unique_ptr<OcShape> shape_unlocated(const OcShape& s);
 std::unique_ptr<OcShape> op_frame_cylinders_at(const OcShape& s, P3 origin, P3 axis);
 OpOut                    op_divide_closed(const OcShape& s);
 uint32_t                 sub_count(const OcShape& s, uint8_t kind);
+uint32_t                 mark_kept_edges(const OcShape& s, const OcShapeList& along, double tol);
 std::unique_ptr<OcShape> sub_shape(const OcShape& s, uint8_t kind, uint32_t index);
 std::unique_ptr<OcShapeList> sub_shapes(const OcShape& s, uint8_t kind);
 int64_t                      index_of(const OcShape& s, const OcShape& sub, uint8_t kind);

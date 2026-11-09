@@ -678,6 +678,31 @@ fn external_thread_is_cosmetic() {
     assert!(b.shape.edges().iter().any(|e| noshape_kernel::distance(&split, e).is_ok_and(|d| d.distance < 1e-9)), "no edge at z = 10 mm");
 }
 
+/// Live 2389: a thread's Split face is kept apart by later features' unifies (c2-fan-blade-sweep: External thread 1
+/// splits a boss's cylinder at its depth, Extrude 7 adds a boss on its cap: live keeps the thread's band). A Ø8
+/// cylinder threaded 10 mm (4 faces), a Ø4 boss added on its end cap: 6 faces, the cylinder still in two.
+#[test]
+fn a_threads_split_face_stays_split_through_a_later_boolean() {
+    let mut t = T::new();
+    let s = t.sketch(Reference::Plane(DatumPlane::Top), circle(DVec2::ZERO, 0.004));
+    let r = t.regions(s)[0].clone();
+    t.extrude(r, "20 mm", "NEW");
+    let res = t.ok();
+    let edge = edge_near(&res.context.bodies[0], DVec3::new(0.004, 0.0, 0.02));
+    t.add("externalThread", &[("entities", q(vec![edge])), ("branchOfStandard", ParamValue::Lookup(vec!["ISO".into(), "M8".into()]))]);
+    let res = t.ok();
+    assert_eq!(res.context.bodies[0].shape.faces().len(), 4);
+    let cap = face_with_normal(&res.context.bodies[0], DVec3::Z);
+    let s = t.sketch(cap, circle(DVec2::ZERO, 0.002));
+    let r = t.regions(s)[0].clone();
+    let x = t.extrude(r, "2 mm", "ADD");
+    t.set(x, "booleanScope", q(vec![Reference::Body(res.context.bodies[0].id.clone())]));
+    let res = t.ok();
+    let b = &res.context.bodies[0];
+    let cylinders = b.shape.faces().iter().filter(|f| matches!(f.face_surface(), Ok(noshape_kernel::Surface::Cylinder { radius, .. }) if (radius - 0.004).abs() < 1e-9)).count();
+    assert_eq!((b.shape.faces().len(), cylinders), (6, 2));
+}
+
 /// std externalThread.fs checkNonMatchingSize (live: c2-fan-blade-sweep's source, External thread 1 on a Ø6.8 boss,
 /// ISO M7: "Exact match for thread size not found."): the standard's size nearest the cylinder against the chosen one.
 #[test]

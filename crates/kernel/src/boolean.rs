@@ -412,6 +412,22 @@ pub fn imprint(shape: &Shape, curves: &[Shape]) -> Result<OpResult> {
     split(std::slice::from_ref(shape), curves, &BooleanOptions::default())
 }
 
+/// [`imprint`] of a split a feature makes on purpose (a thread's Split face, the Split feature, opSplitFace, Wrap,
+/// Offset curve, Isocline): the edges along `curves` are marked kept, so later unifies leave their faces apart, as
+/// Parasolid does (c2-fan-blade-sweep's thread band).
+pub fn imprint_kept(shape: &Shape, curves: &[Shape]) -> Result<OpResult> {
+    let res = imprint(shape, curves)?;
+    mark_kept_edges(&res.shape, curves)?;
+    Ok(res)
+}
+
+/// Marks the edges of `shape` lying along `along` (their midpoints within 1e-7 of them) as kept by every later unify;
+/// the count marked.
+pub fn mark_kept_edges(shape: &Shape, along: &[Shape]) -> Result<usize> {
+    let l = vec_to_list(along);
+    Ok(ck(ffi::mark_kept_edges(shape.raw(), &l, 1e-7))? as usize)
+}
+
 /// Merge same-domain faces/edges (ShapeUpgrade_UnifySameDomain) with history.
 pub fn unify_same_domain(shape: &Shape) -> Result<OpResult> {
     Ok(OpResult::from_ffi(ck(ffi::op_unify(shape.raw()))?))

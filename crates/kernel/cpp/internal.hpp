@@ -6,6 +6,8 @@
 #include "noshape-kernel/src/ffi.rs.h"
 
 #include <BRepTools_History.hxx>
+#include <ShapeUpgrade_UnifySameDomain.hxx>
+#include <functional>
 #include <NCollection_DataMap.hxx>
 #include <TopTools_ShapeMapHasher.hxx>
 #include <Bnd_Box.hxx>
@@ -118,6 +120,19 @@ void inherit_face_boxes(const OcShape& from, OcShape& out);
 const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& ancestors_cached(const OcShape& s, TopAbs_ShapeEnum kind, TopAbs_ShapeEnum ancestor_kind);
 // Every edge used twice, once each way (features.cpp).
 bool closed_and_oriented(const TopoDS_Shape& r);
+
+// Edges a feature split a face along on purpose (a thread's Split face, the Split feature, opSplitFace, an imprint):
+// every unify keeps the faces on their two sides apart, as Parasolid does (c2-fan-blade-sweep's thread band). The
+// mark is a curve representation of the edge's own (a flag lookup): an edge rebuilt or copied loses it unless carried
+// over (carry_kept_marks).
+bool kept_edge(const TopoDS_Shape& e);
+void mark_kept_edge(const TopoDS_Shape& e);
+// Marks in `to` the images (by `image`) of `from`'s marked edges.
+void carry_kept_marks(const TopoDS_Shape& from, const std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)>& image);
+// Every marked edge of `s` as a shape `u` keeps.
+void keep_marked_edges(ShapeUpgrade_UnifySameDomain& u, const TopoDS_Shape& s);
+// After `u` ran on `in`: its result's edges made from marked ones marked (USD rebuilds the edges it keeps).
+void carry_kept_marks(const TopoDS_Shape& in, const ShapeUpgrade_UnifySameDomain& u);
 
 // Where in a shape the unify can find something to merge, when the shape
 // is a local Boolean's result on a target that had nothing (a candidate

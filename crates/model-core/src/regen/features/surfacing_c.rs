@@ -231,7 +231,7 @@ pub fn wrap(ev: &mut EvalCtx) -> FResult<()> {
             let Some((bi, _)) = dst_face else { return err("Trim and Imprint require the destination to be defined by a face.") };
             let body = ev.ctx.bodies[bi].clone();
             let edges: Vec<Shape> = out_faces.iter().flat_map(|f| f.edges()).collect();
-            let imp = k::imprint(&body.shape, &edges).map_err(|_| fe("Failed to imprint edges onto destination face."))?;
+            let imp = k::imprint_kept(&body.shape, &edges).map_err(|_| fe("Failed to imprint edges onto destination face."))?;
             let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &imp.history, &imp.shape, &BTreeMap::new(), None);
             if imp.shape.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
                 ev.warnings.push("The wrapped edges did not split the target face".into());
@@ -316,7 +316,7 @@ pub fn isocline(ev: &mut EvalCtx) -> FResult<()> {
                 continue;
             }
             let body = ev.ctx.bodies[bi].clone();
-            let res = k::imprint(&body.shape, &edges).map_err(|e| fe(format!("The faces could not be split: {e}")))?;
+            let res = k::imprint_kept(&body.shape, &edges).map_err(|e| fe(format!("The faces could not be split: {e}")))?;
             let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &res.history, &res.shape, &BTreeMap::new(), None);
             ev.replace_body(bi, res.shape, names);
         }

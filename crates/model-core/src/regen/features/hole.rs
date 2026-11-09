@@ -952,7 +952,7 @@ fn split_thread_face(ev: &mut EvalCtx, id: &BodyId, center: DVec3, axis: DVec3, 
         return Ok(());
     }
     let circle = k::make_circle(center + axis * depth.copysign(far), axis, r).map_err(kerr("Tool entity cannot split the selected part/face."))?;
-    let res = k::imprint(&body.shape, &[circle]).map_err(kerr("Tool entity cannot split the selected part/face."))?;
+    let res = k::imprint_kept(&body.shape, &[circle]).map_err(kerr("Tool entity cannot split the selected part/face."))?;
     let res_solid = if body.kind == BodyKind::Solid { res.shape.solids().into_iter().next().unwrap_or(res.shape.clone()) } else { res.shape.clone() };
     if res_solid.count(ShapeType::Face) <= body.shape.count(ShapeType::Face) {
         return Ok(());

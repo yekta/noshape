@@ -774,7 +774,7 @@ TopoDS_Shape merge_planar(const TopoDS_Shape& s, HHist& hist, const UnifyScope* 
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2)
+    if (fs.Extent() != 2 || kept_edge(ef.FindKey(i)))
       continue;
     const int a = faces.FindIndex(fs.First()), b = faces.FindIndex(fs.Last());
     if (a == b || !planar[(size_t)a] || !planar[(size_t)b])
@@ -1638,11 +1638,20 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     HHist                hr;
     const FreeIfCancelled<std::unique_ptr<BRepBuilderAPI_Copy>, TopoDS_Shape, HHist, HHist> held(cpp, in, hc, hr);
     hc = cancellable_history(std::vector<TopoDS_Shape>{s}, cp);
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
     if (k >= 8)
       in = faces_reversed(in);
     if (k % 8 > 0)
     {
+      const TopoDS_Shape before_rotation = in;
       in = rotate_round_wires(in, k % 8, hr);
+      if (!in.IsNull() && !hr.IsNull())
+        carry_kept_marks(before_rotation, [&](const TopoDS_Shape& x) {
+          std::vector<TopoDS_Shape> out;
+          for (const TopoDS_Shape& m : hr->Modified(x))
+            out.push_back(m);
+          return out;
+        });
       if (in.IsNull())
       {
         if (k >= 8)
@@ -1661,6 +1670,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     auto                          up = std::make_unique<ShapeUpgrade_UnifySameDomain>(in, true, true, false);
     ShapeUpgrade_UnifySameDomain& u  = *up;
     const FreeIfCancelled<std::unique_ptr<ShapeUpgrade_UnifySameDomain>> held_u(up);
+    keep_marked_edges(u, in);
     u.Build();
     fail_if_cancelled();
     lap = std::make_unique<KernelTimer>("usd.check");
@@ -1689,6 +1699,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
       hist->Merge(hr);
     if (!u.History().IsNull())
       hist->Merge(u.History());
+    carry_kept_marks(in, u);
     return u.Shape();
   }
   // No start keeps it (two half cones meeting at their apex: a blind hole's
@@ -1701,7 +1712,9 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     BRepBuilderAPI_Copy cp(s, false, false);
     const TopoDS_Shape  in = cp.Shape();
     HHist               hc = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s}), cp);
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
     ShapeUpgrade_UnifySameDomain u(in, true, true, false);
+    keep_marked_edges(u, in);
     ShapeAncMap                  ef;
     unique_ancestors(in, TopAbs_EDGE, TopAbs_FACE, ef);
     bool kept = false;
@@ -1739,6 +1752,7 @@ TopoDS_Shape usd_kept_volume(const TopoDS_Shape& s, HHist& hist)
     hist->Merge(hc);
     if (!u.History().IsNull())
       hist->Merge(u.History());
+    carry_kept_marks(in, u);
     return u.Shape();
   }
   return s;
@@ -1824,6 +1838,8 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
         return false;
       if (fl->First().IsSame(other) || fl->Last().IsSame(other))
       {
+        if (kept_edge(e))
+          return false;
         bool seen = false;
         for (const TopoDS_Edge& r : b.ring)
           seen = seen || r.IsSame(e);
@@ -1844,7 +1860,7 @@ TopoDS_Shape merge_cylinder_bands(const TopoDS_Shape& s, HHist& hist)
   };
   for (int i = 1; i <= ef.Extent(); ++i)
   {
-    if (ef(i).Extent() != 2)
+    if (ef(i).Extent() != 2 || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face a = TopoDS::Face(ef(i).First()), b = TopoDS::Face(ef(i).Last());
     gp_Cylinder       ca, cb;
@@ -3047,7 +3063,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
       bool apart = false;
       for (size_t k = 0; k < g.size(); ++k)
         for (TopExp_Explorer x(fm(g[k]), TopAbs_EDGE); x.More(); x.Next())
-          if (const ShapeList* fs = ef.Seek(x.Current()))
+          if (const ShapeList* fs = kept_edge(x.Current()) ? nullptr : ef.Seek(x.Current()))
             for (const TopoDS_Shape& f : *fs)
             {
               const int   j = fm.FindIndex(f);
@@ -3073,6 +3089,7 @@ TopoDS_Shape merge_cylinder_groups(const TopoDS_Shape& s0, HHist& hist, bool any
       return s0;
   }
   BRepBuilderAPI_Copy cp(s0, true, false);
+  carry_kept_marks(s0, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
   TopoDS_Shape        s     = cp.Shape();
   HHist               local = new BRepTools_History(to_list(std::vector<TopoDS_Shape>{s0}), cp);
   bool                any   = false;
@@ -3489,7 +3506,7 @@ TopoDS_Shape share_equal_surfaces(const TopoDS_Shape& s, HHist& hist)
   for (int i = 1; i <= ef.Extent(); ++i)
   {
     const ShapeList& fs = ef(i);
-    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()))
+    if (fs.Extent() != 2 || fs.First().IsSame(fs.Last()) || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face a = TopoDS::Face(fs.First()), b = TopoDS::Face(fs.Last());
     TopLoc_Location   la, lb;
@@ -3506,6 +3523,7 @@ TopoDS_Shape share_equal_surfaces(const TopoDS_Shape& s, HHist& hist)
   if (pairs.empty())
     return s;
   BRepBuilderAPI_Copy cp(s, true, false);
+  carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
   const TopoDS_Shape  out = cp.Shape();
   // Each face's surface: its first partner's, followed through chains of them.
   NCollection_DataMap<TopoDS_Shape, TopoDS_Shape, TopTools_ShapeMapHasher> to;
@@ -3625,7 +3643,7 @@ TopoDS_Shape merge_apex_cones(const TopoDS_Shape& s, HHist& hist)
       const GeomAbs_CurveType t = BRepAdaptor_Curve(e).GetType();
       if (fl->First().IsSame(other) || fl->Last().IsSame(other))
       {
-        if (t != GeomAbs_Line)
+        if (t != GeomAbs_Line || kept_edge(e))
           return false;
         add(h.lines, e);
       }
@@ -3655,6 +3673,7 @@ TopoDS_Shape merge_apex_cones(const TopoDS_Shape& s, HHist& hist)
       continue;
     // On a copy from here (the edges get curves on the new face).
     BRepBuilderAPI_Copy cp(s, false, false);
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
     const TopoDS_Shape  c = cp.Shape();
     auto                image = [&](const TopoDS_Shape& x) {
       TopoDS_Shape r = cp.ModifiedShape(x);
@@ -3844,7 +3863,7 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
   for (int q = 0; q < 2 * ef.Extent(); ++q)
   {
     const int i = q / 2 + 1;
-    if (ef(i).Extent() != 2)
+    if (ef(i).Extent() != 2 || kept_edge(ef.FindKey(i)))
       continue;
     const TopoDS_Face a0 = TopoDS::Face(q % 2 == 0 ? ef(i).First() : ef(i).Last()), b0 = TopoDS::Face(q % 2 == 0 ? ef(i).Last() : ef(i).First());
     gp_Cylinder       ca, cb;
@@ -3860,6 +3879,7 @@ TopoDS_Shape merge_cylinder_patches(const TopoDS_Shape& s, HHist& hist, bool val
     // On a copy from here (the second's edges get curves on the new face).
     BRepBuilderAPI_Copy cp(s, false, false);
     const TopoDS_Shape  c     = cp.Shape();
+    carry_kept_marks(s, [&](const TopoDS_Shape& x) { return std::vector<TopoDS_Shape>{cp.ModifiedShape(x)}; });
     auto                image = [&](const TopoDS_Shape& x) {
       TopoDS_Shape y = cp.ModifiedShape(x);
       return x.Orientation() == y.Orientation() ? y : y.Reversed();
@@ -4756,7 +4776,9 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
         return s3;
       // (Their boundaries' pieces now between one face on each side: joined as USD joins edges.)
       ShapeUpgrade_UnifySameDomain u(s4, true, false, false);
+      keep_marked_edges(u, s4);
       u.Build();
+      carry_kept_marks(s4, u);
       fail_if_cancelled();
       if (!valid_whole(u.Shape()))
         return s3;
@@ -4770,7 +4792,9 @@ TopoDS_Shape unify_faces_in(const TopoDS_Shape& s0, HHist& hist, const UnifyScop
     }
     fail_if_cancelled();
     ShapeUpgrade_UnifySameDomain u(s1, true, true, false);
+    keep_marked_edges(u, s1);
     u.Build();
+    carry_kept_marks(s1, u);
     fail_if_cancelled();
     if (!u.History().IsNull())
     {
@@ -8418,7 +8442,9 @@ OpOut op_unify_edges(const OcShape& s)
 {
   require_non_null(s.shape, "shape");
   ShapeUpgrade_UnifySameDomain u(s.shape, true, false, false);
+  keep_marked_edges(u, s.shape);
   u.Build();
+  carry_kept_marks(s.shape, u);
   fail_if_cancelled();
   if (!BRepCheck_Analyzer(u.Shape()).IsValid())
     return make_result({s.shape}, s.shape, nullptr);
@@ -8776,8 +8802,12 @@ MergedFaces merge_same_surface_faces(const OcShape& s, bool periodic)
     return as_is();
   ShapeUpgrade_UnifySameDomain u(shape, true, true, false);
   u.KeepShapes(keep);
+  keep_marked_edges(u, shape);
   if (any)
+  {
     u.Build();
+    carry_kept_marks(shape, u);
+  }
   // (A merge that leaves a face it can't close: the part as read.)
   const TopoDS_Shape merged = any ? u.Shape() : shape;
   if (!BRepCheck_Analyzer(merged).IsValid())

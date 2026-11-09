@@ -974,7 +974,7 @@ fn split_by_offset(ev: &mut EvalCtx, face: &Shape, edges: &[Shape]) -> FResult<(
         return err("Select target faces");
     };
     let body = ev.ctx.bodies[bi].clone();
-    let res = k::imprint(&body.shape, edges).map_err(|e| FeatureError::new(format!("The faces could not be split: {e}")))?;
+    let res = k::imprint_kept(&body.shape, edges).map_err(|e| FeatureError::new(format!("The faces could not be split: {e}")))?;
     let names = ev.name_result(&[&body.shape_names(), &ShapeNames::default()], &res.history, &res.shape, &BTreeMap::new(), None);
     ev.replace_body(bi, res.shape, names);
     Ok(())
