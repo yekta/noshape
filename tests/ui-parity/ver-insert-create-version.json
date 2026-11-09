@@ -1,0 +1,27 @@
+{
+ "name": "ver-insert-create-version",
+ "about": "Assembly 1's Insert dialog: the header's Create version… (the Create version dialog over it), Cancel",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "two-blocks",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "tool": "Insert"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

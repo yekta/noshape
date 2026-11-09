@@ -1,0 +1,51 @@
+{
+ "name": "ver-healthy-moment",
+ "about": "Extrude 2's depth set to 0 mm (it fails), then its menu › Edit healthy moment of Extrude 2…",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "dblclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "field": "Depth"
+   }
+  },
+  {
+   "do": "key",
+   "key": "mod+a"
+  },
+  {
+   "do": "type",
+   "text": "0 mm"
+  },
+  {
+   "do": "key",
+   "key": "Enter"
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "ok"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 2"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Edit healthy moment of Extrude 2…"
+   }
+  }
+ ]
+}

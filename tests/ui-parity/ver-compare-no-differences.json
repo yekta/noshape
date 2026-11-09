@@ -1,0 +1,33 @@
+{
+ "name": "ver-compare-no-differences",
+ "about": "Compare V1, then Part Studio 2 (the same in both): \"Compare has found no differences.\"",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-versions-tabs",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 2"
+   }
+  }
+ ]
+}

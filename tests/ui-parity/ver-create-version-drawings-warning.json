@@ -1,0 +1,45 @@
+{
+ "name": "ver-create-version-drawings-warning",
+ "about": "Extrude 1 suppressed (the drawing out of date), then Create version…: \"These drawings should be updated…\", Update drawings., Cancel",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "block-drawing",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Part Studio 1"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "feature": "Extrude 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Suppress"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Update drawings."
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "name": "ver-compare-hover-part",
+ "about": "Compare V1, then the box's top face hovered and clicked in the graphics (common faces highlight; V1-only / Main-only geometry not selectable)",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Compare"
+   }
+  },
+  {
+   "do": "hover",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   },
+   "ms": 1000
+  },
+  {
+   "do": "click",
+   "on": {
+    "face": [
+     20,
+     15,
+     10
+    ]
+   }
+  }
+ ]
+}

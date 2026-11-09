@@ -455,6 +455,7 @@ pub fn render_slider(doc: &Entity<DocModel>, cx: &App) -> Option<AnyElement> {
             .child(
                 div()
                     .id("compare-blend")
+                    .map(|d| crate::ui_script::mark(d, || "button:Compare blend".into()))
                     .relative()
                     .mt(px(4.))
                     .mx(px(6.))

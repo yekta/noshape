@@ -3436,7 +3436,20 @@ impl PartStudioView {
                     }
                 })
             });
-        let help = div().size(px(16.)).rounded_full().flex().items_center().justify_center().text_size(px(12.)).font_weight(FontWeight::BOLD).child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)));
+        // Its ? opens help on versions (live: help versionshistorymanager).
+        let help = div()
+            .id("vb-help")
+            .map(|d| crate::ui_script::mark(d, || "button:Versions help".into()))
+            .size(px(16.))
+            .rounded_full()
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .text_size(px(12.))
+            .font_weight(FontWeight::BOLD)
+            .child(crate::ui::glyph("help-dot", 17.8, crate::theme::help_dot(0x999999)))
+            .on_click(|_, _, cx| noshape_app_core::help::open("Versions and workspaces", cx));
         let text = format!("Versions are view only. Viewing {version}.");
         crate::ui::toolbar()
             .id("part-studio-version-bar")

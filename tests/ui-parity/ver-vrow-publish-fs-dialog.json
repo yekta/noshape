@@ -1,0 +1,33 @@
+{
+ "name": "ver-vrow-publish-fs-dialog",
+ "about": "V1's menu › Publish FeatureScript… in a document with a Feature Studio (the Requirements checklist), Cancel",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "fs-versioned",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Publish FeatureScript…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

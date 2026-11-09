@@ -112,9 +112,19 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         let path = files_dir.as_ref().map_or_else(|| std::path::PathBuf::from(name), |d| d.join(name));
         call(ctx, "import_files", json!({ "files": [path] })).map_err(|e| format!("start file {name}: {e}"))?;
     }
+    // A linked document (README "Variable Studio and Versions" `linked`): built from its own start beside this one, its
+    // tab inserted into this document's assembly at one of its versions (a reference to another document's version).
+    if let Some(l) = start.get("linked") {
+        let name = l["name"].as_str().ok_or("linked: its name")?;
+        let source = path.with_file_name(format!("{name}.noshape"));
+        build_start(&mut Ctx::new(), &source, &l["start"]).map_err(|e| format!("linked {name}: {e}"))?;
+        let ins = &l["insert"];
+        let args = json!({ "tab": ins["assembly"].as_str().unwrap_or("Assembly 1"), "source": ins["source"].as_str().unwrap_or("Part Studio 1"), "document": source.to_str().ok_or("path")?, "version": ins["version"].as_str().ok_or("linked: insert's version")? });
+        call(ctx, "assembly_insert", args).map_err(|e| format!("linked {name}: {e}"))?;
+    }
     // (The run opens on Part Studio 1, where the versions' features go too.)
     let has = |key: &str| start[key].as_array().is_some_and(|t| !t.is_empty());
-    if has("tabs") || has("files") || start.get("feature_studio").is_some() {
+    if has("tabs") || has("files") || start.get("feature_studio").is_some() || start.get("linked").is_some() {
         call(ctx, "tab_activate", json!({ "tab": "Part Studio 1" }))?;
     }
     // Versions (README "Versions and history"): each made after what comes before it, then its own `features` in Main.
@@ -430,6 +440,20 @@ mod tests {
         }
         let ui = call(&mut ctx, "ui_state", json!({})).unwrap();
         assert_eq!(ui["active_tab"]["name"], "Part Studio 1", "{}", ui["active_tab"]);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A linked start (doc-linked): "uip Source" built beside it, its Part Studio 1 in Assembly 1 at V1.
+    #[test]
+    fn a_linked_start_builds() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity");
+        let starts: Value = serde_json::from_str(&std::fs::read_to_string(format!("{root}/starts.json")).unwrap()).unwrap();
+        let dir = std::env::temp_dir().join(format!("noshape-uip-linked-{}", std::process::id()));
+        let mut ctx = Ctx::new();
+        build_start(&mut ctx, &dir.join("linked.noshape"), &starts["doc-linked"]).unwrap();
+        assert!(dir.join("uip Source.noshape").exists());
+        let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" })).unwrap();
+        assert_eq!(list["instances"].as_array().map(Vec::len), Some(1), "{list}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

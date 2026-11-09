@@ -1,0 +1,27 @@
+{
+ "name": "ver-create-version-publish-fs",
+ "about": "A document with a Feature Studio: Create version…'s Publish custom features and tables ticked, then Cancel",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "fs-custom",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Create version…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "checkbox": "Publish custom features and tables"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

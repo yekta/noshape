@@ -1,0 +1,27 @@
+{
+ "name": "ver-linked-update-all",
+ "about": "Assembly 1: the toolbar's Update all references to latest versions (the Reference manager), then Update all",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "doc_tab": "Assembly 1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "tool": "Update all references to latest versions"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Update all"
+   }
+  }
+ ]
+}

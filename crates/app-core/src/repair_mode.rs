@@ -128,7 +128,7 @@ pub fn render_panel(doc: &Entity<DocModel>, graphics: Option<AnyElement>, cx: &A
                     .child("Repair"),
             )
             .child(
-                div().flex_1().min_h_0().relative().children(graphics).child(
+                div().flex_1().min_h_0().relative().map(|d| crate::ui_script::mark(d, || "button:Repair graphics".into())).children(graphics).child(
                     div().absolute().top(px(6.)).left_0().right_0().flex().justify_center().child(
                         h_flex()
                             .h(px(30.))

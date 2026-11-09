@@ -1,0 +1,45 @@
+{
+ "name": "ver-repair-close-zoom",
+ "about": "V1's View in repair: right-click in the Repair graphics › Zoom to fit, then the strip's Repair panel wrench closes it",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "V1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "View in repair"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "button": "Repair graphics"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Zoom to fit"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Repair panel"
+   }
+  }
+ ]
+}

@@ -632,6 +632,7 @@ impl AssemblyView {
             let on = tab == ix;
             div()
                 .id(id)
+                .map(|d| crate::ui_script::mark(d, move || format!("button:{label}")))
                 .flex_1()
                 .h(px(32.))
                 .flex()
@@ -659,6 +660,7 @@ impl AssemblyView {
                             div().w(px(19.)).pl(px(4.)).child(
                                 div()
                                     .id(SharedString::from(format!("rm-check-{i}")))
+                                    .map(|e| crate::ui_script::mark(e, || format!("checkbox:{}", d.name)))
                                     .size(px(13.))
                                     .rounded(px(2.))
                                     .border_1()
@@ -692,6 +694,7 @@ impl AssemblyView {
                         r.child(
                             div()
                                 .id(SharedString::from(format!("rm-graph-{i}")))
+                                .map(|e| crate::ui_script::mark(e, || format!("button:Version graph:{}", d.name)))
                                 .mr(px(21.))
                                 .size(px(30.))
                                 .flex()
@@ -800,6 +803,7 @@ impl AssemblyView {
                     h_flex().h(px(46.)).px(px(5.)).justify_end().border_t_1().border_b_1().border_color(rgb(0xeaeaea)).child(
                         div()
                             .id("rm-update")
+                            .map(|d| crate::ui_script::mark(d, move || if tab == 0 { "button:Update all".into() } else { "button:Update selected".into() }))
                             .h(px(34.))
                             .px(px(10.5))
                             .flex()

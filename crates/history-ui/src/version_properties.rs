@@ -264,8 +264,10 @@ impl ItemProperties {
     /// A tree row: ▸ / ▾ (when it has children), a 70×40 picture, the name
     /// and the italic type; light blue when selected.
     fn tree_row(id: &'static str, ix: usize, indent: f32, chevron: Option<(bool, Listener)>, picture: AnyElement, (name, kind): (String, String), selected: bool) -> Stateful<Div> {
+        let row_mark = format!("list_row:{name}");
         h_flex()
             .id((id, ix))
+            .map(|d| crate::ui_script::mark(d, || row_mark))
             .w_full()
             .h(px(55.))
             .flex_none()
@@ -277,6 +279,7 @@ impl ItemProperties {
             .when(!selected, |d| d.hover(|d| d.bg(rgb(0xe5f3fb))))
             .child(div().id("chev").w(px(12.)).h_full().flex_none().flex().items_center().when_some(chevron, |d, (open, toggle)| {
                 d.cursor_pointer()
+                    .map(|d| crate::ui_script::mark(d, || "button:Expand".into()))
                     .child(crate::os_ui::glyph(if open { crate::os_ui::GLYPH_EXPANDED } else { crate::os_ui::GLYPH_COLLAPSED }, 12., rgb(0x333333)))
                     .on_click(move |e, window, cx| {
                         cx.stop_propagation();

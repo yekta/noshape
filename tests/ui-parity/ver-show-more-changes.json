@@ -1,0 +1,27 @@
+{
+ "name": "ver-show-more-changes",
+ "about": "Twelve changes since V1: Main's Show changes…, then Show more changes… at the list's end",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-versions-many",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show changes:Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Show more changes…"
+   }
+  }
+ ]
+}

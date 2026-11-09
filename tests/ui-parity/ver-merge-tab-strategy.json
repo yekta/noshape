@@ -1,0 +1,40 @@
+{
+ "name": "ver-merge-tab-strategy",
+ "about": "B1's Merge into current workspace…: Part Studio 1's tab strategy set to Keep (the yellow corner), then Cancel",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-branches",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "rclick",
+   "on": {
+    "history_row": "B1"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Merge into current workspace…"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "dropdown": "Part Studio 1",
+    "pick": "Keep Main"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Cancel"
+   }
+  }
+ ]
+}

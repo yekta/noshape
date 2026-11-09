@@ -480,7 +480,17 @@
    "where": "end of an expanded change list",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3316"
+   "source": "behaviours.md:3316",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Show more changes…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "vh-click-change-row",
@@ -1360,7 +1370,17 @@
    "where": "Create version dialog checkbox (only when the document has a Feature Studio)",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1665"
+   "source": "behaviours.md:1665",
+   "via": [
+    [
+     {
+      "on": {
+       "checkbox": "Publish custom features and tables"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-cv-outdated-drawings",
@@ -1369,7 +1389,23 @@
    "where": "Create version dialog warning; each drawing link opens it in a new browser tab; Create stays enabled",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:29675"
+   "source": "behaviours.md:29675",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Suppress"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Create version…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-cv-update-drawings",
@@ -1378,7 +1414,17 @@
    "where": "Create version dialog warning › refresh icon button",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:29676"
+   "source": "behaviours.md:29676",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Update drawings."
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-cv-from-picker",
@@ -1387,7 +1433,23 @@
    "where": "Insert / Select a Part Studio / reference pickers: header icon \"Create version…\" or link \"Create a version in <doc>.\" (\"N changes since the last version.\")",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1661"
+   "source": "behaviours.md:1661",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Insert"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Create version…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-br-create",
@@ -1502,7 +1564,23 @@
    "where": "version Properties modal › expand the version row ▶",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:69"
+   "source": "behaviours.md:69",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Properties…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Expand"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-vprops-apply-save-close",
@@ -1570,7 +1648,23 @@
    "where": "version row › Publish FeatureScript…: modal with the Requirements checklist; button disabled while any line is ✗; Cancel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:70"
+   "source": "behaviours.md:70",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Publish FeatureScript…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Cancel"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-wp-enable",
@@ -1625,7 +1719,23 @@
    "where": "Workspace protection dialog notice; names open those drawings",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3339"
+   "source": "behaviours.md:3339",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Suppress"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "menu": "Workspace protection…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "dlg-wp-learn-more",
@@ -2036,7 +2146,17 @@
    "where": "view-only bar ? icon (help versionshistorymanager)",
    "freq": 3,
    "cloud": false,
-   "source": "dom/version-view-only-bar.txt"
+   "source": "dom/version-view-only-bar.txt",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Versions help"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "open-version-missing-tab",
@@ -2045,7 +2165,23 @@
    "where": "opening a version that lacks the current tab: first tab opens + info toast",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:58"
+   "source": "behaviours.md:58",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Create Part Studio"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "history_row": "V1"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-bar",
@@ -2224,7 +2360,17 @@
    "where": "slider at the top of the graphics; base-only blue, target-only red, alpha blend",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:3456"
+   "source": "behaviours.md:3456",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Compare blend"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-moved-marker",
@@ -2233,7 +2379,23 @@
    "where": "reordered feature shows amber ⬇ / ⬆ circle arrows in two rows",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:5383"
+   "source": "behaviours.md:5383",
+   "via": [
+    [
+     {
+      "from": {
+       "feature": "Sketch 2"
+      },
+      "do": "drag"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-sketch-eye",
@@ -2260,7 +2422,27 @@
    "where": "common faces highlight; base-only / target-only geometry not selectable",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3487"
+   "source": "behaviours.md:3487",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "face": [
+        20,
+        15,
+        10
+       ]
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-no-differences-tab",
@@ -2269,7 +2451,23 @@
    "where": "open a tab with no differences: empty list, grey model",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4718"
+   "source": "behaviours.md:4718",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Compare"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "doc_tab": "Part Studio 2"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-feature-studio",
@@ -2278,7 +2476,23 @@
    "where": "open a Feature Studio in compare: two diff editors",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4723"
+   "source": "behaviours.md:4723",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Commit Feature Studio"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-two-entries",
@@ -2315,7 +2529,23 @@
    "where": "compare when the current tab is missing",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:4715"
+   "source": "behaviours.md:4715",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Create Part Studio"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "menu": "Compare"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "cmp-leave-workspace-row",
@@ -2467,7 +2697,23 @@
    "where": "per-tab select: Keep / Merge changes from both / Replace (drawings and new tabs: Keep / Replace); override shows yellow corner",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:5062"
+   "source": "behaviours.md:5062",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Merge into current workspace…"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "dropdown": "Part Studio 1"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "mg-tab-info",
@@ -2595,7 +2841,17 @@
    "where": "assembly instance or drawing tab right-click › Reference manager panel",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1456"
+   "source": "behaviours.md:1456",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Change to version…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "ref-update-to-latest",
@@ -2604,7 +2860,23 @@
    "where": "Reference manager first tab",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1458"
+   "source": "behaviours.md:1458",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Update all references to latest versions"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Update all"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "ref-selective-update",
@@ -2613,7 +2885,23 @@
    "where": "Reference manager second tab: per-document checkbox",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1458"
+   "source": "behaviours.md:1458",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Selective update"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Update selected"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "ref-version-graph-pick",
@@ -2622,7 +2910,17 @@
    "where": "Reference manager Selective update ⎇ / insert pickers' Version graph button: pick a version node",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:1459"
+   "source": "behaviours.md:1459",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Version graph:uip Source"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "ref-update-all-toolbar",
@@ -2631,7 +2929,17 @@
    "where": "assembly toolbar button (enabled when newer versions exist)",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1208"
+   "source": "behaviours.md:1208",
+   "via": [
+    [
+     {
+      "on": {
+       "tool": "Update all references to latest versions"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "ref-outdated-indicators",
@@ -2640,7 +2948,17 @@
    "where": "blue version badge on instances / drawing tab",
    "freq": 2,
    "cloud": false,
-   "source": "behaviours.md:1460"
+   "source": "behaviours.md:1460",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Newer versions of linked documents available"
+      },
+      "do": "hover"
+     }
+    ]
+   ]
   },
   {
    "id": "rel-release-menu",
@@ -3421,7 +3739,23 @@
    "where": "right strip wrench closes the panel",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3324"
+   "source": "behaviours.md:3324",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "View in repair"
+      },
+      "do": "click"
+     },
+     {
+      "on": {
+       "button": "Repair panel"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "repair-zoom-to-fit",
@@ -3430,7 +3764,23 @@
    "where": "right-click inside the Repair graphics",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:3326"
+   "source": "behaviours.md:3326",
+   "via": [
+    [
+     {
+      "on": {
+       "button": "Repair graphics"
+      },
+      "do": "rclick"
+     },
+     {
+      "on": {
+       "menu": "Zoom to fit"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   },
   {
    "id": "edit-healthy-moment",
@@ -3439,7 +3789,17 @@
    "where": "failed feature right-click: searches recent history for a healthy state",
    "freq": 3,
    "cloud": false,
-   "source": "behaviours.md:28510"
+   "source": "behaviours.md:28510",
+   "via": [
+    [
+     {
+      "on": {
+       "menu": "Edit healthy moment of Extrude 2…"
+      },
+      "do": "click"
+     }
+    ]
+   ]
   }
  ],
  "gaps": [

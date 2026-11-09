@@ -108,6 +108,19 @@ browser tab), the tab bar's scroll arrows (start `doc-many-tabs`, 31 tabs), nest
 (start `doc-nested`), Ctrl+Space held and released (the runner's new `release` step). The location box's Sort is in
 (4c129d33). Import to Onshape and Copy workspace's New folder: live2 asked to describe them first (REQUESTS).
 
+**2026-11-09 01:55 UTC: psui took Versions, branches, history and release (lead, while studios and skasm are paused).**
+Applied /root/studios-scratch/keep/merge-rows.patch (store and history e2e tests pass; ver-* run against it: see
+psui's land note). The Versions list, 22 scenarios in two batches (coverage 83.8 → 99.4 %): compare with no
+differences / a tab missing (compare and version), moved-feature markers, the blend slider, compare hover, Feature
+Studio compare, Show more changes…, the view-only bar's ? (now opens help), Publish custom features (Create version
+checkbox, Publish FeatureScript… dialog), the version Properties tree, the drawings-out-of-date notices (Create
+version, Workspace protection), Edit healthy moment, Repair's close and Zoom to fit, the merge dialog's per-tab
+strategy, the assembly Insert dialog's Create version…; batch 2 on a new start `doc-linked` (a second document "uip
+Source" referenced at V1 with a newer V2; start key `linked`): the tab's newer-versions badge, Update all references,
+the Reference manager's Update all / Selective update / Version graph, Change to version…. Left (1): the merge
+dialog's drawing row ⓘ / Open in <ws>. Known gaps ours will show: Show more changes… (none yet), Repair graphics' menu
+(the panel draws no graphics yet).
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;

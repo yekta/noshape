@@ -772,6 +772,7 @@ fn publish_row(on: Rc<std::cell::Cell<bool>>, cx: &App) -> AnyElement {
     crate::ui_script::note_modal_field(|| serde_json::json!({ "label": "Publish custom features and tables", "kind": "checkbox", "value": checked }));
     h_flex()
         .id("publish-fs")
+        .map(|d| crate::ui_script::mark(d, || "checkbox:Publish custom features and tables".into()))
         .w_full()
         .p(px(10.))
         .gap(px(8.))
@@ -883,6 +884,7 @@ fn stale_drawings_warning(doc: &Entity<DocModel>, stale: &Rc<std::cell::RefCell<
     let (doc, stale) = (doc.clone(), stale.clone());
     let button = div()
         .id("update-drawings")
+        .map(|d| crate::ui_script::mark(d, || "button:Update drawings.".into()))
         .size(px(30.))
         .flex_none()
         .flex()

@@ -426,8 +426,10 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
             let plan2 = plan.clone();
             let probe: Rc<std::cell::Cell<Bounds<Pixels>>> = Default::default();
             let probe2 = probe.clone();
+            let select_mark = format!("dropdown:{}", r.name);
             let select = h_flex()
                 .id(SharedString::from(format!("merge-strategy-{i}")))
+                .map(|d| crate::ui_script::mark(d, || select_mark))
                 .relative()
                 .flex_1()
                 .h(px(ROW_H - 4.))

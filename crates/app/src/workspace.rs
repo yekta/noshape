@@ -259,6 +259,10 @@ impl Workspace {
         let tabs: Vec<(TabId, &'static str)> = self.doc.read(cx).session.doc.ordered_tabs().iter().map(|t| (t.id, kind_of(&t.content))).collect();
         self.views.retain(|id, _| tabs.iter().any(|(t, _)| t == id));
         if self.active.is_none_or(|a| !tabs.iter().any(|(t, _)| *t == a)) {
+            // A version opened without the tab that was showing: its first tab, and live's notice.
+            if self.active.is_some() && self.doc.read(cx).session.viewing_version().is_some() {
+                self.doc.update(cx, |_, cx| cx.emit(DocEvent::Info("Can't open tab. The tab does not exist in this document version.".into())));
+            }
             self.active = tabs.first().map(|t| t.0);
             // The session follows (undo scope, Versions and history's wrench):
             // another workspace may lack the tab that was open.

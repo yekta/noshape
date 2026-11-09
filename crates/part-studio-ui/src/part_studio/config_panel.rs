@@ -3136,6 +3136,7 @@ impl PartStudioView {
                         .border_r_0()
                         .border_color(pal.border_strong)
                         .child(crate::assets::icon("repair", 20., cx))
+                        .map(|d| crate::ui_script::mark(d, || "button:Repair panel".into()))
                         .tip("Repair panel", crate::ui::TipSide::Left)
                         .on_click(move |_, _, cx| crate::part_studio_hooks::repair_close(&doc, cx)),
                 )

@@ -1,0 +1,16 @@
+{
+ "name": "ver-linked-badge",
+ "about": "Assembly 1 references uip Source at V1 (V2 is newer): the tab's blue badge hovered (\"Newer versions of linked documents available\")",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-linked",
+ "steps": [
+  {
+   "do": "hover",
+   "on": {
+    "button": "Newer versions of linked documents available"
+   },
+   "ms": 1500
+  }
+ ]
+}

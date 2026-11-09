@@ -1,0 +1,33 @@
+{
+ "name": "ver-open-version-tab-missing",
+ "about": "A Part Studio made after V1, then V1 opened: the first tab opens with \"Can't open tab. The tab does not exist in this document version.\"",
+ "area": "psui",
+ "source": "universe versions (psui 11-09, studios.md Versions list)",
+ "start": "doc-versions",
+ "steps": [
+  {
+   "do": "click",
+   "on": {
+    "button": "Insert new tab"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "menu": "Create Part Studio"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "button": "Versions and history"
+   }
+  },
+  {
+   "do": "click",
+   "on": {
+    "history_row": "V1"
+   }
+  }
+ ]
+}
