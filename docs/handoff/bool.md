@@ -3,6 +3,24 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Speed list (11-09 05:20 UTC, new bool after the quota stop; branches bool-speed, bool-contact)
+- psui's 12 documents on main, features only, ours / live ms (`/root/bool-scratch/speedlist.sh <log> [worktree]`,
+  vibe4; log speed-main-1109.log): c2-impeller-loft 13714 / 2773 (upstream loft wrong: Delete face 2 5558, Shell
+  Gehäuse 3872 failing, Delete face 1 1500), cf-surface-pattern 9456 / 4178 (Surface Pattern 3 7582 / 537),
+  c2-rings-loft 4631 / 1557 (Shell 1 1872 / 235, Circular pattern 2 742 / 201), cf-snap-hook 1520 / 274 (Shell 1
+  640 / 6), c2-hunting-knife 721 / 408, c2-valve-config 630 / 175, cf-lighten 594 / 114 (Lighten 1 577 / 87),
+  c2-housing-draft 401 / 105 (Rotieren 1 327 / 13), motor-mount-jack 141 / 53, c2-helical-sweep 137 / 40,
+  c2-tpd-fillet-variable 122 / 44, c2-bottle-split 98 / 40.
+- **bool-speed c396b66b (gate speed1 + models-ab speed1 running, 05:13 UTC):** sp-cut (Surface Pattern 3's 85-tool
+  cut) ours 6.4 -> 2.0 s, same result: (1) `split_reach`'s vertex groups (240, then 18) were found after the last
+  "vertices to merge first" check, so two rounds classified all 8.7k pieces (275k rays) before restarting; now a
+  check right after the chains; (2) `NurbsCurve::param_of` built its 2049 samples' span runs each call: kept on the
+  curve (`Spans.2`); (3) `pieces_at`: the chains' parameters from `split_params`, not found again. Left in sp-cut:
+  the final round's classification (~0.6 s, rays against the spheres' faces) and round 0 (0.6 s, OCCT's sections).
+  Profiling: in-process sampler copied into kernel tests (crates/model/tests/sampler.rs; NOSHAPE_SAMPLE_OUT around
+  brep_corpus_replay; /root/bool-scratch/spprof.sh <corpus>, prof2.py on vibe4). No gdb on the hosts.
+- Rotieren 1: asked the lead (park, or a band-coincidence rule to match OCCT's history); see its entry below.
+
 ## Heads-up from core (2026-11-09 00:54 UTC, lead's call): unify steps skip edges marked "keep"
 - Intentional splits now survive later unifies, as live's: a thread's Split face, the Split feature / opSplitFace,
   offset-curve splits, wrap and isocline imprint through `k::imprint_kept`, which marks the new edges (common.cpp
@@ -222,6 +240,42 @@ on vibe4 (/home/ngyekta/dx-save/cf-surface-pattern.noshape is saved there; featu
   Next: print the plane's pieces near the circle with their states; check the tool's v = 0 circle edge is found on
   the plane (edge_on_surface, analytic). sp-cut still declines "a piece's point on another solid's face" (spheres
   44 / 45 touching): tangent_side gives None there (find why: normals or signs). Gate not run on the WIP.
+- **Rotieren 1 taken, history differs from OCCT (11-09 04:40 UTC, new bool; WIP commit on bool-contact, debug XTC /
+  XST / XNM prints in it).** In the corpus case (vibe4 ~/agents/bool-corpora/hd/39bba82f912dcab3, /root/bool-scratch/
+  hdone.sh <log> [env] replays it) OCCT's rib-wall sections already start on the circle (y 10.49), so the joined
+  section (through_contact / brep_occt_joined) never fires. The real block: the ribs' 0.144 mm top edges (z = 0, within
+  0.24 um of the revolved face, tangent at one end) were kept off the revolved face (the WIP's end-tangent rule), so
+  the face's four rib regions never closed and it stayed one piece, Out. With that rule saying "on" and
+  `free::projected` allowing the grey band (it allowed 0.2 um): the rib regions are pieces, In, and ours takes the cut
+  (41/98/62; OCCT 42/100/63). Left, history only: OCCT takes the plate's r 15.2-15.3 strips between the ribs as
+  coincident with the tool's revolved face (Modified from both arg0 Face2 and arg1 Face0), and splits the -y strip at
+  the tool's seam edge (arg1 Edge2, a vertex at (0, -15.3, 0)). Matching it needs a free-form face's region within the
+  band of a plane taken as coincident: a design addition, asked of the lead. Gate not run.
+- **Rotieren 1: live's answer and where ours stands (11-09 04:25 UTC; branch bool-contact = the tangent WIP on main).**
+  - Live (REQUESTS 2342, bool/q2342/contact.json): the circle r 15.2 is a real shared edge, in four arcs. Each arc
+    lies between the planar z = 0 face and one revolved face, tangent to it there: a zero-thickness edge, neither a
+    split into separate solids nor left out. The ribs (x = +-11, y = +-11) cut the circle. Short lines on z = 0 (0.144
+    and 0.337 mm) run from the arcs' ends to the rib walls' corners at r 15.3; they lie between the z = 0 face and
+    the rib walls only.
+  - OCCT's result is valid with live's volume: 42/100/63 before the feature's merge, 1294.122 mm3 (live 1294.124).
+    So OCCT's topology is the target.
+  - Ours (with the WIP) declines "a non-manifold result". The revolved face stays one piece and isn't kept, so every
+    edge it should share is used once. OCCT's section of a rib wall (x = 11) with the revolved face starts at
+    (11, 10.634, 0), the far end of the rib's 0.144 mm top edge. Along that edge the revolved surface is within
+    0.24 um of z = 0 (the tangent zone), so OCCT has that stretch on the edge. The section's start is 0.1 mm from the
+    revolved face's boundary circle; it dangles there and splits nothing.
+  - OCCT and live differ in a sliver (~0.002 mm2): OCCT gives the rib's top line to the revolved face and a thin z
+    = 0 strip (r 15.2-15.3); its rib/revolved section is 7.94 mm, from (11, 10.634). Live (contact.json) keeps the
+    line between the z = 0 face and the rib wall (Jpy, 14.4183 mm2; OCCT's 14.4164), and its section, 8.085 mm, runs
+    from the arc's end (11, 10.49, 0) to (11, 18.49, -0.99). Live wins: a gate exception with q2342.
+  - Plan (refines the tangent-contact plan above):
+    - (1) Rust `occt_sections`: take a section of faces A and B ending at P on an edge X of one of them. If X lies
+      within the grey band of the other face all along, and X's other end Q is on that face's boundary (the tangent
+      zone), ask the source for the section joined through to Q.
+    - (2) C++: the joined curve as `refined_section` makes one. Points from Q to P, then along OCCT's section, each
+      brought onto both surfaces in turn; the 3D curve and both face curves refitted.
+    - (3) X stays off B (the WIP's end-tangent rule), between the z = 0 face and A, as live has it.
+    - Same gate; Rotieren 1 (hd/39bba82f) in the corpus `live` list with q2342.
 - **Rotieren 1 needs live's answer (11-08 17:22 UTC; REQUESTS "c2-housing-draft's Rotieren 1"):** with the WIP all of
   the z = 0 face's pieces are classified (kept, outside the tool), consistently; the decline is the geometry: the
   revolve's cavity (below z = 0) touches the top face tangentially along r = 15.2 mm, so the result has the top face
