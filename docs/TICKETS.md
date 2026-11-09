@@ -320,6 +320,19 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   that piece only, part pattern / mirror / subtraction in two / repeated splits name apart, the old shared name finds
   both faces.
 
+## Release blockers for the 2026-11-09 17:00 release (qa list 16:34, cut 1b99f7a95 = green 4e549553's code + qa docs; the latest release is v0.4.38)
+- **qa 16:34: no blocker.** Greens since v0.4.38's cut (62a7e4bc5) with geometry changes swept on vibe3 (volume sweep 20, cf corpus
+  13, the 48 ticket documents): f5e9f8c6 → 4e549553, all unchanged except f5e9f8c6's two fuzz ticket documents, for the better
+  (05:00 list). Fuzz since v0.4.38's publish: v0.4.38 122 seeds, greens 0a88112b / 4e549553 122 seeds, 0 deaths. Suites
+  (SUITE-REGRESSIONS-1108): the 08:00 and 12:21 runs, no crash; c2-impeller-loft's Delete face 1 / 2 and a fillet fail on its
+  now-correct loft (core / bool, being worked on); the asm-robot-relations / -scissor-lift drop is the corpus refetch, not code.
+- **First release named Noshape** (lead's 42fd1ac49, d6fe80fe5, d8c65967a, 4ae66dc04): on green 421f2eb1 (Linux, Xvfb) the start
+  window reads "Documents — Noshape" and a document's "<name> — Noshape", WM_CLASS dev.noshape.noshape; to check again on the
+  release app at publish, with Noshape.app on macOS (qa-os.yml) and the icons.
+- Open, not new in this cut: P1 WIN-SHOW-IN-EXPLORER (no fix on main yet), P1 SAVED-SKETCH-PLANE-LOST, P1
+  T2-ASM-STANDARD-CONTENT-HANG (the nightly copy from 02:09 still runs on vibe2 at 16:25). Long-running P0s: BLEND-RUST,
+  SHELL-SLOW, REGEN-SPEED.
+
 ## Release blockers for the 2026-11-09 05:00 release (qa list 04:04, checked on green 62a7e4bc; newest 35fd1ddf is UI only; the latest release is v0.4.37)
 - **qa 04:04: no blocker.** Greens since the v0.4.37 cut (3fd65b5c9) with geometry changes swept on vibe3 (volume sweep 20, cf
   corpus 13, the 48 ticket documents): 3137184e → 62a7e4bc, 12 greens, all unchanged (the UI-only ones not swept). Fuzz since
