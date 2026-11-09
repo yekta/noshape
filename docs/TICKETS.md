@@ -316,7 +316,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   Boolean now keeping the body: rust-zero-solid-f197's Mirror 3 gives one part of 27,142.42 mm³ (44 faces) where it left four
   slivers of 9.3 / 18.8 mm³ and lost the 27,123.8 mm³ body; the fuzz document's later features, picked on the broken result, now
   say "Select …" (not filed); cli-delete-gpf's Shell 3 now builds and Shell 5 fails (a fuzz document, 18 parts both).
-- **qa 09:05, after the release checks (v0.4.38 published 08:24, run 42576854966, cut 62a7e4bc5): no blocker.** SHA256SUMS OK, 11
+- **qa 09:02, after the release checks (v0.4.38 published 08:24, run 42576854966, cut 62a7e4bc5): no blocker.** SHA256SUMS OK, 11
   assets, every job green incl. the three "Restart into" updates. CLI smoke = v0.4.37; the 48 ticket documents = green 62a7e4bc;
   GUI rows pixel-identical to v0.4.37 (11 / 11); stock ubuntu:24.04 OK; footer OK on Linux and macOS (Show in Finder too);
   Windows: Show in Explorer still fails (WIN-SHOW-IN-EXPLORER, not new). Agent session (Haiku, the release's MCP): 19 tool calls,
