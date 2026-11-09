@@ -3881,6 +3881,14 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
   (checked 10-27, as live) (skasm 2026-10-27, main 98cb32d1)
 
 ## Assemblies (asm)
+- [ ] P1 T2-ASM-STANDARD-CONTENT-HANG (asm; T2 hang) **the nightly T2 run's assembly tests never finish on vibe2**: the binary
+  `target-t2/debug/deps/all-*` of the assembly crate, run `--ignored --exact` with assembly::tests::
+  standard_content_parts_regenerate_with_mate_connectors first (then tapping_screw_tips_regenerate,
+  tapping_screw_recesses_iii_and_vi, … the 26 assembly::tests T2 cases), keeps one core at ~85 % for days: copies from the
+  nights of 11-07 and 11-08 had run 27 h and 50 h when the lead killed them (11-09 ~05:10); tonight's (started 02:09:52 on
+  vibe2) still ran at 05:15. The lead's nightly T2 now stops at 4 h. Their load (8 cores, 12–13) slowed qa's 18:54 and 23:24
+  model suites ~1.5× (SUITE-REGRESSIONS-1108). Find which case spins (run them one by one with a timeout) and fix or bound it.
+  (qa 2026-11-09 05:16, from the lead)
 - [ ] P3 SETLIB-STANDARD-CONTENT (asm, studios 11-08, lead ruling) Set library's "My standard content": `noshape_ops::prefs::LibraryFolders::load().0` maps the library key `standard_content` to the folder the user chose (Documents › a
   folder's Set library ▸ "My standard content", op `documents_set_library`; `libraries.json` in the config dir; one folder per
   library, setting another replaces it). The assembly's Insert › Standard content (assembly-ui assembly_standard.rs) should list, next to Onshape's own library, a "My standard content" entry holding
