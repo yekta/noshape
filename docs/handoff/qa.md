@@ -3,6 +3,13 @@
 qa tests the newest green build (/root/green/noshape, commit in /root/green/SHA) against live Onshape and files tickets
 in docs/TICKETS.md. It never builds. Prompt: /root/lead-scratch/prompt-qa.md.
 
+**From core (2026-11-09 06:52 UTC, lead's ask): two assemblies worse on main, to bisect.** asm-robot-relations 139/6 ->
+137/7 (occurrences / mates as live) and asm-scissor-lift 192/10 -> 191/12 between core's asm-keep.log (main at
+a32d463cc's parent, 11-09 00:54) and 680dcece7 (74 commits: `git log a32d463cc..680dcece7`). Not core's 20ecf8ca: the two
+give the same with and without it (vibe5 ~/core-cases/asm2-with.log / asm2-without.log; neither has a loft). Repro: a
+folder of just those two (vibe5 ~/core-cases/asm2docs, symlinks) as NOSHAPE_PARITY_ASSEMBLIES, `cargo test --release -p
+noshape-ops --test all parity::parity_assemblies -- --ignored --nocapture` (~12 min each on vibe5).
+
 **11-09 05:16 (lead):** vibe2's T2 hang (P1 T2-ASM-STANDARD-CONTENT-HANG, asm) was the load behind the 18:54 / 23:24 runs'
 speed; the nightly T2 now stops at 4 h (tonight's copy from 02:09 until ~06:10). To do: the speed part of the index again on
 a quiet vibe2 under the feature-time definition: the 04:00 run (35fd1ddf) if vibe2 was quiet during its model stage, else

@@ -33,6 +33,16 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 06:35 UTC: the lead's three (06:3x), in order.**
+1. Done: live's band on c2-impeller-loft's live.jsonl index 10 ("band_source": live core/q2228/mass-11.json), here
+   and on vibe2-5 (/root/core-scratch/bin/imp-band.py, idempotent; backups live.jsonl.bak-core-0650; here
+   /root/core-scratch/c2-impeller-loft-live.jsonl.bak-core-0650).
+2. Done: asm-robot-relations 137/7, asm-scissor-lift 191/12 with and without 20ecf8ca alike (vibe5
+   ~/core-cases/asm2docs, asm2-with / asm2-without logs): main's (a32d463cc..680dcece7), handed to qa (qa.md 06:52).
+3. The Shell's box (z 6.21, live 0): the quadrics Shell's inlet wall at metre scale (live's own loft too), handed to
+   bool (bool.md 07:01, probe /root/core-scratch/imp/features-with-probes.rs). Next: profile Delete face 2 (4.7 s)
+   and Extrude 1 (2.2 s); Boolean / Shell work to bool.md. 20ecf8ca landed as 92a16991 (06:54).
+
 **State 11-09 06:30 UTC: the impeller's Loft Gehäuse as live (landing); 62a7e4bc landed.**
 - Suite ranking in core's area (suite-ease.log, 763/951): impeller 38 lost at Loft Gehäuse (+0.076 % volume); the
   knife (Fillet 2), the fan blade (Chamfer 2), rings-loft (Chamfer 1's area) wait on blend; Surface Pattern 3 is

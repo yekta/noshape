@@ -3,6 +3,19 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## From core (2026-11-09 07:01 UTC): the quadrics Shell's inlet wall at metre scale (c2-impeller-loft)
+core's 20ecf8ca (in the queue) makes c2-impeller-loft's Loft Gehäuse live's (face within 0.3 µm of q2228's), and with
+live's band the impeller now reaches Shell Gehäuse, which builds (path quadrics, 6 faces, 45,279.2 mm³, live 45,272.9)
+but its box reaches z 6.21 mm (live 0): the inlet's offset wall (the one run on past its edge to the opening's plane).
+- Only at metre scale, and on live's own loft too: tests/data/shell/impeller-loft-live.step read in mm and shelled
+  3 mm: box max z 0; read in m and shelled 3e-3: 6.205 mm (ours 6.214). BRepBndLib::AddOptimal of that face gives
+  -11.630..6.213 mm, at mm scale -11.630..0.
+- In the document (STEP of the part after Shell Gehäuse) that face doesn't mesh at all (0 triangles); in T1 at metre
+  scale it does. Looks like a length-scaled tolerance (absolute 1e-7?) in the wall's run-on or its UV bounds.
+- Repro: core's probe (/root/core-scratch/imp/features-with-probes.rs, `probe_impeller_shell_box`, kernel tests;
+  ignored): both lofts at k = 1 and 1e-3. The T1 an_impeller_lofts_shell_as_live (Meter) could also check the box.
+- The model suite counts it once live.jsonl's band is in (done 06:50): c2-impeller-loft stops there at 11/48.
+
 ## Speed list (11-09 05:20 UTC, new bool after the quota stop; branches bool-speed, bool-contact)
 - psui's 12 documents on main, features only, ours / live ms (`/root/bool-scratch/speedlist.sh <log> [worktree]`,
   vibe4; log speed-main-1109.log): c2-impeller-loft 13714 / 2773 (upstream loft wrong: Delete face 2 5558, Shell
