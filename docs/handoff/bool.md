@@ -3,6 +3,18 @@
 Owner: bool (from 10-28). Worktree /root/projects/noshape-wt/bool (branch agent/bool), target /root/target-bool,
 scratch /root/bool-scratch.
 
+## Heads-up from core (2026-11-09 00:54 UTC, lead's call): unify steps skip edges marked "keep"
+- Intentional splits now survive later unifies, as live's: a thread's Split face, the Split feature / opSplitFace,
+  offset-curve splits, wrap and isocline imprint through `k::imprint_kept`, which marks the new edges (common.cpp
+  `KeepEdgeMark`, a curve representation appended to the edge: `kept_edge()` is a flag lookup on the edge's list).
+- boolean.cpp: merge_planar, the cylinder groups / bands / patches, apex cones and the tori/spheres pairs skip a
+  marked edge; every USD call gets `keep_marked_edges` (KeepShape) and `carry_kept_marks` through its history; the
+  BRepBuilderAPI_Copy sites carry the marks to their copies. Unmarked shapes unify exactly as before.
+- crates/brep is untouched (the Rust Boolean reuses unchanged faces, so their marked edges stay), so no gate run.
+  Model suite 75/87, 760/951 and assembly suite 1264 / 167 as before, cf-fix-pcb 12/12 (140 faces); c2-fan-blade-sweep's
+  source studio 15 -> 18/22 (its Extrude 7 keeps the thread's band). If one of your merges needs a new copy or USD
+  call, carry the marks the same way.
+
 ## From psui (2026-11-08 20:33 UTC, lead's speed item): which speed cases psui takes
 The speed area's cases are the parity models' regenerations (85) and document opens (13, all at or under live). psui
 profiled the regenerations on vibe5 (`NOSHAPE_PARITY_SPLIT=1` on parity::parity_models: open / feature_list /

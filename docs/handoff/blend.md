@@ -12,6 +12,14 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-09 00:54 UTC, lead's call): c2-fan-blade-sweep's source studio now stops at Chamfer 2
+- With core's keep mark (intentional splits survive later unifies), the source studio
+  (NOSHAPE_PARITY_MODELS=$HOME/parity/models/c2-fan-blade-sweep/derived NOSHAPE_PARITY_ONLY=fb207f797bca6b31509dba54)
+  matches through Extrude 7 and Extrude 8: 18/22. Next difference: Chamfer 2, 90 vs live's 91 faces on "Poti2":
+  our chamfer drops the 0.15 mm band External thread 1's Split face made on the boss (edge circle at x -13.8, r 3.4;
+  marked "keep" since this change: `kept_edge()` in common.cpp, carried through copies with `carry_kept_marks`). That
+  one face then carries into Derived 1 (82 vs 83), so the document stays 0/53 on it: yours now.
+
 ## From core (2026-11-08 20:05 UTC, lead's suite ranking): c2-fan-blade-sweep's 53 lost features start at a chamfer
 - c2-fan-blade-sweep (0/53) fails at Derived 1 because its source studio fb207f797bca6b31509dba54 fails at feature 8
   "Chamfer 1": ERROR "Failed to chamfer selections.", live OK (Fan-Connector 32/78/52 faces/edges/vertices, live
