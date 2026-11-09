@@ -393,6 +393,21 @@ fn register_history_hooks() {
             let path = doc.read(cx).session.path.clone();
             files::open_workspace_window(path, branch, gpu, cx)
         },
+        open_compare_window: |doc, base, target, cx| {
+            let gpu = cx.global::<gpu::GpuGlobal>().0.clone();
+            let (path, branch) = {
+                let s = &doc.read(cx).session;
+                (s.path.clone(), s.branch)
+            };
+            // On the compared workspace (live: …/w/<B1>/and/w/<Main>/m/<base>), else this one.
+            let on = match base.0 {
+                noshape_history_ui::compare_mode::Side::Workspace(b) => b,
+                noshape_history_ui::compare_mode::Side::Entry(_) => branch,
+            };
+            let (_, ws) = files::open_branch_window(path, on, gpu, cx)?;
+            let doc = ws.read(cx).doc.clone();
+            noshape_history_ui::compare_mode::compare(&doc, base, target, cx)
+        },
     });
 }
 

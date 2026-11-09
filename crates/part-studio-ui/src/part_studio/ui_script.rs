@@ -300,7 +300,9 @@ impl PartStudioView {
     /// `undo`: whether the toolbar's Undo and Redo do something (in a sketch
     /// or dialog, its own history).
     fn ui_undo_state(&self, cx: &App) -> Value {
-        let (undo, redo) = if self.edit.is_some() {
+        let (undo, redo) = if self.ui.dyn_suppression.is_some() {
+            (false, false)
+        } else if self.edit.is_some() {
             let (undo, redo) = self.draft_history_state();
             (undo || self.doc_edited_in_dialog(cx), redo)
         } else {
@@ -438,10 +440,25 @@ impl PartStudioView {
             let before = self.ui.preview_before.as_deref();
             std::iter::once(&*self.display).chain(before).find_map(|d| noshape_ops::studio::body_of(d, r).and_then(|b| d.body(&b)).map(|b| b.name.clone())).unwrap_or_default()
         };
+        // A pick that no longer resolves (a missing chip): live's selection names the feature that made it
+        // (fillet-chip-edit-healthy-moment: FEATURE, "Extrude 1").
+        let topo = |kind: &'static str, n: &noshape_model::reference::TopoName| {
+            let owner = body(r);
+            // (An edge or vertex: its first face's creator.)
+            let creator = match n {
+                noshape_model::reference::TopoName::Edge { faces, .. } => faces[0].creator(),
+                noshape_model::reference::TopoName::Vertex { faces, .. } => faces.first().and_then(|f| f.creator()),
+                n => n.creator(),
+            };
+            match creator.filter(|_| owner.is_empty()) {
+                Some(f) => ("FEATURE", feature_name(f)),
+                None => (kind, owner),
+            }
+        };
         match r {
-            Reference::Face(_) => ("FACE", body(r)),
-            Reference::Edge(_) => ("EDGE", body(r)),
-            Reference::Vertex(_) => ("VERTEX", body(r)),
+            Reference::Face(n) => topo("FACE", n),
+            Reference::Edge(n) => topo("EDGE", n),
+            Reference::Vertex(n) => topo("VERTEX", n),
             Reference::Body(_) => ("BODY", body(r)),
             Reference::Plane(p) => ("PLANE", format!("{p:?}")),
             Reference::Origin => ("VERTEX", "Origin".to_string()),

@@ -71,7 +71,7 @@ In an Assembly, **Exploded views** (right strip) move instances away from their 
 ## Versions and workspaces
 
 - **Versions and history** (the clock on the left rail) lists versions, workspaces and every change.
-- **Create version…** (**Ctrl+Alt+V**, **⌘⌥V** on a Mac) keeps the current state. Right-click a version to open it, branch a workspace from it, compare, or restore it.
+- **Create version…** keeps the current state. Right-click a version to open it, branch a workspace from it, compare, or restore it.
 - Right-click another workspace to merge it into the current one.
 
 ### Compare

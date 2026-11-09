@@ -532,7 +532,7 @@ type CreateFn = Rc<dyn Fn(&mut Window, &mut App) -> bool>;
 pub const PUBLISHED_FS_KEY: &str = noshape_ops::versions::PUBLISHED_FS_KEY;
 
 /// Onshape's "Create version from **<workspace>**" dialog (Versions and
-/// history, the rail button, Ctrl+Alt+V; live document/20).
+/// history, the rail button; live document/20).
 pub fn open_create_version(doc: Entity<DocModel>, window: &mut Window, cx: &mut App) {
     create_version_dialog(doc, false, None, window, cx)
 }

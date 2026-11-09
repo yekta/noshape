@@ -123,9 +123,14 @@ pub fn open_version_window(path: PathBuf, version: noshape_store::MicroversionId
 /// browser tab on that workspace): another window on the same file, editing
 /// that workspace; the document stays registered to its first window.
 pub fn open_workspace_window(path: PathBuf, branch: noshape_store::BranchId, gpu: Gpu, cx: &mut App) -> anyhow::Result<()> {
+    open_branch_window(path, branch, gpu, cx).map(|_| ())
+}
+
+/// [`open_workspace_window`], returning the window and its workspace (the merge dialog's Compare with base).
+pub fn open_branch_window(path: PathBuf, branch: noshape_store::BranchId, gpu: Gpu, cx: &mut App) -> anyhow::Result<(AnyWindowHandle, Entity<workspace::Workspace>)> {
     let mut session = session::Session::open(&path)?;
     session.switch_branch(branch)?;
-    open_session_window(session, gpu, cx).map(|_| ())
+    open_session_window(session, gpu, cx)
 }
 
 /// Tab › Open in new browser tab: another window on the same open document

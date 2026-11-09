@@ -210,6 +210,10 @@ def normalize_live(state):
         for it in sel.get("items") or []:
             if isinstance(it, dict) and it.get("kind") == "INSTANCE" and it.get("owner") is None and it.get("id") != "assemblyRoot":
                 it.pop("owner", None)
+            # Nor a sketch's entities the step itself made (Paste sketch: the new sketch isn't in its list yet when it
+            # reads, sketch-row-copy-paste-onto-front).
+            if isinstance(it, dict) and it.get("kind") == "SKETCH_ENTITY" and it.get("owner") is None:
+                it.pop("owner", None)
     # The bubble's close button is part of live's text ("Select a sketch plane × Close").
     if isinstance((state or {}).get("message"), str):
         state["message"] = state["message"].removesuffix("× Close").strip()

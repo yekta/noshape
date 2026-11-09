@@ -23,7 +23,13 @@ pub struct Hooks {
     pub open_new_window: OpenNewWindow,
     /// Another workspace's row › Open in new browser tab: a window on that workspace, editable.
     pub open_workspace_window: fn(Entity<DocModel>, BranchId, &mut App) -> anyhow::Result<()>,
+    /// The merge dialog's Compare with base ↗: another window on the document (on the compared workspace) comparing
+    /// `target` with `base` (live2 2405: a new browser tab; the dialog stays).
+    pub open_compare_window: OpenCompareWindow,
 }
+
+/// [`Hooks::open_compare_window`]: the document, the base and the target (side, label).
+pub type OpenCompareWindow = fn(Entity<DocModel>, (crate::compare_mode::Side, String), (crate::compare_mode::Side, String), &mut App) -> anyhow::Result<()>;
 
 static HOOKS: OnceLock<Hooks> = OnceLock::new();
 
@@ -46,6 +52,10 @@ pub fn workspace_protection(doc: Entity<DocModel>, branch: BranchId, window: &mu
 
 pub fn open_new_window(doc: Entity<DocModel>, at: Option<noshape_store::MicroversionId>, tab: Option<noshape_model::document::TabId>, cx: &mut App) -> anyhow::Result<()> {
     (hooks().open_new_window)(doc, at, tab, cx)
+}
+
+pub fn open_compare_window(doc: Entity<DocModel>, base: (crate::compare_mode::Side, String), target: (crate::compare_mode::Side, String), cx: &mut App) -> anyhow::Result<()> {
+    (hooks().open_compare_window)(doc, base, target, cx)
 }
 
 pub fn open_workspace_window(doc: Entity<DocModel>, branch: BranchId, cx: &mut App) -> anyhow::Result<()> {

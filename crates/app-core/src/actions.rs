@@ -248,7 +248,6 @@ fn key_bindings_for(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new("secondary-w", CloseWindow, None),
         KeyBinding::new("secondary-q", Quit, None),
         KeyBinding::new("alt-h", ToggleVersionGraph, doc_mod),
-        KeyBinding::new("secondary-alt-v", CreateVersion, doc_mod),
         // Part Studio
         KeyBinding::new("shift-s", NewSketch, ps),
         // Enter edits the selected feature (or picks the Select other entry).

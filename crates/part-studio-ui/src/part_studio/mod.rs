@@ -2032,6 +2032,14 @@ impl PartStudioView {
         d.session.undo_tops().0 != e.doc_undo_at_open && d.can_undo()
     }
 
+    /// The toolbar's Undo / Redo: off while the Dynamic suppression panel is open (live feature-menu-edit-expression).
+    fn toolbar_undo_redo(&self, cx: &App) -> AnyElement {
+        if self.ui.dyn_suppression.is_some() {
+            return crate::ui::undo_redo_actions((false, false), cx);
+        }
+        crate::ui::undo_redo(&self.doc, cx)
+    }
+
     /// Ctrl+Z / Ctrl+Y while a feature dialog (or sketch) is open.
     fn draft_undo(&mut self, redo: bool, window: &mut Window, cx: &mut Context<Self>) {
         // Nothing of the draft's own to undo, but a Configure since the dialog opened: that comes off.
@@ -3077,7 +3085,7 @@ impl PartStudioView {
                 .id("part-studio-toolbar")
                 .w_full()
                 .relative()
-                .child(h_flex().flex_none().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)))
+                .child(h_flex().flex_none().gap(px(2.)).child(self.toolbar_undo_redo(cx)))
                 .child(div().absolute().top_0().left_0().right_0().flex().justify_center().child(self.render_paused_banner(cx)))
                 .into_any_element();
         }
@@ -3087,7 +3095,7 @@ impl PartStudioView {
         // the right edge).
         // Tool sets collapse from the right as the window narrows
         // (`toolbar_collapse_from`); the bar clips them when narrower still.
-        let mut bar = h_flex().flex_none().relative().gap(px(2.)).child(crate::ui::undo_redo(&self.doc, cx)).child(crate::ui::tool_separator());
+        let mut bar = h_flex().flex_none().relative().gap(px(2.)).child(self.toolbar_undo_redo(cx)).child(crate::ui::tool_separator());
         let customizing = self.ui.tb_custom.is_some();
         let hidden = self.ui.toolbar.hide_search;
         // Customize toolbar… edits a draft: the toolbar shows it.
@@ -3393,7 +3401,8 @@ impl PartStudioView {
             let s = &self.doc.read(cx).session;
             s.store.branch(s.branch).map(|b| b.name).unwrap_or_else(|_| "Main".into())
         };
-        let custom = self.doc.read(cx).custom_features().feature_types();
+        let names: Vec<&'static str> = self.doc.read(cx).custom_features().feature_types().iter().map(|t| t.name).collect();
+        let has_custom = !names.is_empty();
         let doc = self.doc.clone();
         let custom_btn = div()
             .id("vb-custom-features")
@@ -3415,11 +3424,8 @@ impl PartStudioView {
             // The version's custom features (adding them to the toolbar from a
             // version needs Onshape's Select Feature Studio dialog; listed only).
             .on_click(move |e: &ClickEvent, window, cx| {
-                let names: Vec<&'static str> = custom.iter().map(|t| t.name).collect();
+                let names = names.clone();
                 let menu = crate::os_menu::OsMenu::build(window, cx, move |mut m, _, _| {
-                    if names.is_empty() {
-                        return m.item(crate::os_menu::OsMenuItem::new("No custom features in this document").disabled(true));
-                    }
                     for n in &names {
                         m = m.item(crate::os_menu::OsMenuItem::new(*n).disabled(true));
                     }
@@ -3427,7 +3433,8 @@ impl PartStudioView {
                 });
                 crate::os_menu::open(e.position(), menu, window, cx);
             });
-        let custom_btn = crate::ui::with_tooltip("tt-vb-custom", "Add custom features in this version to your toolbar.", custom_btn);
+        // Only with custom features to add (live2 2405 (e): none in the version, no button at all).
+        let custom_btn = has_custom.then(|| crate::ui::with_tooltip("tt-vb-custom", "Add custom features in this version to your toolbar.", custom_btn));
         let back = div()
             .id("vb-return")
             .map(|d| crate::ui_script::mark(d, || format!("button:Return to {branch}")))
@@ -3477,7 +3484,7 @@ impl PartStudioView {
                     .bg(gpui_kit::rgb(0xffffff))
                     .rounded_b(px(10.))
                     .child(crate::ui::with_tooltip("tt-vb-text", text.clone(), div().id("vb-text").text_size(px(14.)).font_weight(FontWeight::SEMIBOLD).text_color(gpui_kit::rgb(0x333333)).child(text)))
-                    .child(custom_btn)
+                    .children(custom_btn)
                     .child(back)
                     .child(help),
             )
@@ -6798,6 +6805,11 @@ impl Render for PartStudioView {
             }))
             .on_action(cx.listener(Self::on_clear_selection))
             .on_action(cx.listener(|this, _: &Undo, window, cx| {
+                // The Dynamic suppression panel has no history of its own: Undo is off while it is open (live
+                // feature-menu-edit-expression).
+                if this.ui.dyn_suppression.is_some() {
+                    return;
+                }
                 if this.edit.is_some() {
                     this.draft_undo(false, window, cx);
                 } else {
@@ -6805,6 +6817,9 @@ impl Render for PartStudioView {
                 }
             }))
             .on_action(cx.listener(|this, _: &Redo, window, cx| {
+                if this.ui.dyn_suppression.is_some() {
+                    return;
+                }
                 if this.edit.is_some() {
                     this.draft_undo(true, window, cx);
                 } else {

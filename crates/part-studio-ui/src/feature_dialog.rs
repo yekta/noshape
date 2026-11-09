@@ -594,9 +594,12 @@ impl FeatureDialog {
         // replacing Entities to mirror: the select keeps it).
         let kind = self.spec_for_path(path).map(|s| (matches!(s.kind, ParamKind::Enum { .. }), s.hints.has(Hints::HORIZONTAL_ENUM)));
         let before_gone = active.as_deref().is_none_or(|a| !self.visible_selection_fields().contains(&a));
+        // (A dropdown replacing the active field with one that picks geometry passes it on: Face mirror's "Faces to
+        // mirror", live mirror-face-type; a feature list leaves it on the select: Feature mirror.)
+        let picks_geometry = self.active_query.as_deref().and_then(|q| self.spec_for_path(q)).is_some_and(|s| matches!(s.kind, ParamKind::Query { filter, .. } if filter.0 & !QueryFilter::FEATURE.0 != 0));
         let takes = match kind {
             Some((true, true)) => true,
-            Some((true, false)) => !before_gone,
+            Some((true, false)) => !before_gone || picks_geometry,
             _ => before_gone,
         };
         if takes && self.active_query != active && self.active_query.as_ref().is_some_and(|q| !shown.contains(&q.as_str())) {

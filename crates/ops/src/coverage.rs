@@ -563,7 +563,6 @@ pub const MENUS: &[(&str, Cover)] = &[
     ("partStudio:Move down", Op("feature_reorder")),
     ("partStudio:Move up", Op("feature_reorder")),
     ("partStudio:New sketch…", Op("sketch_create")),
-    ("partStudio:No custom features in this document", Op("feature_types")),
     ("partStudio:None", Op("context_show")),
     ("partStudio:Open linked document", Op("document_open")),
     ("partStudio:Remove", Op("ui_toolbar")),

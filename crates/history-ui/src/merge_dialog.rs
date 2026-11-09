@@ -359,11 +359,11 @@ fn open_mode(doc: Entity<DocModel>, source: Side, source_name: String, restore: 
                     .text_color(rgb(BLUE))
                     .hover(|d| d.underline())
                     .child("Compare with base ↗")
-                    .on_click(move |_, window, cx| {
+                    .on_click(move |_, _, cx| {
                         cx.stop_propagation();
-                        window.close_dialog(cx);
-                        // Live mg-909: that side against the merge base.
-                        if let Err(e) = crate::compare_mode::compare(&doc, side.clone(), (Side::Entry(plan.base), plan.base_label.clone()), cx) {
+                        // Live mg-909: that side against the merge base, in a window of its own; the dialog stays
+                        // (live2 2405).
+                        if let Err(e) = crate::history_hooks::open_compare_window(doc.clone(), side.clone(), (Side::Entry(plan.base), plan.base_label.clone()), cx) {
                             doc.update(cx, |_, cx| cx.emit(DocEvent::Error(format!("{e:#}"))));
                         }
                     })

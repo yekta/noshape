@@ -119,7 +119,11 @@ pub fn build_start(ctx: &mut Ctx, path: &Path, start: &Value) -> Result<(), Stri
         let source = path.with_file_name(format!("{name}.noshape"));
         build_start(&mut Ctx::new(), &source, &l["start"]).map_err(|e| format!("linked {name}: {e}"))?;
         let ins = &l["insert"];
-        let args = json!({ "tab": ins["assembly"].as_str().unwrap_or("Assembly 1"), "source": ins["source"].as_str().unwrap_or("Part Studio 1"), "document": source.to_str().ok_or("path")?, "version": ins["version"].as_str().ok_or("linked: insert's version")? });
+        let mut args = json!({ "tab": ins["assembly"].as_str().unwrap_or("Assembly 1"), "source": ins["source"].as_str().unwrap_or("Part Studio 1"), "document": source.to_str().ok_or("path")?, "version": ins["version"].as_str().ok_or("linked: insert's version")? });
+        // One part of it (live2's start: "Part 1 <1>"), else the whole Part Studio.
+        if let Some(part) = ins["part"].as_str() {
+            args["part"] = json!(part);
+        }
         call(ctx, "assembly_insert", args).map_err(|e| format!("linked {name}: {e}"))?;
     }
     // (The run opens on Part Studio 1, where the versions' features go too.)
@@ -443,7 +447,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(dir);
     }
 
-    /// A linked start (doc-linked): "uip Source" built beside it, its Part Studio 1 in Assembly 1 at V1.
+    /// A linked start (doc-linked): "uip Source" built beside it, its Part 1 in Assembly 1 at V1 (live2's "Part 1 <1>").
     #[test]
     fn a_linked_start_builds() {
         let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../tests/ui-parity");
@@ -454,6 +458,7 @@ mod tests {
         assert!(dir.join("uip Source.noshape").exists());
         let list = call(&mut ctx, "assembly_list", json!({ "tab": "Assembly 1" })).unwrap();
         assert_eq!(list["instances"].as_array().map(Vec::len), Some(1), "{list}");
+        assert_eq!(list["instances"][0]["name"], "Part 1 <1>", "{list}");
         let _ = std::fs::remove_dir_all(dir);
     }
 }

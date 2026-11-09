@@ -2279,7 +2279,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|this, _: &TabManager, window, cx| this.toggle_tab_manager(window, cx)))
             // A customized key of an action without its own GPUI action.
             .on_action(cx.listener(|this, a: &crate::shortcuts::RunShortcut, window, cx| this.run_shortcut(a.id, window, cx)))
-            // Ctrl+Alt+V (Onshape "Create version"): the Create version dialog.
+            // Create version (no default key in live, live2 2405; a customized one runs it): the Create version dialog.
             .on_action(cx.listener(|this, _: &CreateVersion, window, cx| crate::history_panel::open_create_version(this.doc.clone(), window, cx)))
             .on_action(cx.listener(|this, _: &ExportRequestedItem, window, cx| {
                 if let Some((t, parts)) = REQUESTED_EXPORT.lock().take() {
@@ -2484,6 +2484,10 @@ impl Workspace {
     /// Runs a customized shortcut (Preferences › Keyboard shortcuts) in the
     /// active tab.
     fn run_shortcut(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        if id == "general:Create version" {
+            crate::history_panel::open_create_version(self.doc.clone(), window, cx);
+            return;
+        }
         match self.active.and_then(|a| self.views.get(&a)) {
             Some(TabView::PartStudio(v)) => v.update(cx, |v, cx| v.run_shortcut(id, window, cx)),
             Some(TabView::Drawing(v)) => {
