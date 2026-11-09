@@ -423,6 +423,11 @@ impl Workspace {
         }
     }
 
+    /// Whether the active tab is a Material Library (ui-parity driver).
+    pub(crate) fn active_is_material_library(&self, cx: &App) -> bool {
+        self.active.and_then(|t| self.doc.read(cx).session.doc.tab(t)).is_some_and(|t| matches!(t.content, TabContent::MaterialLibrary(_)))
+    }
+
     /// The active tab's Feature Studio, if it is one (ui-parity driver).
     pub(crate) fn active_feature_studio(&self) -> Option<Entity<crate::feature_studio::FeatureStudioView>> {
         match self.active.and_then(|t| self.views.get(&t)) {
@@ -648,6 +653,9 @@ impl Workspace {
         });
         if let Some(id) = new_id {
             self.activate(id, window, cx);
+            if let Some(TabView::FeatureStudio(v)) = self.views.get(&id) {
+                v.clone().update(cx, |v, cx| v.start_new(window, cx));
+            }
         }
     }
 
@@ -1050,7 +1058,17 @@ impl Workspace {
                             .item(I::new("Move to…").on_click(move |_, wi, cx| dd::move_to(d2.clone(), wi, cx)))
                             .item(I::new("Restore deleted workspaces…").on_click(move |_, wi, cx| dd::restore_deleted_workspaces(d4.clone(), wi, cx)))
                             .separator()
-                            .item(I::new("Copy version…").on_click(move |_, wi, cx| dd::copy_version(d5.clone(), mv, wi, cx)));
+                            // Versions and history closes behind it (live ver-view-version-copy, doc-document-menu-copy-version).
+                            .item(I::new("Copy version…").on_click({
+                                let w3 = w3.clone();
+                                move |_, wi, cx| {
+                                    w3.update(cx, |t, cx| {
+                                        t.history = None;
+                                        cx.notify();
+                                    });
+                                    dd::copy_version(d5.clone(), mv, wi, cx)
+                                }
+                            }));
                         let m = match version {
                             Some(id) => m.item(I::new("Version properties…").on_click(move |_, wi, cx| noshape_history_ui::version_properties::open(d7.clone(), noshape_history_ui::version_properties::Item::Version(id), wi, cx))),
                             None => m,
@@ -1059,7 +1077,7 @@ impl Workspace {
                             .separator()
                             .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                             .separator()
-                            .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
+                            .item(I::new("Close document").on_click(close_document));
                     }
                     // View only mode (live doc-menu-view-only): only what doesn't edit the workspace.
                     if view_only {
@@ -1075,7 +1093,7 @@ impl Workspace {
                             .separator()
                             .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                             .separator()
-                            .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()));
+                            .item(I::new("Close document").on_click(close_document));
                     }
                     m.dropdown()
                         .item(I::new("Rename document").on_click({
@@ -1099,7 +1117,7 @@ impl Workspace {
                         .separator()
                         .item(I::new("Print…").on_click(move |_, wi, cx| w2.update(cx, |t, cx| t.print_active(wi, cx))))
                         .separator()
-                        .item(I::new("Close document").on_click(|_, wi, _| wi.remove_window()))
+                        .item(I::new("Close document").on_click(close_document))
                 });
                 crate::os_menu::open_anchored(point(x - px(16.), px(crate::ui::NAVBAR_H)), Anchor::TopLeft, menu, window, cx);
             })
@@ -3164,6 +3182,12 @@ pub(crate) fn panel_tab_menu(view: Entity<Workspace>, id: TabId, m: crate::os_me
     m.item(move_to)
 }
 
+
+/// ☰ › Close document: the window closes and the documents page shows (live: the tab goes to the documents page).
+fn close_document(_: &ClickEvent, window: &mut Window, cx: &mut App) {
+    window.remove_window();
+    crate::files::show_start_window(cx);
+}
 
 #[cfg(test)]
 mod switcher_tests {

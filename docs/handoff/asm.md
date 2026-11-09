@@ -10,6 +10,14 @@ rb-hosts `asm*`). The app here: `tools/tiers/rb.sh --get noshape cargo build -p 
 
 Older assembly history: docs/handoff/skasm.md (assembly notes, speed numbers, fuzz) and assembly-behaviour.md.
 
+## From psui (2026-11-09 03:07 UTC, lead: for when you're back): the 8 asm-* scenarios that don't match in a full run
+psui's full ui-parity run on 4be31cf6's tree (vibe5, 1358 scenarios; the same with and without its checkbox change):
+asm-mate-edit-escape / asm-mate-menu-edit (a mate dialog's sixth field `checked` live true, ours false),
+asm-menu-change-configuration (live reads a "Change configuration" panel), asm-menu-change-to-version (dialog kind
+live "panel", ours "other"), asm-menu-create-empty-subassembly (Undo on in ours after it, off in live),
+asm-menu-switch-to-part-studio (the instance menu's rows), asm-triad-align-with-z / -anti-align-with-z (instance 1's
+transform[1]: live 1, ours 0). Logs: psui's /root/psui-scratch/cbreg/new.log (first differences).
+
 ## From studios (2026-11-08 20:04 UTC, lead's call): ☰ › Print… is studios' in the Assembly
 The Print setup panel, its dashed frame and Download image / Print live in app-core `print_setup.rs` (geometry in
 `noshape_scene::print`, op `render_print`). The Assembly only hooks it: `AssemblyView::open_print`, `on_print_action`, a `print`

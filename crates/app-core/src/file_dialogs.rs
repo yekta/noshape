@@ -159,7 +159,9 @@ fn in_app_save_prompt(title: &'static str, ok_label: &'static str, default: Path
         let st = state.clone();
         let then = then.clone();
         // Onshape modal: title bar, body, blue OK then gray Cancel.
-        crate::os_ui::modal(dialog, title, 560.)
+        let modal = crate::os_ui::modal(dialog, title, 560.);
+        crate::ui_script::note_native_standin();
+        modal
             .child(crate::os_ui::modal_body().child(Input::new(&state).h(px(32.)).text_size(px(14.))))
             .footer(
                 crate::os_ui::modal_footer()

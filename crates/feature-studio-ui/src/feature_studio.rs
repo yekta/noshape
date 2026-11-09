@@ -658,6 +658,17 @@ impl FeatureStudioView {
         self.doc.read(cx).session.read_only()
     }
 
+    /// A Feature Studio just made with + › Create Feature Studio: the caret after its starting text, the keyboard
+    /// in the code (live doc-plus-create-feature-studio: caret [3, 0]; an existing studio opens at the top).
+    pub fn start_new(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.editor.update(cx, |e, cx| {
+            let n = e.value().len();
+            e.set_selected_range(n..n, cx);
+            e.focus(window, cx);
+        });
+        cx.notify();
+    }
+
     /// Undo/redo or history browsing replaced the text.
     fn sync_from_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(src) = text_of(&self.doc, self.tab, cx) else { return };

@@ -654,9 +654,15 @@ pub fn start_page(cx: &mut App) {
         // The window in front: the newest one a step opened, else the active one.
         let mut known: Vec<AnyWindowHandle> = Vec::new();
         let mut front: Option<AnyWindowHandle> = None;
+        // A window "Open in new browser tab" opened isn't followed: live's runner stays on its own tab
+        // (docs-doc-menu-open-in-new-browser-tab).
+        let stay = std::rc::Rc::new(std::cell::Cell::new(false));
+        let stay_seen = stay.clone();
         let mut follow = |cx: &mut AsyncApp| -> Option<AnyWindowHandle> {
             let now = cx.update(|cx| cx.windows());
-            if let Some(new) = now.iter().rev().find(|w| !known.contains(w)) {
+            if let Some(new) = now.iter().rev().find(|w| !known.contains(w))
+                && !stay_seen.get()
+            {
                 front = Some(*new);
             }
             if front.is_none_or(|f| !now.contains(&f)) {
@@ -705,6 +711,7 @@ pub fn start_page(cx: &mut App) {
         let mut pointer: Option<Point<Pixels>> = None;
         for (i, step) in scenario["steps"].as_array().cloned().unwrap_or_default().into_iter().enumerate() {
             let Some(w) = follow(cx) else { break };
+            stay.set(step["on"]["menu"].as_str() == Some("Open in new browser tab"));
             let what = step["do"].as_str().unwrap_or("");
             let mods = modifiers(&step);
             let target = step.get("on").or_else(|| step.get("from")).cloned().unwrap_or(Value::Null);
@@ -978,6 +985,10 @@ fn other_tab_state(ws: &mut Workspace, window: &mut Window, cx: &mut Context<Wor
         "drawing": null,
         "variables": ws.ui_variables_state(cx),
     });
+    // A Material Library: live's recorder reads its tab's (empty) list as the feature list (doc-plus-create-material-library).
+    if ws.active_is_material_library(cx) {
+        s["features"] = json!({ "rows": [], "rollbackAfter": null });
+    }
     // A Feature Studio: its editor, and its autocomplete as the list.
     if let Some(fs) = ws.ui_feature_studio_state(cx) {
         s["featurestudio"] = fs["featurestudio"].clone();

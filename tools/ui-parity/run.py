@@ -428,6 +428,10 @@ def no_field_focus(focus):
         return True
     if focus.get("kind") == "field" and focus.get("tag") in ("button", "a") and not focus.get("text"):
         return True
+    # A native <select> holding the keyboard (its value is the field's state, compared there; live reads Angular's
+    # "0: hertz" as its text: doc-units-workspace-units-frequency-unit, prefs-units-frequency).
+    if focus.get("tag") == "select":
+        return True
     # A checkbox (an <input> whose value reads "on", no text selection: live ver-branch-no-open).
     if focus.get("tag") == "input" and focus.get("text") in ("on", "off") and focus.get("selection") in (None, [None, None]):
         return True
@@ -598,6 +602,15 @@ def compare(live, ours, whole_document=True):
             for f in a["dialog"].get("fields") or []:
                 if isinstance(f, dict) and isinstance(f.get("value"), str):
                     f["value"] = re.sub(r"^live2? uip (\S+) \S+ - Copy$", r"\1 - Copy", f["value"])
+        # Ours' in-app stand-in for the OS's file dialog (the runner has none): live's recorder can't read the OS's
+        # (doc-plus-import, docs-create-import-files).
+        if a.get("dialog") is None and isinstance(b.get("dialog"), dict) and b["dialog"].get("native"):
+            b["dialog"], b["focus"] = None, a.get("focus")
+        if isinstance(b.get("dialog"), dict):
+            b["dialog"].pop("native", None)
+        # The Free plan's public-document icon's tooltip under the pointer (docs-row-menu): ours has no public documents.
+        if a.get("tooltip") == "This is a public document." and b.get("tooltip") is None:
+            b["tooltip"] = a["tooltip"]
         # Live's Free plan answers a paid feature (Release…, vs-tab-release) with its upgrade modal where ours opens the
         # feature's dialog: a plan's limit, not compared (as PLAN_ROWS).
         if isinstance(a.get("dialog"), dict) and "Start Professional Trial" in (a["dialog"].get("buttons") or []):

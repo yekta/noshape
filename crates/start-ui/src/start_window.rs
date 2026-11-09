@@ -912,7 +912,7 @@ impl StartView {
                 this.set_source(Source::Folder(made), cx);
                 this.force_rescan(cx);
             });
-            Self::toast(window, cx, Toast { kind: os::BubbleKind::Success, bold: None, text: "Folder created.".into(), restore: None, brief: false });
+            // No bubble (live docs-create-folder: message none after Create).
             true
         });
     }
@@ -985,20 +985,37 @@ impl StartView {
         )
     }
 
-    fn duplicate(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
-        let path = d.path.clone();
-        let name = d.name.clone();
-        cx.spawn_in(window, async move |this, cx| {
-            let result = cx.background_spawn(async move { lib::duplicate_document(&path, &name) }).await;
-            let _ = this.update_in(cx, |this, window, cx| match result {
+    /// A row's Copy workspace…: live's "Copy the active workspace to a new document" (its name "<name> - Copy",
+    /// "Copy document to"), the copy opened (as the document's ☰ › Copy workspace…; live docs-doc-menu-copy-workspace).
+    fn copy_workspace(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
+        let start = d.path.parent().map(Path::to_path_buf).unwrap_or_else(crate::file_dialogs::documents_dir);
+        let location = Location::new(start);
+        let chosen = location.chosen.clone();
+        let view = cx.entity();
+        let source = d.path.clone();
+        let prompt = NamePrompt { title: "Copy the active workspace to a new document", ok_label: "Create document", label: "Document name", default: format!("{} - Copy", d.name), hint: None, location: Some(("Copy document to", location)), labels: None };
+        prompt_name(prompt, window, cx, move |name, window, cx| {
+            let clean = lib::sanitize_name(&name);
+            if clean.is_empty() {
+                Self::notify(window, cx, AlertKind::Warning, "Enter a name for the document");
+                return false;
+            }
+            let dir = chosen.borrow().clone();
+            match lib::copy_document_named(&source, &dir, &clean) {
                 Ok(dest) => {
-                    this.selected = Some(dest.canonicalize().unwrap_or(dest));
-                    this.force_rescan(cx);
+                    view.update(cx, |this, cx| {
+                        this.selected = Some(dest.clone());
+                        this.force_rescan(cx);
+                        this.open_path(dest, window, cx);
+                    });
+                    true
                 }
-                Err(e) => Self::notify(window, cx, AlertKind::Error, format!("Duplicate failed: {e:#}")),
-            });
-        })
-        .detach();
+                Err(e) => {
+                    Self::notify(window, cx, AlertKind::Error, format!("{e:#}"));
+                    false
+                }
+            }
+        });
     }
 
     fn trash(&mut self, d: DocEntry, window: &mut Window, cx: &mut Context<Self>) {
@@ -2260,7 +2277,7 @@ impl StartView {
             // Live's "Open in new browser tab": a document always opens in a window of its own here.
             .item(item("Open in new browser tab", &view, &d, |t, d, w, cx| t.open_path(d.path, w, cx)))
             .item(item("Rename", &view, &d, |t, d, w, cx| t.rename(d, w, cx)))
-            .item(item("Copy workspace…", &view, &d, |t, d, w, cx| t.duplicate(d, w, cx)))
+            .item(item("Copy workspace…", &view, &d, |t, d, w, cx| t.copy_workspace(d, w, cx)))
             .separator()
             .item(item("Details", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Details, cx)))
             .item(item("Versions and history", &view, &d, |t, d, _, cx| t.show_panel(d, DocPanel::Versions, cx)))

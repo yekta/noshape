@@ -132,7 +132,9 @@ impl Render for MaterialLibraryView {
         let doc = self.doc.clone();
         let bullet = |t: AnyElement| h_flex().items_start().gap(px(8.)).child("•").child(t);
         let link = |id: &'static str, t: &'static str| div().id(id).text_color(rgb(0x094174)).underline().cursor_pointer().child(t);
+        // Live's recorder reads the box as the page's message (doc-plus-create-material-library).
         let info = v_flex()
+            .map(|d| noshape_app_core::ui_script::mark_message(d, || INFO_TEXT.into()))
             .px(px(14.))
             .pt(px(12.))
             .pb(px(14.))
@@ -236,3 +238,6 @@ impl Render for MaterialLibraryView {
             .child(v_flex().w(px(660.)).mx_auto().pt(px(48.)).pb(px(40.)).gap(px(14.)).child(info).child(table))
     }
 }
+
+/// The info box's text as live's recorder reads it (its bullets, links and button in a line).
+const INFO_TEXT: &str = "To edit this material library: Right click on the tab and click Export to download a CSV file, or download a sample. Edit the CSV file to add new or remove materials, then save your changes. Right click on this tab and click Update, then choose your saved CSV file. Create a version of this document to make this material library available for use. Learn more about custom materials Download sample";

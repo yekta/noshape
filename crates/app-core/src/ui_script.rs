@@ -376,6 +376,19 @@ pub fn note_modal(title: &str) {
     }
 }
 
+/// The modal being noted is the in-app stand-in for the OS's file dialog (`"native": true`: live's recorder can't read
+/// the OS's, so run.py leaves it out).
+pub fn note_native_standin() {
+    if !active() {
+        return;
+    }
+    if let Ok(mut d) = dialog_slot().lock()
+        && let Some(d) = d.as_mut()
+    {
+        d["native"] = serde_json::json!(true);
+    }
+}
+
 /// A modal's button drawn now (os_ui's buttons): listed in the [`note_modal`] modal being drawn.
 pub fn note_button(label: &str) {
     if !active() || !TITLE_ONLY_MODAL.load(std::sync::atomic::Ordering::Relaxed) {
