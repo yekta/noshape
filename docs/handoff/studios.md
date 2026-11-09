@@ -121,6 +121,19 @@ the Reference manager's Update all / Selective update / Version graph, Change to
 dialog's drawing row ⓘ / Open in <ws>. Known gaps ours will show: Show more changes… (none yet), Repair graphics' menu
 (the panel draws no graphics yet).
 
+**2026-11-09 02:40 UTC (psui): the merge-rows patch landed (71c63ad3; ver-* with it: no regression, +1 state); the older
+ver-* differences.** Fixed (6f0ee049): search (on Enter) and filters list the matching changes alone, newest first,
+else "No changes found"; another workspace's row opens on a click; Suppress / Unsuppress entries name the feature;
+Return to Main closes Versions and history; Workspace protection's Apply toasts "Workspace protection settings
+updated."; the filter's Tab select shows its tab as a tooltip; Show more changes… (50 at a time; doc-versions-many now
+sixty changes); the Repair panel's graphics (part-studio-ui repair_view.rs: the snapshot regenerated off the UI
+thread, following the main camera while synchronized, right-click Zoom to fit; repair_mode's #[allow(dead_code)]
+gone). In the 21-scenario check: ver-search-history / -change, ver-filter-modified-by / -tab / -reset,
+ver-history-entry-per-edit, ver-view-version-return now match. Asked live2 (REQUESTS 02:3x): re-records of takes
+read mid-load or mid-close (8), ver-merge-replace's target, and five questions (Compare with base, Ctrl+Alt+V,
+the date input, Copy version closing the panel, empty custom features / releases). Known: ver-branch-no-open (live's
+checkbox takes the focus from the name field; ours keeps it).
+
 **Coverage plan (lead: coverage is the lever; largest gap first).** Uncovered: documents/tabs/prefs 81 (74.1 %),
 Variable Studio 30 (69.4 %), versions 27 (83.8 %). `python3 tools/ui-parity/coverage_<area>.py --uncovered` lists
 them; an item counts once a scenario's steps contain one of its `via` chains (tools/ui-parity/universe/<area>.json;
