@@ -33,6 +33,18 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 14:36 UTC: tight boxes by what the faces hold (lead, from bool's finding); the hex text parked in skasm.md.**
+- bool: the impeller's z 6.21 box was our tight box sampling the inlet wall's whole parameter rectangle (the trimmed
+  corners of its extended surface). geom.cpp `face_box`: analytic faces keep OCCT's optimal box; a free-form face
+  whose OCCT box passes its edges' quick (pole) box by > 1e-4 of its size takes its edges' exact boxes (cached per
+  shape) and, per side still past them, its own extreme: an 8 x 8 grid of points inside it (BRepTopAdaptor_FClass2d),
+  climbed within it; never past OCCT's box. First tries (cells to 1/256 everywhere; every free-form face) made
+  cf-surface-pattern's measuring 11 -> 235 s, then +2-10 %: interleaved A/B now level but the knife +9 ms (1.4 %,
+  overlapping; ab-box8/9.out). T1: shell::an_impeller_lofts_shell_as_live asserts the box top < 1e-6 m (was 6.2 mm).
+  Other tight boxes all go through bounding_box(true) (parts, faces, evBox3d); shell.cpp's two AddOptimal calls are a
+  ruling length (over is harmless) and a debug print. Kernel 352, model 425, model-core 105; suite only the impeller
+  changes (its Shell box now live's; suite-box2.log vs suite-box-base.log). Landing.
+
 **State 11-09 13:16 UTC: Delete face 1 (lead: start now); feature 15 to bool, fillets' speed noted for blend.**
 - OCCT's defeaturing warns BOPAlgo_AlertUnableToRemoveTheFeature and gives the part back (NOSHAPE_DEFEATURE_DEBUG
   prints its alerts). features.cpp `defeature_by_region` (worktree): the region the deleted faces enclose with their

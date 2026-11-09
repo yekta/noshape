@@ -18,6 +18,7 @@
 #include <Extrema_POnSurf.hxx>
 #include <Extrema_GenLocateExtPS.hxx>
 #include <BRepTopAdaptor_FClass2d.hxx>
+#include <BndLib_Add3dCurve.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <Precision.hxx>
 #include <gp_Pln.hxx>
@@ -1113,6 +1114,141 @@ bool has_free_form_face(const TopoDS_Shape& s)
   return false;
 }
 
+// A face's box from what it holds, not its surface's whole parameter rectangle (OCCT's optimal box takes the
+// rectangle: a wall run on past its edge and trimmed back, c2-impeller-loft's Shell inlet, reached 6.2 mm above the
+// part). A free-form face: its edges exactly, never past OCCT's box, and on each side where OCCT's box passes the
+// edges' box its own extreme there: the best of a grid of its points inside the face, climbed to the top within it.
+static void face_box(const TopoDS_Face& f, Bnd_Box& out, NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher>& edge_boxes)
+{
+  // (Planes, cylinders, cones, spheres and tori: OCCT's box as before; the extended surfaces are free-form.)
+  switch (BRepAdaptor_Surface(f, false).GetType())
+  {
+    case GeomAbs_Plane:
+    case GeomAbs_Cylinder:
+    case GeomAbs_Cone:
+    case GeomAbs_Sphere:
+    case GeomAbs_Torus:
+      BRepBndLib::AddOptimal(f, out, false, false);
+      return;
+    default:
+      break;
+  }
+  // (Only past the edges' quick box (their poles'): the exact work where the surface reaches well out.)
+  Bnd_Box whole;
+  BRepBndLib::AddOptimal(f, whole, false, false);
+  {
+    Bnd_Box quick;
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      if (!BRep_Tool::Degenerated(TopoDS::Edge(e.Current())))
+        BndLib_Add3dCurve::Add(BRepAdaptor_Curve(TopoDS::Edge(e.Current())), 0.0, quick);
+    if (quick.IsVoid() || whole.IsVoid())
+    {
+      out.Add(whole);
+      return;
+    }
+    double q[6], w[6];
+    quick.Get(q[0], q[1], q[2], q[3], q[4], q[5]);
+    whole.Get(w[0], w[1], w[2], w[3], w[4], w[5]);
+    const double t = 1e-4 * std::sqrt(whole.SquareExtent());
+    bool         past = false;
+    for (int i = 0; i < 3; ++i)
+      past = past || w[i] < q[i] - t || w[i + 3] > q[i + 3] + t;
+    if (!past)
+    {
+      out.Add(whole);
+      return;
+    }
+  }
+  Bnd_Box edges;
+  for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+  {
+    const TopoDS_Edge& ed = TopoDS::Edge(e.Current());
+    if (BRep_Tool::Degenerated(ed))
+      continue;
+    // (An edge bounds two faces: boxed once.)
+    if (!edge_boxes.IsBound(ed))
+    {
+      Bnd_Box eb;
+      BndLib_Add3dCurve::AddOptimal(BRepAdaptor_Curve(ed), 0.0, eb);
+      edge_boxes.Bind(ed, eb);
+    }
+    edges.Add(edge_boxes(ed));
+  }
+  BRepAdaptor_Surface s(f, false);
+  if (edges.IsVoid() || whole.IsVoid())
+  {
+    out.Add(whole);
+    out.Add(edges);
+    return;
+  }
+  double a[6], b[6];
+  edges.Get(a[0], a[1], a[2], a[3], a[4], a[5]);
+  whole.Get(b[0], b[1], b[2], b[3], b[4], b[5]);
+  // (Only a face reaching well past its edges: OCCT's small margins on rational faces are tighten_box's.)
+  const double tol = 1e-4 * std::sqrt(whole.SquareExtent());
+  // (OCCT's box holds the face: no side past it, the edges' curves lying off a face by their tolerance included.)
+  double box[6];
+  for (int i = 0; i < 3; ++i)
+  {
+    box[i]     = std::max(a[i], b[i]);
+    box[i + 3] = std::min(a[i + 3], b[i + 3]);
+  }
+  std::optional<BRepTopAdaptor_FClass2d> inside;
+  double u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+  constexpr int n = 8;
+  std::vector<std::pair<gp_Pnt2d, gp_Pnt>> grid;
+  for (int side = 0; side < 6; ++side)
+  {
+    const int    axis = side % 3;
+    const double sign = side < 3 ? -1.0 : 1.0;
+    if (sign * (b[side] - a[side]) <= tol)
+      continue;
+    if (!inside)
+    {
+      inside.emplace(f, 1e-9);
+      BRepTools::UVBounds(f, u0, u1, v0, v1);
+      for (int i = 0; i <= n; ++i)
+        for (int j = 0; j <= n; ++j)
+        {
+          const gp_Pnt2d uv(u0 + (u1 - u0) * i / n, v0 + (v1 - v0) * j / n);
+          if (inside->Perform(uv) == TopAbs_IN)
+            grid.emplace_back(uv, s.Value(uv.X(), uv.Y()));
+        }
+    }
+    // The best grid point along the side's direction, then up its slope while it stays inside.
+    auto along = [&](const gp_Pnt& p) { return sign * p.Coord(axis + 1); };
+    const std::pair<gp_Pnt2d, gp_Pnt>* best = nullptr;
+    for (const auto& g : grid)
+      if (!best || along(g.second) > along(best->second))
+        best = &g;
+    if (!best)
+      continue;
+    gp_Pnt2d uv   = best->first;
+    double   top  = along(best->second);
+    double   step = 0.5 * std::max((u1 - u0), (v1 - v0)) / n;
+    for (int it = 0; it < 40 && step > 1e-6 * std::max(u1 - u0, v1 - v0); ++it)
+    {
+      gp_Pnt p;
+      gp_Vec du, dv;
+      s.D1(uv.X(), uv.Y(), p, du, dv);
+      gp_Vec2d g(sign * du.Coord(axis + 1) * (u1 - u0), sign * dv.Coord(axis + 1) * (v1 - v0));
+      if (g.Magnitude() < 1e-300)
+        break;
+      g.Normalize();
+      const gp_Pnt2d next(uv.X() + g.X() * step * (u1 - u0) / std::max(u1 - u0, v1 - v0), uv.Y() + g.Y() * step * (v1 - v0) / std::max(u1 - u0, v1 - v0));
+      if (inside->Perform(next) == TopAbs_IN && along(s.Value(next.X(), next.Y())) > top)
+      {
+        uv  = next;
+        top = along(s.Value(next.X(), next.Y()));
+      }
+      else
+        step *= 0.5;
+    }
+    box[side] = sign > 0 ? std::min(b[side], std::max(box[side], top)) : std::max(b[side], std::min(box[side], -top));
+  }
+  out.Update(box[0], box[1], box[2], box[3], box[4], box[5]);
+}
+
 // OCCT's optimal box of a free-form face reaches Precision::Confusion past
 // short edges round it (BndLib_Add3dCurve's generic curve box: the corner
 // patches of an imported filleted block, g47-1part: z 10.0001 mm for 10;
@@ -1172,7 +1308,17 @@ rust::Vec<double> bounding_box(const OcShape& s, bool optimal)
   Bnd_Box          b;
   const ShapeIMap& faces = s.map(TopAbs_FACE);
   if (optimal)
-    BRepBndLib::AddOptimal(s.shape, b, false, false);
+  {
+    // Each face by what it holds (face_box); edges outside faces and vertices outside edges as OCCT's.
+    NCollection_DataMap<TopoDS_Shape, Bnd_Box, TopTools_ShapeMapHasher> edge_boxes;
+    for (int i = 1; i <= faces.Extent(); ++i)
+      if (!is_mesh_face(TopoDS::Face(faces(i))))
+        face_box(TopoDS::Face(faces(i)), b, edge_boxes);
+    for (TopExp_Explorer e(s.shape, TopAbs_EDGE, TopAbs_FACE); e.More(); e.Next())
+      BRepBndLib::AddOptimal(e.Current(), b, false, false);
+    for (TopExp_Explorer v(s.shape, TopAbs_VERTEX, TopAbs_EDGE); v.More(); v.Next())
+      BRepBndLib::AddOptimal(v.Current(), b, false, false);
+  }
   else if (faces.Extent() >= 256)
   {
     // A big shape's faces boxed in runs on OCCT's pool, then joined (a box's gap joins as the largest, so this is

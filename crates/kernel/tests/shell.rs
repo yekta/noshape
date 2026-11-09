@@ -1677,4 +1677,8 @@ fn an_impeller_lofts_shell_as_live() {
     let v = vol(&r) * 1e9;
     assert_eq!((r.faces().len(), r.count(ShapeType::Edge), r.count(ShapeType::Vertex)), (6, 16, 12), "path {}, {v} mm³", last_shell_path());
     assert!((v / 45_272.92 - 1.0).abs() < 2e-4, "{v} mm³");
+    // Its box what the faces hold (live's top z 0): the inlet's wall runs on past its edge and is trimmed back, and its
+    // surface's whole parameter rectangle reached 6.2 mm above the part.
+    let bb = r.bounding_box(true).unwrap();
+    assert!(bb.max.z < 1e-6, "box top {} mm", bb.max.z * 1e3);
 }
