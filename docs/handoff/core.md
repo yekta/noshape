@@ -1821,6 +1821,23 @@ rebuilt away by the next Flange (SM-CUT-THEN-FLANGE, SM-HOLE-THEN-FLANGE). Studi
 ran it keep the native features (partstudio.rs ScopeRule 5, `legacy_sheet_metal`).
 
 
+## From bool (11-09 19:02 UTC, lead's call): c2-impeller-loft's Extrude 4 fails on its sketch's untranslated spline constraints
+- Since c7c48f81 (Delete face 1 now works) the document runs to Boolean 1, which takes 4.56 s (live 79 ms): the Union
+  gets two parts 19.6 mm apart where live gets three, so it leaves them apart and the "touching" check measured whole
+  parts (bool bounds that check: 0.14 s now). The missing part is Extrude 4's (live: Part 3, 5 faces, 1,749 mm3, box
+  x 0-61, y +-4.13, z -63.5..-43.1 mm: a rib from the flange face up to the Shell's inner wall).
+- Ours: Extrude 4 "Failed to extrude selections, check input." (kernel: "up-to target does not fully bound the
+  extruded profile"), because its two regions (IMPRINT faces of sketch "Stefevenrohr Führung", Fq5x1oTehE3Zvic)
+  resolve to the sketch's 3,025 mm2 region (the 32.5 mm circle, y +-32.5, z -66.5..-1.5) instead of the rib between
+  the two splines: in ours the rib isn't a region. The suite says why: "constraints left to the solved geometry: 8
+  COINCIDENT to external geometry, 1 MIDPOINT to external geometry, 1 MIRROR rejected, 2 MIRROR to external geometry".
+  The constraints on spline e61c31f5's interpolation points (`e61c31f5….0.internal` COINCIDENT `a0153a50….end`,
+  `….2.internal` COINCIDENT external, MIDPOINT of `….startDerivative` on arc 55be8717, the spline MIRROR to
+  `7dc0036b…0.MirrorCS`) aren't translated (`.N.internal` read as external), so the splines keep their stored places:
+  ours start at (-+2.720, -43.511) where the arc a0153a50 ends at (-+2.908, -43.016) (sketch mm): 0.5 mm off, the
+  rib's loop open. Same before c7c48f81 (Extrude 4 failed the same way; Boolean 1 then stopped at "Need at least two
+  parts"). Saved document: vibe3 ~/agents/bool-cases/imp-save/c2-impeller-loft.noshape.
+
 ## From bool (11-09 14:30 UTC, lead's call): a part's box comes from the parameter rectangle, not the face (c2-impeller-loft)
 Your 07:01 note (Shell Gehäuse's box to z 6.21 mm, live 0) is two things; the wall's edge is bool's (being fixed), the
 box is the query's: **the lead asks that a part's box follow the face's real boundary as live's does, not the parameter

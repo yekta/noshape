@@ -859,6 +859,7 @@ PropsF                   props_surface(const OcShape& s);
 PropsF                   props_linear(const OcShape& s);
 PropsF                   props_bounds(const OcShape& s, uint8_t kind);
 DistanceF                min_distance(const OcShape& a, const OcShape& b);
+bool                     shapes_touch(const OcShape& a, const OcShape& b, double tol);
 double                   angle_between(const OcShape& a, const OcShape& b);
 int8_t                   classify_point(const OcShape& solid, P3 p, double tol);
 rust::Vec<double>        line_crossings(const OcShape& s, P3 p, P3 dir, double len);

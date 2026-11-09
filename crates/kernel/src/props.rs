@@ -93,6 +93,12 @@ pub fn distance(a: &Shape, b: &Shape) -> Result<Distance> {
     Ok(Distance { distance: d.distance, point_a: v3(d.p1), point_b: v3(d.p2), solutions: d.count.max(0) as u32 })
 }
 
+/// Whether two shapes come within `tol` of each other (only the faces whose boxes meet are measured, until the
+/// first that does): a contact test that stays quick on parts far apart in most places.
+pub fn touching(a: &Shape, b: &Shape, tol: f64) -> Result<bool> {
+    ck(ffi::shapes_touch(a.raw(), b.raw(), tol))
+}
+
 /// Angle (radians, 0..π) between planar faces (normals) and/or linear edges
 /// (directions). For a plane and a line, the angle between line and plane.
 pub fn angle_between(a: &Shape, b: &Shape) -> Result<f64> {

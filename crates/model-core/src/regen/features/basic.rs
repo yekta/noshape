@@ -38,15 +38,8 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
             // note while editing; parts touching only along an edge or at a
             // point stay two parts too, with no note (live 1760).
             if ev.ctx.bodies.len() == before {
-                let shapes: Vec<_> = picked_shapes.into_iter().map(|s| {
-                    let b = s.bounding_box(false).ok();
-                    (s, b)
-                }).collect();
-                let near = |a: &Option<k::BoundingBox>, b: &Option<k::BoundingBox>| match (a, b) {
-                    (Some(a), Some(b)) => (a.min - 1e-9).cmple(b.max).all() && (b.min - 1e-9).cmple(a.max).all(),
-                    _ => true,
-                };
-                let touching = (0..shapes.len()).any(|i| (i + 1..shapes.len()).any(|j| near(&shapes[i].1, &shapes[j].1) && k::distance(&shapes[i].0, &shapes[j].0).is_ok_and(|d| d.distance < 1e-9)));
+                let s = &picked_shapes;
+                let touching = (0..s.len()).any(|i| (i + 1..s.len()).any(|j| k::touching(&s[i], &s[j], 1e-9).unwrap_or(false)));
                 if !touching {
                     ev.infos.push(NO_GEOMETRY_CHANGE.into());
                 }
@@ -89,7 +82,7 @@ pub fn boolean(ev: &mut EvalCtx) -> FResult<()> {
                     // BOOL-TOUCH-INFO): they go (unless kept), with live's
                     // shorter info; parts apart change nothing (INT2).
                     let first_shape = ev.ctx.bodies[first].shape.clone();
-                    let touching = tools_idx[1..].iter().any(|&i| k::distance(&first_shape, &ev.ctx.bodies[i].shape).is_ok_and(|d| d.distance < 1e-9));
+                    let touching = tools_idx[1..].iter().any(|&i| k::touching(&first_shape, &ev.ctx.bodies[i].shape, 1e-9).unwrap_or(false));
                     if touching {
                         if !ev.bool("keepTools") {
                             ev.ctx.bodies.retain(|b| !tool_ids.contains(&b.id));

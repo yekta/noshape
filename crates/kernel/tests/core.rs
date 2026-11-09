@@ -256,6 +256,30 @@ fn mass_properties_box() {
     assert!(close(d.distance, 3.0, 1e-9));
 }
 
+/// Contact of two parts (Boolean's "touching" check): face to face, along an edge, at a corner, a cylinder lying on a
+/// face and a ball resting on it (contacts inside both faces), and each moved 1 µm away.
+#[test]
+fn touching_parts_at_faces_edges_points_and_inside_faces() {
+    let mm = 1e-3;
+    let at = |x: f64, y: f64, z: f64| Plane::new(DVec3::new(x, y, z) * mm, DVec3::Z, DVec3::X);
+    let a = make_box(&at(0.0, 0.0, 0.0), 10.0 * mm, 10.0 * mm, 10.0 * mm).unwrap();
+    let cube = |x: f64, y: f64, z: f64| make_box(&at(x, y, z), 10.0 * mm, 10.0 * mm, 10.0 * mm).unwrap();
+    let rod = |z: f64| make_cylinder(&Plane::new(DVec3::new(2.0, 5.0, z) * mm, DVec3::X, DVec3::Y), 3.0 * mm, 6.0 * mm, 2.0 * PI).unwrap();
+    let ball = |z: f64| make_sphere(&at(5.0, 5.0, z), 3.0 * mm, 2.0 * PI).unwrap();
+    let gap = 1e-3;
+    for (what, near, apart) in [
+        ("face", cube(10.0, 0.0, 0.0), cube(10.0 + gap, 0.0, 0.0)),
+        ("edge", cube(10.0, 10.0, 0.0), cube(10.0 + gap, 10.0, 0.0)),
+        ("corner", cube(10.0, 10.0, 10.0), cube(10.0, 10.0, 10.0 + gap)),
+        ("rod", rod(13.0), rod(13.0 + gap)),
+        ("ball", ball(13.0), ball(13.0 + gap)),
+    ] {
+        assert!(touching(&a, &near, 1e-9).unwrap(), "{what}");
+        assert!(touching(&near, &a, 1e-9).unwrap(), "{what}, the other way");
+        assert!(!touching(&a, &apart, 1e-9).unwrap(), "{what} 1 µm away");
+    }
+}
+
 #[test]
 fn brep_and_bin_round_trip() {
     let b = make_box(&Plane::xy(), 1.0, 2.0, 3.0).unwrap();

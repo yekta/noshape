@@ -54,6 +54,13 @@
 #include <TopoDS_Iterator.hxx>
 #include <gp_Sphere.hxx>
 #include <gp_Torus.hxx>
+#include <BRepBuilderAPI_Copy.hxx>
+#include <BRepExtrema_ShapeProximity.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
+#include <TColStd_PackedMapOfInteger.hxx>
+#include <TopLoc_Location.hxx>
+#include <TopoDS_Compound.hxx>
+#include <atomic>
 
 namespace noshape {
 
@@ -1581,6 +1588,116 @@ DistanceF min_distance(const OcShape& a, const OcShape& b)
     }
   }
   return r;
+}
+
+// Whether two shapes come within `tol` of each other, measured until the first pair that does: their pieces (faces,
+// free edges, free vertices) whose boxes meet; of two faces, only those whose coarse meshes (of copies) come within
+// the meshes' error. Parts far apart in most places then cost the meshing, not an exact distance per face pair.
+bool shapes_touch(const OcShape& a, const OcShape& b, double tol)
+{
+  require_non_null(a.shape, "first shape");
+  require_non_null(b.shape, "second shape");
+  struct Piece
+  {
+    TopoDS_Shape s;
+    Bnd_Box      box;
+  };
+  auto pieces = [tol](const TopoDS_Shape& s) {
+    std::vector<Piece> v;
+    auto add = [&](TopExp_Explorer x) {
+      for (; x.More(); x.Next())
+      {
+        Piece p{x.Current(), {}};
+        BRepBndLib::Add(p.s, p.box);
+        p.box.Enlarge(tol);
+        v.push_back(p);
+      }
+    };
+    add(TopExp_Explorer(s, TopAbs_FACE));
+    add(TopExp_Explorer(s, TopAbs_EDGE, TopAbs_FACE));
+    add(TopExp_Explorer(s, TopAbs_VERTEX, TopAbs_EDGE));
+    return v;
+  };
+  const std::vector<Piece> pa = pieces(a.shape), pb = pieces(b.shape);
+  std::vector<std::pair<TopoDS_Shape, TopoDS_Shape>> exact;
+  std::vector<char> face_a(pa.size(), 0), face_b(pb.size(), 0);
+  Bnd_Box reach;
+  for (size_t i = 0; i < pa.size(); ++i)
+    for (size_t j = 0; j < pb.size(); ++j)
+    {
+      if (pa[i].box.IsOut(pb[j].box))
+        continue;
+      if (pa[i].s.ShapeType() != TopAbs_FACE || pb[j].s.ShapeType() != TopAbs_FACE)
+      {
+        exact.emplace_back(pa[i].s, pb[j].s);
+        continue;
+      }
+      face_a[i] = face_b[j] = 1;
+      reach.Add(pa[i].box);
+      reach.Add(pb[j].box);
+    }
+  if (!reach.IsVoid())
+  {
+    // Copies (sharing the geometry) take the meshes; a face that doesn't mesh is measured against each it may touch.
+    const double defl = std::max(1e-3 * std::sqrt(reach.SquareExtent()), 10 * tol);
+    auto meshed = [defl](const std::vector<Piece>& p, const std::vector<char>& used, TopoDS_Compound& with, std::vector<TopoDS_Shape>& without, std::vector<size_t>& without_at) {
+      BRep_Builder bb;
+      TopoDS_Compound c;
+      bb.MakeCompound(c);
+      std::vector<size_t> at;
+      for (size_t i = 0; i < p.size(); ++i)
+        if (used[i])
+        {
+          bb.Add(c, p[i].s);
+          at.push_back(i);
+        }
+      BRepBuilderAPI_Copy copy(c, false);
+      BRepMesh_IncrementalMesh(copy.Shape(), defl, false, 0.5, true);
+      bb.MakeCompound(with);
+      size_t k = 0;
+      for (TopoDS_Iterator x(copy.Shape()); x.More(); x.Next(), ++k)
+      {
+        TopLoc_Location loc;
+        if (BRep_Tool::Triangulation(TopoDS::Face(x.Value()), loc).IsNull())
+        {
+          without.push_back(x.Value());
+          without_at.push_back(at[k]);
+        }
+        else
+          bb.Add(with, x.Value());
+      }
+    };
+    TopoDS_Compound ma, mb;
+    std::vector<TopoDS_Shape> ua, ub;
+    std::vector<size_t> ua_at, ub_at;
+    meshed(pa, face_a, ma, ua, ua_at);
+    meshed(pb, face_b, mb, ub, ub_at);
+    BRepExtrema_ShapeProximity prox(ma, mb, tol + 10 * defl);
+    prox.Perform(); // not "done" when no faces overlap
+    for (NCollection_DataMap<int, TColStd_PackedMapOfInteger>::Iterator x(prox.OverlapSubShapes1()); x.More(); x.Next())
+      for (TColStd_PackedMapOfInteger::Iterator y(x.Value()); y.More(); y.Next())
+        exact.emplace_back(prox.GetSubShape1(x.Key()), prox.GetSubShape2(y.Key()));
+    for (size_t k = 0; k < ua.size(); ++k)
+      for (size_t j = 0; j < pb.size(); ++j)
+        if (face_b[j] && !pa[ua_at[k]].box.IsOut(pb[j].box))
+          exact.emplace_back(ua[k], pb[j].s);
+    for (size_t k = 0; k < ub.size(); ++k)
+      for (size_t i = 0; i < pa.size(); ++i)
+        if (face_a[i] && !pb[ub_at[k]].box.IsOut(pa[i].box))
+          exact.emplace_back(pa[i].s, ub[k]);
+  }
+  std::atomic<bool> found{false};
+  OSD_Parallel::For(0, (int)exact.size(), [&](int k) {
+    if (found.load(std::memory_order_relaxed))
+      return;
+    BRepExtrema_DistShapeShape d;
+    d.SetFlag(Extrema_ExtFlag_MIN);
+    d.LoadS1(exact[(size_t)k].first);
+    d.LoadS2(exact[(size_t)k].second);
+    if (d.Perform() && d.Value() <= tol)
+      found = true;
+  });
+  return found;
 }
 
 // Direction of a planar face normal or linear edge.

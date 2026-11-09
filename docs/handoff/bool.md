@@ -48,10 +48,23 @@ scratch /root/bool-scratch.
   tests 352/352, model and ops Shell tests pass, suite unchanged but for main's own moves, g++-13 builds. The scroll
   wall's offset still doesn't convert (GeomConvert error 0.2885 at 1e-7). The box (6.21 mm) is the query's: core
   (core.md 14:30).
-- **Found (17:30 UTC), from main since core's c7c48f81 (Delete face takes away the region…): the impeller's Boolean 1
-  takes 4.56 s (live 79 ms; under 790 ms before), the document 18.7 -> 22.4 s.** 4.35 s is one BRepExtrema
-  min_distance: the Union leaves the parts apart in ours (live makes one part, 30 faces, 71,495 mm3), so basic.rs:49's
-  touching check measures two whole parts. Same with the old shell.cpp (imp-base.log). Told the lead.
+- **Landed (19:55 UTC, lead: Boolean 1 is mine; bound the touching check; then measure option 2 on vibe3): the
+  impeller's Boolean 1 took 4.56 s (live 79 ms).** 4.35 s was basic.rs's touching check (BRepExtrema MINMAX over
+  whole parts; two face pairs, Part 1's plane face 5 and Offset face 11 against the block, 1.9-3.3 s each), run because
+  the Union leaves the parts apart. Why apart: live's Boolean 1 has three tools, ours two 19.6 mm apart, because
+  Extrude 4 fails: its regions resolve to the sketch's 3,025 mm2 circle instead of the rib, since sketch "Stefevenrohr
+  Führung"'s spline constraints (on `.N.internal` points) aren't translated and the rib's loop stays 0.5 mm open
+  (handed to core, core.md 19:02; the same before c7c48f81). Fix: `k::touching`
+  (geom.cpp `shapes_touch`): pieces whose boxes meet; faces against faces only where coarse meshes of copies (1e-3 of
+  the boxes' diagonal) come within 10 deflections (BRepExtrema_ShapeProximity; this OCCT says "not done" when nothing
+  overlaps); those pairs exact (MIN, all threads, first contact ends it); both of basic.rs's checks use it. Boolean 1's
+  inputs 5.3-7.0 s -> 0.14 s; T1 core::touching_parts_at_faces_edges_points_and_inside_faces (face, edge, corner, a
+  rod and a ball lying on a face; each 1 um away). Kernel core 32/32, model Boolean tests 17/17; suite unchanged
+  but for main's own moves, the impeller 22.4 -> 18.0 s (vibe4).
+- **Option 2 measured (vibe3, corpus r1109-imp3, two replays):** 11 of the impeller's 15 Booleans decline "an offset
+  face", 6.8-7.3 s of OCCT (d05d2e23 Boolean Flansch+Gehäuse 1.5 s, 123220a0 1.4-1.9 s, 39f6c954 1.1-1.2 s, the rest
+  0.26-0.52 s); the others: 3a83ee3b "an edge without its curve on a face" 0.58 s, two "arguments share vertices"
+  14-84 ms, 40aeb362 ours 0.9 ms (OCCT 3.3).
 - **Next (asked of the lead):** the impeller's Booleans after the Shell (11 of 14, ~4.7 s of OCCT incl. Boolean
   Flansch+Gehäuse 1.7 s) decline "an offset face": `offset_as_bspline` (rust_boolean.cpp) fits one wall face (3.9e-8)
   but not the scroll's inner wall (u 0-3.3: GeomConvert_ApproxSurface error 0.29 m at 1e-7, 9e-3 at 1e-6, 6.6e-4 at
