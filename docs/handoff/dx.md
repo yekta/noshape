@@ -54,10 +54,14 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 - **Drawings:** `drawing.selection` as live's pixel reader (2402): a closed crop spline waiting for ✓ is EDGE of its
   view (and the view not VIEW); a break being edited EDGE; a selected table, dimension or hatch inside a view's box
   EDGE of that view when its lines and text there pass 60 pixels, with the Select tool and no panel or hatch dialog;
-  a placed BOM table and a placed foreshorten no longer stay selected (live draws neither orange). 1259 -> 1270/1409
-  states, 127 -> 128/176 scenarios (main's this morning: 1255, 124), no scenario worse. Left in selection: 59
-  states, many pixel-only (block-drawing's projected Top EDGE, its Right VIEW), a sketch circle left orange after
-  its tool's Escape (drw-*-existing-profile step 4), callouts' Group / Add stacked framing Front.
+  a placed BOM table and a placed foreshorten no longer stay selected (live draws neither orange); a view whose Edit
+  auxiliary / Edit section is open VIEW (dark frame), a broken-out section being edited EDGE; nothing while Edit
+  hatch is open, nor after its Esc; Esc closes Edit auxiliary view. 1255 -> 1282/1409 states, 124 -> 130/176
+  scenarios (main's this morning: 1255, 124), no scenario worse. Left in selection: 42 states, many
+  pixel-only (block-drawing's projected Top EDGE, its Right VIEW), a sketch circle left orange after its tool's
+  Escape (drw-*-existing-profile step 4), callouts' Group / Add stacked framing Front. Also seen: our Edit
+  auxiliary view panel isn't live's (live reuses the Auxiliary view panel: Normal / In line / Axis, the edge chip,
+  Show view reference indicator; ours a label field, Reverse, Show).
 
 ## 11-09 03:39 UTC: exchange "still mine" (lead 11-09): hose x_t, B-spline STL grid, o-ring x_t; drawings' EDGE
 

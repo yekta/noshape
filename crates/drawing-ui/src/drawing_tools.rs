@@ -185,6 +185,12 @@ impl DrawingEditor {
             self.close_section_edit(false, cx);
             return;
         }
+        // Edit auxiliary view: closed, nothing left selected (live drw-aux-edit).
+        if self.aux_edit.take().is_some() {
+            self.selection.clear();
+            cx.notify();
+            return;
+        }
         if self.replicate_dlg.is_some() {
             self.close_replicate(false, cx);
             return;

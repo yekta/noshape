@@ -322,6 +322,22 @@ impl DrawingEditor {
             selection.retain(|(k, o)| !(k == "VIEW" && *o == name));
             selection.push(("EDGE".into(), name));
         }
+        // A view whose Edit auxiliary view / Edit section dialog is open has the dark frame (drw-aux-edit,
+        // drw-section-edit); a broken-out section being edited is orange inside its view (drw-broken-out-edit).
+        let framed = |selection: &mut Vec<(String, String)>, v: ViewId, kind: &str| {
+            let name = self.ui_view_name(v);
+            selection.retain(|(_, o)| *o != name);
+            selection.push((kind.into(), name));
+        };
+        if let Some((v, _)) = &self.aux_edit {
+            framed(&mut selection, *v, "VIEW");
+        }
+        if let Some(e) = &self.section_edit {
+            framed(&mut selection, e.view, "VIEW");
+        }
+        if let Some(Panel::BrokenOut { view, edit: Some(_), .. }) = &self.panel {
+            framed(&mut selection, *view, "EDGE");
+        }
         // A break being edited (Edit... on its line: drw-break-edit; not while its menu is open).
         if let Some((v, _)) = self.break_dlg.as_ref().and_then(|d| d.edit) {
             selection.push(("EDGE".into(), self.ui_view_name(v)));
@@ -361,6 +377,10 @@ impl DrawingEditor {
                     selection.push(("EDGE".into(), self.ui_view_name(v.id)));
                 }
             }
+        }
+        // Nothing while the Edit hatch dialog is open (drw-section-hatch-edit, drw-hatch-edit).
+        if self.hatch_dlg.is_some() {
+            selection.clear();
         }
         selection.sort();
         selection.dedup();

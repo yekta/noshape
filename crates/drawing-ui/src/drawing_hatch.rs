@@ -312,6 +312,8 @@ impl DrawingEditor {
         if self.hatch_dlg.take().is_none() {
             return false;
         }
+        // (Live: nothing stays selected, drw-hatch-edit, drw-section-hatch-edit.)
+        self.selection.clear();
         self.set_preview(None, cx);
         true
     }
