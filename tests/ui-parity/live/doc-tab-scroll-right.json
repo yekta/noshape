@@ -1,0 +1,635 @@
+{
+ "scenario": "doc-tab-scroll-right",
+ "recorded": "2026-11-09T07:37:37.508Z",
+ "app": {
+  "name": "live",
+  "version": "web runtime ca5abdc1f92d5fa41125",
+  "platform": "linux (Chrome over CDP, software GL)",
+  "recorder": "2026-11-08.5 0a4d2573 + live2 2026-11-09.1"
+ },
+ "live": {
+  "document": "6615dafd951c9f88bcc4f743",
+  "workspace": "70a058edf012e6f2ec915d89",
+  "element": "26e89791fcfa5e440095491b",
+  "start": "doc-many-tabs",
+  "startElement": "26e89791fcfa5e440095491b",
+  "runner": "live2 .nstate-uip-2.json"
+ },
+ "start": {
+  "focus": {
+   "kind": "none"
+  },
+  "dialog": null,
+  "dialogs": [],
+  "panels": null,
+  "list": null,
+  "selection": {
+   "count": 0,
+   "items": []
+  },
+  "features": {
+   "rows": [],
+   "rollbackAfter": "Default geometry"
+  },
+  "parts": [],
+  "partsHeading": "Parts (0)",
+  "undo": {
+   "undo": false,
+   "redo": false
+  },
+  "message": null,
+  "tooltip": null,
+  "sketch": null,
+  "drawing": null,
+  "document": {
+   "workspace": "Main",
+   "history": null,
+   "compare": null,
+   "tabs": [
+    {
+     "name": "Part Studio 1",
+     "kind": "partstudio",
+     "active": true
+    },
+    {
+     "name": "Assembly 1",
+     "kind": "assembly",
+     "active": false
+    },
+    {
+     "name": "Part Studio 2",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 3",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 4",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 5",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 6",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 7",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 8",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 9",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 10",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 11",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 12",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 13",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 14",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 15",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 16",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 17",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 18",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 19",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 20",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 21",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 22",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 23",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 24",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 25",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 26",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 27",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 28",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 29",
+     "kind": "partstudio",
+     "active": false
+    },
+    {
+     "name": "Part Studio 30",
+     "kind": "partstudio",
+     "active": false
+    }
+   ],
+   "folder": null,
+   "renaming": null,
+   "panel": null,
+   "switcher": null
+  },
+  "variables": null,
+  "featurestudio": null
+ },
+ "steps": [
+  {
+   "step": 1,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Scroll right"
+    }
+   },
+   "ok": true,
+   "at": [
+    1907,
+    978
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": "Default geometry"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 4",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 5",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 6",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 7",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 8",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 9",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 10",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 11",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 12",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 13",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 14",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 15",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 16",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 17",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 18",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 19",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 20",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 21",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 22",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 23",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 24",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 25",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 26",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 27",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 28",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 29",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 30",
+       "kind": "partstudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 26865
+  },
+  {
+   "step": 2,
+   "do": {
+    "do": "click",
+    "on": {
+     "button": "Scroll left"
+    }
+   },
+   "ok": true,
+   "at": [
+    1883,
+    978
+   ],
+   "state": {
+    "focus": {
+     "kind": "none"
+    },
+    "dialog": null,
+    "dialogs": [],
+    "panels": null,
+    "list": null,
+    "selection": {
+     "count": 0,
+     "items": []
+    },
+    "features": {
+     "rows": [],
+     "rollbackAfter": "Default geometry"
+    },
+    "parts": [],
+    "partsHeading": "Parts (0)",
+    "undo": {
+     "undo": false,
+     "redo": false
+    },
+    "message": null,
+    "tooltip": null,
+    "sketch": null,
+    "drawing": null,
+    "document": {
+     "workspace": "Main",
+     "history": null,
+     "compare": null,
+     "tabs": [
+      {
+       "name": "Part Studio 1",
+       "kind": "partstudio",
+       "active": true
+      },
+      {
+       "name": "Assembly 1",
+       "kind": "assembly",
+       "active": false
+      },
+      {
+       "name": "Part Studio 2",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 3",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 4",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 5",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 6",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 7",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 8",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 9",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 10",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 11",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 12",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 13",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 14",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 15",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 16",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 17",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 18",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 19",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 20",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 21",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 22",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 23",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 24",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 25",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 26",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 27",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 28",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 29",
+       "kind": "partstudio",
+       "active": false
+      },
+      {
+       "name": "Part Studio 30",
+       "kind": "partstudio",
+       "active": false
+      }
+     ],
+     "folder": null,
+     "renaming": null,
+     "panel": null,
+     "switcher": null
+    },
+    "variables": null,
+    "featurestudio": null
+   },
+   "t": 44072
+  }
+ ]
+}
