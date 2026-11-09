@@ -12,6 +12,23 @@ Worktree /root/projects/noshape-wt/blend, builds on vibe5 (`NOSHAPE_RB_HOST=vibe
 Parity runs: `NOSHAPE_RB_HOST=vibe5 tools/tiers/rb.sh env NOSHAPE_PARITY_MODELS=/home/ngyekta/parity/models
 NOSHAPE_PARITY_ONLY=<docs> cargo test --release -p noshape-ops --test all parity::parity_models -- --ignored --nocapture`.
 
+## From core (2026-11-09 14:22 UTC, covering blends): c2-impeller-loft's Fillet 1 needs a cliff-edge round
+- With core's Delete face 1 (c7c48f81) the impeller holds through feature 20; feature 21 Fillet 1 (R10, one closed
+  edge where the stern tube's cylinder JSO meets the housing's outer wall, a B-spline; Allow edge overflow OFF)
+  differs: ours +2,767.16 mm³ and 3 round faces, the tube's x 120 end cap cut to 201.06 mm²; live +2,412.73 mm³,
+  JWK (OTHER, 1365.0 mm²) + JWO (OTHER, 173.43 mm², x 113.8..120, z -25.6..-7.6), the cap JRK untouched (314.159).
+- Live's edges there: JWJ, an 11.5 mm arc of the cap's rim (120, 0.06, -24); JWV / JWZ, two 20.38 mm circles at
+  (114.76, ±2.4, -17.97) (the ball's sections where the round becomes the cliff part); JWR, 19.57 mm on the wall.
+  So where the round's contact on the tube would run past its end, Parasolid's ball rolls over the rim edge (the
+  cylinder's end circle) instead: JWO is the ball's sweep touching the wall and that edge, between the two sections.
+- Ours: blend.as_is / blend.scaled fail, blend.fallback.split_closed builds OCCT's round trimmed by the cap.
+  detail.rs's cliff routes cover a planar face narrower than the ball (section_blend cliff) and boss rims
+  (cliff_rim_blend), not a round running off a cylinder's end against a free-form wall.
+- Repro: dump vibe5 ~/core-cases/dumpfil2/fillet-9 (+ .txt: edge 10, R 0.01, checked); a kernel probe must call
+  set_working_scale(1000) as the model does (probe_fillet_dump in /root/core-scratch/imp/features-with-fillet-probe.rs).
+- Downstream: feature 24 Extrude 4 then fails ("up-to target does not fully bound the extruded profile", core's
+  to recheck once this round is live's).
+
 ## From core (2026-11-09 13:12 UTC, lead: core covers blends while blend is paused): the impeller's three slow fillets
 - Fillet Flansch zum Stroemungskanal 2.2 s (live 67 ms), Fillet Ansaugflansch zum Gehaeuse 1.6 s (321), Fillet
   Bohrungssitz Ansaugflasch 1.6 s (246) (kernel profile, vibe5, /root/core-scratch/fil.log): each fails OCCT as is
