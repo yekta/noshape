@@ -22,16 +22,29 @@ pub struct SectionEdit {
     /// ☑ Section depth: its field and value (meters).
     pub depth: Option<(Entity<InputState>, Subscription)>,
     pub depth_value: Option<f64>,
+    /// The section's label field (live: an input, as when creating it) and its text.
+    pub label: (Entity<InputState>, Subscription),
+    pub label_text: String,
 }
 
 impl DrawingEditor {
     pub fn open_section_edit(&mut self, view: ViewId, window: &mut Window, cx: &mut Context<Self>) {
         let sheet = self.current_sheet();
         let Some(v) = sheet.view(view) else { return };
-        let ViewKind::Section { parent, .. } = v.kind else { return };
+        let ViewKind::Section { parent, label: text, .. } = &v.kind else { return };
+        let (parent, text, cut_only, depth) = (*parent, text.clone(), v.cut_only, v.section_depth);
         let Some(cuts) = sheet.section_cuts(view) else { return };
-        let depth = v.section_depth;
-        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only: v.cut_only, depth: None, depth_value: None });
+        let st = cx.new(|cx| InputState::new(window, cx).select_on_focus(false).revert_on_escape(false).default_value(text.clone()));
+        let sub = cx.subscribe(&st, |this: &mut Self, st, ev: &InputEvent, cx| {
+            if matches!(ev, InputEvent::Change) {
+                let v = st.read(cx).value().trim().to_string();
+                if let Some(e) = &mut this.section_edit {
+                    e.label_text = v;
+                }
+                this.preview_section_edit(cx);
+            }
+        });
+        self.section_edit = Some(SectionEdit { view, parent, cuts, cut_only, depth: None, depth_value: None, label: (st, sub), label_text: text });
         if let Some(d) = depth {
             self.toggle_edit_depth(Some(d), window, cx);
         }
@@ -78,6 +91,11 @@ impl DrawingEditor {
         s.set_section_cuts(e.view, e.cuts.clone());
         if let Some(v) = s.view_mut(e.view) {
             v.cut_only = e.cut_only;
+            if let ViewKind::Section { label, .. } = &mut v.kind
+                && !e.label_text.is_empty()
+            {
+                label.clone_from(&e.label_text);
+            }
             if e.depth.is_none() {
                 (v.section_depth, v.section_depth_ref, v.section_depth_offset) = (None, None, None);
             } else if e.depth_value != v.section_depth {
@@ -154,11 +172,9 @@ impl DrawingEditor {
     pub fn render_section_edit(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let e = self.section_edit.as_ref()?;
         let pal = p();
-        let label = match self.current_sheet().view(e.view).map(|v| &v.kind) {
-            Some(ViewKind::Section { label, .. }) => label.clone(),
-            _ => String::new(),
-        };
+        let label = e.label.0.clone();
         let cut_only = e.cut_only;
+        crate::ui_script::note_dialog(|| serde_json::json!({ "kind": "drawing-panel", "title": "Section view", "text": ["Section view", "Show cut geometry only", "Section depth"] }));
         let depth = e.depth.as_ref().map(|(st, _)| st.clone());
         Some(
             v_flex()
@@ -181,7 +197,7 @@ impl DrawingEditor {
                         .child(div().id("se-ok").w(px(28.)).h(px(27.)).flex().items_center().justify_center().bg(pal.accept).cursor_pointer().child(crate::drawing_chrome::ok_check(16.)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(true, cx))))
                         .child(div().id("se-close").w(px(28.)).h(px(27.)).flex().items_center().justify_center().cursor_pointer().child(crate::ui::glyph("close", 14., pal.cancel)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.close_section_edit(false, cx)))),
                 )
-                .child(div().px(px(10.)).h(px(26.)).flex().items_center().text_size(px(12.)).border_b_1().border_color(gpui_kit::rgb(0xdddddd)).child(label))
+                .child(div().px(px(10.)).pt(px(4.)).child(Input::new(&label).xsmall()))
                 // The tool button (live 499–504, as in the creating dialog): the
                 // cutting line's points are being picked, so it shows active.
                 .child(

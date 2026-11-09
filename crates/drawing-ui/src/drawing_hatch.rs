@@ -336,6 +336,8 @@ impl DrawingEditor {
         // tools, a Hatches box (chips named after the view); the rest once a
         // region is picked; General › None hides Scale, Angle and Color.
         let section_mode = d.sections.is_some();
+        // Edit hatch region...: live's "Edit hatch", its region listed without ×.
+        let editing = d.edit.is_some();
         let picked = d.sections.as_ref().is_some_and(|l| !l.is_empty());
         let none = pattern == NO_PATTERN;
         let row = |label: &'static str, body: AnyElement| h_flex().h(px(34.)).pl(px(5.)).child(div().w(px(56.)).text_size(px(11.5)).child(label)).child(body).into_any_element();
@@ -378,7 +380,7 @@ impl DrawingEditor {
                     .h(px(20.))
                     .text_size(px(13.))
                     .child(div().flex_1().child(format!("Hatch {}", i + 1)))
-                    .child(div().id(("hd-profile-x", i)).tooltip(crate::ui::tooltip(format!("Delete hatch {}", i + 1))).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+                    .when(!editing, |r| r.child(div().id(("hd-profile-x", i)).tooltip(crate::ui::tooltip(format!("Delete hatch {}", i + 1))).px(px(4.)).text_color(gpui_kit::rgb(0x9a9a9a)).cursor_pointer().child("×").on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                         this.set_hatch(
                             |d| {
                                 if i < d.profiles.len() {
@@ -387,7 +389,7 @@ impl DrawingEditor {
                             },
                             cx,
                         )
-                    })))
+                    }))))
                     .into_any_element()
             })
             .collect();
@@ -592,10 +594,13 @@ impl DrawingEditor {
         let ok_disabled = if section_mode { !picked } else { d.profiles.is_empty() };
         let show_style = !section_mode || picked;
         crate::ui_script::note_dialog(|| {
-            let mut text: Vec<String> = vec![(if section_mode { "Edit hatch" } else { "Hatch region" }).into(), (if section_mode { "Hatches" } else { "Closed profiles" }).into()];
+            let mut text: Vec<String> = vec![(if section_mode || editing { "Edit hatch" } else { "Hatch region" }).into(), (if section_mode { "Hatches" } else { "Closed profiles" }).into()];
             let names = if section_mode { section_names.clone() } else { (1..=d.profiles.len()).map(|i| format!("Hatch {i}")).collect() };
             for n in names {
-                text.extend([n, "×".into()]);
+                text.push(n);
+                if section_mode || !editing {
+                    text.push("×".into());
+                }
             }
             if show_style {
                 text.extend(GROUPS.iter().map(|(g, _)| g.to_string()));
@@ -626,7 +631,7 @@ impl DrawingEditor {
                     h_flex()
                         .h(px(30.))
                         .pl(px(11.))
-                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if section_mode { "Edit hatch" } else { "Hatch region" }))
+                        .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::MEDIUM).child(if section_mode || editing { "Edit hatch" } else { "Hatch region" }))
                         .child(
                             div()
                                 .id("hd-ok")

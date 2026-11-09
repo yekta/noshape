@@ -465,7 +465,13 @@ impl DrawingEditor {
     /// The toolbar's active tool as live shows it: none while a menu's edit of an existing item runs (a break line's
     /// Edit..., a note's Add leader: live2 drw-break-edit, drw-note-add-leader).
     fn ui_tool(&self) -> Option<&'static str> {
-        if matches!(self.tool, Tool::GdtLeader { .. }) || self.break_dlg.as_ref().is_some_and(|d| d.edit.is_some()) {
+        // (An edit isn't the tool's: Edit... on a break, Edit crop..., Edit hatch region..., live drw-break-edit,
+        // drw-crop-edit, drw-hatch-edit.)
+        if matches!(self.tool, Tool::GdtLeader { .. })
+            || self.break_dlg.as_ref().is_some_and(|d| d.edit.is_some())
+            || self.crop_dlg.as_ref().is_some_and(|d| d.edit.is_some())
+            || self.hatch_dlg.as_ref().is_some_and(|d| d.edit.is_some() && d.sections.is_none())
+        {
             return None;
         }
         ui_tool_name(&self.tool).or_else(|| self.dialog_tool_name())
