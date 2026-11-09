@@ -331,7 +331,7 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **First release named Noshape** (lead's 42fd1ac49, d6fe80fe5, d8c65967a, 4ae66dc04): on green 421f2eb1 (Linux, Xvfb) the start
   window reads "Documents — Noshape" and a document's "<name> — Noshape", WM_CLASS dev.noshape.noshape; to check again on the
   release app at publish, with Noshape.app on macOS (qa-os.yml) and the icons.
-- **qa 19:16, after the release checks (v0.4.39 published 19:11, run 42660387674, cut 1b99f7a95): no blocker.** Linux files = the
+- **qa 19:14, after the release checks (v0.4.39 published 19:11, run 42660387674, cut 1b99f7a95): no blocker.** Linux files = the
   smoked artifact, SHA256SUMS OK, 11 assets, every job green incl. the three "Restart into" updates. **Noshape:** the release
   app's window reads "<document> — Noshape" (Linux, WM_CLASS dev.noshape.noshape), its desktop entry Name=Noshape with the new
   icon; macOS (qa-os.yml): the app's title bar reads Noshape, the new icon in the Dock, the dmg / app.zip / CLI assets there.
