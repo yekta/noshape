@@ -37,7 +37,7 @@ fn panel_header(title: &'static str) -> Div {
 
 /// A 20 px header icon with a tooltip.
 fn header_icon(id: &'static str, icon: &'static str, tip: &'static str) -> Stateful<Div> {
-    div().id(id).size(px(20.)).flex_none().cursor_pointer().child(crate::ui::glyph(icon, 20., p().text)).tooltip(crate::ui::tooltip(tip))
+    div().id(id).map(|d| noshape_app_core::ui_script::mark(d, move || format!("button:{tip}"))).size(px(20.)).flex_none().cursor_pointer().child(crate::ui::glyph(icon, 20., p().text)).tooltip(crate::ui::tooltip(tip))
 }
 
 /// The panels' background (live `#f5f5f5`).
@@ -114,7 +114,7 @@ impl Render for NotesPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let pal = p();
         let link = |id: &'static str, label: &'static str| {
-            div().id(id).text_size(px(14.)).line_height(px(21.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().hover(|d| d.underline()).child(label)
+            div().id(id).map(|d| noshape_app_core::ui_script::mark(d, move || format!("button:Notes › {label}"))).text_size(px(14.)).line_height(px(21.)).text_color(gpui_kit::rgb(0x094174)).cursor_pointer().hover(|d| d.underline()).child(label)
         };
         let close = header_icon("notes-close", "close", "Close").on_click(cx.listener(|_, _, _, cx| cx.emit(ClosePanel)));
         let header = match &self.editor {

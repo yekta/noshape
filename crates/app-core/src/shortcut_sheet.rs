@@ -216,6 +216,7 @@ impl Render for ShortcutSheet {
                             .child(
                                 div()
                                     .id("sc-customize")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Customize keyboard shortcuts".into()))
                                     .text_size(px(12.))
                                     .font_weight(FontWeight::SEMIBOLD)
                                     // Live: #094174 (616), #b2ddf6 in dark (2446).
@@ -231,11 +232,12 @@ impl Render for ShortcutSheet {
                                     }),
                             )
                             .child(div().flex_1())
-                            .child(div().w(px(198.)).h(px(34.)).child(Input::new(&self.search).h(px(34.))))
+                            .child(div().w(px(198.)).h(px(34.)).map(|d| crate::ui_script::mark(d, || "field:Search shortcuts".into())).child(Input::new(&self.search).h(px(34.))))
                             // Live (menus/616): ↗ opens the page in its own window.
                             .child(
                                 div()
                                     .id("sc-popout")
+                                    .map(|d| crate::ui_script::mark(d, || "button:Pop out keyboard shortcuts".into()))
                                     // Live menus/616: 21 px after the search box, 6 px above centre.
                                     .ml(px(17.))
                                     .relative()

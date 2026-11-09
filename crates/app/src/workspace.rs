@@ -1952,6 +1952,7 @@ impl Workspace {
                     // A software renderer is a performance error (live: a red badge).
                     .when(perf_error, |d| d.child(div().absolute().left(px(22.)).top(px(16.)).size(px(11.)).rounded_full().bg(gpui_kit::rgb_static(0xffffff)).child(crate::assets::icon("error", 11., cx))))
                     .tip(if perf_error { "Performance errors detected" } else { "Performance" }, TipSide::Right)
+                    .map(|d| noshape_app_core::ui_script::mark(d, || "button:Performance".into()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| this.toggle_doc_panel(false, cx))),
             )
             // Release management (help releasedraftspanel.png).

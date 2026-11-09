@@ -505,7 +505,7 @@ impl Render for TabManager {
             let (icon, label) = kind_info(k);
             let k: &'static str = k;
             let on = self.kinds.contains(k);
-            crate::ui::icon_button(SharedString::from(format!("tm-kind-{k}")), icon, 30., on, cx).tooltip(label).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
+            crate::ui::icon_button(SharedString::from(format!("tm-kind-{k}")), icon, 30., on, cx).map(|d| noshape_app_core::ui_script::mark(d, move || format!("button:Filter:{label}"))).tooltip(label).on_click(cx.listener(move |this, _: &ClickEvent, _, cx| {
                 if !this.kinds.remove(k) {
                     this.kinds.insert(k);
                 }
@@ -600,6 +600,7 @@ impl Render for TabManager {
                     .child(
                         div()
                             .id("tm-clear")
+                            .map(|d| noshape_app_core::ui_script::mark(d, || "button:Clear filters".into()))
                             .px(px(7.))
                             .h(px(24.))
                             .flex()
@@ -640,12 +641,12 @@ impl Render for TabManager {
                     .child("to open")
                     .child(div().flex_1())
                     // Live document/41, 46, 61–62: the preview toggle (its icon stays the same) and help.
-                    .child(div().id("tm-preview").cursor_pointer().mr(px(4.)).tooltip(crate::ui::tooltip("Toggle preview")).child(crate::assets::icon("tm-preview", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    .child(div().id("tm-preview").map(|d| noshape_app_core::ui_script::mark(d, || "button:Toggle preview".into())).cursor_pointer().mr(px(4.)).tooltip(crate::ui::tooltip("Toggle preview")).child(crate::assets::icon("tm-preview", 20., cx)).on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
                         this.show_preview = !this.show_preview;
                         cx.notify();
                     })))
                     // Live document/63: `a.os-help-link`, no tooltip; opens "Document Tabs".
-                    .child(div().id("tm-help").cursor_pointer().child(crate::assets::icon("help-faint", 16., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Tabs", cx))),
+                    .child(div().id("tm-help").map(|d| noshape_app_core::ui_script::mark(d, || "button:Tab manager help".into())).cursor_pointer().child(crate::assets::icon("help-faint", 16., cx)).on_click(|_, _, cx| noshape_app_core::help::open("Tabs", cx))),
             )
     }
 }
