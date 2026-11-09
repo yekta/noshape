@@ -331,6 +331,15 @@ fixed, mark it `[x]` with the commit, and move the test back to T1 if it is now 
 - **First release named Noshape** (lead's 42fd1ac49, d6fe80fe5, d8c65967a, 4ae66dc04): on green 421f2eb1 (Linux, Xvfb) the start
   window reads "Documents — Noshape" and a document's "<name> — Noshape", WM_CLASS dev.noshape.noshape; to check again on the
   release app at publish, with Noshape.app on macOS (qa-os.yml) and the icons.
+- **qa 19:16, after the release checks (v0.4.39 published 19:11, run 42660387674, cut 1b99f7a95): no blocker.** Linux files = the
+  smoked artifact, SHA256SUMS OK, 11 assets, every job green incl. the three "Restart into" updates. **Noshape:** the release
+  app's window reads "<document> — Noshape" (Linux, WM_CLASS dev.noshape.noshape), its desktop entry Name=Noshape with the new
+  icon; macOS (qa-os.yml): the app's title bar reads Noshape, the new icon in the Dock, the dmg / app.zip / CLI assets there.
+  CLI smoke = v0.4.38 except the user's vase: loft 437,876.295 → 437,879.239 mm³ (+0.0007 %), shell 2 in 58,694.86 → 58,694.10
+  (live 58,695.05), shell 2 out 63,464.51 → 63,463.77 (live 63,461.62): core's loft changes, within 0.002 % of live. The 48
+  ticket documents = green 4e549553; GUI rows pixel-identical to v0.4.38 (11 / 11); stock ubuntu:24.04 OK; footer OK on Linux
+  and macOS (Show in Finder too); Windows: Show in Explorer still fails (WIN-SHOW-IN-EXPLORER). Agent session (Haiku, the
+  release's MCP): 6 tool calls, 0 failed, the block right (23,214.6 mm³; its sketch left without dimensions, the agent said so).
 - Open, not new in this cut: P1 WIN-SHOW-IN-EXPLORER (no fix on main yet), P1 SAVED-SKETCH-PLANE-LOST, P1
   T2-ASM-STANDARD-CONTENT-HANG (the nightly copy from 02:09 still runs on vibe2 at 16:25). Long-running P0s: BLEND-RUST,
   SHELL-SLOW, REGEN-SPEED.
