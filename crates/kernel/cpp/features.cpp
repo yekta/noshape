@@ -20,6 +20,8 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Defeaturing.hxx>
+#include <BOPAlgo_Alerts.hxx>
+#include <ShapeFix_Shell.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
 #include <NCollection_HArray1.hxx>
@@ -8894,6 +8896,138 @@ OpOut op_draft(const OcShape& s, const OcShapeList& faces, P3 dir, const PlaneF&
 
 // ---------------------------------------------------------------- defeature / offsets
 
+// Faces deleted where OCCT's defeaturing can't remove them (BOPAlgo_AlertUnableToRemoveTheFeature: c2-impeller-loft's
+// Delete face 1, a tube's outer cylinder and end cap standing out of a lofted wall; live removes it, 23,456 mm³): the
+// region they enclose with the holes they leave in the faces around them, each hole filled on its own face's
+// surface, taken away (a boss: the region is material) or filled in (a pocket: it is empty), then unified (the
+// patches back into their faces). Null where a hole doesn't lie in one face, the region doesn't close, or the
+// result isn't one valid solid without the faces.
+static std::optional<std::pair<TopoDS_Shape, HHist>> defeature_by_region(const TopoDS_Shape& body, const std::vector<TopoDS_Shape>& del)
+{
+  ShapeIMap gone;
+  for (const TopoDS_Shape& f : del)
+    gone.Add(f);
+  NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> e2f;
+  TopExp::MapShapesAndAncestors(body, TopAbs_EDGE, TopAbs_FACE, e2f);
+  // The kept faces' wires made only of edges they share with deleted faces: the holes.
+  BRep_Builder    B;
+  TopoDS_Shell    shell;
+  B.MakeShell(shell);
+  for (const TopoDS_Shape& f : del)
+    B.Add(shell, f);
+  ShapeIMap kept_done;
+  int       patches = 0;
+  for (const TopoDS_Shape& f : del)
+    for (TopExp_Explorer e(f, TopAbs_EDGE); e.More(); e.Next())
+      for (const TopoDS_Shape& g : e2f.FindFromKey(e.Current()))
+      {
+        if (gone.Contains(g) || kept_done.Contains(g))
+          continue;
+        kept_done.Add(g);
+        const TopoDS_Face& F = TopoDS::Face(g);
+        for (TopExp_Explorer w(F, TopAbs_WIRE); w.More(); w.Next())
+        {
+          bool all = true, any = false;
+          for (TopExp_Explorer we(w.Current(), TopAbs_EDGE); we.More() && all; we.Next())
+          {
+            bool shared = false;
+            for (const TopoDS_Shape& h : e2f.FindFromKey(we.Current()))
+              shared = shared || gone.Contains(h);
+            all = all && shared;
+            any = any || shared;
+          }
+          if (!any)
+            continue;
+          if (!all)
+            return std::nullopt;
+          // The hole's patch: the face's surface inside the wire.
+          TopoDS_Face patch = TopoDS::Face(F.EmptyCopied());
+          B.Add(patch, w.Current().Reversed());
+          B.Add(shell, patch);
+          ++patches;
+        }
+      }
+  if (patches == 0)
+    return std::nullopt;
+  // Closed: every edge of the region in two of its faces.
+  {
+    NCollection_IndexedDataMap<TopoDS_Shape, NCollection_List<TopoDS_Shape>, TopTools_ShapeMapHasher> se;
+    TopExp::MapShapesAndAncestors(shell, TopAbs_EDGE, TopAbs_FACE, se);
+    for (int i = 1; i <= se.Extent(); ++i)
+      if (!BRep_Tool::Degenerated(TopoDS::Edge(se.FindKey(i))) && se(i).Extent() != 2)
+        return std::nullopt;
+  }
+  shell.Closed(true);
+  ShapeFix_Shell fs(shell);
+  fs.Perform();
+  TopoDS_Solid region;
+  B.MakeSolid(region);
+  B.Add(region, fs.Shell());
+  BRepLib::OrientClosedSolid(region);
+  if (!BRepCheck_Analyzer(region).IsValid())
+    return std::nullopt;
+  // Material or void: a point just inside the part behind a deleted face.
+  const TopoDS_Face&  f0 = TopoDS::Face(del.front());
+  BRepAdaptor_Surface a(f0);
+  double              u0, u1, v0, v1;
+  BRepTools::UVBounds(f0, u0, u1, v0, v1);
+  gp_Pnt2d uv(0.5 * (u0 + u1), 0.5 * (v0 + v1));
+  {
+    // (A point of the face itself: its middle, else the first inner point of a small grid.)
+    bool in = BRepClass_FaceClassifier(f0, uv, 1e-9).State() == TopAbs_IN;
+    for (int i = 1; i < 8 && !in; ++i)
+      for (int j = 1; j < 8 && !in; ++j)
+      {
+        uv = gp_Pnt2d(u0 + (u1 - u0) * i / 8, v0 + (v1 - v0) * j / 8);
+        in = BRepClass_FaceClassifier(f0, uv, 1e-9).State() == TopAbs_IN;
+      }
+    if (!in)
+      return std::nullopt;
+  }
+  gp_Pnt p;
+  gp_Vec du, dv;
+  a.D1(uv.X(), uv.Y(), p, du, dv);
+  gp_Vec n = du.Crossed(dv);
+  if (n.Magnitude() < 1e-15)
+    return std::nullopt;
+  n.Normalize();
+  if (f0.Orientation() == TopAbs_REVERSED)
+    n.Reverse();
+  Bnd_Box box;
+  BRepBndLib::Add(body, box);
+  const double eps = 1e-6 * std::sqrt(box.SquareExtent());
+  BRepClass3d_SolidClassifier in_region(region, p.Translated(-n * eps), 1e-9);
+  const bool boss = in_region.State() == TopAbs_IN;
+  // The Boolean, then the unify (the patches back into their faces).
+  std::unique_ptr<BRepAlgoAPI_BooleanOperation> op;
+  if (boss)
+    op = std::make_unique<BRepAlgoAPI_Cut>();
+  else
+    op = std::make_unique<BRepAlgoAPI_Fuse>();
+  ShapeList args, tools;
+  args.Append(body);
+  tools.Append(region);
+  op->SetArguments(args);
+  op->SetTools(tools);
+  op->Build(new_cancel_indicator()->Start());
+  if (!op->IsDone() || op->HasErrors())
+    return std::nullopt;
+  HHist        h = history_of({body}, *op);
+  HHist        uh;
+  TopoDS_Shape r = unify_shape(op->Shape(), uh);
+  if (!uh.IsNull())
+    h = compose(body, h, uh);
+  int solids = 0;
+  for (TopExp_Explorer x(r, TopAbs_SOLID); x.More(); x.Next())
+    ++solids;
+  if (solids != 1 || !valid_shape(r))
+    return std::nullopt;
+  for (const TopoDS_Shape& f : del)
+    if (!h->IsRemoved(f) && !h->Modified(f).IsEmpty())
+      return std::nullopt;
+  return std::make_pair(r, h);
+}
+
 static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
 {
   require_non_null(s.shape, "shape");
@@ -8910,9 +9044,19 @@ static OpOut op_defeature_unbudgeted(const OcShape& s, const OcShapeList& faces)
   mk.SetRunParallel(false);
   mk.SetToFillHistory(true);
   mk.Build(new_cancel_indicator()->Start());
+  if (std::getenv("NOSHAPE_DEFEATURE_DEBUG"))
+  {
+    std::fprintf(stderr, "defeature: done %d errors %d warnings %d\n", (int)mk.IsDone(), (int)mk.HasErrors(), (int)mk.HasWarnings());
+    mk.DumpWarnings(std::cerr);
+    mk.DumpErrors(std::cerr);
+  }
   if (!mk.IsDone() || mk.HasErrors())
     fail_op("delete face failed: " + algo_errors(mk));
   std::vector<TopoDS_Shape> args{s.shape};
+  // Not removed: the region the faces enclose, taken away or filled in.
+  if (mk.HasWarning(STANDARD_TYPE(BOPAlgo_AlertUnableToRemoveTheFeature)))
+    if (auto by = defeature_by_region(s.shape, faces.items))
+      return make_result(args, by->first, by->second.get());
   HHist                     h = history_of(args, mk);
   return make_result(args, mk.Shape(), h.get());
 }

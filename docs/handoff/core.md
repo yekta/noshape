@@ -33,6 +33,18 @@ What blend takes over:
 - Face blend's tangent hold lines (c2-variable-fillet-faceblend): the rule asked (REQUESTS core 17:27, open).
 - Live reads procedural blend faces' area 0.22 % low (PARITY-SUITES.md; the harness allows it).
 
+**State 11-09 13:16 UTC: Delete face 1 (lead: start now); feature 15 to bool, fillets' speed noted for blend.**
+- OCCT's defeaturing warns BOPAlgo_AlertUnableToRemoveTheFeature and gives the part back (NOSHAPE_DEFEATURE_DEBUG
+  prints its alerts). features.cpp `defeature_by_region` (worktree): the region the deleted faces enclose with their
+  holes in the kept faces (each hole a patch on its own face: EmptyCopied face + the hole's wire reversed), closed
+  shell -> solid; a point behind a deleted face says boss (cut) or pocket (fuse); then unify_shape. On the dump:
+  17 faces, 94,990.13 -> 71,515.12 mm³ (removes 23,475.01; live 95,009.49 -> 71,534.52 = 23,474.97). Only after
+  OCCT's alert. Kernel 351, model 423; suite the same with and without (suite-df*.log, 787/947), A/B level
+  (ab-df.out); T1 kernel features::deleting_a_boss_through_a_curved_wall_cuts_its_region_away (tests/data/defeature,
+  the dump). The impeller now holds through feature 20 (the 19.4 mm³ / 4 faces carried from feature 15, bool's); next
+  breaks: feature 21 Fillet 1 (R10, one edge: +335 mm³, 21 faces vs 24; blend's, core covering), feature 24
+  Extrude 4 (up to the Shell's offset wall: ERROR "Failed to extrude selections, check input.", core's).
+
 **State 11-09 13:12 UTC: the impeller's slow fillets (lead) are downstream of a broken chain.**
 - Profile: the three fillets fail OCCT whole (as is, scaled) and build by groups (~1 s); written to blend.md.
 - The chain breaks before them: feature 15 Boolean Flansch+Gehäuse 15/41/30 vs live 19/56/39 (live's inner wall JSG

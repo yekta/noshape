@@ -333,6 +333,23 @@ fn delete_and_offset_faces() {
     assert!(matches!(replace_face(&b, &[], &b), Err(KernelError::Unsupported(_))));
 }
 
+/// c2-impeller-loft's Delete face 1 (metres): a Ø20 tube's outer cylinder and end cap, standing out of the housing's
+/// lofted wall. OCCT's defeaturing can't remove them (UnableToRemoveTheFeature) and gives the part back; the region
+/// they enclose with the hole in the wall, cut away: live removes 23,474.97 mm³ (its part 95,009.49 -> 71,534.52;
+/// this one starts 19.4 mm³ lower), 2 faces fewer.
+#[test]
+fn deleting_a_boss_through_a_curved_wall_cuts_its_region_away() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/defeature/impeller-delete-face-1.brep");
+    let s = read_brep(&path).unwrap();
+    let faces = s.faces();
+    let before = s.volume().unwrap() * 1e9;
+    let r = delete_faces(&s, &[faces[16].clone(), faces[18].clone()]).unwrap().shape;
+    assert!(r.is_valid());
+    assert_eq!(r.faces().len(), faces.len() - 2);
+    let removed = before - r.volume().unwrap() * 1e9;
+    assert!((removed - 23_474.97).abs() < 0.5, "{removed} mm³ removed");
+}
+
 #[test]
 fn split_and_section() {
     let b = box10();
