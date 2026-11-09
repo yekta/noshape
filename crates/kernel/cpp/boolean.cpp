@@ -1510,7 +1510,7 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
     for (const TopoDS_Shape& f : after)
     {
       TopLoc_Location l;
-      char            buf[160];
+      char            buf[256];
       double          sx = 0, sy = 0, sz = 0;
       int             nv = 0, ne = 0;
       for (TopExp_Explorer v(f, TopAbs_VERTEX); v.More(); v.Next(), ++nv)
@@ -1524,7 +1524,16 @@ std::optional<double> usd_volume_change(const std::vector<TopoDS_Shape>& sf, con
         ++ne;
       // (The vertices' sum to 1e-9 of the part: the tries' vertices differ in their last bits.)
       const double q = std::max(1e-9 * diag, 1e-15);
-      std::snprintf(buf, sizeof buf, "%p %d %d %d %lld %lld %lld", (const void*)BRep_Tool::Surface(TopoDS::Face(f), l).get(), (int)f.Orientation(), ne, nv, std::llround(sx / q), std::llround(sy / q), std::llround(sz / q));
+      // (Its surface by kind and the point at the middle of its parameters, not by handle: each try's merged faces get
+      // surfaces of their own, so the same merge never matched (cf-surface-pattern's Surface Pattern 3: 13 merged faces,
+      // three tries of each of two unifies, 175 ms a check).)
+      const occ::handle<Geom_Surface> g = BRep_Tool::Surface(TopoDS::Face(f), l);
+      double                          u0 = 0, u1 = 0, v0 = 0, v1 = 0;
+      BRepTools::UVBounds(TopoDS::Face(f), u0, u1, v0, v1);
+      const gp_Pnt mid = g.IsNull() ? gp_Pnt() : g->Value(0.5 * (u0 + u1), 0.5 * (v0 + v1)).Transformed(l.Transformation());
+      const double qm  = std::max(1e-7 * diag, 1e-15);
+      std::snprintf(buf, sizeof buf, "%s %d %d %d %lld %lld %lld %lld %lld %lld", g.IsNull() ? "-" : g->DynamicType()->Name(), (int)f.Orientation(), ne, nv, std::llround(sx / q), std::llround(sy / q),
+                    std::llround(sz / q), std::llround(mid.X() / qm), std::llround(mid.Y() / qm), std::llround(mid.Z() / qm));
       key.made.emplace_back(buf);
     }
     std::sort(key.made.begin(), key.made.end());
