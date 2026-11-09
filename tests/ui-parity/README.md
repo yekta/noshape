@@ -215,7 +215,8 @@ Its state adds `"drawing"` (`null` outside a drawing tab):
 - `selection` is what is drawn in selection colours: `VIEW` for a framed view (selected or hovered), `EDGE` for a view
   whose edges are drawn picked (a dimension tool's picked circle, or a line once it is the second pick; the edge a
   datum is being placed on, or the last surface finish symbol was placed on; a closed broken-out profile; the
-  projection's parent). In a drawing the focus is `other` (live's drawing is an iframe; its context menus are in it
+  projection's parent; an edge clicked in a view, which selects the edge, not its view). A view stays selected through
+  its menu's Copy, Paste, Zoom to fit, Group, Remove from group, Hide auto centermarks and Show all. In a drawing the focus is `other` (live's drawing is an iframe; its context menus are in it
   too, so a drawing's `list` is null while one is open), `field` in a panel's text box.
 - Compared in a drawing state: `drawing` and the keys above but `selection`, `undo` and `assembly` (live's recorder
   reads the main page's, which a drawing's iframe doesn't change: 0 and false throughout). The start's assembly is

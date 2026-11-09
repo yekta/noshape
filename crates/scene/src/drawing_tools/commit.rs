@@ -1270,7 +1270,8 @@ pub fn delete_selection(s: &mut Sheet, sel: &[super::Sel]) {
             }),
             Sel::Table(t) => s.tables.retain(|n| n.id != *t),
             // A hole table's tag axis isn't deleted on its own (live: no Delete in its menu).
-            Sel::HoleAxis(_) => {}
+            // (An edge alone isn't deleted, nor its view.)
+            Sel::HoleAxis(_) | Sel::Edge(..) => {}
             Sel::Sketch(e) => {
                 s.sketch.sketch.remove_entity(noshape_sketch::EntityId(*e));
             }

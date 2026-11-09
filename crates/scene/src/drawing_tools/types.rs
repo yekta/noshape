@@ -234,6 +234,19 @@ pub enum Sel {
     HoleAxis(u64),
     /// A single format line (`build::PickTarget::FormatLine`).
     FormatLine([i64; 4]),
+    /// An edge of a view (its pick's edge index): live selects the edge under the pointer, not its view
+    /// (drw-view-align-vertically, drw-section-edit); otherwise it stands for its view (dragged, its menu).
+    Edge(ViewId, u32),
+}
+
+impl Sel {
+    /// The view this selects, or whose edge it is.
+    pub fn as_view(&self) -> Option<ViewId> {
+        match self {
+            Sel::View(v) | Sel::Edge(v, _) => Some(*v),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

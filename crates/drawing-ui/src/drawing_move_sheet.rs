@@ -57,7 +57,7 @@ impl DrawingEditor {
 
     /// Right-click with several entities selected (live drawing/291).
     pub fn multi_selection_entries(&self, cx: &App) -> Vec<MenuEntry> {
-        let views: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
+        let views: Vec<ViewId> = self.selection.iter().filter_map(|s| s.as_view()).collect();
         if views.len() == self.selection.len() {
             return self.multi_view_entries(views, cx);
         }

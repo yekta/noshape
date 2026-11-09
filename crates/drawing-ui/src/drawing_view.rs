@@ -159,13 +159,16 @@ pub fn fill_os_menu(mut menu: crate::os_menu::OsMenu, entries: &[MenuEntry], ed:
             MenuEntry::Item { label, checked, act, icon, disabled } => {
                 let ed = ed.clone();
                 let act = act.clone();
+                // Live keeps the selection through these (drw-view-zoom-to-fit, -copy-paste, drw-callout-group-view,
+                // -remove-from-group, drw-view-hide-auto-centermarks).
+                let keeps = matches!(label.as_ref(), "Copy" | "Paste" | "Zoom to fit" | "Group" | "Remove from group" | "Hide auto centermarks" | "Show all");
                 let handler: crate::os_ui::ClickHandler = Rc::new(move |_, window, cx| {
                     let act = act.clone();
                     ed.update(cx, |t, cx| {
                         act(t, window, cx);
                         // Live: a menu action that opens nothing leaves nothing selected (a view's Send to back, Show
                         // hidden lines; View properties keeps its view until it closes).
-                        if matches!(t.tool, Tool::Select) && !t.dialog_or_mode_open() && !t.selection.is_empty() {
+                        if !keeps && matches!(t.tool, Tool::Select) && !t.dialog_or_mode_open() && !t.selection.is_empty() {
                             t.selection.clear();
                             t.redraw(cx);
                         }
@@ -852,7 +855,7 @@ impl DrawingEditor {
         self.sheet_rows.retain(|i| *i < n);
         let sheet = &self.drawing.sheets[self.sheet];
         self.selection.retain(|s| match s {
-            Sel::View(v) => sheet.view(*v).is_some(),
+            Sel::View(v) | Sel::Edge(v, _) => sheet.view(*v).is_some(),
             Sel::Annotation(a) => sheet.annotations.iter().any(|x| x.id == *a),
             Sel::Table(t) | Sel::HoleAxis(t) => sheet.table(*t).is_some(),
             Sel::Break(v, i) => sheet.view(*v).is_some_and(|v| *i < v.breaks.len()),

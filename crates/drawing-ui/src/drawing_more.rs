@@ -317,8 +317,8 @@ impl DrawingEditor {
         let sheet = self.drawn_sheet();
         let mut out = Vec::new();
         for s in &self.selection {
-            let Sel::View(v) = s else { continue };
-            let (Some(pts), Some(parent)) = (sheet.section_points(*v), sheet.parent_of(*v)) else { continue };
+            let Some(v) = s.as_view() else { continue };
+            let (Some(pts), Some(parent)) = (sheet.section_points(v), sheet.parent_of(v)) else { continue };
             let Some(pl) = self.placement(parent) else { continue };
             out.extend(pts.iter().map(|p| pl.to_sheet(*p)));
         }
@@ -351,7 +351,7 @@ impl DrawingEditor {
 
     /// Move the selected views (with `id`) to sheet `to` (None = a new sheet).
     pub fn move_selected_views(&mut self, id: ViewId, to: Option<usize>, cx: &mut Context<Self>) {
-        let mut ids: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
+        let mut ids: Vec<ViewId> = self.selection.iter().filter_map(|s| s.as_view()).collect();
         if !ids.contains(&id) {
             ids = vec![id];
         }

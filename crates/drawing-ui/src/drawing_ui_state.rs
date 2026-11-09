@@ -266,6 +266,7 @@ impl DrawingEditor {
         for s in &self.selection {
             match s {
                 Sel::View(id) => selection.push(("VIEW".into(), self.ui_view_name(*id))),
+                Sel::Edge(id, _) => selection.push(("EDGE".into(), self.ui_view_name(*id))),
                 // Live's recorder can't read an annotation's selection (a clicked callout records []: live2's batch
                 // 9 and 10 recordings), so neither side records one.
                 Sel::Annotation(_) => {}

@@ -189,7 +189,7 @@ impl DrawingEditor {
     /// Automatic: number the scope (Preview applies; Undo reverts).
     fn inspection_preview(&mut self, cx: &mut Context<Self>) {
         let Some(d) = &self.inspection else { return };
-        let view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+        let view = self.selection.iter().find_map(|s| s.as_view());
         let scope = match (d.scope, view) {
             (1, _) => Scope::Sheet(self.sheet),
             (2, Some(v)) => Scope::View(self.sheet, v),

@@ -301,7 +301,7 @@ impl DrawingEditor {
     /// The views whose indicator shows its five dots: the view or the
     /// indicator selected, or the indicator hovered (live u-905…907).
     pub fn aux_dot_views(&self) -> Vec<ViewId> {
-        let mut out: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) | Sel::AuxIndicator(v) = s { Some(*v) } else { None }).collect();
+        let mut out: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) | Sel::AuxIndicator(v) | Sel::Edge(v, _) = s { Some(*v) } else { None }).collect();
         if let Some(Sel::AuxIndicator(v)) = self.hover.and_then(|h| self.sel_of_pick(h)) {
             out.push(v);
         }
@@ -361,7 +361,7 @@ impl DrawingEditor {
 
     /// The parent edge of the selected auxiliary views (sheet segments).
     pub fn aux_edge_highlight(&self) -> Vec<([f64; 2], [f64; 2])> {
-        self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).flat_map(|v| self.aux_parent_edge(v)).collect()
+        self.selection.iter().filter_map(|s| s.as_view()).flat_map(|v| self.aux_parent_edge(v)).collect()
     }
 
     /// Auxiliary view `v`'s edge in its parent (sheet segments).

@@ -157,7 +157,7 @@ impl<'a> SheetPick<'a> {
 
     pub fn view_at(&self, s: [f64; 2]) -> Option<ViewId> {
         if let Some(h) = self.hover
-            && let Some(Sel::View(v)) = self.sel_of_pick(h)
+            && let Some(v) = self.sel_of_pick(h).and_then(|s| s.as_view())
         {
             return Some(v);
         }
@@ -181,6 +181,7 @@ impl<'a> SheetPick<'a> {
                 (Sel::AutoCentermark(v, c), PickTarget::AutoCentermark { view, center }) => v == *view && c == *center,
                 (Sel::ViewLabel(v), PickTarget::ViewLabel(w)) | (Sel::AuxIndicator(v), PickTarget::AuxIndicator(w)) => v == *w,
                 (Sel::FormatLine(a), PickTarget::FormatLine(b)) => a == *b,
+                (Sel::Edge(v, e), PickTarget::Edge { view, edge }) => v == *view && e == *edge,
                 _ => false,
             })
             .map(|(i, _)| i as u32)
@@ -190,7 +191,8 @@ impl<'a> SheetPick<'a> {
     /// The selectable entity a pick id belongs to.
     pub fn sel_of_pick(&self, pick: u32) -> Option<Sel> {
         match self.built?.picks.get(pick as usize)? {
-            PickTarget::View(v) | PickTarget::Edge { view: v, .. } | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
+            PickTarget::Edge { view, edge } => Some(Sel::Edge(*view, *edge)),
+            PickTarget::View(v) | PickTarget::SectionLine(v) | PickTarget::DetailCircle(v) | PickTarget::BrokenOut { view: v, .. } => Some(Sel::View(*v)),
             PickTarget::Annotation(a) | PickTarget::Inspection(a) => Some(Sel::Annotation(*a)),
             PickTarget::Table(t) => Some(Sel::Table(*t)),
             PickTarget::HoleAxis(t) => Some(Sel::HoleAxis(*t)),

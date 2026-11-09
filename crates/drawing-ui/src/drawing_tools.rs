@@ -62,7 +62,7 @@ impl DrawingEditor {
             self.tool = tool;
         }
         // Tools that start from the selected view.
-        let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+        let sel_view = self.selection.iter().find_map(|s| s.as_view());
         match &mut self.tool {
             Tool::Projected { parent }
             | Tool::Section { parent, .. }
@@ -1789,7 +1789,7 @@ impl DrawingEditor {
                     s.tables.push(t);
                 }
             }),
-            Sel::View(id) => {
+            Sel::View(id) | Sel::Edge(id, _) => {
                 if let Ok(clip) = self.drawing.copy_views(self.sheet, &[id], Some(&self.sources)) {
                     self.edit_sheet("Copy view", cx, |s| {
                         // The copy keeps the original's place: paste around the same center.
@@ -1838,7 +1838,8 @@ impl DrawingEditor {
         }
         let sheet = &self.drawing.sheets[self.sheet];
         match sel {
-            Sel::View(id) => {
+            // (Live: a view moves by its edges too.)
+            Sel::View(id) | Sel::Edge(id, _) => {
                 // Move the view with all views derived from it; a projected
                 // (or section/auxiliary) view slides along its alignment axis.
                 // Views with "Suppress alignment with parent" stay where they are.
@@ -2251,7 +2252,7 @@ impl DrawingEditor {
             return out;
         }
         match sel {
-            Some(Sel::View(id)) => out = self.onshape_view_entries(id, cx),
+            Some(Sel::View(id) | Sel::Edge(id, _)) => out = self.onshape_view_entries(id, cx),
             Some(Sel::AuxIndicator(id)) => return Self::aux_indicator_entries(id, crate::drawing_props::paste_entry(cx)),
             // A hole table's tag axis (help drawing_hole_table): Hole table
             // properties, Flip X direction, Flip Y direction | Clear
@@ -2336,7 +2337,7 @@ impl DrawingEditor {
                     let a2 = a.clone();
                     let edit = MenuEntry::item("Edit...", move |t, w, cx| t.open_annotation_panel(&a2, w, cx));
                     let mut own = self.annotation_more_entries(a);
-                    let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+                    let sel_view = self.selection.iter().find_map(|s| s.as_view());
                     if a.view_group.is_some() {
                         own.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| group_with_view(s, &[id], None))));
                     } else if let Some(v) = sel_view {
@@ -2448,7 +2449,7 @@ impl DrawingEditor {
                     // Group / Remove from group (with a selected view), Group
                     // annotation / Remove annotation from group (notes, callouts).
                     if matches!(a.kind, AnnotationKind::Note { .. } | AnnotationKind::Balloon { .. }) {
-                        let sel_view = self.selection.iter().find_map(|s| if let Sel::View(v) = s { Some(*v) } else { None });
+                        let sel_view = self.selection.iter().find_map(|s| s.as_view());
                         let anns: Vec<u64> = self.selection.iter().filter_map(|s| if let Sel::Annotation(x) = s { Some(*x) } else { None }).chain([id]).collect();
                         if a.view_group.is_some() {
                             out.push(MenuEntry::item("Remove from group", move |t, _, cx| t.edit_sheet("Remove from group", cx, |s| noshape_scene::drawing_tools::annotation_edit::group_with_view(s, &[id], None))));

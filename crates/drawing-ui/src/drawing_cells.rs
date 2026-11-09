@@ -88,12 +88,12 @@ impl DrawingEditor {
                 None => all_in.push((sel, ok)),
             };
             for l in built.geometry.lines.iter().filter(|l| l.pick != 0) {
-                if let Some(sel) = self.sel_of_pick(l.pick).filter(|s| !matches!(s, Sel::View(_))) {
+                if let Some(sel) = self.sel_of_pick(l.pick).filter(|s| !matches!(s, Sel::View(_) | Sel::Edge(..))) {
                     note(sel, l.points.iter().all(|p| inside(*p)));
                 }
             }
             for t in built.geometry.texts.iter().filter(|t| t.pick != 0) {
-                if let Some(sel) = self.sel_of_pick(t.pick).filter(|s| !matches!(s, Sel::View(_))) {
+                if let Some(sel) = self.sel_of_pick(t.pick).filter(|s| !matches!(s, Sel::View(_) | Sel::Edge(..))) {
                     note(sel, inside(t.pos));
                 }
             }

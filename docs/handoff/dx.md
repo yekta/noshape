@@ -11,6 +11,18 @@ Setup: worktree /root/projects/noshape-wt/dx (branch agent/dx), env in /root/dx-
 (target id in /root/dx-scratch/live/.dx-tab).
 
 
+## 11-09 01:14 UTC: drawing interaction (lead): 121 → 123/176 scenarios, 1248 → 1253/1409 states
+
+- 37 of the 54 failing first differ in `drawing.selection` (live's recorder reads selection colours, README
+  "### Drawings"). Done: an edge clicked in a view is its own selection (`Sel::Edge`, EDGE; it moves, opens and menus
+  as its view); a view stays selected through its menu's Copy, Paste, Zoom to fit, Group, Remove from group, Hide
+  auto centermarks, Show all (live 2068 recordings, row by row).
+- Left, not understood yet: live reports EDGE after a right-click at the middle of Top, Section, Auxiliary (a plain
+  block: no edge there; Front gives VIEW), after a crop profile closes, a datum target's corner, a format painter
+  click, Escape after a max / min dimension; counting every hovered edge as EDGE is wrong (89/176). A question to
+  live2 on how its recorder decides EDGE would settle it. Also the Sheets panel rows' right-click (live's selection
+  is an edge of the view behind the panel: its runner's click reaches the drawing?).
+
 ## 11-09 00:09 UTC: data exchange (lead): "live imports ours" first, then "ours imports live's", then drawings
 
 - **Notes kept open (lead 11-08):** clamp-hms Medium is 34,712 triangles for live's 34,732 (−0.058 %, the 0.05 %

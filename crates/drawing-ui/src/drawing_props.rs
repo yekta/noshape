@@ -403,7 +403,7 @@ impl DrawingEditor {
     /// Copy (view menu, Ctrl+C): the selected views (or `id`) with their
     /// derived views, annotations and tables.
     pub fn copy_views(&mut self, id: Option<ViewId>, cx: &mut Context<Self>) {
-        let mut ids: Vec<ViewId> = self.selection.iter().filter_map(|s| if let Sel::View(v) = s { Some(*v) } else { None }).collect();
+        let mut ids: Vec<ViewId> = self.selection.iter().filter_map(|s| s.as_view()).collect();
         if let Some(id) = id.filter(|i| !ids.contains(i)) {
             ids = vec![id];
         }
@@ -471,7 +471,7 @@ impl DrawingEditor {
     pub fn align_views_click(&mut self, cx: &mut Context<Self>) -> bool {
         let Some((id, vertical)) = self.align_views.take() else { return false };
         self.update_hover(cx);
-        let target = self.sel_at(self.hover, self.cursor).and_then(|s| if let Sel::View(v) = s { Some(v) } else { None });
+        let target = self.sel_at(self.hover, self.cursor).and_then(|s| s.as_view());
         match target.and_then(|t| self.current_sheet().view(t)).map(|t| t.position) {
             Some(to) if target != Some(id) => {
                 self.edit_view("Align views", id, cx, |v| noshape_scene::drawing_tools::view_edit::align_view(v, to, vertical));
